@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
 
     const settingsMap: Record<string, unknown> = {};
     for (const row of settings ?? []) {
-      settingsMap[row.key] = row.value;
+      // Handle double-serialized JSON (string instead of object)
+      settingsMap[row.key] = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
     }
 
     const hours = settingsMap.business_hours as Record<

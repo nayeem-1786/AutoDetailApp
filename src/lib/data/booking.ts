@@ -215,7 +215,9 @@ export async function getBusinessHours(): Promise<BusinessHours> {
     };
   }
 
-  return data.value as BusinessHours;
+  // Handle double-serialized JSON (string instead of object)
+  const val = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+  return val as BusinessHours;
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +241,9 @@ export async function getBookingConfig(): Promise<BookingConfig> {
     };
   }
 
-  return data.value as BookingConfig;
+  // Handle double-serialized JSON (string instead of object)
+  const val = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+  return val as BookingConfig;
 }
 
 // ---------------------------------------------------------------------------
