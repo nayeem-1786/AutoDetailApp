@@ -14,7 +14,7 @@ export interface AppointmentService {
 export interface AppointmentWithRelations extends Appointment {
   customer: Pick<Customer, 'id' | 'first_name' | 'last_name' | 'phone' | 'email'>;
   vehicle: Pick<Vehicle, 'id' | 'year' | 'make' | 'model' | 'color'> | null;
-  employee: Pick<Employee, 'id' | 'first_name' | 'last_name'> | null;
+  employee: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'> | null;
   appointment_services: AppointmentService[];
 }
 

@@ -21,7 +21,7 @@ export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [employees, setEmployees] = useState<Pick<Employee, 'id' | 'first_name' | 'last_name'>[]>([]);
+  const [employees, setEmployees] = useState<Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'>[]>([]);
 
   // Dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -50,7 +50,7 @@ export default function AppointmentsPage() {
         *,
         customer:customers!customer_id(id, first_name, last_name, phone, email),
         vehicle:vehicles!vehicle_id(id, year, make, model, color),
-        employee:employees!employee_id(id, first_name, last_name),
+        employee:employees!employee_id(id, first_name, last_name, role),
         appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
       `)
       .gte('scheduled_date', monthStart)
@@ -72,9 +72,8 @@ export default function AppointmentsPage() {
   const fetchEmployees = useCallback(async () => {
     const { data } = await supabase
       .from('employees')
-      .select('id, first_name, last_name')
+      .select('id, first_name, last_name, role')
       .eq('status', 'active')
-      .eq('bookable_for_appointments', true)
       .order('first_name');
 
     if (data) setEmployees(data);

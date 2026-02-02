@@ -17,16 +17,23 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { appointmentUpdateSchema, type AppointmentUpdateInput } from '@/lib/utils/validation';
-import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
+import { APPOINTMENT_STATUS_LABELS, ROLE_LABELS } from '@/lib/utils/constants';
 import { STATUS_TRANSITIONS } from '../types';
 import type { AppointmentWithRelations } from '../types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
+
+const CHANNEL_LABELS: Record<string, string> = {
+  online: 'Client (Online Booking)',
+  portal: 'Client (Customer Portal)',
+  phone: 'Staff (Phone)',
+  walk_in: 'Staff (Walk-in)',
+};
 
 interface EditAppointmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appointment: AppointmentWithRelations | null;
-  employees: Pick<Employee, 'id' | 'first_name' | 'last_name'>[];
+  employees: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'>[];
   onSave: (id: string, data: AppointmentUpdateInput) => Promise<boolean>;
 }
 
@@ -83,6 +90,8 @@ export function EditAppointmentDialog({
         <DialogTitle>Edit Appointment</DialogTitle>
         <DialogDescription>
           {appointment.customer.first_name} {appointment.customer.last_name}
+          {' — Booked by: '}
+          {CHANNEL_LABELS[appointment.channel] || appointment.channel}
         </DialogDescription>
       </DialogHeader>
       <DialogContent>
@@ -109,12 +118,12 @@ export function EditAppointmentDialog({
             </FormField>
           </div>
 
-          <FormField label="Assigned Employee" error={errors.employee_id?.message} htmlFor="edit-employee">
+          <FormField label="Assigned Detailer" error={errors.employee_id?.message} htmlFor="edit-employee">
             <Select id="edit-employee" {...register('employee_id')}>
               <option value="">Unassigned</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.first_name} {emp.last_name}
+                  {emp.first_name} {emp.last_name} ({ROLE_LABELS[emp.role] || emp.role})
                 </option>
               ))}
             </Select>
