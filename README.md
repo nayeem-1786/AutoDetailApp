@@ -68,7 +68,7 @@ src/
 │   └── ui/                  — Reusable UI component library (22)
 ├── lib/
 │   ├── auth/                — AuthProvider, permissions, roles
-│   ├── data/                — Server-side data fetching (services, products)
+│   ├── data/                — Server-side data fetching (services, products, business settings)
 │   ├── hooks/               — Client hooks (feature flags, permissions)
 │   ├── seo/                 — JSON-LD generators, metadata helpers
 │   ├── supabase/            — Client initialization (server, browser, admin, anon)
@@ -78,7 +78,7 @@ src/
 
 ## Database
 
-37 tables managed via sequential Supabase migrations in `supabase/migrations/`. Key tables:
+38 tables managed via sequential Supabase migrations in `supabase/migrations/`. Key tables:
 
 - **services** / **service_categories** — 30 services across 7 categories with 6 pricing models
 - **service_pricing** — Tiered pricing with vehicle-size-aware options
@@ -88,6 +88,7 @@ src/
 - **appointments** — Scheduling with mobile zone support
 - **transactions** / **payments** — POS with Stripe integration
 - **feature_flags** — Database-driven feature toggles
+- **business_settings** — Key-value store for business profile (name, phone, address, hours); public pages read from this at render time
 
 ## Getting Started
 
