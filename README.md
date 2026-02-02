@@ -43,11 +43,13 @@ src/app/(public)/
 
 ### Admin Dashboard (`/admin/*`)
 
-Role-based management interface behind Supabase Auth. Sidebar navigation with modules for catalog management, customers, inventory, staff, appointments, and settings.
+Role-based management interface behind Supabase Auth. Sidebar navigation with modules for catalog management, customers, inventory, staff, appointments, and settings. Header bar includes an account dropdown (initials avatar, name, email, role, status, sign out) on all pages.
 
 **Dashboard Home** — Today's appointments snapshot with status breakdown (remaining, in progress, completed), today's schedule list, pending-confirmation alerts, and role-appropriate quick actions.
 
-**Appointments** — Month calendar with status-colored dots, day appointment list panel, detail/edit dialog (status, reschedule, assign detailer, job notes), and cancel dialog with reason and fee. Role-based permissions: detailers see today's schedule only, cashiers cannot cancel appointments, admin/super-admin have full access.
+**Appointments** — Month calendar with status-colored dots, day appointment list panel, detail/edit dialog (status, reschedule, assign detailer, job notes), and cancel dialog with reason and fee. Status dropdown shows recommended transitions with an "Override" group for staff flexibility. Role-based permissions: detailers see today's schedule only, cashiers cannot cancel appointments, admin/super-admin have full access.
+
+**Staff** — Team member management with profile editing, role reassignment (Super Admin, Admin, Cashier, Detailer), bookable status toggle, and granular per-employee permission overrides.
 
 **Online Booking** (`/book`) — Public-facing booking page with service selection, vehicle info, date/time picker, customer info, and Stripe payment integration.
 
