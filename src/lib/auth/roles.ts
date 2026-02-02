@@ -15,6 +15,7 @@ export const ROUTE_ACCESS: Record<string, UserRole[]> = {
   '/admin/catalog/categories': ['super_admin', 'admin'],
   '/admin/inventory': ['super_admin', 'admin'],
   '/admin/inventory/vendors': ['super_admin', 'admin'],
+  '/admin/appointments': ['super_admin', 'admin', 'cashier', 'detailer'],
   '/admin/customers': ['super_admin', 'admin', 'cashier'],
   '/admin/staff': ['super_admin'],
   '/admin/migration': ['super_admin'],
@@ -34,6 +35,12 @@ export const SIDEBAR_NAV: NavItem[] = [
     label: 'Dashboard',
     href: '/admin',
     icon: 'LayoutDashboard',
+    roles: ['super_admin', 'admin', 'cashier', 'detailer'],
+  },
+  {
+    label: 'Appointments',
+    href: '/admin/appointments',
+    icon: 'CalendarDays',
     roles: ['super_admin', 'admin', 'cashier', 'detailer'],
   },
   {

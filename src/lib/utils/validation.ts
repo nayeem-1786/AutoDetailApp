@@ -292,6 +292,23 @@ export const customerProfileSchema = z.object({
   email_consent: z.boolean(),
 });
 
+// Appointment update schema (admin edit)
+export const appointmentUpdateSchema = z.object({
+  status: z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show']).optional(),
+  scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format').optional(),
+  scheduled_start_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional(),
+  scheduled_end_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional(),
+  employee_id: z.string().uuid().optional().nullable(),
+  job_notes: optionalString,
+  internal_notes: optionalString,
+});
+
+// Appointment cancel schema
+export const appointmentCancelSchema = z.object({
+  cancellation_reason: z.string().min(1, 'Cancellation reason is required'),
+  cancellation_fee: z.number().min(0, 'Must be 0 or greater').optional().nullable(),
+});
+
 // Type inference helpers
 export type BookingCustomerInput = z.infer<typeof bookingCustomerSchema>;
 export type BookingVehicleInput = z.infer<typeof bookingVehicleSchema>;
@@ -319,3 +336,5 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type CouponInput = z.infer<typeof couponSchema>;
 export type CustomerSignupInput = z.infer<typeof customerSignupSchema>;
 export type CustomerProfileInput = z.infer<typeof customerProfileSchema>;
+export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
+export type AppointmentCancelInput = z.infer<typeof appointmentCancelSchema>;

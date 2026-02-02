@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils/cn';
 import {
   LayoutDashboard,
+  CalendarDays,
   Users,
   Package,
   ShoppingBag,
@@ -29,6 +30,7 @@ import type { LucideIcon } from 'lucide-react';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
+  CalendarDays,
   Users,
   Package,
   ShoppingBag,
