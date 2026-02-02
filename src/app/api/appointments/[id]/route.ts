@@ -2,16 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { appointmentUpdateSchema } from '@/lib/utils/validation';
 import { APPOINTMENT } from '@/lib/utils/constants';
-import type { AppointmentStatus } from '@/lib/supabase/types';
-
-const STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
-  pending: ['confirmed', 'cancelled', 'no_show'],
-  confirmed: ['in_progress', 'cancelled', 'no_show'],
-  in_progress: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-  no_show: [],
-};
 
 export async function PATCH(
   request: NextRequest,
@@ -44,17 +34,6 @@ export async function PATCH(
         { error: 'Appointment not found' },
         { status: 404 }
       );
-    }
-
-    // Validate status transition if status is changing
-    if (data.status && data.status !== current.status) {
-      const allowed = STATUS_TRANSITIONS[current.status as AppointmentStatus];
-      if (!allowed.includes(data.status)) {
-        return NextResponse.json(
-          { error: `Cannot transition from ${current.status} to ${data.status}` },
-          { status: 400 }
-        );
-      }
     }
 
     // Overlap check if date/time is changing
