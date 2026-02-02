@@ -30,8 +30,11 @@ export function ServicePricingDisplay({ service }: ServicePricingDisplayProps) {
 }
 
 function VehicleSizePricing({ service }: { service: Service }) {
-  const tier = service.pricing?.[0];
-  if (!tier) {
+  const tiers = service.pricing
+    ? [...service.pricing].sort((a, b) => a.display_order - b.display_order)
+    : [];
+
+  if (tiers.length === 0) {
     return <p className="text-sm text-gray-500">Contact us for pricing.</p>;
   }
 
@@ -40,34 +43,20 @@ function VehicleSizePricing({ service }: { service: Service }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200">
-            <th className="px-4 py-3 text-left font-semibold text-gray-900">
-              Sedan
-            </th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-900">
-              Truck / SUV
-            </th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-900">
-              SUV / Van
-            </th>
+            {tiers.map((tier) => (
+              <th key={tier.id} className="px-4 py-3 text-left font-semibold text-gray-900">
+                {tier.tier_label ?? tier.tier_name}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td className="px-4 py-3 font-medium text-gray-900">
-              {tier.vehicle_size_sedan_price !== null
-                ? formatCurrency(tier.vehicle_size_sedan_price)
-                : '--'}
-            </td>
-            <td className="px-4 py-3 font-medium text-gray-900">
-              {tier.vehicle_size_truck_suv_price !== null
-                ? formatCurrency(tier.vehicle_size_truck_suv_price)
-                : '--'}
-            </td>
-            <td className="px-4 py-3 font-medium text-gray-900">
-              {tier.vehicle_size_suv_van_price !== null
-                ? formatCurrency(tier.vehicle_size_suv_van_price)
-                : '--'}
-            </td>
+            {tiers.map((tier) => (
+              <td key={tier.id} className="px-4 py-3 font-medium text-gray-900">
+                {formatCurrency(tier.price)}
+              </td>
+            ))}
           </tr>
         </tbody>
       </table>
