@@ -20,6 +20,7 @@ import { FormField } from '@/components/ui/form-field';
 import { formatTime, formatCurrency, formatPhone } from '@/lib/utils/format';
 import { appointmentUpdateSchema, type AppointmentUpdateInput } from '@/lib/utils/validation';
 import { APPOINTMENT_STATUS_LABELS, ROLE_LABELS } from '@/lib/utils/constants';
+import { STATUS_TRANSITIONS } from '../types';
 import type { AppointmentWithRelations } from '../types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
@@ -88,6 +89,8 @@ export function AppointmentDetailDialog({
   if (!appointment) return null;
 
   const allStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
+  const recommendedStatuses = [appointment.status, ...STATUS_TRANSITIONS[appointment.status]];
+  const overrideStatuses = allStatuses.filter((s) => !recommendedStatuses.includes(s));
   const showCancelButton =
     canCancel && appointment.status !== 'cancelled';
   const services = appointment.appointment_services;
@@ -194,11 +197,20 @@ export function AppointmentDetailDialog({
           <div className={canReschedule ? 'grid grid-cols-2 gap-3' : ''}>
             <FormField label="Status" error={errors.status?.message} htmlFor="detail-status">
               <Select id="detail-status" {...register('status')}>
-                {allStatuses.map((s) => (
+                {recommendedStatuses.map((s) => (
                   <option key={s} value={s}>
                     {APPOINTMENT_STATUS_LABELS[s]}
                   </option>
                 ))}
+                {overrideStatuses.length > 0 && (
+                  <optgroup label="Override">
+                    {overrideStatuses.map((s) => (
+                      <option key={s} value={s}>
+                        {APPOINTMENT_STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </Select>
             </FormField>
 
