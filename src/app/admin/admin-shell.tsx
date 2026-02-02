@@ -27,6 +27,7 @@ import {
   X,
   CircleUser,
   Shield,
+  MonitorSmartphone,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/utils/constants';
@@ -273,8 +274,19 @@ function AdminContent({ children }: { children: React.ReactNode }) {
               ))}
           </nav>
 
+          {/* Open POS */}
+          <a
+            href="/pos"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          >
+            <MonitorSmartphone className="h-4 w-4" />
+            <span className="hidden sm:inline">Open POS</span>
+          </a>
+
           {/* Account dropdown */}
-          <div className="relative ml-auto" ref={accountRef}>
+          <div className="relative" ref={accountRef}>
             <button
               onClick={() => setAccountOpen((prev) => !prev)}
               className="flex items-center gap-2 rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
