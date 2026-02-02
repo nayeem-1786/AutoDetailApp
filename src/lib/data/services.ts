@@ -153,7 +153,7 @@ export async function getServiceBySlug(
       `*,
       service_pricing(*),
       service_categories!inner(*),
-      service_addon_suggestions(
+      service_addon_suggestions!service_addon_suggestions_primary_service_id_fkey(
         *,
         addon_service:services!service_addon_suggestions_addon_service_id_fkey(
           id, name, slug, description, pricing_model, flat_price, custom_starting_price
