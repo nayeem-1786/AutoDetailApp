@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/book', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt'];
+const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,6 +19,14 @@ export async function middleware(request: NextRequest) {
   if (!user && pathname.startsWith('/admin')) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // Customer portal: redirect unauthenticated users to signin
+  if (!user && pathname.startsWith('/account')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/signin';
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }

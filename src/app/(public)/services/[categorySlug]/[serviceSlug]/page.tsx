@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Clock, Truck, Tag, ArrowRight } from 'lucide-react';
+import { Clock, Truck, Tag, ArrowRight, CalendarDays } from 'lucide-react';
 import {
   getServiceBySlug,
   getAllServicesForSitemap,
@@ -167,6 +167,19 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                       <dd className="mt-1 text-sm text-gray-900">
                         {service.special_requirements}
                       </dd>
+                    </div>
+                  )}
+
+                  {/* Book This Service CTA */}
+                  {service.online_bookable && (
+                    <div className="border-t border-gray-200 pt-4">
+                      <Link
+                        href={`/book?service=${service.slug}`}
+                        className="flex w-full items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+                      >
+                        <CalendarDays className="h-4 w-4" />
+                        Book This Service
+                      </Link>
                     </div>
                   )}
                 </dl>

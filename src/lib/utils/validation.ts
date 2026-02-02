@@ -206,7 +206,98 @@ export const couponSchema = z.object({
   customer_id: z.string().uuid().optional().nullable(),
 });
 
+// ---------------------------------------------------------------------------
+// Booking schemas (online booking wizard)
+// ---------------------------------------------------------------------------
+
+// Phone required for booking (must be (XXX) XXX-XXXX format)
+const bookingPhoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/;
+
+export const bookingCustomerSchema = z.object({
+  first_name: requiredString,
+  last_name: requiredString,
+  phone: z.string().regex(bookingPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  email: z.string().email('Invalid email address'),
+});
+
+export const bookingVehicleSchema = z.object({
+  vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
+  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
+  make: optionalString,
+  model: optionalString,
+  color: optionalString,
+});
+
+export const bookingAddonSchema = z.object({
+  service_id: z.string().uuid(),
+  name: z.string(),
+  price: positiveNumber,
+  tier_name: z.string().optional().nullable(),
+});
+
+export const bookingSubmitSchema = z.object({
+  service_id: z.string().uuid(),
+  tier_name: z.string().optional().nullable(),
+  price: positiveNumber,
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+  time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
+  duration_minutes: z.coerce.number().int().min(1),
+  is_mobile: z.boolean().default(false),
+  mobile_zone_id: z.string().uuid().optional().nullable(),
+  mobile_address: z.string().optional().nullable(),
+  mobile_surcharge: positiveNumber.default(0),
+  customer: bookingCustomerSchema,
+  vehicle: bookingVehicleSchema,
+  addons: z.array(bookingAddonSchema).default([]),
+  notes: optionalString,
+  channel: z.enum(['online', 'portal']).default('online'),
+});
+
+// Business hours day schema (open/close times or null for closed)
+const dayHoursSchema = z.object({
+  open: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format'),
+  close: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format'),
+}).nullable();
+
+export const businessHoursSchema = z.object({
+  monday: dayHoursSchema,
+  tuesday: dayHoursSchema,
+  wednesday: dayHoursSchema,
+  thursday: dayHoursSchema,
+  friday: dayHoursSchema,
+  saturday: dayHoursSchema,
+  sunday: dayHoursSchema,
+});
+
+// Customer signup schema (customer portal registration)
+export const customerSignupSchema = z.object({
+  first_name: requiredString,
+  last_name: requiredString,
+  email: z.string().email('Invalid email address'),
+  phone: z.string().regex(bookingPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirm_password: z.string().min(1, 'Please confirm your password'),
+}).refine((data) => data.password === data.confirm_password, {
+  message: 'Passwords do not match',
+  path: ['confirm_password'],
+});
+
+// Customer profile update schema (portal profile edit)
+export const customerProfileSchema = z.object({
+  first_name: requiredString,
+  last_name: requiredString,
+  phone: z.string().regex(bookingPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  sms_consent: z.boolean(),
+  email_consent: z.boolean(),
+});
+
 // Type inference helpers
+export type BookingCustomerInput = z.infer<typeof bookingCustomerSchema>;
+export type BookingVehicleInput = z.infer<typeof bookingVehicleSchema>;
+export type BookingAddonInput = z.infer<typeof bookingAddonSchema>;
+export type BookingSubmitInput = z.infer<typeof bookingSubmitSchema>;
+export type BusinessHoursInput = z.infer<typeof businessHoursSchema>;
 export type EmployeeCreateInput = z.infer<typeof employeeCreateSchema>;
 export type EmployeeUpdateInput = z.infer<typeof employeeUpdateSchema>;
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
@@ -226,3 +317,5 @@ export type BusinessProfileInput = z.infer<typeof businessProfileSchema>;
 export type TaxConfigInput = z.infer<typeof taxConfigSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CouponInput = z.infer<typeof couponSchema>;
+export type CustomerSignupInput = z.infer<typeof customerSignupSchema>;
+export type CustomerProfileInput = z.infer<typeof customerProfileSchema>;

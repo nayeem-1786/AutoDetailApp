@@ -4,19 +4,43 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { createClient } from '@/lib/supabase/client';
-import { businessProfileSchema, type BusinessProfileInput } from '@/lib/utils/validation';
+import { businessProfileSchema, businessHoursSchema, type BusinessProfileInput, type BusinessHoursInput } from '@/lib/utils/validation';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { toast } from 'sonner';
 
+const DAY_LABELS = [
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+  { key: 'saturday', label: 'Saturday' },
+  { key: 'sunday', label: 'Sunday' },
+] as const;
+
+type DayKey = typeof DAY_LABELS[number]['key'];
+
 export default function BusinessProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingHours, setSavingHours] = useState(false);
+  const [hours, setHours] = useState<BusinessHoursInput>({
+    monday: { open: '08:00', close: '18:00' },
+    tuesday: { open: '08:00', close: '18:00' },
+    wednesday: { open: '08:00', close: '18:00' },
+    thursday: { open: '08:00', close: '18:00' },
+    friday: { open: '08:00', close: '18:00' },
+    saturday: { open: '08:00', close: '18:00' },
+    sunday: null,
+  });
+  const [hoursDirty, setHoursDirty] = useState(false);
 
   const {
     register,
@@ -45,7 +69,7 @@ export default function BusinessProfilePage() {
       const { data, error } = await supabase
         .from('business_settings')
         .select('key, value')
-        .in('key', ['business_name', 'business_phone', 'business_address']);
+        .in('key', ['business_name', 'business_phone', 'business_address', 'business_hours']);
 
       if (error) {
         toast.error('Failed to load business settings', {
@@ -74,6 +98,14 @@ export default function BusinessProfilePage() {
           zip: '',
         },
       });
+
+      // Load business hours
+      if (settings.business_hours) {
+        const parsed = businessHoursSchema.safeParse(settings.business_hours);
+        if (parsed.success) {
+          setHours(parsed.data);
+        }
+      }
 
       setLoading(false);
     }
@@ -129,6 +161,52 @@ export default function BusinessProfilePage() {
         </div>
       </div>
     );
+  }
+
+  function toggleDayOpen(day: DayKey) {
+    setHours((prev) => ({
+      ...prev,
+      [day]: prev[day] ? null : { open: '08:00', close: '18:00' },
+    }));
+    setHoursDirty(true);
+  }
+
+  function updateDayTime(day: DayKey, field: 'open' | 'close', value: string) {
+    setHours((prev) => {
+      const current = prev[day];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [day]: { ...current, [field]: value },
+      };
+    });
+    setHoursDirty(true);
+  }
+
+  async function saveHours() {
+    setSavingHours(true);
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from('business_settings')
+      .upsert(
+        {
+          key: 'business_hours',
+          value: hours as unknown,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      );
+
+    if (error) {
+      toast.error('Failed to save business hours', {
+        description: error.message,
+      });
+    } else {
+      toast.success('Business hours updated');
+      setHoursDirty(false);
+    }
+    setSavingHours(false);
   }
 
   return (
@@ -244,6 +322,67 @@ export default function BusinessProfilePage() {
           </CardContent>
         </Card>
       </form>
+
+      {/* Business Hours */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Business Hours</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {DAY_LABELS.map(({ key, label }) => {
+            const dayHours = hours[key];
+            const isOpen = dayHours !== null;
+
+            return (
+              <div
+                key={key}
+                className="flex items-center gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0"
+              >
+                <div className="w-28 text-sm font-medium text-gray-700">
+                  {label}
+                </div>
+                <Switch
+                  checked={isOpen}
+                  onCheckedChange={() => toggleDayOpen(key)}
+                />
+                {isOpen && dayHours ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="time"
+                      value={dayHours.open}
+                      onChange={(e) =>
+                        updateDayTime(key, 'open', e.target.value)
+                      }
+                      className="w-32"
+                    />
+                    <span className="text-sm text-gray-500">to</span>
+                    <Input
+                      type="time"
+                      value={dayHours.close}
+                      onChange={(e) =>
+                        updateDayTime(key, 'close', e.target.value)
+                      }
+                      className="w-32"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-400">Closed</span>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="flex justify-end border-t border-gray-200 pt-4">
+            <Button
+              type="button"
+              onClick={saveHours}
+              disabled={savingHours || !hoursDirty}
+            >
+              {savingHours ? 'Saving...' : 'Save Hours'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

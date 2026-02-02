@@ -1,11 +1,31 @@
 import Link from 'next/link';
-import { Phone } from 'lucide-react';
+import { Phone, User } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatPhone, phoneToE164 } from '@/lib/utils/format';
+import { createClient } from '@/lib/supabase/server';
 
 export async function SiteHeader() {
   const biz = await getBusinessInfo();
+
+  // Check if the current user is a customer (for "My Account" / "Sign In" link)
+  let isCustomer = false;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+      isCustomer = !!cust;
+    }
+  } catch {
+    // Not authenticated or server component without cookies — ignore
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
@@ -52,6 +72,20 @@ export async function SiteHeader() {
           >
             <Phone className="h-5 w-5" />
           </a>
+          <Link
+            href={isCustomer ? '/account' : '/signin'}
+            className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <User className="h-4 w-4" />
+            <span>{isCustomer ? 'My Account' : 'Sign In'}</span>
+          </Link>
+          <Link
+            href={isCustomer ? '/account' : '/signin'}
+            className="inline-flex sm:hidden items-center justify-center h-9 w-9 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label={isCustomer ? 'My Account' : 'Sign In'}
+          >
+            <User className="h-5 w-5" />
+          </Link>
           <Link
             href="/book"
             className={cn(
