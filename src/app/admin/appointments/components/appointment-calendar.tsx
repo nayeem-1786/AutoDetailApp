@@ -105,7 +105,7 @@ export function AppointmentCalendar({
               type="button"
               onClick={() => onDateSelect(day)}
               className={cn(
-                'flex h-14 flex-col items-center justify-start gap-0.5 rounded-md pt-1 text-sm transition-colors',
+                'flex h-14 flex-col items-center justify-center gap-0.5 rounded-md text-sm transition-colors',
                 !inMonth && 'text-gray-300',
                 inMonth && !selected && 'text-gray-900 hover:bg-gray-100',
                 selected && 'bg-gray-900 text-white',

@@ -8,10 +8,10 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Spinner } from '@/components/ui/spinner';
 import { AppointmentCalendar } from './components/appointment-calendar';
 import { DayAppointmentsList } from './components/day-appointments-list';
-import { EditAppointmentDialog } from './components/edit-appointment-dialog';
+import { AppointmentDetailDialog } from './components/appointment-detail-dialog';
 import { CancelAppointmentDialog } from './components/cancel-appointment-dialog';
 import type { AppointmentWithRelations } from './types';
-import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
+import type { Employee } from '@/lib/supabase/types';
 import type { AppointmentUpdateInput, AppointmentCancelInput } from '@/lib/utils/validation';
 
 export default function AppointmentsPage() {
@@ -24,7 +24,7 @@ export default function AppointmentsPage() {
   const [employees, setEmployees] = useState<Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'>[]>([]);
 
   // Dialog state
-  const [editOpen, setEditOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [activeAppointment, setActiveAppointment] = useState<AppointmentWithRelations | null>(null);
 
@@ -95,31 +95,9 @@ export default function AppointmentsPage() {
     setSelectedDate(date);
   }
 
-  async function handleStatusChange(id: string, status: AppointmentStatus) {
-    try {
-      const res = await fetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        toast.error(result.error || 'Failed to update status');
-        return;
-      }
-
-      toast.success(`Status updated to ${status.replace('_', ' ')}`);
-      fetchAppointments(currentMonth);
-    } catch {
-      toast.error('Failed to update status');
-    }
-  }
-
-  function handleEditClick(appointment: AppointmentWithRelations) {
+  function handleAppointmentSelect(appointment: AppointmentWithRelations) {
     setActiveAppointment(appointment);
-    setEditOpen(true);
+    setDetailOpen(true);
   }
 
   function handleCancelClick(appointment: AppointmentWithRelations) {
@@ -127,9 +105,8 @@ export default function AppointmentsPage() {
     setCancelOpen(true);
   }
 
-  async function handleEditSave(id: string, data: AppointmentUpdateInput): Promise<boolean> {
+  async function handleSave(id: string, data: AppointmentUpdateInput): Promise<boolean> {
     try {
-      // Convert empty employee_id to null
       const payload = {
         ...data,
         employee_id: data.employee_id || null,
@@ -211,20 +188,19 @@ export default function AppointmentsPage() {
           <DayAppointmentsList
             selectedDate={selectedDate}
             appointments={selectedDayAppointments}
-            onStatusChange={handleStatusChange}
-            onEdit={handleEditClick}
-            onCancel={handleCancelClick}
+            onSelect={handleAppointmentSelect}
           />
         </div>
       </div>
 
-      {/* Edit dialog */}
-      <EditAppointmentDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
+      {/* Detail + Edit dialog */}
+      <AppointmentDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
         appointment={activeAppointment}
         employees={employees}
-        onSave={handleEditSave}
+        onSave={handleSave}
+        onCancel={handleCancelClick}
       />
 
       {/* Cancel dialog */}

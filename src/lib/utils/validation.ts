@@ -298,7 +298,7 @@ export const appointmentUpdateSchema = z.object({
   scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format').optional(),
   scheduled_start_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional(),
   scheduled_end_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional(),
-  employee_id: z.string().uuid().optional().nullable(),
+  employee_id: z.union([z.string().uuid(), z.literal('')]).optional().nullable(),
   job_notes: optionalString,
   internal_notes: optionalString,
 });
