@@ -43,7 +43,7 @@ src/app/(public)/
 
 ### Admin Dashboard (`/admin/*`)
 
-Role-based management interface behind Supabase Auth. Sidebar navigation with modules for catalog management, customers, inventory, staff, appointments, and settings. Header bar includes an account dropdown (initials avatar, name, email, role, status, sign out) on all pages.
+Role-based management interface behind Supabase Auth. Sidebar navigation with modules for catalog management, customers, inventory, staff, appointments, and settings. Header bar includes an "Open POS" button (opens `/pos` in new tab) and an account dropdown (initials avatar, name, email, role, status, sign out) on all pages.
 
 **Dashboard Home** — Today's appointments snapshot with status breakdown (remaining, in progress, completed), today's schedule list, pending-confirmation alerts, and role-appropriate quick actions.
 
