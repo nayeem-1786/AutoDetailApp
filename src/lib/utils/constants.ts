@@ -1,3 +1,8 @@
+// Site-wide SEO constants
+export const SITE_URL = 'https://smartdetailsautospa.com';
+export const SITE_NAME = 'Smart Detail Auto Spa & Supplies';
+export const SITE_DESCRIPTION = 'Professional auto detailing, ceramic coatings, and car care supplies in Lomita, CA. Mobile detailing available in the South Bay area.';
+
 // Business constants for Smart Detail Auto Spa & Supplies
 
 export const TAX_RATE = 0.1025; // 10.25% CA sales tax

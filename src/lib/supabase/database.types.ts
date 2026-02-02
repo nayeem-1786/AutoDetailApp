@@ -1153,6 +1153,7 @@ export type Database = {
           reorder_threshold: number | null
           retail_price: number
           sku: string | null
+          slug: string
           square_item_id: string | null
           updated_at: string
           vendor_id: string | null
@@ -1173,6 +1174,7 @@ export type Database = {
           reorder_threshold?: number | null
           retail_price?: number
           sku?: string | null
+          slug: string
           square_item_id?: string | null
           updated_at?: string
           vendor_id?: string | null
@@ -1193,6 +1195,7 @@ export type Database = {
           reorder_threshold?: number | null
           retail_price?: number
           sku?: string | null
+          slug?: string
           square_item_id?: string | null
           updated_at?: string
           vendor_id?: string | null
@@ -1731,6 +1734,7 @@ export type Database = {
           per_unit_max: number | null
           per_unit_price: number | null
           pricing_model: Database["public"]["Enums"]["pricing_model"]
+          slug: string
           special_requirements: string | null
           staff_assessed: boolean
           updated_at: string
@@ -1755,6 +1759,7 @@ export type Database = {
           per_unit_max?: number | null
           per_unit_price?: number | null
           pricing_model: Database["public"]["Enums"]["pricing_model"]
+          slug: string
           special_requirements?: string | null
           staff_assessed?: boolean
           updated_at?: string
@@ -1779,6 +1784,7 @@ export type Database = {
           per_unit_max?: number | null
           per_unit_price?: number | null
           pricing_model?: Database["public"]["Enums"]["pricing_model"]
+          slug?: string
           special_requirements?: string | null
           staff_assessed?: boolean
           updated_at?: string

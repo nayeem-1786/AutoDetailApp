@@ -123,6 +123,7 @@ export interface Product {
   square_item_id: string | null;
   sku: string | null;
   name: string;
+  slug: string;
   description: string | null;
   category_id: string | null;
   vendor_id: string | null;
@@ -156,6 +157,7 @@ export interface ServiceCategory {
 export interface Service {
   id: string;
   name: string;
+  slug: string;
   description: string | null;
   category_id: string | null;
   pricing_model: PricingModel;

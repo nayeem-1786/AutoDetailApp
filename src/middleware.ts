@@ -2,13 +2,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/book', '/api/'];
+const PUBLIC_ROUTES = ['/login', '/book', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes
-  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+  // Allow public routes (including homepage)
+  if (pathname === '/' || PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
     const { supabaseResponse } = await updateSession(request);
     return supabaseResponse;
   }
