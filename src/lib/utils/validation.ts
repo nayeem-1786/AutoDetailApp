@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-// Phone validation - E.164 format
-const phoneRegex = /^\+1\d{10}$/;
+// Phone validation - accepts (XXX) XXX-XXXX format (also allows E.164 for backwards compat)
+const phoneRegex = /^(\(\d{3}\) \d{3}-\d{4}|\+1\d{10})$/;
 
 export const phoneSchema = z
   .string()
-  .regex(phoneRegex, 'Phone must be in format +1XXXXXXXXXX')
+  .regex(phoneRegex, 'Enter a valid 10-digit phone number')
   .or(z.literal(''))
   .optional()
   .nullable();

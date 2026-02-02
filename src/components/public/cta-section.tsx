@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Phone } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, phoneToE164 } from '@/lib/utils/format';
 
 interface CtaSectionProps {
   title?: string;
@@ -27,7 +27,7 @@ export async function CtaSection({
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href={`tel:${biz.phone}`}
+              href={`tel:${phoneToE164(biz.phone)}`}
               className={cn(
                 'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors',
                 'border border-white text-white hover:bg-white hover:text-gray-900',

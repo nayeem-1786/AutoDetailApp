@@ -40,6 +40,46 @@ export function normalizePhone(input: string): string | null {
   return null;
 }
 
+/**
+ * Auto-format a phone input as (XXX) XXX-XXXX while typing.
+ * Accepts any input — strips non-digits and builds the formatted string
+ * progressively so partial input looks correct too.
+ */
+export function formatPhoneInput(value: string): string {
+  let digits = value.replace(/\D/g, '');
+
+  // Strip leading country code "1" if user typed it
+  if (digits.length > 10 && digits.startsWith('1')) {
+    digits = digits.slice(1);
+  }
+
+  // Cap at 10 digits
+  digits = digits.slice(0, 10);
+
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+/**
+ * Convert any phone format to E.164 (+1XXXXXXXXXX) for tel: links and JSON-LD.
+ * Returns the original string if it can't be parsed as a 10-digit US number.
+ */
+export function phoneToE164(phone: string): string {
+  let digits = phone.replace(/\D/g, '');
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+
+  // Already E.164 or unparseable — return as-is
+  return phone;
+}
+
 export function formatDate(date: string | Date): string {
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',

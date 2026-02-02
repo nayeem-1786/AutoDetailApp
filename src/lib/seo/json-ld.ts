@@ -1,5 +1,5 @@
 import { SITE_URL, SITE_NAME } from '@/lib/utils/constants';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, phoneToE164 } from '@/lib/utils/format';
 import type { BusinessInfo } from '@/lib/data/business';
 import type { Service, ServiceCategory, Product, ProductCategory, ServicePricing } from '@/lib/supabase/types';
 
@@ -26,7 +26,7 @@ export function generateLocalBusinessSchema(business: BusinessInfo) {
     '@type': 'AutoRepair',
     name: business.name,
     url: SITE_URL,
-    telephone: business.phone,
+    telephone: phoneToE164(business.phone),
     address: {
       '@type': 'PostalAddress',
       streetAddress: business.streetAddress,

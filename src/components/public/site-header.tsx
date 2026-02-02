@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Phone } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, phoneToE164 } from '@/lib/utils/format';
 
 export async function SiteHeader() {
   const biz = await getBusinessInfo();
@@ -39,14 +39,14 @@ export async function SiteHeader() {
         {/* Right: Phone + Book Now */}
         <div className="flex items-center gap-4">
           <a
-            href={`tel:${biz.phone}`}
+            href={`tel:${phoneToE164(biz.phone)}`}
             className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
           >
             <Phone className="h-4 w-4" />
             <span>{formatPhone(biz.phone)}</span>
           </a>
           <a
-            href={`tel:${biz.phone}`}
+            href={`tel:${phoneToE164(biz.phone)}`}
             className="inline-flex sm:hidden items-center justify-center h-9 w-9 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
             aria-label="Call us"
           >

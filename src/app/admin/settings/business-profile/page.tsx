@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
+import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { toast } from 'sonner';
 
 export default function BusinessProfilePage() {
@@ -21,6 +22,7 @@ export default function BusinessProfilePage() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<BusinessProfileInput>({
     resolver: formResolver(businessProfileSchema),
@@ -58,9 +60,13 @@ export default function BusinessProfilePage() {
         settings[row.key] = row.value;
       }
 
+      // Convert any stored format (E.164 or raw) to (XXX) XXX-XXXX for display
+      const rawPhone = (settings.business_phone as string) || '';
+      const displayPhone = rawPhone ? formatPhone(rawPhone) : '';
+
       reset({
         business_name: (settings.business_name as string) || '',
-        business_phone: (settings.business_phone as string) || '',
+        business_phone: displayPhone,
         business_address: (settings.business_address as BusinessProfileInput['business_address']) || {
           line1: '',
           city: '',
@@ -154,13 +160,18 @@ export default function BusinessProfilePage() {
             <FormField
               label="Business Phone"
               error={errors.business_phone?.message}
-              description="Format: +1XXXXXXXXXX"
+              description="(XXX) XXX-XXXX"
               htmlFor="business_phone"
             >
               <Input
                 id="business_phone"
-                placeholder="+13105551234"
-                {...register('business_phone')}
+                placeholder="(310) 555-1234"
+                {...register('business_phone', {
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                    const formatted = formatPhoneInput(e.target.value);
+                    setValue('business_phone', formatted, { shouldDirty: true, shouldValidate: true });
+                  },
+                })}
               />
             </FormField>
 

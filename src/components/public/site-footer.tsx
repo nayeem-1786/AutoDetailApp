@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { MapPin, Phone as PhoneIcon } from 'lucide-react';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, phoneToE164 } from '@/lib/utils/format';
 
 export async function SiteFooter() {
   const biz = await getBusinessInfo();
@@ -22,7 +22,7 @@ export async function SiteFooter() {
               <div className="flex items-center gap-2">
                 <PhoneIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
                 <a
-                  href={`tel:${biz.phone}`}
+                  href={`tel:${phoneToE164(biz.phone)}`}
                   className="hover:text-white transition-colors"
                 >
                   {formatPhone(biz.phone)}
