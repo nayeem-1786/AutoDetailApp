@@ -47,6 +47,8 @@ interface AppointmentDetailDialogProps {
   employees: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'>[];
   onSave: (id: string, data: AppointmentUpdateInput) => Promise<boolean>;
   onCancel: (appointment: AppointmentWithRelations) => void;
+  canReschedule: boolean;
+  canCancel: boolean;
 }
 
 export function AppointmentDetailDialog({
@@ -56,6 +58,8 @@ export function AppointmentDetailDialog({
   employees,
   onSave,
   onCancel,
+  canReschedule,
+  canCancel,
 }: AppointmentDetailDialogProps) {
   const [saving, setSaving] = useState(false);
 
@@ -88,8 +92,8 @@ export function AppointmentDetailDialog({
     appointment.status,
     ...STATUS_TRANSITIONS[appointment.status],
   ];
-  const canCancel =
-    STATUS_TRANSITIONS[appointment.status].includes('cancelled');
+  const showCancelButton =
+    canCancel && STATUS_TRANSITIONS[appointment.status].includes('cancelled');
   const services = appointment.appointment_services;
 
   async function onSubmit(data: AppointmentUpdateInput) {
@@ -110,7 +114,7 @@ export function AppointmentDetailDialog({
         </DialogDescription>
       </DialogHeader>
       <DialogContent className="max-h-[70vh] overflow-y-auto">
-        {/* ── Read-only info ── */}
+        {/* Read-only info */}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div>
             <dt className="text-xs font-medium text-gray-500">Customer</dt>
@@ -189,9 +193,9 @@ export function AppointmentDetailDialog({
           </div>
         )}
 
-        {/* ── Editable fields ── */}
+        {/* Editable fields */}
         <form id="detail-edit-form" onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3 border-t border-gray-200 pt-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className={canReschedule ? 'grid grid-cols-2 gap-3' : ''}>
             <FormField label="Status" error={errors.status?.message} htmlFor="detail-status">
               <Select id="detail-status" {...register('status')}>
                 {allowedStatuses.map((s) => (
@@ -202,29 +206,33 @@ export function AppointmentDetailDialog({
               </Select>
             </FormField>
 
-            <FormField label="Assigned Detailer" error={errors.employee_id?.message} htmlFor="detail-employee">
-              <Select id="detail-employee" {...register('employee_id')}>
-                <option value="">Unassigned</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.first_name} {emp.last_name} ({ROLE_LABELS[emp.role] || emp.role})
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+            {canReschedule && (
+              <FormField label="Assigned Detailer" error={errors.employee_id?.message} htmlFor="detail-employee">
+                <Select id="detail-employee" {...register('employee_id')}>
+                  <option value="">Unassigned</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.first_name} {emp.last_name} ({ROLE_LABELS[emp.role] || emp.role})
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <FormField label="Date" error={errors.scheduled_date?.message} htmlFor="detail-date">
-              <Input id="detail-date" type="date" {...register('scheduled_date')} />
-            </FormField>
-            <FormField label="Start" error={errors.scheduled_start_time?.message} htmlFor="detail-start">
-              <Input id="detail-start" type="time" {...register('scheduled_start_time')} />
-            </FormField>
-            <FormField label="End" error={errors.scheduled_end_time?.message} htmlFor="detail-end">
-              <Input id="detail-end" type="time" {...register('scheduled_end_time')} />
-            </FormField>
-          </div>
+          {canReschedule && (
+            <div className="grid grid-cols-3 gap-3">
+              <FormField label="Date" error={errors.scheduled_date?.message} htmlFor="detail-date">
+                <Input id="detail-date" type="date" {...register('scheduled_date')} />
+              </FormField>
+              <FormField label="Start" error={errors.scheduled_start_time?.message} htmlFor="detail-start">
+                <Input id="detail-start" type="time" {...register('scheduled_start_time')} />
+              </FormField>
+              <FormField label="End" error={errors.scheduled_end_time?.message} htmlFor="detail-end">
+                <Input id="detail-end" type="time" {...register('scheduled_end_time')} />
+              </FormField>
+            </div>
+          )}
 
           <FormField label="Job Notes" error={errors.job_notes?.message} htmlFor="detail-job-notes">
             <textarea
@@ -246,7 +254,7 @@ export function AppointmentDetailDialog({
         </form>
       </DialogContent>
       <DialogFooter>
-        {canCancel && (
+        {showCancelButton && (
           <Button
             variant="destructive"
             size="sm"

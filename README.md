@@ -45,6 +45,12 @@ src/app/(public)/
 
 Role-based management interface behind Supabase Auth. Sidebar navigation with modules for catalog management, customers, inventory, staff, appointments, and settings.
 
+**Dashboard Home** — Today's appointments snapshot with status breakdown (remaining, in progress, completed), today's schedule list, pending-confirmation alerts, and role-appropriate quick actions.
+
+**Appointments** — Month calendar with status-colored dots, day appointment list panel, detail/edit dialog (status, reschedule, assign detailer, job notes), and cancel dialog with reason and fee. Role-based permissions: detailers see today's schedule only, cashiers cannot cancel appointments, admin/super-admin have full access.
+
+**Online Booking** (`/book`) — Public-facing booking page with service selection, vehicle info, date/time picker, customer info, and Stripe payment integration.
+
 ### Authentication
 
 - Supabase Auth (email/password)
@@ -78,7 +84,7 @@ src/
 
 ## Database
 
-38 tables managed via sequential Supabase migrations in `supabase/migrations/`. Key tables:
+38 tables managed via sequential Supabase migrations in `supabase/migrations/`. Seeded staff: Nayeem Khan (super_admin), Su Khan (admin), Joselyn Reyes (cashier), Joana Lira (cashier), Segundo Cadena (detailer). Key tables:
 
 - **services** / **service_categories** — 30 services across 7 categories with 6 pricing models
 - **service_pricing** — Tiered pricing with vehicle-size-aware options

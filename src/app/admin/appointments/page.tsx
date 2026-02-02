@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Spinner } from '@/components/ui/spinner';
 import { AppointmentCalendar } from './components/appointment-calendar';
@@ -16,6 +17,12 @@ import type { AppointmentUpdateInput, AppointmentCancelInput } from '@/lib/utils
 
 export default function AppointmentsPage() {
   const supabase = createClient();
+  const { role } = useAuth();
+
+  // Permission flags based on PROJECT.md permission matrix
+  const canViewFullCalendar = role === 'super_admin' || role === 'admin' || role === 'cashier';
+  const canReschedule = role === 'super_admin' || role === 'admin' || role === 'cashier';
+  const canCancel = role === 'super_admin' || role === 'admin';
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -41,33 +48,62 @@ export default function AppointmentsPage() {
 
   const fetchAppointments = useCallback(async (month: Date) => {
     setLoading(true);
-    const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
-    const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
-    const { data, error } = await supabase
-      .from('appointments')
-      .select(`
-        *,
-        customer:customers!customer_id(id, first_name, last_name, phone, email),
-        vehicle:vehicles!vehicle_id(id, year, make, model, color),
-        employee:employees!employee_id(id, first_name, last_name, role),
-        appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
-      `)
-      .gte('scheduled_date', monthStart)
-      .lte('scheduled_date', monthEnd)
-      .order('scheduled_date')
-      .order('scheduled_start_time');
+    if (canViewFullCalendar) {
+      // Full month fetch for calendar view
+      const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
+      const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
-    if (error) {
-      console.error('Error loading appointments:', error);
-      toast.error('Failed to load appointments');
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:customers!customer_id(id, first_name, last_name, phone, email),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color),
+          employee:employees!employee_id(id, first_name, last_name, role),
+          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
+        `)
+        .gte('scheduled_date', monthStart)
+        .lte('scheduled_date', monthEnd)
+        .order('scheduled_date')
+        .order('scheduled_start_time');
+
+      if (error) {
+        console.error('Error loading appointments:', error);
+        toast.error('Failed to load appointments');
+      }
+
+      if (data) {
+        setAppointments(data as unknown as AppointmentWithRelations[]);
+      }
+    } else {
+      // Detailer: today only
+      const today = format(new Date(), 'yyyy-MM-dd');
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:customers!customer_id(id, first_name, last_name, phone, email),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color),
+          employee:employees!employee_id(id, first_name, last_name, role),
+          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
+        `)
+        .eq('scheduled_date', today)
+        .order('scheduled_start_time');
+
+      if (error) {
+        console.error('Error loading appointments:', error);
+        toast.error('Failed to load appointments');
+      }
+
+      if (data) {
+        setAppointments(data as unknown as AppointmentWithRelations[]);
+      }
     }
 
-    if (data) {
-      setAppointments(data as unknown as AppointmentWithRelations[]);
-    }
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, canViewFullCalendar]);
 
   const fetchEmployees = useCallback(async () => {
     const { data } = await supabase
@@ -158,6 +194,50 @@ export default function AppointmentsPage() {
     }
   }
 
+  // Detailer view: today only, no calendar
+  if (!canViewFullCalendar) {
+    const today = new Date();
+    const todayKey = format(today, 'yyyy-MM-dd');
+    const todayAppointments = appointmentsByDate[todayKey] || [];
+
+    return (
+      <div>
+        <PageHeader
+          title="Today's Schedule"
+          description={loading ? 'Loading...' : `${todayAppointments.length} appointment${todayAppointments.length !== 1 ? 's' : ''} today`}
+        />
+
+        <div className="mt-6">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            {loading ? (
+              <div className="flex h-60 items-center justify-center">
+                <Spinner size="lg" />
+              </div>
+            ) : (
+              <DayAppointmentsList
+                selectedDate={today}
+                appointments={todayAppointments}
+                onSelect={handleAppointmentSelect}
+              />
+            )}
+          </div>
+        </div>
+
+        <AppointmentDetailDialog
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          appointment={activeAppointment}
+          employees={employees}
+          onSave={handleSave}
+          onCancel={handleCancelClick}
+          canReschedule={false}
+          canCancel={false}
+        />
+      </div>
+    );
+  }
+
+  // Full calendar view for super_admin, admin, cashier
   return (
     <div>
       <PageHeader
@@ -201,15 +281,19 @@ export default function AppointmentsPage() {
         employees={employees}
         onSave={handleSave}
         onCancel={handleCancelClick}
+        canReschedule={canReschedule}
+        canCancel={canCancel}
       />
 
-      {/* Cancel dialog */}
-      <CancelAppointmentDialog
-        open={cancelOpen}
-        onOpenChange={setCancelOpen}
-        appointment={activeAppointment}
-        onConfirm={handleCancelConfirm}
-      />
+      {/* Cancel dialog — only rendered if user has cancel permission */}
+      {canCancel && (
+        <CancelAppointmentDialog
+          open={cancelOpen}
+          onOpenChange={setCancelOpen}
+          appointment={activeAppointment}
+          onConfirm={handleCancelConfirm}
+        />
+      )}
     </div>
   );
 }
