@@ -1,0 +1,27 @@
+-- Enums for Auto Detail Platform
+CREATE TYPE user_role AS ENUM ('super_admin', 'admin', 'cashier', 'detailer');
+CREATE TYPE vehicle_type AS ENUM ('standard', 'motorcycle', 'rv', 'boat', 'aircraft');
+CREATE TYPE vehicle_size_class AS ENUM ('sedan', 'truck_suv_2row', 'suv_3row_van');
+CREATE TYPE pricing_model AS ENUM ('vehicle_size', 'scope', 'per_unit', 'specialty', 'flat', 'custom');
+CREATE TYPE service_classification AS ENUM ('primary', 'addon_only', 'both');
+CREATE TYPE appointment_status AS ENUM ('pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show');
+CREATE TYPE appointment_channel AS ENUM ('online', 'phone', 'walk_in', 'portal');
+CREATE TYPE payment_status AS ENUM ('pending', 'partial', 'paid', 'refunded', 'partial_refund');
+CREATE TYPE payment_method AS ENUM ('cash', 'card', 'split');
+CREATE TYPE transaction_status AS ENUM ('open', 'completed', 'voided', 'refunded', 'partial_refund');
+CREATE TYPE transaction_item_type AS ENUM ('product', 'service', 'package', 'custom');
+CREATE TYPE refund_status AS ENUM ('pending', 'processed', 'failed');
+CREATE TYPE coupon_type AS ENUM ('flat', 'percentage', 'free_addon', 'free_product');
+CREATE TYPE coupon_status AS ENUM ('active', 'redeemed', 'expired', 'disabled');
+CREATE TYPE loyalty_action AS ENUM ('earned', 'redeemed', 'adjusted', 'expired', 'welcome_bonus');
+CREATE TYPE campaign_status AS ENUM ('draft', 'scheduled', 'sending', 'sent', 'paused', 'cancelled');
+CREATE TYPE campaign_channel AS ENUM ('sms', 'email', 'both');
+CREATE TYPE lifecycle_action AS ENUM ('sms', 'email', 'both');
+CREATE TYPE quote_status AS ENUM ('draft', 'sent', 'viewed', 'accepted', 'expired', 'converted');
+CREATE TYPE po_status AS ENUM ('draft', 'submitted', 'shipped', 'partial', 'received', 'cancelled');
+CREATE TYPE photo_type AS ENUM ('before', 'after', 'damage');
+CREATE TYPE consent_channel AS ENUM ('sms', 'email');
+CREATE TYPE consent_action AS ENUM ('opt_in', 'opt_out');
+CREATE TYPE consent_source AS ENUM ('pos', 'online', 'portal', 'import', 'manual');
+CREATE TYPE prerequisite_enforcement AS ENUM ('required_same_ticket', 'required_history', 'recommended');
+CREATE TYPE employee_status AS ENUM ('active', 'inactive', 'terminated');
