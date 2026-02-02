@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { formatTime } from '@/lib/utils/format';
-import { APPOINTMENT_STATUS_LABELS, ROLE_LABELS } from '@/lib/utils/constants';
+import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import type { AppointmentStatus } from '@/lib/supabase/types';
 
 interface TodayAppointment {
@@ -261,21 +261,6 @@ export default function AdminDashboard() {
                 </Link>
               ))}
             </div>
-          </div>
-
-          {/* Role info */}
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">Your Account</h3>
-            <dl className="mt-3 space-y-2 text-sm">
-              <div>
-                <dt className="text-xs text-gray-500">Role</dt>
-                <dd className="font-medium text-gray-900">{role ? ROLE_LABELS[role] || role : 'N/A'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Status</dt>
-                <dd className="font-medium text-green-600">Active</dd>
-              </div>
-            </dl>
           </div>
 
           {/* Alerts placeholder for pending confirmations */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
 import { getNavForRole, canAccessRoute, type NavItem } from '@/lib/auth/roles';
@@ -25,8 +25,11 @@ import {
   ChevronRight,
   Menu,
   X,
+  CircleUser,
+  Shield,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { ROLE_LABELS } from '@/lib/utils/constants';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -50,6 +53,8 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!loading && !employee) {
@@ -62,6 +67,19 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       router.push('/admin');
     }
   }, [role, pathname, router]);
+
+  // Close account dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    if (accountOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [accountOpen]);
 
   // Auto-expand parent nav item when child is active
   useEffect(() => {
@@ -254,6 +272,54 @@ function AdminContent({ children }: { children: React.ReactNode }) {
                 </span>
               ))}
           </nav>
+
+          {/* Account dropdown */}
+          <div className="relative ml-auto" ref={accountRef}>
+            <button
+              onClick={() => setAccountOpen((prev) => !prev)}
+              className="flex items-center gap-2 rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                {employee.first_name[0]}
+                {employee.last_name[0]}
+              </div>
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', accountOpen && 'rotate-180')} />
+            </button>
+
+            {accountOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                {/* User info */}
+                <div className="px-4 py-2">
+                  <p className="text-sm font-medium text-gray-900">
+                    {employee.first_name} {employee.last_name}
+                  </p>
+                  <p className="text-xs text-gray-500">{employee.email}</p>
+                </div>
+                <div className="my-1 border-t border-gray-100" />
+                <div className="px-4 py-2">
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <Shield className="h-3.5 w-3.5" />
+                    <span>{ROLE_LABELS[role] || role}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                    <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                    <span>Active</span>
+                  </div>
+                </div>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  onClick={() => {
+                    setAccountOpen(false);
+                    signOut();
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Page content */}
