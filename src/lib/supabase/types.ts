@@ -338,6 +338,16 @@ export interface Refund {
   updated_at: string;
 }
 
+export interface RefundItem {
+  id: string;
+  refund_id: string;
+  transaction_item_id: string;
+  quantity: number;
+  amount: number;
+  restock: boolean;
+  created_at: string;
+}
+
 export interface Coupon {
   id: string;
   code: string;

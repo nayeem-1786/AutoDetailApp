@@ -309,6 +309,79 @@ export const appointmentCancelSchema = z.object({
   cancellation_fee: z.number().min(0, 'Must be 0 or greater').optional().nullable(),
 });
 
+// ---------------------------------------------------------------------------
+// POS Transaction schemas
+// ---------------------------------------------------------------------------
+
+const transactionItemSchema = z.object({
+  item_type: z.enum(['product', 'service', 'package', 'custom']),
+  product_id: z.string().uuid().optional().nullable(),
+  service_id: z.string().uuid().optional().nullable(),
+  item_name: requiredString,
+  quantity: z.coerce.number().int().min(1),
+  unit_price: positiveNumber,
+  total_price: positiveNumber,
+  tax_amount: positiveNumber,
+  is_taxable: z.boolean(),
+  tier_name: optionalString,
+  vehicle_size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  notes: optionalString,
+});
+
+export const paymentSchema = z.object({
+  method: z.enum(['cash', 'card', 'split']),
+  amount: positiveNumber,
+  tip_amount: positiveNumber.default(0),
+  stripe_payment_intent_id: optionalString,
+  card_brand: optionalString,
+  card_last_four: optionalString,
+});
+
+export const transactionCreateSchema = z.object({
+  customer_id: z.string().uuid().optional().nullable(),
+  vehicle_id: z.string().uuid().optional().nullable(),
+  subtotal: positiveNumber,
+  tax_amount: positiveNumber,
+  tip_amount: positiveNumber.default(0),
+  discount_amount: positiveNumber.default(0),
+  total_amount: positiveNumber,
+  payment_method: z.enum(['cash', 'card', 'split']),
+  coupon_id: z.string().uuid().optional().nullable(),
+  loyalty_points_redeemed: positiveInt.default(0),
+  loyalty_discount: positiveNumber.default(0),
+  notes: optionalString,
+  items: z.array(transactionItemSchema),
+  payments: z.array(paymentSchema),
+});
+
+// ---------------------------------------------------------------------------
+// POS Refund schemas
+// ---------------------------------------------------------------------------
+
+const refundItemSchema = z.object({
+  transaction_item_id: z.string().uuid(),
+  quantity: z.coerce.number().int().min(1),
+  amount: positiveNumber,
+  restock: z.boolean().default(true),
+});
+
+export const refundCreateSchema = z.object({
+  transaction_id: z.string().uuid(),
+  items: z.array(refundItemSchema).min(1, 'Select at least one item to refund'),
+  reason: requiredString,
+});
+
+// ---------------------------------------------------------------------------
+// Cash Drawer / End-of-Day schemas
+// ---------------------------------------------------------------------------
+
+export const cashDrawerCloseSchema = z.object({
+  counted_cash: positiveNumber,
+  deposit_amount: positiveNumber.default(0),
+  next_day_float: positiveNumber.default(0),
+  notes: optionalString,
+});
+
 // Type inference helpers
 export type BookingCustomerInput = z.infer<typeof bookingCustomerSchema>;
 export type BookingVehicleInput = z.infer<typeof bookingVehicleSchema>;
@@ -338,3 +411,7 @@ export type CustomerSignupInput = z.infer<typeof customerSignupSchema>;
 export type CustomerProfileInput = z.infer<typeof customerProfileSchema>;
 export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
 export type AppointmentCancelInput = z.infer<typeof appointmentCancelSchema>;
+export type TransactionCreateInput = z.infer<typeof transactionCreateSchema>;
+export type PaymentInput = z.infer<typeof paymentSchema>;
+export type RefundCreateInput = z.infer<typeof refundCreateSchema>;
+export type CashDrawerCloseInput = z.infer<typeof cashDrawerCloseSchema>;

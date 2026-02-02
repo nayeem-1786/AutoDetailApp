@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
   // For protected routes, check authentication
   const { user, supabaseResponse } = await updateSession(request);
 
-  if (!user && pathname.startsWith('/admin')) {
+  if (!user && (pathname.startsWith('/admin') || pathname.startsWith('/pos'))) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', pathname);

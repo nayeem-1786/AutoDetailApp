@@ -19,6 +19,7 @@ export const ROUTE_ACCESS: Record<string, UserRole[]> = {
   '/admin/customers': ['super_admin', 'admin', 'cashier'],
   '/admin/staff': ['super_admin'],
   '/admin/migration': ['super_admin'],
+  '/pos': ['super_admin', 'admin', 'cashier'],
 };
 
 // Sidebar navigation structure
