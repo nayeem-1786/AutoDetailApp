@@ -70,3 +70,17 @@ export interface CatalogService extends Service {
   category?: ServiceCategory;
   pricing?: ServicePricing[];
 }
+
+// ─── Favorites ────────────────────────────────────────────────
+
+export type FavoriteActionType = 'product' | 'service' | 'custom_amount' | 'customer_lookup' | 'discount';
+
+export interface FavoriteItem {
+  id: string;
+  type: FavoriteActionType;
+  referenceId: string | null;
+  label: string;
+  color: FavoriteColor;
+}
+
+export type FavoriteColor = 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'amber' | 'teal' | 'pink';

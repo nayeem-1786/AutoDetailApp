@@ -173,6 +173,7 @@ export default function StaffDetailPage() {
       email: data.email,
       phone: data.phone || '',
       role: data.role,
+      pin_code: data.pin_code || '',
       hourly_rate: data.hourly_rate,
       bookable_for_appointments: data.bookable_for_appointments,
     });
@@ -248,6 +249,7 @@ export default function StaffDetailPage() {
           email: data.email,
           phone: data.phone || null,
           role: data.role as UserRole,
+          pin_code: data.pin_code || null,
           hourly_rate: data.hourly_rate ?? null,
           bookable_for_appointments: data.bookable_for_appointments,
         })
@@ -391,6 +393,17 @@ export default function StaffDetailPage() {
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </Select>
+                  </FormField>
+
+                  <FormField label="POS PIN Code" error={errors.pin_code?.message} htmlFor="pin_code" description="Optional 4-digit PIN for POS register login">
+                    <Input
+                      id="pin_code"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={4}
+                      {...register('pin_code')}
+                      placeholder="1234"
+                    />
                   </FormField>
 
                   <FormField label="Hourly Rate" error={errors.hourly_rate?.message} htmlFor="hourly_rate">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -23,12 +23,24 @@ import { CouponInput } from './coupon-input';
 import { LoyaltyPanel } from './loyalty-panel';
 import type { Customer, Vehicle } from '@/lib/supabase/types';
 
-export function TicketPanel() {
+interface TicketPanelProps {
+  externalCustomerLookup?: boolean;
+  onExternalCustomerLookupClose?: () => void;
+}
+
+export function TicketPanel({ externalCustomerLookup, onExternalCustomerLookupClose }: TicketPanelProps) {
   const { ticket, dispatch } = useTicket();
   const { services } = useCatalog();
 
-  // Dialog state
+  // Dialog state — also synced to external trigger
   const [showCustomerLookup, setShowCustomerLookup] = useState(false);
+
+  useEffect(() => {
+    if (externalCustomerLookup) {
+      setShowCustomerLookup(true);
+      onExternalCustomerLookupClose?.();
+    }
+  }, [externalCustomerLookup, onExternalCustomerLookupClose]);
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);

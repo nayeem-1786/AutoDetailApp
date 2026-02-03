@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, ChevronRight } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, ChevronRight } from 'lucide-react';
 
 const settingsSections = [
   {
@@ -33,6 +33,13 @@ const settingsSections = [
     description: 'Manage service zones, distance ranges, and mobile surcharges.',
     href: '/admin/settings/mobile-zones',
     icon: MapPin,
+    roles: ['super_admin'] as const,
+  },
+  {
+    title: 'POS Favorites',
+    description: 'Configure quick-action tiles on the POS Favorites tab.',
+    href: '/admin/settings/pos-favorites',
+    icon: Star,
     roles: ['super_admin'] as const,
   },
 ];

@@ -18,6 +18,13 @@ export const positiveNumber = z.coerce.number().min(0, 'Must be 0 or greater');
 export const positiveInt = z.coerce.number().int().min(0, 'Must be 0 or greater');
 
 // Employee schemas
+export const pinCodeSchema = z
+  .string()
+  .regex(/^\d{4}$/, 'PIN must be exactly 4 digits')
+  .or(z.literal(''))
+  .optional()
+  .nullable();
+
 export const employeeCreateSchema = z.object({
   first_name: requiredString,
   last_name: requiredString,
@@ -25,6 +32,7 @@ export const employeeCreateSchema = z.object({
   phone: phoneSchema,
   role: z.enum(['super_admin', 'admin', 'cashier', 'detailer']),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  pin_code: pinCodeSchema,
   hourly_rate: positiveNumber.optional().nullable(),
   bookable_for_appointments: z.boolean().default(true),
 });

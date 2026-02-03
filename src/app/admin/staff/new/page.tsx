@@ -35,6 +35,7 @@ export default function NewStaffPage() {
       phone: '',
       role: 'detailer',
       password: '',
+      pin_code: '',
       hourly_rate: null,
       bookable_for_appointments: true,
     },
@@ -109,6 +110,17 @@ export default function NewStaffPage() {
 
               <FormField label="Password" error={errors.password?.message} required htmlFor="password" description="Minimum 8 characters">
                 <Input id="password" type="password" {...register('password')} placeholder="Min. 8 characters" />
+              </FormField>
+
+              <FormField label="POS PIN Code" error={errors.pin_code?.message} htmlFor="pin_code" description="Optional 4-digit PIN for POS register login">
+                <Input
+                  id="pin_code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  {...register('pin_code')}
+                  placeholder="1234"
+                />
               </FormField>
 
               <FormField label="Hourly Rate" error={errors.hourly_rate?.message} htmlFor="hourly_rate">

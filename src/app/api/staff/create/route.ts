@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { password, ...employeeData } = parsed.data;
+    const { password, pin_code, ...employeeData } = parsed.data;
     const adminClient = createAdminClient();
 
     // Create Supabase auth user
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
         email: employeeData.email,
         phone: employeeData.phone || null,
         role: employeeData.role,
+        pin_code: pin_code || null,
         hourly_rate: employeeData.hourly_rate ?? null,
         bookable_for_appointments: employeeData.bookable_for_appointments,
         status: 'active',

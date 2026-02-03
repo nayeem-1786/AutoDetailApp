@@ -1,4 +1,4 @@
-import { PosShell } from './pos-shell';
+import { PosLayoutInner } from './pos-layout-inner';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,5 +7,5 @@ export default function PosLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <PosShell>{children}</PosShell>;
+  return <PosLayoutInner>{children}</PosLayoutInner>;
 }

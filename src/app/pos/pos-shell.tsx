@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Receipt,
-  CalendarClock,
   Loader2,
   ShieldAlert,
 } from 'lucide-react';
@@ -15,6 +13,7 @@ import { canAccessRoute } from '@/lib/auth/roles';
 import { TicketProvider } from './context/ticket-context';
 import { CheckoutProvider } from './context/checkout-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
+import { BottomNav } from './components/bottom-nav';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
   const { employee, role, loading } = useAuth();
@@ -40,7 +39,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !employee) {
-      router.replace('/login?redirect=/pos');
+      router.replace('/pos/login');
     }
   }, [loading, employee, router]);
 
@@ -77,9 +76,9 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     <TicketProvider>
       <CheckoutProvider>
         <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
-          {/* Top Bar */}
+          {/* Top Bar — simplified: logo, employee name, clock */}
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
-            {/* Left: Back to Admin */}
+            {/* Left: Back to Admin + Logo */}
             <div className="flex items-center gap-4">
               <Link
                 href="/admin"
@@ -93,23 +92,8 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
               </span>
             </div>
 
-            {/* Right: Nav + Employee + Clock */}
+            {/* Right: Employee + Clock */}
             <div className="flex items-center gap-3">
-              <Link
-                href="/pos/transactions"
-                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
-              >
-                <Receipt className="h-4 w-4" />
-                <span className="hidden sm:inline">Txns</span>
-              </Link>
-              <Link
-                href="/pos/end-of-day"
-                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
-              >
-                <CalendarClock className="h-4 w-4" />
-                <span className="hidden sm:inline">EOD</span>
-              </Link>
-              <div className="h-5 w-px bg-gray-200" />
               <span className="text-sm font-medium text-gray-700">
                 {displayName}
               </span>
@@ -118,7 +102,10 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-hidden">{children}</main>
+          <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+
+          {/* Bottom Navigation */}
+          <BottomNav />
         </div>
 
         {/* Checkout overlay renders on top of everything */}
