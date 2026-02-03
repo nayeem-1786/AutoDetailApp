@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils/cn';
 import { PinPad } from '../components/pin-pad';
+import { setPosSession } from '../pos-shell';
 
 export default function PosLoginPage() {
   const router = useRouter();
@@ -12,18 +13,6 @@ export default function PosLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [shake, setShake] = useState(false);
-
-  // Check if already authenticated
-  useEffect(() => {
-    async function checkSession() {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        router.replace('/pos');
-      }
-    }
-    checkSession();
-  }, [router]);
 
   const handleSubmit = useCallback(async (pin: string) => {
     setSubmitting(true);
@@ -42,19 +31,24 @@ export default function PosLoginPage() {
         throw new Error(data.error || 'Invalid PIN');
       }
 
-      const { token, email } = data;
+      const { token_hash } = data;
 
-      // Verify OTP to create a session
+      // Sign out existing session only AFTER successful PIN verification
       const supabase = createClient();
+      await supabase.auth.signOut();
+
+      // Verify OTP using the hashed token to create a session as the PIN employee
       const { error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token,
+        token_hash,
         type: 'magiclink',
       });
 
       if (verifyError) {
         throw new Error('Authentication failed. Please try again.');
       }
+
+      // Mark POS session as authenticated
+      setPosSession();
 
       router.replace('/pos');
     } catch (err) {

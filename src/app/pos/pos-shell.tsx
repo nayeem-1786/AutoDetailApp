@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -10,15 +10,100 @@ import {
 } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
 import { canAccessRoute } from '@/lib/auth/roles';
+import { createClient } from '@/lib/supabase/client';
 import { TicketProvider } from './context/ticket-context';
 import { CheckoutProvider } from './context/checkout-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
 
+const POS_SESSION_KEY = 'pos_session_authenticated';
+const POS_SESSION_TIMESTAMP_KEY = 'pos_session_timestamp';
+const DEFAULT_IDLE_TIMEOUT_MINUTES = 15;
+
+function getPosSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return sessionStorage.getItem(POS_SESSION_KEY) === 'true';
+}
+
+export function setPosSession() {
+  sessionStorage.setItem(POS_SESSION_KEY, 'true');
+  sessionStorage.setItem(POS_SESSION_TIMESTAMP_KEY, Date.now().toString());
+}
+
+export function clearPosSession() {
+  sessionStorage.removeItem(POS_SESSION_KEY);
+  sessionStorage.removeItem(POS_SESSION_TIMESTAMP_KEY);
+}
+
 function PosShellInner({ children }: { children: React.ReactNode }) {
-  const { employee, role, loading } = useAuth();
+  const { employee, role, loading, signOut } = useAuth();
   const router = useRouter();
   const [clock, setClock] = useState('');
+  const [posAuthenticated, setPosAuthenticated] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [idleTimeoutMinutes, setIdleTimeoutMinutes] = useState(DEFAULT_IDLE_TIMEOUT_MINUTES);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Load idle timeout setting from business_settings
+  useEffect(() => {
+    async function loadTimeout() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('business_settings')
+        .select('value')
+        .eq('key', 'pos_idle_timeout_minutes')
+        .single();
+
+      if (data?.value && typeof data.value === 'number' && data.value > 0) {
+        setIdleTimeoutMinutes(data.value);
+      }
+    }
+    loadTimeout();
+  }, []);
+
+  // Check POS session on mount
+  useEffect(() => {
+    setPosAuthenticated(getPosSession());
+    setCheckingSession(false);
+  }, []);
+
+  // Redirect if not authenticated or no POS session
+  useEffect(() => {
+    if (loading || checkingSession) return;
+
+    if (!employee || !posAuthenticated) {
+      router.replace('/pos/login');
+    }
+  }, [loading, checkingSession, employee, posAuthenticated, router]);
+
+  // Idle timeout — reset on user activity, sign out when expired
+  const handleIdleTimeout = useCallback(() => {
+    clearPosSession();
+    signOut();
+    router.replace('/pos/login');
+  }, [signOut, router]);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+    }
+    idleTimerRef.current = setTimeout(handleIdleTimeout, idleTimeoutMinutes * 60 * 1000);
+  }, [handleIdleTimeout, idleTimeoutMinutes]);
+
+  useEffect(() => {
+    if (!posAuthenticated) return;
+
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    const handler = () => resetIdleTimer();
+
+    events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
+    resetIdleTimer(); // Start initial timer
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, handler));
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [posAuthenticated, resetIdleTimer]);
 
   // Live clock
   useEffect(() => {
@@ -36,14 +121,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!loading && !employee) {
-      router.replace('/pos/login');
-    }
-  }, [loading, employee, router]);
-
-  if (loading) {
+  if (loading || checkingSession) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -51,7 +129,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!employee || !role) {
+  if (!employee || !role || !posAuthenticated) {
     return null;
   }
 

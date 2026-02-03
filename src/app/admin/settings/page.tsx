@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, ChevronRight } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight } from 'lucide-react';
 
 const settingsSections = [
   {
@@ -37,9 +37,16 @@ const settingsSections = [
   },
   {
     title: 'POS Favorites',
-    description: 'Configure quick-action tiles on the POS Favorites tab.',
+    description: 'Configure quick-action tiles on the POS Register tab.',
     href: '/admin/settings/pos-favorites',
     icon: Star,
+    roles: ['super_admin'] as const,
+  },
+  {
+    title: 'POS Idle Timeout',
+    description: 'Set how long the POS stays active before auto-logout.',
+    href: '/admin/settings/pos-idle-timeout',
+    icon: Timer,
     roles: ['super_admin'] as const,
   },
 ];

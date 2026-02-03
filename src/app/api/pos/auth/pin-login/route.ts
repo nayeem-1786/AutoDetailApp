@@ -124,13 +124,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
   }
 
-  // Extract the token hash from the generated link
-  const token = linkData.properties.hashed_token;
+  // Extract the hashed token — client will pass this to verifyOtp as token_hash
+  const token_hash = linkData.properties.hashed_token;
 
   clearFailures(ip);
 
   return NextResponse.json({
-    token,
-    email,
+    token_hash,
   });
 }

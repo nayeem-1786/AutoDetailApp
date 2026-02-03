@@ -8,7 +8,7 @@ const SETTINGS_KEY = 'pos_favorites';
 
 let cachedFavorites: FavoriteItem[] | null = null;
 let cacheTimestamp = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 1000; // 30 seconds — short TTL so admin changes appear quickly
 
 export function useFavorites() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>(cachedFavorites ?? []);

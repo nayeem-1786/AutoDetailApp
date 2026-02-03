@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LogOut,
   ShoppingCart,
@@ -13,9 +13,11 @@ import { cn } from '@/lib/utils/cn';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { useTicket } from '../context/ticket-context';
 import { useCheckout } from '../context/checkout-context';
+import { clearPosSession } from '../pos-shell';
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { employee, signOut } = useAuth();
   const { ticket } = useTicket();
   const { openCheckout } = useCheckout();
@@ -31,11 +33,17 @@ export function BottomNav() {
     }
   }
 
+  async function handleLogout() {
+    clearPosSession();
+    await signOut();
+    router.replace('/pos/login');
+  }
+
   return (
     <nav className="flex h-14 shrink-0 items-center justify-around border-t border-gray-200 bg-white px-2">
       {/* Log out */}
       <button
-        onClick={signOut}
+        onClick={handleLogout}
         className="flex flex-col items-center gap-0.5 px-3 py-1 text-gray-500 hover:text-gray-800"
       >
         <LogOut className="h-5 w-5" />

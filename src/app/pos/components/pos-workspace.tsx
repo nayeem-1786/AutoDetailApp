@@ -13,15 +13,13 @@ import { SearchBar } from './search-bar';
 import { ProductGrid, ServiceGrid } from './catalog-grid';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { TicketPanel } from './ticket-panel';
-import { KeypadTab } from './keypad-tab';
+import { RegisterTab } from './register-tab';
 import { CatalogBrowser } from './catalog-browser';
-import { FavoritesTab } from './favorites-tab';
 
-type PosTab = 'keypad' | 'favorites' | 'products' | 'services';
+type PosTab = 'register' | 'products' | 'services';
 
 const TABS: { key: PosTab; label: string }[] = [
-  { key: 'keypad', label: 'Keypad' },
-  { key: 'favorites', label: 'Favorites' },
+  { key: 'register', label: 'Register' },
   { key: 'products', label: 'Products' },
   { key: 'services', label: 'Services' },
 ];
@@ -30,7 +28,7 @@ export function PosWorkspace() {
   const { products, services, loading } = useCatalog();
   const { ticket, dispatch } = useTicket();
 
-  const [tab, setTab] = useState<PosTab>('keypad');
+  const [tab, setTab] = useState<PosTab>('register');
   const [search, setSearch] = useState('');
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
   const [showCustomerLookup, setShowCustomerLookup] = useState(false);
@@ -132,7 +130,7 @@ export function PosWorkspace() {
   }
 
   const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
-  const isGlobalSearch = search && (tab === 'keypad' || tab === 'favorites');
+  const isGlobalSearch = search && tab === 'register';
 
   return (
     <div className="grid h-full grid-cols-[1fr_380px]">
@@ -170,7 +168,7 @@ export function PosWorkspace() {
               <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
             </div>
           ) : isGlobalSearch ? (
-            // Global search results (from Keypad or Favorites)
+            // Global search results (from Register tab)
             <div className="space-y-4 p-4">
               {filteredProducts.length > 0 && (
                 <div>
@@ -194,11 +192,8 @@ export function PosWorkspace() {
                 </div>
               )}
             </div>
-          ) : tab === 'keypad' ? (
-            <KeypadTab />
-          ) : tab === 'favorites' ? (
-            <FavoritesTab
-              onSwitchToKeypad={() => setTab('keypad')}
+          ) : tab === 'register' ? (
+            <RegisterTab
               onOpenCustomerLookup={() => setShowCustomerLookup(true)}
             />
           ) : tab === 'products' ? (
