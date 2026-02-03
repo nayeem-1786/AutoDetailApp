@@ -872,7 +872,12 @@ Built but toggled OFF. Activate when business warrants:
 - Refunds/returns: partial or full, item selection, inventory restock, Stripe refund, points adjustment
 - Receipts via Mailgun (email) and/or Twilio (SMS)
 - End-of-day cash management: expected vs actual, variance, deposit recording, day summary
-- Role-based views per user type
+- Role-based views per user type (cashier restrictions: no EOD, no manual discounts, no settings; manager role badge in POS header)
+- Void transaction from transaction detail (admin/super-admin only, confirmation modal, irreversible)
+- Receipt re-send from transaction detail (print, email, SMS for any completed/voided/refunded transaction)
+- Manual ticket discount: dollar or percentage with optional label (e.g., "Employee discount"), manager-only
+- Admin transactions page: full transaction list with search, date/status filters, inline detail expansion, CSV export, receipt re-send
+- Cash drawer open/close tracking: opening float, drawer status banner on EOD page, green dot indicator in POS nav, auto-close on EOD submit
 - Ticket hold/park: suspend active ticket to start a new one, resume held tickets from queue
 - Clear cart confirmation dialog before clearing all items
 - POS "More" menu: quick access to admin panel, end-of-day, settings, common actions
@@ -1029,3 +1034,4 @@ These standards apply across all phases and should be implemented progressively:
 | v6 | 2026-02-02 | Status dropdown shows recommended transitions with "Override" group for staff flexibility. Account dropdown added to admin header bar (all pages). Staff role reassignment documented. |
 | v7 | 2026-02-02 | "Open POS" button added to admin header bar — opens `/pos` in new tab, navigation ready for Phase 2 POS build. |
 | v8 | 2026-02-02 | Phase 1 known gaps documented (product/service edit pages, settings sections). Phase 2 expanded: ticket hold/park, clear cart confirmation, POS "More" menu, quick-tender buttons, scanner indicator, line-item notes, keyboard shortcuts, expanded split payment, bidirectional POS↔Admin nav. New "UX & Accessibility Standards" cross-phase section added: global search (Cmd+K), bulk actions, multi-tag filtering, CSV export, breadcrumbs, loading states, dialog focus trapping, empty states, search placeholders, login consistency, audit log viewer. Customer transaction history tab wired to live data. |
+| v9 | 2026-02-02 | Phase 2 expanded: void transaction (admin-only, confirmation modal), receipt re-send from transaction detail (print/email/SMS), manual ticket discount (dollar/percent with label, manager-only), admin transactions page (search, filters, inline detail, CSV export, receipt actions), role-based POS views (cashier restrictions for EOD/discounts/settings, role badge in header), cash drawer open/close tracking (opening float, status banner, nav indicator, auto-close on EOD). |

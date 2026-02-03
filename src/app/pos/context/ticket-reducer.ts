@@ -9,6 +9,7 @@ export const initialTicketState: TicketState = {
   coupon: null,
   loyaltyPointsToRedeem: 0,
   loyaltyDiscount: 0,
+  manualDiscount: null,
   notes: null,
   subtotal: 0,
   taxAmount: 0,
@@ -29,8 +30,20 @@ function generateId(): string {
 }
 
 function recalculateTotals(state: TicketState): TicketState {
+  // Calculate subtotal first for percentage-based manual discount
+  const subtotal = state.items.reduce((sum, item) => sum + item.totalPrice, 0);
+
+  let manualDiscountAmount = 0;
+  if (state.manualDiscount) {
+    if (state.manualDiscount.type === 'dollar') {
+      manualDiscountAmount = state.manualDiscount.value;
+    } else {
+      manualDiscountAmount = Math.round(subtotal * state.manualDiscount.value / 100 * 100) / 100;
+    }
+  }
+
   const discountAmount =
-    (state.coupon?.discount ?? 0) + state.loyaltyDiscount;
+    (state.coupon?.discount ?? 0) + state.loyaltyDiscount + manualDiscountAmount;
   const totals = calculateTicketTotals(state.items, discountAmount);
   return { ...state, ...totals };
 }
@@ -205,6 +218,24 @@ export function ticketReducer(
         ...state,
         loyaltyPointsToRedeem: action.points,
         loyaltyDiscount: action.discount,
+      });
+    }
+
+    case 'APPLY_MANUAL_DISCOUNT': {
+      return recalculateTotals({
+        ...state,
+        manualDiscount: {
+          type: action.discountType,
+          value: action.value,
+          label: action.label,
+        },
+      });
+    }
+
+    case 'REMOVE_MANUAL_DISCOUNT': {
+      return recalculateTotals({
+        ...state,
+        manualDiscount: null,
       });
     }
 

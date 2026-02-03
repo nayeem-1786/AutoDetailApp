@@ -161,7 +161,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     <TicketProvider>
       <CheckoutProvider>
         <HeldTicketsProvider>
-          <PosShellContent displayName={displayName} clock={clock}>
+          <PosShellContent displayName={displayName} clock={clock} role={role}>
             {children}
           </PosShellContent>
         </HeldTicketsProvider>
@@ -175,10 +175,12 @@ function PosShellContent({
   children,
   displayName,
   clock,
+  role,
 }: {
   children: React.ReactNode;
   displayName: string;
   clock: string;
+  role: string;
 }) {
   const pathname = usePathname();
   const { ticket, dispatch } = useTicket();
@@ -293,6 +295,9 @@ function PosShellContent({
 
           <span className="text-sm font-medium text-gray-700">
             {displayName}
+          </span>
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+            {role === 'super_admin' ? 'Admin' : role === 'admin' ? 'Admin' : 'Cashier'}
           </span>
           <span className="text-sm tabular-nums text-gray-400">{clock}</span>
 

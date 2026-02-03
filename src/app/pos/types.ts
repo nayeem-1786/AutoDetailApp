@@ -36,6 +36,7 @@ export interface TicketState {
   coupon: { id: string; code: string; discount: number } | null;
   loyaltyPointsToRedeem: number;
   loyaltyDiscount: number;
+  manualDiscount: { type: 'dollar' | 'percent'; value: number; label: string } | null;
   notes: string | null;
   // Computed totals
   subtotal: number;
@@ -59,6 +60,8 @@ export type TicketAction =
   | { type: 'SET_LOYALTY_REDEEM'; points: number; discount: number }
   | { type: 'SET_NOTES'; notes: string | null }
   | { type: 'UPDATE_ITEM_NOTE'; itemId: string; note: string | null }
+  | { type: 'APPLY_MANUAL_DISCOUNT'; discountType: 'dollar' | 'percent'; value: number; label: string }
+  | { type: 'REMOVE_MANUAL_DISCOUNT' }
   | { type: 'RESTORE_TICKET'; state: TicketState }
   | { type: 'CLEAR_TICKET' };
 

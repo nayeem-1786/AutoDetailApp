@@ -9,6 +9,10 @@ import {
   DialogContent,
   DialogClose,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tag, X } from 'lucide-react';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { useTicket } from '../context/ticket-context';
 import { useCatalog } from '../hooks/use-catalog';
 import { TicketItemRow } from './ticket-item-row';
@@ -29,11 +33,17 @@ interface TicketPanelProps {
 }
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
+  const { role } = useAuth();
+  const isManager = role === 'super_admin' || role === 'admin';
   const { ticket, dispatch } = useTicket();
   const { services } = useCatalog();
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
+  const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountLabel, setDiscountLabel] = useState('');
 
   function handleSelectCustomer(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
@@ -82,6 +92,35 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     dispatch({ type: 'SET_VEHICLE', vehicle: null });
   }
 
+  function handleApplyDiscount() {
+    const parsed = parseFloat(discountValue);
+    if (isNaN(parsed) || parsed <= 0) {
+      toast.error('Enter a discount value greater than 0');
+      return;
+    }
+    if (discountType === 'percent' && parsed > 100) {
+      toast.error('Percentage discount cannot exceed 100%');
+      return;
+    }
+    dispatch({
+      type: 'APPLY_MANUAL_DISCOUNT',
+      discountType,
+      value: parsed,
+      label: discountLabel.trim(),
+    });
+    toast.success(
+      `Discount applied: ${discountType === 'percent' ? `${parsed}%` : `$${parsed.toFixed(2)}`}`
+    );
+    setShowDiscountForm(false);
+    setDiscountValue('');
+    setDiscountLabel('');
+  }
+
+  function handleRemoveDiscount() {
+    dispatch({ type: 'REMOVE_MANUAL_DISCOUNT' });
+    toast.info('Discount removed');
+  }
+
   return (
     <div className="flex h-full flex-col border-l border-gray-200 bg-white">
       {/* Header */}
@@ -123,11 +162,122 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         />
       </div>
 
-      {/* Coupon + Loyalty */}
+      {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (
         <div className="space-y-2 border-t border-gray-100 px-4 py-2">
           <CouponInput />
           <LoyaltyPanel />
+
+          {/* Manual Discount — manager only */}
+          {isManager && (
+            <>
+              {ticket.manualDiscount ? (
+                <div className="flex items-center justify-between rounded-md bg-red-50 px-3 py-1.5">
+                  <div className="flex items-center gap-1.5 text-sm text-red-700">
+                    <Tag className="h-3.5 w-3.5" />
+                    <span className="font-medium">
+                      {ticket.manualDiscount.label || 'Discount'}
+                    </span>
+                    <span className="text-red-600">
+                      {ticket.manualDiscount.type === 'percent'
+                        ? `${ticket.manualDiscount.value}%`
+                        : `-$${ticket.manualDiscount.value.toFixed(2)}`}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleRemoveDiscount}
+                    className="rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-700"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : showDiscountForm ? (
+                <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+                  {/* Toggle: Dollar / Percent */}
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setDiscountType('dollar')}
+                      className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                        discountType === 'dollar'
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Dollar ($)
+                    </button>
+                    <button
+                      onClick={() => setDiscountType('percent')}
+                      className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                        discountType === 'percent'
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Percent (%)
+                    </button>
+                  </div>
+
+                  {/* Value input */}
+                  <Input
+                    type="number"
+                    min="0"
+                    max={discountType === 'percent' ? '100' : undefined}
+                    step="0.01"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder={discountType === 'dollar' ? 'Amount ($)' : 'Percentage (%)'}
+                    className="h-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleApplyDiscount();
+                    }}
+                  />
+
+                  {/* Label input */}
+                  <Input
+                    value={discountLabel}
+                    onChange={(e) => setDiscountLabel(e.target.value)}
+                    placeholder="Reason (e.g., Employee discount)"
+                    className="h-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleApplyDiscount();
+                    }}
+                  />
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowDiscountForm(false);
+                        setDiscountValue('');
+                        setDiscountLabel('');
+                      }}
+                      className="h-8 flex-1 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleApplyDiscount}
+                      disabled={!discountValue.trim()}
+                      className="h-8 flex-1 text-xs"
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowDiscountForm(true)}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
+                >
+                  <Tag className="h-3 w-3" />
+                  Add Discount
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
 

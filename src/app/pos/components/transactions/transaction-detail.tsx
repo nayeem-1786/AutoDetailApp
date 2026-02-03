@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Ban, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format';
 import { RefundDialog } from '../refund/refund-dialog';
+import { ReceiptOptions } from '../receipt-options';
 import type {
   Transaction,
   TransactionItem,
@@ -49,6 +51,8 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
   const [transaction, setTransaction] = useState<FullTransaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [voiding, setVoiding] = useState(false);
 
   const fetchTransaction = useCallback(async () => {
     setLoading(true);
@@ -91,6 +95,39 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
   const canRefund =
     (role === 'super_admin' || role === 'admin') &&
     (transaction.status === 'completed' || transaction.status === 'partial_refund');
+
+  const canVoid =
+    (role === 'super_admin' || role === 'admin') &&
+    transaction.status === 'completed';
+
+  const showReceipt =
+    transaction.status === 'completed' ||
+    transaction.status === 'voided' ||
+    transaction.status === 'refunded' ||
+    transaction.status === 'partial_refund';
+
+  async function handleVoid() {
+    setVoiding(true);
+    try {
+      const res = await fetch(`/api/pos/transactions/${transactionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'void' }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || 'Failed to void transaction');
+        return;
+      }
+      toast.success('Transaction voided');
+      setShowVoidConfirm(false);
+      fetchTransaction();
+    } catch {
+      toast.error('Failed to void transaction');
+    } finally {
+      setVoiding(false);
+    }
+  }
 
   return (
     <div className="h-full overflow-auto bg-white">
@@ -383,18 +420,80 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
           </div>
         )}
 
-        {/* Issue Refund button */}
-        {canRefund && (
-          <div className="border-t border-gray-200 pt-4">
-            <Button
-              variant="destructive"
-              onClick={() => setShowRefundDialog(true)}
-            >
-              Issue Refund
-            </Button>
+        {/* Send Receipt */}
+        {showReceipt && (
+          <div className="mb-6 rounded-lg border border-gray-200 px-4 py-4">
+            <h2 className="mb-3 text-sm font-semibold text-gray-900">Send Receipt</h2>
+            <ReceiptOptions
+              transactionId={transactionId}
+              customerEmail={transaction.customer?.email ?? null}
+              customerPhone={transaction.customer?.phone ?? null}
+            />
+          </div>
+        )}
+
+        {/* Action buttons */}
+        {(canRefund || canVoid) && (
+          <div className="flex gap-3 border-t border-gray-200 pt-4">
+            {canRefund && (
+              <Button
+                variant="destructive"
+                onClick={() => setShowRefundDialog(true)}
+              >
+                Issue Refund
+              </Button>
+            )}
+            {canVoid && (
+              <Button
+                variant="outline"
+                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={() => setShowVoidConfirm(true)}
+              >
+                <Ban className="mr-1.5 h-4 w-4" />
+                Void Transaction
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Void Confirmation Modal */}
+      {showVoidConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">Void Transaction</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Are you sure you want to void this transaction? This action is irreversible
+              and will mark the transaction as voided.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowVoidConfirm(false)}
+                disabled={voiding}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleVoid}
+                disabled={voiding}
+              >
+                {voiding ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    Voiding...
+                  </>
+                ) : (
+                  'Void Transaction'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Refund Dialog */}
       {showRefundDialog && (

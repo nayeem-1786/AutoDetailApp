@@ -37,6 +37,24 @@ export function TicketTotals() {
         </div>
       )}
 
+      {ticket.manualDiscount && (
+        <div className="flex justify-between text-sm text-red-600">
+          <span>
+            {ticket.manualDiscount.label || 'Discount'} (
+            {ticket.manualDiscount.type === 'percent'
+              ? `${ticket.manualDiscount.value}%`
+              : `$${ticket.manualDiscount.value.toFixed(2)}`}
+            )
+          </span>
+          <span className="tabular-nums">
+            -$
+            {ticket.manualDiscount.type === 'percent'
+              ? (ticket.subtotal * ticket.manualDiscount.value / 100).toFixed(2)
+              : ticket.manualDiscount.value.toFixed(2)}
+          </span>
+        </div>
+      )}
+
       <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
         <span>Total</span>
         <span className="tabular-nums">${ticket.total.toFixed(2)}</span>

@@ -22,16 +22,32 @@ import { clearPosSession } from '../pos-shell';
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { employee, signOut } = useAuth();
+  const { employee, role, signOut } = useAuth();
+  const isManager = role === 'super_admin' || role === 'admin';
   const { ticket } = useTicket();
   const { openCheckout } = useCheckout();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const itemCount = ticket.items.length;
   const initials = employee
     ? `${employee.first_name?.[0] ?? ''}${employee.last_name?.[0] ?? ''}`.toUpperCase()
     : '';
+
+  // Read drawer session status from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('pos_drawer_session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        setDrawerOpen(session.status === 'open');
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   function handleCheckout() {
     if (itemCount > 0) {
@@ -99,17 +115,24 @@ export function BottomNav() {
         <span className="text-[10px] font-medium leading-tight">Txns</span>
       </Link>
 
-      {/* End of Day */}
-      <Link
-        href="/pos/end-of-day"
-        className={cn(
-          'flex flex-col items-center gap-0.5 px-3 py-1',
-          pathname === '/pos/end-of-day' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
-        )}
-      >
-        <CalendarClock className="h-5 w-5" />
-        <span className="text-[10px] font-medium leading-tight">EOD</span>
-      </Link>
+      {/* End of Day — manager only */}
+      {isManager && (
+        <Link
+          href="/pos/end-of-day"
+          className={cn(
+            'flex flex-col items-center gap-0.5 px-3 py-1',
+            pathname === '/pos/end-of-day' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+          )}
+        >
+          <div className="relative">
+            <CalendarClock className="h-5 w-5" />
+            {drawerOpen && (
+              <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500" />
+            )}
+          </div>
+          <span className="text-[10px] font-medium leading-tight">EOD</span>
+        </Link>
+      )}
 
       {/* More */}
       <div className="relative" ref={moreRef}>
@@ -135,24 +158,28 @@ export function BottomNav() {
               <ExternalLink className="h-4 w-4 text-gray-400" />
               Go to Admin
             </Link>
-            <Link
-              href="/pos/end-of-day"
-              onClick={() => setMoreOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Moon className="h-4 w-4 text-gray-400" />
-              End of Day
-            </Link>
-            <button
-              onClick={() => {
-                setMoreOpen(false);
-                // Settings placeholder - no settings page yet
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Settings className="h-4 w-4 text-gray-400" />
-              Settings
-            </button>
+            {isManager && (
+              <Link
+                href="/pos/end-of-day"
+                onClick={() => setMoreOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Moon className="h-4 w-4 text-gray-400" />
+                End of Day
+              </Link>
+            )}
+            {isManager && (
+              <button
+                onClick={() => {
+                  setMoreOpen(false);
+                  // Settings placeholder - no settings page yet
+                }}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Settings className="h-4 w-4 text-gray-400" />
+                Settings
+              </button>
+            )}
           </div>
         )}
       </div>

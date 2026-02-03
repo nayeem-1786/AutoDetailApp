@@ -6,8 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils/format';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { CashCountForm } from '../components/eod/cash-count-form';
 import { DaySummary } from '../components/eod/day-summary';
+import {
+  DrawerStatusBanner,
+  closeDrawerSession,
+  getLastOpeningFloat,
+} from '../components/eod/drawer-status';
 
 interface DaySummaryData {
   date: string;
@@ -25,6 +31,7 @@ interface DaySummaryData {
 }
 
 export default function EndOfDayPage() {
+  const { employee } = useAuth();
   const [summary, setSummary] = useState<DaySummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [countedCash, setCountedCash] = useState(0);
@@ -33,6 +40,16 @@ export default function EndOfDayPage() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Pre-fill next-day float from the last drawer session opening float
+  useEffect(() => {
+    const lastFloat = getLastOpeningFloat();
+    if (lastFloat !== null && nextDayFloat === '') {
+      setNextDayFloat(lastFloat.toFixed(2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     async function fetchSummary() {
@@ -81,6 +98,10 @@ export default function EndOfDayPage() {
       if (!res.ok) {
         throw new Error(json.error || 'Failed to close register');
       }
+
+      // Close the drawer session in localStorage
+      closeDrawerSession();
+      setDrawerOpen(false);
 
       toast.success('Register closed');
       setSubmitted(true);
@@ -146,6 +167,16 @@ export default function EndOfDayPage() {
 
   return (
     <div className="mx-auto max-w-2xl overflow-y-auto px-4 py-6">
+      {/* Drawer Status Banner */}
+      <DrawerStatusBanner
+        onStatusChange={(isOpen) => setDrawerOpen(isOpen)}
+        employeeName={
+          employee
+            ? `${employee.first_name ?? ''} ${employee.last_name ?? ''}`.trim()
+            : undefined
+        }
+      />
+
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">End of Day</h1>

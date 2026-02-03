@@ -391,6 +391,14 @@ POS MANAGEMENT
     └── POS Keyboard Shortcuts (view and customize)
 ```
 
+**Built features:**
+- Admin Transactions page (`/admin/transactions`): full list with search, date presets, status filter, inline detail expansion, CSV export, receipt re-send (print/email/SMS)
+- Void transaction: from POS transaction detail, admin/super-admin only, confirmation dialog, irreversible
+- Receipt re-send: from POS transaction detail, print/email/SMS for completed/voided/refunded transactions
+- Manual discount: dollar or percentage on active ticket, optional label (e.g., "Employee discount"), manager-only
+- Role-based POS views: cashiers cannot see EOD, settings, or manual discounts; role badge in POS header
+- Cash drawer tracking: opening float, status banner on EOD page, green dot in POS bottom nav, auto-close on EOD submit
+
 **Square parity:** Covers Transactions, Cash Drawers, Receipts, Tips. Adds quotes, refund management, and customer-facing screen config.
 
 ---
@@ -1261,3 +1269,4 @@ Public components pull business name, phone, and address from the `business_sett
 | v4 | 2026-02-01 | Added Public Website (SEO Pages) section: route structure, SEO features, ceramic coatings priority, 11 public Server Components, authentication boundary. |
 | v5 | 2026-02-01 | Public components now fetch business info (name, phone, address) from `business_settings` table via `getBusinessInfo()` with `React.cache()` deduplication. No more hardcoded business data in public pages. |
 | v6 | 2026-02-02 | POS Management: added Held Tickets section (hold/park/resume tickets). POS Settings: added Quick-Tender Buttons, Barcode Scanner Settings, POS Keyboard Shortcuts. |
+| v7 | 2026-02-02 | POS Management: admin transactions page built (search, date/status filters, inline detail, CSV export, receipt re-send). Void transaction from transaction detail. Receipt re-send (print/email/SMS). Manual ticket discount (dollar/percent, manager-only). Role-based POS views (cashier restrictions). Cash drawer open/close tracking with EOD integration. |
