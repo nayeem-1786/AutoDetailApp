@@ -398,6 +398,10 @@ POS MANAGEMENT
 - Manual discount: dollar or percentage on active ticket, optional label (e.g., "Employee discount"), manager-only
 - Role-based POS views: cashiers cannot see EOD, settings, or manual discounts; role badge in POS header
 - Cash drawer tracking: opening float, status banner on EOD page, green dot in POS bottom nav, auto-close on EOD submit
+- Quotes system (`/admin/quotes`): full CRUD with list/create/edit pages, status badges (draft/sent/viewed/accepted/expired/converted), customer picker, vehicle picker (with Add Vehicle dialog), line items with tiered service pricing (tier dropdown + vehicle size dropdown), auto-calculated totals, send via email (Mailgun) / SMS with PDF (Twilio MMS) / both, public quote view (`/quote/[token]`), accept online, convert to appointment, PDF generation endpoint
+  - Valid Until defaults to 10 days from today
+  - Quote numbers: sequential Q-0001 format
+  - Public quote page: server-rendered for SEO, accessible via access_token (no auth required)
 
 **Square parity:** Covers Transactions, Cash Drawers, Receipts, Tips. Adds quotes, refund management, and customer-facing screen config.
 
@@ -455,7 +459,15 @@ APPOINTMENTS
     └── Blocked Dates (holidays, vacations)
 ```
 
-**Square parity:** Covers Calendar, Waitlist, Online Booking, Settings. Adds 11 Labs integration, cancellation tracking, and widget embedding.
+**Built features:**
+- Calendar: month view with status-colored dots, day appointment list, detail/edit dialog, cancel dialog (Phase 1)
+- Staff scheduling page (`/admin/appointments/scheduling`): per-employee weekly schedule grid (Mon-Sun), blocked dates management with calendar picker and reason field
+- Waitlist admin panel (`/admin/appointments/waitlist`): list with status badges, filter by status/service/date, notify/book/cancel actions (gated by WAITLIST feature flag)
+- Enhanced slot availability: `/api/book/slots` checks employee_schedules + blocked_dates + business_hours
+- Webhook events fire for confirmed/cancelled/rescheduled/completed appointments
+- Cancellation auto-notifies matching waitlist entries via SMS
+
+**Square parity:** Covers Calendar, Waitlist, Online Booking, Settings. Adds 11 Labs integration, cancellation tracking, staff scheduling, and widget embedding.
 
 ---
 
@@ -1270,3 +1282,4 @@ Public components pull business name, phone, and address from the `business_sett
 | v5 | 2026-02-01 | Public components now fetch business info (name, phone, address) from `business_settings` table via `getBusinessInfo()` with `React.cache()` deduplication. No more hardcoded business data in public pages. |
 | v6 | 2026-02-02 | POS Management: added Held Tickets section (hold/park/resume tickets). POS Settings: added Quick-Tender Buttons, Barcode Scanner Settings, POS Keyboard Shortcuts. |
 | v7 | 2026-02-02 | POS Management: admin transactions page built (search, date/status filters, inline detail, CSV export, receipt re-send). Void transaction from transaction detail. Receipt re-send (print/email/SMS). Manual ticket discount (dollar/percent, manager-only). Role-based POS views (cashier restrictions). Cash drawer open/close tracking with EOD integration. |
+| v8 | 2026-02-03 | Phase 3 built features documented: Quotes system (admin CRUD pages, public view, PDF generation, send via email/SMS/both, tiered pricing in line items). Staff scheduling (weekly schedule grid, blocked dates). Waitlist admin panel. Enhanced slot availability. Webhook events for appointment lifecycle. 11 Labs Voice Agent API (6 endpoints). |

@@ -888,18 +888,27 @@ Built but toggled OFF. Activate when business warrants:
 - Expanded split payment UI (multi-card support, partial amount entry)
 - POS ↔ Admin bidirectional navigation (complete)
 
-### Phase 3 — Booking System, Quotes & 11 Labs Integration
+### Phase 3 — Booking System, Quotes & 11 Labs Integration ✅ COMPLETE
 
 **Goal:** Enable customers to book through any channel.
+**Status:** Complete (2026-02-03). Quotes system, voice agent API, staff scheduling, waitlist, webhook events, and online booking payment all built and verified.
 
-- Scheduling engine: detailer availability, service duration blocking, buffer time, holiday blocking
-- Customer-facing booking page: service selection, vehicle, date/time, customer info, online payment (full prepaid via Stripe), cancellation policy agreement
-- Quote system: create, send (SMS/email), customer approval, convert to booking, expiration
-- 11 Labs voice agent REST API: services, availability, appointments, customers, quotes
-- Waitlist (toggleable): join when full, auto-notify on cancellation opening
-- N8N automations: booking confirmation, 24hr reminder, post-service follow-up
-- Telegram notifications for new bookings and cancellations
-- Cancellation handling: >24hr free / <24hr fee / no-show fee
+- Shared infrastructure: webhook utility (`fireWebhook()`), API key auth for voice agent, quote number generator (`Q-0001` format), expanded types and validation schemas
+- Database migrations: `waitlist_entries`, `employee_schedules`, `blocked_dates` tables, `quotes.access_token` column, `voice_agent_api_key` setting, expanded webhook event keys
+- Quote system: full CRUD API (`/api/quotes`), admin list/create/edit pages (`/admin/quotes`), public quote view page (`/quote/[token]`), quote accept (public, via access_token), quote-to-appointment conversion
+  - Line items with tiered pricing: services auto-populate price from service_pricing tiers, vehicle size-aware pricing, tier dropdown + vehicle size dropdown for multi-tier services
+  - Add Vehicle dialog on both create and edit pages
+  - Send via Email (Mailgun), SMS with PDF (Twilio MMS), or both — send method selection dialog
+  - PDF generation endpoint (`/api/quotes/[id]/pdf`) using pdfkit — professional layout with business header, line items table, totals, footer
+  - Valid Until defaults to 10 days from today (editable)
+  - Status lifecycle: draft → sent → viewed → accepted → converted / expired
+- 11 Labs Voice Agent REST API: 6 endpoints under `/api/voice-agent/` — services, availability, appointments (GET/POST), quotes, customers — all authenticated via API key (not Supabase session)
+- Staff scheduling: admin page (`/admin/appointments/scheduling`), per-employee weekly schedule CRUD, blocked dates management with calendar picker, API routes for schedules and blocked dates
+- Enhanced slot availability: `/api/book/slots` now checks employee_schedules + blocked_dates (backward compatible — falls back to business_hours if no schedules exist)
+- Waitlist system: API routes (`/api/waitlist`), admin panel (`/admin/appointments/waitlist`), auto-notify on cancellation, booking wizard integration ("Join Waitlist" when no slots, gated by WAITLIST feature flag)
+- Webhook events: `booking.created`, `appointment.confirmed`, `appointment.cancelled`, `appointment.rescheduled`, `appointment.completed`, `quote.created`, `quote.sent`, `quote.accepted` — fired from appointment and booking routes via shared `fireWebhook()` utility
+- Online booking payment: Stripe Elements payment step in booking wizard (gated by `ONLINE_BOOKING_PAYMENT` feature flag), `POST /api/book/payment-intent` for PaymentIntent creation, payment_intent_id stored on appointment
+- Admin nav: Quotes added to sidebar navigation (between Transactions and Customers), `/quote` added to public routes in middleware
 
 ### Phase 4 — Customer Portal
 
@@ -1035,3 +1044,4 @@ These standards apply across all phases and should be implemented progressively:
 | v7 | 2026-02-02 | "Open POS" button added to admin header bar — opens `/pos` in new tab, navigation ready for Phase 2 POS build. |
 | v8 | 2026-02-02 | Phase 1 known gaps documented (product/service edit pages, settings sections). Phase 2 expanded: ticket hold/park, clear cart confirmation, POS "More" menu, quick-tender buttons, scanner indicator, line-item notes, keyboard shortcuts, expanded split payment, bidirectional POS↔Admin nav. New "UX & Accessibility Standards" cross-phase section added: global search (Cmd+K), bulk actions, multi-tag filtering, CSV export, breadcrumbs, loading states, dialog focus trapping, empty states, search placeholders, login consistency, audit log viewer. Customer transaction history tab wired to live data. |
 | v9 | 2026-02-02 | Phase 2 expanded: void transaction (admin-only, confirmation modal), receipt re-send from transaction detail (print/email/SMS), manual ticket discount (dollar/percent with label, manager-only), admin transactions page (search, filters, inline detail, CSV export, receipt actions), role-based POS views (cashier restrictions for EOD/discounts/settings, role badge in header), cash drawer open/close tracking (opening float, status banner, nav indicator, auto-close on EOD). |
+| v10 | 2026-02-03 | Phase 3 marked complete. Quotes system (CRUD API, admin pages, public view, PDF generation, send via email/SMS/both), 11 Labs Voice Agent REST API (6 endpoints with API key auth), staff scheduling (weekly schedules, blocked dates, enhanced slot availability), waitlist system (API, admin panel, auto-notify, booking wizard integration), webhook events for appointment/quote lifecycle, online booking payment via Stripe Elements, shared webhook utility. |

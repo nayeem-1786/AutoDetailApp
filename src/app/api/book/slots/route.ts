@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dayName = DAY_NAMES[dateObj.getUTCDay()];
+    const dayOfWeek = dateObj.getUTCDay(); // 0=Sun, 6=Sat
+    const dayName = DAY_NAMES[dayOfWeek];
     const supabase = createAdminClient();
 
     // Fetch business_hours and booking_config
@@ -87,9 +88,80 @@ export async function GET(request: NextRequest) {
       end: timeToMinutes(a.scheduled_end_time),
     }));
 
+    // --- Enhanced slot availability: employee schedules + blocked dates ---
+
+    // Get employee schedules for this day of week
+    const { data: employeeSchedules } = await supabase
+      .from('employee_schedules')
+      .select('employee_id, start_time, end_time, is_available')
+      .eq('day_of_week', dayOfWeek)
+      .eq('is_available', true);
+
+    // Get blocked dates for this date
+    const { data: blockedDates } = await supabase
+      .from('blocked_dates')
+      .select('employee_id')
+      .eq('date', dateStr);
+
+    // Determine the availability window
+    let openMin: number;
+    let closeMin: number;
+
+    const hasEmployeeSchedules = employeeSchedules && employeeSchedules.length > 0;
+
+    if (hasEmployeeSchedules) {
+      // Build set of blocked employee IDs (including those blocked by "all staff" entries)
+      const blockedEmployeeIds = new Set<string>();
+      let allStaffBlocked = false;
+
+      for (const bd of blockedDates ?? []) {
+        if (bd.employee_id === null) {
+          // All staff blocked on this date
+          allStaffBlocked = true;
+          break;
+        }
+        blockedEmployeeIds.add(bd.employee_id);
+      }
+
+      if (allStaffBlocked) {
+        // Everyone is blocked -- no slots
+        return NextResponse.json({ slots: [] });
+      }
+
+      // Filter out employees who are individually blocked
+      const availableSchedules = employeeSchedules.filter(
+        (es) => !blockedEmployeeIds.has(es.employee_id)
+      );
+
+      if (availableSchedules.length === 0) {
+        // All available employees are blocked on this date
+        return NextResponse.json({ slots: [] });
+      }
+
+      // Compute the UNION window (widest possible from all available employees)
+      let earliestOpen = Infinity;
+      let latestClose = -Infinity;
+
+      for (const es of availableSchedules) {
+        const esOpen = timeToMinutes(es.start_time);
+        const esClose = timeToMinutes(es.end_time);
+        if (esOpen < earliestOpen) earliestOpen = esOpen;
+        if (esClose > latestClose) latestClose = esClose;
+      }
+
+      // Clamp to business hours (don't exceed the business's overall window)
+      const businessOpen = timeToMinutes(dayHours.open);
+      const businessClose = timeToMinutes(dayHours.close);
+
+      openMin = Math.max(earliestOpen, businessOpen);
+      closeMin = Math.min(latestClose, businessClose);
+    } else {
+      // No employee schedules configured: fall back to business hours (backward compatible)
+      openMin = timeToMinutes(dayHours.open);
+      closeMin = timeToMinutes(dayHours.close);
+    }
+
     // Generate time slots
-    const openMin = timeToMinutes(dayHours.open);
-    const closeMin = timeToMinutes(dayHours.close);
     const slots: string[] = [];
 
     for (let t = openMin; t + totalNeeded <= closeMin; t += slotInterval) {
@@ -101,7 +173,29 @@ export async function GET(request: NextRequest) {
       );
 
       if (!hasConflict) {
-        slots.push(minutesToTime(t));
+        // If employee schedules exist, verify at least one available (non-blocked)
+        // employee covers this specific slot time range
+        if (hasEmployeeSchedules) {
+          const blockedEmployeeIds = new Set<string>();
+          for (const bd of blockedDates ?? []) {
+            if (bd.employee_id !== null) {
+              blockedEmployeeIds.add(bd.employee_id);
+            }
+          }
+
+          const slotCovered = employeeSchedules!.some((es) => {
+            if (blockedEmployeeIds.has(es.employee_id)) return false;
+            const esOpen = timeToMinutes(es.start_time);
+            const esClose = timeToMinutes(es.end_time);
+            return t >= esOpen && (t + totalNeeded) <= esClose;
+          });
+
+          if (slotCovered) {
+            slots.push(minutesToTime(t));
+          }
+        } else {
+          slots.push(minutesToTime(t));
+        }
       }
     }
 

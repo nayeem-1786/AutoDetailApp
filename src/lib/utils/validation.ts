@@ -260,6 +260,7 @@ export const bookingSubmitSchema = z.object({
   addons: z.array(bookingAddonSchema).default([]),
   notes: optionalString,
   channel: z.enum(['online', 'portal']).default('online'),
+  payment_intent_id: optionalString,
 });
 
 // Business hours day schema (open/close times or null for closed)
@@ -390,6 +391,71 @@ export const cashDrawerCloseSchema = z.object({
   notes: optionalString,
 });
 
+// ---------------------------------------------------------------------------
+// Quote schemas
+// ---------------------------------------------------------------------------
+
+export const quoteItemSchema = z.object({
+  item_name: requiredString,
+  quantity: z.coerce.number().int().min(1).default(1),
+  unit_price: positiveNumber,
+  service_id: z.string().uuid().optional().nullable(),
+  product_id: z.string().uuid().optional().nullable(),
+  tier_name: optionalString,
+  notes: optionalString,
+});
+
+export const createQuoteSchema = z.object({
+  customer_id: z.string().uuid(),
+  vehicle_id: z.string().uuid().optional().nullable(),
+  items: z.array(quoteItemSchema).min(1, 'At least one item is required'),
+  notes: optionalString,
+  valid_until: z.string().optional().nullable(),
+});
+
+export const updateQuoteSchema = z.object({
+  customer_id: z.string().uuid().optional(),
+  vehicle_id: z.string().uuid().optional().nullable(),
+  items: z.array(quoteItemSchema).min(1).optional(),
+  notes: optionalString,
+  valid_until: z.string().optional().nullable(),
+  status: z.enum(['draft', 'sent', 'viewed', 'accepted', 'expired', 'converted']).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Waitlist schemas
+// ---------------------------------------------------------------------------
+
+export const waitlistEntrySchema = z.object({
+  customer_id: z.string().uuid(),
+  service_id: z.string().uuid(),
+  preferred_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format').optional().nullable(),
+  preferred_time_start: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional().nullable(),
+  preferred_time_end: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional().nullable(),
+  notes: optionalString,
+});
+
+// ---------------------------------------------------------------------------
+// Employee schedule schemas
+// ---------------------------------------------------------------------------
+
+export const employeeScheduleSchema = z.object({
+  day_of_week: z.coerce.number().int().min(0).max(6),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format'),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format'),
+  is_available: z.boolean().default(true),
+});
+
+export const employeeWeeklyScheduleSchema = z.object({
+  schedules: z.array(employeeScheduleSchema),
+});
+
+export const blockedDateSchema = z.object({
+  employee_id: z.string().uuid().optional().nullable(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+  reason: optionalString,
+});
+
 // Type inference helpers
 export type BookingCustomerInput = z.infer<typeof bookingCustomerSchema>;
 export type BookingVehicleInput = z.infer<typeof bookingVehicleSchema>;
@@ -423,3 +489,10 @@ export type TransactionCreateInput = z.infer<typeof transactionCreateSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type RefundCreateInput = z.infer<typeof refundCreateSchema>;
 export type CashDrawerCloseInput = z.infer<typeof cashDrawerCloseSchema>;
+export type QuoteItemInput = z.infer<typeof quoteItemSchema>;
+export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
+export type UpdateQuoteInput = z.infer<typeof updateQuoteSchema>;
+export type WaitlistEntryInput = z.infer<typeof waitlistEntrySchema>;
+export type EmployeeScheduleInput = z.infer<typeof employeeScheduleSchema>;
+export type EmployeeWeeklyScheduleInput = z.infer<typeof employeeWeeklyScheduleSchema>;
+export type BlockedDateInput = z.infer<typeof blockedDateSchema>;

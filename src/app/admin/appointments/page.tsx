@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { Clock, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
+import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { AppointmentCalendar } from './components/appointment-calendar';
 import { DayAppointmentsList } from './components/day-appointments-list';
@@ -243,6 +246,24 @@ export default function AppointmentsPage() {
       <PageHeader
         title="Appointments"
         description={loading ? undefined : `${appointments.length} appointments this month`}
+        action={
+          (role === 'super_admin' || role === 'admin') ? (
+            <div className="flex items-center gap-2">
+              <Link href="/admin/appointments/waitlist">
+                <Button variant="outline" size="sm">
+                  <ClipboardList className="h-4 w-4" />
+                  Waitlist
+                </Button>
+              </Link>
+              <Link href="/admin/appointments/scheduling">
+                <Button variant="outline" size="sm">
+                  <Clock className="h-4 w-4" />
+                  Staff Scheduling
+                </Button>
+              </Link>
+            </div>
+          ) : undefined
+        }
       />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,400px]">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { appointmentUpdateSchema } from '@/lib/utils/validation';
 import { APPOINTMENT } from '@/lib/utils/constants';
+import { fireWebhook } from '@/lib/utils/webhook';
 
 export async function PATCH(
   request: NextRequest,
@@ -94,6 +95,40 @@ export async function PATCH(
         { error: 'Failed to update appointment' },
         { status: 500 }
       );
+    }
+
+    // Fire webhooks based on status changes
+    if (data.status && data.status !== current.status) {
+      const webhookPayload = {
+        event: '',
+        timestamp: new Date().toISOString(),
+        appointment: { id, status: data.status },
+      };
+
+      if (data.status === 'confirmed') {
+        fireWebhook('appointment_confirmed', { ...webhookPayload, event: 'appointment.confirmed' }, supabase).catch(err =>
+          console.error('Webhook fire failed:', err)
+        );
+      } else if (data.status === 'completed') {
+        fireWebhook('appointment_completed', { ...webhookPayload, event: 'appointment.completed' }, supabase).catch(err =>
+          console.error('Webhook fire failed:', err)
+        );
+      }
+    }
+
+    // Fire rescheduled webhook if date/time changed
+    if (dateChanged || timeChanged) {
+      fireWebhook('appointment_rescheduled', {
+        event: 'appointment.rescheduled',
+        timestamp: new Date().toISOString(),
+        appointment: {
+          id,
+          old_date: current.scheduled_date,
+          old_start_time: current.scheduled_start_time,
+          new_date: newDate,
+          new_start_time: newStart,
+        },
+      }, supabase).catch(err => console.error('Webhook fire failed:', err));
     }
 
     return NextResponse.json({ success: true, appointment: updated });

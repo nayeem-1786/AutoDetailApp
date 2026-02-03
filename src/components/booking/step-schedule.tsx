@@ -17,8 +17,12 @@ import {
   subMonths,
   getDay,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Clock, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
 import { formatTime } from '@/lib/utils/format';
 import type { BusinessHours, BookingConfig } from '@/lib/data/booking';
 
@@ -32,6 +36,22 @@ const DAY_NAMES = [
   'saturday',
 ] as const;
 
+// Generate time options in 30-minute increments for waitlist preference
+const TIME_OPTIONS: string[] = [];
+for (let h = 7; h <= 19; h++) {
+  for (const m of ['00', '30']) {
+    const hh = h.toString().padStart(2, '0');
+    TIME_OPTIONS.push(`${hh}:${m}`);
+  }
+}
+
+interface WaitlistPreference {
+  preferred_date: string;
+  preferred_time_start: string | null;
+  preferred_time_end: string | null;
+  notes: string | null;
+}
+
 interface StepScheduleProps {
   businessHours: BusinessHours;
   bookingConfig: BookingConfig;
@@ -40,6 +60,8 @@ interface StepScheduleProps {
   initialTime: string | null;
   onContinue: (date: string, time: string) => void;
   onBack: () => void;
+  waitlistEnabled?: boolean;
+  onJoinWaitlist?: (preference: WaitlistPreference) => void;
 }
 
 export function StepSchedule({
@@ -50,6 +72,8 @@ export function StepSchedule({
   initialTime,
   onContinue,
   onBack,
+  waitlistEnabled = false,
+  onJoinWaitlist,
 }: StepScheduleProps) {
   const today = new Date();
   const minDate = addDays(today, bookingConfig.advance_days_min);
@@ -67,11 +91,18 @@ export function StepSchedule({
   const [slots, setSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
+  // Waitlist state
+  const [waitlistTimeStart, setWaitlistTimeStart] = useState<string>('');
+  const [waitlistTimeEnd, setWaitlistTimeEnd] = useState<string>('');
+  const [waitlistNotes, setWaitlistNotes] = useState('');
+  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+
   // Fetch slots when date changes
   const fetchSlots = useCallback(async (date: Date) => {
     setLoadingSlots(true);
     setSlots([]);
     setSelectedTime(null);
+    setWaitlistSubmitted(false);
 
     const dateStr = format(date, 'yyyy-MM-dd');
     try {
@@ -202,10 +233,108 @@ export function StepSchedule({
               <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
             </div>
           ) : slots.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-gray-500">
-                No available times on this date. Try another day.
-              </p>
+            <div className="flex h-full flex-col items-center justify-center gap-4">
+              {waitlistEnabled && onJoinWaitlist && !waitlistSubmitted ? (
+                <Card className="w-full">
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-3">
+                      <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          No slots available on this date
+                        </p>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Join our waitlist and we&apos;ll notify you when a slot opens up.
+                        </p>
+
+                        <div className="mt-4 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label htmlFor="wl-time-start">Preferred start</Label>
+                              <Select
+                                id="wl-time-start"
+                                value={waitlistTimeStart}
+                                onChange={(e) => setWaitlistTimeStart(e.target.value)}
+                                className="mt-1"
+                              >
+                                <option value="">Any time</option>
+                                {TIME_OPTIONS.map((t) => (
+                                  <option key={t} value={t}>
+                                    {formatTime(t)}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor="wl-time-end">Preferred end</Label>
+                              <Select
+                                id="wl-time-end"
+                                value={waitlistTimeEnd}
+                                onChange={(e) => setWaitlistTimeEnd(e.target.value)}
+                                className="mt-1"
+                              >
+                                <option value="">Any time</option>
+                                {TIME_OPTIONS.map((t) => (
+                                  <option key={t} value={t}>
+                                    {formatTime(t)}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="wl-notes">Notes (optional)</Label>
+                            <Textarea
+                              id="wl-notes"
+                              value={waitlistNotes}
+                              onChange={(e) => setWaitlistNotes(e.target.value)}
+                              placeholder="Any scheduling preferences..."
+                              rows={2}
+                              className="mt-1"
+                            />
+                          </div>
+
+                          <Button
+                            className="w-full"
+                            onClick={() => {
+                              if (!selectedDate) return;
+                              const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                              onJoinWaitlist({
+                                preferred_date: dateStr,
+                                preferred_time_start: waitlistTimeStart || null,
+                                preferred_time_end: waitlistTimeEnd || null,
+                                notes: waitlistNotes || null,
+                              });
+                              setWaitlistSubmitted(true);
+                            }}
+                          >
+                            Join Waitlist for This Date
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : waitlistSubmitted ? (
+                <Card className="w-full">
+                  <CardContent className="flex items-center gap-3 p-5">
+                    <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Added to waitlist
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        We&apos;ll notify you when a slot opens up on this date.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No available times on this date. Try another day.
+                </p>
+              )}
             </div>
           ) : (
             <div>

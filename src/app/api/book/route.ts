@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { bookingSubmitSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
 import { APPOINTMENT } from '@/lib/utils/constants';
+import { fireWebhook } from '@/lib/utils/webhook';
 
 export async function POST(request: NextRequest) {
   try {
@@ -227,6 +228,17 @@ export async function POST(request: NextRequest) {
       console.error('Appointment services insertion failed:', junctionErr.message);
     }
 
+    // 8b. If payment was made online, update payment status
+    if (data.payment_intent_id) {
+      await supabase
+        .from('appointments')
+        .update({
+          stripe_payment_intent_id: data.payment_intent_id,
+          payment_status: 'paid',
+        })
+        .eq('id', appointment.id);
+    }
+
     // 9. Fire n8n webhook (non-blocking)
     const webhookPayload = {
       event: 'booking.created',
@@ -281,7 +293,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Fire-and-forget: don't await, don't block the response
-    fireWebhook(supabase, 'booking_created', webhookPayload).catch((err) =>
+    fireWebhook('booking_created', webhookPayload, supabase).catch((err) =>
       console.error('Webhook fire failed:', err)
     );
 
@@ -303,42 +315,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Webhook helper — fetches URL from business_settings and POSTs the payload
-// ---------------------------------------------------------------------------
-
-async function fireWebhook(
-  supabase: ReturnType<typeof createAdminClient>,
-  event: string,
-  payload: unknown
-): Promise<void> {
-  const { data: setting } = await supabase
-    .from('business_settings')
-    .select('value')
-    .eq('key', 'n8n_webhook_urls')
-    .single();
-
-  if (!setting?.value) return;
-
-  const urls = setting.value as Record<string, string | null>;
-  const url = urls[event];
-
-  if (!url) return;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(10_000), // 10s timeout
-  });
-
-  if (!res.ok) {
-    console.error(
-      `Webhook ${event} failed: ${res.status} ${res.statusText}`
     );
   }
 }

@@ -439,9 +439,66 @@ export interface Quote {
   viewed_at: string | null;
   accepted_at: string | null;
   converted_appointment_id: string | null;
+  access_token: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Joined relations
+  customer?: Customer;
+  vehicle?: Vehicle;
+  items?: QuoteItem[];
+}
+
+export interface QuoteItem {
+  id: string;
+  quote_id: string;
+  service_id: string | null;
+  product_id: string | null;
+  item_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  tier_name: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export type WaitlistStatus = 'waiting' | 'notified' | 'booked' | 'expired' | 'cancelled';
+
+export interface WaitlistEntry {
+  id: string;
+  customer_id: string;
+  service_id: string;
+  preferred_date: string | null;
+  preferred_time_start: string | null;
+  preferred_time_end: string | null;
+  status: WaitlistStatus;
+  notified_at: string | null;
+  notes: string | null;
+  created_at: string;
+  // Joined relations
+  customer?: Customer;
+  service?: Service;
+}
+
+export interface EmployeeSchedule {
+  id: string;
+  employee_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlockedDate {
+  id: string;
+  employee_id: string | null;
+  date: string;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface Photo {
