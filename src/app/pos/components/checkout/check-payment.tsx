@@ -85,7 +85,7 @@ export function CheckPayment() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
+    <div className="flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
         <p className="text-lg text-gray-500">Check Payment</p>
         <p className="mt-1 text-3xl font-bold text-gray-900">
@@ -127,7 +127,7 @@ export function CheckPayment() {
           size="lg"
           onClick={handleProcessCheck}
           disabled={processing}
-          className="min-w-[160px] bg-amber-600 hover:bg-amber-700"
+          className="min-w-[160px] bg-green-600 hover:bg-green-700"
         >
           {processing ? (
             <Loader2 className="h-5 w-5 animate-spin" />
