@@ -80,13 +80,16 @@ export interface CatalogService extends Service {
 
 export type FavoriteActionType = 'product' | 'service' | 'custom_amount' | 'customer_lookup' | 'discount' | 'surcharge';
 
+export type FavoriteColorShade = 10 | 25 | 40 | 60 | 80 | 100;
+
 export interface FavoriteItem {
   id: string;
   type: FavoriteActionType;
   referenceId: string | null;
   label: string;
   color: FavoriteColor;
+  colorShade?: FavoriteColorShade; // Intensity: 10%–100%, default 80% (Tailwind 500)
   percentage?: number; // For surcharge type: X% of subtotal
 }
 
-export type FavoriteColor = 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'amber' | 'teal' | 'pink';
+export type FavoriteColor = 'red' | 'orange' | 'fuchsia' | 'lime' | 'cyan' | 'teal' | 'blue' | 'indigo' | 'purple' | 'pink' | 'rose' | 'slate';
