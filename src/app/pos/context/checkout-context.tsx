@@ -34,6 +34,8 @@ interface CheckoutState {
   transactionId: string | null;
   customerEmail: string | null; // preserved for receipt after ticket clear
   customerPhone: string | null; // preserved for receipt after ticket clear
+  customerId: string | null; // preserved for type badge after ticket clear
+  customerTags: string[] | null; // preserved for type badge after ticket clear
   processing: boolean;
   error: string | null;
 }
@@ -47,7 +49,7 @@ interface CheckoutContextType extends CheckoutState {
   setCashPayment: (tendered: number, change: number) => void;
   setSplitCash: (cashPortion: number) => void;
   setCardResult: (intentId: string, brand: string | null, lastFour: string | null) => void;
-  setComplete: (transactionId: string, receiptNumber: string | null, customerEmail?: string | null, customerPhone?: string | null) => void;
+  setComplete: (transactionId: string, receiptNumber: string | null, customerEmail?: string | null, customerPhone?: string | null, customerId?: string | null, customerTags?: string[] | null) => void;
   setProcessing: (processing: boolean) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -70,6 +72,8 @@ const initialState: CheckoutState = {
   transactionId: null,
   customerEmail: null,
   customerPhone: null,
+  customerId: null,
+  customerTags: null,
   processing: false,
   error: null,
 };
@@ -120,13 +124,15 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   );
 
   const setComplete = useCallback(
-    (transactionId: string, receiptNumber: string | null, customerEmail?: string | null, customerPhone?: string | null) => {
+    (transactionId: string, receiptNumber: string | null, customerEmail?: string | null, customerPhone?: string | null, customerId?: string | null, customerTags?: string[] | null) => {
       setState((s) => ({
         ...s,
         transactionId,
         receiptNumber,
         customerEmail: customerEmail ?? null,
         customerPhone: customerPhone ?? null,
+        customerId: customerId ?? null,
+        customerTags: customerTags ?? null,
         step: 'complete',
         processing: false,
       }));

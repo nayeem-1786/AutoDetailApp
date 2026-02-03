@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatPhoneInput } from '@/lib/utils/format';
 import type { Customer } from '@/lib/supabase/types';
@@ -20,12 +20,14 @@ interface CustomerCreateDialogProps {
   open: boolean;
   onClose: () => void;
   onCreated: (customer: Customer) => void;
+  onBack?: () => void;
 }
 
 export function CustomerCreateDialog({
   open,
   onClose,
   onCreated,
+  onBack,
 }: CustomerCreateDialogProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -76,10 +78,27 @@ export function CustomerCreateDialog({
     onClose();
   }
 
+  function handleBack() {
+    setFirstName('');
+    setLastName('');
+    setPhone('');
+    onBack?.();
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogClose onClose={handleClose} />
       <DialogHeader>
+        {onBack && (
+          <button
+            type="button"
+            onClick={handleBack}
+            className="mb-1 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to search
+          </button>
+        )}
         <DialogTitle>New Customer</DialogTitle>
       </DialogHeader>
       <form onSubmit={handleSubmit}>

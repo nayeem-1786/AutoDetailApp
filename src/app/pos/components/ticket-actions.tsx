@@ -59,7 +59,7 @@ export function TicketActions() {
           disabled={!hasItems}
           onClick={openCheckout}
         >
-          Charge ${ticket.total.toFixed(2)}
+          Pay Now
         </Button>
       </div>
 

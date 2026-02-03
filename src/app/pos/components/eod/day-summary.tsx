@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Loader2, DollarSign, Receipt, Banknote, CreditCard } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 
 interface DaySummaryProps {
@@ -21,58 +21,33 @@ interface DaySummaryProps {
   loading: boolean;
 }
 
-function StatRow({
+function MetricCard({
+  icon: Icon,
+  iconBg,
+  iconColor,
   label,
   value,
-  negative,
+  detail,
 }: {
+  icon: React.ComponentType<{ className?: string }>;
+  iconBg: string;
+  iconColor: string;
   label: string;
   value: string;
-  negative?: boolean;
+  detail?: string;
 }) {
   return (
-    <div className="flex items-center justify-between py-1">
-      <span className="text-sm text-gray-600">{label}</span>
-      <span
-        className={`text-sm font-medium tabular-nums ${
-          negative ? 'text-red-600' : 'text-gray-900'
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function PaymentMethodRow({
-  method,
-  count,
-  amount,
-  tips,
-}: {
-  method: string;
-  count: number;
-  amount: number;
-  tips: number;
-}) {
-  return (
-    <div className="flex items-center justify-between py-1.5">
-      <div>
-        <span className="text-sm font-medium text-gray-700">{method}</span>
-        <span className="ml-2 text-xs text-gray-400">
-          {count} transaction{count !== 1 ? 's' : ''}
-        </span>
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="flex items-center gap-2">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconBg}`}>
+          <Icon className={`h-4 w-4 ${iconColor}`} />
+        </div>
+        <span className="text-xs font-medium text-gray-500">{label}</span>
       </div>
-      <div className="text-right">
-        <span className="text-sm font-medium tabular-nums text-gray-900">
-          {formatCurrency(amount)}
-        </span>
-        {tips > 0 && (
-          <span className="ml-2 text-xs tabular-nums text-gray-500">
-            + {formatCurrency(tips)} tips
-          </span>
-        )}
-      </div>
+      <p className="mt-2 text-2xl font-bold tabular-nums text-gray-900">{value}</p>
+      {detail && (
+        <p className="mt-0.5 text-xs text-gray-500">{detail}</p>
+      )}
     </div>
   );
 }
@@ -94,68 +69,43 @@ export function DaySummary({ summary, loading }: DaySummaryProps) {
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {/* Day Overview */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">
-          Day Overview
-        </h3>
-        <div className="space-y-0.5">
-          <StatRow
-            label="Total Transactions"
-            value={String(summary.total_transactions)}
-          />
-          <StatRow
-            label="Gross Revenue"
-            value={formatCurrency(summary.total_revenue)}
-          />
-          <div className="my-1.5 border-t border-gray-200" />
-          <StatRow
-            label="Subtotal"
-            value={formatCurrency(summary.total_subtotal)}
-          />
-          <StatRow
-            label="Tax Collected"
-            value={formatCurrency(summary.total_tax)}
-          />
-          <StatRow
-            label="Tips"
-            value={formatCurrency(summary.total_tips)}
-          />
-          <StatRow
-            label="Discounts"
-            value={formatCurrency(summary.total_discounts)}
-          />
-          <StatRow
-            label="Refunds"
-            value={`-${formatCurrency(summary.total_refunds)}`}
-            negative
-          />
-        </div>
-      </div>
+  const cashTotal = summary.payments_by_method.cash.amount + summary.payments_by_method.cash.tips;
+  const cardTotal = summary.payments_by_method.card.amount + summary.payments_by_method.card.tips;
 
-      {/* Payment Breakdown */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">
-          Payment Breakdown
-        </h3>
-        <div className="space-y-0.5">
-          <PaymentMethodRow
-            method="Cash"
-            count={summary.payments_by_method.cash.count}
-            amount={summary.payments_by_method.cash.amount}
-            tips={summary.payments_by_method.cash.tips}
-          />
-          <div className="border-t border-gray-200" />
-          <PaymentMethodRow
-            method="Card"
-            count={summary.payments_by_method.card.count}
-            amount={summary.payments_by_method.card.amount}
-            tips={summary.payments_by_method.card.tips}
-          />
-        </div>
-      </div>
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <MetricCard
+        icon={DollarSign}
+        iconBg="bg-green-50"
+        iconColor="text-green-600"
+        label="Total Revenue"
+        value={formatCurrency(summary.total_revenue)}
+        detail={`${formatCurrency(summary.total_tips)} in tips`}
+      />
+      <MetricCard
+        icon={Receipt}
+        iconBg="bg-blue-50"
+        iconColor="text-blue-600"
+        label="Transactions"
+        value={String(summary.total_transactions)}
+        detail={summary.total_refunds > 0 ? `${formatCurrency(summary.total_refunds)} refunds` : undefined}
+      />
+      <MetricCard
+        icon={Banknote}
+        iconBg="bg-emerald-50"
+        iconColor="text-emerald-600"
+        label="Cash Total"
+        value={formatCurrency(cashTotal)}
+        detail={`${summary.payments_by_method.cash.count} transaction${summary.payments_by_method.cash.count !== 1 ? 's' : ''}`}
+      />
+      <MetricCard
+        icon={CreditCard}
+        iconBg="bg-purple-50"
+        iconColor="text-purple-600"
+        label="Card Total"
+        value={formatCurrency(cardTotal)}
+        detail={`${summary.payments_by_method.card.count} transaction${summary.payments_by_method.card.count !== 1 ? 's' : ''}`}
+      />
     </div>
   );
 }

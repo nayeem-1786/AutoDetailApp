@@ -5,33 +5,25 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LogOut,
-  ShoppingCart,
+  Vault,
   Receipt,
-  CalendarClock,
   MoreHorizontal,
   ExternalLink,
-  Moon,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useAuth } from '@/lib/auth/auth-provider';
-import { useTicket } from '../context/ticket-context';
-import { useCheckout } from '../context/checkout-context';
 import { clearPosSession } from '../pos-shell';
 
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { employee, role, signOut } = useAuth();
-  const isManager = role === 'super_admin' || role === 'admin';
-  const { ticket } = useTicket();
-  const { openCheckout } = useCheckout();
+  const { employee, signOut } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const itemCount = ticket.items.length;
   const initials = employee
     ? `${employee.first_name?.[0] ?? ''}${employee.last_name?.[0] ?? ''}`.toUpperCase()
     : '';
@@ -49,11 +41,25 @@ export function BottomNav() {
     }
   }, []);
 
-  function handleCheckout() {
-    if (itemCount > 0) {
-      openCheckout();
+  // Listen for storage changes (when drawer opens/closes from other components)
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === 'pos_drawer_session') {
+        try {
+          if (e.newValue) {
+            const session = JSON.parse(e.newValue);
+            setDrawerOpen(session.status === 'open');
+          } else {
+            setDrawerOpen(false);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     }
-  }
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   async function handleLogout() {
     clearPosSession();
@@ -84,24 +90,22 @@ export function BottomNav() {
         <span className="text-[10px] font-medium leading-tight">{initials || 'Out'}</span>
       </button>
 
-      {/* Checkout */}
-      <button
-        onClick={handleCheckout}
+      {/* Register */}
+      <Link
+        href="/pos/end-of-day"
         className={cn(
-          'relative flex flex-col items-center gap-0.5 px-3 py-1',
-          itemCount > 0 ? 'text-gray-800' : 'text-gray-400'
+          'flex flex-col items-center gap-0.5 px-3 py-1',
+          pathname === '/pos/end-of-day' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
         )}
       >
         <div className="relative">
-          <ShoppingCart className="h-5 w-5" />
-          {itemCount > 0 && (
-            <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-              {itemCount}
-            </span>
+          <Vault className="h-5 w-5" />
+          {drawerOpen && (
+            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500" />
           )}
         </div>
-        <span className="text-[10px] font-medium leading-tight">Checkout</span>
-      </button>
+        <span className="text-[10px] font-medium leading-tight">Register</span>
+      </Link>
 
       {/* Transactions */}
       <Link
@@ -112,27 +116,8 @@ export function BottomNav() {
         )}
       >
         <Receipt className="h-5 w-5" />
-        <span className="text-[10px] font-medium leading-tight">Txns</span>
+        <span className="text-[10px] font-medium leading-tight">Transactions</span>
       </Link>
-
-      {/* End of Day — manager only */}
-      {isManager && (
-        <Link
-          href="/pos/end-of-day"
-          className={cn(
-            'flex flex-col items-center gap-0.5 px-3 py-1',
-            pathname === '/pos/end-of-day' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
-          )}
-        >
-          <div className="relative">
-            <CalendarClock className="h-5 w-5" />
-            {drawerOpen && (
-              <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500" />
-            )}
-          </div>
-          <span className="text-[10px] font-medium leading-tight">EOD</span>
-        </Link>
-      )}
 
       {/* More */}
       <div className="relative" ref={moreRef}>
@@ -158,28 +143,16 @@ export function BottomNav() {
               <ExternalLink className="h-4 w-4 text-gray-400" />
               Go to Admin
             </Link>
-            {isManager && (
-              <Link
-                href="/pos/end-of-day"
-                onClick={() => setMoreOpen(false)}
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <Moon className="h-4 w-4 text-gray-400" />
-                End of Day
-              </Link>
-            )}
-            {isManager && (
-              <button
-                onClick={() => {
-                  setMoreOpen(false);
-                  // Settings placeholder - no settings page yet
-                }}
-                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <Settings className="h-4 w-4 text-gray-400" />
-                Settings
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setMoreOpen(false);
+                // Settings placeholder - no settings page yet
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <Settings className="h-4 w-4 text-gray-400" />
+              Settings
+            </button>
           </div>
         )}
       </div>

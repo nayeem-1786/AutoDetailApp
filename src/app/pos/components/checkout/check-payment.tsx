@@ -69,7 +69,9 @@ export function CheckPayment() {
         json.data.id,
         json.data.receipt_number,
         ticket.customer?.email,
-        ticket.customer?.phone
+        ticket.customer?.phone,
+        ticket.customer?.id,
+        ticket.customer?.tags
       );
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {

@@ -92,6 +92,12 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     dispatch({ type: 'SET_VEHICLE', vehicle: null });
   }
 
+  function handleCustomerTagsChanged(newTags: string[]) {
+    if (ticket.customer) {
+      dispatch({ type: 'SET_CUSTOMER', customer: { ...ticket.customer, tags: newTags } });
+    }
+  }
+
   function handleApplyDiscount() {
     const parsed = parseFloat(discountValue);
     if (isNaN(parsed) || parsed <= 0) {
@@ -123,6 +129,24 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
   return (
     <div className="flex h-full flex-col border-l border-gray-200 bg-white">
+      {/* Customer / Vehicle summary */}
+      <div className="border-b border-gray-100 px-4 py-2">
+        <CustomerVehicleSummary
+          customer={ticket.customer}
+          vehicle={ticket.vehicle}
+          onChangeCustomer={() => onCustomerLookupChange(true)}
+          onChangeVehicle={() => {
+            if (ticket.customer) {
+              setShowVehicleSelector(true);
+            } else {
+              onCustomerLookupChange(true);
+            }
+          }}
+          onClear={handleClearCustomer}
+          onCustomerTagsChanged={handleCustomerTagsChanged}
+        />
+      </div>
+
       {/* Header */}
       <div className="border-b border-gray-200 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -143,23 +167,6 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
             ))}
           </div>
         )}
-      </div>
-
-      {/* Customer / Vehicle summary */}
-      <div className="border-t border-gray-100 px-4 py-2">
-        <CustomerVehicleSummary
-          customer={ticket.customer}
-          vehicle={ticket.vehicle}
-          onChangeCustomer={() => onCustomerLookupChange(true)}
-          onChangeVehicle={() => {
-            if (ticket.customer) {
-              setShowVehicleSelector(true);
-            } else {
-              onCustomerLookupChange(true);
-            }
-          }}
-          onClear={handleClearCustomer}
-        />
       </div>
 
       {/* Coupon + Loyalty + Discount */}
@@ -312,6 +319,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         open={showCustomerCreate}
         onClose={() => setShowCustomerCreate(false)}
         onCreated={handleCustomerCreated}
+        onBack={() => {
+          setShowCustomerCreate(false);
+          onCustomerLookupChange(true);
+        }}
       />
 
       {/* Vehicle Selector Dialog */}

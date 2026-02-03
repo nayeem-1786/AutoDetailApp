@@ -6,6 +6,10 @@ import { formatCurrency } from '@/lib/utils/format';
 
 interface CashCountFormProps {
   onTotalChange: (total: number) => void;
+  title?: string;
+  compact?: boolean;
+  /** When true, coin denominations (25¢, 10¢, 5¢, 1¢) are hidden */
+  skipChange?: boolean;
 }
 
 const denominations = [
@@ -31,11 +35,15 @@ function buildInitialCounts(): DenominationCounts {
   return counts;
 }
 
-export function CashCountForm({ onTotalChange }: CashCountFormProps) {
+export function CashCountForm({ onTotalChange, title, compact, skipChange }: CashCountFormProps) {
   const [counts, setCounts] = useState<DenominationCounts>(buildInitialCounts);
 
-  const total = denominations.reduce(
-    (sum, d) => sum + (counts[d.value] || 0) * d.value,
+  const visibleDenominations = skipChange
+    ? denominations.filter((d) => d.value >= 1)
+    : [...denominations];
+
+  const total = visibleDenominations.reduce(
+    (sum: number, d) => sum + (counts[d.value] || 0) * d.value,
     0
   );
 
@@ -46,6 +54,19 @@ export function CashCountForm({ onTotalChange }: CashCountFormProps) {
     onTotalChange(roundedTotal);
   }, [roundedTotal, onTotalChange]);
 
+  // Clear coin counts when skipChange is toggled on
+  useEffect(() => {
+    if (skipChange) {
+      setCounts((prev) => {
+        const next = { ...prev };
+        for (const d of denominations) {
+          if (d.value < 1) next[d.value] = 0;
+        }
+        return next;
+      });
+    }
+  }, [skipChange]);
+
   const handleCountChange = useCallback((value: number, count: string) => {
     const parsed = parseInt(count, 10);
     setCounts((prev) => ({
@@ -55,7 +76,11 @@ export function CashCountForm({ onTotalChange }: CashCountFormProps) {
   }, []);
 
   return (
-    <div className="space-y-1">
+    <div className={compact ? 'space-y-0.5' : 'space-y-1'}>
+      {/* Title */}
+      {title && (
+        <h3 className="mb-2 text-sm font-semibold text-gray-900">{title}</h3>
+      )}
       {/* Header */}
       <div className="grid grid-cols-[4rem_5rem_1fr] items-center gap-2 px-1 text-xs font-medium text-gray-500">
         <span>Denom</span>
@@ -64,13 +89,13 @@ export function CashCountForm({ onTotalChange }: CashCountFormProps) {
       </div>
 
       {/* Denomination rows */}
-      {denominations.map((d) => {
+      {visibleDenominations.map((d) => {
         const subtotal = (counts[d.value] || 0) * d.value;
         const roundedSubtotal = Math.round(subtotal * 100) / 100;
         return (
           <div
             key={d.value}
-            className="grid grid-cols-[4rem_5rem_1fr] items-center gap-2 px-1 py-0.5"
+            className={`grid grid-cols-[4rem_5rem_1fr] items-center gap-2 px-1 ${compact ? 'py-0' : 'py-0.5'}`}
           >
             <span className="text-sm font-medium text-gray-700">
               {d.label}

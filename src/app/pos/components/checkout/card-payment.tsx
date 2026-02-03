@@ -128,6 +128,7 @@ export function CardPayment() {
       const custId = ticket.customer?.id || null;
       const custEmail = ticket.customer?.email;
       const custPhone = ticket.customer?.phone;
+      const custTags = ticket.customer?.tags || null;
 
       fetch('/api/pos/card-customer', {
         method: 'POST',
@@ -148,7 +149,9 @@ export function CardPayment() {
               txId,
               txJson.data.receipt_number,
               data.matched_customer.email || custEmail,
-              data.matched_customer.phone || custPhone
+              data.matched_customer.phone || custPhone,
+              data.matched_customer.id,
+              data.matched_customer.tags
             );
           }
         })
@@ -162,7 +165,9 @@ export function CardPayment() {
         txId,
         txJson.data.receipt_number,
         custEmail,
-        custPhone
+        custPhone,
+        custId,
+        custTags
       );
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {

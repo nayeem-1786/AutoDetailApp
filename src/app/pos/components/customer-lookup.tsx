@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Search, UserPlus, UserX, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
+import { CustomerTypeBadge } from './customer-type-badge';
 import type { Customer } from '@/lib/supabase/types';
 
 interface CustomerLookupProps {
@@ -20,6 +21,7 @@ interface SearchResult {
   email: string | null;
   loyalty_points_balance: number;
   visit_count: number;
+  tags: string[];
 }
 
 export function CustomerLookup({
@@ -94,12 +96,14 @@ export function CustomerLookup({
       {results.length > 0 && (
         <div className="max-h-48 overflow-y-auto rounded-md border border-gray-200">
           {results.map((r) => (
-            <button
+            <div
               key={r.id}
-              onClick={() => handleSelectResult(r)}
-              className="flex w-full items-center justify-between border-b border-gray-100 px-3 py-2.5 text-left last:border-b-0 hover:bg-gray-50"
+              className="flex w-full items-center justify-between border-b border-gray-100 px-3 py-2.5 last:border-b-0 hover:bg-gray-50"
             >
-              <div>
+              <button
+                onClick={() => handleSelectResult(r)}
+                className="flex-1 text-left"
+              >
                 <p className="text-sm font-medium text-gray-900">
                   {r.first_name} {r.last_name}
                 </p>
@@ -108,18 +112,34 @@ export function CustomerLookup({
                     {formatPhone(r.phone)}
                   </p>
                 )}
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">
-                  {r.visit_count} visit{r.visit_count !== 1 ? 's' : ''}
-                </p>
-                {r.loyalty_points_balance > 0 && (
-                  <p className="text-xs text-amber-600">
-                    {r.loyalty_points_balance} pts
+              </button>
+              <div className="flex items-center gap-2">
+                <CustomerTypeBadge
+                  customerId={r.id}
+                  tags={r.tags}
+                  onTypeChanged={(newTags) => {
+                    setResults((prev) =>
+                      prev.map((item) =>
+                        item.id === r.id ? { ...item, tags: newTags } : item
+                      )
+                    );
+                  }}
+                />
+                <button
+                  onClick={() => handleSelectResult(r)}
+                  className="text-right"
+                >
+                  <p className="text-xs text-gray-500">
+                    {r.visit_count} visit{r.visit_count !== 1 ? 's' : ''}
                   </p>
-                )}
+                  {r.loyalty_points_balance > 0 && (
+                    <p className="text-xs text-amber-600">
+                      {r.loyalty_points_balance} pts
+                    </p>
+                  )}
+                </button>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
