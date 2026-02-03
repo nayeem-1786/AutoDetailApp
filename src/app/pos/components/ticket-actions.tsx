@@ -59,7 +59,7 @@ export function TicketActions() {
           disabled={!hasItems}
           onClick={openCheckout}
         >
-          Pay Now
+          Checkout
         </Button>
       </div>
 
