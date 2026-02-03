@@ -73,7 +73,7 @@ export interface CatalogService extends Service {
 
 // ─── Favorites ────────────────────────────────────────────────
 
-export type FavoriteActionType = 'product' | 'service' | 'custom_amount' | 'customer_lookup' | 'discount';
+export type FavoriteActionType = 'product' | 'service' | 'custom_amount' | 'customer_lookup' | 'discount' | 'surcharge';
 
 export interface FavoriteItem {
   id: string;
@@ -81,6 +81,7 @@ export interface FavoriteItem {
   referenceId: string | null;
   label: string;
   color: FavoriteColor;
+  percentage?: number; // For surcharge type: X% of subtotal
 }
 
 export type FavoriteColor = 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'amber' | 'teal' | 'pink';

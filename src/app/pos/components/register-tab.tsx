@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Users, DollarSign, Tag, Package, Wrench, X } from 'lucide-react';
+import { Loader2, Users, DollarSign, Tag, Package, Wrench, Percent, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useFavorites } from '../hooks/use-favorites';
 import { useCatalog } from '../hooks/use-catalog';
@@ -29,6 +29,7 @@ const TYPE_ICONS: Record<string, typeof Package> = {
   custom_amount: DollarSign,
   customer_lookup: Users,
   discount: Tag,
+  surcharge: Percent,
 };
 
 interface RegisterTabProps {
@@ -104,6 +105,28 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
       case 'customer_lookup':
         onOpenCustomerLookup();
         break;
+      case 'surcharge': {
+        const pct = Number(fav.percentage);
+        if (!pct || pct <= 0) {
+          toast.error('Surcharge percentage not configured — edit this favorite in Admin > Settings');
+          return;
+        }
+        const subtotal = ticket.subtotal;
+        if (subtotal <= 0) {
+          toast.error('Add items before applying a surcharge');
+          return;
+        }
+        const rate = pct / 100;
+        const amount = Math.round(subtotal * rate * 100) / 100;
+        dispatch({
+          type: 'ADD_CUSTOM_ITEM',
+          name: fav.label,
+          price: amount,
+          isTaxable: false,
+        });
+        toast.success(`Added ${fav.label}: $${amount.toFixed(2)}`);
+        break;
+      }
       case 'discount':
         toast.info('Coupon input coming soon');
         break;

@@ -23,6 +23,7 @@ const TYPE_OPTIONS: { value: FavoriteActionType; label: string }[] = [
   { value: 'custom_amount', label: 'Custom Amount' },
   { value: 'customer_lookup', label: 'Customer Lookup' },
   { value: 'discount', label: 'Discount' },
+  { value: 'surcharge', label: 'Surcharge (% of sale)' },
 ];
 
 const COLOR_CLASSES: Record<FavoriteColor, string> = {
@@ -42,6 +43,7 @@ const TYPE_BADGES: Record<FavoriteActionType, { label: string; className: string
   custom_amount: { label: 'Custom', className: 'bg-amber-100 text-amber-700' },
   customer_lookup: { label: 'Customer', className: 'bg-green-100 text-green-700' },
   discount: { label: 'Discount', className: 'bg-red-100 text-red-700' },
+  surcharge: { label: 'Surcharge', className: 'bg-orange-100 text-orange-700' },
 };
 
 interface CatalogItem {
@@ -62,6 +64,7 @@ export default function PosFavoritesPage() {
   const [newLabel, setNewLabel] = useState('');
   const [newColor, setNewColor] = useState<FavoriteColor>('blue');
   const [newReferenceId, setNewReferenceId] = useState('');
+  const [newPercentage, setNewPercentage] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -140,6 +143,11 @@ export default function PosFavoritesPage() {
       toast.error(`Select a ${newType}`);
       return;
     }
+    const parsedPct = parseFloat(newPercentage);
+    if (newType === 'surcharge' && (!parsedPct || parsedPct <= 0 || parsedPct > 100)) {
+      toast.error('Enter a valid percentage (1–100)');
+      return;
+    }
 
     const item: FavoriteItem = {
       id: typeof crypto.randomUUID === 'function'
@@ -149,11 +157,13 @@ export default function PosFavoritesPage() {
       referenceId: (newType === 'product' || newType === 'service') ? newReferenceId : null,
       label: newLabel.trim(),
       color: newColor,
+      ...(newType === 'surcharge' ? { percentage: parsedPct } : {}),
     };
 
     setFavorites([...favorites, item]);
     setNewLabel('');
     setNewReferenceId('');
+    setNewPercentage('');
     setNewType('product');
     setNewColor('blue');
     setShowAdd(false);
@@ -214,6 +224,7 @@ export default function PosFavoritesPage() {
                       setNewType(e.target.value as FavoriteActionType);
                       setNewReferenceId('');
                       setNewLabel('');
+                      setNewPercentage('');
                     }}
                   >
                     {TYPE_OPTIONS.map((opt) => (
@@ -234,6 +245,21 @@ export default function PosFavoritesPage() {
                         <option key={item.id} value={item.id}>{item.name}</option>
                       ))}
                     </Select>
+                  </FormField>
+                )}
+
+                {newType === 'surcharge' && (
+                  <FormField label="Percentage (%)" htmlFor="fav-pct">
+                    <Input
+                      id="fav-pct"
+                      type="number"
+                      min="0.1"
+                      max="100"
+                      step="0.1"
+                      value={newPercentage}
+                      onChange={(e) => setNewPercentage(e.target.value)}
+                      placeholder="e.g. 5"
+                    />
                   </FormField>
                 )}
 
@@ -291,6 +317,9 @@ export default function PosFavoritesPage() {
                     {/* Label */}
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
                       {fav.label}
+                      {fav.type === 'surcharge' && fav.percentage != null && (
+                        <span className="ml-1.5 text-xs font-normal text-gray-500">({fav.percentage}%)</span>
+                      )}
                     </span>
 
                     {/* Type badge */}

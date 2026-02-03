@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -38,6 +38,7 @@ export function clearPosSession() {
 function PosShellInner({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [clock, setClock] = useState('');
   const [posAuthenticated, setPosAuthenticated] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -156,14 +157,14 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
         <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
           {/* Top Bar — simplified: logo, employee name, clock */}
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
-            {/* Left: Back to Admin + Logo */}
+            {/* Left: Back navigation + Logo */}
             <div className="flex items-center gap-4">
               <Link
-                href="/admin"
+                href={pathname === '/pos' ? '/admin' : '/pos'}
                 className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Admin</span>
+                <span className="hidden sm:inline">{pathname === '/pos' ? 'Admin' : 'POS'}</span>
               </Link>
               <span className="text-lg font-semibold text-gray-900">
                 Smart Detail POS

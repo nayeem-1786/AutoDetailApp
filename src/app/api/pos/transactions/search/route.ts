@@ -58,12 +58,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Date filters
+    // Date filters (expects full ISO strings with timezone, e.g. from the frontend)
     if (dateFrom) {
       query = query.gte('transaction_date', dateFrom);
     }
     if (dateTo) {
-      query = query.lte('transaction_date', dateTo + 'T23:59:59');
+      query = query.lte('transaction_date', dateTo);
     }
 
     // Order and paginate

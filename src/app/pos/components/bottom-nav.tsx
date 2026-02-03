@@ -74,7 +74,7 @@ export function BottomNav() {
         href="/pos/transactions"
         className={cn(
           'flex flex-col items-center gap-0.5 px-3 py-1',
-          pathname === '/pos/transactions' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+          pathname.startsWith('/pos/transactions') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
         )}
       >
         <Receipt className="h-5 w-5" />
