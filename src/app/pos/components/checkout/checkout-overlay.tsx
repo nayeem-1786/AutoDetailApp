@@ -2,10 +2,10 @@
 
 import { X } from 'lucide-react';
 import { useCheckout } from '../../context/checkout-context';
-import { TipScreen } from './tip-screen';
 import { PaymentMethodScreen } from './payment-method-screen';
 import { CashPayment } from './cash-payment';
 import { CardPayment } from './card-payment';
+import { CheckPayment } from './check-payment';
 import { SplitPayment } from './split-payment';
 import { PaymentComplete } from './payment-complete';
 
@@ -31,10 +31,10 @@ export function CheckoutOverlay() {
 
         {/* Step content */}
         <div className="flex h-full flex-col overflow-y-auto">
-          {step === 'tip' && <TipScreen />}
           {step === 'payment-method' && <PaymentMethodScreen />}
           {step === 'cash' && <CashPayment />}
           {step === 'card' && <CardPayment />}
+          {step === 'check' && <CheckPayment />}
           {step === 'split' && <SplitPayment />}
           {step === 'complete' && <PaymentComplete />}
         </div>

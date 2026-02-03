@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { TIP_PRESETS } from '@/lib/utils/constants';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -18,7 +19,7 @@ export function CardPayment() {
   const { ticket, dispatch } = useTicket();
   const checkout = useCheckout();
 
-  const amountDue = ticket.total + checkout.tipAmount;
+  const amountDue = ticket.total;
   const [status, setStatus] = useState<CardStatus>('creating-intent');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -27,7 +28,7 @@ export function CardPayment() {
     setErrorMsg(null);
 
     try {
-      // 1. Create PaymentIntent
+      // 1. Create PaymentIntent with base amount (no tip baked in)
       const amountCents = Math.round(amountDue * 100);
       const piRes = await fetch('/api/pos/stripe/payment-intent', {
         method: 'POST',
@@ -45,19 +46,34 @@ export function CardPayment() {
 
       setStatus('waiting-for-card');
 
-      // 2. Collect payment method via terminal
+      // 2. Collect payment method via terminal with on-reader tipping
       const { collectPaymentMethod, processPayment } = await import(
         '../../lib/stripe-terminal'
       );
 
-      const paymentIntent = await collectPaymentMethod(piJson.client_secret);
+      const subtotalCents = Math.round(ticket.subtotal * 100);
+      const tipOptions = TIP_PRESETS.map((pct) => ({
+        amount: Math.round(subtotalCents * pct / 100),
+        label: `${pct}%`,
+      }));
+
+      const paymentIntent = await collectPaymentMethod(piJson.client_secret, {
+        tip_configuration: { options: tipOptions },
+      });
 
       setStatus('processing');
 
       // 3. Process payment
-      await processPayment(paymentIntent);
+      const processed = await processPayment(paymentIntent);
 
-      // 4. Create transaction
+      // 4. Calculate tip from amount difference
+      const tipCents = Math.max(0, processed.amount - amountCents);
+      const tipAmount = tipCents / 100;
+
+      // Set tip in checkout context for display
+      checkout.setTip(tipAmount, null);
+
+      // 5. Create transaction
       const txRes = await fetch('/api/pos/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +82,7 @@ export function CardPayment() {
           vehicle_id: ticket.vehicle?.id || null,
           subtotal: ticket.subtotal,
           tax_amount: ticket.taxAmount,
-          tip_amount: checkout.tipAmount,
+          tip_amount: tipAmount,
           discount_amount: ticket.discountAmount,
           total_amount: ticket.total,
           payment_method: 'card',
@@ -91,8 +107,8 @@ export function CardPayment() {
           payments: [
             {
               method: 'card',
-              amount: amountDue,
-              tip_amount: checkout.tipAmount,
+              amount: amountDue + tipAmount,
+              tip_amount: tipAmount,
               stripe_payment_intent_id: piJson.id,
               card_brand: null,
               card_last_four: null,
@@ -106,13 +122,47 @@ export function CardPayment() {
         throw new Error(txJson.error || 'Failed to save transaction');
       }
 
+      // Card-to-customer matching (fire-and-forget)
+      const piId = piJson.id;
+      const txId = txJson.data.id;
+      const custId = ticket.customer?.id || null;
+      const custEmail = ticket.customer?.email;
+      const custPhone = ticket.customer?.phone;
+
+      fetch('/api/pos/card-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stripe_payment_intent_id: piId,
+          transaction_id: txId,
+          customer_id: custId,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.matched_customer && !custId) {
+            const name = `${data.matched_customer.first_name} ${data.matched_customer.last_name}`.trim();
+            toast.success(`Customer recognized: ${name}`);
+            // Update checkout with matched customer's contact info for receipts
+            checkout.setComplete(
+              txId,
+              txJson.data.receipt_number,
+              data.matched_customer.email || custEmail,
+              data.matched_customer.phone || custPhone
+            );
+          }
+        })
+        .catch(() => {
+          // Silent fail — card matching is non-critical
+        });
+
       setStatus('success');
-      checkout.setCardResult(piJson.id, null, null);
+      checkout.setCardResult(piId, null, null);
       checkout.setComplete(
-        txJson.data.id,
+        txId,
         txJson.data.receipt_number,
-        ticket.customer?.email,
-        ticket.customer?.phone
+        custEmail,
+        custPhone
       );
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {

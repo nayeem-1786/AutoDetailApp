@@ -3,30 +3,19 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
-import { useAuth } from '@/lib/auth/auth-provider';
 
-const QUICK_TENDERS = [20, 50, 100];
-
-export function CashPayment() {
+export function CheckPayment() {
   const { ticket, dispatch } = useTicket();
   const checkout = useCheckout();
-  const { employee } = useAuth();
 
   const amountDue = ticket.total;
-  const [tendered, setTendered] = useState('');
+  const [checkNumber, setCheckNumber] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  const tenderedNum = parseFloat(tendered) || 0;
-  const change = Math.max(0, tenderedNum - amountDue);
-  const isValid = tenderedNum >= amountDue;
-
-  async function handleProcessCash() {
-    if (!isValid) return;
-
+  async function handleProcessCheck() {
     setProcessing(true);
     checkout.setProcessing(true);
 
@@ -42,11 +31,11 @@ export function CashPayment() {
           tip_amount: 0,
           discount_amount: ticket.discountAmount,
           total_amount: ticket.total,
-          payment_method: 'cash',
+          payment_method: 'check',
           coupon_id: ticket.coupon?.id || null,
           loyalty_points_redeemed: ticket.loyaltyPointsToRedeem,
           loyalty_discount: ticket.loyaltyDiscount,
-          notes: ticket.notes,
+          notes: checkNumber ? `Check #${checkNumber}${ticket.notes ? ` — ${ticket.notes}` : ''}` : ticket.notes,
           items: ticket.items.map((i) => ({
             item_type: i.itemType,
             product_id: i.productId,
@@ -63,7 +52,7 @@ export function CashPayment() {
           })),
           payments: [
             {
-              method: 'cash',
+              method: 'check',
               amount: amountDue,
               tip_amount: 0,
             },
@@ -76,7 +65,6 @@ export function CashPayment() {
         throw new Error(json.error || 'Failed to process transaction');
       }
 
-      checkout.setCashPayment(tenderedNum, change);
       checkout.setComplete(
         json.data.id,
         json.data.receipt_number,
@@ -99,79 +87,27 @@ export function CashPayment() {
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
-        <p className="text-lg text-gray-500">Cash Payment</p>
+        <p className="text-lg text-gray-500">Check Payment</p>
         <p className="mt-1 text-3xl font-bold text-gray-900">
           ${amountDue.toFixed(2)}
         </p>
       </div>
 
-      {/* Quick tender buttons */}
-      <div className="flex gap-3">
-        {QUICK_TENDERS.map((amt) => (
-          <button
-            key={amt}
-            onClick={() => setTendered(amt.toString())}
-            disabled={amt < amountDue}
-            className={cn(
-              'h-14 w-20 rounded-lg border-2 text-lg font-semibold transition-all',
-              tendered === amt.toString()
-                ? 'border-green-500 bg-green-50 text-green-700'
-                : 'border-gray-200 text-gray-700 hover:border-gray-300',
-              amt < amountDue && 'opacity-40'
-            )}
-          >
-            ${amt}
-          </button>
-        ))}
-        <button
-          onClick={() => setTendered(amountDue.toFixed(2))}
-          className={cn(
-            'h-14 rounded-lg border-2 px-4 text-lg font-semibold transition-all',
-            tendered === amountDue.toFixed(2)
-              ? 'border-green-500 bg-green-50 text-green-700'
-              : 'border-gray-200 text-gray-700 hover:border-gray-300'
-          )}
-        >
-          Exact
-        </button>
-      </div>
-
-      {/* Custom amount input */}
-      <div className="flex items-center gap-2">
-        <span className="text-xl text-gray-500">$</span>
+      {/* Check number input */}
+      <div className="flex flex-col items-center gap-2">
+        <label htmlFor="check-number" className="text-sm text-gray-600">
+          Check number (optional)
+        </label>
         <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={tendered}
-          onChange={(e) => setTendered(e.target.value)}
-          className="h-14 w-40 rounded-lg border border-gray-300 text-center text-2xl tabular-nums focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-200"
-          placeholder="0.00"
+          id="check-number"
+          type="text"
+          value={checkNumber}
+          onChange={(e) => setCheckNumber(e.target.value)}
+          autoFocus
+          className="h-14 w-48 rounded-lg border border-gray-300 text-center text-2xl tabular-nums focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+          placeholder="#"
         />
       </div>
-
-      {/* Change display */}
-      {tenderedNum > 0 && (
-        <div
-          className={cn(
-            'rounded-lg px-6 py-3 text-center',
-            isValid ? 'bg-green-50' : 'bg-red-50'
-          )}
-        >
-          {isValid ? (
-            <p className="text-lg">
-              Change:{' '}
-              <span className="text-2xl font-bold text-green-700">
-                ${change.toFixed(2)}
-              </span>
-            </p>
-          ) : (
-            <p className="text-lg text-red-600">
-              Short ${(amountDue - tenderedNum).toFixed(2)}
-            </p>
-          )}
-        </div>
-      )}
 
       {checkout.error && (
         <p className="text-sm text-red-600">{checkout.error}</p>
@@ -189,9 +125,9 @@ export function CashPayment() {
         </Button>
         <Button
           size="lg"
-          onClick={handleProcessCash}
-          disabled={!isValid || processing}
-          className="min-w-[160px] bg-green-600 hover:bg-green-700"
+          onClick={handleProcessCheck}
+          disabled={processing}
+          className="min-w-[160px] bg-amber-600 hover:bg-amber-700"
         >
           {processing ? (
             <Loader2 className="h-5 w-5 animate-spin" />

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, CreditCard, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { TIP_PRESETS } from '@/lib/utils/constants';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -13,7 +14,7 @@ export function SplitPayment() {
   const { ticket, dispatch } = useTicket();
   const checkout = useCheckout();
 
-  const grandTotal = ticket.total + checkout.tipAmount;
+  const grandTotal = ticket.total;
   const [cashAmount, setCashAmount] = useState('');
   const [splitStep, setSplitStep] = useState<SplitStep>('enter-cash');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -29,13 +30,13 @@ export function SplitPayment() {
     checkout.setProcessing(true);
 
     try {
-      // Create PaymentIntent for card portion
-      const amountCents = Math.round(cardRemainder * 100);
+      // Create PaymentIntent for card portion (no tip baked in)
+      const cardCents = Math.round(cardRemainder * 100);
       const piRes = await fetch('/api/pos/stripe/payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: amountCents,
+          amount: cardCents,
           description: `POS Split Sale (card portion)`,
         }),
       });
@@ -45,17 +46,29 @@ export function SplitPayment() {
         throw new Error(piJson.error || 'Failed to create payment intent');
       }
 
-      // Collect + process card via terminal
+      // Collect + process card via terminal with on-reader tipping
       const { collectPaymentMethod, processPayment } = await import(
         '../../lib/stripe-terminal'
       );
 
-      const paymentIntent = await collectPaymentMethod(piJson.client_secret);
-      await processPayment(paymentIntent);
+      const subtotalCents = Math.round(ticket.subtotal * 100);
+      const tipOptions = TIP_PRESETS.map((pct) => ({
+        amount: Math.round(subtotalCents * pct / 100),
+        label: `${pct}%`,
+      }));
 
-      // Determine tip split — attribute all tip to card payment
-      const cashTip = 0;
-      const cardTip = checkout.tipAmount;
+      const paymentIntent = await collectPaymentMethod(piJson.client_secret, {
+        tip_configuration: { options: tipOptions },
+      });
+
+      const processed = await processPayment(paymentIntent);
+
+      // Calculate tip from amount difference
+      const tipCents = Math.max(0, processed.amount - cardCents);
+      const tipAmount = tipCents / 100;
+
+      // Set tip in checkout context for display
+      checkout.setTip(tipAmount, null);
 
       // Create transaction with both payments
       const txRes = await fetch('/api/pos/transactions', {
@@ -66,7 +79,7 @@ export function SplitPayment() {
           vehicle_id: ticket.vehicle?.id || null,
           subtotal: ticket.subtotal,
           tax_amount: ticket.taxAmount,
-          tip_amount: checkout.tipAmount,
+          tip_amount: tipAmount,
           discount_amount: ticket.discountAmount,
           total_amount: ticket.total,
           payment_method: 'split',
@@ -92,12 +105,12 @@ export function SplitPayment() {
             {
               method: 'cash',
               amount: cashNum,
-              tip_amount: cashTip,
+              tip_amount: 0,
             },
             {
               method: 'card',
-              amount: cardRemainder,
-              tip_amount: cardTip,
+              amount: cardRemainder + tipAmount,
+              tip_amount: tipAmount,
               stripe_payment_intent_id: piJson.id,
             },
           ],
@@ -109,15 +122,48 @@ export function SplitPayment() {
         throw new Error(txJson.error || 'Failed to save transaction');
       }
 
+      // Card-to-customer matching for the card portion (fire-and-forget)
+      const piId = piJson.id;
+      const txId = txJson.data.id;
+      const custId = ticket.customer?.id || null;
+      const custEmail = ticket.customer?.email;
+      const custPhone = ticket.customer?.phone;
+
+      fetch('/api/pos/card-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stripe_payment_intent_id: piId,
+          transaction_id: txId,
+          customer_id: custId,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.matched_customer && !custId) {
+            const name = `${data.matched_customer.first_name} ${data.matched_customer.last_name}`.trim();
+            toast.success(`Customer recognized: ${name}`);
+            checkout.setComplete(
+              txId,
+              txJson.data.receipt_number,
+              data.matched_customer.email || custEmail,
+              data.matched_customer.phone || custPhone
+            );
+          }
+        })
+        .catch(() => {
+          // Silent fail — card matching is non-critical
+        });
+
       setSplitStep('complete');
       checkout.setSplitCash(cashNum);
-      checkout.setCardResult(piJson.id, null, null);
+      checkout.setCardResult(piId, null, null);
       checkout.setCashPayment(cashNum, 0);
       checkout.setComplete(
-        txJson.data.id,
+        txId,
         txJson.data.receipt_number,
-        ticket.customer?.email,
-        ticket.customer?.phone
+        custEmail,
+        custPhone
       );
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {

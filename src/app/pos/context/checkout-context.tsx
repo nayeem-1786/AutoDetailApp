@@ -10,10 +10,10 @@ import {
 import type { PaymentMethod } from '@/lib/supabase/types';
 
 export type CheckoutStep =
-  | 'tip'
   | 'payment-method'
   | 'cash'
   | 'card'
+  | 'check'
   | 'split'
   | 'complete';
 
@@ -55,7 +55,7 @@ interface CheckoutContextType extends CheckoutState {
 
 const initialState: CheckoutState = {
   isOpen: false,
-  step: 'tip',
+  step: 'payment-method',
   tipAmount: 0,
   tipPercent: null,
   paymentMethod: null,
@@ -80,7 +80,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CheckoutState>(initialState);
 
   const openCheckout = useCallback(() => {
-    setState({ ...initialState, isOpen: true, step: 'tip' });
+    setState({ ...initialState, isOpen: true, step: 'payment-method' });
   }, []);
 
   const closeCheckout = useCallback(() => {

@@ -4,6 +4,8 @@ import type {
   Reader,
   ISdkManagedPaymentIntent,
   IPaymentIntent,
+  ITipConfiguration,
+  ICollectConfig,
 } from '@stripe/terminal-js';
 
 type TerminalInstance = Terminal;
@@ -83,12 +85,17 @@ export function getConnectedReader(): Reader | null {
 
 /**
  * Collect payment method on a PaymentIntent via the terminal reader.
+ * Optionally pass tipping config to show tip selection on the reader.
  */
 export async function collectPaymentMethod(
-  clientSecret: string
+  clientSecret: string,
+  options?: {
+    tip_configuration?: ITipConfiguration;
+    config_override?: ICollectConfig;
+  }
 ): Promise<ISdkManagedPaymentIntent> {
   const t = await getTerminal();
-  const result = await t.collectPaymentMethod(clientSecret);
+  const result = await t.collectPaymentMethod(clientSecret, options);
 
   if ('error' in result) {
     throw new Error(result.error.message);

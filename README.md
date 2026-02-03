@@ -71,7 +71,7 @@ Square-style point-of-sale register with PIN-based employee login, three-tab wor
 
 **Bottom Nav** — Log out (employee initials), Checkout (cart badge with item count), Transactions, End of Day, More.
 
-**Checkout Flow** — Supports cash, card (Stripe Terminal), and split payment methods. Tip entry before payment selection. Payment complete screen shows summary and receipt options (print, email, SMS). Customer email/phone auto-populated from ticket customer data for receipt delivery.
+**Checkout Flow** — Payment method selection first: cash, card (Stripe Terminal), check, or split. Card payments use on-reader tipping (15%/20%/25% presets + custom) — tip amount is collected on the Stripe reader hardware and extracted from the processed PaymentIntent. Cash and check payments have no tip. Split payments collect cash first, then process the card remainder with on-reader tipping. Payment complete screen shows summary and receipt options (print, email, SMS). Customer email/phone auto-populated from ticket customer data for receipt delivery.
 
 **Network Restriction** — POS routes (`/pos/*`) can be locked to specific IP addresses via the `ALLOWED_POS_IPS` environment variable (comma-separated). Only enforced in production — local development is unrestricted. Returns 403 to all other IPs.
 
@@ -117,7 +117,7 @@ src/
 
 ## Database
 
-38 tables managed via sequential Supabase migrations in `supabase/migrations/`. Seeded staff: Nayeem Khan (super_admin), Su Khan (admin), Joselyn Reyes (cashier), Joana Lira (cashier), Segundo Cadena (detailer). Key tables:
+44 migrations in `supabase/migrations/`. Seeded staff: Nayeem Khan (super_admin), Su Khan (admin), Joselyn Reyes (cashier), Joana Lira (cashier), Segundo Cadena (detailer). Key tables:
 
 - **services** / **service_categories** — 30 services across 7 categories with 6 pricing models
 - **service_pricing** — Tiered pricing with vehicle-size-aware options

@@ -49,6 +49,13 @@ export function PaymentComplete() {
           </div>
         )}
 
+        {checkout.paymentMethod === 'check' && (
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Check</span>
+            <span className="tabular-nums">Received</span>
+          </div>
+        )}
+
         {checkout.paymentMethod === 'split' && (
           <>
             <div className="flex justify-between text-sm">

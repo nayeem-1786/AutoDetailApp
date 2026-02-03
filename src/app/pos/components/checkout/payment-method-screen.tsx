@@ -1,6 +1,6 @@
 'use client';
 
-import { Banknote, CreditCard, Split } from 'lucide-react';
+import { Banknote, CreditCard, FileText, Split } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTicket } from '../../context/ticket-context';
@@ -8,11 +8,9 @@ import { useCheckout } from '../../context/checkout-context';
 
 export function PaymentMethodScreen() {
   const { ticket } = useTicket();
-  const { tipAmount, setPaymentMethod, setStep } = useCheckout();
+  const { setPaymentMethod, setStep, closeCheckout } = useCheckout();
 
-  const grandTotal = ticket.total + tipAmount;
-
-  function handleSelect(method: 'cash' | 'card' | 'split') {
+  function handleSelect(method: 'cash' | 'card' | 'check' | 'split') {
     setPaymentMethod(method);
     setStep(method);
   }
@@ -22,13 +20,8 @@ export function PaymentMethodScreen() {
       <div className="text-center">
         <p className="text-lg text-gray-500">Payment method</p>
         <p className="mt-1 text-3xl font-bold text-gray-900">
-          ${grandTotal.toFixed(2)}
+          ${ticket.total.toFixed(2)}
         </p>
-        {tipAmount > 0 && (
-          <p className="mt-1 text-sm text-gray-400">
-            includes ${tipAmount.toFixed(2)} tip
-          </p>
-        )}
       </div>
 
       <div className="flex gap-6">
@@ -55,6 +48,17 @@ export function PaymentMethodScreen() {
         </button>
 
         <button
+          onClick={() => handleSelect('check')}
+          className={cn(
+            'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 transition-all',
+            'hover:border-amber-400 hover:bg-amber-50 active:scale-[0.97]'
+          )}
+        >
+          <FileText className="h-8 w-8 text-amber-600" />
+          <span className="text-lg font-semibold text-gray-900">Check</span>
+        </button>
+
+        <button
           onClick={() => handleSelect('split')}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 transition-all',
@@ -68,7 +72,7 @@ export function PaymentMethodScreen() {
 
       <Button
         variant="outline"
-        onClick={() => setStep('tip')}
+        onClick={closeCheckout}
         className="mt-4"
       >
         Back

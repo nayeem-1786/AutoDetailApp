@@ -337,7 +337,7 @@ const transactionItemSchema = z.object({
 });
 
 export const paymentSchema = z.object({
-  method: z.enum(['cash', 'card', 'split']),
+  method: z.enum(['cash', 'card', 'check', 'split']),
   amount: positiveNumber,
   tip_amount: positiveNumber.default(0),
   stripe_payment_intent_id: optionalString,
@@ -353,7 +353,7 @@ export const transactionCreateSchema = z.object({
   tip_amount: positiveNumber.default(0),
   discount_amount: positiveNumber.default(0),
   total_amount: positiveNumber,
-  payment_method: z.enum(['cash', 'card', 'split']),
+  payment_method: z.enum(['cash', 'card', 'check', 'split']),
   coupon_id: z.string().uuid().optional().nullable(),
   loyalty_points_redeemed: positiveInt.default(0),
   loyalty_discount: positiveNumber.default(0),
