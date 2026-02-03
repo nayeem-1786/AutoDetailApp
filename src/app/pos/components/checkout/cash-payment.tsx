@@ -79,7 +79,9 @@ export function CashPayment() {
       checkout.setCashPayment(tenderedNum, change);
       checkout.setComplete(
         json.data.id,
-        json.data.receipt_number
+        json.data.receipt_number,
+        ticket.customer?.email,
+        ticket.customer?.phone
       );
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {

@@ -113,7 +113,12 @@ export function SplitPayment() {
       checkout.setSplitCash(cashNum);
       checkout.setCardResult(piJson.id, null, null);
       checkout.setCashPayment(cashNum, 0);
-      checkout.setComplete(txJson.data.id, txJson.data.receipt_number);
+      checkout.setComplete(
+        txJson.data.id,
+        txJson.data.receipt_number,
+        ticket.customer?.email,
+        ticket.customer?.phone
+      );
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Split payment failed';

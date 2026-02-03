@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import { Minus, Plus, X } from 'lucide-react';
 import type { TicketItem } from '../types';
 import { useTicket } from '../context/ticket-context';
@@ -10,6 +11,30 @@ interface TicketItemRowProps {
 
 export function TicketItemRow({ item }: TicketItemRowProps) {
   const { dispatch } = useTicket();
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  function startEditing() {
+    setEditValue(String(item.quantity));
+    setEditing(true);
+  }
+
+  function commitEdit() {
+    const qty = parseInt(editValue, 10);
+    if (!isNaN(qty) && qty > 0) {
+      dispatch({ type: 'UPDATE_ITEM_QUANTITY', itemId: item.id, quantity: qty });
+    } else if (editValue === '0' || editValue === '') {
+      dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+    }
+    setEditing(false);
+  }
 
   return (
     <div className="flex items-center gap-2 border-b border-gray-100 py-2">
@@ -37,9 +62,29 @@ export function TicketItemRow({ item }: TicketItemRowProps) {
         >
           <Minus className="h-3 w-3" />
         </button>
-        <span className="w-6 text-center text-sm tabular-nums text-gray-900">
-          {item.quantity}
-        </span>
+        {editing ? (
+          <input
+            ref={inputRef}
+            type="number"
+            min="0"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitEdit();
+              if (e.key === 'Escape') setEditing(false);
+            }}
+            className="h-7 w-12 rounded border border-blue-400 bg-white text-center text-sm tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-blue-300"
+            autoFocus
+          />
+        ) : (
+          <button
+            onClick={startEditing}
+            className="flex h-7 min-w-[28px] items-center justify-center rounded px-1 text-sm tabular-nums text-gray-900 hover:bg-blue-50 hover:text-blue-700"
+          >
+            {item.quantity}
+          </button>
+        )}
         <button
           onClick={() =>
             dispatch({

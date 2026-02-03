@@ -32,6 +32,8 @@ interface CheckoutState {
   cardLastFour: string | null;
   receiptNumber: string | null;
   transactionId: string | null;
+  customerEmail: string | null; // preserved for receipt after ticket clear
+  customerPhone: string | null; // preserved for receipt after ticket clear
   processing: boolean;
   error: string | null;
 }
@@ -45,7 +47,7 @@ interface CheckoutContextType extends CheckoutState {
   setCashPayment: (tendered: number, change: number) => void;
   setSplitCash: (cashPortion: number) => void;
   setCardResult: (intentId: string, brand: string | null, lastFour: string | null) => void;
-  setComplete: (transactionId: string, receiptNumber: string | null) => void;
+  setComplete: (transactionId: string, receiptNumber: string | null, customerEmail?: string | null, customerPhone?: string | null) => void;
   setProcessing: (processing: boolean) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -66,6 +68,8 @@ const initialState: CheckoutState = {
   cardLastFour: null,
   receiptNumber: null,
   transactionId: null,
+  customerEmail: null,
+  customerPhone: null,
   processing: false,
   error: null,
 };
@@ -116,11 +120,13 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   );
 
   const setComplete = useCallback(
-    (transactionId: string, receiptNumber: string | null) => {
+    (transactionId: string, receiptNumber: string | null, customerEmail?: string | null, customerPhone?: string | null) => {
       setState((s) => ({
         ...s,
         transactionId,
         receiptNumber,
+        customerEmail: customerEmail ?? null,
+        customerPhone: customerPhone ?? null,
         step: 'complete',
         processing: false,
       }));

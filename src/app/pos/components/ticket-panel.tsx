@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -24,30 +24,20 @@ import { LoyaltyPanel } from './loyalty-panel';
 import type { Customer, Vehicle } from '@/lib/supabase/types';
 
 interface TicketPanelProps {
-  externalCustomerLookup?: boolean;
-  onExternalCustomerLookupClose?: () => void;
+  customerLookupOpen: boolean;
+  onCustomerLookupChange: (open: boolean) => void;
 }
 
-export function TicketPanel({ externalCustomerLookup, onExternalCustomerLookupClose }: TicketPanelProps) {
+export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
   const { ticket, dispatch } = useTicket();
   const { services } = useCatalog();
-
-  // Dialog state — also synced to external trigger
-  const [showCustomerLookup, setShowCustomerLookup] = useState(false);
-
-  useEffect(() => {
-    if (externalCustomerLookup) {
-      setShowCustomerLookup(true);
-      onExternalCustomerLookupClose?.();
-    }
-  }, [externalCustomerLookup, onExternalCustomerLookupClose]);
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
 
   function handleSelectCustomer(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
-    setShowCustomerLookup(false);
+    onCustomerLookupChange(false);
     // Open vehicle selector for the new customer
     setShowVehicleSelector(true);
   }
@@ -55,7 +45,7 @@ export function TicketPanel({ externalCustomerLookup, onExternalCustomerLookupCl
   function handleGuestCheckout() {
     dispatch({ type: 'SET_CUSTOMER', customer: null });
     dispatch({ type: 'SET_VEHICLE', vehicle: null });
-    setShowCustomerLookup(false);
+    onCustomerLookupChange(false);
   }
 
   function handleCustomerCreated(customer: Customer) {
@@ -121,12 +111,12 @@ export function TicketPanel({ externalCustomerLookup, onExternalCustomerLookupCl
         <CustomerVehicleSummary
           customer={ticket.customer}
           vehicle={ticket.vehicle}
-          onChangeCustomer={() => setShowCustomerLookup(true)}
+          onChangeCustomer={() => onCustomerLookupChange(true)}
           onChangeVehicle={() => {
             if (ticket.customer) {
               setShowVehicleSelector(true);
             } else {
-              setShowCustomerLookup(true);
+              onCustomerLookupChange(true);
             }
           }}
           onClear={handleClearCustomer}
@@ -150,8 +140,8 @@ export function TicketPanel({ externalCustomerLookup, onExternalCustomerLookupCl
       </div>
 
       {/* Customer Lookup Dialog */}
-      <Dialog open={showCustomerLookup} onOpenChange={setShowCustomerLookup}>
-        <DialogClose onClose={() => setShowCustomerLookup(false)} />
+      <Dialog open={customerLookupOpen} onOpenChange={onCustomerLookupChange}>
+        <DialogClose onClose={() => onCustomerLookupChange(false)} />
         <DialogHeader>
           <DialogTitle>Find Customer</DialogTitle>
         </DialogHeader>
@@ -160,7 +150,7 @@ export function TicketPanel({ externalCustomerLookup, onExternalCustomerLookupCl
             onSelect={handleSelectCustomer}
             onGuest={handleGuestCheckout}
             onCreateNew={() => {
-              setShowCustomerLookup(false);
+              onCustomerLookupChange(false);
               setShowCustomerCreate(true);
             }}
           />

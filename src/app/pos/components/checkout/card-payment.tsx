@@ -108,7 +108,12 @@ export function CardPayment() {
 
       setStatus('success');
       checkout.setCardResult(piJson.id, null, null);
-      checkout.setComplete(txJson.data.id, txJson.data.receipt_number);
+      checkout.setComplete(
+        txJson.data.id,
+        txJson.data.receipt_number,
+        ticket.customer?.email,
+        ticket.customer?.phone
+      );
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Card payment failed';

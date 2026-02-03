@@ -206,8 +206,8 @@ export function PosWorkspace() {
 
       {/* Right panel — Ticket */}
       <TicketPanel
-        externalCustomerLookup={showCustomerLookup}
-        onExternalCustomerLookupClose={() => setShowCustomerLookup(false)}
+        customerLookupOpen={showCustomerLookup}
+        onCustomerLookupChange={setShowCustomerLookup}
       />
 
       {/* Service Pricing Picker Dialog (for global search results) */}

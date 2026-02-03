@@ -3,12 +3,10 @@
 import { CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCheckout } from '../../context/checkout-context';
-import { useTicket } from '../../context/ticket-context';
 import { ReceiptOptions } from '../receipt-options';
 
 export function PaymentComplete() {
   const checkout = useCheckout();
-  const { ticket } = useTicket();
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
@@ -82,8 +80,8 @@ export function PaymentComplete() {
       {checkout.transactionId && (
         <ReceiptOptions
           transactionId={checkout.transactionId}
-          customerEmail={ticket.customer?.email ?? null}
-          customerPhone={ticket.customer?.phone ?? null}
+          customerEmail={checkout.customerEmail}
+          customerPhone={checkout.customerPhone}
         />
       )}
 

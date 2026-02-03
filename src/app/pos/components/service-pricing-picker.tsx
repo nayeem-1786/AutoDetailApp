@@ -31,8 +31,10 @@ export function ServicePricingPicker({
 }: ServicePricingPickerProps) {
   const pricing = service.pricing ?? [];
 
-  function handleSelect(tier: ServicePricing) {
-    onSelect(tier, vehicleSizeClass);
+  const VEHICLE_SIZES: VehicleSizeClass[] = ['sedan', 'truck_suv_2row', 'suv_3row_van'];
+
+  function handleSelect(tier: ServicePricing, sizeOverride?: VehicleSizeClass) {
+    onSelect(tier, sizeOverride ?? vehicleSizeClass);
     onClose();
   }
 
@@ -58,13 +60,49 @@ export function ServicePricingPicker({
             {pricing
               .sort((a, b) => a.display_order - b.display_order)
               .map((tier) => {
+                const needsSizeSelection =
+                  !vehicleSizeClass && tier.is_vehicle_size_aware;
+
+                // When vehicle-size-aware and no vehicle set, show individual size options
+                if (needsSizeSelection) {
+                  return (
+                    <div key={tier.id} className="flex flex-col gap-1.5">
+                      {pricing.length > 1 && (
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                          {tier.tier_label || tier.tier_name}
+                        </p>
+                      )}
+                      {VEHICLE_SIZES.map((size) => {
+                        const sizePrice = resolveServicePrice(tier, size);
+                        return (
+                          <button
+                            key={`${tier.id}-${size}`}
+                            onClick={() => handleSelect(tier, size)}
+                            className={cn(
+                              'flex items-center justify-between rounded-lg border border-gray-200 p-3 text-left transition-all',
+                              'min-h-[48px] active:scale-[0.99] active:bg-gray-50',
+                              'hover:border-blue-300 hover:bg-blue-50/50'
+                            )}
+                          >
+                            <span className="text-sm font-medium text-gray-900">
+                              {VEHICLE_SIZE_LABELS[size]}
+                            </span>
+                            <span className="text-sm font-semibold text-gray-700">
+                              ${sizePrice.toFixed(2)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                // Vehicle is set or tier is not vehicle-size-aware — single button
                 const price = resolveServicePrice(tier, vehicleSizeClass);
                 const sizeLabel =
                   vehicleSizeClass && tier.is_vehicle_size_aware
                     ? VEHICLE_SIZE_LABELS[vehicleSizeClass]
                     : null;
-                const showRange =
-                  !vehicleSizeClass && tier.is_vehicle_size_aware;
 
                 return (
                   <button
@@ -89,25 +127,18 @@ export function ServicePricingPicker({
                       )}
                     </div>
                     <span className="text-sm font-semibold text-gray-700">
-                      {showRange
-                        ? (() => {
-                            const prices = [
-                              tier.vehicle_size_sedan_price ?? tier.price,
-                              tier.vehicle_size_truck_suv_price ?? tier.price,
-                              tier.vehicle_size_suv_van_price ?? tier.price,
-                            ];
-                            const min = Math.min(...prices);
-                            const max = Math.max(...prices);
-                            return min === max
-                              ? `$${min.toFixed(2)}`
-                              : `$${min.toFixed(2)}–$${max.toFixed(2)}`;
-                          })()
-                        : `$${price.toFixed(2)}`}
+                      ${price.toFixed(2)}
                     </span>
                   </button>
                 );
               })}
           </div>
+        )}
+
+        {!vehicleSizeClass && pricing.some((t) => t.is_vehicle_size_aware) && (
+          <p className="mt-2 text-xs text-gray-400">
+            Select a vehicle size above, or set a vehicle on the ticket for automatic pricing.
+          </p>
         )}
 
         <div className="mt-4 flex justify-end">
