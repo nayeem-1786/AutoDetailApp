@@ -29,7 +29,7 @@ export async function GET() {
 
     const { data: coupons, error } = await admin
       .from('coupons')
-      .select('id, code, type, value, min_purchase, max_discount, expires_at, is_single_use')
+      .select('id, code, name, min_purchase, expires_at, is_single_use, coupon_rewards(*)')
       .eq('customer_id', customer.id)
       .eq('status', 'active')
       .or(`expires_at.is.null,expires_at.gt.${now}`)

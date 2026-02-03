@@ -13,8 +13,11 @@ export type PaymentMethod = 'cash' | 'card' | 'check' | 'split';
 export type TransactionStatus = 'open' | 'completed' | 'voided' | 'refunded' | 'partial_refund';
 export type TransactionItemType = 'product' | 'service' | 'package' | 'custom';
 export type RefundStatus = 'pending' | 'processed' | 'failed';
-export type CouponType = 'flat' | 'percentage' | 'free_addon' | 'free_product';
-export type CouponStatus = 'active' | 'redeemed' | 'expired' | 'disabled';
+export type DiscountType = 'percentage' | 'flat' | 'free';
+export type AppliesTo = 'order' | 'product' | 'service';
+export type TagMatchMode = 'any' | 'all';
+export type ConditionLogic = 'and' | 'or';
+export type CouponStatus = 'draft' | 'active' | 'redeemed' | 'expired' | 'disabled';
 export type LoyaltyAction = 'earned' | 'redeemed' | 'adjusted' | 'expired' | 'welcome_bonus';
 export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
 export type CampaignChannel = 'sms' | 'email' | 'both';
@@ -348,23 +351,52 @@ export interface RefundItem {
   created_at: string;
 }
 
+export interface CouponReward {
+  id: string;
+  coupon_id: string;
+  applies_to: AppliesTo;
+  discount_type: DiscountType;
+  discount_value: number;
+  max_discount: number | null;
+  target_product_id: string | null;
+  target_service_id: string | null;
+  target_product_category_id: string | null;
+  target_service_category_id: string | null;
+  created_at: string;
+  // Joined names (populated by API)
+  target_product_name?: string;
+  target_service_name?: string;
+  target_product_category_name?: string;
+  target_service_category_name?: string;
+}
+
 export interface Coupon {
   id: string;
+  name: string | null;
   code: string;
-  type: CouponType;
-  value: number;
+  status: CouponStatus;
+  auto_apply: boolean;
+  // Targeting (WHO)
+  customer_id: string | null;
+  customer_tags: string[] | null;
+  tag_match_mode: TagMatchMode;
+  // Conditions (IF)
+  condition_logic: ConditionLogic;
+  requires_product_id: string | null;
+  requires_service_id: string | null;
+  requires_product_category_id: string | null;
+  requires_service_category_id: string | null;
   min_purchase: number | null;
-  max_discount: number | null;
+  // Constraints
   is_single_use: boolean;
   use_count: number;
   max_uses: number | null;
-  status: CouponStatus;
   expires_at: string | null;
   campaign_id: string | null;
-  customer_id: string | null;
-  free_item_id: string | null;
   created_at: string;
   updated_at: string;
+  // Joined relations
+  rewards?: CouponReward[];
 }
 
 export interface LoyaltyLedger {
@@ -414,7 +446,7 @@ export interface LifecycleRule {
   sms_template: string | null;
   email_subject: string | null;
   email_template: string | null;
-  coupon_type: CouponType | null;
+  coupon_type: string | null;
   coupon_value: number | null;
   coupon_expiry_days: number | null;
   chain_order: number;

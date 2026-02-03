@@ -20,6 +20,11 @@ import {
   UserCog,
   ArrowRightLeft,
   Settings,
+  Megaphone,
+  Ticket,
+  Send,
+  Zap,
+  ShieldCheck,
   LogOut,
   ChevronDown,
   ChevronRight,
@@ -47,6 +52,11 @@ const iconMap: Record<string, LucideIcon> = {
   UserCog,
   ArrowRightLeft,
   Settings,
+  Megaphone,
+  Ticket,
+  Send,
+  Zap,
+  ShieldCheck,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments

@@ -51,6 +51,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt } from 'lucide-react';
+import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
 import type { ColumnDef } from '@tanstack/react-table';
 
 export default function CustomerProfilePage() {
@@ -502,7 +503,20 @@ export default function CustomerProfilePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${customer.first_name} ${customer.last_name}`}
+        title={
+          <span className="flex items-center gap-2">
+            {customer.first_name} {customer.last_name}
+            <CustomerTypeBadge
+              customerId={customer.id}
+              tags={customer.tags}
+              size="md"
+              onTypeChanged={(newTags) => {
+                setCustomer((prev) => prev ? { ...prev, tags: newTags } : prev);
+                reset((prev) => ({ ...prev, tags: newTags }));
+              }}
+            />
+          </span>
+        }
         description={
           [
             customer.phone ? formatPhone(customer.phone) : null,

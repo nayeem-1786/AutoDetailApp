@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { sendEmail } from '@/lib/utils/email';
 import { BUSINESS } from '@/lib/utils/constants';
 
 export async function POST(request: NextRequest) {
@@ -40,17 +41,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send via Mailgun
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunKey = process.env.MAILGUN_API_KEY;
-
-    if (!mailgunDomain || !mailgunKey) {
-      return NextResponse.json(
-        { error: 'Email service not configured' },
-        { status: 400 }
-      );
-    }
-
     const items = (transaction.items as { item_name: string; quantity: number; total_price: number; tax_amount: number }[]) ?? [];
     const payments = (transaction.payments as { method: string; amount: number }[]) ?? [];
     const customerName = transaction.customer
@@ -87,28 +77,13 @@ ${paymentLines}
 
 Thank you for choosing ${BUSINESS.NAME}!`;
 
-    const formData = new URLSearchParams();
-    formData.append('from', `${BUSINESS.NAME} <receipts@${mailgunDomain}>`);
-    formData.append('to', email);
-    formData.append('subject', `Receipt #${transaction.receipt_number || transaction.id.slice(0, 8)} from ${BUSINESS.NAME}`);
-    formData.append('text', textBody);
+    const subject = `Receipt #${transaction.receipt_number || transaction.id.slice(0, 8)} from ${BUSINESS.NAME}`;
 
-    const mgRes = await fetch(
-      `https://api.mailgun.net/v3/${mailgunDomain}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${btoa(`api:${mailgunKey}`)}`,
-        },
-        body: formData,
-      }
-    );
+    const result = await sendEmail(email, subject, textBody);
 
-    if (!mgRes.ok) {
-      const errText = await mgRes.text();
-      console.error('Mailgun error:', errText);
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'Failed to send email receipt' },
+        { error: result.error },
         { status: 500 }
       );
     }

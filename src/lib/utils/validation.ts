@@ -201,17 +201,39 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-// Coupon schema
-export const couponSchema = z.object({
-  code: requiredString,
-  type: z.enum(['flat', 'percentage', 'free_addon', 'free_product']),
-  value: positiveNumber,
-  min_purchase: positiveNumber.optional().nullable(),
+// Coupon reward schema (the THEN — what discount the customer gets)
+export const couponRewardSchema = z.object({
+  applies_to: z.enum(['order', 'product', 'service']),
+  discount_type: z.enum(['percentage', 'flat', 'free']),
+  discount_value: positiveNumber.default(0),
   max_discount: positiveNumber.optional().nullable(),
+  target_product_id: z.string().uuid().optional().nullable(),
+  target_service_id: z.string().uuid().optional().nullable(),
+  target_product_category_id: z.string().uuid().optional().nullable(),
+  target_service_category_id: z.string().uuid().optional().nullable(),
+});
+
+// Coupon schema (code is optional — API auto-generates if empty)
+export const couponSchema = z.object({
+  // Basics
+  name: optionalString,
+  code: z.string().default(''),
+  auto_apply: z.boolean().default(false),
+  // Targeting (WHO)
+  customer_id: z.string().uuid().optional().nullable(),
+  customer_tags: z.array(z.string()).optional().nullable(),
+  tag_match_mode: z.enum(['any', 'all']).default('any'),
+  // Conditions (IF)
+  condition_logic: z.enum(['and', 'or']).default('and'),
+  requires_product_id: z.string().uuid().optional().nullable(),
+  requires_service_id: z.string().uuid().optional().nullable(),
+  requires_product_category_id: z.string().uuid().optional().nullable(),
+  requires_service_category_id: z.string().uuid().optional().nullable(),
+  min_purchase: positiveNumber.optional().nullable(),
+  // Constraints
   is_single_use: z.boolean().default(true),
   max_uses: positiveInt.optional().nullable(),
   expires_at: z.string().optional().nullable(),
-  customer_id: z.string().uuid().optional().nullable(),
 });
 
 // ---------------------------------------------------------------------------
@@ -478,6 +500,41 @@ export const blockedDateSchema = z.object({
   reason: optionalString,
 });
 
+// ---------------------------------------------------------------------------
+// Marketing schemas
+// ---------------------------------------------------------------------------
+
+export const campaignCreateSchema = z.object({
+  name: requiredString,
+  channel: z.enum(['sms', 'email', 'both']),
+  audience_filters: z.record(z.string(), z.unknown()).default({}),
+  sms_template: optionalString,
+  email_subject: optionalString,
+  email_template: optionalString,
+  coupon_id: z.string().uuid().optional().nullable(),
+  scheduled_at: z.string().optional().nullable(),
+});
+
+export const campaignUpdateSchema = campaignCreateSchema.partial();
+
+export const lifecycleRuleSchema = z.object({
+  name: requiredString,
+  description: optionalString,
+  trigger_condition: requiredString,
+  trigger_service_id: z.string().uuid().optional().nullable(),
+  delay_days: positiveInt.default(7),
+  action: z.enum(['sms', 'email', 'both']),
+  sms_template: optionalString,
+  email_subject: optionalString,
+  email_template: optionalString,
+  coupon_type: z.enum(['flat', 'percentage', 'free_addon', 'free_product']).optional().nullable(),
+  coupon_value: positiveNumber.optional().nullable(),
+  coupon_expiry_days: positiveInt.optional().nullable(),
+  is_active: z.boolean().default(true),
+  is_vehicle_aware: z.boolean().default(false),
+  chain_order: positiveInt.default(0),
+});
+
 // Type inference helpers
 export type BookingCustomerInput = z.infer<typeof bookingCustomerSchema>;
 export type BookingVehicleInput = z.infer<typeof bookingVehicleSchema>;
@@ -502,6 +559,7 @@ export type ProductCategoryInput = z.infer<typeof productCategorySchema>;
 export type BusinessProfileInput = z.infer<typeof businessProfileSchema>;
 export type TaxConfigInput = z.infer<typeof taxConfigSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type CouponRewardInput = z.infer<typeof couponRewardSchema>;
 export type CouponInput = z.infer<typeof couponSchema>;
 export type CustomerSignupInput = z.infer<typeof customerSignupSchema>;
 export type CustomerProfileInput = z.infer<typeof customerProfileSchema>;
@@ -521,3 +579,6 @@ export type BlockedDateInput = z.infer<typeof blockedDateSchema>;
 export type PhoneOtpSendInput = z.infer<typeof phoneOtpSendSchema>;
 export type PhoneOtpVerifyInput = z.infer<typeof phoneOtpVerifySchema>;
 export type CustomerVehicleInput = z.infer<typeof customerVehicleSchema>;
+export type CampaignCreateInput = z.infer<typeof campaignCreateSchema>;
+export type CampaignUpdateInput = z.infer<typeof campaignUpdateSchema>;
+export type LifecycleRuleInput = z.infer<typeof lifecycleRuleSchema>;

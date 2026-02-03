@@ -10,15 +10,25 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { formatPoints } from '@/lib/utils/format';
 
+interface CouponRewardData {
+  applies_to: string;
+  discount_type: string;
+  discount_value: number;
+  max_discount: number | null;
+  target_product_name?: string;
+  target_service_name?: string;
+  target_product_category_name?: string;
+  target_service_category_name?: string;
+}
+
 interface CouponData {
   id: string;
   code: string;
-  type: string;
-  value: number;
+  name: string | null;
   min_purchase: number | null;
-  max_discount: number | null;
   expires_at: string | null;
   is_single_use: boolean;
+  coupon_rewards?: CouponRewardData[];
 }
 
 export default function AccountDashboardPage() {
@@ -101,7 +111,7 @@ export default function AccountDashboardPage() {
           </h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {coupons.map((coupon) => (
-              <CouponCard key={coupon.id} coupon={coupon} />
+              <CouponCard key={coupon.id} coupon={{ ...coupon, rewards: coupon.coupon_rewards }} />
             ))}
           </div>
         </div>

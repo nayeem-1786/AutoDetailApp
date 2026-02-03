@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { sendSms } from '@/lib/utils/sms';
 import { BUSINESS } from '@/lib/utils/constants';
 
 export async function POST(request: NextRequest) {
@@ -35,17 +36,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-    const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-
-    if (!twilioSid || !twilioAuth || !twilioFrom) {
-      return NextResponse.json(
-        { error: 'SMS service not configured' },
-        { status: 400 }
-      );
-    }
-
     const smsBody =
       `Receipt from ${BUSINESS.NAME}\n` +
       `#${transaction.receipt_number || 'N/A'}\n` +
@@ -55,28 +45,11 @@ export async function POST(request: NextRequest) {
         : '') +
       `\nThank you!`;
 
-    const formData = new URLSearchParams();
-    formData.append('From', twilioFrom);
-    formData.append('To', phone);
-    formData.append('Body', smsBody);
+    const result = await sendSms(phone, smsBody);
 
-    const twRes = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData,
-      }
-    );
-
-    if (!twRes.ok) {
-      const errText = await twRes.text();
-      console.error('Twilio error:', errText);
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'Failed to send SMS receipt' },
+        { error: result.error },
         { status: 500 }
       );
     }

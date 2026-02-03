@@ -121,6 +121,51 @@ export const VEHICLE_TYPE_SIZE_CLASSES: Record<string, string[]> = {
   aircraft: [],
 } as const;
 
+// Coupon type labels
+export const DISCOUNT_TYPE_LABELS: Record<string, string> = {
+  percentage: 'Percentage Off',
+  flat: 'Dollar Amount Off',
+  free: 'Free',
+} as const;
+
+export const APPLIES_TO_LABELS: Record<string, string> = {
+  order: 'Entire Order',
+  product: 'Product',
+  service: 'Service',
+} as const;
+
+// Coupon status labels
+export const COUPON_STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  active: 'Active',
+  redeemed: 'Redeemed',
+  expired: 'Expired',
+  disabled: 'Disabled',
+} as const;
+
+// Campaign status labels
+export const CAMPAIGN_STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  sending: 'Sending',
+  sent: 'Sent',
+  paused: 'Paused',
+  cancelled: 'Cancelled',
+} as const;
+
+// Campaign channel labels
+export const CAMPAIGN_CHANNEL_LABELS: Record<string, string> = {
+  sms: 'SMS',
+  email: 'Email',
+  both: 'SMS + Email',
+} as const;
+
+// Consent action labels
+export const CONSENT_ACTION_LABELS: Record<string, string> = {
+  opt_in: 'Opt In',
+  opt_out: 'Opt Out',
+} as const;
+
 // Feature flag keys
 export const FEATURE_FLAGS = {
   LOYALTY_REWARDS: 'loyalty_rewards',

@@ -8,7 +8,9 @@ export type WebhookEvent =
   | 'appointment_confirmed'
   | 'appointment_cancelled'
   | 'appointment_rescheduled'
-  | 'appointment_completed';
+  | 'appointment_completed'
+  | 'campaign_send'
+  | 'lifecycle_rule_trigger';
 
 /**
  * Fire-and-forget webhook to n8n.
