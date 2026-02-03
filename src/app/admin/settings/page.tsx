@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList } from 'lucide-react';
 
 const settingsSections = [
   {
@@ -47,6 +47,13 @@ const settingsSections = [
     description: 'Set how long the POS stays active before auto-logout.',
     href: '/admin/settings/pos-idle-timeout',
     icon: Timer,
+    roles: ['super_admin'] as const,
+  },
+  {
+    title: 'Audit Log',
+    description: 'View system activity history and user actions.',
+    href: '/admin/settings/audit-log',
+    icon: ClipboardList,
     roles: ['super_admin'] as const,
   },
 ];

@@ -16,16 +16,18 @@ import {
   VEHICLE_TYPE_LABELS,
   VEHICLE_SIZE_LABELS,
   VEHICLE_TYPE_SIZE_CLASSES,
+  TRANSACTION_STATUS_LABELS,
 } from '@/lib/utils/constants';
 import type {
   Customer,
   Vehicle,
   LoyaltyLedger,
+  Transaction,
   VehicleType,
   VehicleSizeClass,
   LoyaltyAction,
 } from '@/lib/supabase/types';
-import { formatCurrency, formatPhone, formatDate, formatPoints, normalizePhone } from '@/lib/utils/format';
+import { formatCurrency, formatPhone, formatDate, formatDateTime, formatPoints, normalizePhone } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +50,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 export default function CustomerProfilePage() {
@@ -60,6 +62,7 @@ export default function CustomerProfilePage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [ledger, setLedger] = useState<LoyaltyLedger[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState('info');
@@ -122,10 +125,11 @@ export default function CustomerProfilePage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [custRes, vehRes, ledgerRes] = await Promise.all([
+    const [custRes, vehRes, ledgerRes, txRes] = await Promise.all([
       supabase.from('customers').select('*').eq('id', id).single(),
       supabase.from('vehicles').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('loyalty_ledger').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('transactions').select('*, employee:employees(id, first_name, last_name)').eq('customer_id', id).order('transaction_date', { ascending: false }),
     ]);
 
     if (custRes.error || !custRes.data) {
@@ -154,6 +158,7 @@ export default function CustomerProfilePage() {
 
     if (vehRes.data) setVehicles(vehRes.data);
     if (ledgerRes.data) setLedger(ledgerRes.data);
+    if (txRes.data) setTransactions(txRes.data);
     setLoading(false);
   }, [id, supabase, router, reset]);
 
@@ -415,6 +420,77 @@ export default function CustomerProfilePage() {
     },
   ];
 
+  // Transaction history columns
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transactionColumns: ColumnDef<any, unknown>[] = [
+    {
+      id: 'date',
+      header: 'Date',
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600">{formatDateTime(row.original.transaction_date)}</span>
+      ),
+    },
+    {
+      id: 'receipt',
+      header: 'Receipt #',
+      cell: ({ row }) => (
+        <span className="text-sm font-mono text-gray-900">{row.original.receipt_number ?? '—'}</span>
+      ),
+    },
+    {
+      id: 'employee',
+      header: 'Employee',
+      cell: ({ row }) => {
+        const emp = row.original.employee;
+        return (
+          <span className="text-sm text-gray-600">
+            {emp ? `${emp.first_name} ${emp.last_name}` : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'method',
+      header: 'Method',
+      cell: ({ row }) => {
+        const method = row.original.payment_method;
+        return (
+          <span className="text-sm text-gray-600">
+            {method ? method.charAt(0).toUpperCase() + method.slice(1) : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.status;
+        const variants: Record<string, 'success' | 'destructive' | 'warning' | 'info' | 'default'> = {
+          completed: 'success',
+          open: 'info',
+          voided: 'destructive',
+          refunded: 'destructive',
+          partial_refund: 'warning',
+        };
+        return (
+          <Badge variant={variants[status] || 'default'}>
+            {TRANSACTION_STATUS_LABELS[status] || status}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'total',
+      header: () => <div className="text-right">Total</div>,
+      cell: ({ row }) => (
+        <div className="text-right text-sm font-medium text-gray-900">
+          {formatCurrency(row.original.total_amount)}
+        </div>
+      ),
+    },
+  ];
+
   if (loading || !customer) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -448,7 +524,7 @@ export default function CustomerProfilePage() {
           <TabsTrigger value="info">Info</TabsTrigger>
           <TabsTrigger value="vehicles">Vehicles ({vehicles.length})</TabsTrigger>
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>
         </TabsList>
 
         {/* ===== INFO TAB ===== */}
@@ -887,16 +963,24 @@ export default function CustomerProfilePage() {
         {/* ===== HISTORY TAB ===== */}
         <TabsContent value="history">
           <Card>
-            <CardContent className="pt-6">
-              <EmptyState
-                icon={Clock}
-                title="Visit history coming in Phase 2 (POS)"
-                description="Once the POS module is live, completed transactions and appointment history will appear here."
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Transaction History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={transactionColumns}
+                data={transactions}
+                emptyTitle="No transactions"
+                emptyDescription="Completed transactions will appear here."
+                pageSize={10}
               />
             </CardContent>
           </Card>
 
-          {/* Quick stats for now */}
+          {/* Quick stats */}
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <Card>
               <CardContent className="pt-6">

@@ -7,14 +7,20 @@ import {
   ArrowLeft,
   Loader2,
   ShieldAlert,
+  ScanLine,
+  PauseCircle,
+  Keyboard,
+  X,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
 import { canAccessRoute } from '@/lib/auth/roles';
 import { createClient } from '@/lib/supabase/client';
-import { TicketProvider } from './context/ticket-context';
-import { CheckoutProvider } from './context/checkout-context';
+import { TicketProvider, useTicket } from './context/ticket-context';
+import { CheckoutProvider, useCheckout } from './context/checkout-context';
+import { HeldTicketsProvider, useHeldTickets } from './context/held-tickets-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
+import { HeldTicketsPanel } from './components/held-tickets-panel';
 
 const POS_SESSION_KEY = 'pos_session_authenticated';
 const POS_SESSION_TIMESTAMP_KEY = 'pos_session_timestamp';
@@ -154,43 +160,213 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   return (
     <TicketProvider>
       <CheckoutProvider>
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
-          {/* Top Bar — simplified: logo, employee name, clock */}
-          <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
-            {/* Left: Back navigation + Logo */}
-            <div className="flex items-center gap-4">
-              <Link
-                href={pathname === '/pos' ? '/admin' : '/pos'}
-                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">{pathname === '/pos' ? 'Admin' : 'POS'}</span>
-              </Link>
-              <span className="text-lg font-semibold text-gray-900">
-                Smart Detail POS
-              </span>
-            </div>
-
-            {/* Right: Employee + Clock */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700">
-                {displayName}
-              </span>
-              <span className="text-sm tabular-nums text-gray-400">{clock}</span>
-            </div>
-          </header>
-
-          {/* Main Content */}
-          <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
-
-          {/* Bottom Navigation */}
-          <BottomNav />
-        </div>
-
-        {/* Checkout overlay renders on top of everything */}
-        <CheckoutOverlay />
+        <HeldTicketsProvider>
+          <PosShellContent displayName={displayName} clock={clock}>
+            {children}
+          </PosShellContent>
+        </HeldTicketsProvider>
       </CheckoutProvider>
     </TicketProvider>
+  );
+}
+
+/** Inner component that has access to all providers */
+function PosShellContent({
+  children,
+  displayName,
+  clock,
+}: {
+  children: React.ReactNode;
+  displayName: string;
+  clock: string;
+}) {
+  const pathname = usePathname();
+  const { ticket, dispatch } = useTicket();
+  const { openCheckout, isOpen: checkoutOpen } = useCheckout();
+  const { heldTickets } = useHeldTickets();
+  const [heldPanelOpen, setHeldPanelOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const heldCount = heldTickets.length;
+
+  // P7: Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Don't fire shortcuts when typing in inputs
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        // Escape should still work in inputs
+        if (e.key !== 'Escape') return;
+      }
+
+      switch (e.key) {
+        case 'F1':
+          e.preventDefault();
+          dispatch({ type: 'CLEAR_TICKET' });
+          break;
+        case 'F2':
+          e.preventDefault();
+          if (ticket.items.length > 0 && !checkoutOpen) {
+            openCheckout();
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          if (shortcutsOpen) {
+            setShortcutsOpen(false);
+          } else if (heldPanelOpen) {
+            setHeldPanelOpen(false);
+          }
+          break;
+        case '?':
+          // Only toggle shortcuts if no modifier keys
+          if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            // Don't trigger when typing in inputs (already handled above except Escape)
+            if (
+              target.tagName !== 'INPUT' &&
+              target.tagName !== 'TEXTAREA' &&
+              !target.isContentEditable
+            ) {
+              e.preventDefault();
+              setShortcutsOpen((prev) => !prev);
+            }
+          }
+          break;
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dispatch, ticket.items.length, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen]);
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
+      {/* Top Bar */}
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+        {/* Left: Back navigation + Logo */}
+        <div className="flex items-center gap-4">
+          <Link
+            href={pathname === '/pos' ? '/admin' : '/pos'}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">{pathname === '/pos' ? 'Admin' : 'POS'}</span>
+          </Link>
+          <span className="text-lg font-semibold text-gray-900">
+            Smart Detail POS
+          </span>
+        </div>
+
+        {/* Right: Scanner indicator + Held tickets + Employee + Clock + Shortcuts help */}
+        <div className="flex items-center gap-3">
+          {/* P5: Scanner Connection Indicator */}
+          <div className="flex items-center gap-1" title="Scanner: disconnected">
+            <ScanLine className="h-4 w-4 text-gray-400" />
+            <span className="hidden text-xs text-gray-400 sm:inline">Disconnected</span>
+          </div>
+
+          {/* P3: Held Tickets badge */}
+          {heldCount > 0 && (
+            <button
+              onClick={() => setHeldPanelOpen(true)}
+              className="relative flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700 hover:bg-amber-100"
+            >
+              <PauseCircle className="h-4 w-4" />
+              <span className="text-xs font-medium">{heldCount} held</span>
+            </button>
+          )}
+
+          {/* Show held tickets panel even when count is 0 — the button just won't be visible */}
+          {heldCount === 0 && (
+            <button
+              onClick={() => setHeldPanelOpen(true)}
+              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Held tickets"
+            >
+              <PauseCircle className="h-4 w-4" />
+            </button>
+          )}
+
+          <span className="text-sm font-medium text-gray-700">
+            {displayName}
+          </span>
+          <span className="text-sm tabular-nums text-gray-400">{clock}</span>
+
+          {/* P7: Shortcuts help button */}
+          <button
+            onClick={() => setShortcutsOpen((prev) => !prev)}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-xs font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            title="Keyboard shortcuts"
+          >
+            ?
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+
+      {/* Bottom Navigation */}
+      <BottomNav />
+
+      {/* Checkout overlay renders on top of everything */}
+      <CheckoutOverlay />
+
+      {/* P3: Held Tickets Panel */}
+      <HeldTicketsPanel open={heldPanelOpen} onClose={() => setHeldPanelOpen(false)} />
+
+      {/* P7: Keyboard Shortcuts Overlay */}
+      {shortcutsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Keyboard className="h-5 w-5 text-gray-400" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Keyboard Shortcuts
+                </h3>
+              </div>
+              <button
+                onClick={() => setShortcutsOpen(false)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">New ticket (clear current)</span>
+                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                  F1
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Go to payment / checkout</span>
+                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                  F2
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Cancel / go back / close</span>
+                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                  Esc
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Toggle this help</span>
+                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                  ?
+                </kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

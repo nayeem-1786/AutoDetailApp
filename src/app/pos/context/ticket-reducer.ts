@@ -212,6 +212,19 @@ export function ticketReducer(
       return { ...state, notes: action.notes };
     }
 
+    case 'UPDATE_ITEM_NOTE': {
+      const items = state.items.map((item) =>
+        item.id === action.itemId
+          ? { ...item, notes: action.note }
+          : item
+      );
+      return { ...state, items };
+    }
+
+    case 'RESTORE_TICKET': {
+      return { ...action.state };
+    }
+
     case 'CLEAR_TICKET': {
       return { ...initialTicketState };
     }

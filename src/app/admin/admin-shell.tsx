@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
 import { getNavForRole, canAccessRoute, type NavItem } from '@/lib/auth/roles';
@@ -28,6 +28,7 @@ import {
   CircleUser,
   Shield,
   MonitorSmartphone,
+  Search,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/utils/constants';
@@ -48,6 +49,172 @@ const iconMap: Record<string, LucideIcon> = {
   Settings,
 };
 
+// Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
+const BREADCRUMB_ACRONYMS: Record<string, string> = {
+  pos: 'POS',
+  sms: 'SMS',
+  api: 'API',
+  id: 'ID',
+  url: 'URL',
+  faq: 'FAQ',
+  csv: 'CSV',
+};
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function formatBreadcrumbSegment(segment: string): string | null {
+  // Hide UUID segments
+  if (UUID_REGEX.test(segment)) return null;
+
+  // Check for known acronyms
+  const lower = segment.toLowerCase().replace(/-/g, ' ');
+  const words = lower.split(' ');
+  const formatted = words
+    .map((word) => {
+      if (BREADCRUMB_ACRONYMS[word]) return BREADCRUMB_ACRONYMS[word];
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+  return formatted;
+}
+
+// Flatten nav items for global search
+function flattenNavItems(items: NavItem[]): NavItem[] {
+  const result: NavItem[] = [];
+  for (const item of items) {
+    result.push(item);
+    if (item.children) {
+      result.push(...item.children);
+    }
+  }
+  return result;
+}
+
+// Global Search Dialog component
+function CommandPalette({
+  open,
+  onOpenChange,
+  navItems,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  navItems: NavItem[];
+}) {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const allItems = flattenNavItems(navItems);
+
+  const filtered = query.trim()
+    ? allItems.filter((item) =>
+        item.label.toLowerCase().includes(query.toLowerCase()) ||
+        item.href.toLowerCase().includes(query.toLowerCase())
+      )
+    : allItems;
+
+  useEffect(() => {
+    if (open) {
+      setQuery('');
+      setSelectedIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
+
+  const handleSelect = useCallback(
+    (item: NavItem) => {
+      onOpenChange(false);
+      router.push(item.href);
+    },
+    [onOpenChange, router]
+  );
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === 'Enter' && filtered[selectedIndex]) {
+      e.preventDefault();
+      handleSelect(filtered[selectedIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onOpenChange(false);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className="fixed inset-0 bg-black/50"
+        onClick={() => onOpenChange(false)}
+      />
+      <div className="fixed inset-0 flex items-start justify-center pt-[20vh]">
+        <div
+          className="relative z-50 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Search input */}
+          <div className="flex items-center gap-3 border-b border-gray-200 px-4">
+            <Search className="h-4 w-4 shrink-0 text-gray-400" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search pages..."
+              className="h-12 w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+            />
+            <kbd className="hidden shrink-0 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs text-gray-400 sm:inline">
+              ESC
+            </kbd>
+          </div>
+
+          {/* Results */}
+          <div className="max-h-72 overflow-y-auto p-2">
+            {filtered.length === 0 ? (
+              <div className="py-6 text-center text-sm text-gray-500">
+                No results found.
+              </div>
+            ) : (
+              filtered.map((item, index) => {
+                const Icon = iconMap[item.icon] || LayoutDashboard;
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => handleSelect(item)}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
+                      index === selectedIndex
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-gray-400" />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <span className="text-xs text-gray-400">{item.href}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminContent({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, signOut } = useAuth();
   const router = useRouter();
@@ -55,6 +222,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,6 +249,18 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [accountOpen]);
+
+  // Cmd+K / Ctrl+K keyboard shortcut for global search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandOpen((prev) => !prev);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Auto-expand parent nav item when child is active
   useEffect(() => {
@@ -256,7 +436,13 @@ function AdminContent({ children }: { children: React.ReactNode }) {
             {pathname
               .split('/')
               .filter(Boolean)
-              .map((segment, i, arr) => (
+              .reduce<{ segment: string; label: string | null }[]>((acc, segment) => {
+                const label = formatBreadcrumbSegment(segment);
+                acc.push({ segment, label });
+                return acc;
+              }, [])
+              .filter((item) => item.label !== null)
+              .map((item, i, arr) => (
                 <span key={i} className="flex items-center gap-1">
                   {i > 0 && <span>/</span>}
                   <span
@@ -266,20 +452,32 @@ function AdminContent({ children }: { children: React.ReactNode }) {
                         : 'text-gray-500'
                     )}
                   >
-                    {segment
-                      .replace(/-/g, ' ')
-                      .replace(/\b\w/g, (l) => l.toUpperCase())}
+                    {item.label}
                   </span>
                 </span>
               ))}
           </nav>
+
+          {/* Global Search Trigger */}
+          <button
+            onClick={() => setCommandOpen(true)}
+            className="ml-auto hidden w-64 cursor-pointer items-center justify-between rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-200 sm:flex"
+          >
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              <span>Search...</span>
+            </div>
+            <kbd className="rounded border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-400">
+              ⌘K
+            </kbd>
+          </button>
 
           {/* Open POS */}
           <a
             href="/pos"
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+            className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 sm:ml-0 ml-auto"
           >
             <MonitorSmartphone className="h-4 w-4" />
             <span className="hidden sm:inline">Open POS</span>
@@ -337,6 +535,13 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
+
+      {/* Global Search Command Palette */}
+      <CommandPalette
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        navItems={navItems}
+      />
     </div>
   );
 }

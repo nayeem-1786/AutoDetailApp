@@ -58,6 +58,8 @@ export type TicketAction =
   | { type: 'SET_COUPON'; coupon: { id: string; code: string; discount: number } | null }
   | { type: 'SET_LOYALTY_REDEEM'; points: number; discount: number }
   | { type: 'SET_NOTES'; notes: string | null }
+  | { type: 'UPDATE_ITEM_NOTE'; itemId: string; note: string | null }
+  | { type: 'RESTORE_TICKET'; state: TicketState }
   | { type: 'CLEAR_TICKET' };
 
 // ─── Catalog types ─────────────────────────────────────────────

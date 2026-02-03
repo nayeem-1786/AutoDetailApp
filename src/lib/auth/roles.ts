@@ -9,6 +9,7 @@ export const ROUTE_ACCESS: Record<string, UserRole[]> = {
   '/admin/settings/business-profile': ['super_admin'],
   '/admin/settings/tax-config': ['super_admin'],
   '/admin/settings/mobile-zones': ['super_admin'],
+  '/admin/settings/audit-log': ['super_admin'],
   '/admin/catalog': ['super_admin', 'admin'],
   '/admin/catalog/products': ['super_admin', 'admin'],
   '/admin/catalog/services': ['super_admin', 'admin'],

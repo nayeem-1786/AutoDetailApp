@@ -10,7 +10,74 @@ interface DialogProps {
   children: React.ReactNode;
 }
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 function Dialog({ open, onOpenChange, children }: DialogProps) {
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const previousFocusRef = React.useRef<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    if (open) {
+      // Store the currently focused element to restore later
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+
+      // Auto-focus the first focusable element inside the dialog
+      const timer = setTimeout(() => {
+        if (dialogRef.current) {
+          const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+          if (focusable.length > 0) {
+            focusable[0].focus();
+          }
+        }
+      }, 0);
+
+      return () => clearTimeout(timer);
+    } else {
+      // Restore focus to the element that was focused before the dialog opened
+      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
+        previousFocusRef.current.focus();
+        previousFocusRef.current = null;
+      }
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onOpenChange(false);
+        return;
+      }
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          // Shift+Tab: if on first element, wrap to last
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          // Tab: if on last element, wrap to first
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onOpenChange]);
+
   if (!open) return null;
 
   return (
@@ -21,6 +88,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
       />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <div
+          ref={dialogRef}
           className="relative z-50 w-full max-w-lg rounded-lg bg-white shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >

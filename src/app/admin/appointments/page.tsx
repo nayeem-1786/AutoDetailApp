@@ -204,7 +204,7 @@ export default function AppointmentsPage() {
       <div>
         <PageHeader
           title="Today's Schedule"
-          description={loading ? 'Loading...' : `${todayAppointments.length} appointment${todayAppointments.length !== 1 ? 's' : ''} today`}
+          description={loading ? undefined : `${todayAppointments.length} appointment${todayAppointments.length !== 1 ? 's' : ''} today`}
         />
 
         <div className="mt-6">
@@ -242,7 +242,7 @@ export default function AppointmentsPage() {
     <div>
       <PageHeader
         title="Appointments"
-        description={loading ? 'Loading...' : `${appointments.length} appointments this month`}
+        description={loading ? undefined : `${appointments.length} appointments this month`}
       />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,400px]">
