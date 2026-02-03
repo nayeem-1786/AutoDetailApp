@@ -77,10 +77,24 @@ Square-style point-of-sale register with PIN-based employee login, three-tab wor
 
 **Session Management** — POS session tracked via sessionStorage (separate from Supabase auth). Configurable idle timeout auto-logs out after inactivity and clears the current ticket (default 15 min, adjustable in Admin > Settings > POS Idle Timeout).
 
+### Customer Portal (`/account/*`)
+
+Self-service portal for customers with phone OTP as the primary authentication method (Supabase Auth + Twilio), email/password as secondary fallback.
+
+- **Dashboard** — Loyalty points, active coupons, upcoming appointments, quick actions
+- **Appointments** — Upcoming/past split view, self-cancellation (24h advance window), rebook
+- **Vehicles** — Full CRUD with add/edit dialog and delete confirmation
+- **Transactions** — Paginated history with expandable inline detail (items, payments, totals)
+- **Loyalty** — Points balance, redemption info, chronological ledger with action badges
+- **Profile** — Editable name, phone, marketing consent preferences
+
+Phone-based customer matching automatically links POS/migration customers to portal accounts on first sign-in.
+
 ### Authentication
 
-- Supabase Auth (email/password for admin, PIN-based for POS)
+- Supabase Auth (email/password for admin, PIN-based for POS, phone OTP for customer portal)
 - Middleware protects `/admin/*` routes, redirects unauthenticated users to `/login`
+- Middleware protects `/account/*` routes, redirects unauthenticated users to `/signin`
 - POS routes protected by sessionStorage-based POS session flag + Supabase auth
 - Public routes (`/`, `/services/*`, `/products/*`, `/book`, `/api/*`) pass through without auth
 - Role-based access (super_admin, admin, cashier, detailer) enforced at page level
@@ -90,10 +104,12 @@ Square-style point-of-sale register with PIN-based employee login, three-tab wor
 ```
 src/
 ├── app/
-│   ├── (auth)/              — Login page
+│   ├── (auth)/              — Staff login page
+│   ├── (customer-auth)/     — Customer sign-in/sign-up (phone OTP + email)
+│   ├── (account)/           — Customer portal (dashboard, appointments, vehicles, transactions, loyalty, profile)
 │   ├── (public)/            — Public SEO pages
 │   ├── admin/               — Admin dashboard
-│   ├── api/                 — API routes (including /api/pos/auth/pin-login)
+│   ├── api/                 — API routes (pos, customer, appointments, booking, quotes, etc.)
 │   ├── pos/                 — POS terminal
 │   │   ├── login/           — PIN-based login page
 │   │   ├── components/      — POS UI (register-tab, catalog-browser, pin-pad, etc.)
@@ -103,10 +119,11 @@ src/
 │   ├── sitemap.xml/         — Dynamic sitemap
 │   └── robots.txt/          — robots.txt handler
 ├── components/
+│   ├── account/             — Customer portal components (13)
 │   ├── public/              — Public-facing Server Components (11)
-│   └── ui/                  — Reusable UI component library (22)
+│   └── ui/                  — Reusable UI component library (24)
 ├── lib/
-│   ├── auth/                — AuthProvider, permissions, roles
+│   ├── auth/                — AuthProvider, CustomerAuthProvider, permissions, roles
 │   ├── data/                — Server-side data fetching (services, products, business settings)
 │   ├── hooks/               — Client hooks (feature flags, permissions)
 │   ├── seo/                 — JSON-LD generators, metadata helpers

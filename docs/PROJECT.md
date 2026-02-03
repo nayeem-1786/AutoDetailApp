@@ -566,16 +566,18 @@ Same booking and availability rules enforced regardless of channel. Appointments
 
 ---
 
-## Customer Portal (/portal)
+## Customer Portal (`/account/*`) ✅ BUILT
 
-- **Authentication:** Phone number + OTP (Supabase Auth + Twilio)
-- **Dashboard:** Points balance, active coupons, upcoming appointments
-- **Vehicles:** View, add, edit vehicles; service history per vehicle
-- **Appointments:** View upcoming, reschedule, cancel, book new
-- **History:** Past transactions and receipts, filter by vehicle/date/service
-- **Photos:** Before/after photos of their vehicles (when feature active)
-- **Profile:** Phone, email, birthday, marketing preferences (opt-in/out)
-- **Online store link:** Browse and purchase products (WooCommerce)
+- **Authentication:** Phone OTP as primary sign-in method (Supabase Auth + Twilio), email/password as secondary. Sign-up supports post-OTP simplified form (name + email, phone pre-filled) and full registration. Phone-based customer matching links POS/migration customers to auth accounts automatically.
+- **Dashboard (`/account`):** Loyalty points balance (links to detail page), active coupons section, upcoming appointments with cancel action, quick actions (book, view transactions, view all appointments).
+- **Vehicles (`/account/vehicles`):** Full CRUD — add/edit dialog (type, size class, year, make, model, color), delete with confirmation. All operations via authenticated API with ownership checks.
+- **Appointments (`/account/appointments`):** Split into "Upcoming" and "Past" sections. Cancel button on pending/confirmed appointments with 24-hour advance window enforcement and confirmation dialog with policy text. Rebook action on completed/cancelled.
+- **Transactions (`/account/transactions`):** Paginated list of completed/refunded transactions. Click-to-expand inline detail showing items, payments, tax, tip, discounts, loyalty earned.
+- **Loyalty (`/account/loyalty`):** Current balance prominently displayed, redemption info (100 pts = $5.00 off), chronological ledger with action badges (earned/redeemed/adjusted/expired/bonus), signed points change with running balance.
+- **Profile (`/account/profile`):** Editable form for name, phone, marketing preferences (SMS/email consent).
+- **Navigation:** AccountShell with 6 tabs — Dashboard, Appointments, Vehicles, Transactions, Loyalty, Profile. Middleware protects all `/account/*` routes.
+- **Photos:** Before/after photos of their vehicles (when feature active, Phase 8)
+- **Online store link:** Browse and purchase products (WooCommerce, Phase 9)
 
 ---
 
@@ -966,17 +968,23 @@ Built but toggled OFF. Activate when business warrants:
 - Online booking payment: Stripe Elements payment step in booking wizard (gated by `ONLINE_BOOKING_PAYMENT` feature flag), `POST /api/book/payment-intent` for PaymentIntent creation, payment_intent_id stored on appointment
 - Admin nav: Quotes added to sidebar navigation (between Transactions and Customers), `/quote` added to public routes in middleware
 
-### Phase 4 — Customer Portal
+### Phase 4 — Customer Portal ✅ COMPLETE
 
 **Goal:** Customer self-service, reduce phone calls.
 
-- Phone OTP login (Supabase Auth + Twilio)
-- Dashboard: points balance, active coupons, upcoming appointments
-- Vehicle management: view, add, edit, service history per vehicle
-- Appointments: view upcoming, reschedule, cancel, book new
-- Transaction history with receipts
-- Profile management and marketing preferences
-- Online store link (WooCommerce)
+- Phone OTP sign-in redesigned as primary auth method (Supabase Auth + Twilio) with Square-style card layout, 60-second resend cooldown, email/password as secondary fallback
+- Sign-up page supports post-OTP simplified profile completion (name + email only, phone pre-filled) and fresh phone OTP registration with full email/password alternative
+- Link-account API matches customers by: (1) auth_user_id already linked, (2) phone match where auth_user_id is null, (3) email match where auth_user_id is null, (4) create new — enables POS/migration customers to claim their accounts via phone
+- CustomerAuthProvider updated with `refreshCustomer()` method for post-profile-completion re-fetch
+- Customer API endpoints: vehicles CRUD (GET/POST/PATCH/DELETE with ownership checks), paginated transactions (list + detail with items/payments/vehicle), loyalty ledger (balance + paginated entries), active coupons, appointment self-cancellation (24-hour advance window, webhook fired)
+- Dashboard: points balance (links to loyalty detail page), active coupons section, upcoming appointments with cancel action, "View Transactions" quick action
+- Vehicle management: add/edit dialog with react-hook-form validation, delete with confirmation, fetches via API instead of direct Supabase queries
+- Appointments page: split into "Upcoming" and "Past" sections, cancel button with confirmation dialog and policy text, refreshes on status change
+- Transaction history page: paginated list with expandable detail (items, payments, tax, tip, loyalty earned), click-to-expand inline
+- Loyalty detail page: current balance prominently displayed, redemption info (100 pts = $5.00 off), chronological ledger with action badges (earned/redeemed/adjusted/expired/bonus), points change with running balance
+- AccountShell tabs: Dashboard, Appointments, Vehicles, Transactions, Loyalty, Profile
+- Validation schemas: phoneOtpSendSchema, phoneOtpVerifySchema, customerVehicleSchema
+- 24 files total (13 new, 11 modified), `npm run build` passes with zero errors
 
 ### Phase 5 — Marketing, Coupons & Campaigns
 
@@ -1102,3 +1110,4 @@ These standards apply across all phases and should be implemented progressively:
 | v9 | 2026-02-02 | Phase 2 expanded: void transaction (admin-only, confirmation modal), receipt re-send from transaction detail (print/email/SMS), manual ticket discount (dollar/percent with label, manager-only), admin transactions page (search, filters, inline detail, CSV export, receipt actions), role-based POS views (cashier restrictions for EOD/discounts/settings, role badge in header), cash drawer open/close tracking (opening float, status banner, nav indicator, auto-close on EOD). |
 | v10 | 2026-02-03 | Phase 3 marked complete. Quotes system (CRUD API, admin pages, public view, PDF generation, send via email/SMS/both), 11 Labs Voice Agent REST API (6 endpoints with API key auth), staff scheduling (weekly schedules, blocked dates, enhanced slot availability), waitlist system (API, admin panel, auto-notify, booking wizard integration), webhook events for appointment/quote lifecycle, online booking payment via Stripe Elements, shared webhook utility. |
 | v11 | 2026-02-03 | Phase 2 marked complete with comprehensive documentation: 67+ files covering PIN auth, IP restriction, idle timeout, catalog with barcode scanner, vehicle-aware pricing, all payment methods, tip handling, receipts (print/email/SMS), loyalty system, coupon validation, item-level refunds, cash management, favorites system, keyboard shortcuts, tablet-optimized UI. DASHBOARD_RULES.md POS Management section expanded with full built-feature inventory. |
+| v12 | 2026-02-03 | Phase 4 marked complete. Customer Portal: phone OTP sign-in (primary) with email fallback, Square-style card layout; sign-up with post-OTP simplified form and phone-based customer matching (POS/migration customers auto-linked); customer API endpoints for vehicles CRUD, paginated transactions with detail, loyalty ledger, coupons, appointment self-cancellation (24h window + webhook); dashboard with coupons section and loyalty link; vehicle management with add/edit/delete dialogs; appointments split into upcoming/past with cancel action; transaction history with inline expandable detail; loyalty page with balance + ledger; AccountShell expanded with Transactions and Loyalty tabs. 24 files (13 new, 11 modified). |

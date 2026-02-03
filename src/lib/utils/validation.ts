@@ -279,6 +279,28 @@ export const businessHoursSchema = z.object({
   sunday: dayHoursSchema,
 });
 
+// Phone OTP schemas (customer portal phone authentication)
+const otpPhoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/;
+
+export const phoneOtpSendSchema = z.object({
+  phone: z.string().regex(otpPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+});
+
+export const phoneOtpVerifySchema = z.object({
+  phone: z.string().regex(otpPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+
+// Customer vehicle schema (customer portal vehicle management)
+export const customerVehicleSchema = z.object({
+  vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
+  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
+  make: optionalString,
+  model: optionalString,
+  color: optionalString,
+});
+
 // Customer signup schema (customer portal registration)
 export const customerSignupSchema = z.object({
   first_name: requiredString,
@@ -496,3 +518,6 @@ export type WaitlistEntryInput = z.infer<typeof waitlistEntrySchema>;
 export type EmployeeScheduleInput = z.infer<typeof employeeScheduleSchema>;
 export type EmployeeWeeklyScheduleInput = z.infer<typeof employeeWeeklyScheduleSchema>;
 export type BlockedDateInput = z.infer<typeof blockedDateSchema>;
+export type PhoneOtpSendInput = z.infer<typeof phoneOtpSendSchema>;
+export type PhoneOtpVerifyInput = z.infer<typeof phoneOtpVerifySchema>;
+export type CustomerVehicleInput = z.infer<typeof customerVehicleSchema>;

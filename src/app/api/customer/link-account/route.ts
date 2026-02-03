@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if a customer record already has this auth_user_id
+    // (1) Check if a customer record already has this auth_user_id
     const { data: alreadyLinked } = await admin
       .from('customers')
       .select('id')
@@ -56,7 +56,32 @@ export async function POST(request: NextRequest) {
     // Normalize phone
     const e164Phone = phone ? normalizePhone(phone) : null;
 
-    // Try to find an existing customer by email without an auth_user_id
+    // (2) Try to find existing customer by phone where auth_user_id is null
+    if (e164Phone) {
+      const { data: existingByPhone } = await admin
+        .from('customers')
+        .select('id, first_name, last_name, email')
+        .eq('phone', e164Phone)
+        .is('auth_user_id', null)
+        .limit(1)
+        .single();
+
+      if (existingByPhone) {
+        const updates: Record<string, unknown> = {
+          auth_user_id: user.id,
+          updated_at: new Date().toISOString(),
+        };
+        if (!existingByPhone.first_name && first_name) updates.first_name = first_name;
+        if (!existingByPhone.last_name && last_name) updates.last_name = last_name;
+        if (!existingByPhone.email && email) updates.email = email;
+
+        await admin.from('customers').update(updates).eq('id', existingByPhone.id);
+
+        return NextResponse.json({ success: true, customer_id: existingByPhone.id });
+      }
+    }
+
+    // (3) Try to find existing customer by email where auth_user_id is null
     const { data: existingByEmail } = await admin
       .from('customers')
       .select('id, first_name, last_name, phone')
@@ -66,7 +91,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingByEmail) {
-      // Link existing customer to auth user, fill in any missing fields
       const updates: Record<string, unknown> = {
         auth_user_id: user.id,
         updated_at: new Date().toISOString(),
@@ -80,7 +104,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, customer_id: existingByEmail.id });
     }
 
-    // No existing customer found — create a new one
+    // (4) No existing customer found — create a new one
     const { data: newCustomer, error: custErr } = await admin
       .from('customers')
       .insert({

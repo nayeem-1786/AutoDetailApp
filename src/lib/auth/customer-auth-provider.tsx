@@ -11,6 +11,7 @@ interface CustomerAuthContextType {
   customer: Customer | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshCustomer: () => Promise<void>;
 }
 
 const CustomerAuthContext = createContext<CustomerAuthContextType>({
@@ -19,6 +20,7 @@ const CustomerAuthContext = createContext<CustomerAuthContextType>({
   customer: null,
   loading: true,
   signOut: async () => {},
+  refreshCustomer: async () => {},
 });
 
 export function CustomerAuthProvider({ children }: { children: React.ReactNode }) {
@@ -77,6 +79,13 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     setCustomer(null);
   };
 
+  const refreshCustomer = useCallback(async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+      await loadCustomerData(currentUser.id);
+    }
+  }, [supabase, loadCustomerData]);
+
   return (
     <CustomerAuthContext.Provider
       value={{
@@ -85,6 +94,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         customer,
         loading,
         signOut,
+        refreshCustomer,
       }}
     >
       {children}
