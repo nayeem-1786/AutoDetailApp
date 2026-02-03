@@ -4,8 +4,36 @@ import { updateSession } from '@/lib/supabase/middleware';
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt', '/pos/login'];
 
+// Allowed IPs for POS access (comma-separated in env var)
+const ALLOWED_POS_IPS: string[] | null = process.env.ALLOWED_POS_IPS
+  ? process.env.ALLOWED_POS_IPS.split(',').map((ip) => ip.trim()).filter(Boolean)
+  : null;
+
+function getClientIp(request: NextRequest): string | null {
+  // x-forwarded-for is set by proxies/load balancers (Vercel, Cloudflare, etc.)
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  // x-real-ip is set by some proxies (Nginx, Cloudflare)
+  return request.headers.get('x-real-ip');
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // IP restriction for POS routes (only enforced in production when ALLOWED_POS_IPS is set)
+  if (
+    pathname.startsWith('/pos') &&
+    ALLOWED_POS_IPS &&
+    ALLOWED_POS_IPS.length > 0 &&
+    process.env.NODE_ENV === 'production'
+  ) {
+    const clientIp = getClientIp(request);
+    if (!clientIp || !ALLOWED_POS_IPS.includes(clientIp)) {
+      return new NextResponse('Access denied', { status: 403 });
+    }
+  }
 
   // Allow public routes (including homepage)
   if (pathname === '/' || PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {

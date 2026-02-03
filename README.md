@@ -61,15 +61,21 @@ Square-style point-of-sale register with PIN-based employee login, three-tab wor
 
 **PIN Login** (`/pos/login`) — Dark full-screen 4-digit PIN pad. Auto-submits on 4th digit. Each POS session requires PIN authentication regardless of existing admin session. Uses Supabase magic link token generation under the hood. Rate-limited (5 failures → 15-min lockout).
 
-**Register Tab** — Side-by-side layout: favorites grid (3 columns × up to 5 rows of configurable quick-action tiles) on the left, cents-based keypad with dollar display, description field, and numpad on the right. Favorites support product, service, custom amount, customer lookup, and discount action types.
+**Register Tab** — Side-by-side layout: favorites grid (3 columns × up to 5 rows of configurable quick-action tiles) on the left, cents-based keypad with dollar display, description field, and numpad on the right. Favorites support product, service, custom amount, customer lookup (opens customer search dialog), and discount action types.
 
 **Products Tab** — Category-first browsing: category tiles with images → items in category → full product detail page (image, price, SKU, barcode, stock, qty selector, "Add to Ticket"). Search filters products by name/SKU/barcode.
 
-**Services Tab** — Same drill-down pattern: category tiles → services → service detail with tier radio selection and vehicle-size-aware pricing. Auto-selects matching vehicle price when set on ticket.
+**Services Tab** — Same drill-down pattern: category tiles → services → service detail with tier radio selection and vehicle-size-aware pricing. Auto-selects matching vehicle price when set on ticket. When no vehicle is set, vehicle-size-aware tiers show individual size buttons (Sedan, Truck/SUV, SUV/Van) with respective prices.
+
+**Ticket Panel** — Displays current items with inline-editable quantity (tap the number to type a new value), +/− buttons, per-item price/tax, and remove button. Supports customer/vehicle assignment, coupons, loyalty points, notes, and discount display.
 
 **Bottom Nav** — Log out (employee initials), Checkout (cart badge with item count), Transactions, End of Day, More.
 
-**Session Management** — POS session tracked via sessionStorage (separate from Supabase auth). Configurable idle timeout auto-logs out after inactivity (default 15 min, adjustable in Admin > Settings > POS Idle Timeout).
+**Checkout Flow** — Supports cash, card (Stripe Terminal), and split payment methods. Tip entry before payment selection. Payment complete screen shows summary and receipt options (print, email, SMS). Customer email/phone auto-populated from ticket customer data for receipt delivery.
+
+**Network Restriction** — POS routes (`/pos/*`) can be locked to specific IP addresses via the `ALLOWED_POS_IPS` environment variable (comma-separated). Only enforced in production — local development is unrestricted. Returns 403 to all other IPs.
+
+**Session Management** — POS session tracked via sessionStorage (separate from Supabase auth). Configurable idle timeout auto-logs out after inactivity and clears the current ticket (default 15 min, adjustable in Admin > Settings > POS Idle Timeout).
 
 ### Authentication
 
