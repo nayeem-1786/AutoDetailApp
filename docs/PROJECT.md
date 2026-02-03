@@ -852,41 +852,97 @@ Built but toggled OFF. Activate when business warrants:
 - Product and service edit pages partially implemented — list views exist but individual edit forms need completion
 - Some settings sections are placeholder/incomplete (integrations, notifications, business profile)
 
-### Phase 2 — POS Application
+### Phase 2 — POS Application ✅ COMPLETE
 
 **Goal:** Replace Square's POS. Enables cancelling Square subscription.
+**Status:** Complete (2026-02-03). Full POS system with 67+ files covering pages, components, API routes, context, utilities. Production-ready with multi-method payments, loyalty, coupons, receipts, cash management, and complete audit trail.
 
-- Professional tablet-optimized POS UI
-- Product + service catalog with categories, search, favorites
-- Vehicle-aware service pricing (auto-price by vehicle size)
-- Ticket management: create, add items, apply coupons/rewards, job notes, internal notes
-- Customer capture flow: phone lookup, profile create/update, vehicle selection
-- Customer-facing screen: total display, phone capture, loyalty opt-in, marketing opt-in
-- Stripe Terminal integration (card payments)
-- Cash payment recording
-- Split payments (any cash + card combination)
-- Tip capture: 15%/20%/25%/custom/none, 5% CC fee deduction on card tips
-- Loyalty system (toggleable): earn 1pt/$1, redeem 100pts=$5
-- Coupon code validation and redemption
-- Sales tax: 10.25% on products only
-- Refunds/returns: partial or full, item selection, inventory restock, Stripe refund, points adjustment
-- Receipts via Mailgun (email) and/or Twilio (SMS)
-- End-of-day cash management: expected vs actual, variance, deposit recording, day summary
-- Role-based views per user type (cashier restrictions: no EOD, no manual discounts, no settings; manager role badge in POS header)
-- Void transaction from transaction detail (admin/super-admin only, confirmation modal, irreversible)
-- Receipt re-send from transaction detail (print, email, SMS for any completed/voided/refunded transaction)
-- Manual ticket discount: dollar or percentage with optional label (e.g., "Employee discount"), manager-only
-- Admin transactions page: full transaction list with search, date/status filters, inline detail expansion, CSV export, receipt re-send
-- Cash drawer open/close tracking: opening float, drawer status banner on EOD page, green dot indicator in POS nav, auto-close on EOD submit
-- Ticket hold/park: suspend active ticket to start a new one, resume held tickets from queue
-- Clear cart confirmation dialog before clearing all items
-- POS "More" menu: quick access to admin panel, end-of-day, settings, common actions
-- Quick-tender buttons ($20, $50, $100, exact change) for cash payments
-- Barcode scanner connection status indicator in POS header
-- Line-item notes on individual ticket items
-- POS keyboard shortcuts for common actions (new ticket, payment, search)
-- Expanded split payment UI (multi-card support, partial amount entry)
-- POS ↔ Admin bidirectional navigation (complete)
+**Authentication & Security:**
+- PIN-based login: 4-digit PIN pad with rate limiting (5 failures → 15-minute lockout), magic link token generation via Supabase Auth
+- IP-based network restriction: `ALLOWED_POS_IPS` env var, enforced in middleware (production only)
+- Idle timeout: configurable via `pos_idle_timeout_minutes` in business_settings (default 15 min), auto-logout on inactivity
+- Role-based access: admin/super_admin vs cashier, manager-only end-of-day close
+
+**Catalog & Product Management:**
+- Product + service catalog with category tabs, grid/tile layout, product images
+- Vehicle-aware service pricing: auto-price by vehicle size class from service_pricing tiers
+- Service pricing picker dialog for selecting tier and vehicle size
+- Search by name, SKU, or barcode across products and services
+- Barcode scanner integration (USB/HID reader, connection status indicator in header)
+- Custom items: arbitrary name, price, taxability toggle, per-item notes
+
+**Ticket Management:**
+- Line items: add products, services, custom items with quantity, notes, pricing
+- Customer & vehicle association with dynamic price recalculation on vehicle change
+- Coupon application with validation (flat/$/%/free item, expiry, usage limits, minimum purchase)
+- Loyalty points display, redemption (100pts = $5), and earn preview
+- Manual discount: dollar or percentage with optional label (e.g., "Employee discount"), manager-only
+- Ticket hold/park: suspend active ticket, resume from queue (max 10 held tickets with timestamps)
+- Clear cart confirmation dialog
+- Ticket-level notes field
+
+**Checkout & Payment:**
+- Payment methods: Cash, Card (Stripe Terminal), Check, Split (cash + card)
+- Cash: amount tendered input, auto-calculate change, quick-tender buttons ($20, $50, $100, exact)
+- Card: Stripe Payment Intent, card-present via Terminal, on-reader tipping (15%/18%/20% presets), auto-capture, card brand/last4 tracking
+- Check: check number input with reference tracking
+- Split: distribute between cash and card with split tip handling
+- Tip screen: preset percentages, custom amount, displayed on total
+- Payment complete screen: receipt number, customer type badge, loyalty points earned, receipt delivery options
+- Button label: "Checkout" (renamed from "Pay Now")
+
+**Receipts:**
+- Three delivery channels: Print (Star WebPRNT thermal printer), Email (Mailgun), SMS (Twilio)
+- Receipt template with business header, itemized list, tax, tip, payment breakdown
+- Re-send from transaction detail (print/email/SMS for completed/voided/refunded transactions)
+- Star printer IP configurable via business_settings
+
+**Loyalty System (toggleable):**
+- Earn: 1 point per $1 on eligible purchases (water SKU excluded)
+- Redeem: 100 points = $5 discount (one-click full balance redeem)
+- Ledger: per-transaction entries (earned, redeemed, adjusted) with balance snapshots
+- Proportional point deduction on refunds
+
+**Coupons:**
+- Code validation at POS (`/api/pos/coupons/validate`)
+- Types: flat dollar, percentage, free add-on, free product
+- Enforcements: expiry date, single-use per customer, usage limits, minimum purchase, max discount cap
+
+**Transaction Management:**
+- Create: stores customer, vehicle, employee, items, payments, tax, tip, discount, coupon, loyalty
+- Search: receipt number lookup, customer phone, date range, pagination (`/api/pos/transactions/search`)
+- Transaction list: status badges, date presets (today/week/month/year/custom), search, pagination
+- Transaction detail: full items, payments, customer, vehicle, refund history
+- Void: admin/super-admin only, confirmation modal, irreversible
+- Admin transactions page (`/admin/transactions`): full list with search, date/status filters, inline detail expansion, CSV export, receipt re-send
+
+**Refunds:**
+- Partial or full item-level refunds with quantity and restock option
+- Stripe refund for card payments, inventory restock for products, proportional loyalty point deduction
+- Reason entry required, status tracking (processed/failed)
+- Over-refund prevention via per-item quantity tracking
+
+**End-of-Day & Cash Management:**
+- Open register with starting float (cash count form)
+- Day summary API: total transactions, revenue, subtotal, tax, tips, payment method breakdown, refunds
+- Close register: cash count, expected vs actual, variance, next-day float, deposit calculation
+- Drawer session tracking in localStorage with green dot indicator in POS nav
+- Auto-close drawer on EOD submit, manager-only access
+
+**Favorites System:**
+- Register tab with configurable favorites grid
+- 10 color themes with 6 intensity levels (10%-100%)
+- Action types: product, service, custom_amount, customer_lookup, discount, surcharge
+- Edit mode with color shade picker
+- Percentage-based surcharge support
+
+**UI & Navigation:**
+- Tablet-optimized layout with bottom navigation (Register, Products, Services tabs)
+- Top bar: back nav (Admin↔POS toggle), business name, scanner indicator, held tickets badge, employee name, role badge, live clock
+- Keyboard shortcuts: F1 (new ticket), F2 (checkout), Esc (close modals), ? (help)
+- POS ↔ Admin bidirectional navigation
+- Customer type/tags system (enthusiast, detailer) with badges
+- Role-based views: cashiers restricted from EOD, manual discounts, settings; role badge in header
 
 ### Phase 3 — Booking System, Quotes & 11 Labs Integration ✅ COMPLETE
 
@@ -1045,3 +1101,4 @@ These standards apply across all phases and should be implemented progressively:
 | v8 | 2026-02-02 | Phase 1 known gaps documented (product/service edit pages, settings sections). Phase 2 expanded: ticket hold/park, clear cart confirmation, POS "More" menu, quick-tender buttons, scanner indicator, line-item notes, keyboard shortcuts, expanded split payment, bidirectional POS↔Admin nav. New "UX & Accessibility Standards" cross-phase section added: global search (Cmd+K), bulk actions, multi-tag filtering, CSV export, breadcrumbs, loading states, dialog focus trapping, empty states, search placeholders, login consistency, audit log viewer. Customer transaction history tab wired to live data. |
 | v9 | 2026-02-02 | Phase 2 expanded: void transaction (admin-only, confirmation modal), receipt re-send from transaction detail (print/email/SMS), manual ticket discount (dollar/percent with label, manager-only), admin transactions page (search, filters, inline detail, CSV export, receipt actions), role-based POS views (cashier restrictions for EOD/discounts/settings, role badge in header), cash drawer open/close tracking (opening float, status banner, nav indicator, auto-close on EOD). |
 | v10 | 2026-02-03 | Phase 3 marked complete. Quotes system (CRUD API, admin pages, public view, PDF generation, send via email/SMS/both), 11 Labs Voice Agent REST API (6 endpoints with API key auth), staff scheduling (weekly schedules, blocked dates, enhanced slot availability), waitlist system (API, admin panel, auto-notify, booking wizard integration), webhook events for appointment/quote lifecycle, online booking payment via Stripe Elements, shared webhook utility. |
+| v11 | 2026-02-03 | Phase 2 marked complete with comprehensive documentation: 67+ files covering PIN auth, IP restriction, idle timeout, catalog with barcode scanner, vehicle-aware pricing, all payment methods, tip handling, receipts (print/email/SMS), loyalty system, coupon validation, item-level refunds, cash management, favorites system, keyboard shortcuts, tablet-optimized UI. DASHBOARD_RULES.md POS Management section expanded with full built-feature inventory. |
