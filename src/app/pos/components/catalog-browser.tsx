@@ -16,7 +16,6 @@ import { ServicePricingPicker } from './service-pricing-picker';
 type BrowseState =
   | { view: 'categories' }
   | { view: 'items'; categoryId: string; categoryName: string }
-  | { view: 'product-detail'; product: CatalogProduct; categoryName: string }
   | { view: 'service-detail'; service: CatalogService; categoryName: string };
 
 interface CatalogBrowserProps {
@@ -29,6 +28,7 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
   const { ticket, dispatch } = useTicket();
   const [browseState, setBrowseState] = useState<BrowseState>({ view: 'categories' });
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
+  const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
 
   const items = type === 'products' ? products : services;
   const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
@@ -46,7 +46,6 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
       const existing = map.get(cat.id);
       if (existing) {
         existing.count++;
-        // Use first available image
         if (!existing.imageUrl && 'image_url' in item && item.image_url) {
           existing.imageUrl = item.image_url as string;
         }
@@ -60,7 +59,6 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
       }
     });
 
-    // Add uncategorized items
     const uncategorized = items.filter((item) => {
       const cat = 'category' in item ? (item as CatalogProduct | CatalogService).category : null;
       return !cat;
@@ -106,16 +104,7 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
   }, [search, type, products, services]);
 
   function handleTapProduct(product: CatalogProduct) {
-    const catName =
-      browseState.view === 'items'
-        ? browseState.categoryName
-        : product.category?.name ?? 'Products';
-    setBrowseState({ view: 'product-detail', product, categoryName: catName });
-  }
-
-  function handleTapProductDirect(product: CatalogProduct) {
-    dispatch({ type: 'ADD_PRODUCT', product });
-    toast.success(`Added ${product.name}`);
+    setDetailProduct(product);
   }
 
   function handleTapService(service: CatalogService) {
@@ -179,14 +168,36 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
     setPickerService(null);
   }
 
-  // If search is active, show flat list
+  // Dialogs (rendered outside conditional branches so they're always available)
+  const dialogs = (
+    <>
+      {pickerService && (
+        <ServicePricingPicker
+          open={!!pickerService}
+          onClose={() => setPickerService(null)}
+          service={pickerService}
+          vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
+          onSelect={handlePricingSelect}
+        />
+      )}
+      {detailProduct && (
+        <ProductDetail
+          product={detailProduct}
+          open={!!detailProduct}
+          onClose={() => setDetailProduct(null)}
+        />
+      )}
+    </>
+  );
+
+  // Search results (flat list)
   if (search) {
     return (
       <div className="p-4">
         {type === 'products' ? (
           <ProductGrid
             products={searchResults as CatalogProduct[]}
-            onTapProduct={handleTapProductDirect}
+            onTapProduct={handleTapProduct}
           />
         ) : (
           <ServiceGrid
@@ -195,39 +206,12 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
             onTapService={handleTapServiceDirect}
           />
         )}
-
-        {pickerService && (
-          <ServicePricingPicker
-            open={!!pickerService}
-            onClose={() => setPickerService(null)}
-            service={pickerService}
-            vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
-            onSelect={handlePricingSelect}
-          />
-        )}
+        {dialogs}
       </div>
     );
   }
 
-  // Product detail
-  if (browseState.view === 'product-detail') {
-    return (
-      <ProductDetail
-        product={browseState.product}
-        categoryName={browseState.categoryName}
-        onBack={() =>
-          setBrowseState({
-            view: 'items',
-            categoryId:
-              browseState.product.category_id ?? '__uncategorized__',
-            categoryName: browseState.categoryName,
-          })
-        }
-      />
-    );
-  }
-
-  // Service detail
+  // Service detail (full page, unchanged)
   if (browseState.view === 'service-detail') {
     return (
       <ServiceDetail
@@ -273,16 +257,7 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
             />
           )}
         </div>
-
-        {pickerService && (
-          <ServicePricingPicker
-            open={!!pickerService}
-            onClose={() => setPickerService(null)}
-            service={pickerService}
-            vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
-            onSelect={handlePricingSelect}
-          />
-        )}
+        {dialogs}
       </div>
     );
   }
@@ -313,6 +288,7 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
           ))}
         </div>
       )}
+      {dialogs}
     </div>
   );
 }

@@ -197,9 +197,9 @@ export function PosWorkspace() {
               onOpenCustomerLookup={() => setShowCustomerLookup(true)}
             />
           ) : tab === 'products' ? (
-            <CatalogBrowser type="products" search={search} />
+            <CatalogBrowser key="products" type="products" search={search} />
           ) : tab === 'services' ? (
-            <CatalogBrowser type="services" search={search} />
+            <CatalogBrowser key="services" type="services" search={search} />
           ) : null}
         </div>
       </div>
