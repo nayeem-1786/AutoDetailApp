@@ -89,7 +89,7 @@ The coupon creation UI is a 6-step wizard at `/admin/marketing/coupons/new`. Pro
 
 **Fields:**
 - **Name** — Human-readable label (e.g., "Booster Bundle Deal")
-- **Code** — Auto-generate toggle or custom entry (e.g., `BOOSTBUNDLE`)
+- **Code** — Auto-generate toggle or custom entry (e.g., `BOOSTBUNDLE`). Spaces are stripped automatically; use hyphens for multi-word codes (e.g., `BOOSTER-CAR`). Codes are always stored uppercase.
 - **Auto-apply** — Toggle. When ON, the POS applies this coupon automatically when conditions are met without requiring a code.
 
 **Help text:**
@@ -326,7 +326,7 @@ The coupon detail page includes an Edit button that navigates to `/admin/marketi
 When a coupon is applied (manually or auto):
 
 ```
-1. Look up coupon by code (or by auto-apply scan)
+1. Look up coupon by code (case-insensitive, spaces stripped) or by auto-apply scan
 2. Check status = 'active'
 3. Check not expired
 4. Check use_count < max_uses (if max_uses set)
@@ -375,7 +375,7 @@ When a coupon is applied (manually or auto):
 - `src/app/api/pos/transactions/route.ts` — Saves coupon_id, increments use_count
 
 **Admin Coupon Management:**
-- `src/app/admin/marketing/coupons/page.tsx` — List page (search, filter by status including draft)
+- `src/app/admin/marketing/coupons/page.tsx` — List page (search, filter by status including draft/expired, centered columns for badges)
 - `src/app/admin/marketing/coupons/new/page.tsx` — 6-step wizard with auto-save, searchable pickers, eligible count
 - `src/app/admin/marketing/coupons/[id]/page.tsx` — Detail/edit page
 - `src/app/api/marketing/coupons/route.ts` — GET/POST API (supports draft status)
@@ -383,7 +383,7 @@ When a coupon is applied (manually or auto):
 - `src/app/api/marketing/coupons/[id]/stats/route.ts` — Usage stats API
 
 **Campaign Integration:**
-- `src/app/admin/marketing/campaigns/_components/campaign-wizard.tsx` — Coupon step in campaign wizard
+- `src/app/admin/marketing/campaigns/_components/campaign-wizard.tsx` — Coupon step in campaign wizard (filters out expired coupons)
 - `src/app/api/marketing/campaigns/[id]/send/route.ts` — Per-customer coupon generation
 - `src/app/api/marketing/campaigns/process-scheduled/route.ts` — Scheduled campaign coupon generation
 
@@ -465,3 +465,13 @@ When a coupon is applied (manually or auto):
 42. Detail page: derived expired state for badge variant, text, and toggle disabled state
 43. Filter dropdown: "Expired" option filters by derived `expires_at` check instead of DB status
 44. Postgres enum left unchanged (removing enum values requires destructive `DROP TYPE`)
+
+### Phase H: Code Validation, Space Stripping & List Polish ✅
+45. Coupon codes cannot contain spaces — stripped on input at all entry points (wizard, detail page, campaign wizard, POS)
+46. Wizard validation blocks save when auto-generate is off and code is empty
+47. Wizard validation blocks save when expiration date is in the past
+48. POST API strips internal spaces from codes; PATCH API now normalizes code (uppercase, strip spaces, trim)
+49. POS input and validate API strip spaces for forgiving customer entry
+50. List page: "Auto-Generated" shown when code is blank, "Used / Limit" column with ∞ for unlimited
+51. List page: Discount, Status, Auto-Apply, Used/Limit columns centered
+52. Campaign wizard filters expired coupons from dropdown (active + non-expired only)
