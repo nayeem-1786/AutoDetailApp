@@ -13,7 +13,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus } from 'lucide-react';
+import { Info, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 
 function discountSummary(coupon: Coupon): string {
@@ -34,6 +35,55 @@ export default function CouponsListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [togglingAutoId, setTogglingAutoId] = useState<string | null>(null);
+
+  async function toggleAutoApply(coupon: Coupon) {
+    setTogglingAutoId(coupon.id);
+    try {
+      const res = await fetch(`/api/marketing/coupons/${coupon.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_apply: !coupon.auto_apply }),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setCoupons((prev) => prev.map((c) => (c.id === data.id ? { ...c, ...data } : c)));
+        toast.success(`Auto-apply ${data.auto_apply ? 'enabled' : 'disabled'}`);
+      } else {
+        const { error } = await res.json();
+        toast.error(error || 'Failed to update');
+      }
+    } catch {
+      toast.error('Failed to update');
+    } finally {
+      setTogglingAutoId(null);
+    }
+  }
+
+  async function toggleStatus(coupon: Coupon) {
+    const newStatus = coupon.status === 'active' ? 'disabled' : 'active';
+    setTogglingId(coupon.id);
+    try {
+      const res = await fetch(`/api/marketing/coupons/${coupon.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setCoupons((prev) => prev.map((c) => (c.id === data.id ? { ...c, ...data } : c)));
+        toast.success(`Coupon ${newStatus === 'active' ? 'enabled' : 'disabled'}`);
+      } else {
+        const { error } = await res.json();
+        toast.error(error || 'Failed to update status');
+      }
+    } catch {
+      toast.error('Failed to update status');
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -57,25 +107,34 @@ export default function CouponsListPage() {
         const matchesName = c.name?.toLowerCase().includes(q);
         if (!matchesCode && !matchesName) return false;
       }
-      if (statusFilter && c.status !== statusFilter) return false;
+      if (statusFilter === 'expired') {
+        if (!isExpired(c)) return false;
+      } else if (statusFilter && c.status !== statusFilter) return false;
       return true;
     });
   }, [coupons, search, statusFilter]);
 
-  function statusBadge(status: string) {
+  function isExpired(coupon: Coupon): boolean {
+    return !!coupon.expires_at && new Date(coupon.expires_at) < new Date();
+  }
+
+  function statusBadge(coupon: Coupon) {
+    if (isExpired(coupon)) {
+      return <Badge variant="warning">Expired</Badge>;
+    }
     const variant =
-      status === 'active' ? 'success' :
-      status === 'disabled' ? 'destructive' :
-      status === 'expired' ? 'warning' :
-      status === 'draft' ? 'default' :
+      coupon.status === 'active' ? 'success' :
+      coupon.status === 'disabled' ? 'destructive' :
+      coupon.status === 'draft' ? 'default' :
       'secondary';
-    return <Badge variant={variant}>{COUPON_STATUS_LABELS[status] || status}</Badge>;
+    return <Badge variant={variant}>{COUPON_STATUS_LABELS[coupon.status] || coupon.status}</Badge>;
   }
 
   const columns: ColumnDef<Coupon, unknown>[] = [
     {
       accessorKey: 'name',
       header: 'Name',
+      size: 200,
       cell: ({ row }) => {
         const c = row.original;
         const href = c.status === 'draft'
@@ -94,6 +153,7 @@ export default function CouponsListPage() {
     {
       accessorKey: 'code',
       header: 'Code',
+      size: 130,
       cell: ({ row }) => (
         <span className="font-mono text-sm text-gray-700">
           {row.original.code}
@@ -103,6 +163,7 @@ export default function CouponsListPage() {
     {
       id: 'discount',
       header: 'Discount',
+      size: 140,
       cell: ({ row }) => {
         const summary = discountSummary(row.original);
         if (summary === '--') return <span className="text-sm text-gray-400">--</span>;
@@ -112,13 +173,79 @@ export default function CouponsListPage() {
     },
     {
       id: 'status',
-      header: 'Status',
-      cell: ({ row }) => statusBadge(row.original.status),
+      size: 120,
+      header: () => (
+        <div className="flex items-center gap-1">
+          <span>Status</span>
+          <div className="group relative">
+            <Info className="h-3.5 w-3.5 cursor-help text-gray-400" />
+            <div className="pointer-events-none absolute top-full left-0 z-20 mt-1.5 w-48 rounded-md bg-gray-900 px-3 py-2 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              Click a status badge to toggle between Active and Disabled.
+              <div className="absolute bottom-full left-4 border-4 border-transparent border-b-gray-900" />
+            </div>
+          </div>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const c = row.original;
+        const canToggle = !isExpired(c) && (c.status === 'active' || c.status === 'disabled');
+        if (!canToggle) return statusBadge(c);
+        return (
+          <button
+            type="button"
+            disabled={togglingId === c.id}
+            onClick={(e) => { e.stopPropagation(); toggleStatus(c); }}
+            className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            title={c.status === 'active' ? 'Click to disable' : 'Click to enable'}
+          >
+            {statusBadge(c)}
+          </button>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      id: 'auto',
+      size: 140,
+      header: () => (
+        <div className="flex items-center gap-1">
+          <span>Auto-Apply</span>
+          <div className="group relative">
+            <Info className="h-3.5 w-3.5 cursor-help text-gray-400" />
+            <div className="pointer-events-none absolute top-full left-0 z-20 mt-1.5 w-52 rounded-md bg-gray-900 px-3 py-2 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              When on, this coupon applies automatically at the POS when conditions are met.
+              <div className="absolute bottom-full left-4 border-4 border-transparent border-b-gray-900" />
+            </div>
+          </div>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const c = row.original;
+        if (c.status === 'draft' || isExpired(c)) {
+          return c.auto_apply
+            ? <Badge variant="info">On</Badge>
+            : <span className="text-sm text-gray-400">Off</span>;
+        }
+        return (
+          <button
+            type="button"
+            disabled={togglingAutoId === c.id}
+            onClick={(e) => { e.stopPropagation(); toggleAutoApply(c); }}
+            className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            title={c.auto_apply ? 'Click to turn off auto-apply' : 'Click to turn on auto-apply'}
+          >
+            {c.auto_apply
+              ? <Badge variant="info">On</Badge>
+              : <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">Off</span>}
+          </button>
+        );
+      },
       enableSorting: false,
     },
     {
       id: 'uses',
       header: 'Uses',
+      size: 100,
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">
           {row.original.use_count}{row.original.max_uses ? ` / ${row.original.max_uses}` : ''}
@@ -128,20 +255,12 @@ export default function CouponsListPage() {
     {
       id: 'expires',
       header: 'Expires',
+      size: 140,
       cell: ({ row }) => (
         <span className="text-sm text-gray-500">
           {row.original.expires_at ? formatDate(row.original.expires_at) : 'Never'}
         </span>
       ),
-    },
-    {
-      id: 'auto',
-      header: 'Auto',
-      cell: ({ row }) =>
-        row.original.auto_apply ? (
-          <Badge variant="info">Auto</Badge>
-        ) : null,
-      enableSorting: false,
     },
   ];
 
@@ -181,7 +300,6 @@ export default function CouponsListPage() {
           <option value="">All Statuses</option>
           <option value="draft">Draft</option>
           <option value="active">Active</option>
-          <option value="redeemed">Redeemed</option>
           <option value="expired">Expired</option>
           <option value="disabled">Disabled</option>
         </Select>

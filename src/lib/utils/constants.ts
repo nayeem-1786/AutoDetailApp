@@ -138,8 +138,6 @@ export const APPLIES_TO_LABELS: Record<string, string> = {
 export const COUPON_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   active: 'Active',
-  redeemed: 'Redeemed',
-  expired: 'Expired',
   disabled: 'Disabled',
 } as const;
 

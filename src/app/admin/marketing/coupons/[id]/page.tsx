@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Check, Pencil, X } from 'lucide-react';
 
 interface CouponStats {
   usage_count: number;
@@ -31,8 +32,17 @@ export default function CouponDetailPage() {
   const [coupon, setCoupon] = useState<Coupon | null>(null);
   const [stats, setStats] = useState<CouponStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<'disable' | 'enable'>('disable');
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [reEnableOpen, setReEnableOpen] = useState(false);
+  const [reEnableExpiryMode, setReEnableExpiryMode] = useState<'keep' | 'clear' | 'new'>('keep');
+  const [reEnableExpiry, setReEnableExpiry] = useState('');
+
+  // Inline edit states
+  const [editingCode, setEditingCode] = useState(false);
+  const [editCode, setEditCode] = useState('');
+  const [editingExpiry, setEditingExpiry] = useState(false);
+  const [editExpiry, setEditExpiry] = useState('');
+  const [inlineSaving, setInlineSaving] = useState(false);
 
   // Name lookups for resolving IDs to display names
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
@@ -170,28 +180,118 @@ export default function CouponDetailPage() {
       (coupon.requires_service_ids && coupon.requires_service_ids.length > 0) ||
       (coupon.requires_product_category_ids && coupon.requires_product_category_ids.length > 0) ||
       (coupon.requires_service_category_ids && coupon.requires_service_category_ids.length > 0) ||
-      coupon.min_purchase
+      coupon.min_purchase ||
+      coupon.max_customer_visits != null
     );
   }
 
-  async function handleStatusChange() {
-    const newStatus = confirmAction === 'disable' ? 'disabled' : 'active';
+  async function handleDisable() {
     try {
       const res = await fetch(`/api/marketing/coupons/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: 'disabled' }),
       });
-
       if (res.ok) {
         const { data } = await res.json();
         setCoupon(data);
-        toast.success(`Coupon ${newStatus === 'disabled' ? 'disabled' : 're-enabled'}`);
+        toast.success('Coupon disabled');
       }
     } catch {
-      toast.error('Failed to update status');
+      toast.error('Failed to disable coupon');
     }
-    setConfirmOpen(false);
+    setDisableOpen(false);
+  }
+
+  function openReEnableDialog() {
+    // Initialize the dialog state based on current expiration
+    if (!coupon) return;
+    const hasExpiry = !!coupon.expires_at;
+    const isPast = hasExpiry && new Date(coupon.expires_at!) < new Date();
+
+    if (!hasExpiry) {
+      setReEnableExpiryMode('clear');
+    } else if (isPast) {
+      setReEnableExpiryMode('clear');
+    } else {
+      setReEnableExpiryMode('keep');
+    }
+    setReEnableExpiry('');
+    setReEnableOpen(true);
+  }
+
+  async function handleReEnable() {
+    try {
+      const body: Record<string, unknown> = { status: 'active' };
+
+      if (reEnableExpiryMode === 'clear') {
+        body.expires_at = null;
+      } else if (reEnableExpiryMode === 'new') {
+        if (!reEnableExpiry) {
+          toast.error('Please select a new expiration date');
+          return;
+        }
+        body.expires_at = reEnableExpiry;
+      }
+      // 'keep' = don't send expires_at, keep existing value
+
+      const res = await fetch(`/api/marketing/coupons/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setCoupon(data);
+        toast.success('Coupon re-enabled');
+      }
+    } catch {
+      toast.error('Failed to re-enable coupon');
+    }
+    setReEnableOpen(false);
+  }
+
+  async function inlinePatch(updates: Record<string, unknown>) {
+    setInlineSaving(true);
+    try {
+      const res = await fetch(`/api/marketing/coupons/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setCoupon(data);
+        toast.success('Updated');
+        return true;
+      } else {
+        const { error } = await res.json();
+        toast.error(error || 'Update failed');
+        return false;
+      }
+    } catch {
+      toast.error('Update failed');
+      return false;
+    } finally {
+      setInlineSaving(false);
+    }
+  }
+
+  async function saveCode() {
+    const trimmed = editCode.trim().toUpperCase();
+    if (!trimmed) { toast.error('Code cannot be empty'); return; }
+    const ok = await inlinePatch({ code: trimmed });
+    if (ok) setEditingCode(false);
+  }
+
+  async function toggleAutoApply() {
+    if (!coupon) return;
+    await inlinePatch({ auto_apply: !coupon.auto_apply });
+  }
+
+  async function saveExpiry() {
+    const ok = await inlinePatch({ expires_at: editExpiry || null });
+    if (ok) setEditingExpiry(false);
   }
 
   if (loading) {
@@ -206,10 +306,12 @@ export default function CouponDetailPage() {
     return <p className="py-12 text-center text-gray-500">Coupon not found.</p>;
   }
 
+  const expired = !!coupon.expires_at && new Date(coupon.expires_at) < new Date();
+
   const statusVariant =
+    expired ? 'warning' :
     coupon.status === 'active' ? 'success' :
     coupon.status === 'disabled' ? 'destructive' :
-    coupon.status === 'expired' ? 'warning' :
     'secondary';
 
   const rewards: CouponReward[] = (coupon as any).coupon_rewards || coupon.rewards || [];
@@ -220,22 +322,13 @@ export default function CouponDetailPage() {
         title={coupon.name || coupon.code}
         action={
           <div className="flex gap-2">
-            {coupon.status === 'active' && (
-              <Button
-                variant="outline"
-                onClick={() => { setConfirmAction('disable'); setConfirmOpen(true); }}
-              >
-                Disable
-              </Button>
-            )}
-            {coupon.status === 'disabled' && (
-              <Button
-                variant="outline"
-                onClick={() => { setConfirmAction('enable'); setConfirmOpen(true); }}
-              >
-                Re-enable
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/admin/marketing/coupons/new?edit=${id}`)}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
             <Button variant="outline" onClick={() => router.push('/admin/marketing/coupons')}>
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -246,28 +339,99 @@ export default function CouponDetailPage() {
 
       {/* Info Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Code — inline editable */}
         <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-sm text-gray-500">Code</p>
-          <p className="mt-1 font-mono text-lg font-bold">{coupon.code}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">Code</p>
+            {!editingCode && (
+              <button
+                type="button"
+                onClick={() => { setEditCode(coupon.code); setEditingCode(true); }}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {editingCode ? (
+            <div className="mt-1 flex items-center gap-1.5">
+              <input
+                type="text"
+                value={editCode}
+                onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                className="w-full rounded border border-gray-300 px-2 py-1 font-mono text-sm uppercase focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') saveCode(); if (e.key === 'Escape') setEditingCode(false); }}
+              />
+              <button onClick={saveCode} disabled={inlineSaving} className="rounded p-1 text-green-600 hover:bg-green-50">
+                <Check className="h-4 w-4" />
+              </button>
+              <button onClick={() => setEditingCode(false)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <p className="mt-1 font-mono text-lg font-bold">{coupon.code}</p>
+          )}
         </div>
+
+        {/* Status — toggle slider */}
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-sm text-gray-500">Status</p>
-          <div className="mt-1">
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              disabled={inlineSaving || expired}
+              onClick={() => {
+                if (coupon.status === 'active') setDisableOpen(true);
+                else if (coupon.status === 'disabled') openReEnableDialog();
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                coupon.status === 'active' ? 'bg-green-500' : 'bg-gray-300'
+              }`}
+              role="switch"
+              aria-checked={coupon.status === 'active'}
+              aria-label="Toggle coupon status"
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
+                  coupon.status === 'active' ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
             <Badge variant={statusVariant}>
-              {COUPON_STATUS_LABELS[coupon.status]}
+              {expired ? 'Expired' : (COUPON_STATUS_LABELS[coupon.status] || coupon.status)}
             </Badge>
           </div>
         </div>
+
+        {/* Auto-Apply — toggle slider */}
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-sm text-gray-500">Auto-Apply</p>
-          <div className="mt-1">
-            {coupon.auto_apply ? (
-              <Badge variant="info">Yes</Badge>
-            ) : (
-              <span className="text-sm font-medium text-gray-700">No</span>
-            )}
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              disabled={inlineSaving}
+              onClick={toggleAutoApply}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                coupon.auto_apply ? 'bg-blue-500' : 'bg-gray-300'
+              }`}
+              role="switch"
+              aria-checked={coupon.auto_apply}
+              aria-label="Toggle auto-apply"
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
+                  coupon.auto_apply ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className="text-sm font-medium text-gray-700">
+              {coupon.auto_apply ? 'On' : 'Off'}
+            </span>
           </div>
         </div>
+
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-sm text-gray-500">Created</p>
           <p className="mt-1 text-sm font-medium text-gray-900">{formatDate(coupon.created_at)}</p>
@@ -371,6 +535,16 @@ export default function CouponDetailPage() {
                         </span>
                       </div>
                     )}
+                    {coupon.max_customer_visits != null && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="default">Customer Visits</Badge>
+                        <span className="text-gray-700">
+                          {coupon.max_customer_visits === 0
+                            ? 'New customers only'
+                            : `${coupon.max_customer_visits} or fewer visits`}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -418,10 +592,52 @@ export default function CouponDetailPage() {
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <p className="text-sm text-gray-500">Expiration</p>
-                  <p className="mt-1 text-sm font-medium text-gray-900">
-                    {coupon.expires_at ? formatDate(coupon.expires_at) : 'Never'}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-500">Expiration</p>
+                    {!editingExpiry && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditExpiry(coupon.expires_at ? coupon.expires_at.slice(0, 16) : '');
+                          setEditingExpiry(true);
+                        }}
+                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {editingExpiry ? (
+                    <div className="mt-1 space-y-2">
+                      <input
+                        type="datetime-local"
+                        value={editExpiry}
+                        onChange={(e) => setEditExpiry(e.target.value)}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={saveExpiry} disabled={inlineSaving} className="rounded p-1 text-green-600 hover:bg-green-50">
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setEditingExpiry(false)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                          <X className="h-4 w-4" />
+                        </button>
+                        {editExpiry && (
+                          <button
+                            onClick={() => setEditExpiry('')}
+                            className="ml-1 text-xs text-red-600 hover:text-red-800"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm font-medium text-gray-900">
+                      {coupon.expires_at ? formatDate(coupon.expires_at) : 'Never'}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Single Use</p>
@@ -475,19 +691,104 @@ export default function CouponDetailPage() {
         </div>
       </div>
 
+      {/* Disable confirm dialog */}
       <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={confirmAction === 'disable' ? 'Disable Coupon' : 'Re-enable Coupon'}
-        description={
-          confirmAction === 'disable'
-            ? 'This coupon will no longer be usable. You can re-enable it later.'
-            : 'This coupon will become active again.'
-        }
-        confirmLabel={confirmAction === 'disable' ? 'Disable' : 'Enable'}
-        variant={confirmAction === 'disable' ? 'destructive' : 'default'}
-        onConfirm={handleStatusChange}
+        open={disableOpen}
+        onOpenChange={setDisableOpen}
+        title="Disable Coupon"
+        description="This coupon will no longer be usable. You can re-enable it later."
+        confirmLabel="Disable"
+        variant="destructive"
+        onConfirm={handleDisable}
       />
+
+      {/* Re-enable dialog with expiration options */}
+      <Dialog open={reEnableOpen} onOpenChange={setReEnableOpen}>
+        <DialogHeader>
+          <DialogTitle>Re-enable Coupon</DialogTitle>
+          <DialogDescription>
+            This coupon will become active again. Review the expiration date before re-enabling.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogContent>
+          {(() => {
+            const hasExpiry = !!coupon.expires_at;
+            const isPast = hasExpiry && new Date(coupon.expires_at!) < new Date();
+
+            return (
+              <div className="space-y-4">
+                {/* Current expiration status */}
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-sm font-medium text-gray-700">Current Expiration</p>
+                  <p className="mt-0.5 text-sm text-gray-600">
+                    {!hasExpiry
+                      ? 'No expiration set'
+                      : isPast
+                        ? `Expired on ${formatDate(coupon.expires_at!)} (already passed)`
+                        : `Expires ${formatDate(coupon.expires_at!)}`}
+                  </p>
+                </div>
+
+                {/* Radio options */}
+                <div className="space-y-2">
+                  {hasExpiry && !isPast && (
+                    <label className="flex items-center gap-2 rounded-md border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="re-enable-expiry"
+                        checked={reEnableExpiryMode === 'keep'}
+                        onChange={() => setReEnableExpiryMode('keep')}
+                        className="h-4 w-4 text-gray-900"
+                      />
+                      <span className="text-sm text-gray-700">Keep current date ({formatDate(coupon.expires_at!)})</span>
+                    </label>
+                  )}
+                  <label className="flex items-center gap-2 rounded-md border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="re-enable-expiry"
+                      checked={reEnableExpiryMode === 'clear'}
+                      onChange={() => setReEnableExpiryMode('clear')}
+                      className="h-4 w-4 text-gray-900"
+                    />
+                    <span className="text-sm text-gray-700">Remove expiration (never expires)</span>
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="re-enable-expiry"
+                      checked={reEnableExpiryMode === 'new'}
+                      onChange={() => setReEnableExpiryMode('new')}
+                      className="h-4 w-4 text-gray-900"
+                    />
+                    <span className="text-sm text-gray-700">Set a new expiration date</span>
+                  </label>
+                </div>
+
+                {/* Date picker when "new" is selected */}
+                {reEnableExpiryMode === 'new' && (
+                  <div>
+                    <input
+                      type="datetime-local"
+                      value={reEnableExpiry}
+                      onChange={(e) => setReEnableExpiry(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setReEnableOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleReEnable}>
+            Re-enable
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

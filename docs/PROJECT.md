@@ -250,7 +250,7 @@ When a primary service is selected at POS, booking, or by the voice agent, the s
 - **transaction_items** — individual line items with price-locked amounts
 - **payments** — per transaction: method (cash/card), amount, stripe payment ID, tip amount, tip net (after CC fee)
 - **refunds** — linked to transaction, line items refunded, reason, restock flag
-- **coupons** — code, type (flat/$/%/free item), value, expiry, single-use flag, minimum purchase, campaign link, status (active/redeemed/expired)
+- **coupons** — code, type (flat/$/%/free item), value, expiry, single-use flag, minimum purchase, campaign link, status (draft/active/disabled); expiration derived from `expires_at`
 - **loyalty_ledger** — points earned, redeemed, adjustments, running balance per customer
 - **campaigns** — name, audience filters, message template (SMS/email), coupon link, schedule, status, metrics
 - **lifecycle_rules** — service trigger, delay period, action (SMS/email), message template, coupon, chain order

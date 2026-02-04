@@ -777,7 +777,7 @@ MARKETING
 │       └── Birthday reward
 │
 ├── Coupons
-│   ├── All Coupons (active, expired, redeemed)
+│   ├── All Coupons (draft, active, expired via expires_at, disabled)
 │   ├── Create Coupon
 │   │   ├── Type: flat $, percentage %, free add-on, free product
 │   │   ├── Applies to: any, specific services, specific products

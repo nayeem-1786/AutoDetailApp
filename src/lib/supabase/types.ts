@@ -17,7 +17,7 @@ export type DiscountType = 'percentage' | 'flat' | 'free';
 export type AppliesTo = 'order' | 'product' | 'service';
 export type TagMatchMode = 'any' | 'all';
 export type ConditionLogic = 'and' | 'or';
-export type CouponStatus = 'draft' | 'active' | 'redeemed' | 'expired' | 'disabled';
+export type CouponStatus = 'draft' | 'active' | 'disabled';
 export type LoyaltyAction = 'earned' | 'redeemed' | 'adjusted' | 'expired' | 'welcome_bonus';
 export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
 export type CampaignChannel = 'sms' | 'email' | 'both';
@@ -387,6 +387,7 @@ export interface Coupon {
   requires_product_category_ids: string[] | null;
   requires_service_category_ids: string[] | null;
   min_purchase: number | null;
+  max_customer_visits: number | null;
   // Constraints
   is_single_use: boolean;
   use_count: number;

@@ -25,7 +25,7 @@ Stores the coupon identity, targeting, conditions, and constraints.
 | `id` | UUID PK | Primary key |
 | `name` | TEXT | Human-readable name (e.g., "Spring Booster Bundle") |
 | `code` | TEXT UNIQUE | The code entered at POS (auto-generated if blank) |
-| `status` | ENUM | `draft`, `active`, `redeemed`, `expired`, `disabled` |
+| `status` | ENUM | `draft`, `active`, `disabled` (Postgres enum retains `redeemed`/`expired` but they are unused; expiration is derived from `expires_at < now`) |
 | `auto_apply` | BOOLEAN | When true, POS applies automatically when conditions met — no code needed |
 | **Targeting (WHO)** | | |
 | `customer_id` | UUID FK | Lock to one specific customer (NULL = anyone) |
@@ -38,6 +38,7 @@ Stores the coupon identity, targeting, conditions, and constraints.
 | `requires_product_category_ids` | UUID[] | Ticket must contain a product from ANY of these categories |
 | `requires_service_category_ids` | UUID[] | Ticket must contain a service from ANY of these categories |
 | `min_purchase` | DECIMAL | Minimum order subtotal |
+| `max_customer_visits` | INTEGER | Max visit count for eligible customers (NULL = no limit, 0 = new customers only) |
 | **Constraints** | | |
 | `is_single_use` | BOOLEAN | One use per customer |
 | `use_count` | INTEGER | Current total uses |
@@ -238,6 +239,14 @@ The `MultiSearchableSelect` component renders selected items as removable chips/
 | Spend $100+, free Air Freshener | min_purchase=100 | 1 reward: product, free, target=Air Freshener |
 | Buy Full Detail, free Spray + 50% off Freshener | requires_service_ids=[Full Detail] | 2 rewards: (1) product, free, target=Ceramic Spray; (2) product, percentage, 50, target=Air Freshener |
 
+### New Customer Coupons
+
+| Scenario | Conditions | Rewards |
+|----------|-----------|---------|
+| 10% off first visit | max_customer_visits=0 | 1 reward: order, percentage, 10 |
+| $15 off for customers with 2 or fewer visits | max_customer_visits=2 | 1 reward: order, flat, 15 |
+| Free Air Freshener for new customers | max_customer_visits=0 | 1 reward: product, free, target=Air Freshener |
+
 ### Category-Level Coupons
 
 | Scenario | Conditions | Rewards |
@@ -271,6 +280,7 @@ There are two levels of logic in conditions:
 - `requires_product_category_ids: [Cat1, Cat2]` — ticket must have a product from Cat1 OR Cat2
 - `requires_service_category_ids: [Cat3]` — ticket must have a service from Cat3
 - `min_purchase` — subtotal must meet threshold
+- `max_customer_visits` — customer's `visit_count` must be <= value (0 = new customers only)
 
 **Example:** With `condition_logic = 'and'`, `requires_product_ids = [A, B]`, and `min_purchase = 100`:
 - The ticket must contain product A OR B, **AND** subtotal must be >= $100.
@@ -289,6 +299,22 @@ When `auto_apply = true`:
 5. Cashier can remove the auto-applied coupon if needed
 
 Auto-apply coupons still have a `code` (for reference/tracking) but the code is not entered manually.
+
+---
+
+## Re-enable Expiration Prompt
+
+When re-enabling a disabled coupon, a dialog presents expiration options:
+
+- **Expiration in the future:** Radio choice to keep the current date or set a new one
+- **Expiration in the past:** Radio choice to clear expiration (never expires) or set a new date -- the "keep" option is not available since the date has already passed
+- **No expiration set:** Note that no expiration is set, with an option to add one
+
+The PATCH request sends both `status: 'active'` and `expires_at` in one call.
+
+## Edit Coupon
+
+The coupon detail page includes an Edit button that navigates to `/admin/marketing/coupons/new?edit=<id>`. This reuses the same wizard used for draft editing, allowing any coupon (active, disabled) to be modified.
 
 ---
 
@@ -311,6 +337,7 @@ When a coupon is applied (manually or auto):
    c. requires_product_category_ids → product from any listed category in ticket
    d. requires_service_category_ids → service from any listed category in ticket
    e. min_purchase → subtotal >= threshold
+   f. max_customer_visits → customer visit_count <= threshold (requires customer_id)
 8. Fetch coupon_rewards
 9. For each reward, calculate discount:
    - order: percentage/flat/free of subtotal
@@ -331,7 +358,8 @@ When a coupon is applied (manually or auto):
 - `supabase/migrations/20260203000007_enhance_coupons.sql` — Added name, targeting, conditions, coupon_rewards table
 - `supabase/migrations/20260203000008_coupon_draft_status.sql` — Added `draft` status to coupon_status enum
 - `supabase/migrations/20260203000009_multi_product_conditions.sql` — Converted singular condition columns to UUID arrays (multi-product/service/category conditions)
-- `src/lib/supabase/types.ts` — `Coupon` interface, `CouponStatus` enum (`draft | active | redeemed | expired | disabled`)
+- `supabase/migrations/20260203000010_coupon_max_visits.sql` — Added `max_customer_visits` column for new customer conditions
+- `src/lib/supabase/types.ts` — `Coupon` interface, `CouponStatus` type (`draft | active | disabled`)
 - `src/lib/utils/validation.ts` — `couponSchema`, `CouponInput` type
 - `src/lib/utils/constants.ts` — `COUPON_STATUS_LABELS`, `DISCOUNT_TYPE_LABELS`
 
@@ -413,3 +441,21 @@ When a coupon is applied (manually or auto):
 25. Dynamic section labels ("Requires Product(s)" ↔ "Requires Product Category(ies)")
 26. Condition Logic tooltip (matches Match Mode tooltip pattern)
 27. Detail page updated to display arrays ("Requires any of: X, Y, Z")
+
+### Phase F: New Customer Conditions + Re-enable + Edit ✅
+28. DB migration — `max_customer_visits` nullable integer column
+29. Updated TypeScript types and Zod validation
+30. PATCH API allows `max_customer_visits`
+31. POS validation checks customer `visit_count` against `max_customer_visits`
+32. Wizard conditions step includes Max Customer Visits input
+33. Detail page displays customer visits condition
+34. Re-enable expiration dialog (keep / clear / new date)
+35. Edit button on coupon detail page navigates to wizard
+
+### Phase G: Remove Dead Statuses (`redeemed`, `expired`) ✅
+36. Removed `redeemed` and `expired` from `CouponStatus` TypeScript type (now `draft | active | disabled`)
+37. Removed from `COUPON_STATUS_LABELS` constants
+38. List page: derived "Expired" badge from `expires_at < now`, disabled status/auto-apply toggles for expired coupons
+39. Detail page: derived expired state for badge variant, text, and toggle disabled state
+40. Filter dropdown: "Expired" option filters by derived `expires_at` check instead of DB status
+41. Postgres enum left unchanged (removing enum values requires destructive `DROP TYPE`)
