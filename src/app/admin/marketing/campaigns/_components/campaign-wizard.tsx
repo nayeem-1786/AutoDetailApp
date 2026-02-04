@@ -146,7 +146,10 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
         supabase.from('products').select('id, name').eq('is_active', true).order('name'),
       ]);
       if (servicesRes.data) setServices(servicesRes.data as Service[]);
-      if (couponsRes.data) setCoupons(couponsRes.data);
+      if (couponsRes.data) {
+        const now = new Date();
+        setCoupons(couponsRes.data.filter((c: Coupon) => !c.expires_at || new Date(c.expires_at) >= now));
+      }
       if (productsRes.data) setProducts(productsRes.data);
     }
     load();
@@ -946,7 +949,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                   id="new_coupon_code"
                   value={newCouponCode}
                   onChange={(e) =>
-                    setNewCouponCode(e.target.value.toUpperCase())
+                    setNewCouponCode(e.target.value.toUpperCase().replace(/\s/g, ''))
                   }
                   placeholder="e.g. SUMMER25"
                   className="font-mono uppercase"

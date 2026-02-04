@@ -134,7 +134,7 @@ export default function CouponsListPage() {
     {
       accessorKey: 'name',
       header: 'Name',
-      size: 200,
+      size: 175,
       cell: ({ row }) => {
         const c = row.original;
         const href = c.status === 'draft'
@@ -153,29 +153,29 @@ export default function CouponsListPage() {
     {
       accessorKey: 'code',
       header: 'Code',
-      size: 130,
+      size: 175,
       cell: ({ row }) => (
-        <span className="font-mono text-sm text-gray-700">
-          {row.original.code}
-        </span>
+        row.original.code
+          ? <span className="font-mono text-sm text-gray-700">{row.original.code}</span>
+          : <span className="text-xs text-gray-400 italic">Auto-Generated</span>
       ),
     },
     {
       id: 'discount',
-      header: 'Discount',
-      size: 140,
+      header: () => <div className="text-center w-full">Discount</div>,
+      size: 130,
       cell: ({ row }) => {
         const summary = discountSummary(row.original);
-        if (summary === '--') return <span className="text-sm text-gray-400">--</span>;
-        return <Badge variant="info">{summary}</Badge>;
+        if (summary === '--') return <div className="text-center"><span className="text-sm text-gray-400">--</span></div>;
+        return <div className="text-center"><Badge variant="info">{summary}</Badge></div>;
       },
       enableSorting: false,
     },
     {
       id: 'status',
-      size: 120,
+      size: 130,
       header: () => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-center gap-1 w-full">
           <span>Status</span>
           <div className="group relative">
             <Info className="h-3.5 w-3.5 cursor-help text-gray-400" />
@@ -189,26 +189,28 @@ export default function CouponsListPage() {
       cell: ({ row }) => {
         const c = row.original;
         const canToggle = !isExpired(c) && (c.status === 'active' || c.status === 'disabled');
-        if (!canToggle) return statusBadge(c);
+        if (!canToggle) return <div className="text-center">{statusBadge(c)}</div>;
         return (
-          <button
-            type="button"
-            disabled={togglingId === c.id}
-            onClick={(e) => { e.stopPropagation(); toggleStatus(c); }}
-            className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            title={c.status === 'active' ? 'Click to disable' : 'Click to enable'}
-          >
-            {statusBadge(c)}
-          </button>
+          <div className="text-center">
+            <button
+              type="button"
+              disabled={togglingId === c.id}
+              onClick={(e) => { e.stopPropagation(); toggleStatus(c); }}
+              className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              title={c.status === 'active' ? 'Click to disable' : 'Click to enable'}
+            >
+              {statusBadge(c)}
+            </button>
+          </div>
         );
       },
       enableSorting: false,
     },
     {
       id: 'auto',
-      size: 140,
+      size: 130,
       header: () => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-center gap-1 w-full">
           <span>Auto-Apply</span>
           <div className="group relative">
             <Info className="h-3.5 w-3.5 cursor-help text-gray-400" />
@@ -222,40 +224,42 @@ export default function CouponsListPage() {
       cell: ({ row }) => {
         const c = row.original;
         if (c.status === 'draft' || isExpired(c)) {
-          return c.auto_apply
+          return <div className="text-center">{c.auto_apply
             ? <Badge variant="info">On</Badge>
-            : <span className="text-sm text-gray-400">Off</span>;
+            : <span className="text-sm text-gray-400">Off</span>}</div>;
         }
         return (
-          <button
-            type="button"
-            disabled={togglingAutoId === c.id}
-            onClick={(e) => { e.stopPropagation(); toggleAutoApply(c); }}
-            className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            title={c.auto_apply ? 'Click to turn off auto-apply' : 'Click to turn on auto-apply'}
-          >
-            {c.auto_apply
-              ? <Badge variant="info">On</Badge>
-              : <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">Off</span>}
-          </button>
+          <div className="text-center">
+            <button
+              type="button"
+              disabled={togglingAutoId === c.id}
+              onClick={(e) => { e.stopPropagation(); toggleAutoApply(c); }}
+              className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              title={c.auto_apply ? 'Click to turn off auto-apply' : 'Click to turn on auto-apply'}
+            >
+              {c.auto_apply
+                ? <Badge variant="info">On</Badge>
+                : <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">Off</span>}
+            </button>
+          </div>
         );
       },
       enableSorting: false,
     },
     {
       id: 'uses',
-      header: 'Uses',
-      size: 100,
+      header: () => <div className="text-center w-full">Used / Limit</div>,
+      size: 140,
       cell: ({ row }) => (
-        <span className="text-sm text-gray-600">
-          {row.original.use_count}{row.original.max_uses ? ` / ${row.original.max_uses}` : ''}
-        </span>
+        <div className="text-center text-sm text-gray-600">
+          {row.original.use_count} / {row.original.max_uses ?? '∞'}
+        </div>
       ),
     },
     {
       id: 'expires',
       header: 'Expires',
-      size: 140,
+      size: 130,
       cell: ({ row }) => (
         <span className="text-sm text-gray-500">
           {row.original.expires_at ? formatDate(row.original.expires_at) : 'Never'}

@@ -85,6 +85,10 @@ export async function PATCH(
     for (const key of allowedFields) {
       if (key in fields) updates[key] = fields[key];
     }
+    // Normalize code: uppercase, strip spaces
+    if (typeof updates.code === 'string') {
+      updates.code = (updates.code as string).toUpperCase().replace(/\s/g, '').trim();
+    }
 
     // Update coupon fields if any were provided
     if (Object.keys(updates).length > 0) {

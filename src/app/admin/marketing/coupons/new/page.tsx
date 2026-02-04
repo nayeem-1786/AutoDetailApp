@@ -806,6 +806,14 @@ export default function NewCouponPage() {
       toast.error('Enter a name before saving');
       return;
     }
+    if (!autoGenerate && !code.trim()) {
+      toast.error('Enter a coupon code or turn on auto-generate');
+      return;
+    }
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      toast.error('Expiration date is in the past — update it or clear it before saving');
+      return;
+    }
     try {
       const payload = buildPayload();
       if (couponId) {
@@ -849,8 +857,16 @@ export default function NewCouponPage() {
       toast.error('Name is required');
       return;
     }
+    if (!autoGenerate && !code.trim()) {
+      toast.error('Enter a coupon code or turn on auto-generate');
+      return;
+    }
     if (rewards.length === 0) {
       toast.error('At least one reward is required');
+      return;
+    }
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      toast.error('Expiration date is in the past — update it or clear it before saving');
       return;
     }
 
@@ -1116,7 +1132,7 @@ export default function NewCouponPage() {
                       <Input
                         id="coupon-code"
                         value={code}
-                        onChange={(e) => setCode(e.target.value.toUpperCase())}
+                        onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
                         placeholder="e.g. SPRING25"
                         className="font-mono uppercase"
                       />

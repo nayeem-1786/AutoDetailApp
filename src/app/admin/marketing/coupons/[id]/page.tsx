@@ -358,7 +358,7 @@ export default function CouponDetailPage() {
               <input
                 type="text"
                 value={editCode}
-                onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                onChange={(e) => setEditCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
                 className="w-full rounded border border-gray-300 px-2 py-1 font-mono text-sm uppercase focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') saveCode(); if (e.key === 'Escape') setEditingCode(false); }}
@@ -371,7 +371,7 @@ export default function CouponDetailPage() {
               </button>
             </div>
           ) : (
-            <p className="mt-1 font-mono text-lg font-bold">{coupon.code}</p>
+            <p className="mt-1 font-mono text-lg font-bold">{coupon.code || <span className="text-sm font-normal text-gray-400 italic">Auto-Generated</span>}</p>
           )}
         </div>
 

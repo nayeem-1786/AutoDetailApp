@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (!body.code) {
       body.code = generateCode();
     }
-    body.code = body.code.toUpperCase().trim();
+    body.code = body.code.toUpperCase().replace(/\s/g, '').trim();
 
     // Extract rewards before validation
     const { rewards, ...couponFields } = body;

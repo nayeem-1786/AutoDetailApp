@@ -21,7 +21,7 @@ export function CouponInput() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: code.trim(),
+          code: code.replace(/\s/g, '').trim(),
           subtotal: ticket.subtotal,
           customer_id: ticket.customer?.id || null,
         }),
