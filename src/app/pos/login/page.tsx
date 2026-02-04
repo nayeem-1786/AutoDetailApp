@@ -2,10 +2,9 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils/cn';
 import { PinPad } from '../components/pin-pad';
-import { setPosSession } from '../pos-shell';
+import { storePosSession } from '../context/pos-auth-context';
 
 export default function PosLoginPage() {
   const router = useRouter();
@@ -31,24 +30,12 @@ export default function PosLoginPage() {
         throw new Error(data.error || 'Invalid PIN');
       }
 
-      const { token_hash } = data;
-
-      // Sign out existing session only AFTER successful PIN verification
-      const supabase = createClient();
-      await supabase.auth.signOut();
-
-      // Verify OTP using the hashed token to create a session as the PIN employee
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash,
-        type: 'magiclink',
+      // Store POS session in sessionStorage (no Supabase auth involved)
+      storePosSession({
+        token: data.token,
+        employee: data.employee,
+        idleTimeoutMinutes: data.idle_timeout_minutes,
       });
-
-      if (verifyError) {
-        throw new Error('Authentication failed. Please try again.');
-      }
-
-      // Mark POS session as authenticated
-      setPosSession();
 
       router.replace('/pos');
     } catch (err) {

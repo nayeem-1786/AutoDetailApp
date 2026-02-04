@@ -5,16 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
+import { posFetch } from '../../lib/pos-fetch';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
-import { useAuth } from '@/lib/auth/auth-provider';
+import { usePosAuth } from '../../context/pos-auth-context';
 
 const QUICK_TENDERS = [20, 50, 100];
 
 export function CashPayment() {
   const { ticket, dispatch } = useTicket();
   const checkout = useCheckout();
-  const { employee } = useAuth();
+  const { employee } = usePosAuth();
 
   const amountDue = ticket.total;
   const [tendered, setTendered] = useState('');
@@ -31,7 +32,7 @@ export function CashPayment() {
     checkout.setProcessing(true);
 
     try {
-      const res = await fetch('/api/pos/transactions', {
+      const res = await posFetch('/api/pos/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

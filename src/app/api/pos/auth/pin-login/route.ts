@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createPosToken } from '@/lib/pos/session';
 
 // Simple in-memory rate limit (per IP, resets on deploy)
 const failureMap = new Map<string, { count: number; firstFailure: number; lockedUntil: number }>();
@@ -80,10 +81,10 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Find active employee with this PIN
+  // Find active employee with this PIN (include role)
   const { data: employee, error: empError } = await admin
     .from('employees')
-    .select('id, auth_user_id, first_name, last_name, email')
+    .select('id, auth_user_id, first_name, last_name, email, role')
     .eq('pin_code', pin)
     .eq('status', 'active')
     .single();
@@ -101,35 +102,40 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Get the user's email from auth
-  const { data: authUser, error: authError } = await admin.auth.admin.getUserById(
-    employee.auth_user_id
-  );
-
-  if (authError || !authUser?.user?.email) {
-    recordFailure(ip);
-    return NextResponse.json({ error: 'Unable to authenticate employee' }, { status: 500 });
-  }
-
-  const email = authUser.user.email;
-
-  // Generate a magic link token
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email,
+  // Create POS session token (no Supabase auth session needed)
+  const token = createPosToken({
+    id: employee.id,
+    auth_user_id: employee.auth_user_id,
+    role: employee.role,
+    first_name: employee.first_name,
+    last_name: employee.last_name,
+    email: employee.email,
   });
 
-  if (linkError || !linkData?.properties?.hashed_token) {
-    console.error('PIN login generateLink error:', linkError);
-    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
-  }
+  // Fetch idle timeout setting
+  const { data: timeoutSetting } = await admin
+    .from('business_settings')
+    .select('value')
+    .eq('key', 'pos_idle_timeout_minutes')
+    .single();
 
-  // Extract the hashed token — client will pass this to verifyOtp as token_hash
-  const token_hash = linkData.properties.hashed_token;
+  const idleTimeoutMinutes =
+    timeoutSetting?.value && typeof timeoutSetting.value === 'number' && timeoutSetting.value > 0
+      ? timeoutSetting.value
+      : 15;
 
   clearFailures(ip);
 
   return NextResponse.json({
-    token_hash,
+    token,
+    employee: {
+      id: employee.id,
+      auth_user_id: employee.auth_user_id,
+      first_name: employee.first_name,
+      last_name: employee.last_name,
+      email: employee.email,
+      role: employee.role,
+    },
+    idle_timeout_minutes: idleTimeoutMinutes,
   });
 }

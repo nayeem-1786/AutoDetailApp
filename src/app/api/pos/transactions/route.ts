@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { transactionCreateSchema } from '@/lib/utils/validation';
 import { CC_FEE_RATE, LOYALTY, WATER_SKU } from '@/lib/utils/constants';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const posEmployee = authenticatePosRequest(request);
+    if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const supabase = createAdminClient();
 
     const body = await request.json();
     const parsed = transactionCreateSchema.safeParse(body);
@@ -23,20 +23,13 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
 
-    // Look up employee
-    const { data: employee } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
-
     // 1. Insert transaction
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
       .insert({
         customer_id: data.customer_id || null,
         vehicle_id: data.vehicle_id || null,
-        employee_id: employee?.id || null,
+        employee_id: posEmployee.employee_id,
         status: 'completed',
         subtotal: data.subtotal,
         tax_amount: data.tax_amount,

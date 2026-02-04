@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { posFetch } from '../lib/pos-fetch';
 import {
   VEHICLE_TYPE_LABELS,
   VEHICLE_SIZE_LABELS,
@@ -49,7 +50,7 @@ export function VehicleCreateDialog({
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/pos/customers/${customerId}/vehicles`, {
+      const res = await posFetch(`/api/pos/customers/${customerId}/vehicles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

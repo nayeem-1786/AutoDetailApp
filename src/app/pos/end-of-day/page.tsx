@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Loader2, CheckCircle2, LockOpen, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils/format';
-import { useAuth } from '@/lib/auth/auth-provider';
+import { posFetch } from '../lib/pos-fetch';
+import { usePosAuth } from '../context/pos-auth-context';
 import { CashCountForm } from '../components/eod/cash-count-form';
 import { DaySummary } from '../components/eod/day-summary';
 import {
@@ -32,7 +33,7 @@ interface DaySummaryData {
 }
 
 export default function EndOfDayPage() {
-  const { employee, role } = useAuth();
+  const { employee, role } = usePosAuth();
   const isManager = role === 'super_admin' || role === 'admin';
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -90,7 +91,7 @@ export default function EndOfDayPage() {
     }
     async function fetchSummary() {
       try {
-        const res = await fetch('/api/pos/end-of-day/summary');
+        const res = await posFetch('/api/pos/end-of-day/summary');
         const json = await res.json();
         if (res.ok && json.data) {
           setSummary(json.data);
@@ -141,7 +142,7 @@ export default function EndOfDayPage() {
     // Fetch summary for the close view
     (async () => {
       try {
-        const res = await fetch('/api/pos/end-of-day/summary');
+        const res = await posFetch('/api/pos/end-of-day/summary');
         const json = await res.json();
         if (res.ok && json.data) {
           setSummary(json.data);
@@ -157,7 +158,7 @@ export default function EndOfDayPage() {
   async function handleCloseRegister() {
     setSubmitting(true);
     try {
-      const res = await fetch('/api/pos/end-of-day', {
+      const res = await posFetch('/api/pos/end-of-day', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

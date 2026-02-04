@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { posFetch } from '../lib/pos-fetch';
 import type { CustomerType } from '@/lib/supabase/types';
 
 export type { CustomerType };
@@ -57,7 +58,7 @@ export function CustomerTypeBadge({
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/pos/customers/${customerId}/type`, {
+      const res = await posFetch(`/api/pos/customers/${customerId}/type`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customer_type: newType }),

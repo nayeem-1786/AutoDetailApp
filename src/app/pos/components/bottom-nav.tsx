@@ -12,13 +12,12 @@ import {
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { useAuth } from '@/lib/auth/auth-provider';
-import { clearPosSession } from '../pos-shell';
+import { usePosAuth } from '../context/pos-auth-context';
 
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { employee } = useAuth();
+  const { employee, signOut: posSignOut } = usePosAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +61,7 @@ export function BottomNav() {
   }, []);
 
   function handleLogout() {
-    clearPosSession();
+    posSignOut();
     router.replace('/pos/login');
   }
 

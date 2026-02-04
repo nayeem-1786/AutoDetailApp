@@ -4,6 +4,7 @@ import { createContext, useContext, useReducer, useEffect, useRef, useCallback, 
 import { toast } from 'sonner';
 import type { TicketState, TicketAction } from '../types';
 import { ticketReducer, initialTicketState } from './ticket-reducer';
+import { posFetch } from '../lib/pos-fetch';
 
 interface TicketContextType {
   ticket: TicketState;
@@ -38,7 +39,7 @@ export function TicketProvider({ children }: { children: ReactNode }) {
     // If a coupon is applied, recalculate it
     if (ticket.coupon) {
       try {
-        const res = await fetch('/api/pos/coupons/validate', {
+        const res = await posFetch('/api/pos/coupons/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -76,7 +77,7 @@ export function TicketProvider({ children }: { children: ReactNode }) {
     // No coupon applied — try auto-apply
     // Only auto-apply if no manually-applied coupon was removed
     try {
-      const res = await fetch('/api/pos/promotions/available', {
+      const res = await posFetch('/api/pos/promotions/available', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -109,7 +110,7 @@ export function TicketProvider({ children }: { children: ReactNode }) {
       const best = autoApplyCoupons[0];
 
       // Validate it through the normal flow
-      const validateRes = await fetch('/api/pos/coupons/validate', {
+      const validateRes = await posFetch('/api/pos/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

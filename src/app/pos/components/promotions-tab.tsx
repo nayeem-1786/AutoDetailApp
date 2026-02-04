@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useTicket } from '../context/ticket-context';
 import { Tag, Gift, TrendingUp, ChevronDown, ChevronUp, Loader2, Search, Clock, X } from 'lucide-react';
+import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
 
 interface PromotionItem {
@@ -199,7 +200,7 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
         item_name: item.itemName,
       }));
 
-      const res = await fetch('/api/pos/promotions/available', {
+      const res = await posFetch('/api/pos/promotions/available', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -258,7 +259,7 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
         item_name: item.itemName,
       }));
 
-      const res = await fetch('/api/pos/coupons/validate', {
+      const res = await posFetch('/api/pos/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime } from '@/lib/utils/format';
+import { posFetch } from '../../lib/pos-fetch';
 import type { Transaction } from '@/lib/supabase/types';
 
 type TransactionWithRelations = Transaction & {
@@ -114,7 +115,7 @@ export function TransactionList({ onSelect }: TransactionListProps) {
         params.set('date_to', new Date(y, m - 1, d, 23, 59, 59, 999).toISOString());
       }
 
-      const res = await fetch(`/api/pos/transactions/search?${params}`);
+      const res = await posFetch(`/api/pos/transactions/search?${params}`);
       if (!res.ok) throw new Error('Failed to fetch transactions');
       const json = await res.json();
       setTransactions(json.data ?? []);

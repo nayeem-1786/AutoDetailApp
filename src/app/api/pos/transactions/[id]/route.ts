@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { authenticatePosRequest } from '@/lib/pos/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -7,12 +8,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const posEmployee = authenticatePosRequest(request);
+    if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const supabase = createAdminClient();
 
     const { data: transaction, error } = await supabase
       .from('transactions')
@@ -50,12 +50,11 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const posEmployee = authenticatePosRequest(request);
+    if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const supabase = createAdminClient();
 
     const body = await request.json();
     const { action } = body;

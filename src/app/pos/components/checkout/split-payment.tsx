@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, CreditCard, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { posFetch } from '../../lib/pos-fetch';
 import { cn } from '@/lib/utils/cn';
 import { TIP_PRESETS } from '@/lib/utils/constants';
 import { useTicket } from '../../context/ticket-context';
@@ -50,7 +51,7 @@ export function SplitPayment() {
     try {
       // Create PaymentIntent for card portion (no tip baked in)
       const cardCents = Math.round(cardAmount * 100);
-      const piRes = await fetch('/api/pos/stripe/payment-intent', {
+      const piRes = await posFetch('/api/pos/stripe/payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,7 +90,7 @@ export function SplitPayment() {
       checkout.setTip(tipAmount, null);
 
       // Create transaction with both payments
-      const txRes = await fetch('/api/pos/transactions', {
+      const txRes = await posFetch('/api/pos/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -148,7 +149,7 @@ export function SplitPayment() {
       const custPhone = ticket.customer?.phone;
       const custTags = ticket.customer?.tags || null;
 
-      fetch('/api/pos/card-customer', {
+      posFetch('/api/pos/card-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tag, X } from 'lucide-react';
-import { useAuth } from '@/lib/auth/auth-provider';
+import { usePosAuth } from '../context/pos-auth-context';
 import { useTicket } from '../context/ticket-context';
 import { useCatalog } from '../hooks/use-catalog';
 import { TicketItemRow } from './ticket-item-row';
@@ -34,7 +34,7 @@ interface TicketPanelProps {
 }
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
-  const { role } = useAuth();
+  const { role } = usePosAuth();
   const isManager = role === 'super_admin' || role === 'admin';
   const { ticket, dispatch } = useTicket();
   const { services } = useCatalog();

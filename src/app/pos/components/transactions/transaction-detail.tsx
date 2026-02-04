@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Ban, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { useAuth } from '@/lib/auth/auth-provider';
+import { usePosAuth } from '../../context/pos-auth-context';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format';
+import { posFetch } from '../../lib/pos-fetch';
 import { RefundDialog } from '../refund/refund-dialog';
 import { ReceiptOptions } from '../receipt-options';
 import type {
@@ -47,7 +48,7 @@ const REFUND_STATUS_CLASSES: Record<string, string> = {
 };
 
 export function TransactionDetail({ transactionId, onBack }: TransactionDetailProps) {
-  const { role } = useAuth();
+  const { role } = usePosAuth();
   const [transaction, setTransaction] = useState<FullTransaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
@@ -57,7 +58,7 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
   const fetchTransaction = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/pos/transactions/${transactionId}`);
+      const res = await posFetch(`/api/pos/transactions/${transactionId}`);
       if (!res.ok) throw new Error('Failed to fetch transaction');
       const json = await res.json();
       setTransaction(json.data ?? null);
@@ -109,7 +110,7 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
   async function handleVoid() {
     setVoiding(true);
     try {
-      const res = await fetch(`/api/pos/transactions/${transactionId}`, {
+      const res = await posFetch(`/api/pos/transactions/${transactionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'void' }),

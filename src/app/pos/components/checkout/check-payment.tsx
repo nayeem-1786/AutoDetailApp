@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { posFetch } from '../../lib/pos-fetch';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -20,7 +21,7 @@ export function CheckPayment() {
     checkout.setProcessing(true);
 
     try {
-      const res = await fetch('/api/pos/transactions', {
+      const res = await posFetch('/api/pos/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

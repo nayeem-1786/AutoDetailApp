@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { cashDrawerCloseSchema } from '@/lib/utils/validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const posEmployee = authenticatePosRequest(request);
+    if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const supabase = createAdminClient();
 
     const body = await request.json();
     const parsed = cashDrawerCloseSchema.safeParse(body);
@@ -21,13 +21,6 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
-
-    // Look up employee
-    const { data: employee } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
 
     // Check for open cash drawer
     const { data: openDrawer } = await supabase
@@ -126,7 +119,7 @@ export async function POST(request: NextRequest) {
       total_tax: roundTwo(totalTax),
       total_tips: roundTwo(totalTips),
       total_refunds: roundTwo(totalRefundsAmount),
-      closed_by: employee?.id || null,
+      closed_by: posEmployee.employee_id,
       notes: data.notes || null,
     };
 

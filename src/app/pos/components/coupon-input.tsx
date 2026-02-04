@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tag, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { posFetch } from '../lib/pos-fetch';
 import { useTicket } from '../context/ticket-context';
 
 export function CouponInput() {
@@ -26,7 +27,7 @@ export function CouponInput() {
         item_name: item.itemName,
       }));
 
-      const res = await fetch('/api/pos/coupons/validate', {
+      const res = await posFetch('/api/pos/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

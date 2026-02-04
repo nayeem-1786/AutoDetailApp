@@ -16,6 +16,7 @@ import type {
   Refund,
   RefundItem,
 } from '@/lib/supabase/types';
+import { posFetch } from '../../lib/pos-fetch';
 import { RefundItemRow } from './refund-item-row';
 import { RefundSummary } from './refund-summary';
 
@@ -158,7 +159,7 @@ export function RefundDialog({
         reason: reason.trim(),
       };
 
-      const res = await fetch('/api/pos/refunds', {
+      const res = await posFetch('/api/pos/refunds', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

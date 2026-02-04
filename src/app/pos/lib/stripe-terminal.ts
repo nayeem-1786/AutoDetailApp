@@ -7,6 +7,7 @@ import type {
   ITipConfiguration,
   ICollectConfig,
 } from '@stripe/terminal-js';
+import { posFetch } from './pos-fetch';
 
 type TerminalInstance = Terminal;
 
@@ -14,7 +15,7 @@ let terminal: TerminalInstance | null = null;
 let connectedReader: Reader | null = null;
 
 async function fetchConnectionToken(): Promise<string> {
-  const res = await fetch('/api/pos/stripe/connection-token', {
+  const res = await posFetch('/api/pos/stripe/connection-token', {
     method: 'POST',
   });
   const json = await res.json();

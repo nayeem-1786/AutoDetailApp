@@ -11,85 +11,45 @@ import {
   PauseCircle,
   Keyboard,
   X,
+  Lock,
 } from 'lucide-react';
-import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
 import { canAccessRoute } from '@/lib/auth/roles';
-import { createClient } from '@/lib/supabase/client';
+import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
 import { TicketProvider, useTicket } from './context/ticket-context';
 import { CheckoutProvider, useCheckout } from './context/checkout-context';
 import { HeldTicketsProvider, useHeldTickets } from './context/held-tickets-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
 import { HeldTicketsPanel } from './components/held-tickets-panel';
-
-const POS_SESSION_KEY = 'pos_session_authenticated';
-const POS_SESSION_TIMESTAMP_KEY = 'pos_session_timestamp';
-const DEFAULT_IDLE_TIMEOUT_MINUTES = 15;
-
-function getPosSession(): boolean {
-  if (typeof window === 'undefined') return false;
-  return sessionStorage.getItem(POS_SESSION_KEY) === 'true';
-}
-
-export function setPosSession() {
-  sessionStorage.setItem(POS_SESSION_KEY, 'true');
-  sessionStorage.setItem(POS_SESSION_TIMESTAMP_KEY, Date.now().toString());
-}
-
-export function clearPosSession() {
-  sessionStorage.removeItem(POS_SESSION_KEY);
-  sessionStorage.removeItem(POS_SESSION_TIMESTAMP_KEY);
-}
+import { PinPad } from './components/pin-pad';
+import { cn } from '@/lib/utils/cn';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
-  const { employee, role, loading } = useAuth();
+  const { employee, role, loading, locked, lock, replaceSession, signOut } = usePosAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [clock, setClock] = useState('');
-  const [posAuthenticated, setPosAuthenticated] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [idleTimeoutMinutes, setIdleTimeoutMinutes] = useState(DEFAULT_IDLE_TIMEOUT_MINUTES);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { idleTimeoutMinutes } = usePosAuth();
 
-  // Load idle timeout setting from business_settings
+  // Lock screen state
+  const [lockDigits, setLockDigits] = useState('');
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [lockSubmitting, setLockSubmitting] = useState(false);
+  const [lockShake, setLockShake] = useState(false);
+
+  // Redirect if not authenticated
   useEffect(() => {
-    async function loadTimeout() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('business_settings')
-        .select('value')
-        .eq('key', 'pos_idle_timeout_minutes')
-        .single();
-
-      if (data?.value && typeof data.value === 'number' && data.value > 0) {
-        setIdleTimeoutMinutes(data.value);
-      }
-    }
-    loadTimeout();
-  }, []);
-
-  // Check POS session on mount
-  useEffect(() => {
-    setPosAuthenticated(getPosSession());
-    setCheckingSession(false);
-  }, []);
-
-  // Redirect if not authenticated or no POS session
-  useEffect(() => {
-    if (loading || checkingSession) return;
-
-    if (!employee || !posAuthenticated) {
+    if (loading) return;
+    if (!employee) {
       router.replace('/pos/login');
     }
-  }, [loading, checkingSession, employee, posAuthenticated, router]);
+  }, [loading, employee, router]);
 
-  // Idle timeout — lock POS screen without destroying the Supabase auth session.
-  // The next PIN login will sign out and create a fresh session for that employee.
+  // Idle timeout — set locked = true (shows PIN overlay)
   const handleIdleTimeout = useCallback(() => {
-    clearPosSession();
-    setPosAuthenticated(false);
-    router.replace('/pos/login');
-  }, [router]);
+    lock();
+  }, [lock]);
 
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current) {
@@ -99,7 +59,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   }, [handleIdleTimeout, idleTimeoutMinutes]);
 
   useEffect(() => {
-    if (!posAuthenticated) return;
+    if (!employee || locked) return;
 
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
     const handler = () => resetIdleTimer();
@@ -111,7 +71,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
       events.forEach((e) => window.removeEventListener(e, handler));
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [posAuthenticated, resetIdleTimer]);
+  }, [employee, locked, resetIdleTimer]);
 
   // Live clock
   useEffect(() => {
@@ -129,7 +89,70 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading || checkingSession) {
+  // Lock screen PIN submit
+  const handleLockPinSubmit = useCallback(
+    async (pin: string) => {
+      setLockSubmitting(true);
+      setLockError(null);
+
+      try {
+        const res = await fetch('/api/pos/auth/pin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Invalid PIN');
+        }
+
+        // Replace session with new employee (handles both same and different employee)
+        replaceSession({
+          token: data.token,
+          employee: data.employee,
+          idleTimeoutMinutes: data.idle_timeout_minutes,
+        });
+
+        setLockDigits('');
+      } catch (err) {
+        setLockError(err instanceof Error ? err.message : 'Invalid PIN');
+        setLockDigits('');
+        setLockShake(true);
+        setTimeout(() => setLockShake(false), 500);
+      } finally {
+        setLockSubmitting(false);
+      }
+    },
+    [replaceSession]
+  );
+
+  function handleLockDigit(d: string) {
+    if (d === '.' || lockSubmitting) return;
+    const next = lockDigits + d;
+    if (next.length > 4) return;
+
+    setLockDigits(next);
+    setLockError(null);
+
+    if (next.length === 4) {
+      handleLockPinSubmit(next);
+    }
+  }
+
+  function handleLockBackspace() {
+    if (lockSubmitting) return;
+    setLockDigits(lockDigits.slice(0, -1));
+    setLockError(null);
+  }
+
+  function handleLockLogout() {
+    signOut();
+    router.replace('/pos/login');
+  }
+
+  if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -137,7 +160,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!employee || !role || !posAuthenticated) {
+  if (!employee || !role) {
     return null;
   }
 
@@ -165,6 +188,73 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
           <PosShellContent displayName={displayName} clock={clock} role={role}>
             {children}
           </PosShellContent>
+
+          {/* Lock screen overlay */}
+          {locked && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/95">
+              <div className="w-full max-w-sm px-4">
+                <div className="mb-6 flex flex-col items-center gap-2">
+                  <Lock className="h-10 w-10 text-gray-400" />
+                  <h2 className="text-xl font-bold text-white">Screen Locked</h2>
+                  <p className="text-sm text-gray-400">
+                    Enter PIN to continue as {employee.first_name} or switch user
+                  </p>
+                </div>
+
+                {/* Dot indicators */}
+                <div
+                  className={cn(
+                    'mb-6 flex items-center justify-center gap-4',
+                    lockShake && 'animate-shake'
+                  )}
+                >
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'h-4 w-4 rounded-full border-2 transition-all duration-150',
+                        i < lockDigits.length
+                          ? 'border-white bg-white'
+                          : 'border-gray-500 bg-transparent'
+                      )}
+                    />
+                  ))}
+                </div>
+
+                {lockError && (
+                  <p className="mb-4 text-center text-sm text-red-400">{lockError}</p>
+                )}
+
+                {lockSubmitting && (
+                  <p className="mb-4 text-center text-sm text-gray-400">Verifying...</p>
+                )}
+
+                <PinPad
+                  onDigit={handleLockDigit}
+                  onBackspace={handleLockBackspace}
+                  size="lg"
+                />
+
+                <button
+                  onClick={handleLockLogout}
+                  className="mt-6 w-full text-center text-sm text-gray-500 hover:text-gray-300"
+                >
+                  Sign out instead
+                </button>
+              </div>
+
+              <style jsx>{`
+                @keyframes shake {
+                  0%, 100% { transform: translateX(0); }
+                  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+                  20%, 40%, 60%, 80% { transform: translateX(8px); }
+                }
+                .animate-shake {
+                  animation: shake 0.5s ease-in-out;
+                }
+              `}</style>
+            </div>
+          )}
         </HeldTicketsProvider>
       </CheckoutProvider>
     </TicketProvider>
@@ -378,8 +468,8 @@ function PosShellContent({
 
 export function PosShell({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
+    <PosAuthProvider>
       <PosShellInner>{children}</PosShellInner>
-    </AuthProvider>
+    </PosAuthProvider>
   );
 }

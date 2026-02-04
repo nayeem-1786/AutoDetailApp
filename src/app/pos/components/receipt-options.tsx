@@ -5,6 +5,7 @@ import { Printer, Mail, MessageSquare, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { posFetch } from '../lib/pos-fetch';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { generateReceiptLines } from '../lib/receipt-template';
 import { printReceipt } from '../lib/star-printer';
@@ -35,7 +36,7 @@ export function ReceiptOptions({
   async function handlePrint() {
     setPrinting(true);
     try {
-      const res = await fetch('/api/pos/receipts/print', {
+      const res = await posFetch('/api/pos/receipts/print', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transaction_id: transactionId }),
@@ -62,7 +63,7 @@ export function ReceiptOptions({
     if (!email) return;
     setEmailing(true);
     try {
-      const res = await fetch('/api/pos/receipts/email', {
+      const res = await posFetch('/api/pos/receipts/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transaction_id: transactionId, email }),
@@ -88,7 +89,7 @@ export function ReceiptOptions({
     if (!phone) return;
     setSmsing(true);
     try {
-      const res = await fetch('/api/pos/receipts/sms', {
+      const res = await posFetch('/api/pos/receipts/sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transaction_id: transactionId, phone }),

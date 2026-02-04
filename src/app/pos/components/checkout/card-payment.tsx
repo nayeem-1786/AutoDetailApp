@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { posFetch } from '../../lib/pos-fetch';
 import { TIP_PRESETS } from '@/lib/utils/constants';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
@@ -30,7 +31,7 @@ export function CardPayment() {
     try {
       // 1. Create PaymentIntent with base amount (no tip baked in)
       const amountCents = Math.round(amountDue * 100);
-      const piRes = await fetch('/api/pos/stripe/payment-intent', {
+      const piRes = await posFetch('/api/pos/stripe/payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,7 +75,7 @@ export function CardPayment() {
       checkout.setTip(tipAmount, null);
 
       // 5. Create transaction
-      const txRes = await fetch('/api/pos/transactions', {
+      const txRes = await posFetch('/api/pos/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,7 +131,7 @@ export function CardPayment() {
       const custPhone = ticket.customer?.phone;
       const custTags = ticket.customer?.tags || null;
 
-      fetch('/api/pos/card-customer', {
+      posFetch('/api/pos/card-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

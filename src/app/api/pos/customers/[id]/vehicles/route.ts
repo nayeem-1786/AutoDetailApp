@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { authenticatePosRequest } from '@/lib/pos/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -7,13 +8,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
 
-    // Verify authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const posEmployee = authenticatePosRequest(request);
+    if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const supabase = createAdminClient();
 
     const { data: vehicles, error } = await supabase
       .from('vehicles')
@@ -45,13 +45,12 @@ export async function POST(
 ) {
   try {
     const { id: customerId } = await params;
-    const supabase = await createClient();
 
-    // Verify authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const posEmployee = authenticatePosRequest(request);
+    if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const supabase = createAdminClient();
 
     const body = await request.json();
     const { vehicle_type, size_class, year, make, model, color } = body;

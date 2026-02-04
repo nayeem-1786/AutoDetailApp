@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
 import type { CustomerType } from '@/lib/supabase/types';
 
@@ -48,7 +49,7 @@ export function CustomerTypePrompt({
   async function handleSelect(type: CustomerType) {
     setSaving(true);
     try {
-      const res = await fetch(`/api/pos/customers/${customerId}/type`, {
+      const res = await posFetch(`/api/pos/customers/${customerId}/type`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customer_type: type }),

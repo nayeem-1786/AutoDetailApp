@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Search, UserPlus, UserX, Loader2 } from 'lucide-react';
+import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { CustomerTypeBadge } from './customer-type-badge';
@@ -45,7 +46,7 @@ export function CustomerLookup({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/pos/customers/search?phone=${digits}`);
+      const res = await posFetch(`/api/pos/customers/search?phone=${digits}`);
       const json = await res.json();
       setResults(json.data ?? []);
       setSearched(true);

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt', '/pos/login'];
+const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt', '/pos'];
 
 // Allowed IPs for POS access (comma-separated in env var)
 const ALLOWED_POS_IPS: string[] | null = process.env.ALLOWED_POS_IPS
@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
   // For protected routes, check authentication
   const { user, supabaseResponse } = await updateSession(request);
 
-  if (!user && (pathname.startsWith('/admin') || pathname.startsWith('/pos'))) {
+  if (!user && pathname.startsWith('/admin')) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', pathname);

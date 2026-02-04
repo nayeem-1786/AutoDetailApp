@@ -9,6 +9,7 @@ import {
   VEHICLE_TYPE_LABELS,
 } from '@/lib/utils/constants';
 import type { Vehicle } from '@/lib/supabase/types';
+import { posFetch } from '../lib/pos-fetch';
 
 interface VehicleSelectorProps {
   customerId: string;
@@ -30,7 +31,7 @@ export function VehicleSelector({
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/pos/customers/${customerId}/vehicles`);
+        const res = await posFetch(`/api/pos/customers/${customerId}/vehicles`);
         const json = await res.json();
         setVehicles(json.data ?? []);
       } catch {

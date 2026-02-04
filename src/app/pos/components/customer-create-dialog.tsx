@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { posFetch } from '../lib/pos-fetch';
 import { formatPhoneInput } from '@/lib/utils/format';
 import type { Customer, CustomerType } from '@/lib/supabase/types';
 
@@ -51,7 +52,7 @@ export function CustomerCreateDialog({
 
     setSaving(true);
     try {
-      const res = await fetch('/api/pos/customers', {
+      const res = await posFetch('/api/pos/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
