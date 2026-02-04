@@ -109,7 +109,9 @@ export default function CouponsListPage() {
       }
       if (statusFilter === 'expired') {
         if (!isExpired(c)) return false;
-      } else if (statusFilter && c.status !== statusFilter) return false;
+      } else if (statusFilter) {
+        if (isExpired(c) || c.status !== statusFilter) return false;
+      }
       return true;
     });
   }, [coupons, search, statusFilter]);
