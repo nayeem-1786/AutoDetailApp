@@ -33,10 +33,10 @@ Stores the coupon identity, targeting, conditions, and constraints.
 | `tag_match_mode` | TEXT | `any` (customer has at least one tag) or `all` (customer has every tag) |
 | **Conditions (IF)** | | |
 | `condition_logic` | TEXT | `and` (all conditions must be met) or `or` (any condition suffices) |
-| `requires_product_id` | UUID FK | Ticket must contain this specific product |
-| `requires_service_id` | UUID FK | Ticket must contain this specific service |
-| `requires_product_category_id` | UUID FK | Ticket must contain a product from this category |
-| `requires_service_category_id` | UUID FK | Ticket must contain a service from this category |
+| `requires_product_ids` | UUID[] | Ticket must contain ANY one of these products |
+| `requires_service_ids` | UUID[] | Ticket must contain ANY one of these services |
+| `requires_product_category_ids` | UUID[] | Ticket must contain a product from ANY of these categories |
+| `requires_service_category_ids` | UUID[] | Ticket must contain a service from ANY of these categories |
 | `min_purchase` | DECIMAL | Minimum order subtotal |
 | **Constraints** | | |
 | `is_single_use` | BOOLEAN | One use per customer |
@@ -123,15 +123,13 @@ An inline counter at the bottom of this step shows how many customers match the 
 **Toggle:** "No conditions — works on any order" vs. "Set conditions"
 
 When conditions are enabled:
-- **Logic mode** — AND (all conditions must be met) or OR (any one condition suffices)
-- **Requires product** — Searchable product picker (search by name, SKU, vendor, or category)
-- **Product category** — Select from category dropdown
-- **Requires service** — Searchable service picker (search by name or category)
-- **Service category** — Select from category dropdown
+- **Condition Logic** — AND (all conditions must be met) or OR (any one condition suffices). Hover the info icon for a tooltip explaining the difference.
+- **Requires Product(s)** / **Requires Product Category(ies)** — Toggle between selecting specific products or product categories. Both use a multi-select chip UI (`MultiSearchableSelect`) so you can pick multiple items. Within each array, semantics are OR — the ticket must contain ANY one of the listed items. The section label changes dynamically based on the toggle.
+- **Requires Service(s)** / **Requires Service Category(ies)** — Same pattern as products: toggle between specific services or service categories with multi-select.
 - **Minimum purchase** — Dollar amount threshold
 
 **Example:**
-> Set "Requires Service: Booster Wash" so this coupon only activates when the customer is getting a Booster Wash. Add "Minimum Purchase: $50" with AND logic to require both.
+> Set "Requires Service(s): 1-Year Ceramic Shield, 3-Year Ceramic Shield, 5-Year Ceramic Shield" so this coupon activates when ANY of those services is in the ticket. Add "Minimum Purchase: $50" with AND logic to require both conditions.
 
 ### Step 4 — Rewards
 
@@ -199,13 +197,16 @@ Coupons support a `draft` status for work-in-progress coupons:
 
 ## Searchable Product & Service Pickers
 
-All product and service selection fields in the Conditions and Rewards steps use a searchable combobox (the `SearchableSelect` component) instead of plain dropdowns:
+All product and service selection fields in the Conditions and Rewards steps use searchable combobox components instead of plain dropdowns:
 
-- **Products** — Searchable by product name, SKU, vendor name, and category. Each option shows the product name with a sublabel containing SKU, category, and vendor for easy identification.
-- **Services** — Searchable by service name and category. Each option shows the service name with a sublabel showing the category.
-- **Categories** — Standard dropdown (smaller dataset, no search needed).
+- **Products** (Conditions) — `MultiSearchableSelect` for multi-select with chips. Searchable by product name, SKU, vendor name, and category. Each option shows the product name with a sublabel containing SKU, category, and vendor for easy identification.
+- **Services** (Conditions) — `MultiSearchableSelect` for multi-select with chips. Searchable by service name and category.
+- **Product Categories** (Conditions) — `MultiSearchableSelect` for multi-select with chips. Searchable by category name.
+- **Service Categories** (Conditions) — `MultiSearchableSelect` for multi-select with chips. Searchable by category name.
+- **Products/Services** (Rewards) — `SearchableSelect` for single-select (each reward targets one specific item).
+- **Categories** (Rewards) — Standard dropdown for single-select.
 
-This is important because the product catalog can be large. Searching by SKU or vendor name helps quickly locate the right item.
+The `MultiSearchableSelect` component renders selected items as removable chips/badges above the search input. Searching filters the dropdown to exclude already-selected items. This is important because the product catalog can be large — searching by SKU or vendor name helps quickly locate the right item.
 
 ---
 
@@ -231,17 +232,19 @@ This is important because the product catalog can be large. Searching by SKU or 
 
 | Scenario | Conditions | Rewards |
 |----------|-----------|---------|
-| Buy Booster Wash, Product 20% off | requires_service=Booster Wash | 1 reward: product, percentage, 20, target=Booster Product |
-| Ceramic Coating 15% off this month | requires_service=Ceramic Coating | 1 reward: service, percentage, 15, target=Ceramic Coating |
+| Buy Booster Wash, Product 20% off | requires_service_ids=[Booster Wash] | 1 reward: product, percentage, 20, target=Booster Product |
+| Any Ceramic Shield → Booster 30% off | requires_service_ids=[1yr Shield, 3yr Shield, 5yr Shield] | 1 reward: product, percentage, 30, target=Booster Product |
+| Ceramic Coating 15% off this month | requires_service_ids=[Ceramic Coating] | 1 reward: service, percentage, 15, target=Ceramic Coating |
 | Spend $100+, free Air Freshener | min_purchase=100 | 1 reward: product, free, target=Air Freshener |
-| Buy Full Detail, free Spray + 50% off Freshener | requires_service=Full Detail | 2 rewards: (1) product, free, target=Ceramic Spray; (2) product, percentage, 50, target=Air Freshener |
+| Buy Full Detail, free Spray + 50% off Freshener | requires_service_ids=[Full Detail] | 2 rewards: (1) product, free, target=Ceramic Spray; (2) product, percentage, 50, target=Air Freshener |
 
 ### Category-Level Coupons
 
 | Scenario | Conditions | Rewards |
 |----------|-----------|---------|
-| 20% off all Chemicals with any detail service | requires_service_category=Detailing | 1 reward: product, percentage, 20, target_category=Chemicals |
-| Buy any service, all products 10% off | requires_service_category=any (or none) | 1 reward: product (no target = all), percentage, 10 |
+| 20% off all Chemicals with any detail service | requires_service_category_ids=[Detailing] | 1 reward: product, percentage, 20, target_category=Chemicals |
+| Buy from Coatings or PPF category, 10% off products | requires_service_category_ids=[Coatings, PPF] | 1 reward: product (no target = all), percentage, 10 |
+| Buy any service, all products 10% off | no conditions | 1 reward: product (no target = all), percentage, 10 |
 
 ### Campaign-Generated Coupons
 
@@ -256,16 +259,23 @@ When a campaign sends coupons, each recipient gets a unique coupon row:
 
 ## Condition Logic (AND vs OR)
 
-When `condition_logic = 'and'`, ALL set conditions must be satisfied:
-- requires_product_id: product must be in ticket
-- requires_service_id: service must be in ticket
-- requires_product_category_id: a product from category must be in ticket
-- requires_service_category_id: a service from category must be in ticket
-- min_purchase: subtotal must meet threshold
+There are two levels of logic in conditions:
 
-When `condition_logic = 'or'`, ANY single condition being met is enough.
+**Between condition types** (`condition_logic`):
+- `and` — ALL set condition types must be satisfied
+- `or` — ANY single condition type being met is enough
 
-Unset conditions (NULL) are ignored — they don't count toward AND/OR.
+**Within each array** (implicit OR):
+- `requires_product_ids: [A, B, C]` — ticket must contain product A OR B OR C
+- `requires_service_ids: [X, Y]` — ticket must contain service X OR Y
+- `requires_product_category_ids: [Cat1, Cat2]` — ticket must have a product from Cat1 OR Cat2
+- `requires_service_category_ids: [Cat3]` — ticket must have a service from Cat3
+- `min_purchase` — subtotal must meet threshold
+
+**Example:** With `condition_logic = 'and'`, `requires_product_ids = [A, B]`, and `min_purchase = 100`:
+- The ticket must contain product A OR B, **AND** subtotal must be >= $100.
+
+Empty/NULL arrays are ignored — they don't count toward AND/OR.
 
 ---
 
@@ -295,11 +305,11 @@ When a coupon is applied (manually or auto):
 6. Check targeting:
    a. If customer_id set → must match current customer
    b. If customer_tags set → customer tags must match (any/all per tag_match_mode)
-7. Check conditions (AND/OR logic):
-   a. requires_product_id → product in ticket items
-   b. requires_service_id → service in ticket items
-   c. requires_product_category_id → product from category in ticket
-   d. requires_service_category_id → service from category in ticket
+7. Check conditions (AND/OR logic between types, OR within each array):
+   a. requires_product_ids → any listed product in ticket items
+   b. requires_service_ids → any listed service in ticket items
+   c. requires_product_category_ids → product from any listed category in ticket
+   d. requires_service_category_ids → service from any listed category in ticket
    e. min_purchase → subtotal >= threshold
 8. Fetch coupon_rewards
 9. For each reward, calculate discount:
@@ -320,6 +330,7 @@ When a coupon is applied (manually or auto):
 - `supabase/migrations/20260201000020_create_coupons.sql` — Original coupons table
 - `supabase/migrations/20260203000007_enhance_coupons.sql` — Added name, targeting, conditions, coupon_rewards table
 - `supabase/migrations/20260203000008_coupon_draft_status.sql` — Added `draft` status to coupon_status enum
+- `supabase/migrations/20260203000009_multi_product_conditions.sql` — Converted singular condition columns to UUID arrays (multi-product/service/category conditions)
 - `src/lib/supabase/types.ts` — `Coupon` interface, `CouponStatus` enum (`draft | active | redeemed | expired | disabled`)
 - `src/lib/utils/validation.ts` — `couponSchema`, `CouponInput` type
 - `src/lib/utils/constants.ts` — `COUPON_STATUS_LABELS`, `DISCOUNT_TYPE_LABELS`
@@ -391,3 +402,14 @@ When a coupon is applied (manually or auto):
 16. Add auto-apply logic
 17. Update coupon input component
 18. Update transaction save to record per-item discounts
+
+### Phase E: Multi-Product/Service/Category Conditions ✅
+19. DB migration — convert singular UUID condition columns to UUID arrays
+20. Updated types and Zod validation for array fields
+21. Updated PATCH API allowedFields
+22. Updated POS validation to check arrays with `.includes()` and fetch multiple names for error messages
+23. Added `MultiSearchableSelect` chip-based component for multi-item selection
+24. Wizard conditions step: multi-select for products, services, product categories, and service categories
+25. Dynamic section labels ("Requires Product(s)" ↔ "Requires Product Category(ies)")
+26. Condition Logic tooltip (matches Match Mode tooltip pattern)
+27. Detail page updated to display arrays ("Requires any of: X, Y, Z")
