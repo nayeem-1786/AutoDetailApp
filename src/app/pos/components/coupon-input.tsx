@@ -17,6 +17,15 @@ export function CouponInput() {
 
     setValidating(true);
     try {
+      const cartItems = ticket.items.map((item) => ({
+        item_type: item.itemType,
+        product_id: item.productId || undefined,
+        service_id: item.serviceId || undefined,
+        unit_price: item.unitPrice,
+        quantity: item.quantity,
+        item_name: item.itemName,
+      }));
+
       const res = await fetch('/api/pos/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -24,6 +33,7 @@ export function CouponInput() {
           code: code.replace(/\s/g, '').trim(),
           subtotal: ticket.subtotal,
           customer_id: ticket.customer?.id || null,
+          items: cartItems,
         }),
       });
 
@@ -39,10 +49,16 @@ export function CouponInput() {
         coupon: {
           id: json.data.id,
           code: json.data.code,
-          discount: json.data.discount,
+          discount: json.data.total_discount,
+          isAutoApplied: false,
         },
       });
-      toast.success(`Coupon applied: ${json.data.description}`);
+
+      if (json.data.warning) {
+        toast.warning(json.data.warning);
+      } else {
+        toast.success(`Coupon applied: ${json.data.description}`);
+      }
       setCode('');
     } catch {
       toast.error('Failed to validate coupon');
@@ -62,6 +78,9 @@ export function CouponInput() {
         <div className="flex items-center gap-1.5 text-sm text-green-700">
           <Tag className="h-3.5 w-3.5" />
           <span className="font-medium">{ticket.coupon.code}</span>
+          {ticket.coupon.isAutoApplied && (
+            <span className="text-[10px] text-green-500">(auto)</span>
+          )}
           <span className="text-green-600">
             -${ticket.coupon.discount.toFixed(2)}
           </span>

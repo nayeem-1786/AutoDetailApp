@@ -29,6 +29,7 @@ export type ConsentAction = 'opt_in' | 'opt_out';
 export type ConsentSource = 'pos' | 'online' | 'portal' | 'import' | 'manual';
 export type PrerequisiteEnforcement = 'required_same_ticket' | 'required_history' | 'recommended';
 export type EmployeeStatus = 'active' | 'inactive' | 'terminated';
+export type CustomerType = 'enthusiast' | 'professional';
 
 // Row types for each table
 
@@ -67,6 +68,7 @@ export interface Customer {
   zip: string | null;
   notes: string | null;
   tags: string[];
+  customer_type: CustomerType | null;
   sms_consent: boolean;
   email_consent: boolean;
   first_visit_date: string | null;
@@ -393,6 +395,7 @@ export interface Coupon {
   use_count: number;
   max_uses: number | null;
   expires_at: string | null;
+  target_customer_type: CustomerType | null;
   campaign_id: string | null;
   created_at: string;
   updated_at: string;

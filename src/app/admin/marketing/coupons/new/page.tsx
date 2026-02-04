@@ -306,6 +306,7 @@ export default function NewCouponPage() {
   const [autoApply, setAutoApply] = useState(false);
 
   // Step 2: Targeting
+  const [targetCustomerType, setTargetCustomerType] = useState<string>('');
   const [targeting, setTargeting] = useState<Targeting>('everyone');
   const [customerId, setCustomerId] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null);
@@ -413,6 +414,7 @@ export default function NewCouponPage() {
           setAutoGenerate(false);
         }
         setAutoApply(c.auto_apply || false);
+        setTargetCustomerType(c.target_customer_type || '');
 
         // Targeting
         if (c.customer_id) {
@@ -723,6 +725,7 @@ export default function NewCouponPage() {
       // and PATCH leaves the existing code untouched.
       ...(!autoGenerate ? { code: code.trim() } : {}),
       auto_apply: autoApply,
+      target_customer_type: targetCustomerType || null,
       customer_id: targeting === 'customer' ? customerId : null,
       customer_tags: targeting === 'group' ? customerTags : null,
       tag_match_mode: tagMatchMode,
@@ -917,15 +920,20 @@ export default function NewCouponPage() {
   // -------------------------------------------------------------------------
 
   function describeTargeting(): string {
-    if (targeting === 'everyone') return 'Everyone';
-    if (targeting === 'customer') {
-      return selectedCustomer ? selectedCustomer.name : 'Specific customer (not selected)';
+    let desc = '';
+    if (targeting === 'everyone') desc = 'Everyone';
+    else if (targeting === 'customer') {
+      desc = selectedCustomer ? selectedCustomer.name : 'Specific customer (not selected)';
+    } else if (targeting === 'group') {
+      if (customerTags.length === 0) desc = 'Customer group (no tags set)';
+      else desc = `Customers tagged [${customerTags.join(', ')}] (match ${tagMatchMode})`;
+    } else {
+      desc = 'Everyone';
     }
-    if (targeting === 'group') {
-      if (customerTags.length === 0) return 'Customer group (no tags set)';
-      return `Customers tagged [${customerTags.join(', ')}] (match ${tagMatchMode})`;
+    if (targetCustomerType) {
+      desc += ` (${targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Detailer'} only)`;
     }
-    return 'Everyone';
+    return desc;
   }
 
   function describeConditions(): string {
@@ -1226,6 +1234,37 @@ export default function NewCouponPage() {
                     Filter by customer tags
                   </p>
                 </button>
+              </div>
+
+              {/* Customer Type restriction */}
+              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="mb-2 text-sm font-medium text-gray-700">Customer Type</p>
+                <div className="flex gap-2">
+                  {[
+                    { value: '', label: 'Any Type' },
+                    { value: 'enthusiast', label: 'Enthusiast Only' },
+                    { value: 'professional', label: 'Professional Only' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setTargetCustomerType(opt.value)}
+                      className={`flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                        targetCustomerType === opt.value
+                          ? 'bg-gray-900 text-white'
+                          : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {targetCustomerType && (
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    Only customers marked as &ldquo;{targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Detailer'}&rdquo; can use this coupon
+                    (enforcement depends on the Coupon Enforcement setting in Settings).
+                  </p>
+                )}
               </div>
 
               {/* Specific customer picker */}

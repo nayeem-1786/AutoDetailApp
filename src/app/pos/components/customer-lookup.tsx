@@ -22,6 +22,7 @@ interface SearchResult {
   loyalty_points_balance: number;
   visit_count: number;
   tags: string[];
+  customer_type: import('@/lib/supabase/types').CustomerType | null;
 }
 
 export function CustomerLookup({
@@ -116,11 +117,11 @@ export function CustomerLookup({
               <div className="flex items-center gap-2">
                 <CustomerTypeBadge
                   customerId={r.id}
-                  tags={r.tags}
-                  onTypeChanged={(newTags) => {
+                  customerType={r.customer_type}
+                  onTypeChanged={(newType) => {
                     setResults((prev) =>
                       prev.map((item) =>
-                        item.id === r.id ? { ...item, tags: newTags } : item
+                        item.id === r.id ? { ...item, customer_type: newType } : item
                       )
                     );
                   }}

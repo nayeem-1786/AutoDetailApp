@@ -97,6 +97,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   );
 
   // Audience filters
+  const [customerType, setCustomerType] = useState(String(initFilters.customer_type ?? ''));
   const [lastService, setLastService] = useState(String(initFilters.last_service ?? ''));
   const [daysSinceVisitMin, setDaysSinceVisitMin] = useState(
     initFilters.days_since_visit_min != null ? String(initFilters.days_since_visit_min) : ''
@@ -157,6 +158,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
 
   const buildFilters = useCallback(() => {
     const filters: Record<string, unknown> = {};
+    if (customerType) filters.customer_type = customerType;
     if (lastService) filters.last_service = lastService;
     const parsedMin = daysSinceVisitMin ? parseInt(daysSinceVisitMin) : NaN;
     if (parsedMin > 0) filters.days_since_visit_min = parsedMin;
@@ -166,7 +168,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
     const parsedSpend = minSpend ? parseFloat(minSpend) : NaN;
     if (parsedSpend > 0) filters.min_spend = parsedSpend;
     return filters;
-  }, [lastService, daysSinceVisitMin, daysSinceVisitMax, vehicleType, minSpend]);
+  }, [customerType, lastService, daysSinceVisitMin, daysSinceVisitMax, vehicleType, minSpend]);
 
   function buildPayload() {
     return {
@@ -582,6 +584,17 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 md:grid-cols-2">
+              <FormField label="Customer Type" htmlFor="customer_type">
+                <Select
+                  id="customer_type"
+                  value={customerType}
+                  onChange={(e) => setCustomerType(e.target.value)}
+                >
+                  <option value="">Any</option>
+                  <option value="enthusiast">Enthusiast</option>
+                  <option value="professional">Professional</option>
+                </Select>
+              </FormField>
               <FormField label="Last Service" htmlFor="last_service">
                 <Select
                   id="last_service"

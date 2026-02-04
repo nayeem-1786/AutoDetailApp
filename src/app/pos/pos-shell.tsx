@@ -42,7 +42,7 @@ export function clearPosSession() {
 }
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
-  const { employee, role, loading, signOut } = useAuth();
+  const { employee, role, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [clock, setClock] = useState('');
@@ -83,12 +83,13 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     }
   }, [loading, checkingSession, employee, posAuthenticated, router]);
 
-  // Idle timeout — reset on user activity, sign out when expired
+  // Idle timeout — lock POS screen without destroying the Supabase auth session.
+  // The next PIN login will sign out and create a fresh session for that employee.
   const handleIdleTimeout = useCallback(() => {
     clearPosSession();
-    signOut();
+    setPosAuthenticated(false);
     router.replace('/pos/login');
-  }, [signOut, router]);
+  }, [router]);
 
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current) {

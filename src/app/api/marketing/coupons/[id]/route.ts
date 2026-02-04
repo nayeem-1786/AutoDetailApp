@@ -70,6 +70,7 @@ export async function PATCH(
       'customer_id',
       'customer_tags',
       'tag_match_mode',
+      'target_customer_type',
       'condition_logic',
       'requires_product_ids',
       'requires_service_ids',

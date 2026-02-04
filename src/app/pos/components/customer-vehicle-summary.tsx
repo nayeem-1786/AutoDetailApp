@@ -4,7 +4,7 @@ import { User, Car, X, ChevronRight } from 'lucide-react';
 import { formatPhone } from '@/lib/utils/format';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import { CustomerTypeBadge } from './customer-type-badge';
-import type { Customer, Vehicle } from '@/lib/supabase/types';
+import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
 interface CustomerVehicleSummaryProps {
   customer: Customer | null;
@@ -12,7 +12,7 @@ interface CustomerVehicleSummaryProps {
   onChangeCustomer: () => void;
   onChangeVehicle: () => void;
   onClear: () => void;
-  onCustomerTagsChanged?: (newTags: string[]) => void;
+  onCustomerTypeChanged?: (newType: CustomerType | null) => void;
 }
 
 export function CustomerVehicleSummary({
@@ -21,10 +21,10 @@ export function CustomerVehicleSummary({
   onChangeCustomer,
   onChangeVehicle,
   onClear,
-  onCustomerTagsChanged,
+  onCustomerTypeChanged,
 }: CustomerVehicleSummaryProps) {
   if (!customer) {
-    // Guest state — show "Add Customer" button
+    // Guest state -- show "Add Customer" button
     return (
       <button
         onClick={onChangeCustomer}
@@ -67,8 +67,8 @@ export function CustomerVehicleSummary({
           </button>
           <CustomerTypeBadge
             customerId={customer.id}
-            tags={customer.tags}
-            onTypeChanged={onCustomerTagsChanged}
+            customerType={customer.customer_type}
+            onTypeChanged={onCustomerTypeChanged}
           />
         </div>
         <button

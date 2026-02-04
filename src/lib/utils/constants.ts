@@ -32,6 +32,12 @@ export const BUSINESS = {
   PHONE: '+13109990000',
 } as const;
 
+// Customer type labels
+export const CUSTOMER_TYPE_LABELS: Record<string, string> = {
+  enthusiast: 'Enthusiast',
+  professional: 'Professional',
+} as const;
+
 // Vehicle size class labels
 export const VEHICLE_SIZE_LABELS: Record<string, string> = {
   sedan: 'Sedan',

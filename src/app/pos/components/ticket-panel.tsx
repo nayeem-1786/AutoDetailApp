@@ -25,7 +25,8 @@ import { VehicleSelector } from './vehicle-selector';
 import { VehicleCreateDialog } from './vehicle-create-dialog';
 import { CouponInput } from './coupon-input';
 import { LoyaltyPanel } from './loyalty-panel';
-import type { Customer, Vehicle } from '@/lib/supabase/types';
+import { CustomerTypePrompt } from './customer-type-prompt';
+import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
 interface TicketPanelProps {
   customerLookupOpen: boolean;
@@ -41,6 +42,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
   const [discountValue, setDiscountValue] = useState('');
   const [discountLabel, setDiscountLabel] = useState('');
@@ -48,6 +50,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   function handleSelectCustomer(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
     onCustomerLookupChange(false);
+    // Prompt for customer type if unknown
+    if (!customer.customer_type) {
+      setShowTypePrompt(true);
+    }
     // Open vehicle selector for the new customer
     setShowVehicleSelector(true);
   }
@@ -61,6 +67,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   function handleCustomerCreated(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
     setShowCustomerCreate(false);
+    // Prompt for customer type if unknown
+    if (!customer.customer_type) {
+      setShowTypePrompt(true);
+    }
     // Open vehicle selector for newly created customer
     setShowVehicleSelector(true);
   }
@@ -92,9 +102,9 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     dispatch({ type: 'SET_VEHICLE', vehicle: null });
   }
 
-  function handleCustomerTagsChanged(newTags: string[]) {
+  function handleCustomerTypeChanged(newType: CustomerType | null) {
     if (ticket.customer) {
-      dispatch({ type: 'SET_CUSTOMER', customer: { ...ticket.customer, tags: newTags } });
+      dispatch({ type: 'SET_CUSTOMER', customer: { ...ticket.customer, customer_type: newType } });
     }
   }
 
@@ -143,7 +153,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
             }
           }}
           onClear={handleClearCustomer}
-          onCustomerTagsChanged={handleCustomerTagsChanged}
+          onCustomerTypeChanged={handleCustomerTypeChanged}
         />
       </div>
 
@@ -359,6 +369,21 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           onClose={() => setShowVehicleCreate(false)}
           customerId={ticket.customer.id}
           onCreated={handleVehicleCreated}
+        />
+      )}
+
+      {/* Customer Type Prompt — shown when customer type is unknown */}
+      {ticket.customer && (
+        <CustomerTypePrompt
+          open={showTypePrompt}
+          onOpenChange={setShowTypePrompt}
+          customerId={ticket.customer.id}
+          customerName={`${ticket.customer.first_name} ${ticket.customer.last_name}`}
+          onTypeSelected={(newType) => {
+            if (newType && ticket.customer) {
+              dispatch({ type: 'SET_CUSTOMER', customer: { ...ticket.customer, customer_type: newType } });
+            }
+          }}
         />
       )}
     </div>

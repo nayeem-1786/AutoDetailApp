@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { bookingCustomerSchema, bookingVehicleSchema, type BookingCustomerInput, type BookingVehicleInput } from '@/lib/utils/validation';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
-import type { VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
+import type { VehicleSizeClass, VehicleType, CustomerType } from '@/lib/supabase/types';
 import { z } from 'zod';
 
 interface SavedVehicle {
@@ -35,7 +36,7 @@ interface StepCustomerInfoProps {
   requireSizeClass: boolean;
   initialSizeClass: VehicleSizeClass | null;
   savedVehicles?: SavedVehicle[];
-  onContinue: (customer: BookingCustomerInput, vehicle: BookingVehicleInput) => void;
+  onContinue: (customer: BookingCustomerInput, vehicle: BookingVehicleInput, customerType?: CustomerType | null) => void;
   onBack: () => void;
 }
 
@@ -74,6 +75,8 @@ export function StepCustomerInfo({
     },
   });
 
+  const [customerType, setCustomerType] = useState<CustomerType | null>(null);
+
   const vehicleType = watch('vehicle.vehicle_type');
   const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[vehicleType] ?? [];
 
@@ -87,7 +90,7 @@ export function StepCustomerInfo({
   }
 
   function onSubmit(data: CustomerInfoFormData) {
-    onContinue(data.customer, data.vehicle);
+    onContinue(data.customer, data.vehicle, customerType);
   }
 
   return (
@@ -162,6 +165,37 @@ export function StepCustomerInfo({
               {...register('customer.email')}
             />
           </FormField>
+        </div>
+
+        {/* Customer type toggle */}
+        <div className="mt-4 sm:col-span-2">
+          <p className="mb-2 text-sm font-medium text-gray-700">
+            I&apos;m a... <span className="font-normal text-gray-400">(optional)</span>
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomerType(customerType === 'enthusiast' ? null : 'enthusiast')}
+              className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                customerType === 'enthusiast'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Car Enthusiast
+            </button>
+            <button
+              type="button"
+              onClick={() => setCustomerType(customerType === 'professional' ? null : 'professional')}
+              className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                customerType === 'professional'
+                  ? 'border-purple-600 bg-purple-50 text-purple-700'
+                  : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Professional
+            </button>
+          </div>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-const CUSTOMER_TYPES = ['enthusiast', 'detailer'] as const;
+const CUSTOMER_TYPES = ['enthusiast', 'professional'] as const;
 
 export async function PATCH(
   request: NextRequest,
@@ -28,30 +28,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch current tags
-    const { data: customer, error: fetchError } = await supabase
-      .from('customers')
-      .select('tags')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !customer) {
-      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
-    }
-
-    // Remove any existing customer type tags, then add the new one
-    const currentTags: string[] = Array.isArray(customer.tags) ? customer.tags : [];
-    const filteredTags = currentTags.filter(
-      (t: string) => !CUSTOMER_TYPES.includes(t as typeof CUSTOMER_TYPES[number])
-    );
-
-    const newTags = customer_type ? [...filteredTags, customer_type] : filteredTags;
-
+    // Update customer_type column directly
     const { data: updated, error: updateError } = await supabase
       .from('customers')
-      .update({ tags: newTags })
+      .update({ customer_type })
       .eq('id', id)
-      .select('id, tags')
+      .select('id, customer_type')
       .single();
 
     if (updateError) {
@@ -60,6 +42,10 @@ export async function PATCH(
         { error: 'Failed to update customer type' },
         { status: 500 }
       );
+    }
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
     return NextResponse.json({ data: updated });

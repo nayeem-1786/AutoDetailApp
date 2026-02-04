@@ -15,13 +15,15 @@ import { ServicePricingPicker } from './service-pricing-picker';
 import { TicketPanel } from './ticket-panel';
 import { RegisterTab } from './register-tab';
 import { CatalogBrowser } from './catalog-browser';
+import { PromotionsTab } from './promotions-tab';
 
-type PosTab = 'register' | 'products' | 'services';
+type PosTab = 'register' | 'products' | 'services' | 'promotions';
 
 const TABS: { key: PosTab; label: string }[] = [
   { key: 'register', label: 'Register' },
   { key: 'products', label: 'Products' },
   { key: 'services', label: 'Services' },
+  { key: 'promotions', label: 'Promos' },
 ];
 
 export function PosWorkspace() {
@@ -147,7 +149,13 @@ export function PosWorkspace() {
             {TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => { setTab(t.key); setSearch(''); }}
+                onClick={() => {
+                  if (t.key === 'promotions' && !ticket.customer) {
+                    setShowCustomerLookup(true);
+                  }
+                  setTab(t.key);
+                  setSearch('');
+                }}
                 className={cn(
                   'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all',
                   tab === t.key
@@ -200,6 +208,10 @@ export function PosWorkspace() {
             <CatalogBrowser key="products" type="products" search={search} />
           ) : tab === 'services' ? (
             <CatalogBrowser key="services" type="services" search={search} />
+          ) : tab === 'promotions' ? (
+            <PromotionsTab
+              onOpenCustomerLookup={() => setShowCustomerLookup(true)}
+            />
           ) : null}
         </div>
       </div>

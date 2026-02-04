@@ -50,7 +50,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User } from 'lucide-react';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -510,11 +510,10 @@ export default function CustomerProfilePage() {
             {customer.first_name} {customer.last_name}
             <CustomerTypeBadge
               customerId={customer.id}
-              tags={customer.tags}
+              customerType={customer.customer_type}
               size="md"
-              onTypeChanged={(newTags) => {
-                setCustomer((prev) => prev ? { ...prev, tags: newTags } : prev);
-                reset((prev) => ({ ...prev, tags: newTags }));
+              onTypeChanged={(newType) => {
+                setCustomer((prev) => prev ? { ...prev, customer_type: newType } : prev);
               }}
             />
           </span>
@@ -571,6 +570,60 @@ export default function CustomerProfilePage() {
                   <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
                     <Input id="birthday" type="date" {...register('birthday')} />
                   </FormField>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Customer Type
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-3 text-sm text-gray-500">
+                  Classify this customer to target promotions and coupons by type.
+                </p>
+                <div className="flex gap-2">
+                  {([null, 'enthusiast', 'professional'] as const).map((type) => {
+                    const isActive = customer.customer_type === type;
+                    const label = type === null ? 'Unknown' : type === 'enthusiast' ? 'Enthusiast' : 'Professional';
+                    const activeClass =
+                      type === null
+                        ? 'border-gray-400 bg-gray-50 text-gray-700'
+                        : type === 'enthusiast'
+                          ? 'border-blue-400 bg-blue-50 text-blue-700'
+                          : 'border-purple-400 bg-purple-50 text-purple-700';
+                    return (
+                      <button
+                        key={type ?? 'none'}
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/pos/customers/${customer.id}/type`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ customer_type: type }),
+                            });
+                            const json = await res.json();
+                            if (!res.ok) throw new Error(json.error || 'Failed to update');
+                            setCustomer((prev) => prev ? { ...prev, customer_type: json.data?.customer_type ?? type } : prev);
+                            toast.success(type ? `Marked as ${label}` : 'Customer type cleared');
+                          } catch {
+                            toast.error('Failed to update customer type');
+                          }
+                        }}
+                        className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                          isActive
+                            ? activeClass
+                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

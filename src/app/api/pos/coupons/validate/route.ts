@@ -210,6 +210,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 6c. Check customer_type targeting
+    let customerTypeWarning: string | null = null;
+    if (coupon.target_customer_type) {
+      if (!customer_id) {
+        return NextResponse.json(
+          { error: 'A customer account is required to use this coupon' },
+          { status: 400 }
+        );
+      }
+
+      // Fetch customer's type (reuse existing customer data if already fetched above, otherwise fetch)
+      const { data: typeCustomer } = await supabase
+        .from('customers')
+        .select('customer_type')
+        .eq('id', customer_id)
+        .single();
+
+      const customerType = typeCustomer?.customer_type || null;
+
+      if (customerType !== coupon.target_customer_type) {
+        const typeLabel = coupon.target_customer_type === 'enthusiast' ? 'Enthusiast' : 'Detailer';
+
+        // Check enforcement mode
+        const { data: enforcementSetting } = await supabase
+          .from('business_settings')
+          .select('value')
+          .eq('key', 'coupon_type_enforcement')
+          .single();
+
+        const enforcementMode = typeof enforcementSetting?.value === 'string'
+          ? enforcementSetting.value
+          : 'soft';
+
+        if (enforcementMode === 'hard') {
+          return NextResponse.json(
+            { error: `This coupon is for ${typeLabel} customers` },
+            { status: 400 }
+          );
+        }
+
+        // Soft mode: allow but set warning
+        customerTypeWarning = `This coupon is intended for ${typeLabel} customers`;
+      }
+    }
+
     // 7. Check conditions using condition_logic
     const conditionLogic: 'and' | 'or' = coupon.condition_logic || 'and';
     const cartItems: CartItem[] = items || [];
@@ -490,6 +535,7 @@ export async function POST(request: NextRequest) {
         rewards: rewardResults,
         total_discount: totalDiscount,
         description,
+        ...(customerTypeWarning ? { warning: customerTypeWarning } : {}),
       },
     });
   } catch (err) {

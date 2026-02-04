@@ -18,7 +18,7 @@ import { clearPosSession } from '../pos-shell';
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { employee, signOut } = useAuth();
+  const { employee } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
@@ -61,9 +61,8 @@ export function BottomNav() {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  async function handleLogout() {
+  function handleLogout() {
     clearPosSession();
-    await signOut();
     router.replace('/pos/login');
   }
 

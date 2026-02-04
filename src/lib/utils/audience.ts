@@ -12,6 +12,7 @@ export interface AudienceFilters {
   tags?: string[];
   has_email?: boolean;
   has_phone?: boolean;
+  customer_type?: 'enthusiast' | 'professional';
 }
 
 export interface AudienceResult {
@@ -47,6 +48,11 @@ function applyFilters(
   // Filter: tags (contains all)
   if (filters.tags && filters.tags.length > 0) {
     query = query.contains('tags', filters.tags);
+  }
+
+  // Filter: customer_type
+  if (filters.customer_type) {
+    query = query.eq('customer_type', filters.customer_type);
   }
 
   // Filter: has_email / has_phone

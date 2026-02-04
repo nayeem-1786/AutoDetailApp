@@ -33,7 +33,7 @@ export interface TicketState {
   items: TicketItem[];
   customer: Customer | null;
   vehicle: Vehicle | null;
-  coupon: { id: string; code: string; discount: number } | null;
+  coupon: { id: string; code: string; discount: number; isAutoApplied?: boolean } | null;
   loyaltyPointsToRedeem: number;
   loyaltyDiscount: number;
   manualDiscount: { type: 'dollar' | 'percent'; value: number; label: string } | null;
@@ -56,7 +56,7 @@ export type TicketAction =
   | { type: 'SET_CUSTOMER'; customer: Customer | null }
   | { type: 'SET_VEHICLE'; vehicle: Vehicle | null }
   | { type: 'RECALCULATE_VEHICLE_PRICES'; vehicle: Vehicle | null; services: Service[] }
-  | { type: 'SET_COUPON'; coupon: { id: string; code: string; discount: number } | null }
+  | { type: 'SET_COUPON'; coupon: { id: string; code: string; discount: number; isAutoApplied?: boolean } | null }
   | { type: 'SET_LOYALTY_REDEEM'; points: number; discount: number }
   | { type: 'SET_NOTES'; notes: string | null }
   | { type: 'UPDATE_ITEM_NOTE'; itemId: string; note: string | null }

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     // Search by phone — partial match on last digits
     const { data: customers, error } = await supabase
       .from('customers')
-      .select('id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags')
+      .select('id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags, customer_type')
       .like('phone', `%${digits}`)
       .order('last_name')
       .limit(10);

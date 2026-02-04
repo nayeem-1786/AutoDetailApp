@@ -223,6 +223,7 @@ export const couponSchema = z.object({
   customer_id: z.string().uuid().optional().nullable(),
   customer_tags: z.array(z.string()).optional().nullable(),
   tag_match_mode: z.enum(['any', 'all']).default('any'),
+  target_customer_type: z.enum(['enthusiast', 'professional']).optional().nullable(),
   // Conditions (IF)
   condition_logic: z.enum(['and', 'or']).default('and'),
   requires_product_ids: z.array(z.string().uuid()).optional().nullable(),

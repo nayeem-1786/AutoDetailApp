@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatPhoneInput } from '@/lib/utils/format';
-import type { Customer } from '@/lib/supabase/types';
+import type { Customer, CustomerType } from '@/lib/supabase/types';
 
 interface CustomerCreateDialogProps {
   open: boolean;
@@ -22,6 +22,12 @@ interface CustomerCreateDialogProps {
   onCreated: (customer: Customer) => void;
   onBack?: () => void;
 }
+
+const TYPE_OPTIONS: { value: CustomerType | null; label: string; activeClass: string }[] = [
+  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'bg-blue-600 text-white border-blue-600' },
+  { value: 'professional', label: 'Professional', activeClass: 'bg-purple-600 text-white border-purple-600' },
+  { value: null, label: 'Unknown', activeClass: 'bg-gray-900 text-white border-gray-900' },
+];
 
 export function CustomerCreateDialog({
   open,
@@ -32,6 +38,7 @@ export function CustomerCreateDialog({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [customerType, setCustomerType] = useState<CustomerType | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -51,6 +58,7 @@ export function CustomerCreateDialog({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           phone,
+          customer_type: customerType,
         }),
       });
 
@@ -75,6 +83,7 @@ export function CustomerCreateDialog({
     setFirstName('');
     setLastName('');
     setPhone('');
+    setCustomerType(null);
     onClose();
   }
 
@@ -82,6 +91,7 @@ export function CustomerCreateDialog({
     setFirstName('');
     setLastName('');
     setPhone('');
+    setCustomerType(null);
     onBack?.();
   }
 
@@ -136,6 +146,27 @@ export function CustomerCreateDialog({
               onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
               placeholder="(310) 555-0123"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Customer Type
+            </label>
+            <div className="flex gap-2">
+              {TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setCustomerType(opt.value)}
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    customerType === opt.value
+                      ? opt.activeClass
+                      : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </DialogContent>
         <DialogFooter>

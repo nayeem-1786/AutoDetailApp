@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { first_name, last_name, phone } = body;
+    const { first_name, last_name, phone, customer_type } = body;
 
     if (!first_name || !last_name || !phone) {
       return NextResponse.json(
@@ -44,12 +44,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate customer_type if provided
+    const validTypes = ['enthusiast', 'professional'];
+    const resolvedType = customer_type && validTypes.includes(customer_type) ? customer_type : null;
+
     const { data: customer, error } = await supabase
       .from('customers')
       .insert({
         first_name: first_name.trim(),
         last_name: last_name.trim(),
         phone: normalizedPhone,
+        ...(resolvedType ? { customer_type: resolvedType } : {}),
       })
       .select('*')
       .single();

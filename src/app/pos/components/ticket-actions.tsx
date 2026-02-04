@@ -7,12 +7,14 @@ import { PauseCircle } from 'lucide-react';
 import { useTicket } from '../context/ticket-context';
 import { useCheckout } from '../context/checkout-context';
 import { useHeldTickets } from '../context/held-tickets-context';
+import { CustomerTypePrompt } from './customer-type-prompt';
 
 export function TicketActions() {
   const { ticket, dispatch } = useTicket();
   const { openCheckout } = useCheckout();
   const { holdTicket } = useHeldTickets();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [showTypePrompt, setShowTypePrompt] = useState(false);
 
   const hasItems = ticket.items.length > 0;
 
@@ -57,11 +59,34 @@ export function TicketActions() {
         <Button
           className="flex-1 bg-green-600 hover:bg-green-700"
           disabled={!hasItems}
-          onClick={openCheckout}
+          onClick={() => {
+            if (ticket.customer && !ticket.customer.customer_type) {
+              setShowTypePrompt(true);
+            } else {
+              openCheckout();
+            }
+          }}
         >
           Checkout
         </Button>
       </div>
+
+      {/* Customer Type Prompt at checkout */}
+      {ticket.customer && (
+        <CustomerTypePrompt
+          open={showTypePrompt}
+          onOpenChange={setShowTypePrompt}
+          customerId={ticket.customer.id}
+          customerName={`${ticket.customer.first_name} ${ticket.customer.last_name}`}
+          onTypeSelected={(newType) => {
+            if (newType && ticket.customer) {
+              dispatch({ type: 'SET_CUSTOMER', customer: { ...ticket.customer, customer_type: newType } });
+            }
+            // Proceed to checkout after type selection or skip
+            openCheckout();
+          }}
+        />
+      )}
 
       {/* Clear Ticket Confirmation Modal */}
       {confirmClearOpen && (
