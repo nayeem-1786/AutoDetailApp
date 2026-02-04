@@ -216,42 +216,46 @@ export async function POST(request: NextRequest) {
 
     const conditions: boolean[] = [];
 
-    if (coupon.requires_product_id) {
+    if (coupon.requires_product_ids && coupon.requires_product_ids.length > 0) {
       conditions.push(
         cartItems.some(
           (item) =>
             item.item_type === 'product' &&
-            item.product_id === coupon.requires_product_id
+            item.product_id &&
+            coupon.requires_product_ids.includes(item.product_id)
         )
       );
     }
 
-    if (coupon.requires_service_id) {
+    if (coupon.requires_service_ids && coupon.requires_service_ids.length > 0) {
       conditions.push(
         cartItems.some(
           (item) =>
             item.item_type === 'service' &&
-            item.service_id === coupon.requires_service_id
+            item.service_id &&
+            coupon.requires_service_ids.includes(item.service_id)
         )
       );
     }
 
-    if (coupon.requires_product_category_id) {
+    if (coupon.requires_product_category_ids && coupon.requires_product_category_ids.length > 0) {
       conditions.push(
         cartItems.some(
           (item) =>
             item.item_type === 'product' &&
-            item.category_id === coupon.requires_product_category_id
+            item.category_id &&
+            coupon.requires_product_category_ids.includes(item.category_id)
         )
       );
     }
 
-    if (coupon.requires_service_category_id) {
+    if (coupon.requires_service_category_ids && coupon.requires_service_category_ids.length > 0) {
       conditions.push(
         cartItems.some(
           (item) =>
             item.item_type === 'service' &&
-            item.category_id === coupon.requires_service_category_id
+            item.category_id &&
+            coupon.requires_service_category_ids.includes(item.category_id)
         )
       );
     }
@@ -271,61 +275,91 @@ export async function POST(request: NextRequest) {
         const failedParts: string[] = [];
 
         if (
-          coupon.requires_product_id &&
+          coupon.requires_product_ids &&
+          coupon.requires_product_ids.length > 0 &&
           !cartItems.some(
             (i) =>
               i.item_type === 'product' &&
-              i.product_id === coupon.requires_product_id
+              i.product_id &&
+              coupon.requires_product_ids.includes(i.product_id)
           )
         ) {
-          const { data: p } = await supabase
+          const { data: prods } = await supabase
             .from('products')
             .select('name')
-            .eq('id', coupon.requires_product_id)
-            .single();
-          failedParts.push(
-            `purchase of ${p?.name || 'a specific product'}`
-          );
+            .in('id', coupon.requires_product_ids);
+          const names = prods?.map((p: { name: string }) => p.name) || [];
+          if (names.length > 1) {
+            failedParts.push(`purchase of one of: ${names.join(', ')}`);
+          } else {
+            failedParts.push(`purchase of ${names[0] || 'a specific product'}`);
+          }
         }
 
         if (
-          coupon.requires_service_id &&
+          coupon.requires_service_ids &&
+          coupon.requires_service_ids.length > 0 &&
           !cartItems.some(
             (i) =>
               i.item_type === 'service' &&
-              i.service_id === coupon.requires_service_id
+              i.service_id &&
+              coupon.requires_service_ids.includes(i.service_id)
           )
         ) {
-          const { data: s } = await supabase
+          const { data: svcs } = await supabase
             .from('services')
             .select('name')
-            .eq('id', coupon.requires_service_id)
-            .single();
-          failedParts.push(
-            `purchase of ${s?.name || 'a specific service'}`
-          );
+            .in('id', coupon.requires_service_ids);
+          const names = svcs?.map((s: { name: string }) => s.name) || [];
+          if (names.length > 1) {
+            failedParts.push(`purchase of one of: ${names.join(', ')}`);
+          } else {
+            failedParts.push(`purchase of ${names[0] || 'a specific service'}`);
+          }
         }
 
         if (
-          coupon.requires_product_category_id &&
+          coupon.requires_product_category_ids &&
+          coupon.requires_product_category_ids.length > 0 &&
           !cartItems.some(
             (i) =>
               i.item_type === 'product' &&
-              i.category_id === coupon.requires_product_category_id
+              i.category_id &&
+              coupon.requires_product_category_ids.includes(i.category_id)
           )
         ) {
-          failedParts.push('a product from the required category');
+          const { data: cats } = await supabase
+            .from('product_categories')
+            .select('name')
+            .in('id', coupon.requires_product_category_ids);
+          const names = cats?.map((c: { name: string }) => c.name) || [];
+          if (names.length > 1) {
+            failedParts.push(`a product from one of: ${names.join(', ')}`);
+          } else {
+            failedParts.push(`a product from the ${names[0] || 'required'} category`);
+          }
         }
 
         if (
-          coupon.requires_service_category_id &&
+          coupon.requires_service_category_ids &&
+          coupon.requires_service_category_ids.length > 0 &&
           !cartItems.some(
             (i) =>
               i.item_type === 'service' &&
-              i.category_id === coupon.requires_service_category_id
+              i.category_id &&
+              coupon.requires_service_category_ids.includes(i.category_id)
           )
         ) {
-          failedParts.push('a service from the required category');
+          const { data: cats } = await supabase
+            .from('service_categories')
+            .select('name')
+            .in('id', coupon.requires_service_category_ids);
+          const names = cats?.map((c: { name: string }) => c.name) || [];
+          if (names.length > 1) {
+            failedParts.push(`a service from one of: ${names.join(', ')}`);
+          } else {
+            failedParts.push(`a service from the ${names[0] || 'required'} category`);
+          }
         }
 
         if (coupon.min_purchase != null && subtotal < coupon.min_purchase) {

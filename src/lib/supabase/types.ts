@@ -382,10 +382,10 @@ export interface Coupon {
   tag_match_mode: TagMatchMode;
   // Conditions (IF)
   condition_logic: ConditionLogic;
-  requires_product_id: string | null;
-  requires_service_id: string | null;
-  requires_product_category_id: string | null;
-  requires_service_category_id: string | null;
+  requires_product_ids: string[] | null;
+  requires_service_ids: string[] | null;
+  requires_product_category_ids: string[] | null;
+  requires_service_category_ids: string[] | null;
   min_purchase: number | null;
   // Constraints
   is_single_use: boolean;

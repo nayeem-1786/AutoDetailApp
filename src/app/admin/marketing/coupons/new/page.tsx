@@ -161,6 +161,121 @@ function SearchableSelect({
 }
 
 // ---------------------------------------------------------------------------
+// Multi Searchable Select (select multiple items as chips)
+// ---------------------------------------------------------------------------
+
+function MultiSearchableSelect({
+  items,
+  values,
+  onChange,
+  placeholder = 'Search...',
+}: {
+  items: SearchableSelectItem[];
+  values: string[];
+  onChange: (ids: string[]) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedItems = values
+    .map((v) => items.find((i) => i.id === v))
+    .filter(Boolean) as SearchableSelectItem[];
+
+  const available = items.filter(
+    (i) =>
+      !values.includes(i.id) &&
+      (i.label.toLowerCase().includes(query.toLowerCase()) ||
+        (i.sublabel && i.sublabel.toLowerCase().includes(query.toLowerCase())))
+  );
+
+  function addItem(id: string) {
+    onChange([...values, id]);
+    setQuery('');
+  }
+
+  function removeItem(id: string) {
+    onChange(values.filter((v) => v !== id));
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      {/* Selected chips */}
+      {selectedItems.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {selectedItems.map((item) => (
+            <span
+              key={item.id}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
+            >
+              {item.label}
+              <button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                className="rounded-full p-0.5 hover:bg-gray-200"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Search input */}
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
+        placeholder={placeholder}
+        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+      />
+
+      {/* Dropdown */}
+      {open && available.length > 0 && (
+        <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+          {available.slice(0, 50).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => { addItem(item.id); }}
+              className="flex w-full flex-col px-3 py-2 text-left hover:bg-gray-50"
+            >
+              <span className="text-sm font-medium text-gray-900">{item.label}</span>
+              {item.sublabel && (
+                <span className="text-xs text-gray-500">{item.sublabel}</span>
+              )}
+            </button>
+          ))}
+          {available.length > 50 && (
+            <p className="px-3 py-2 text-xs text-gray-400">
+              {available.length - 50} more results — refine your search
+            </p>
+          )}
+        </div>
+      )}
+      {open && available.length === 0 && query && (
+        <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white p-3 shadow-lg">
+          <p className="text-sm text-gray-500">No results found</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -206,10 +321,10 @@ export default function NewCouponPage() {
   // Step 3: Conditions
   const [hasConditions, setHasConditions] = useState(false);
   const [conditionLogic, setConditionLogic] = useState<ConditionLogic>('and');
-  const [requiresProductId, setRequiresProductId] = useState('');
-  const [requiresServiceId, setRequiresServiceId] = useState('');
-  const [requiresProductCategoryId, setRequiresProductCategoryId] = useState('');
-  const [requiresServiceCategoryId, setRequiresServiceCategoryId] = useState('');
+  const [requiresProductIds, setRequiresProductIds] = useState<string[]>([]);
+  const [requiresServiceIds, setRequiresServiceIds] = useState<string[]>([]);
+  const [requiresProductCategoryIds, setRequiresProductCategoryIds] = useState<string[]>([]);
+  const [requiresServiceCategoryIds, setRequiresServiceCategoryIds] = useState<string[]>([]);
   const [minPurchase, setMinPurchase] = useState('');
   const [showProductCategory, setShowProductCategory] = useState(false);
   const [showServiceCategory, setShowServiceCategory] = useState(false);
@@ -316,16 +431,19 @@ export default function NewCouponPage() {
         }
 
         // Conditions
-        const hasCond = !!(c.requires_product_id || c.requires_service_id ||
-          c.requires_product_category_id || c.requires_service_category_id || c.min_purchase);
+        const hasCond = !!((c.requires_product_ids && c.requires_product_ids.length > 0) ||
+          (c.requires_service_ids && c.requires_service_ids.length > 0) ||
+          (c.requires_product_category_ids && c.requires_product_category_ids.length > 0) ||
+          (c.requires_service_category_ids && c.requires_service_category_ids.length > 0) ||
+          c.min_purchase);
         setHasConditions(hasCond);
         setConditionLogic(c.condition_logic || 'and');
-        setRequiresProductId(c.requires_product_id || '');
-        setRequiresServiceId(c.requires_service_id || '');
-        setRequiresProductCategoryId(c.requires_product_category_id || '');
-        setRequiresServiceCategoryId(c.requires_service_category_id || '');
-        if (c.requires_product_category_id) setShowProductCategory(true);
-        if (c.requires_service_category_id) setShowServiceCategory(true);
+        setRequiresProductIds(c.requires_product_ids || []);
+        setRequiresServiceIds(c.requires_service_ids || []);
+        setRequiresProductCategoryIds(c.requires_product_category_ids || []);
+        setRequiresServiceCategoryIds(c.requires_service_category_ids || []);
+        if (c.requires_product_category_ids && c.requires_product_category_ids.length > 0) setShowProductCategory(true);
+        if (c.requires_service_category_ids && c.requires_service_category_ids.length > 0) setShowServiceCategory(true);
         setMinPurchase(c.min_purchase != null ? String(c.min_purchase) : '');
 
         // Rewards
@@ -401,6 +519,18 @@ export default function NewCouponPage() {
       sublabel: cat?.name || undefined,
     };
   });
+
+  // Build searchable items for product categories
+  const productCategoryItems: SearchableSelectItem[] = productCategories.map((c) => ({
+    id: c.id,
+    label: c.name,
+  }));
+
+  // Build searchable items for service categories
+  const serviceCategoryItems: SearchableSelectItem[] = serviceCategories.map((c) => ({
+    id: c.id,
+    label: c.name,
+  }));
 
   // -------------------------------------------------------------------------
   // Customer search (Step 2)
@@ -591,10 +721,10 @@ export default function NewCouponPage() {
       customer_tags: targeting === 'group' ? customerTags : null,
       tag_match_mode: tagMatchMode,
       condition_logic: conditionLogic,
-      requires_product_id: hasConditions ? requiresProductId || null : null,
-      requires_service_id: hasConditions ? requiresServiceId || null : null,
-      requires_product_category_id: hasConditions ? requiresProductCategoryId || null : null,
-      requires_service_category_id: hasConditions ? requiresServiceCategoryId || null : null,
+      requires_product_ids: hasConditions && requiresProductIds.length > 0 ? requiresProductIds : null,
+      requires_service_ids: hasConditions && requiresServiceIds.length > 0 ? requiresServiceIds : null,
+      requires_product_category_ids: hasConditions && requiresProductCategoryIds.length > 0 ? requiresProductCategoryIds : null,
+      requires_service_category_ids: hasConditions && requiresServiceCategoryIds.length > 0 ? requiresServiceCategoryIds : null,
       min_purchase: hasConditions && minPurchase ? parseFloat(minPurchase) : null,
       is_single_use: isSingleUse,
       max_uses: maxUses ? parseInt(maxUses) : null,
@@ -750,21 +880,49 @@ export default function NewCouponPage() {
     if (!hasConditions) return 'No conditions';
     const parts: string[] = [];
 
-    if (requiresProductId) {
-      const p = products.find((x) => x.id === requiresProductId);
-      parts.push(`requires product "${p?.name || requiresProductId}"`);
+    if (requiresProductIds.length > 0) {
+      const names = requiresProductIds.map((id) => {
+        const p = products.find((x) => x.id === id);
+        return p?.name || id;
+      });
+      if (names.length === 1) {
+        parts.push(`requires product "${names[0]}"`);
+      } else {
+        parts.push(`requires any of products: ${names.join(', ')}`);
+      }
     }
-    if (requiresProductCategoryId) {
-      const c = productCategories.find((x) => x.id === requiresProductCategoryId);
-      parts.push(`requires product category "${c?.name || requiresProductCategoryId}"`);
+    if (requiresProductCategoryIds.length > 0) {
+      const names = requiresProductCategoryIds.map((id) => {
+        const c = productCategories.find((x) => x.id === id);
+        return c?.name || id;
+      });
+      if (names.length === 1) {
+        parts.push(`requires product category "${names[0]}"`);
+      } else {
+        parts.push(`requires any of product categories: ${names.join(', ')}`);
+      }
     }
-    if (requiresServiceId) {
-      const s = services.find((x) => x.id === requiresServiceId);
-      parts.push(`requires service "${s?.name || requiresServiceId}"`);
+    if (requiresServiceIds.length > 0) {
+      const names = requiresServiceIds.map((id) => {
+        const s = services.find((x) => x.id === id);
+        return s?.name || id;
+      });
+      if (names.length === 1) {
+        parts.push(`requires service "${names[0]}"`);
+      } else {
+        parts.push(`requires any of services: ${names.join(', ')}`);
+      }
     }
-    if (requiresServiceCategoryId) {
-      const c = serviceCategories.find((x) => x.id === requiresServiceCategoryId);
-      parts.push(`requires service category "${c?.name || requiresServiceCategoryId}"`);
+    if (requiresServiceCategoryIds.length > 0) {
+      const names = requiresServiceCategoryIds.map((id) => {
+        const c = serviceCategories.find((x) => x.id === id);
+        return c?.name || id;
+      });
+      if (names.length === 1) {
+        parts.push(`requires service category "${names[0]}"`);
+      } else {
+        parts.push(`requires any of service categories: ${names.join(', ')}`);
+      }
     }
     if (minPurchase) {
       parts.push(`minimum purchase $${parseFloat(minPurchase).toFixed(2)}`);
@@ -1269,9 +1427,21 @@ export default function NewCouponPage() {
                 <div className="space-y-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
                   {/* Logic mode */}
                   <div>
-                    <p className="mb-2 text-sm font-medium text-gray-700">
-                      Condition Logic
-                    </p>
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-gray-700">
+                        Condition Logic
+                      </p>
+                      <div className="group relative">
+                        <Info className="h-3.5 w-3.5 cursor-help text-gray-400" />
+                        <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-64 -translate-x-1/2 rounded-md bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                          <p className="font-medium">ALL (AND)</p>
+                          <p className="mt-0.5 text-gray-300">Every condition below must be satisfied for the coupon to apply.</p>
+                          <p className="mt-1.5 font-medium">ANY (OR)</p>
+                          <p className="mt-0.5 text-gray-300">Meeting any single condition is enough for the coupon to apply.</p>
+                          <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1298,99 +1468,111 @@ export default function NewCouponPage() {
                     </div>
                   </div>
 
-                  {/* Requires product */}
+                  {/* Requires product(s) or product category(ies) */}
                   <div>
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-700">
-                        Requires Product
+                        {showProductCategory ? 'Requires Product Category(ies)' : 'Requires Product(s)'}
                       </p>
                       <button
                         type="button"
                         onClick={() => {
                           setShowProductCategory(!showProductCategory);
                           if (!showProductCategory) {
-                            setRequiresProductId('');
+                            setRequiresProductIds([]);
                           } else {
-                            setRequiresProductCategoryId('');
+                            setRequiresProductCategoryIds([]);
                           }
                         }}
                         className="text-xs text-blue-600 hover:text-blue-800"
                       >
                         {showProductCategory
-                          ? 'or choose a specific product'
-                          : 'or choose a category'}
+                          ? 'or choose specific products'
+                          : 'or choose by category'}
                       </button>
                     </div>
                     {!showProductCategory ? (
                       <div className="mt-1">
-                        <SearchableSelect
+                        <MultiSearchableSelect
                           items={productItems}
-                          value={requiresProductId}
-                          onChange={setRequiresProductId}
+                          values={requiresProductIds}
+                          onChange={setRequiresProductIds}
                           placeholder="Search by name, SKU, vendor..."
                         />
+                        {requiresProductIds.length > 1 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Cart must contain ANY one of these products
+                          </p>
+                        )}
                       </div>
                     ) : (
-                      <Select
-                        value={requiresProductCategoryId}
-                        onChange={(e) => setRequiresProductCategoryId(e.target.value)}
-                        className="mt-1"
-                      >
-                        <option value="">No category requirement</option>
-                        {productCategories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </Select>
+                      <div className="mt-1">
+                        <MultiSearchableSelect
+                          items={productCategoryItems}
+                          values={requiresProductCategoryIds}
+                          onChange={setRequiresProductCategoryIds}
+                          placeholder="Search product categories..."
+                        />
+                        {requiresProductCategoryIds.length > 1 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Cart must contain a product from ANY one of these categories
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
 
-                  {/* Requires service */}
+                  {/* Requires service(s) or service category(ies) */}
                   <div>
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-700">
-                        Requires Service
+                        {showServiceCategory ? 'Requires Service Category(ies)' : 'Requires Service(s)'}
                       </p>
                       <button
                         type="button"
                         onClick={() => {
                           setShowServiceCategory(!showServiceCategory);
                           if (!showServiceCategory) {
-                            setRequiresServiceId('');
+                            setRequiresServiceIds([]);
                           } else {
-                            setRequiresServiceCategoryId('');
+                            setRequiresServiceCategoryIds([]);
                           }
                         }}
                         className="text-xs text-blue-600 hover:text-blue-800"
                       >
                         {showServiceCategory
-                          ? 'or choose a specific service'
-                          : 'or choose a category'}
+                          ? 'or choose specific services'
+                          : 'or choose by category'}
                       </button>
                     </div>
                     {!showServiceCategory ? (
                       <div className="mt-1">
-                        <SearchableSelect
+                        <MultiSearchableSelect
                           items={serviceItems}
-                          value={requiresServiceId}
-                          onChange={setRequiresServiceId}
+                          values={requiresServiceIds}
+                          onChange={setRequiresServiceIds}
                           placeholder="Search by name, category..."
                         />
+                        {requiresServiceIds.length > 1 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Cart must contain ANY one of these services
+                          </p>
+                        )}
                       </div>
                     ) : (
-                      <Select
-                        value={requiresServiceCategoryId}
-                        onChange={(e) => setRequiresServiceCategoryId(e.target.value)}
-                        className="mt-1"
-                      >
-                        <option value="">No category requirement</option>
-                        {serviceCategories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </Select>
+                      <div className="mt-1">
+                        <MultiSearchableSelect
+                          items={serviceCategoryItems}
+                          values={requiresServiceCategoryIds}
+                          onChange={setRequiresServiceCategoryIds}
+                          placeholder="Search service categories..."
+                        />
+                        {requiresServiceCategoryIds.length > 1 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Cart must contain a service from ANY one of these categories
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
 

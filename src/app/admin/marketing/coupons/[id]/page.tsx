@@ -166,10 +166,10 @@ export default function CouponDetailPage() {
   function hasConditions(): boolean {
     if (!coupon) return false;
     return !!(
-      coupon.requires_product_id ||
-      coupon.requires_service_id ||
-      coupon.requires_product_category_id ||
-      coupon.requires_service_category_id ||
+      (coupon.requires_product_ids && coupon.requires_product_ids.length > 0) ||
+      (coupon.requires_service_ids && coupon.requires_service_ids.length > 0) ||
+      (coupon.requires_product_category_ids && coupon.requires_product_category_ids.length > 0) ||
+      (coupon.requires_service_category_ids && coupon.requires_service_category_ids.length > 0) ||
       coupon.min_purchase
     );
   }
@@ -323,35 +323,43 @@ export default function CouponDetailPage() {
                     Logic: {coupon.condition_logic === 'and' ? 'ALL conditions must be met (AND)' : 'ANY condition must be met (OR)'}
                   </p>
                   <div className="space-y-2">
-                    {coupon.requires_product_id && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Badge variant="default">Product</Badge>
+                    {coupon.requires_product_ids && coupon.requires_product_ids.length > 0 && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <Badge variant="default" className="mt-0.5 shrink-0">Product</Badge>
                         <span className="text-gray-700">
-                          Requires: {getProductName(coupon.requires_product_id)}
+                          {coupon.requires_product_ids.length === 1
+                            ? `Requires: ${getProductName(coupon.requires_product_ids[0])}`
+                            : `Requires any of: ${coupon.requires_product_ids.map((id) => getProductName(id)).join(', ')}`}
                         </span>
                       </div>
                     )}
-                    {coupon.requires_service_id && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Badge variant="default">Service</Badge>
+                    {coupon.requires_service_ids && coupon.requires_service_ids.length > 0 && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <Badge variant="default" className="mt-0.5 shrink-0">Service</Badge>
                         <span className="text-gray-700">
-                          Requires: {getServiceName(coupon.requires_service_id)}
+                          {coupon.requires_service_ids.length === 1
+                            ? `Requires: ${getServiceName(coupon.requires_service_ids[0])}`
+                            : `Requires any of: ${coupon.requires_service_ids.map((id) => getServiceName(id)).join(', ')}`}
                         </span>
                       </div>
                     )}
-                    {coupon.requires_product_category_id && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Badge variant="default">Product Category</Badge>
+                    {coupon.requires_product_category_ids && coupon.requires_product_category_ids.length > 0 && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <Badge variant="default" className="mt-0.5 shrink-0">Product Category</Badge>
                         <span className="text-gray-700">
-                          Requires: {getProductCategoryName(coupon.requires_product_category_id)}
+                          {coupon.requires_product_category_ids.length === 1
+                            ? `Requires: ${getProductCategoryName(coupon.requires_product_category_ids[0])}`
+                            : `Requires any of: ${coupon.requires_product_category_ids.map((id) => getProductCategoryName(id)).join(', ')}`}
                         </span>
                       </div>
                     )}
-                    {coupon.requires_service_category_id && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Badge variant="default">Service Category</Badge>
+                    {coupon.requires_service_category_ids && coupon.requires_service_category_ids.length > 0 && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <Badge variant="default" className="mt-0.5 shrink-0">Service Category</Badge>
                         <span className="text-gray-700">
-                          Requires: {getServiceCategoryName(coupon.requires_service_category_id)}
+                          {coupon.requires_service_category_ids.length === 1
+                            ? `Requires: ${getServiceCategoryName(coupon.requires_service_category_ids[0])}`
+                            : `Requires any of: ${coupon.requires_service_category_ids.map((id) => getServiceCategoryName(id)).join(', ')}`}
                         </span>
                       </div>
                     )}

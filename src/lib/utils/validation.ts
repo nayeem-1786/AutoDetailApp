@@ -225,10 +225,10 @@ export const couponSchema = z.object({
   tag_match_mode: z.enum(['any', 'all']).default('any'),
   // Conditions (IF)
   condition_logic: z.enum(['and', 'or']).default('and'),
-  requires_product_id: z.string().uuid().optional().nullable(),
-  requires_service_id: z.string().uuid().optional().nullable(),
-  requires_product_category_id: z.string().uuid().optional().nullable(),
-  requires_service_category_id: z.string().uuid().optional().nullable(),
+  requires_product_ids: z.array(z.string().uuid()).optional().nullable(),
+  requires_service_ids: z.array(z.string().uuid()).optional().nullable(),
+  requires_product_category_ids: z.array(z.string().uuid()).optional().nullable(),
+  requires_service_category_ids: z.array(z.string().uuid()).optional().nullable(),
   min_purchase: positiveNumber.optional().nullable(),
   // Constraints
   is_single_use: z.boolean().default(true),
