@@ -738,22 +738,30 @@ MARKETING
 │
 ├── Campaigns
 │   ├── All Campaigns (draft, scheduled, sent, completed)
+│   │   ├── Edit button (draft/scheduled only)
+│   │   └── Delete button (trash icon, confirmation dialog)
 │   ├── Create Campaign
 │   │   ├── Name and goal
 │   │   ├── Audience builder (filters, preview count)
 │   │   ├── Coupon setup (create new or attach existing)
 │   │   ├── Message composer (SMS + email templates)
-│   │   ├── Variable insertion (name, vehicle, coupon code, etc.)
+│   │   ├── Variable insertion (name, vehicle, coupon code, book_now_url, etc.)
 │   │   ├── A/B test setup (optional)
 │   │   ├── Schedule (immediate or future)
 │   │   └── Cost estimate and ROI projection
 │   ├── Campaign Analytics
 │   │   ├── Delivery metrics (sent, delivered, failed)
-│   │   ├── Engagement (opens, clicks for email)
+│   │   ├── Engagement (opens, clicks for email — via Mailgun webhooks)
 │   │   ├── Redemptions (coupon usage)
 │   │   ├── Revenue attributed
 │   │   ├── A/B test winner
 │   │   └── ROI calculation
+│   ├── Email Deep Links
+│   │   ├── "Book Now" CTA button in campaign emails
+│   │   ├── URL: /book?service=<slug>&coupon=<code>&email=<email>
+│   │   ├── Auto-fills customer info from existing records
+│   │   ├── Pre-selects service from coupon target
+│   │   └── Coupon code displayed in review + confirmation (applied at POS)
 │   └── Duplicate Campaign (reuse with tweaks)
 │
 ├── Automations (Lifecycle Rules)
@@ -780,6 +788,8 @@ MARKETING
 │
 ├── Coupons
 │   ├── All Coupons (draft, active, expired via expires_at, disabled)
+│   │   ├── Status/auto-apply toggles (click badge to toggle)
+│   │   └── Delete button (trash icon, confirmation dialog)
 │   ├── Create Coupon
 │   │   ├── Type: flat $, percentage %, free add-on, free product
 │   │   ├── Applies to: any, specific services, specific products

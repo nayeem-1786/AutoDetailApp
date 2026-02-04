@@ -13,7 +13,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Info, Plus } from 'lucide-react';
+import { Info, Plus, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -37,6 +38,8 @@ export default function CouponsListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [togglingAutoId, setTogglingAutoId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Coupon | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function toggleAutoApply(coupon: Coupon) {
     setTogglingAutoId(coupon.id);
@@ -82,6 +85,26 @@ export default function CouponsListPage() {
       toast.error('Failed to update status');
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/marketing/coupons/${deleteTarget.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCoupons((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+        toast.success('Coupon deleted');
+      } else {
+        const { error } = await res.json();
+        toast.error(error || 'Failed to delete coupon');
+      }
+    } catch {
+      toast.error('Failed to delete coupon');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   }
 
@@ -268,6 +291,26 @@ export default function CouponsListPage() {
         </span>
       ),
     },
+    {
+      id: 'delete',
+      header: '',
+      size: 50,
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteTarget(row.original);
+          }}
+          className="text-gray-400 hover:text-red-600"
+          title="Delete coupon"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      ),
+      enableSorting: false,
+    },
   ];
 
   if (loading) {
@@ -322,6 +365,17 @@ export default function CouponsListPage() {
             Create Coupon
           </Button>
         }
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Coupon"
+        description={`Are you sure you want to delete "${deleteTarget?.name || deleteTarget?.code}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleting}
+        onConfirm={handleDelete}
       />
     </div>
   );

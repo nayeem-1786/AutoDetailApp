@@ -12,7 +12,9 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 
 export default function CampaignsListPage() {
@@ -23,6 +25,8 @@ export default function CampaignsListPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [channelFilter, setChannelFilter] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -49,6 +53,26 @@ export default function CampaignsListPage() {
   function statusBadge(status: string) {
     const variant = status === 'sent' ? 'success' : status === 'draft' ? 'secondary' : status === 'scheduled' ? 'info' : status === 'sending' ? 'warning' : status === 'cancelled' ? 'destructive' : 'default';
     return <Badge variant={variant}>{CAMPAIGN_STATUS_LABELS[status] || status}</Badge>;
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/marketing/campaigns/${deleteTarget.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCampaigns((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+        toast.success('Campaign deleted');
+      } else {
+        const { error } = await res.json();
+        toast.error(error || 'Failed to delete campaign');
+      }
+    } catch {
+      toast.error('Failed to delete campaign');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   }
 
   const columns: ColumnDef<Campaign, unknown>[] = [
@@ -100,20 +124,38 @@ export default function CampaignsListPage() {
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) =>
-        ['draft', 'scheduled'].includes(row.original.status) ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(`/admin/marketing/campaigns/${row.original.id}/edit`);
-            }}
-          >
-            <Pencil className="h-3 w-3" />
-            {row.original.status === 'draft' ? 'Resume' : 'Edit'}
-          </Button>
-        ) : null,
+      cell: ({ row }) => {
+        const c = row.original;
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {['draft', 'scheduled'].includes(c.status) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/admin/marketing/campaigns/${c.id}/edit`);
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+                {c.status === 'draft' ? 'Resume' : 'Edit'}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteTarget(c);
+              }}
+              className="text-gray-400 hover:text-red-600"
+              title="Delete campaign"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
       enableSorting: false,
     },
   ];
@@ -174,6 +216,17 @@ export default function CampaignsListPage() {
             Create Campaign
           </Button>
         }
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Campaign"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleting}
+        onConfirm={handleDelete}
       />
     </div>
   );

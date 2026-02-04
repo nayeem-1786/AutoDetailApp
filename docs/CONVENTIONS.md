@@ -47,6 +47,8 @@ src/
 │   │   │       └── [id]/
 │   │   │           ├── route.ts # GET (detail), PATCH (update), DELETE
 │   │   │           └── stats/route.ts
+│   │   ├── webhooks/
+│   │   │   └── mailgun/route.ts  # Mailgun open/click webhook → campaign_recipients
 │   │   └── pos/
 │   │       └── coupons/validate/route.ts
 │   ├── pos/                     # POS system (PIN auth)
@@ -77,9 +79,9 @@ src/
 │       ├── form.ts              # formResolver wrapper (Zod + react-hook-form)
 │       ├── validation.ts        # Zod schemas + shared field validators
 │       ├── audience.ts          # Campaign audience filter helpers
-│       ├── email.ts             # Email sending (Mailgun)
+│       ├── email.ts             # Email sending (Mailgun) with tracking options
 │       ├── sms.ts               # SMS sending (Twilio)
-│       ├── template.ts          # Message template variable replacement
+│       ├── template.ts          # Message template variable replacement (book_now_url, coupon_code, etc.)
 │       ├── quote-number.ts      # Quote number generation
 │       └── webhook.ts           # Webhook dispatching
 └── supabase/

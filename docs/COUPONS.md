@@ -377,7 +377,7 @@ When a coupon is applied (manually or auto):
 - `src/app/api/pos/transactions/route.ts` — Saves coupon_id, increments use_count
 
 **Admin Coupon Management:**
-- `src/app/admin/marketing/coupons/page.tsx` — List page (search, filter by status including draft/expired, centered columns for badges)
+- `src/app/admin/marketing/coupons/page.tsx` — List page (search, filter by status including draft/expired, centered columns for badges, delete with confirmation)
 - `src/app/admin/marketing/coupons/new/page.tsx` — 6-step wizard with auto-save, searchable pickers, eligible count
 - `src/app/admin/marketing/coupons/[id]/page.tsx` — Detail/edit page
 - `src/app/api/marketing/coupons/route.ts` — GET/POST API (supports draft status)
@@ -386,8 +386,9 @@ When a coupon is applied (manually or auto):
 
 **Campaign Integration:**
 - `src/app/admin/marketing/campaigns/_components/campaign-wizard.tsx` — Coupon step in campaign wizard (filters out expired coupons)
-- `src/app/api/marketing/campaigns/[id]/send/route.ts` — Per-customer coupon generation
-- `src/app/api/marketing/campaigns/process-scheduled/route.ts` — Scheduled campaign coupon generation
+- `src/app/api/marketing/campaigns/[id]/send/route.ts` — Per-customer coupon generation, book-now deep link, Mailgun tracking
+- `src/app/api/marketing/campaigns/process-scheduled/route.ts` — Scheduled campaign coupon generation, book-now deep link, Mailgun tracking
+- `src/app/api/webhooks/mailgun/route.ts` — Mailgun webhook for open/click tracking (updates campaign_recipients)
 
 **Customer Portal:**
 - `src/app/api/customer/coupons/route.ts` — Customer's available coupons API
@@ -480,3 +481,13 @@ When a coupon is applied (manually or auto):
 
 ### Phase I: Filter Fix ✅
 53. Status filter (Active/Draft/Disabled) now excludes expired coupons — previously a coupon with `status: 'active'` and past `expires_at` leaked into Active filter results
+
+### Phase J: Delete from List + Campaign Deep Links ✅
+54. Coupon list page: trash icon at end of each row with destructive ConfirmDialog (calls DELETE API)
+55. Campaign list page: trash icon at end of each row with destructive ConfirmDialog (calls DELETE API, draft-only server-side)
+56. Campaign send routes: `book_now_url` template variable with service slug, coupon code, and customer email
+57. Campaign emails: styled "Book Now" CTA button appended to email HTML
+58. Booking page: `?email=` param looks up customer by email (admin client) for auto-fill; `?coupon=` passed through to wizard
+59. Booking wizard: `couponCode` prop flows to StepReview (green banner) and BookingConfirmation (reminder)
+60. Mailgun open/click tracking: `sendEmail` accepts tracking options, webhook endpoint updates `campaign_recipients.opened_at`/`clicked_at`
+61. Campaign wizard preview: `book_now_url` rendered in template preview
