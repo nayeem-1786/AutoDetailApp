@@ -10,6 +10,7 @@ import {
 } from '@/lib/data/booking';
 import { getCustomerFromSession } from '@/lib/auth/customer-helpers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { SITE_NAME, SITE_URL } from '@/lib/utils/constants';
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 interface BookPageProps {
-  searchParams: Promise<{ service?: string; rebook?: string }>;
+  searchParams: Promise<{ service?: string; rebook?: string; coupon?: string; email?: string }>;
 }
 
 export default async function BookPage({ searchParams }: BookPageProps) {
@@ -78,6 +79,34 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     // Not authenticated — ignore
   }
 
+  // Campaign deep-link: look up customer by email if not logged in
+  let campaignCustomerData = null;
+  if (params.email && !customerData) {
+    const adminClient = createAdminClient();
+    const { data: cust } = await adminClient
+      .from('customers')
+      .select('id, first_name, last_name, phone, email')
+      .eq('email', decodeURIComponent(params.email))
+      .single();
+    if (cust) {
+      const { data: vehicles } = await adminClient
+        .from('vehicles')
+        .select('id, vehicle_type, size_class, year, make, model, color')
+        .eq('customer_id', cust.id)
+        .order('created_at', { ascending: false });
+      campaignCustomerData = {
+        customer: { first_name: cust.first_name, last_name: cust.last_name, phone: cust.phone, email: cust.email },
+        vehicles: vehicles ?? [],
+      };
+    } else {
+      // Customer not in DB — still pre-fill the email field
+      campaignCustomerData = {
+        customer: { first_name: '', last_name: '', phone: null, email: decodeURIComponent(params.email) },
+        vehicles: [],
+      };
+    }
+  }
+
   return (
     <section className="bg-white py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -99,7 +128,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
             bookingConfig={bookingConfig}
             preSelectedService={preSelectedService}
             rebookData={rebookData}
-            customerData={customerData}
+            customerData={customerData ?? campaignCustomerData}
+            couponCode={params.coupon ?? null}
           />
         </div>
       </div>

@@ -388,6 +388,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       coupon_code: sampleCode,
       business_name: BUSINESS.NAME,
       booking_url: `${SITE_URL}/book`,
+      book_now_url: `${SITE_URL}/book?service=example-service&coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`,
     };
     return {
       sms: smsTemplate ? renderTemplate(smsTemplate, vars) : null,
@@ -399,18 +400,33 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   // -- Template variable helpers --
   function insertVariable(
     setter: (fn: (prev: string) => string) => void,
-    variable: string
+    variable: string,
+    inputId: string
   ) {
-    setter((prev: string) => `${prev}{${variable}}`);
+    const el = document.getElementById(inputId) as HTMLInputElement | HTMLTextAreaElement | null;
+    const tag = `{${variable}}`;
+    if (el && el.selectionStart != null) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd ?? start;
+      setter((prev: string) => prev.slice(0, start) + tag + prev.slice(end));
+      // Restore cursor position after the inserted variable
+      requestAnimationFrame(() => {
+        el.focus();
+        const newPos = start + tag.length;
+        el.setSelectionRange(newPos, newPos);
+      });
+    } else {
+      setter((prev: string) => `${prev}${tag}`);
+    }
   }
 
-  const variableChips = (setter: (fn: (prev: string) => string) => void) => (
+  const variableChips = (setter: (fn: (prev: string) => string) => void, inputId: string) => (
     <div className="mt-2 flex flex-wrap gap-1">
       {Object.entries(TEMPLATE_VARIABLES).map(([key, desc]) => (
         <button
           key={key}
           type="button"
-          onClick={() => insertVariable(setter, key)}
+          onClick={() => insertVariable(setter, key, inputId)}
           className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
           title={desc}
         >
@@ -702,7 +718,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                         : '1 segment'}
                     </span>
                   </div>
-                  {variableChips(setSmsTemplate)}
+                  {variableChips(setSmsTemplate, 'sms_template')}
                 </div>
               )}
               {(channel === 'email' || channel === 'both') && (
@@ -716,7 +732,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                         placeholder="Special offer just for you, {first_name}!"
                       />
                     </FormField>
-                    {variableChips(setEmailSubject)}
+                    {variableChips(setEmailSubject, 'email_subject')}
                   </div>
                   <div>
                     <FormField label="Email Body" htmlFor="email_template">
@@ -728,7 +744,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                         placeholder="Hi {first_name},&#10;&#10;We wanted to reach out with a special offer..."
                       />
                     </FormField>
-                    {variableChips(setEmailTemplate)}
+                    {variableChips(setEmailTemplate, 'email_template')}
                   </div>
                 </>
               )}

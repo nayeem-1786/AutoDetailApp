@@ -271,11 +271,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 7. Increment coupon use_count
+    // 7. Increment coupon use_count and attribute campaign metrics
     if (data.coupon_id) {
       const { data: coupon } = await supabase
         .from('coupons')
-        .select('use_count')
+        .select('use_count, campaign_id')
         .eq('id', data.coupon_id)
         .single();
 
@@ -284,6 +284,25 @@ export async function POST(request: NextRequest) {
           .from('coupons')
           .update({ use_count: coupon.use_count + 1 })
           .eq('id', data.coupon_id);
+
+        // If coupon is linked to a campaign, update campaign metrics
+        if (coupon.campaign_id) {
+          const { data: camp } = await supabase
+            .from('campaigns')
+            .select('redeemed_count, revenue_attributed')
+            .eq('id', coupon.campaign_id)
+            .single();
+
+          if (camp) {
+            await supabase
+              .from('campaigns')
+              .update({
+                redeemed_count: (camp.redeemed_count || 0) + 1,
+                revenue_attributed: Math.round(((camp.revenue_attributed || 0) + data.total_amount) * 100) / 100,
+              })
+              .eq('id', coupon.campaign_id);
+          }
+        }
       }
     }
 

@@ -7,6 +7,7 @@ import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { BUSINESS, SITE_URL } from '@/lib/utils/constants';
 import type { CampaignChannel } from '@/lib/supabase/types';
+import crypto from 'crypto';
 
 function generateCouponCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -89,6 +90,17 @@ export async function POST(request: NextRequest) {
         couponTemplate = coupon;
       }
 
+      // Look up target service slug for book-now deep link
+      let serviceSlug: string | null = null;
+      if (couponTemplate?.coupon_rewards?.length > 0) {
+        const targetServiceId = couponTemplate.coupon_rewards[0].target_service_id;
+        if (targetServiceId) {
+          const { data: svc } = await adminClient
+            .from('services').select('slug').eq('id', targetServiceId).single();
+          serviceSlug = svc?.slug ?? null;
+        }
+      }
+
       // Get customer details
       const { data: customers } = await adminClient
         .from('customers')
@@ -131,16 +143,28 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Build book-now deep link with service, coupon & email
+        const bookNowParams = new URLSearchParams();
+        if (serviceSlug) bookNowParams.set('service', serviceSlug);
+        if (couponCode) bookNowParams.set('coupon', couponCode);
+        if (customer.email) bookNowParams.set('email', customer.email);
+        const bookNowUrl = `${SITE_URL}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
+
         const templateVars: Record<string, string> = {
           first_name: customer.first_name,
           last_name: customer.last_name,
           coupon_code: couponCode,
           business_name: BUSINESS.NAME,
-          booking_url: `${SITE_URL}/booking`,
+          booking_url: `${SITE_URL}/book`,
+          book_now_url: bookNowUrl,
         };
 
         let smsDelivered = false;
         let emailDelivered = false;
+        let mailgunMessageId: string | null = null;
+
+        // Pre-generate recipient ID so we can pass it to Mailgun as a custom variable
+        const recipientId = crypto.randomUUID();
 
         if (
           (campaign.channel === 'sms' || campaign.channel === 'both') &&
@@ -161,20 +185,31 @@ export async function POST(request: NextRequest) {
           campaign.email_template
         ) {
           const subj = renderTemplate(campaign.email_subject, templateVars);
-          const body = renderTemplate(campaign.email_template, templateVars);
-          const result = await sendEmail(customer.email, subj, body);
+          const emailBody = renderTemplate(campaign.email_template, templateVars);
+          const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
+          const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${bookNowUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Book Now</a></div>`;
+          const emailHtml = `<html><body>${bodyParagraphs}${ctaButton}</body></html>`;
+          const result = await sendEmail(customer.email, subj, emailBody, emailHtml, {
+            variables: { campaign_id: campaign.id, recipient_id: recipientId },
+            tracking: true,
+          });
           emailDelivered = result.success;
+          if (result.success) {
+            mailgunMessageId = result.id;
+          }
         }
 
         const delivered = smsDelivered || emailDelivered;
         if (delivered) deliveredCount++;
 
         await adminClient.from('campaign_recipients').insert({
+          id: recipientId,
           campaign_id: campaign.id,
           customer_id: customer.id,
           channel: campaign.channel,
           coupon_code: couponCode || null,
           delivered,
+          mailgun_message_id: mailgunMessageId,
           sent_at: new Date().toISOString(),
         });
       }

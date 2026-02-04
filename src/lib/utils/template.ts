@@ -8,6 +8,7 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
   vehicle_description: 'Vehicle year/make/model',
   business_name: 'Business name',
   booking_url: 'Online booking URL',
+  book_now_url: 'Booking URL with service, coupon & email pre-filled',
 };
 
 /**

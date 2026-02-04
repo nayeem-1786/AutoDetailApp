@@ -21,6 +21,7 @@ interface StepReviewProps {
   customer: BookingCustomerInput;
   vehicle: BookingVehicleInput;
   addons: BookingAddonInput[];
+  couponCode?: string | null;
   onConfirm: () => Promise<void>;
   onBack: () => void;
 }
@@ -38,6 +39,7 @@ export function StepReview({
   customer,
   vehicle,
   addons,
+  couponCode,
   onConfirm,
   onBack,
 }: StepReviewProps) {
@@ -185,6 +187,18 @@ export function StepReview({
             </p>
           </div>
         </div>
+
+        {/* Coupon Code */}
+        {couponCode && (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+            <p className="text-sm font-medium text-green-900">
+              Coupon Code: <span className="font-mono font-bold">{couponCode}</span>
+            </p>
+            <p className="mt-1 text-xs text-green-700">
+              Your discount will be applied when payment is collected at time of service.
+            </p>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

@@ -28,7 +28,7 @@ export async function GET(
     const { data, count, error } = await supabase
       .from('campaign_recipients')
       .select(
-        'id, customer_id, channel, coupon_code, delivered, sent_at, customers(first_name, last_name, phone, email)',
+        'id, customer_id, channel, coupon_code, delivered, opened_at, clicked_at, sent_at, customers(first_name, last_name, phone, email)',
         { count: 'exact' }
       )
       .eq('campaign_id', id)
@@ -49,6 +49,8 @@ export async function GET(
         channel: r.channel,
         coupon_code: r.coupon_code,
         delivered: r.delivered,
+        opened_at: r.opened_at ?? null,
+        clicked_at: r.clicked_at ?? null,
         sent_at: r.sent_at,
       };
     });

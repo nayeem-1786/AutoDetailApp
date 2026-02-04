@@ -13,6 +13,11 @@ interface EmailError {
 
 export type SendEmailResult = EmailResult | EmailError;
 
+interface SendEmailOptions {
+  variables?: Record<string, string>;  // Mailgun custom vars (v:key)
+  tracking?: boolean;                  // Enable open/click tracking
+}
+
 /**
  * Send an email via Mailgun.
  * Validates env vars and returns a typed result.
@@ -21,7 +26,8 @@ export async function sendEmail(
   to: string,
   subject: string,
   text: string,
-  html?: string
+  html?: string,
+  options?: SendEmailOptions
 ): Promise<SendEmailResult> {
   const mailgunDomain = process.env.MAILGUN_DOMAIN;
   const mailgunKey = process.env.MAILGUN_API_KEY;
@@ -38,6 +44,17 @@ export async function sendEmail(
     formData.append('text', text);
     if (html) {
       formData.append('html', html);
+    }
+
+    if (options?.variables) {
+      for (const [key, value] of Object.entries(options.variables)) {
+        formData.append(`v:${key}`, value);
+      }
+    }
+
+    if (options?.tracking) {
+      formData.append('o:tracking-opens', 'yes');
+      formData.append('o:tracking-clicks', 'yes');
     }
 
     const res = await fetch(

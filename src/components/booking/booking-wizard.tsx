@@ -38,6 +38,7 @@ interface BookingWizardProps {
   preSelectedService: BookableService | null;
   rebookData?: RebookData | null;
   customerData?: CustomerDataProp | null;
+  couponCode?: string | null;
 }
 
 interface BookingState {
@@ -70,6 +71,7 @@ export function BookingWizard({
   preSelectedService,
   rebookData,
   customerData,
+  couponCode,
 }: BookingWizardProps) {
   // Determine initial step and pre-fill state
   const rebookService = rebookData
@@ -122,6 +124,7 @@ export function BookingWizard({
         serviceName={confirmation.serviceName}
         isMobile={confirmation.isMobile}
         mobileAddress={confirmation.mobileAddress}
+        couponCode={couponCode ?? null}
       />
     );
   }
@@ -333,6 +336,7 @@ export function BookingWizard({
             customer={state.customer}
             vehicle={state.vehicle}
             addons={state.config.addons as BookingAddonInput[]}
+            couponCode={couponCode ?? null}
             onConfirm={handleConfirm}
             onBack={() => setStep(4)}
           />

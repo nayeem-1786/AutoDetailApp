@@ -16,6 +16,7 @@ interface BookingConfirmationProps {
   serviceName: string;
   isMobile: boolean;
   mobileAddress?: string | null;
+  couponCode?: string | null;
 }
 
 export function BookingConfirmation({
@@ -23,6 +24,7 @@ export function BookingConfirmation({
   serviceName,
   isMobile,
   mobileAddress,
+  couponCode,
 }: BookingConfirmationProps) {
   return (
     <div className="mx-auto max-w-lg text-center">
@@ -81,6 +83,16 @@ export function BookingConfirmation({
               Payment collected at time of service
             </p>
           </div>
+          {couponCode && (
+            <div className="mt-3 border-t border-gray-200 pt-3">
+              <p className="text-sm font-medium text-gray-700">
+                Coupon: <span className="font-mono font-bold">{couponCode}</span>
+              </p>
+              <p className="text-xs text-gray-500">
+                Mention this code — your discount will be applied at time of service.
+              </p>
+            </div>
+          )}
         </dl>
       </div>
 

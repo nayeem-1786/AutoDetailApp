@@ -43,6 +43,8 @@ interface Recipient {
   channel: string;
   coupon_code: string | null;
   delivered: boolean;
+  opened_at: string | null;
+  clicked_at: string | null;
   sent_at: string;
 }
 
@@ -241,6 +243,8 @@ export default function CampaignDetailPage() {
                         <th className="pb-2 pr-4">Contact</th>
                         <th className="pb-2 pr-4">Channel</th>
                         <th className="pb-2 pr-4">Delivered</th>
+                        <th className="pb-2 pr-4">Opened</th>
+                        <th className="pb-2 pr-4">Clicked</th>
                         <th className="pb-2 pr-4">Coupon</th>
                         <th className="pb-2">Sent</th>
                       </tr>
@@ -262,6 +266,12 @@ export default function CampaignDetailPage() {
                             <Badge variant={r.delivered ? 'success' : 'destructive'}>
                               {r.delivered ? 'Yes' : 'Failed'}
                             </Badge>
+                          </td>
+                          <td className="py-2.5 pr-4 text-gray-500">
+                            {r.opened_at ? '\u2713' : '\u2014'}
+                          </td>
+                          <td className="py-2.5 pr-4 text-gray-500">
+                            {r.clicked_at ? '\u2713' : '\u2014'}
                           </td>
                           <td className="py-2.5 pr-4 font-mono text-xs text-gray-500">
                             {r.coupon_code || '--'}
