@@ -1,5 +1,7 @@
 # Coupon System — Smart Details Auto Spa
 
+> **Prerequisites:** See [`CONVENTIONS.md`](./CONVENTIONS.md) for component APIs, auth patterns, and project conventions.
+
 ## Overview
 
 The coupon system uses an IF/THEN model that separates **who** can use a coupon, **what conditions** must be met, and **what discount** the customer receives. A single coupon can grant multiple rewards (e.g., "20% off Product A + Free Product B").
