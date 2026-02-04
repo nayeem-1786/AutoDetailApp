@@ -477,3 +477,6 @@ When a coupon is applied (manually or auto):
 50. List page: "Auto-Generated" shown when code is blank, "Used / Limit" column with ∞ for unlimited
 51. List page: Discount, Status, Auto-Apply, Used/Limit columns centered
 52. Campaign wizard filters expired coupons from dropdown (active + non-expired only)
+
+### Phase I: Filter Fix ✅
+53. Status filter (Active/Draft/Disabled) now excludes expired coupons — previously a coupon with `status: 'active'` and past `expires_at` leaked into Active filter results

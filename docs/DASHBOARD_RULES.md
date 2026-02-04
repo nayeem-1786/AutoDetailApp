@@ -1042,7 +1042,9 @@ STAFF
 ```
 /admin/settings
 
-SETTINGS
+Settings hub organized into three sections:
+
+BUSINESS
 ├── Business Profile
 │   ├── Business Name
 │   ├── Address
@@ -1051,7 +1053,23 @@ SETTINGS
 │   ├── Logo (upload)
 │   ├── Business Hours (store hours display)
 │   └── About / Description
-│
+├── Tax Configuration
+│   ├── Tax Rate (percentage)
+│   └── Tax Products Only (toggle — services exempt when on)
+└── Mobile Zones
+    ├── Zone Name, Distance Range, Surcharge
+    ├── Availability toggle per zone
+    └── Display order
+
+POS
+├── POS Favorites
+│   ├── Quick-action tiles (product, service, custom amount, etc.)
+│   ├── Tile color (12 colors) and shade intensity
+│   └── Reorder tiles
+└── POS Idle Timeout
+    └── Session timeout (1–480 minutes, default 15)
+
+PLATFORM
 ├── Feature Toggles
 │   ├── Loyalty & Rewards (on/off + config)
 │   ├── Recurring/Subscription Services (on/off)
@@ -1064,6 +1082,8 @@ SETTINGS
 │   ├── Photo Documentation (on/off)
 │   ├── Cancellation Fee Enforcement (on/off + config)
 │   └── Referral Program (on/off)
+└── Audit Log
+    └── View-only system activity history (who did what, when)
 │
 ├── Integrations
 │   ├── Stripe
@@ -1336,3 +1356,4 @@ Public components pull business name, phone, and address from the `business_sett
 | v7 | 2026-02-02 | POS Management: admin transactions page built (search, date/status filters, inline detail, CSV export, receipt re-send). Void transaction from transaction detail. Receipt re-send (print/email/SMS). Manual ticket discount (dollar/percent, manager-only). Role-based POS views (cashier restrictions). Cash drawer open/close tracking with EOD integration. |
 | v8 | 2026-02-03 | Phase 3 built features documented: Quotes system (admin CRUD pages, public view, PDF generation, send via email/SMS/both, tiered pricing in line items). Staff scheduling (weekly schedule grid, blocked dates). Waitlist admin panel. Enhanced slot availability. Webhook events for appointment lifecycle. 11 Labs Voice Agent API (6 endpoints). |
 | v9 | 2026-02-03 | POS Management built features expanded: comprehensive Phase 2 documentation added — PIN auth with rate limiting, IP restriction, idle timeout, catalog with barcode scanner, vehicle-aware pricing, all payment methods (cash/card/check/split), tip screen, receipts (print/email/SMS), loyalty system, coupon validation, refunds, cash management (open/close/variance), favorites system (colors/actions/surcharges), keyboard shortcuts, tablet-optimized UI. |
+| v10 | 2026-02-03 | Settings page reorganized into three section groups: Business (profile, tax, mobile zones), POS (favorites, idle timeout), Platform (feature toggles, audit log). Customer consent warnings: inline amber alert when SMS/email consent is toggled on but contact info is missing. Campaign audience preview fixes: error surfacing, consistent counts, last_service/vehicle_type filter support in preview. |
