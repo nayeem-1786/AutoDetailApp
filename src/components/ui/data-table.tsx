@@ -174,8 +174,10 @@ function DataTable<TData>({
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
+              {headerGroup.headers.map((header) => {
+                const colSize = header.column.columnDef.size;
+                return (
+                <TableHead key={header.id} style={colSize ? { width: colSize } : undefined}>
                   {header.isPlaceholder ? null : (
                     <div
                       className={cn(
@@ -191,18 +193,22 @@ function DataTable<TData>({
                     </div>
                   )}
                 </TableHead>
-              ))}
+                );
+              })}
             </TableRow>
           ))}
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows.map((row) => (
             <TableRow key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
+              {row.getVisibleCells().map((cell) => {
+                const colSize = cell.column.columnDef.size;
+                return (
+                <TableCell key={cell.id} style={colSize ? { width: colSize } : undefined}>
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
-              ))}
+                );
+              })}
             </TableRow>
           ))}
         </TableBody>

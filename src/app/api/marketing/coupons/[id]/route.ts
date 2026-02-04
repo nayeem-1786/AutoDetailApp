@@ -76,6 +76,7 @@ export async function PATCH(
       'requires_product_category_ids',
       'requires_service_category_ids',
       'min_purchase',
+      'max_customer_visits',
       'is_single_use',
       'max_uses',
       'expires_at',

@@ -128,9 +128,12 @@ When conditions are enabled:
 - **Requires Product(s)** / **Requires Product Category(ies)** — Toggle between selecting specific products or product categories. Both use a multi-select chip UI (`MultiSearchableSelect`) so you can pick multiple items. Within each array, semantics are OR — the ticket must contain ANY one of the listed items. The section label changes dynamically based on the toggle.
 - **Requires Service(s)** / **Requires Service Category(ies)** — Same pattern as products: toggle between specific services or service categories with multi-select.
 - **Minimum purchase** — Dollar amount threshold
+- **Maximum Customer Visits** — Limits coupon to customers with this many visits or fewer. Set to 0 for new customers only. Leave empty for no limit.
 
 **Example:**
 > Set "Requires Service(s): 1-Year Ceramic Shield, 3-Year Ceramic Shield, 5-Year Ceramic Shield" so this coupon activates when ANY of those services is in the ticket. Add "Minimum Purchase: $50" with AND logic to require both conditions.
+>
+> Set "Maximum Customer Visits: 0" to create a new-customer-only coupon (first visit discount).
 
 ### Step 4 — Rewards
 
@@ -177,9 +180,9 @@ THEN:   Booster Product is 20% off (max $5.00 discount)
 LIMITS: Expires Feb 28, 2026 · Single use per customer
 ```
 
-**Actions:**
-- **Create Coupon** — Activates the coupon (sets status to `active`)
-- **Save Draft** — Saves current progress as a draft (accessible from the coupons list)
+**Actions (in footer bar):**
+- **Create Coupon** / **Update Coupon** — Activates the coupon (sets status to `active`). Shows "Update Coupon" when editing an existing coupon.
+- **Save & Exit** — Saves current progress and returns to the coupons list (detail page for existing coupons, list page for new drafts).
 
 ---
 
@@ -190,8 +193,8 @@ Coupons support a `draft` status for work-in-progress coupons:
 - **Auto-save on navigation:** Every time you move between wizard steps (Next, Previous, or clicking a step indicator), the coupon is silently saved as a draft.
 - **First save creates the draft:** On the first auto-save, a new coupon row is created with `status: 'draft'`. Subsequent saves update the existing record.
 - **Resume editing:** Draft coupons appear in the coupons list with a "Draft" badge. Clicking a draft navigates to `/admin/marketing/coupons/new?edit=<id>` which reloads all wizard state.
-- **Save Draft button:** Explicitly saves and returns to the coupons list.
-- **Create Coupon:** Sets the status from `draft` to `active` (or creates a new active coupon if no draft exists).
+- **Save & Exit button:** Explicitly saves and returns to the coupons list (or detail page when editing an existing coupon).
+- **Create Coupon / Update Coupon:** Sets the status from `draft` to `active` (or creates/updates a coupon). The button label changes based on edit mode.
 - **Draft coupons skip duplicate code checks** during creation since the code may change before activation.
 
 ---
@@ -446,16 +449,19 @@ When a coupon is applied (manually or auto):
 28. DB migration — `max_customer_visits` nullable integer column
 29. Updated TypeScript types and Zod validation
 30. PATCH API allows `max_customer_visits`
-31. POS validation checks customer `visit_count` against `max_customer_visits`
+31. POS validation checks customer `visit_count` against `max_customer_visits`, descriptive error messages
 32. Wizard conditions step includes Max Customer Visits input
 33. Detail page displays customer visits condition
 34. Re-enable expiration dialog (keep / clear / new date)
 35. Edit button on coupon detail page navigates to wizard
+36. Wizard UX: "Save & Exit" replaces "Save Draft", returns to detail page for edits; "Create Coupon"/"Update Coupon" button moved to footer; page title shows "Edit Coupon" in edit mode
+37. Wizard auto-generate code fix: omits `code` field on PATCH to preserve existing code
+38. DataTable column width: headers and cells now respect `size` from column definitions
 
 ### Phase G: Remove Dead Statuses (`redeemed`, `expired`) ✅
-36. Removed `redeemed` and `expired` from `CouponStatus` TypeScript type (now `draft | active | disabled`)
-37. Removed from `COUPON_STATUS_LABELS` constants
-38. List page: derived "Expired" badge from `expires_at < now`, disabled status/auto-apply toggles for expired coupons
-39. Detail page: derived expired state for badge variant, text, and toggle disabled state
-40. Filter dropdown: "Expired" option filters by derived `expires_at` check instead of DB status
-41. Postgres enum left unchanged (removing enum values requires destructive `DROP TYPE`)
+39. Removed `redeemed` and `expired` from `CouponStatus` TypeScript type (now `draft | active | disabled`)
+40. Removed from `COUPON_STATUS_LABELS` constants
+41. List page: derived "Expired" badge from `expires_at < now`, disabled status/auto-apply toggles for expired coupons
+42. Detail page: derived expired state for badge variant, text, and toggle disabled state
+43. Filter dropdown: "Expired" option filters by derived `expires_at` check instead of DB status
+44. Postgres enum left unchanged (removing enum values requires destructive `DROP TYPE`)

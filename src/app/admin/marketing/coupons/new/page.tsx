@@ -326,6 +326,7 @@ export default function NewCouponPage() {
   const [requiresProductCategoryIds, setRequiresProductCategoryIds] = useState<string[]>([]);
   const [requiresServiceCategoryIds, setRequiresServiceCategoryIds] = useState<string[]>([]);
   const [minPurchase, setMinPurchase] = useState('');
+  const [maxCustomerVisits, setMaxCustomerVisits] = useState('');
   const [showProductCategory, setShowProductCategory] = useState(false);
   const [showServiceCategory, setShowServiceCategory] = useState(false);
 
@@ -435,7 +436,8 @@ export default function NewCouponPage() {
           (c.requires_service_ids && c.requires_service_ids.length > 0) ||
           (c.requires_product_category_ids && c.requires_product_category_ids.length > 0) ||
           (c.requires_service_category_ids && c.requires_service_category_ids.length > 0) ||
-          c.min_purchase);
+          c.min_purchase ||
+          c.max_customer_visits != null);
         setHasConditions(hasCond);
         setConditionLogic(c.condition_logic || 'and');
         setRequiresProductIds(c.requires_product_ids || []);
@@ -445,6 +447,7 @@ export default function NewCouponPage() {
         if (c.requires_product_category_ids && c.requires_product_category_ids.length > 0) setShowProductCategory(true);
         if (c.requires_service_category_ids && c.requires_service_category_ids.length > 0) setShowServiceCategory(true);
         setMinPurchase(c.min_purchase != null ? String(c.min_purchase) : '');
+        setMaxCustomerVisits(c.max_customer_visits != null ? String(c.max_customer_visits) : '');
 
         // Rewards
         const rw = c.coupon_rewards || [];
@@ -715,7 +718,10 @@ export default function NewCouponPage() {
   function buildPayload() {
     return {
       name: name.trim(),
-      code: autoGenerate ? '' : code.trim(),
+      // Only include code when user specified a custom one.
+      // When autoGenerate is true, omit code so POST auto-generates
+      // and PATCH leaves the existing code untouched.
+      ...(!autoGenerate ? { code: code.trim() } : {}),
       auto_apply: autoApply,
       customer_id: targeting === 'customer' ? customerId : null,
       customer_tags: targeting === 'group' ? customerTags : null,
@@ -726,6 +732,7 @@ export default function NewCouponPage() {
       requires_product_category_ids: hasConditions && requiresProductCategoryIds.length > 0 ? requiresProductCategoryIds : null,
       requires_service_category_ids: hasConditions && requiresServiceCategoryIds.length > 0 ? requiresServiceCategoryIds : null,
       min_purchase: hasConditions && minPurchase ? parseFloat(minPurchase) : null,
+      max_customer_visits: hasConditions && maxCustomerVisits !== '' ? parseInt(maxCustomerVisits) : null,
       is_single_use: isSingleUse,
       max_uses: maxUses ? parseInt(maxUses) : null,
       expires_at: expiresAt || null,
@@ -794,14 +801,43 @@ export default function NewCouponPage() {
     }
   }
 
-  async function handleSaveDraft() {
+  async function handleSaveAndExit() {
     if (!name.trim()) {
       toast.error('Enter a name before saving');
       return;
     }
-    await silentSave();
-    toast.success('Coupon saved as draft');
-    router.push('/admin/marketing/coupons');
+    try {
+      const payload = buildPayload();
+      if (couponId) {
+        const res = await fetch(`/api/marketing/coupons/${couponId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const result = await res.json();
+          toast.error(result.error || 'Failed to save coupon');
+          return;
+        }
+      } else {
+        const res = await fetch('/api/marketing/coupons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, status: 'draft' }),
+        });
+        if (!res.ok) {
+          const result = await res.json();
+          toast.error(result.error || 'Failed to save coupon');
+          return;
+        }
+        const result = await res.json();
+        setCouponId(result.data.id);
+      }
+      toast.success('Coupon saved');
+      router.push(editId ? `/admin/marketing/coupons/${editId}` : '/admin/marketing/coupons');
+    } catch {
+      toast.error('Failed to save coupon');
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -851,7 +887,7 @@ export default function NewCouponPage() {
         resultData = result.data;
       }
 
-      toast.success(`Coupon ${resultData.code} created`);
+      toast.success(`Coupon ${resultData.code} ${editId ? 'updated' : 'created'}`);
       router.push(`/admin/marketing/coupons/${resultData.id}`);
     } catch {
       toast.error('Failed to create coupon');
@@ -927,6 +963,10 @@ export default function NewCouponPage() {
     if (minPurchase) {
       parts.push(`minimum purchase $${parseFloat(minPurchase).toFixed(2)}`);
     }
+    if (maxCustomerVisits !== '') {
+      const v = parseInt(maxCustomerVisits);
+      parts.push(v === 0 ? 'new customers only' : `customers with ${v} or fewer visits`);
+    }
 
     if (parts.length === 0) return 'Conditions enabled but none specified';
     const joiner = conditionLogic === 'and' ? ' AND ' : ' OR ';
@@ -994,7 +1034,7 @@ export default function NewCouponPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={couponId ? 'Edit Coupon Draft' : 'Create Coupon'}
+        title={editId ? 'Edit Coupon' : 'Create Coupon'}
         action={
           <Button
             variant="outline"
@@ -1588,6 +1628,23 @@ export default function NewCouponPage() {
                       placeholder="No minimum"
                     />
                   </FormField>
+
+                  {/* Maximum customer visits */}
+                  <FormField
+                    label="Maximum Customer Visits"
+                    htmlFor="max-visits"
+                    description="Limit to customers with this many visits or fewer. Set to 0 for new customers only. Leave it empty to include all customers."
+                  >
+                    <Input
+                      id="max-visits"
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={maxCustomerVisits}
+                      onChange={(e) => setMaxCustomerVisits(e.target.value)}
+                      placeholder="No limit"
+                    />
+                  </FormField>
                 </div>
               )}
             </div>
@@ -1975,19 +2032,6 @@ export default function NewCouponPage() {
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="mt-6 flex gap-3">
-              <Button onClick={handleCreate} disabled={creating}>
-                {creating ? 'Creating...' : 'Create Coupon'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSaveDraft}
-                disabled={creating}
-              >
-                Save Draft
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}
@@ -2003,14 +2047,20 @@ export default function NewCouponPage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={handleSaveDraft}
+            onClick={handleSaveAndExit}
           >
-            Save Draft
+            Save &amp; Exit
           </Button>
-          {canNext && (
+          {canNext ? (
             <Button onClick={goNext}>
               Next
               <ArrowRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button onClick={handleCreate} disabled={creating}>
+              {creating
+                ? (editId ? 'Updating...' : 'Creating...')
+                : (editId ? 'Update Coupon' : 'Create Coupon')}
             </Button>
           )}
         </div>

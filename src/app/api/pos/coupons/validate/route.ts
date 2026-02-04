@@ -264,6 +264,19 @@ export async function POST(request: NextRequest) {
       conditions.push(subtotal >= coupon.min_purchase);
     }
 
+    if (coupon.max_customer_visits != null) {
+      if (!customer_id) {
+        conditions.push(false);
+      } else {
+        const { data: visitCustomer } = await supabase
+          .from('customers')
+          .select('visit_count')
+          .eq('id', customer_id)
+          .single();
+        conditions.push((visitCustomer?.visit_count ?? 0) <= coupon.max_customer_visits);
+      }
+    }
+
     if (conditions.length > 0) {
       const conditionsMet =
         conditionLogic === 'and'
@@ -366,6 +379,18 @@ export async function POST(request: NextRequest) {
           failedParts.push(
             `minimum purchase of $${coupon.min_purchase.toFixed(2)}`
           );
+        }
+
+        if (coupon.max_customer_visits != null) {
+          if (!customer_id) {
+            failedParts.push('a customer account (new customer discount)');
+          } else {
+            failedParts.push(
+              coupon.max_customer_visits === 0
+                ? 'new customers only (no previous visits)'
+                : `customers with ${coupon.max_customer_visits} or fewer visits`
+            );
+          }
         }
 
         const joiner = conditionLogic === 'and' ? ' and ' : ' or ';

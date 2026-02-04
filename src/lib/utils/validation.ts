@@ -230,6 +230,7 @@ export const couponSchema = z.object({
   requires_product_category_ids: z.array(z.string().uuid()).optional().nullable(),
   requires_service_category_ids: z.array(z.string().uuid()).optional().nullable(),
   min_purchase: positiveNumber.optional().nullable(),
+  max_customer_visits: z.coerce.number().int().min(0).optional().nullable(),
   // Constraints
   is_single_use: z.boolean().default(true),
   max_uses: positiveInt.optional().nullable(),
