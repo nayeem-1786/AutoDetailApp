@@ -23,14 +23,26 @@ export async function POST(request: NextRequest) {
     const { filters = {}, channel = 'sms' } = body;
 
     const adminClient = createAdminClient();
-    const { totalMatch, consentEligible } = await previewAudienceCount(
+    const result = await previewAudienceCount(
       adminClient,
       filters,
       channel as CampaignChannel
     );
 
+    if (result.error) {
+      console.error('Audience preview query error:', result.error);
+      return NextResponse.json(
+        { error: `Audience query failed: ${result.error}` },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
-      data: { count: consentEligible, totalMatch, consentEligible },
+      data: {
+        count: result.consentEligible,
+        totalMatch: result.totalMatch,
+        consentEligible: result.consentEligible,
+      },
     });
   } catch (err) {
     console.error('Audience preview error:', err);

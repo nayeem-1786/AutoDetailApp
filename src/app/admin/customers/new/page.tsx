@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 
 export default function NewCustomerPage() {
   const router = useRouter();
@@ -51,6 +51,8 @@ export default function NewCustomerPage() {
 
   const smsConsent = watch('sms_consent');
   const emailConsent = watch('email_consent');
+  const watchPhone = watch('phone');
+  const watchEmail = watch('email');
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
@@ -271,25 +273,41 @@ export default function NewCustomerPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">SMS Marketing</p>
-                  <p className="text-xs text-gray-500">Allow promotional text messages</p>
+              <div>
+                <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">SMS Marketing</p>
+                    <p className="text-xs text-gray-500">Allow promotional text messages</p>
+                  </div>
+                  <Switch
+                    checked={smsConsent}
+                    onCheckedChange={(checked) => setValue('sms_consent', checked)}
+                  />
                 </div>
-                <Switch
-                  checked={smsConsent}
-                  onCheckedChange={(checked) => setValue('sms_consent', checked)}
-                />
+                {smsConsent && !watchPhone && (
+                  <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    SMS consent is on but no phone number is on file. Add a phone number or turn this off.
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Email Marketing</p>
-                  <p className="text-xs text-gray-500">Allow promotional emails</p>
+              <div>
+                <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Email Marketing</p>
+                    <p className="text-xs text-gray-500">Allow promotional emails</p>
+                  </div>
+                  <Switch
+                    checked={emailConsent}
+                    onCheckedChange={(checked) => setValue('email_consent', checked)}
+                  />
                 </div>
-                <Switch
-                  checked={emailConsent}
-                  onCheckedChange={(checked) => setValue('email_consent', checked)}
-                />
+                {emailConsent && !watchEmail && (
+                  <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    Email consent is on but no email address is on file. Add an email or turn this off.
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>

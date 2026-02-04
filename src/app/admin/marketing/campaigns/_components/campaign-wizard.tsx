@@ -158,10 +158,13 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   const buildFilters = useCallback(() => {
     const filters: Record<string, unknown> = {};
     if (lastService) filters.last_service = lastService;
-    if (daysSinceVisitMin) filters.days_since_visit_min = parseInt(daysSinceVisitMin);
-    if (daysSinceVisitMax) filters.days_since_visit_max = parseInt(daysSinceVisitMax);
+    const parsedMin = daysSinceVisitMin ? parseInt(daysSinceVisitMin) : NaN;
+    if (parsedMin > 0) filters.days_since_visit_min = parsedMin;
+    const parsedMax = daysSinceVisitMax ? parseInt(daysSinceVisitMax) : NaN;
+    if (parsedMax > 0) filters.days_since_visit_max = parsedMax;
     if (vehicleType) filters.vehicle_type = vehicleType;
-    if (minSpend) filters.min_spend = parseFloat(minSpend);
+    const parsedSpend = minSpend ? parseFloat(minSpend) : NaN;
+    if (parsedSpend > 0) filters.min_spend = parsedSpend;
     return filters;
   }, [lastService, daysSinceVisitMin, daysSinceVisitMax, vehicleType, minSpend]);
 
@@ -337,10 +340,12 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filters: buildFilters(), channel }),
       });
+      const json = await res.json();
       if (res.ok) {
-        const { data } = await res.json();
-        setAudienceCount(data.consentEligible);
-        setTotalMatch(data.totalMatch);
+        setAudienceCount(json.data.consentEligible);
+        setTotalMatch(json.data.totalMatch);
+      } else {
+        toast.error(json.error || 'Failed to preview audience');
       }
     } catch {
       toast.error('Failed to preview audience');
@@ -702,24 +707,29 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
               )}
               {(channel === 'email' || channel === 'both') && (
                 <>
-                  <FormField label="Email Subject" htmlFor="email_subject">
-                    <Input
-                      id="email_subject"
-                      value={emailSubject}
-                      onChange={(e) => setEmailSubject(e.target.value)}
-                      placeholder="Special offer just for you, {first_name}!"
-                    />
-                  </FormField>
-                  <FormField label="Email Body" htmlFor="email_template">
-                    <Textarea
-                      id="email_template"
-                      value={emailTemplate}
-                      onChange={(e) => setEmailTemplate(e.target.value)}
-                      rows={8}
-                      placeholder="Hi {first_name},&#10;&#10;We wanted to reach out with a special offer..."
-                    />
-                  </FormField>
-                  {variableChips(setEmailTemplate)}
+                  <div>
+                    <FormField label="Email Subject" htmlFor="email_subject">
+                      <Input
+                        id="email_subject"
+                        value={emailSubject}
+                        onChange={(e) => setEmailSubject(e.target.value)}
+                        placeholder="Special offer just for you, {first_name}!"
+                      />
+                    </FormField>
+                    {variableChips(setEmailSubject)}
+                  </div>
+                  <div>
+                    <FormField label="Email Body" htmlFor="email_template">
+                      <Textarea
+                        id="email_template"
+                        value={emailTemplate}
+                        onChange={(e) => setEmailTemplate(e.target.value)}
+                        rows={8}
+                        placeholder="Hi {first_name},&#10;&#10;We wanted to reach out with a special offer..."
+                      />
+                    </FormField>
+                    {variableChips(setEmailTemplate)}
+                  </div>
                 </>
               )}
             </div>
