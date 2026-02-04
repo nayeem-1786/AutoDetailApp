@@ -1,5 +1,7 @@
 # Auto Detail — Project Document
 
+> **Prerequisites:** See [`CONVENTIONS.md`](./CONVENTIONS.md) for component APIs, auth patterns, and project conventions.
+
 ## Business Overview
 
 **Business Name:** Smart Detail Auto Spa & Supplies

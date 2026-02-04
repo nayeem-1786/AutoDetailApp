@@ -4,6 +4,8 @@
 > **Last Updated:** 2026-02-01
 > **Status:** Approved — Owner reviewed and confirmed 2026-02-01
 
+> **Prerequisites:** See [`CONVENTIONS.md`](./CONVENTIONS.md) for component APIs, auth patterns, and project conventions.
+
 ---
 
 ## Table of Contents

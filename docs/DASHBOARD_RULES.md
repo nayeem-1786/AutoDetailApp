@@ -1,5 +1,7 @@
 # Dashboard Rules — Auto Detail
 
+> **Prerequisites:** See [`CONVENTIONS.md`](./CONVENTIONS.md) for component APIs, auth patterns, and project conventions.
+
 ## Purpose
 
 This document is the **single source of truth** for how the Auto Detail admin dashboard and management interface should be designed, organized, and operated. It is informed by analysis of the existing Square Dashboard and expanded to cover all features of the new system.

@@ -1,5 +1,7 @@
 # Data Migration Rules — Auto Detail
 
+> **Prerequisites:** See [`CONVENTIONS.md`](./CONVENTIONS.md) for component APIs, auth patterns, and project conventions.
+
 ## Purpose
 
 This document is the **single source of truth** for how inbound data from Square is handled during migration to the Auto Detail platform. All decisions regarding data cleaning, field mapping, classification, deduplication, and import logic are documented here.
