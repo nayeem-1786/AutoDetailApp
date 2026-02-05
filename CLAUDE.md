@@ -85,6 +85,12 @@ ALTER TABLE customers ADD COLUMN deactivated_auth_user_id UUID;
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
 
+## Tomorrow's Priority Tasks
+- [ ] Setup Stripe handheld device (card reader) for testing with POS transactions
+- [ ] Setup receipt printer integration for POS
+- [ ] Add IP whitelist for POS access (3 authorized IP addresses)
+- [ ] Run pending SQL migrations in Supabase
+
 ## Customer Portal Redesign
 
 ### Design Principles
