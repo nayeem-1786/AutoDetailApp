@@ -1288,30 +1288,14 @@ export default function CustomerProfilePage() {
             </DialogContent>
             {!loadingReceipt && receiptTransaction && (
               <DialogFooter className="flex-col items-stretch gap-3">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleReceiptPrint}
-                    disabled={receiptPrinting || receiptPrinted}
-                  >
-                    {receiptPrinting ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : receiptPrinted ? (
-                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
-                    ) : (
-                      <Printer className="mr-1.5 h-4 w-4" />
-                    )}
-                    Receipt Printer
-                  </Button>
-
+                <div className="grid grid-cols-4 gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleReceiptCopierPrint}
                   >
-                    <Copy className="mr-1.5 h-4 w-4" />
-                    Print (Copier)
+                    <Printer className="mr-1.5 h-4 w-4" />
+                    Print
                   </Button>
 
                   <Button
@@ -1358,6 +1342,22 @@ export default function CustomerProfilePage() {
                       <MessageSquare className="mr-1.5 h-4 w-4" />
                     )}
                     SMS
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReceiptPrint}
+                    disabled={receiptPrinting || receiptPrinted}
+                  >
+                    {receiptPrinting ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : receiptPrinted ? (
+                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
+                    ) : (
+                      <Receipt className="mr-1.5 h-4 w-4" />
+                    )}
+                    Receipt
                   </Button>
                 </div>
 

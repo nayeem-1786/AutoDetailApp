@@ -36,6 +36,7 @@ export interface ReceiptLine {
   type: 'header' | 'text' | 'bold' | 'divider' | 'columns' | 'spacer' | 'image';
   text?: string;
   left?: string;
+  center?: string;
   right?: string;
   url?: string;
   width?: number;
@@ -98,19 +99,14 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     right: new Date(tx.transaction_date).toLocaleDateString(),
   });
 
-  // Cashier
-  if (tx.employee) {
+  // Customer (left) + Employee name (right) on same line
+  const customerStr = tx.customer ? `Customer: ${tx.customer.first_name} ${tx.customer.last_name}` : '';
+  const employeeStr = tx.employee ? tx.employee.first_name : '';
+  if (customerStr || employeeStr) {
     lines.push({
-      type: 'text',
-      text: `Cashier: ${tx.employee.first_name} ${tx.employee.last_name}`,
-    });
-  }
-
-  // Customer
-  if (tx.customer) {
-    lines.push({
-      type: 'text',
-      text: `Customer: ${tx.customer.first_name} ${tx.customer.last_name}`,
+      type: 'columns',
+      left: customerStr,
+      right: employeeStr,
     });
   }
 
@@ -126,18 +122,25 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
 
   lines.push({ type: 'divider' });
 
-  // Items
+  // Items layout:
+  //   qty > 1: line 1 = item name (full width, wraps if long)
+  //            line 2 = indented qty + price + TX
+  //   qty = 1: single line = name + price + TX
   for (const item of tx.items) {
-    lines.push({
-      type: 'columns',
-      left: `${item.item_name}${item.quantity > 1 ? ` x${item.quantity}` : ''}`,
-      right: `$${item.total_price.toFixed(2)}`,
-    });
-    if (item.tax_amount > 0) {
+    const price = `$${item.total_price.toFixed(2)}`;
+    const txCol = item.tax_amount > 0 ? ' TX' : '   ';
+    if (item.quantity > 1) {
+      lines.push({ type: 'columns', left: item.item_name, right: '' });
       lines.push({
         type: 'columns',
-        left: '  Tax',
-        right: `$${item.tax_amount.toFixed(2)}`,
+        left: `  ${item.quantity} x $${item.unit_price.toFixed(2)} each`,
+        right: `${price}${txCol}`,
+      });
+    } else {
+      lines.push({
+        type: 'columns',
+        left: item.item_name,
+        right: `${price}${txCol}`,
       });
     }
   }
@@ -246,7 +249,15 @@ export function receiptToPlainText(
           return '-'.repeat(width);
         case 'columns': {
           const left = line.left ?? '';
+          const center = line.center ?? '';
           const right = line.right ?? '';
+          if (center) {
+            const usedLen = left.length + center.length + right.length;
+            const totalGap = Math.max(2, width - usedLen);
+            const gapLeft = Math.ceil(totalGap / 2);
+            const gapRight = totalGap - gapLeft;
+            return left + ' '.repeat(gapLeft) + center + ' '.repeat(gapRight) + right;
+          }
           const gap = width - left.length - right.length;
           return left + ' '.repeat(Math.max(1, gap)) + right;
         }
@@ -291,15 +302,24 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 
   const itemRows = tx.items
     .map((item) => {
-      const qty = item.quantity > 1 ? ` x${item.quantity}` : '';
-      const taxNote = item.tax_amount > 0
-        ? `<div style="font-size:11px;color:#888;padding-left:12px;">Tax: $${item.tax_amount.toFixed(2)}</div>`
-        : '';
+      const txCell = item.tax_amount > 0 ? 'TX' : '';
+      if (item.quantity > 1) {
+        // Multi-qty: name on own row (full width), qty + price + TX on next row
+        return `<tr>
+          <td colspan="3" style="padding:4px 0 0;font-size:14px;">${esc(item.item_name)}</td>
+        </tr>
+        <tr>
+          <td style="padding:0 0 4px 12px;font-size:13px;color:#444;">${item.quantity} x $${item.unit_price.toFixed(2)} each</td>
+          <td style="padding:0 0 4px;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
+          <td style="padding:0 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
+        </tr>`;
+      }
+      // Single qty: name + price + TX on one row
       return `<tr>
-        <td style="padding:4px 0;font-size:13px;">${esc(item.item_name)}${qty}</td>
-        <td style="padding:4px 0;font-size:13px;text-align:right;">$${item.total_price.toFixed(2)}</td>
-      </tr>
-      ${taxNote ? `<tr><td colspan="2">${taxNote}</td></tr>` : ''}`;
+        <td style="padding:4px 0;font-size:14px;">${esc(item.item_name)}</td>
+        <td style="padding:4px 0;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
+        <td style="padding:4px 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
+      </tr>`;
     })
     .join('');
 
@@ -326,27 +346,44 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     ? `<div style="text-align:${logoAlign};margin:8px 0;"><img src="${esc(c.logo_url)}" alt="" style="display:inline-block;width:${c.logo_width}px;max-width:100%;height:auto;" /></div>`
     : '';
 
-  // Contact lines
-  const emailLine = c.email ? `<div style="font-size:12px;color:#666;">${esc(c.email)}</div>` : '';
-  const websiteLine = c.website ? `<div style="font-size:12px;color:#666;">${esc(c.website)}</div>` : '';
+  // Contact lines — wrapped in <a> tags with explicit color to prevent
+  // email clients from auto-linking as blue text (invisible on dark mode)
+  const linkStyle = 'color:#444444;text-decoration:none;';
+  const emailLine = c.email ? `<div style="font-size:13px;"><a href="mailto:${esc(c.email)}" style="${linkStyle}">${esc(c.email)}</a></div>` : '';
+  const websiteLine = c.website ? `<div style="font-size:13px;"><a href="${esc(c.website)}" style="${linkStyle}">${esc(c.website)}</a></div>` : '';
 
   // Custom text HTML
   const customTextHtml = c.custom_text
-    ? `<div style="text-align:center;font-size:11px;color:#888;margin:8px 0;white-space:pre-wrap;">${esc(c.custom_text)}</div>`
+    ? `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(c.custom_text)}</div>`
     : '';
 
   return `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:20px;background:#f5f5f5;font-family:'Courier New',Courier,monospace;">
-<div style="max-width:400px;margin:0 auto;background:#fff;border:1px solid #ddd;padding:24px 20px;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-modes" content="light dark">
+<style>
+  @media (prefers-color-scheme: dark) {
+    body { background: #1a1a1a !important; }
+    .receipt-wrap { background: #222 !important; border-color: #444 !important; color: #e0e0e0 !important; }
+    .receipt-wrap a { color: #cccccc !important; }
+    .receipt-wrap hr { border-color: #555 !important; }
+    .receipt-wrap td, .receipt-wrap div { color: #e0e0e0 !important; }
+    .receipt-wrap .tx-col { color: #aaa !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:20px;background:#f5f5f5;">
+<div class="receipt-wrap" style="max-width:400px;margin:0 auto;background:#fff;border:1px solid #ddd;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#222;line-height:1.5;">
   <!-- Header -->
   ${c.logo_placement === 'above_name' ? logoHtml : ''}
   <div style="text-align:center;margin-bottom:16px;">
     <div style="font-size:18px;font-weight:bold;letter-spacing:1px;">${esc(c.name)}</div>
     ${c.logo_placement === 'below_name' ? logoHtml : ''}
-    <div style="font-size:12px;color:#666;margin-top:4px;">${esc(c.address)}</div>
-    <div style="font-size:12px;color:#666;">${esc(c.phone)}</div>
+    <div style="font-size:13px;margin-top:4px;"><a style="${linkStyle}">${esc(c.address)}</a></div>
+    <div style="font-size:13px;"><a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}" style="${linkStyle}">${esc(c.phone)}</a></div>
     ${emailLine}
     ${websiteLine}
   </div>
@@ -356,16 +393,18 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   ${c.custom_text && c.custom_text_placement === 'below_header' ? customTextHtml + '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">' : ''}
 
   <!-- Receipt info -->
-  <table style="width:100%;font-size:13px;margin-bottom:4px;">
+  <table style="width:100%;font-size:14px;margin-bottom:4px;">
     <tr>
       <td>Receipt #${esc(tx.receipt_number || 'N/A')}</td>
       <td style="text-align:right;">${esc(date)}</td>
     </tr>
   </table>
 
-  ${tx.employee ? `<div style="font-size:13px;">Cashier: ${esc(tx.employee.first_name)} ${esc(tx.employee.last_name)}</div>` : ''}
-  ${tx.customer ? `<div style="font-size:13px;">Customer: ${esc(tx.customer.first_name)} ${esc(tx.customer.last_name)}</div>` : ''}
-  ${vehicleStr ? `<div style="font-size:13px;">Vehicle: ${esc(vehicleStr)}</div>` : ''}
+  ${tx.customer || tx.employee ? `<table style="width:100%;font-size:14px;"><tr>
+      <td>${tx.customer ? `Customer: ${esc(tx.customer.first_name)} ${esc(tx.customer.last_name)}` : ''}</td>
+      <td style="text-align:right;">${tx.employee ? esc(tx.employee.first_name) : ''}</td>
+    </tr></table>` : ''}
+  ${vehicleStr ? `<div style="font-size:14px;">Vehicle: ${esc(vehicleStr)}</div>` : ''}
 
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
 
@@ -391,7 +430,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
 
   <!-- Payments -->
-  <div style="font-size:12px;color:#666;margin-bottom:4px;">Payment</div>
+  <div style="font-size:13px;color:#333;margin-bottom:4px;font-weight:bold;">Payment</div>
   <table style="width:100%;border-collapse:collapse;">
     ${paymentRows}
   </table>
@@ -400,7 +439,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   ${c.custom_text && c.custom_text_placement === 'above_footer' ? customTextHtml : ''}
 
   <!-- Footer -->
-  <div style="text-align:center;margin-top:20px;font-size:13px;color:#666;">
+  <div style="text-align:center;margin-top:20px;font-size:14px;color:#333;">
     Thank you for your business!
   </div>
 
@@ -413,7 +452,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 function row(left: string, right: string, color?: string): string {
   const style = color ? `;color:${color}` : '';
   return `<tr>
-    <td style="padding:3px 0;font-size:13px${style}">${left}</td>
-    <td style="padding:3px 0;font-size:13px;text-align:right${style}">${right}</td>
+    <td style="padding:3px 0;font-size:14px${style}">${left}</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right${style}">${right}</td>
   </tr>`;
 }

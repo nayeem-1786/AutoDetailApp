@@ -81,7 +81,9 @@ export async function POST(request: NextRequest) {
     const itemLines = items
       .map(
         (i) =>
-          `${i.item_name} x${i.quantity} — $${i.total_price.toFixed(2)}${i.tax_amount > 0 ? ` (+$${i.tax_amount.toFixed(2)} tax)` : ''}`
+          i.quantity > 1
+            ? `${i.item_name}\n  ${i.quantity} x $${i.unit_price.toFixed(2)} each${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`
+            : `${i.item_name}${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`
       )
       .join('\n');
 

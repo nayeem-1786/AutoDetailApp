@@ -101,9 +101,19 @@ async function buildWebPRNTXml(lines: ReceiptLine[]): Promise<string> {
 
       case 'columns': {
         const left = line.left ?? '';
+        const center = line.center ?? '';
         const right = line.right ?? '';
-        const gap = 48 - left.length - right.length;
-        const padded = left + ' '.repeat(Math.max(1, gap)) + right;
+        let padded: string;
+        if (center) {
+          const usedLen = left.length + center.length + right.length;
+          const totalGap = Math.max(2, 48 - usedLen);
+          const gapLeft = Math.ceil(totalGap / 2);
+          const gapRight = totalGap - gapLeft;
+          padded = left + ' '.repeat(gapLeft) + center + ' '.repeat(gapRight) + right;
+        } else {
+          const gap = 48 - left.length - right.length;
+          padded = left + ' '.repeat(Math.max(1, gap)) + right;
+        }
         body += `<text>${escapeXml(padded)}\n</text>\n`;
         break;
       }

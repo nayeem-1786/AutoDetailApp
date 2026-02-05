@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Printer, Mail, MessageSquare, Loader2, Check } from 'lucide-react';
+import { Printer, Mail, MessageSquare, Receipt, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
-import { generateReceiptLines } from '../lib/receipt-template';
+import { generateReceiptLines, generateReceiptHtml } from '../lib/receipt-template';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 import { printReceipt } from '../lib/star-printer';
 
@@ -28,13 +28,14 @@ export function ReceiptOptions({
   const [emailed, setEmailed] = useState(false);
   const [smsing, setSmsing] = useState(false);
   const [smsed, setSmsed] = useState(false);
+  const [copierPrinting, setCopierPrinting] = useState(false);
 
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [emailInput, setEmailInput] = useState(customerEmail ?? '');
   const [showSmsInput, setShowSmsInput] = useState(false);
   const [smsInput, setSmsInput] = useState(customerPhone ? formatPhone(customerPhone) : '');
 
-  async function handlePrint() {
+  async function handleReceiptPrint() {
     setPrinting(true);
     try {
       const res = await posFetch('/api/pos/receipts/print', {
@@ -58,6 +59,41 @@ export function ReceiptOptions({
       toast.error(err instanceof Error ? err.message : 'Print failed');
     } finally {
       setPrinting(false);
+    }
+  }
+
+  async function handleCopierPrint() {
+    // Open window immediately in the click handler so Safari/iPad doesn't block it
+    const printWindow = window.open('', '_blank', 'width=450,height=700');
+    if (!printWindow) {
+      toast.error('Pop-up blocked — allow pop-ups and try again');
+      return;
+    }
+    printWindow.document.write('<html><body><p>Loading receipt…</p></body></html>');
+
+    setCopierPrinting(true);
+    try {
+      const res = await posFetch(`/api/pos/transactions/${transactionId}`);
+      const json = await res.json();
+      if (!res.ok) {
+        printWindow.close();
+        toast.error(json.error || 'Failed to load receipt');
+        return;
+      }
+
+      const tx = json.data;
+      const rcfg: MergedReceiptConfig | undefined = json.receipt_config ?? undefined;
+      const html = generateReceiptHtml(tx, rcfg);
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    } catch (err) {
+      printWindow.close();
+      toast.error(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      setCopierPrinting(false);
     }
   }
 
@@ -115,17 +151,15 @@ export function ReceiptOptions({
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="flex gap-3">
+      <div className="grid grid-cols-4 gap-2">
         <Button
           variant="outline"
           size="sm"
-          onClick={handlePrint}
-          disabled={printing || printed}
+          onClick={handleCopierPrint}
+          disabled={copierPrinting}
         >
-          {printing ? (
+          {copierPrinting ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-          ) : printed ? (
-            <Check className="mr-1.5 h-4 w-4 text-green-500" />
           ) : (
             <Printer className="mr-1.5 h-4 w-4" />
           )}
@@ -174,6 +208,22 @@ export function ReceiptOptions({
             <MessageSquare className="mr-1.5 h-4 w-4" />
           )}
           SMS
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReceiptPrint}
+          disabled={printing || printed}
+        >
+          {printing ? (
+            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+          ) : printed ? (
+            <Check className="mr-1.5 h-4 w-4 text-green-500" />
+          ) : (
+            <Receipt className="mr-1.5 h-4 w-4" />
+          )}
+          Receipt
         </Button>
       </div>
 
