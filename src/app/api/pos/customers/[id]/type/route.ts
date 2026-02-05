@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 
 const CUSTOMER_TYPES = ['enthusiast', 'professional'] as const;
@@ -21,9 +22,14 @@ export async function PATCH(
       );
     }
 
+    // Accept POS token auth OR admin Supabase session auth
     const posEmployee = authenticatePosRequest(request);
     if (!posEmployee) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
     const supabase = createAdminClient();
 
