@@ -11,8 +11,13 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { Info, Plus, Globe, Trash2, ShieldCheck, ShieldOff } from 'lucide-react';
 
+// IPv4: 192.168.1.1
 const IPV4_REGEX =
   /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
+// IPv6: 2001:0db8:85a3::8a2e:0370:7334 (full or compressed)
+const IPV6_REGEX =
+  /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,7}:$|^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}$|^([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}$|^([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}$|^([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}$|^[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})$|^:((:[0-9a-fA-F]{1,4}){1,7}|:)$/;
 
 export default function PosSecurityPage() {
   const [loading, setLoading] = useState(true);
@@ -87,7 +92,11 @@ export default function PosSecurityPage() {
 
   function validateIp(value: string): string | null {
     if (!value.trim()) return null; // Allow empty
-    return IPV4_REGEX.test(value.trim()) ? null : 'Enter a valid IPv4 address';
+    const trimmed = value.trim();
+    if (IPV4_REGEX.test(trimmed) || IPV6_REGEX.test(trimmed)) {
+      return null;
+    }
+    return 'Enter a valid IP address (IPv4 or IPv6)';
   }
 
   function handleIpChange(index: number, value: string) {
