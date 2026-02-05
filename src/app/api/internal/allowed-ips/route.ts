@@ -18,7 +18,16 @@ export async function GET() {
       settings[row.key] = row.value;
     }
 
-    const ips = Array.isArray(settings.pos_allowed_ips) ? settings.pos_allowed_ips : [];
+    // Handle both old format (string[]) and new format ({ip, name}[])
+    const rawIps = settings.pos_allowed_ips;
+    let ips: string[] = [];
+    if (Array.isArray(rawIps)) {
+      ips = rawIps.map((item) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null && item.ip) return item.ip;
+        return '';
+      }).filter(Boolean);
+    }
     const enabled = settings.pos_ip_whitelist_enabled === true;
 
     return NextResponse.json(

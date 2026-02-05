@@ -19,11 +19,16 @@ const IPV4_REGEX =
 const IPV6_REGEX =
   /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,7}:$|^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}$|^([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}$|^([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}$|^([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}$|^[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})$|^:((:[0-9a-fA-F]{1,4}){1,7}|:)$/;
 
+interface IpEntry {
+  ip: string;
+  name: string;
+}
+
 export default function PosSecurityPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentIp, setCurrentIp] = useState<string | null>(null);
-  const [ips, setIps] = useState<string[]>([]);
+  const [entries, setEntries] = useState<IpEntry[]>([]);
   const [enabled, setEnabled] = useState(false);
   const [errors, setErrors] = useState<Record<number, string>>({});
 
@@ -52,8 +57,23 @@ export default function PosSecurityPage() {
         settings[row.key] = row.value;
       }
 
-      const savedIps = Array.isArray(settings.pos_allowed_ips) ? settings.pos_allowed_ips : [];
-      setIps(savedIps);
+      // Handle both old format (string[]) and new format (IpEntry[])
+      const savedData = settings.pos_allowed_ips;
+      let savedEntries: IpEntry[] = [];
+      if (Array.isArray(savedData)) {
+        savedEntries = savedData.map((item) => {
+          if (typeof item === 'string') {
+            // Old format: just IP string
+            return { ip: item, name: '' };
+          } else if (typeof item === 'object' && item !== null) {
+            // New format: { ip, name }
+            return { ip: item.ip || '', name: item.name || '' };
+          }
+          return { ip: '', name: '' };
+        });
+      }
+
+      setEntries(savedEntries);
       setEnabled(settings.pos_ip_whitelist_enabled === true);
       setLoading(false);
     }
@@ -63,8 +83,8 @@ export default function PosSecurityPage() {
   // Auto-save toggle immediately when changed
   async function handleToggleChange(newEnabled: boolean) {
     // Don't allow enabling with no IPs
-    const cleanIps = ips.map((ip) => ip.trim()).filter(Boolean);
-    if (newEnabled && cleanIps.length === 0) {
+    const validEntries = entries.filter((e) => e.ip.trim());
+    if (newEnabled && validEntries.length === 0) {
       toast.error('Add at least one IP address before enabling restrictions');
       return;
     }
@@ -96,13 +116,13 @@ export default function PosSecurityPage() {
     if (IPV4_REGEX.test(trimmed) || IPV6_REGEX.test(trimmed)) {
       return null;
     }
-    return 'Enter a valid IP address (IPv4 or IPv6)';
+    return 'Enter a valid IP address';
   }
 
   function handleIpChange(index: number, value: string) {
-    const newIps = [...ips];
-    newIps[index] = value;
-    setIps(newIps);
+    const newEntries = [...entries];
+    newEntries[index] = { ...newEntries[index], ip: value };
+    setEntries(newEntries);
 
     // Validate
     const error = validateIp(value);
@@ -117,13 +137,19 @@ export default function PosSecurityPage() {
     });
   }
 
-  function addIpField() {
-    setIps([...ips, '']);
+  function handleNameChange(index: number, value: string) {
+    const newEntries = [...entries];
+    newEntries[index] = { ...newEntries[index], name: value };
+    setEntries(newEntries);
   }
 
-  function removeIp(index: number) {
-    const newIps = ips.filter((_, i) => i !== index);
-    setIps(newIps);
+  function addEntry() {
+    setEntries([...entries, { ip: '', name: '' }]);
+  }
+
+  function removeEntry(index: number) {
+    const newEntries = entries.filter((_, i) => i !== index);
+    setEntries(newEntries);
     // Rebuild errors with adjusted indices
     setErrors((prev) => {
       const next: Record<number, string> = {};
@@ -143,19 +169,19 @@ export default function PosSecurityPage() {
     if (!currentIp || currentIp === 'unknown') return;
 
     // Check if already added
-    if (ips.includes(currentIp)) {
+    if (entries.some((e) => e.ip === currentIp)) {
       toast.info('This IP is already in the whitelist');
       return;
     }
 
-    setIps([...ips, currentIp]);
+    setEntries([...entries, { ip: currentIp, name: 'Current Location' }]);
   }
 
   async function handleSave() {
     // Validate all
     const newErrors: Record<number, string> = {};
-    ips.forEach((ip, index) => {
-      const error = validateIp(ip);
+    entries.forEach((entry, index) => {
+      const error = validateIp(entry.ip);
       if (error) newErrors[index] = error;
     });
 
@@ -165,11 +191,13 @@ export default function PosSecurityPage() {
       return;
     }
 
-    // Filter empty and trim
-    const cleanIps = ips.map((ip) => ip.trim()).filter(Boolean);
+    // Filter entries with valid IPs
+    const cleanEntries = entries
+      .filter((e) => e.ip.trim())
+      .map((e) => ({ ip: e.ip.trim(), name: e.name.trim() }));
 
     // Warn if enabling with no IPs
-    if (enabled && cleanIps.length === 0) {
+    if (enabled && cleanEntries.length === 0) {
       toast.error('Add at least one IP address before enabling restrictions');
       return;
     }
@@ -177,16 +205,17 @@ export default function PosSecurityPage() {
     setSaving(true);
     const supabase = createClient();
 
-    // Save both settings
+    // Save entries
     const { error: ipsError } = await supabase.from('business_settings').upsert(
       {
         key: 'pos_allowed_ips',
-        value: cleanIps as unknown,
+        value: cleanEntries as unknown,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'key' }
     );
 
+    // Save enabled state
     const { error: enabledError } = await supabase.from('business_settings').upsert(
       {
         key: 'pos_ip_whitelist_enabled',
@@ -202,19 +231,19 @@ export default function PosSecurityPage() {
       return;
     }
 
-    toast.success(enabled ? 'IP restrictions enabled' : 'Settings saved');
-    setIps(cleanIps);
+    toast.success('IP whitelist saved');
+    setEntries(cleanEntries);
     setSaving(false);
   }
 
-  // Count valid IPs (non-empty, trimmed)
-  const currentClean = ips.map((ip) => ip.trim()).filter(Boolean);
-  const hasValidIps = currentClean.length > 0;
+  // Count valid IPs (non-empty)
+  const validEntries = entries.filter((e) => e.ip.trim());
+  const hasValidIps = validEntries.length > 0;
 
   // Check if any non-empty IP has a validation error
-  const hasErrors = ips.some((ip, index) => ip.trim() && errors[index]);
+  const hasErrors = entries.some((entry, index) => entry.ip.trim() && errors[index]);
 
-  const isCurrentIpAdded = currentIp && currentIp !== 'unknown' && ips.includes(currentIp);
+  const isCurrentIpAdded = currentIp && currentIp !== 'unknown' && entries.some((e) => e.ip === currentIp);
 
   if (loading) {
     return (
@@ -332,12 +361,21 @@ export default function PosSecurityPage() {
             from that location.
           </p>
 
+          {/* Header row */}
+          {entries.length > 0 && (
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <span>IP Address</span>
+              <span>Location Name</span>
+              <span className="w-9"></span>
+            </div>
+          )}
+
           <div className="space-y-3">
-            {ips.map((ip, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <div className="flex-1">
+            {entries.map((entry, index) => (
+              <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                <div>
                   <Input
-                    value={ip}
+                    value={entry.ip}
                     onChange={(e) => handleIpChange(index, e.target.value)}
                     placeholder="e.g., 172.249.105.229"
                     className={errors[index] ? 'border-red-500' : ''}
@@ -346,11 +384,16 @@ export default function PosSecurityPage() {
                     <p className="mt-1 text-xs text-red-600">{errors[index]}</p>
                   )}
                 </div>
+                <Input
+                  value={entry.name}
+                  onChange={(e) => handleNameChange(index, e.target.value)}
+                  placeholder="e.g., Office, Home, Shop"
+                />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => removeIp(index)}
+                  onClick={() => removeEntry(index)}
                   className="text-gray-400 hover:text-red-600"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -358,13 +401,13 @@ export default function PosSecurityPage() {
               </div>
             ))}
 
-            {ips.length === 0 && (
+            {entries.length === 0 && (
               <p className="py-4 text-center text-sm text-gray-400">
                 No IP addresses configured. Add IPs to restrict POS access.
               </p>
             )}
 
-            <Button type="button" variant="outline" size="sm" onClick={addIpField}>
+            <Button type="button" variant="outline" size="sm" onClick={addEntry}>
               <Plus className="mr-1 h-4 w-4" />
               Add IP Address
             </Button>
@@ -401,8 +444,8 @@ export default function PosSecurityPage() {
           <div className="flex items-center justify-between border-t border-gray-200 pt-4">
             <p className="text-xs text-gray-400">
               {hasValidIps
-                ? `${currentClean.length} IP${currentClean.length !== 1 ? 's' : ''} configured`
-                : 'No IPs configured'}
+                ? `${validEntries.length} location${validEntries.length !== 1 ? 's' : ''} configured`
+                : 'No locations configured'}
             </p>
             <Button onClick={handleSave} disabled={saving || hasErrors}>
               {saving ? 'Saving...' : 'Save Changes'}
