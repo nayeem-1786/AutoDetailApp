@@ -94,6 +94,10 @@ export default function CustomerProfilePage() {
   const [reactivatingPortal, setReactivatingPortal] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
+  // Delete customer state
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0); // 0=closed, 1=first confirm, 2=final confirm
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
+
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,7 +181,7 @@ export default function CustomerProfilePage() {
     reset({
       first_name: custRes.data.first_name,
       last_name: custRes.data.last_name,
-      phone: custRes.data.phone || '',
+      phone: custRes.data.phone ? formatPhone(custRes.data.phone) : '',
       email: custRes.data.email || '',
       birthday: custRes.data.birthday || '',
       address_line_1: custRes.data.address_line_1 || '',
@@ -585,6 +589,31 @@ export default function CustomerProfilePage() {
       toast.error(err instanceof Error ? err.message : 'Failed to reactivate portal access');
     } finally {
       setReactivatingPortal(false);
+    }
+  }
+
+  // --- Delete Customer ---
+  async function handleDeleteCustomer() {
+    if (!customer) return;
+    setDeletingCustomer(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customer.id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to delete customer');
+      }
+
+      toast.success('Customer deleted successfully');
+      router.push('/admin/customers');
+    } catch (err) {
+      console.error('Delete customer error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to delete customer');
+      setDeleteStep(0);
+    } finally {
+      setDeletingCustomer(false);
     }
   }
 
@@ -1104,13 +1133,24 @@ export default function CustomerProfilePage() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => router.push('/admin/customers')}>
-                Cancel
+            <div className="flex justify-between">
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => setDeleteStep(1)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Customer
               </Button>
-              <Button type="submit" disabled={saving || !isDirty}>
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" onClick={() => router.push('/admin/customers')}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saving || !isDirty}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
             </div>
           </form>
         </TabsContent>
@@ -1621,6 +1661,50 @@ export default function CustomerProfilePage() {
           </Dialog>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Customer - First Confirmation */}
+      <ConfirmDialog
+        open={deleteStep === 1}
+        onOpenChange={(open) => { if (!open) setDeleteStep(0); }}
+        title="Delete Customer"
+        description={
+          <div className="space-y-3">
+            <p>Are you sure you want to delete <strong>{customer?.first_name} {customer?.last_name}</strong>?</p>
+            <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="font-medium">This will permanently delete:</p>
+              <ul className="mt-1 list-disc pl-5">
+                <li>Customer profile and contact information</li>
+                <li>All {vehicles.length} vehicle record(s)</li>
+                <li>Loyalty points balance ({formatPoints(customer?.loyalty_points_balance || 0)} pts)</li>
+                <li>Portal access (if any)</li>
+              </ul>
+              <p className="mt-2">Transaction history will be preserved but unlinked from this customer.</p>
+            </div>
+          </div>
+        }
+        confirmLabel="Yes, Continue"
+        variant="destructive"
+        onConfirm={() => setDeleteStep(2)}
+      />
+
+      {/* Delete Customer - Final Confirmation */}
+      <ConfirmDialog
+        open={deleteStep === 2}
+        onOpenChange={(open) => { if (!open) setDeleteStep(0); }}
+        title="Final Confirmation"
+        description={
+          <div className="space-y-3">
+            <p className="text-red-600 font-medium">This action cannot be undone.</p>
+            <p>Type the customer&apos;s first name to confirm deletion:</p>
+            <p className="text-center font-mono text-lg font-bold text-gray-900">{customer?.first_name}</p>
+          </div>
+        }
+        confirmLabel={deletingCustomer ? 'Deleting...' : 'Permanently Delete'}
+        variant="destructive"
+        loading={deletingCustomer}
+        requireConfirmText={customer?.first_name || ''}
+        onConfirm={handleDeleteCustomer}
+      />
     </div>
   );
 }

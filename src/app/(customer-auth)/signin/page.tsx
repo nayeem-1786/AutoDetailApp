@@ -126,7 +126,7 @@ export default function CustomerSignInPage() {
         return;
       }
 
-      // Check for customer record
+      // Check for customer record by auth_user_id first
       const { data: cust } = await supabase
         .from('customers')
         .select('id')
@@ -134,10 +134,48 @@ export default function CustomerSignInPage() {
         .single();
 
       if (!cust) {
-        // No customer record — redirect to signup with phone pre-filled
-        const phoneParam = encodeURIComponent(data.phone);
-        router.push(`/signup?phone=${phoneParam}`);
-        return;
+        // No linked customer — try to link via API (bypasses RLS)
+        try {
+          const linkRes = await fetch('/api/customer/link-by-phone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: e164 }),
+          });
+
+          const linkData = await linkRes.json();
+          console.log('[SignIn] Link by phone result:', linkData);
+
+          if (linkData.success) {
+            // Successfully linked or already linked — continue to account
+            router.push(redirectTo);
+            router.refresh();
+            return;
+          }
+
+          if (linkData.error === 'This phone number is already linked to another account') {
+            await supabase.auth.signOut();
+            setError('This phone number is already linked to another account.');
+            setLoading(false);
+            return;
+          }
+
+          if (!linkData.found) {
+            // No customer record — redirect to signup with phone pre-filled
+            const phoneParam = encodeURIComponent(data.phone);
+            router.push(`/signup?phone=${phoneParam}`);
+            return;
+          }
+
+          // Other error
+          setError(linkData.error || 'Failed to link your account. Please contact support.');
+          setLoading(false);
+          return;
+        } catch (linkErr) {
+          console.error('Link API error:', linkErr);
+          setError('Failed to link your account. Please contact support.');
+          setLoading(false);
+          return;
+        }
       }
     }
 
