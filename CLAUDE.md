@@ -47,6 +47,11 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - **POS API routes** use `authenticatePosRequest()` + `createAdminClient()` (service role). Admin routes still use cookie-based `createClient()` + `supabase.auth.getUser()`
 - **POS components** use `usePosAuth()` from `pos-auth-context` and `posFetch()` for all API calls. Admin components use `useAuth()` from `auth-provider` unchanged
 
+## Task List
+- [ ] Fix bugs in receipts (various issues to investigate)
+- [ ] Fix loyalty points showing as "Discount" on receipt — should display correctly as points redeemed
+- [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
+
 ## Session Instructions
 - Update this file at end of session or when asked
 - Reference `docs/PROJECT.md` for full specs, `docs/DASHBOARD_RULES.md` for admin UI structure
