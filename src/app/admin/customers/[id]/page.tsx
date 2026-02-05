@@ -868,8 +868,8 @@ export default function CustomerProfilePage() {
                     <Input id="last_name" {...register('last_name')} />
                   </FormField>
 
-                  <FormField label="Phone" error={errors.phone?.message} htmlFor="phone">
-                    <Input id="phone" {...register('phone')} placeholder="+1XXXXXXXXXX" />
+                  <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
+                    <Input id="phone" {...register('phone')} placeholder="(310) 555-1234" />
                   </FormField>
 
                   <FormField label="Email" error={errors.email?.message} htmlFor="email">
@@ -972,7 +972,7 @@ export default function CustomerProfilePage() {
                     {smsConsent && !watchPhone && (
                       <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                        SMS consent is on but no phone number is on file. Add a phone number or turn this off.
+                        SMS consent is on but no mobile number is on file. Add a mobile number or turn this off.
                       </div>
                     )}
                   </div>

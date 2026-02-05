@@ -404,7 +404,7 @@ export default function CustomersPage() {
     },
     {
       id: 'phone',
-      header: 'Phone',
+      header: 'Mobile',
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">
           {row.original.phone ? formatPhone(row.original.phone) : '--'}

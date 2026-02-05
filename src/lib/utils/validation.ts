@@ -250,7 +250,7 @@ const bookingPhoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/;
 export const bookingCustomerSchema = z.object({
   first_name: requiredString,
   last_name: requiredString,
-  phone: z.string().regex(bookingPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  phone: z.string().regex(bookingPhoneRegex, 'Enter valid mobile number'),
   email: z.string().email('Invalid email address'),
 });
 
@@ -309,11 +309,11 @@ export const businessHoursSchema = z.object({
 const otpPhoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/;
 
 export const phoneOtpSendSchema = z.object({
-  phone: z.string().regex(otpPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  phone: z.string().regex(otpPhoneRegex, 'Enter valid mobile number'),
 });
 
 export const phoneOtpVerifySchema = z.object({
-  phone: z.string().regex(otpPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  phone: z.string().regex(otpPhoneRegex, 'Enter valid mobile number'),
   code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
 });
 
@@ -332,7 +332,7 @@ export const customerSignupSchema = z.object({
   first_name: requiredString,
   last_name: requiredString,
   email: z.string().email('Invalid email address'),
-  phone: z.string().regex(bookingPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  phone: z.string().regex(bookingPhoneRegex, 'Enter valid mobile number'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirm_password: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirm_password, {
@@ -344,7 +344,7 @@ export const customerSignupSchema = z.object({
 export const customerProfileSchema = z.object({
   first_name: requiredString,
   last_name: requiredString,
-  phone: z.string().regex(bookingPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
+  phone: z.string().regex(bookingPhoneRegex, 'Enter valid mobile number'),
   sms_consent: z.boolean(),
   email_consent: z.boolean(),
   notify_promotions: z.boolean(),

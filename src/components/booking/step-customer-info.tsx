@@ -10,8 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
-import type { VehicleSizeClass, VehicleType, CustomerType } from '@/lib/supabase/types';
+import type { VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
 import { z } from 'zod';
+import { Plus, Check } from 'lucide-react';
 
 interface SavedVehicle {
   id: string;
@@ -36,7 +37,7 @@ interface StepCustomerInfoProps {
   requireSizeClass: boolean;
   initialSizeClass: VehicleSizeClass | null;
   savedVehicles?: SavedVehicle[];
-  onContinue: (customer: BookingCustomerInput, vehicle: BookingVehicleInput, customerType?: CustomerType | null) => void;
+  onContinue: (customer: BookingCustomerInput, vehicle: BookingVehicleInput) => void;
   onBack: () => void;
 }
 
@@ -54,6 +55,7 @@ export function StepCustomerInfo({
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors },
   } = useForm<CustomerInfoFormData>({
     resolver: formResolver(customerInfoSchema),
@@ -75,12 +77,17 @@ export function StepCustomerInfo({
     },
   });
 
-  const [customerType, setCustomerType] = useState<CustomerType | null>(null);
+  // Track selected saved vehicle ID, or null if adding new
+  const [selectedSavedVehicleId, setSelectedSavedVehicleId] = useState<string | null>(null);
+  // Track if user explicitly chose to add new vehicle
+  const [isAddingNew, setIsAddingNew] = useState(savedVehicles.length === 0);
 
   const vehicleType = watch('vehicle.vehicle_type');
   const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[vehicleType] ?? [];
 
   function handleSelectSavedVehicle(v: SavedVehicle) {
+    setSelectedSavedVehicleId(v.id);
+    setIsAddingNew(false);
     setValue('vehicle.vehicle_type', v.vehicle_type, { shouldDirty: true });
     setValue('vehicle.size_class', v.size_class ?? undefined, { shouldDirty: true });
     setValue('vehicle.year', v.year ?? undefined, { shouldDirty: true });
@@ -89,9 +96,36 @@ export function StepCustomerInfo({
     setValue('vehicle.color', v.color ?? '', { shouldDirty: true });
   }
 
-  function onSubmit(data: CustomerInfoFormData) {
-    onContinue(data.customer, data.vehicle, customerType);
+  function handleAddNewVehicle() {
+    setSelectedSavedVehicleId(null);
+    setIsAddingNew(true);
+    // Reset vehicle fields to defaults
+    reset({
+      customer: watch('customer'),
+      vehicle: {
+        vehicle_type: 'standard',
+        size_class: null,
+        year: undefined,
+        make: '',
+        model: '',
+        color: '',
+      },
+    });
   }
+
+  function formatVehicleLabel(v: SavedVehicle): string {
+    const parts = [v.year, v.make, v.model].filter(Boolean);
+    const label = parts.length > 0 ? parts.join(' ') : 'Vehicle';
+    return v.color ? `${label} (${v.color})` : label;
+  }
+
+  function onSubmit(data: CustomerInfoFormData) {
+    // All online bookings are enthusiasts by default
+    onContinue(data.customer, data.vehicle);
+  }
+
+  const hasSavedVehicles = savedVehicles.length > 0;
+  const showVehicleForm = isAddingNew || !hasSavedVehicles;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -131,10 +165,9 @@ export function StepCustomerInfo({
           </FormField>
 
           <FormField
-            label="Phone"
+            label="Mobile"
             required
             error={errors.customer?.phone?.message}
-            description="(XXX) XXX-XXXX"
             htmlFor="phone"
           >
             <Input
@@ -166,37 +199,6 @@ export function StepCustomerInfo({
             />
           </FormField>
         </div>
-
-        {/* Customer type toggle */}
-        <div className="mt-4 sm:col-span-2">
-          <p className="mb-2 text-sm font-medium text-gray-700">
-            I&apos;m a... <span className="font-normal text-gray-400">(optional)</span>
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setCustomerType(customerType === 'enthusiast' ? null : 'enthusiast')}
-              className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-                customerType === 'enthusiast'
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Car Enthusiast
-            </button>
-            <button
-              type="button"
-              onClick={() => setCustomerType(customerType === 'professional' ? null : 'professional')}
-              className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-                customerType === 'professional'
-                  ? 'border-purple-600 bg-purple-50 text-purple-700'
-                  : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Professional
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Vehicle Info */}
@@ -204,96 +206,115 @@ export function StepCustomerInfo({
         <h3 className="text-sm font-semibold text-gray-700">Vehicle Details</h3>
 
         {/* Saved Vehicle Picker for logged-in customers */}
-        {savedVehicles.length > 0 && (
+        {hasSavedVehicles && (
           <div className="mt-3 mb-4">
             <p className="text-sm text-gray-600 mb-2">Select a saved vehicle:</p>
             <div className="flex flex-wrap gap-2">
               {savedVehicles.map((v) => {
-                const label = [v.year, v.make, v.model].filter(Boolean).join(' ');
+                const isSelected = selectedSavedVehicleId === v.id;
                 return (
                   <button
                     key={v.id}
                     type="button"
                     onClick={() => handleSelectSavedVehicle(v)}
-                    className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
                   >
-                    {label || 'Saved Vehicle'}
-                    {v.color ? ` (${v.color})` : ''}
+                    {isSelected && <Check className="h-4 w-4" />}
+                    {formatVehicleLabel(v)}
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={handleAddNewVehicle}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                  isAddingNew
+                    ? 'border-green-600 bg-green-50 text-green-700'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Plus className="h-4 w-4" />
+                Add New Vehicle
+              </button>
             </div>
           </div>
         )}
 
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <FormField label="Vehicle Type" htmlFor="vehicle_type">
-            <Select
-              id="vehicle_type"
-              {...register('vehicle.vehicle_type')}
-            >
-              {Object.entries(VEHICLE_TYPE_LABELS).map(([val, label]) => (
-                <option key={val} value={val}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-
-          {sizeClasses.length > 0 && (
-            <FormField
-              label="Size Class"
-              htmlFor="size_class"
-              required={requireSizeClass}
-              error={errors.vehicle?.size_class?.message}
-            >
+        {/* Vehicle form fields - shown when adding new or no saved vehicles */}
+        {showVehicleForm && (
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <FormField label="Vehicle Type" htmlFor="vehicle_type">
               <Select
-                id="size_class"
-                {...register('vehicle.size_class')}
+                id="vehicle_type"
+                {...register('vehicle.vehicle_type')}
               >
-                <option value="">Select size...</option>
-                {sizeClasses.map((sc) => (
-                  <option key={sc} value={sc}>
-                    {VEHICLE_SIZE_LABELS[sc]}
+                {Object.entries(VEHICLE_TYPE_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
                   </option>
                 ))}
               </Select>
             </FormField>
-          )}
 
-          <FormField label="Year" htmlFor="year">
-            <Input
-              id="year"
-              type="number"
-              placeholder="2024"
-              {...register('vehicle.year')}
-            />
-          </FormField>
+            {sizeClasses.length > 0 && (
+              <FormField
+                label="Size Class"
+                htmlFor="size_class"
+                required={requireSizeClass}
+                error={errors.vehicle?.size_class?.message}
+              >
+                <Select
+                  id="size_class"
+                  {...register('vehicle.size_class')}
+                >
+                  <option value="">Select size...</option>
+                  {sizeClasses.map((sc) => (
+                    <option key={sc} value={sc}>
+                      {VEHICLE_SIZE_LABELS[sc]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            )}
 
-          <FormField label="Make" htmlFor="make">
-            <Input
-              id="make"
-              placeholder="Toyota"
-              {...register('vehicle.make')}
-            />
-          </FormField>
+            <FormField label="Year" htmlFor="year">
+              <Input
+                id="year"
+                type="number"
+                placeholder="2024"
+                {...register('vehicle.year')}
+              />
+            </FormField>
 
-          <FormField label="Model" htmlFor="model">
-            <Input
-              id="model"
-              placeholder="Camry"
-              {...register('vehicle.model')}
-            />
-          </FormField>
+            <FormField label="Make" htmlFor="make">
+              <Input
+                id="make"
+                placeholder="Toyota"
+                {...register('vehicle.make')}
+              />
+            </FormField>
 
-          <FormField label="Color" htmlFor="color">
-            <Input
-              id="color"
-              placeholder="White"
-              {...register('vehicle.color')}
-            />
-          </FormField>
-        </div>
+            <FormField label="Model" htmlFor="model">
+              <Input
+                id="model"
+                placeholder="Camry"
+                {...register('vehicle.model')}
+              />
+            </FormField>
+
+            <FormField label="Color" htmlFor="color">
+              <Input
+                id="color"
+                placeholder="White"
+                {...register('vehicle.color')}
+              />
+            </FormField>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}

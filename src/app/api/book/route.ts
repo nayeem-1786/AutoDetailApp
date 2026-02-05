@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
           .update({ phone: e164Phone, updated_at: new Date().toISOString() })
           .eq('id', customerId);
       } else {
-        // Create new customer
+        // Create new customer - all online bookings are enthusiasts by default
         const { data: newCustomer, error: custErr } = await supabase
           .from('customers')
           .insert({
@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
             last_name: data.customer.last_name,
             phone: e164Phone,
             email: data.customer.email,
+            customer_type: 'enthusiast',
           })
           .select('id')
           .single();

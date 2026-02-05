@@ -224,7 +224,7 @@ export default function VendorsPage() {
     },
     {
       accessorKey: 'phone',
-      header: 'Phone',
+      header: 'Mobile',
       cell: ({ row }) =>
         row.original.phone ? formatPhone(row.original.phone) : '--',
     },
@@ -342,8 +342,8 @@ export default function VendorsPage() {
                 <Input id="vendor-email" type="email" {...register('email')} placeholder="vendor@example.com" />
               </FormField>
 
-              <FormField label="Phone" error={errors.phone?.message} htmlFor="vendor-phone">
-                <Input id="vendor-phone" {...register('phone')} placeholder="+13101234567" />
+              <FormField label="Mobile" error={errors.phone?.message} htmlFor="vendor-phone">
+                <Input id="vendor-phone" {...register('phone')} placeholder="(310) 555-1234" />
               </FormField>
             </div>
 

@@ -241,7 +241,7 @@ export default function CustomerSignInPage() {
           {mode === 'phone' && (
             <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5">
               <FormField
-                label="Phone number"
+                label="Mobile"
                 required
                 error={phoneForm.formState.errors.phone?.message}
                 htmlFor="phone"

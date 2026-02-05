@@ -166,7 +166,7 @@ export default function NewCustomerPage() {
                 <Input id="last_name" {...register('last_name')} placeholder="Smith" />
               </FormField>
 
-              <FormField label="Phone" error={errors.phone?.message} htmlFor="phone">
+              <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
                 <Input
                   id="phone"
                   {...register('phone')}
@@ -180,7 +180,7 @@ export default function NewCustomerPage() {
                         {phonePreview.formatted} ({phonePreview.normalized})
                       </span>
                     ) : (
-                      <span className="text-amber-600">Enter a valid US phone number</span>
+                      <span className="text-amber-600">Enter a valid US mobile number</span>
                     )}
                   </div>
                 )}
@@ -287,7 +287,7 @@ export default function NewCustomerPage() {
                 {smsConsent && !watchPhone && (
                   <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    SMS consent is on but no phone number is on file. Add a phone number or turn this off.
+                    SMS consent is on but no mobile number is on file. Add a mobile number or turn this off.
                   </div>
                 )}
               </div>

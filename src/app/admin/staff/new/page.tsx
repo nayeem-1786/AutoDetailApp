@@ -96,8 +96,8 @@ export default function NewStaffPage() {
                 <Input id="email" type="email" {...register('email')} placeholder="john@example.com" />
               </FormField>
 
-              <FormField label="Phone" error={errors.phone?.message} htmlFor="phone">
-                <Input id="phone" {...register('phone')} placeholder="+1XXXXXXXXXX" />
+              <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
+                <Input id="phone" {...register('phone')} placeholder="(310) 555-1234" />
               </FormField>
 
               <FormField label="Role" error={errors.role?.message} required htmlFor="role">

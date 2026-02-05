@@ -276,7 +276,7 @@ export default function CustomerSignUpPage() {
           {mode === 'otp-profile' && (
             <form onSubmit={otpProfileForm.handleSubmit(onOtpProfileSubmit)} className="space-y-5">
               {/* Phone read-only */}
-              <FormField label="Phone" htmlFor="otp-phone">
+              <FormField label="Mobile" htmlFor="otp-phone">
                 <Input
                   id="otp-phone"
                   value={otpPhone || phoneParam || ''}
@@ -342,7 +342,7 @@ export default function CustomerSignUpPage() {
           {mode === 'phone-otp' && (
             <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5">
               <FormField
-                label="Phone number"
+                label="Mobile"
                 required
                 error={phoneForm.formState.errors.phone?.message}
                 htmlFor="signup-phone"
@@ -493,10 +493,9 @@ export default function CustomerSignUpPage() {
               </FormField>
 
               <FormField
-                label="Phone"
+                label="Mobile"
                 required
                 error={fullForm.formState.errors.phone?.message}
-                description="(XXX) XXX-XXXX"
                 htmlFor="phone"
               >
                 <Input

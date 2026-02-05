@@ -184,7 +184,7 @@ export default function AccountProfilePage() {
             </FormField>
 
             <FormField
-              label="Phone"
+              label="Mobile"
               required
               error={errors.phone?.message}
               htmlFor="phone"

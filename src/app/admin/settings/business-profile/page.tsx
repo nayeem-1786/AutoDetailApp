@@ -244,7 +244,6 @@ export default function BusinessProfilePage() {
             <FormField
               label="Business Phone"
               error={errors.business_phone?.message}
-              description="(XXX) XXX-XXXX"
               htmlFor="business_phone"
             >
               <Input

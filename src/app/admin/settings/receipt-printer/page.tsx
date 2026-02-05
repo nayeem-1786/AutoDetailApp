@@ -343,7 +343,7 @@ export default function ReceiptPrinterPage() {
             />
           </FormField>
 
-          <FormField label="Phone" htmlFor="override_phone">
+          <FormField label="Mobile" htmlFor="override_phone">
             <Input
               id="override_phone"
               placeholder={defaults.business_phone || 'Business Profile value'}
