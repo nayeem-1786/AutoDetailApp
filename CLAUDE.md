@@ -26,7 +26,9 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - **Customer Detail Page:** Combined Customer Type + Customer Journey card with vertical divider. Journey shows Since/Visits/Lifetime/Last Visit as pill-shaped stats. Receipt popup with 4 unified action buttons.
 - **Receipt Discount Display:** Loyalty points now show as "Loyalty (X pts)" with amber color, separate from coupon discounts. Coupon discounts show as "Coupon (CODE)" with coupon code displayed. Print popup window doubled to 900px width.
 - **Notification Preferences:** Customer portal profile page has 4-toggle notification preferences (Appointments/Service Updates required, Promotions/Loyalty optional). Public unsubscribe page at `/unsubscribe/[customerId]` allows preference management without login. New columns: `notify_promotions`, `notify_loyalty` on customers table.
-- **Customer Portal Access Section:** Admin customer detail page (`/admin/customers/[id]`) now has an "Account" section showing portal access status (Active/None with colored dot indicator). If customer has portal access and email on file, admin can send password reset email via button. API endpoint at `/api/admin/customers/[id]/reset-password`.
+- **Customer Portal Access Section:** Admin customer detail page (`/admin/customers/[id]`) now has an "Account" section showing portal access status (Active/Deactivated toggle). Admin can activate/deactivate portal access with click. Deactivation preserves auth_user_id in backup column for reactivation. If customer has portal access and email on file, admin can send password reset email. API endpoints at `/api/admin/customers/[id]/portal-access` (POST/DELETE) and `/api/admin/customers/[id]/reset-password`.
+- **Customer Sign-in Auto-Link:** When customers sign in via phone OTP, system automatically links to existing customer record by phone number. API at `/api/customer/link-by-phone` bypasses RLS to search across phone formats (E.164, 10-digit, formatted). Shows "Account Deactivated" message if customer exists but portal access is disabled.
+- **Delete Customer:** Admin customer detail page has red "Delete Customer" button with double confirmation (first warning, then type customer's first name). Cascading deletion removes vehicles, loyalty ledger, consent log, appointments, quotes; transactions are preserved but unlinked. API at `/api/admin/customers/[id]` (DELETE).
 
 ## Phase 5 — What's Remaining
 - Lifecycle automation rules (service-based triggers, configurable timing, vehicle-aware reminders)
@@ -77,7 +79,11 @@ ALTER TABLE customers ADD COLUMN deactivated_auth_user_id UUID;
 - [x] Store coupon code on transactions — receipts show "Coupon (CODE)"
 - [x] Notification preferences — 4-toggle system with public unsubscribe page
 - [x] Add Account section to customer detail page (portal access status + password reset)
+- [x] Portal access toggle (Active/Deactivated) with reactivation support
+- [x] Customer sign-in auto-links existing customer records by phone
+- [x] Delete customer with double confirmation
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
+- [ ] Merge duplicate customers feature (detect and consolidate)
 
 ## Customer Portal Redesign
 
@@ -138,6 +144,17 @@ ALTER TABLE customers ADD COLUMN deactivated_auth_user_id UUID;
 - **Customer type auto-set:** Online bookings automatically mark customers as "enthusiast" (removed selector)
 - **Vehicle selection UX:** Logged-in customers see saved vehicles as selectable buttons + "Add New Vehicle" toggle
 - **Vehicle required:** Booking cannot proceed without selecting or creating a vehicle (customer portal + POS checkout)
+
+### Customer Management Improvements
+- **Portal Access Toggle:** Active/Deactivated toggle in customer detail page. Clicking toggles state. Deactivation backs up auth_user_id for easy reactivation. Reactivation can auto-recover by matching email/phone.
+- **Sign-in Auto-Link:** Phone OTP sign-in automatically links to existing customer record. Searches multiple phone formats. Handles duplicates by picking oldest record.
+- **Delete Customer:** Double confirmation with type-to-confirm. Cascading cleanup of related records. Transactions preserved but unlinked for accounting.
+- **Phone Display Fix:** Customer detail page now displays phone in formatted style on load (was showing E.164).
+
+### Twilio SMS Configuration
+- Supabase Phone Auth configured with Twilio
+- Use phone number directly in Supabase Auth settings (not Messaging Service SID) to avoid A2P registration issues
+- Phone number: +14244010094
 
 ## Session Instructions
 - Update this file at end of session or when asked
