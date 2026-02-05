@@ -76,6 +76,50 @@ ALTER TABLE customers
 - [x] Add Account section to customer detail page (portal access status + password reset)
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 
+## Customer Portal Redesign
+
+### Design Principles
+- Human-friendly language — no jargon, explain what things do
+- Grouped cards — related items together with clear headers
+- Confirmation dialogs — when turning things off, explain what they'll lose
+- Mirror admin patterns — consistent UI language across the app
+
+### Phase 1: Profile Page Redesign ✓
+- [x] Card 1: Personal Information (First Name, Last Name, Phone, Email locked)
+- [x] Card 2: Communication Channels (SMS/Email toggles with confirmation dialogs)
+- [x] Card 3: Notification Preferences (Required items locked, optional with confirmations)
+- [x] Card 4: Account Security (Change Password, Sign Out All Devices)
+- [x] Human-friendly explanations and tooltips throughout
+
+### Phase 2: Transactions Page
+- [ ] Summary stat cards at top (Total Visits, Lifetime Spend, Loyalty Balance)
+- [ ] DataTable with columns: Date, Receipt #, Vehicle, Status, Total
+- [ ] Receipt popup dialog (Print to browser, Email only — no SMS/thermal)
+- [ ] Reuse `generateReceiptHtml` from POS
+
+### Phase 3: Loyalty Page
+- [ ] Balance card matching admin design (big number + dollar value)
+- [ ] "How it works" info card with earn/redeem rates in plain language
+- [ ] DataTable for Points History: Date, Action, Points, Balance, Description
+
+### Phase 4: Vehicles Page
+- [ ] Group vehicles by type with icons (🚗 Cars, 🚤 Boats, ✈️ Aircraft, etc.)
+- [ ] Cleaner card layout showing Year Make Model, Color, License Plate
+- [ ] Human explanation: "Add all your vehicles here so we can track their service history"
+
+### Phase 5: Appointments Edit Flow
+- [ ] "Edit Appointment" button on upcoming appointments
+- [ ] Change date/time (calendar picker, respects cancellation window)
+- [ ] Change vehicle (dropdown of customer's vehicles)
+- [ ] Add/remove services (with live price update)
+- [ ] Show price difference: "This change will cost $X more" or "You'll save $X"
+- [ ] Confirmation before saving changes
+
+### Phase 6: Dashboard Polish
+- [ ] Coupons section with explanation: "These discounts are ready to use on your next booking"
+- [ ] Loyalty points with human explanation: "You have X points — that's $Y off your next visit"
+- [ ] Keep coupons on dashboard + show inline during booking
+
 ## Session Instructions
 - Update this file at end of session or when asked
 - Reference `docs/PROJECT.md` for full specs, `docs/DASHBOARD_RULES.md` for admin UI structure
