@@ -894,7 +894,7 @@ export default function CustomerProfilePage() {
                     <Input id="birthday" type="date" {...register('birthday')} />
                   </FormField>
                   {/* Row 3: City, State, ZIP (same width as Address + Address 2) */}
-                  <div className="col-span-2 grid grid-cols-3 gap-x-3">
+                  <div className="col-span-2 grid grid-cols-[5fr_2fr_2fr] gap-x-3">
                     <FormField label="City" htmlFor="city">
                       <Input id="city" {...register('city')} />
                     </FormField>
