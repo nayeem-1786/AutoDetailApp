@@ -55,6 +55,36 @@ export default function PosSecurityPage() {
     load();
   }, []);
 
+  // Auto-save toggle immediately when changed
+  async function handleToggleChange(newEnabled: boolean) {
+    // Don't allow enabling with no IPs
+    const cleanIps = ips.map((ip) => ip.trim()).filter(Boolean);
+    if (newEnabled && cleanIps.length === 0) {
+      toast.error('Add at least one IP address before enabling restrictions');
+      return;
+    }
+
+    setEnabled(newEnabled);
+
+    const supabase = createClient();
+    const { error } = await supabase.from('business_settings').upsert(
+      {
+        key: 'pos_ip_whitelist_enabled',
+        value: newEnabled as unknown,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'key' }
+    );
+
+    if (error) {
+      toast.error('Failed to save', { description: error.message });
+      setEnabled(!newEnabled); // Revert on error
+      return;
+    }
+
+    toast.success(newEnabled ? 'IP restrictions enabled' : 'IP restrictions disabled');
+  }
+
   function validateIp(value: string): string | null {
     if (!value.trim()) return null; // Allow empty
     return IPV4_REGEX.test(value.trim()) ? null : 'Enter a valid IPv4 address';
@@ -219,7 +249,7 @@ export default function PosSecurityPage() {
                 </p>
               </div>
             </div>
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
+            <Switch checked={enabled} onCheckedChange={handleToggleChange} />
           </div>
 
           {/* Status explanation */}

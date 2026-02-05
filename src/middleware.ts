@@ -8,7 +8,7 @@ const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/unsu
 let cachedIps: string[] | null = null;
 let cachedEnabled: boolean | null = null;
 let cacheExpiry = 0;
-const CACHE_TTL_MS = 60_000; // 1 minute
+const CACHE_TTL_MS = 10_000; // 10 seconds (faster updates for IP whitelist changes)
 
 async function getIpWhitelistConfig(): Promise<{ ips: string[]; enabled: boolean }> {
   const now = Date.now();
