@@ -893,11 +893,11 @@ export default function CustomerProfilePage() {
                   <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
                     <Input id="birthday" type="date" {...register('birthday')} />
                   </FormField>
-                  {/* Row 3: City, State, ZIP (same width as Address + Address 2) */}
-                  <div className="col-span-2 grid grid-cols-[5fr_2fr_2fr] gap-x-3">
-                    <FormField label="City" htmlFor="city">
-                      <Input id="city" {...register('city')} />
-                    </FormField>
+                  {/* Row 3: City = Address width, State + ZIP = Address 2 width */}
+                  <FormField label="City" htmlFor="city">
+                    <Input id="city" {...register('city')} />
+                  </FormField>
+                  <div className="grid grid-cols-2 gap-x-2">
                     <FormField label="State" htmlFor="state">
                       <Input id="state" {...register('state')} maxLength={2} placeholder="CA" />
                     </FormField>
