@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils/cn';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
 import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, Phone } from 'lucide-react';
+import { BUSINESS } from '@/lib/utils/constants';
 
 const ACCOUNT_TABS = [
   { label: 'Dashboard', href: '/account' },
@@ -17,15 +20,16 @@ const ACCOUNT_TABS = [
 ] as const;
 
 export function AccountShell({ children }: { children: React.ReactNode }) {
-  const { customer, loading } = useCustomerAuth();
+  const { user, customer, loading, signOut } = useCustomerAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !customer) {
+    // Only redirect to signin if not logged in at all
+    if (!loading && !user) {
       router.push('/signin?redirect=' + encodeURIComponent(pathname));
     }
-  }, [loading, customer, router, pathname]);
+  }, [loading, user, router, pathname]);
 
   if (loading) {
     return (
@@ -35,8 +39,47 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!customer) {
+  // Not logged in - will redirect
+  if (!user) {
     return null;
+  }
+
+  // Logged in but account is deactivated (no linked customer record)
+  if (!customer) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 sm:px-6 lg:px-8">
+        <div className="rounded-2xl bg-white p-8 shadow-lg text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+            <AlertTriangle className="h-8 w-8 text-amber-600" />
+          </div>
+          <h1 className="mt-6 text-2xl font-bold text-gray-900">
+            Account Access Unavailable
+          </h1>
+          <p className="mt-3 text-gray-600">
+            Your portal access has been temporarily deactivated. This may be due to an account update or administrative action.
+          </p>
+          <p className="mt-4 text-gray-600">
+            Please contact us to restore access to your account.
+          </p>
+          <div className="mt-8 space-y-3">
+            <a
+              href={`tel:${BUSINESS.PHONE.replace(/\D/g, '')}`}
+              className="flex items-center justify-center gap-2 rounded-full bg-gray-900 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+            >
+              <Phone className="h-4 w-4" />
+              Call {BUSINESS.PHONE}
+            </a>
+            <Button
+              variant="outline"
+              onClick={signOut}
+              className="w-full rounded-full"
+            >
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
