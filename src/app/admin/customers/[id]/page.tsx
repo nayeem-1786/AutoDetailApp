@@ -89,6 +89,10 @@ export default function CustomerProfilePage() {
   // Password reset state
   const [sendingReset, setSendingReset] = useState(false);
 
+  // Portal access state
+  const [deactivatingPortal, setDeactivatingPortal] = useState(false);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -534,6 +538,26 @@ export default function CustomerProfilePage() {
     }
   }
 
+  // --- Deactivate Portal Access ---
+  async function handleDeactivatePortal() {
+    if (!customer) return;
+    setDeactivatingPortal(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customer.id}/portal-access`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to deactivate portal access');
+      toast.success('Portal access deactivated');
+      setCustomer({ ...customer, auth_user_id: null });
+      setConfirmDeactivateOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to deactivate portal access');
+    } finally {
+      setDeactivatingPortal(false);
+    }
+  }
+
   // Ledger table columns
   const ledgerColumns: ColumnDef<LoyaltyLedger, unknown>[] = [
     {
@@ -814,19 +838,33 @@ export default function CustomerProfilePage() {
 
                   {/* Online Access section */}
                   <div className="flex-shrink-0">
-                    <CardTitle className="mb-3">Online Access</CardTitle>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Portal Access:</span>
+                    <CardTitle
+                      className="mb-3 cursor-help"
+                      title="Customer has portal access when they've signed up via the customer portal with email/password or phone OTP. This links their auth account to their customer record."
+                    >
+                      Online Access
+                    </CardTitle>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
                         {customer.auth_user_id ? (
-                          <span className="flex items-center gap-1.5 text-sm font-medium text-green-600">
-                            <span className="h-2 w-2 rounded-full bg-green-500" />
-                            Active
-                          </span>
+                          <>
+                            <span className="flex items-center gap-1.5 text-sm font-medium text-green-600">
+                              <span className="h-2 w-2 rounded-full bg-green-500" />
+                              Active
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeactivateOpen(true)}
+                              className="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-gray-400" />
+                              Deactivate
+                            </button>
+                          </>
                         ) : (
                           <span className="flex items-center gap-1.5 text-sm font-medium text-gray-500">
                             <span className="h-2 w-2 rounded-full bg-gray-400" />
-                            None
+                            Inactive
                           </span>
                         )}
                       </div>
@@ -850,6 +888,18 @@ export default function CustomerProfilePage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Deactivate Portal Confirmation */}
+                  <ConfirmDialog
+                    open={confirmDeactivateOpen}
+                    onOpenChange={setConfirmDeactivateOpen}
+                    title="Deactivate Portal Access?"
+                    description="This customer will no longer be able to sign in to their portal account. Their account history and data will be preserved."
+                    confirmLabel="Deactivate"
+                    variant="destructive"
+                    onConfirm={handleDeactivatePortal}
+                    loading={deactivatingPortal}
+                  />
                 </div>
               </CardContent>
             </Card>
