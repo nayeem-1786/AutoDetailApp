@@ -880,16 +880,14 @@ export default function CustomerProfilePage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (!customer.auth_user_id && customer.deactivated_auth_user_id) {
+                            if (!customer.auth_user_id) {
                               handleReactivatePortal();
                             }
                           }}
                           title={
                             customer.auth_user_id
-                              ? 'Portal access is active'
-                              : customer.deactivated_auth_user_id
-                              ? 'Click to restore portal access'
-                              : 'No previous access to restore'
+                              ? 'Portal access is active - customer can sign in'
+                              : 'Click to link customer to their portal account'
                           }
                           className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                             customer.auth_user_id

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
-// POST - Reactivate portal access (restore auth user link from backup)
+// POST - Activate/Reactivate portal access
+// 1. First tries to restore from deactivated_auth_user_id backup
+// 2. If no backup, searches auth.users for matching email/phone
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,10 +20,10 @@ export async function POST(
     const { id } = await params;
     const supabase = createAdminClient();
 
-    // Fetch customer to get deactivated auth user ID
+    // Fetch customer details
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select('id, auth_user_id, deactivated_auth_user_id')
+      .select('id, auth_user_id, deactivated_auth_user_id, email, phone')
       .eq('id', id)
       .single();
 
@@ -36,33 +38,62 @@ export async function POST(
       );
     }
 
-    if (!customer.deactivated_auth_user_id) {
+    let authUserIdToLink: string | null = null;
+
+    // Strategy 1: Restore from backup
+    if (customer.deactivated_auth_user_id) {
+      authUserIdToLink = customer.deactivated_auth_user_id;
+    }
+
+    // Strategy 2: Find matching auth user by email
+    if (!authUserIdToLink && customer.email) {
+      const { data: authUsers } = await supabase.auth.admin.listUsers();
+      const matchingUser = authUsers?.users?.find(
+        (u) => u.email?.toLowerCase() === customer.email?.toLowerCase()
+      );
+      if (matchingUser) {
+        authUserIdToLink = matchingUser.id;
+      }
+    }
+
+    // Strategy 3: Find matching auth user by phone
+    if (!authUserIdToLink && customer.phone) {
+      const { data: authUsers } = await supabase.auth.admin.listUsers();
+      const matchingUser = authUsers?.users?.find(
+        (u) => u.phone === customer.phone
+      );
+      if (matchingUser) {
+        authUserIdToLink = matchingUser.id;
+      }
+    }
+
+    if (!authUserIdToLink) {
       return NextResponse.json(
-        { error: 'No previous portal access to restore. Customer must sign up again.' },
+        { error: 'No matching portal account found. Customer must sign up through the portal first.' },
         { status: 400 }
       );
     }
 
-    // Restore auth user link from backup
+    // Link the auth user to the customer
     const { error: updateError } = await supabase
       .from('customers')
       .update({
-        auth_user_id: customer.deactivated_auth_user_id,
+        auth_user_id: authUserIdToLink,
         deactivated_auth_user_id: null,
       })
       .eq('id', id);
 
     if (updateError) {
-      console.error('Reactivate portal access error:', updateError);
+      console.error('Activate portal access error:', updateError);
       return NextResponse.json(
-        { error: 'Failed to reactivate portal access' },
+        { error: 'Failed to activate portal access' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      auth_user_id: customer.deactivated_auth_user_id,
+      auth_user_id: authUserIdToLink,
     });
   } catch (err) {
     console.error('Portal access endpoint error:', err);
