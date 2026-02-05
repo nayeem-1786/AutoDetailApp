@@ -16,9 +16,15 @@ The POS system can be restricted to only allow access from specific IP addresses
 Navigate to **Settings > POS Security** (`/admin/settings/pos-security/`)
 
 The page provides:
-1. **Enable/Disable Toggle** — Master switch for IP restrictions
+1. **Enable/Disable Toggle** — Master switch for IP restrictions (auto-saves immediately)
 2. **Your Current IP** — Shows your public IP with "Add My IP" button
-3. **IP Whitelist** — Add/remove authorized IP addresses
+3. **IP Whitelist** — Two-column layout: IP Address | Location Name
+
+### IP Entry Format
+
+Each whitelist entry has:
+- **IP Address** — IPv4 (e.g., `172.249.105.229`) or IPv6 (e.g., `2001:0db8::1`)
+- **Location Name** — Optional friendly name (e.g., "Office", "Home", "Shop")
 
 ### Toggle States
 
@@ -27,13 +33,17 @@ The page provides:
 | **Enabled** | Only whitelisted IPs can access `/pos/*`. All others see "Access denied" |
 | **Disabled** | POS accessible from any IP address (no restrictions) |
 
+**Note:** The toggle auto-saves when switched. IP addresses require clicking "Save Changes".
+
 ## Technical Implementation
 
 ### Database Settings
 
 Two keys in `business_settings` table:
 - `pos_ip_whitelist_enabled` — Boolean (true/false)
-- `pos_allowed_ips` — JSON array of IP strings (e.g., `["172.249.105.229", "98.45.32.10"]`)
+- `pos_allowed_ips` — JSON array of objects: `[{"ip": "172.249.105.229", "name": "Office"}, {"ip": "98.45.32.10", "name": "Home"}]`
+
+The middleware extracts just the IP addresses for validation. Location names are for display only.
 
 ### Middleware
 
@@ -47,8 +57,8 @@ The middleware:
 
 ### Caching
 
-- Settings cached in-memory for **60 seconds**
-- Changes take up to 1 minute to take effect
+- Settings cached in-memory for **10 seconds**
+- Changes take effect within 10 seconds
 - Cache reduces database load on every request
 
 ### API Routes
@@ -91,10 +101,17 @@ To test IP restrictions from external locations without deploying:
 
 Visit any of these sites from the location you want to whitelist:
 - https://whatismyip.com
-- https://api.ipify.org
+- https://api.ipify.org (IPv4 only)
 - https://ifconfig.me
 
 The IP shown is what you need to add to the whitelist.
+
+### IPv4 vs IPv6
+
+- **IPv4**: Traditional format like `172.249.105.229`
+- **IPv6**: Newer format like `2a04:4e41:29b1:6a71::12b1:6a71`
+
+Mobile devices often connect via IPv6. If testing with ngrok shows a different IP than expected, check both IPv4 and IPv6 addresses. The whitelist supports both formats.
 
 ## Fallback Behavior
 

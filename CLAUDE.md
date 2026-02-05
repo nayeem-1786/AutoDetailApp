@@ -135,11 +135,13 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - **Phone Display Fix:** Customer detail page now displays phone in formatted style on load (was showing E.164).
 
 ### POS IP Whitelist Security
-- **Settings page:** `/admin/settings/pos-security/` with enable/disable toggle
+- **Settings page:** `/admin/settings/pos-security/` with enable/disable toggle (auto-saves)
+- **Location names:** Each IP has optional friendly name (e.g., "Office", "Home", "Shop")
+- **IPv4 + IPv6:** Supports both address formats
 - **How it works:** Middleware checks `pos_ip_whitelist_enabled` and `pos_allowed_ips` from `business_settings` table
 - **When enabled:** Only whitelisted IPs can access `/pos/*` routes; others get 403
 - **When disabled:** POS accessible from any IP
-- **Cache:** 60-second TTL to reduce database queries
+- **Cache:** 10-second TTL for fast updates during testing
 - **Fallback:** Falls back to `ALLOWED_POS_IPS` env var if database unavailable
 - **Testing:** Use ngrok (`~/bin/ngrok http 3000`) to test from external locations
 - See `docs/POS_SECURITY.md` for full documentation
