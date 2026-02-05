@@ -91,11 +91,11 @@ ALTER TABLE customers
 - [x] Card 4: Account Security (Change Password, Sign Out All Devices)
 - [x] Human-friendly explanations and tooltips throughout
 
-### Phase 2: Transactions Page
-- [ ] Summary stat cards at top (Total Visits, Lifetime Spend, Loyalty Balance)
-- [ ] DataTable with columns: Date, Receipt #, Vehicle, Status, Total
-- [ ] Receipt popup dialog (Print to browser, Email only — no SMS/thermal)
-- [ ] Reuse `generateReceiptHtml` from POS
+### Phase 2: Transactions Page ✓
+- [x] Summary stat cards at top (Member Since, Total Visits, Lifetime Spend, Loyalty Balance)
+- [x] DataTable with columns: Date, Receipt #, Vehicle, Status, Total
+- [x] Receipt popup dialog (Print to browser, Email only — no SMS/thermal)
+- [x] Reuse `generateReceiptHtml` from POS
 
 ### Phase 3: Loyalty Page
 - [ ] Balance card matching admin design (big number + dollar value)

@@ -37,13 +37,14 @@ export async function GET(request: NextRequest) {
       .eq('customer_id', customer.id)
       .in('status', ['completed', 'refunded']);
 
-    // Get paginated transactions
+    // Get paginated transactions with vehicle info
     const { data: transactions, error } = await admin
       .from('transactions')
       .select(
         `id, receipt_number, status, subtotal, tax_amount, tip_amount,
          discount_amount, total_amount, payment_method, loyalty_points_earned,
-         loyalty_points_redeemed, loyalty_discount, transaction_date, created_at`
+         loyalty_points_redeemed, loyalty_discount, transaction_date, created_at,
+         vehicles(year, make, model, color)`
       )
       .eq('customer_id', customer.id)
       .in('status', ['completed', 'refunded'])
@@ -55,11 +56,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });
     }
 
+    // Get customer stats for summary cards
+    const { data: customerData } = await admin
+      .from('customers')
+      .select('loyalty_points_balance, lifetime_spend, first_visit_date')
+      .eq('id', customer.id)
+      .single();
+
     return NextResponse.json({
       data: transactions,
       total: count ?? 0,
       page,
       limit,
+      stats: {
+        total_visits: count ?? 0,
+        lifetime_spend: customerData?.lifetime_spend ?? 0,
+        loyalty_balance: customerData?.loyalty_points_balance ?? 0,
+        member_since: customerData?.first_visit_date ?? null,
+      },
     });
   } catch (err) {
     console.error('Transactions GET error:', err);
