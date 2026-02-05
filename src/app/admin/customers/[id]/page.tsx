@@ -889,22 +889,22 @@ export default function CustomerProfilePage() {
                   <FormField label="Address 2" htmlFor="address_line_2">
                     <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt, suite" />
                   </FormField>
+                  <div />
                   <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
                     <Input id="birthday" type="date" {...register('birthday')} />
                   </FormField>
-                  <div />
-                  {/* Row 3: City, State, ZIP */}
-                  <div className="col-span-2">
+                  {/* Row 3: City, State, ZIP (same width as Address + Address 2) */}
+                  <div className="col-span-2 grid grid-cols-3 gap-x-3">
                     <FormField label="City" htmlFor="city">
                       <Input id="city" {...register('city')} />
                     </FormField>
+                    <FormField label="State" htmlFor="state">
+                      <Input id="state" {...register('state')} maxLength={2} placeholder="CA" />
+                    </FormField>
+                    <FormField label="ZIP" htmlFor="zip">
+                      <Input id="zip" {...register('zip')} placeholder="90717" />
+                    </FormField>
                   </div>
-                  <FormField label="State" htmlFor="state">
-                    <Input id="state" {...register('state')} maxLength={2} placeholder="CA" />
-                  </FormField>
-                  <FormField label="ZIP" htmlFor="zip">
-                    <Input id="zip" {...register('zip')} placeholder="90717" />
-                  </FormField>
                 </div>
               </CardContent>
             </Card>
