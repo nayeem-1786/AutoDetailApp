@@ -57,6 +57,9 @@ WHERE t.coupon_id = c.id AND t.coupon_code IS NULL;
 ALTER TABLE customers
   ADD COLUMN notify_promotions BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN notify_loyalty BOOLEAN NOT NULL DEFAULT true;
+
+-- Add deactivated_auth_user_id for portal access toggle
+ALTER TABLE customers ADD COLUMN deactivated_auth_user_id UUID;
 ```
 
 ## Key Architecture Notes

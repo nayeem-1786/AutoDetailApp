@@ -54,6 +54,7 @@ export interface Employee {
 export interface Customer {
   id: string;
   auth_user_id: string | null;
+  deactivated_auth_user_id: string | null;
   square_customer_id: string | null;
   square_reference_id: string | null;
   first_name: string;

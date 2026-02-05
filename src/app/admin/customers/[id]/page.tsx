@@ -91,6 +91,7 @@ export default function CustomerProfilePage() {
 
   // Portal access state
   const [deactivatingPortal, setDeactivatingPortal] = useState(false);
+  const [reactivatingPortal, setReactivatingPortal] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
   // Receipt dialog state
@@ -549,12 +550,41 @@ export default function CustomerProfilePage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to deactivate portal access');
       toast.success('Portal access deactivated');
-      setCustomer({ ...customer, auth_user_id: null });
+      // Store backup and clear active
+      setCustomer({
+        ...customer,
+        deactivated_auth_user_id: customer.auth_user_id,
+        auth_user_id: null,
+      });
       setConfirmDeactivateOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to deactivate portal access');
     } finally {
       setDeactivatingPortal(false);
+    }
+  }
+
+  // --- Reactivate Portal Access ---
+  async function handleReactivatePortal() {
+    if (!customer) return;
+    setReactivatingPortal(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customer.id}/portal-access`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to reactivate portal access');
+      toast.success('Portal access reactivated');
+      // Restore from backup
+      setCustomer({
+        ...customer,
+        auth_user_id: json.auth_user_id || customer.deactivated_auth_user_id,
+        deactivated_auth_user_id: null,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reactivate portal access');
+    } finally {
+      setReactivatingPortal(false);
     }
   }
 
@@ -840,42 +870,57 @@ export default function CustomerProfilePage() {
                   <div className="flex-shrink-0">
                     <CardTitle
                       className="mb-3 cursor-help"
-                      title="Customer has portal access when they've signed up via the customer portal with email/password or phone OTP. This links their auth account to their customer record."
+                      title="Portal access allows customers to sign in to view appointments, transaction history, and manage their profile. Access is created when a customer signs up via the portal with email/password or phone OTP."
                     >
                       Online Access
                     </CardTitle>
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
-                        {/* Active toggle */}
-                        <span
-                          className={`flex items-center gap-1.5 text-sm font-medium ${
+                        {/* Active toggle - clickable to reactivate when inactive */}
+                        <button
+                          type="button"
+                          onClick={() => !customer.auth_user_id && customer.deactivated_auth_user_id && handleReactivatePortal()}
+                          disabled={!!customer.auth_user_id || !customer.deactivated_auth_user_id || reactivatingPortal}
+                          title={
                             customer.auth_user_id
-                              ? 'text-green-600'
-                              : 'text-gray-400'
+                              ? 'Customer can sign in to the portal'
+                              : customer.deactivated_auth_user_id
+                              ? 'Click to restore portal access'
+                              : 'Customer has never had portal access'
+                          }
+                          className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                            customer.auth_user_id
+                              ? 'text-green-600 cursor-default'
+                              : customer.deactivated_auth_user_id
+                              ? 'text-gray-300 hover:text-green-600 [&:hover>span]:bg-green-500 cursor-pointer'
+                              : 'text-gray-300 cursor-not-allowed'
                           }`}
                         >
                           <span
-                            className={`h-2 w-2 rounded-full ${
+                            className={`h-2 w-2 rounded-full transition-colors ${
                               customer.auth_user_id ? 'bg-green-500' : 'bg-gray-300'
                             }`}
                           />
-                          Active
-                        </span>
+                          {reactivatingPortal ? 'Activating...' : 'Active'}
+                        </button>
                         {/* Deactivate toggle */}
                         <button
                           type="button"
                           onClick={() => customer.auth_user_id && setConfirmDeactivateOpen(true)}
                           disabled={!customer.auth_user_id}
+                          title={
+                            customer.auth_user_id
+                              ? 'Click to revoke portal access (can be restored later)'
+                              : 'Portal access is already inactive'
+                          }
                           className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                             customer.auth_user_id
-                              ? 'text-gray-400 hover:text-red-600 [&:hover>span]:bg-red-500'
-                              : 'text-gray-400 cursor-not-allowed'
+                              ? 'text-gray-300 hover:text-red-600 [&:hover>span]:bg-red-500 cursor-pointer'
+                              : 'text-gray-300 cursor-not-allowed'
                           }`}
                         >
                           <span
-                            className={`h-2 w-2 rounded-full transition-colors ${
-                              customer.auth_user_id ? 'bg-gray-300' : 'bg-gray-300'
-                            }`}
+                            className={`h-2 w-2 rounded-full transition-colors bg-gray-300`}
                           />
                           Deactivate
                         </button>
