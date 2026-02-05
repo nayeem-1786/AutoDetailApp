@@ -859,7 +859,8 @@ export default function CustomerProfilePage() {
                 <CardTitle>Contact & Address</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-x-4 gap-y-3 grid-cols-4">
+                  {/* Row 1: Name, Mobile, Email */}
                   <FormField label="First Name" error={errors.first_name?.message} required htmlFor="first_name">
                     <Input id="first_name" {...register('first_name')} />
                   </FormField>
@@ -881,18 +882,23 @@ export default function CustomerProfilePage() {
                   <FormField label="Email" error={errors.email?.message} htmlFor="email">
                     <Input id="email" type="email" {...register('email')} />
                   </FormField>
-                  <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
-                    <Input id="birthday" type="date" {...register('birthday')} />
-                  </FormField>
+                  {/* Row 2: Address, Address 2, Birthday */}
                   <FormField label="Address" htmlFor="address_line_1">
                     <Input id="address_line_1" {...register('address_line_1')} placeholder="Street address" />
                   </FormField>
                   <FormField label="Address 2" htmlFor="address_line_2">
-                    <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt, suite, etc." />
+                    <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt, suite" />
                   </FormField>
-                  <FormField label="City" htmlFor="city">
-                    <Input id="city" {...register('city')} />
+                  <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
+                    <Input id="birthday" type="date" {...register('birthday')} />
                   </FormField>
+                  <div />
+                  {/* Row 3: City, State, ZIP */}
+                  <div className="col-span-2">
+                    <FormField label="City" htmlFor="city">
+                      <Input id="city" {...register('city')} />
+                    </FormField>
+                  </div>
                   <FormField label="State" htmlFor="state">
                     <Input id="state" {...register('state')} maxLength={2} placeholder="CA" />
                   </FormField>
