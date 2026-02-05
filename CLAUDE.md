@@ -2,7 +2,7 @@
 
 ## Project
 Smart Details Auto Spa — custom POS, booking, portal, and admin system replacing Square.
-Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `docs/COUPONS.md`, `docs/DASHBOARD_RULES.md`, `docs/DATA_MIGRATION_RULES.md`, `docs/SERVICE_CATALOG.md`, `docs/iPAD.md`
+Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `docs/COUPONS.md`, `docs/DASHBOARD_RULES.md`, `docs/DATA_MIGRATION_RULES.md`, `docs/SERVICE_CATALOG.md`, `docs/iPAD.md`, `docs/POS_SECURITY.md`
 
 ## Current Status
 - **Phases 1–4:** Complete (Foundation, POS, Booking/Quotes/11Labs, Customer Portal)
@@ -43,27 +43,6 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - Some settings sections are placeholder/incomplete (integrations, notifications)
 - Business Profile now has website/email fields; Receipt Printer settings page is complete
 
-## Pending SQL Migrations
-Run these in Supabase SQL editor:
-```sql
--- Add coupon_code to transactions
-ALTER TABLE transactions ADD COLUMN coupon_code TEXT;
-
--- Backfill existing transactions with coupon codes
-UPDATE transactions t
-SET coupon_code = c.code
-FROM coupons c
-WHERE t.coupon_id = c.id AND t.coupon_code IS NULL;
-
--- Add notification preferences to customers
-ALTER TABLE customers
-  ADD COLUMN notify_promotions BOOLEAN NOT NULL DEFAULT true,
-  ADD COLUMN notify_loyalty BOOLEAN NOT NULL DEFAULT true;
-
--- Add deactivated_auth_user_id for portal access toggle
-ALTER TABLE customers ADD COLUMN deactivated_auth_user_id UUID;
-```
-
 ## Key Architecture Notes
 - Supabase project: `zwvahzymzardmxixyfim`
 - Super-Admin: nayeem@smartdetailautospa.com
@@ -85,11 +64,9 @@ ALTER TABLE customers ADD COLUMN deactivated_auth_user_id UUID;
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
 
-## Tomorrow's Priority Tasks
+## Next Priority Tasks
 - [ ] Setup Stripe handheld device (card reader) for testing with POS transactions
 - [ ] Setup receipt printer integration for POS
-- [ ] Add IP whitelist for POS access (3 authorized IP addresses)
-- [ ] Run pending SQL migrations in Supabase
 
 ## Customer Portal Redesign
 
@@ -156,6 +133,22 @@ ALTER TABLE customers ADD COLUMN deactivated_auth_user_id UUID;
 - **Sign-in Auto-Link:** Phone OTP sign-in automatically links to existing customer record. Searches multiple phone formats. Handles duplicates by picking oldest record.
 - **Delete Customer:** Double confirmation with type-to-confirm. Cascading cleanup of related records. Transactions preserved but unlinked for accounting.
 - **Phone Display Fix:** Customer detail page now displays phone in formatted style on load (was showing E.164).
+
+### POS IP Whitelist Security
+- **Settings page:** `/admin/settings/pos-security/` with enable/disable toggle
+- **How it works:** Middleware checks `pos_ip_whitelist_enabled` and `pos_allowed_ips` from `business_settings` table
+- **When enabled:** Only whitelisted IPs can access `/pos/*` routes; others get 403
+- **When disabled:** POS accessible from any IP
+- **Cache:** 60-second TTL to reduce database queries
+- **Fallback:** Falls back to `ALLOWED_POS_IPS` env var if database unavailable
+- **Testing:** Use ngrok (`~/bin/ngrok http 3000`) to test from external locations
+- See `docs/POS_SECURITY.md` for full documentation
+
+### Dynamic Business Info
+- Business phone/email/address now fetched from database instead of hardcoded constants
+- API at `/api/public/business-info` for client components
+- Server components use `getBusinessInfo()` from `src/lib/data/business.ts`
+- Customer-facing pages (account shell, appointment dialogs) pull from Settings > Business Profile
 
 ### Twilio SMS Configuration
 - Supabase Phone Auth configured with Twilio

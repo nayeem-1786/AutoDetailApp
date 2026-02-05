@@ -53,6 +53,7 @@ export function AppointmentEditDialog({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [businessPhone, setBusinessPhone] = useState<string | null>(null);
 
   // Form state
   const [scheduledDate, setScheduledDate] = useState('');
@@ -67,6 +68,14 @@ export function AppointmentEditDialog({
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [bookedServices, setBookedServices] = useState<AppointmentService[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
+
+  // Load business info
+  useEffect(() => {
+    fetch('/api/public/business-info')
+      .then((res) => res.json())
+      .then((info) => setBusinessPhone(info.phone))
+      .catch(() => {});
+  }, []);
 
   // Load appointment data
   useEffect(() => {
@@ -106,6 +115,16 @@ export function AppointmentEditDialog({
         setLoading(false);
       });
   }, [open, appointmentId]);
+
+  // Format phone for display: +13109551779 -> (310) 955-1779
+  function formatPhone(phone: string): string {
+    const digits = phone.replace(/\D/g, '');
+    const national = digits.startsWith('1') ? digits.slice(1) : digits;
+    if (national.length === 10) {
+      return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
+    }
+    return phone;
+  }
 
   // Format vehicle for display
   function formatVehicle(v: Vehicle): string {
@@ -249,20 +268,25 @@ export function AppointmentEditDialog({
             </div>
 
             {/* Service Change Notice */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <div className="flex items-start gap-3">
-                <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-blue-900">
-                    Need to change services?
-                  </p>
-                  <p className="mt-1 text-sm text-blue-700">
-                    Please call us at <a href="tel:+13109551779" className="font-medium underline">(310) 955-1779</a> to
-                    modify your services. Our team will help you find the best options for your vehicle.
-                  </p>
+            {businessPhone && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">
+                      Need to change services?
+                    </p>
+                    <p className="mt-1 text-sm text-blue-700">
+                      Please call us at{' '}
+                      <a href={`tel:${businessPhone}`} className="font-medium underline">
+                        {formatPhone(businessPhone)}
+                      </a>{' '}
+                      to modify your services. Our team will help you find the best options for your vehicle.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </DialogContent>

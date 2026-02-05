@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -68,6 +68,13 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Configure receipt printer, branding, logo, and custom text.',
         href: '/admin/settings/receipt-printer',
         icon: Printer,
+        roles: ['super_admin'],
+      },
+      {
+        title: 'POS Security',
+        description: 'Manage IP whitelist for POS access restriction.',
+        href: '/admin/settings/pos-security',
+        icon: Shield,
         roles: ['super_admin'],
       },
     ],

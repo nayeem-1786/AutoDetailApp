@@ -4,10 +4,50 @@ import { updateSession } from '@/lib/supabase/middleware';
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/unsubscribe', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt', '/pos'];
 
-// Allowed IPs for POS access (comma-separated in env var)
-const ALLOWED_POS_IPS: string[] | null = process.env.ALLOWED_POS_IPS
-  ? process.env.ALLOWED_POS_IPS.split(',').map((ip) => ip.trim()).filter(Boolean)
-  : null;
+// In-memory cache for IP whitelist
+let cachedIps: string[] | null = null;
+let cachedEnabled: boolean | null = null;
+let cacheExpiry = 0;
+const CACHE_TTL_MS = 60_000; // 1 minute
+
+async function getIpWhitelistConfig(): Promise<{ ips: string[]; enabled: boolean }> {
+  const now = Date.now();
+
+  // Return cached value if still valid
+  if (cachedIps !== null && cachedEnabled !== null && now < cacheExpiry) {
+    return { ips: cachedIps, enabled: cachedEnabled };
+  }
+
+  // Try to fetch from database via internal API
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/internal/allowed-ips`, {
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      const { ips, enabled } = await res.json();
+      cachedIps = Array.isArray(ips) ? ips : [];
+      cachedEnabled = enabled === true;
+      cacheExpiry = now + CACHE_TTL_MS;
+      return { ips: cachedIps, enabled: cachedEnabled };
+    }
+  } catch {
+    // Fall through to env var
+  }
+
+  // Fallback to environment variable
+  const envIps = process.env.ALLOWED_POS_IPS
+    ? process.env.ALLOWED_POS_IPS.split(',')
+        .map((ip) => ip.trim())
+        .filter(Boolean)
+    : [];
+
+  cachedIps = envIps;
+  cachedEnabled = envIps.length > 0; // If env var is set, assume enabled
+  cacheExpiry = now + CACHE_TTL_MS;
+  return { ips: cachedIps, enabled: cachedEnabled };
+}
 
 function getClientIp(request: NextRequest): string | null {
   // x-forwarded-for is set by proxies/load balancers (Vercel, Cloudflare, etc.)
@@ -22,16 +62,14 @@ function getClientIp(request: NextRequest): string | null {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // IP restriction for POS routes (only enforced in production when ALLOWED_POS_IPS is set)
-  if (
-    pathname.startsWith('/pos') &&
-    ALLOWED_POS_IPS &&
-    ALLOWED_POS_IPS.length > 0 &&
-    process.env.NODE_ENV === 'production'
-  ) {
-    const clientIp = getClientIp(request);
-    if (!clientIp || !ALLOWED_POS_IPS.includes(clientIp)) {
-      return new NextResponse('Access denied', { status: 403 });
+  // IP restriction for POS routes (controlled by toggle in Settings > POS Security)
+  if (pathname.startsWith('/pos')) {
+    const { ips, enabled } = await getIpWhitelistConfig();
+    if (enabled && ips.length > 0) {
+      const clientIp = getClientIp(request);
+      if (!clientIp || !ips.includes(clientIp)) {
+        return new NextResponse('Access denied: Your IP address is not authorized to access the POS system.', { status: 403 });
+      }
     }
   }
 
