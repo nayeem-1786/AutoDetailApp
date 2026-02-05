@@ -97,10 +97,10 @@ ALTER TABLE customers
 - [x] Receipt popup dialog (Print to browser, Email only — no SMS/thermal)
 - [x] Reuse `generateReceiptHtml` from POS
 
-### Phase 3: Loyalty Page
-- [ ] Balance card matching admin design (big number + dollar value)
-- [ ] "How it works" info card with earn/redeem rates in plain language
-- [ ] DataTable for Points History: Date, Action, Points, Balance, Description
+### Phase 3: Loyalty Page ✓
+- [x] Balance card matching admin design (big number + dollar value + progress bar)
+- [x] "How it works" info card with earn/redeem rates in plain language
+- [x] DataTable for Points History: Date, Action, Points, Balance, Description
 
 ### Phase 4: Vehicles Page
 - [ ] Group vehicles by type with icons (🚗 Cars, 🚤 Boats, ✈️ Aircraft, etc.)
