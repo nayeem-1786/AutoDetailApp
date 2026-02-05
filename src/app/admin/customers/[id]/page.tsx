@@ -845,28 +845,40 @@ export default function CustomerProfilePage() {
                       Online Access
                     </CardTitle>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-4">
-                        {customer.auth_user_id ? (
-                          <>
-                            <span className="flex items-center gap-1.5 text-sm font-medium text-green-600">
-                              <span className="h-2 w-2 rounded-full bg-green-500" />
-                              Active
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeactivateOpen(true)}
-                              className="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700"
-                            >
-                              <span className="h-2 w-2 rounded-full bg-gray-400" />
-                              Deactivate
-                            </button>
-                          </>
-                        ) : (
-                          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-500">
-                            <span className="h-2 w-2 rounded-full bg-gray-400" />
-                            Inactive
-                          </span>
-                        )}
+                      <div className="flex items-center gap-3">
+                        {/* Active toggle */}
+                        <span
+                          className={`flex items-center gap-1.5 text-sm font-medium ${
+                            customer.auth_user_id
+                              ? 'text-green-600'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              customer.auth_user_id ? 'bg-green-500' : 'bg-gray-300'
+                            }`}
+                          />
+                          Active
+                        </span>
+                        {/* Deactivate toggle */}
+                        <button
+                          type="button"
+                          onClick={() => customer.auth_user_id && setConfirmDeactivateOpen(true)}
+                          disabled={!customer.auth_user_id}
+                          className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                            customer.auth_user_id
+                              ? 'text-gray-400 hover:text-red-600 [&:hover>span]:bg-red-500'
+                              : 'text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full transition-colors ${
+                              customer.auth_user_id ? 'bg-gray-300' : 'bg-gray-300'
+                            }`}
+                          />
+                          Deactivate
+                        </button>
                       </div>
                       {customer.auth_user_id && (
                         <Button
