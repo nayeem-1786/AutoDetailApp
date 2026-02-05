@@ -21,7 +21,8 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - Consent validation warnings on campaigns
 - Settings grouped into sections
 - CONVENTIONS.md shared foundation doc created and referenced from all module docs
-- **Dynamic Receipt Config:** Receipts pull branding from DB settings instead of hardcoded constants. Business Profile has website/email fields. Receipt Printer settings page with header overrides, logo upload (Supabase Storage `receipt-assets` bucket), logo width/position/alignment, custom text with placement options. All receipt API routes (print/email/sms) and client-side generators use `fetchReceiptConfig()` merge helper. Cashier name shown on receipts. Preview button on settings page.
+- **Dynamic Receipt Config:** Receipts pull branding from DB settings instead of hardcoded constants. Business Profile has website/email fields. Receipt Printer settings page with header overrides, logo upload (Supabase Storage `receipt-assets` bucket), logo width/position/alignment, custom text with placement options. All receipt API routes (print/email/sms) and client-side generators use `fetchReceiptConfig()` merge helper. Cashier first name shown on receipts. Preview button on settings page. Receipt buttons unified across admin and POS (Print, Email, SMS, Receipt) with consistent styling.
+- **Customer Detail Page:** Combined Customer Type + Customer Journey card with vertical divider. Journey shows Since/Visits/Lifetime/Last Visit as pill-shaped stats. Receipt popup with 4 unified action buttons.
 
 ## Phase 5 — What's Remaining
 - Lifecycle automation rules (service-based triggers, configurable timing, vehicle-aware reminders)

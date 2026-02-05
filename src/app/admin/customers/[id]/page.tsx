@@ -698,6 +698,94 @@ export default function CustomerProfilePage() {
         {/* ===== INFO TAB ===== */}
         <TabsContent value="info">
           <form onSubmit={handleSubmit(onSaveInfo)} className="space-y-6">
+            {/* Customer Type + Customer Journey Card */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                  {/* Customer Type section */}
+                  <div className="flex-shrink-0">
+                    <CardTitle className="mb-3">Customer Type</CardTitle>
+                    <div className="flex gap-2">
+                      {([null, 'enthusiast', 'professional'] as const).map((type) => {
+                        const isActive = customer.customer_type === type;
+                        const label = type === null ? 'Unknown' : type === 'enthusiast' ? 'Enthusiast' : 'Professional';
+                        const activeClass =
+                          type === null
+                            ? 'border-gray-400 bg-gray-50 text-gray-700'
+                            : type === 'enthusiast'
+                              ? 'border-blue-400 bg-blue-50 text-blue-700'
+                              : 'border-purple-400 bg-purple-50 text-purple-700';
+                        return (
+                          <button
+                            key={type ?? 'none'}
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/pos/customers/${customer.id}/type`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ customer_type: type }),
+                                });
+                                const json = await res.json();
+                                if (!res.ok) throw new Error(json.error || 'Failed to update');
+                                setCustomer((prev) => prev ? { ...prev, customer_type: json.data?.customer_type ?? type } : prev);
+                                toast.success(type ? `Marked as ${label}` : 'Customer type cleared');
+                              } catch {
+                                toast.error('Failed to update customer type');
+                              }
+                            }}
+                            className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                              isActive
+                                ? activeClass
+                                : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Vertical divider */}
+                  <div className="hidden sm:flex sm:items-center sm:px-10 self-stretch">
+                    <div className="h-3/4 w-px bg-gray-200" />
+                  </div>
+
+                  {/* Customer Journey section */}
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="mb-3">Customer Journey</CardTitle>
+                    <div className="flex gap-2">
+                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Since </span>
+                        <span className="text-sm font-medium text-gray-700">
+                          {customer.first_visit_date
+                            ? formatDate(customer.first_visit_date)
+                            : customer.created_at
+                              ? formatDate(customer.created_at)
+                              : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Visits </span>
+                        <span className="text-sm font-medium text-gray-700">{transactions.length}</span>
+                      </div>
+                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Lifetime </span>
+                        <span className="text-sm font-medium text-gray-700">{formatCurrency(customer.lifetime_spend)}</span>
+                      </div>
+                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Last Visit </span>
+                        <span className="text-sm font-medium text-gray-700">
+                          {customer.last_visit_date ? formatDate(customer.last_visit_date) : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Contact Information</CardTitle>
@@ -723,60 +811,6 @@ export default function CustomerProfilePage() {
                   <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
                     <Input id="birthday" type="date" {...register('birthday')} />
                   </FormField>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Customer Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-3 text-sm text-gray-500">
-                  Classify this customer to target promotions and coupons by type.
-                </p>
-                <div className="flex gap-2">
-                  {([null, 'enthusiast', 'professional'] as const).map((type) => {
-                    const isActive = customer.customer_type === type;
-                    const label = type === null ? 'Unknown' : type === 'enthusiast' ? 'Enthusiast' : 'Professional';
-                    const activeClass =
-                      type === null
-                        ? 'border-gray-400 bg-gray-50 text-gray-700'
-                        : type === 'enthusiast'
-                          ? 'border-blue-400 bg-blue-50 text-blue-700'
-                          : 'border-purple-400 bg-purple-50 text-purple-700';
-                    return (
-                      <button
-                        key={type ?? 'none'}
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            const res = await fetch(`/api/pos/customers/${customer.id}/type`, {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ customer_type: type }),
-                            });
-                            const json = await res.json();
-                            if (!res.ok) throw new Error(json.error || 'Failed to update');
-                            setCustomer((prev) => prev ? { ...prev, customer_type: json.data?.customer_type ?? type } : prev);
-                            toast.success(type ? `Marked as ${label}` : 'Customer type cleared');
-                          } catch {
-                            toast.error('Failed to update customer type');
-                          }
-                        }}
-                        className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
-                          isActive
-                            ? activeClass
-                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
                 </div>
               </CardContent>
             </Card>
