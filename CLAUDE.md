@@ -102,10 +102,10 @@ ALTER TABLE customers
 - [x] "How it works" info card with earn/redeem rates in plain language
 - [x] DataTable for Points History: Date, Action, Points, Balance, Description
 
-### Phase 4: Vehicles Page
-- [ ] Group vehicles by type with icons (🚗 Cars, 🚤 Boats, ✈️ Aircraft, etc.)
-- [ ] Cleaner card layout showing Year Make Model, Color, License Plate
-- [ ] Human explanation: "Add all your vehicles here so we can track their service history"
+### Phase 4: Vehicles Page ✓
+- [x] Group vehicles by type with icons (Car, Bike, Truck, Ship, Plane)
+- [x] Cleaner card layout showing Year Make Model, Color, Size, License Plate
+- [x] Human explanation: "Add all your vehicles here so we can track their service history"
 
 ### Phase 5: Appointments Edit Flow
 - [ ] "Edit Appointment" button on upcoming appointments
