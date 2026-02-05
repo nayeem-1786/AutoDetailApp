@@ -437,6 +437,8 @@ export type Database = {
           lifetime_spend: number
           loyalty_points_balance: number
           notes: string | null
+          notify_loyalty: boolean
+          notify_promotions: boolean
           phone: string | null
           sms_consent: boolean
           square_customer_id: string | null
@@ -464,6 +466,8 @@ export type Database = {
           lifetime_spend?: number
           loyalty_points_balance?: number
           notes?: string | null
+          notify_loyalty?: boolean
+          notify_promotions?: boolean
           phone?: string | null
           sms_consent?: boolean
           square_customer_id?: string | null
@@ -491,6 +495,8 @@ export type Database = {
           lifetime_spend?: number
           loyalty_points_balance?: number
           notes?: string | null
+          notify_loyalty?: boolean
+          notify_promotions?: boolean
           phone?: string | null
           sms_consent?: boolean
           square_customer_id?: string | null
@@ -1990,6 +1996,7 @@ export type Database = {
       transactions: {
         Row: {
           appointment_id: string | null
+          coupon_code: string | null
           coupon_id: string | null
           created_at: string
           customer_id: string | null
@@ -2014,6 +2021,7 @@ export type Database = {
         }
         Insert: {
           appointment_id?: string | null
+          coupon_code?: string | null
           coupon_id?: string | null
           created_at?: string
           customer_id?: string | null
@@ -2038,6 +2046,7 @@ export type Database = {
         }
         Update: {
           appointment_id?: string | null
+          coupon_code?: string | null
           coupon_id?: string | null
           created_at?: string
           customer_id?: string | null

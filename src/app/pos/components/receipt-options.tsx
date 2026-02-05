@@ -64,7 +64,7 @@ export function ReceiptOptions({
 
   async function handleCopierPrint() {
     // Open window immediately in the click handler so Safari/iPad doesn't block it
-    const printWindow = window.open('', '_blank', 'width=450,height=700');
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) {
       toast.error('Pop-up blocked — allow pop-ups and try again');
       return;

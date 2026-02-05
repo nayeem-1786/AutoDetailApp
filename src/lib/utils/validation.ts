@@ -347,6 +347,8 @@ export const customerProfileSchema = z.object({
   phone: z.string().regex(bookingPhoneRegex, 'Enter phone as (XXX) XXX-XXXX'),
   sms_consent: z.boolean(),
   email_consent: z.boolean(),
+  notify_promotions: z.boolean(),
+  notify_loyalty: z.boolean(),
 });
 
 // Appointment update schema (admin edit)
@@ -404,6 +406,7 @@ export const transactionCreateSchema = z.object({
   total_amount: positiveNumber,
   payment_method: z.enum(['cash', 'card', 'check', 'split']),
   coupon_id: z.string().uuid().optional().nullable(),
+  coupon_code: z.string().optional().nullable(),
   loyalty_points_redeemed: positiveInt.default(0),
   loyalty_discount: positiveNumber.default(0),
   notes: optionalString,

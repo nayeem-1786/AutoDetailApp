@@ -23,6 +23,9 @@ export interface ReceiptTransaction {
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
+  coupon_code?: string | null;
+  loyalty_discount?: number;
+  loyalty_points_redeemed?: number;
   tip_amount: number;
   total_amount: number;
   customer?: { first_name: string; last_name: string; phone?: string | null } | null;
@@ -163,10 +166,20 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   }
 
   if (tx.discount_amount > 0) {
+    const discountLabel = tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount';
     lines.push({
       type: 'columns',
-      left: 'Discount',
+      left: discountLabel,
       right: `-$${tx.discount_amount.toFixed(2)}`,
+    });
+  }
+
+  if (tx.loyalty_discount && tx.loyalty_discount > 0) {
+    const ptsLabel = tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : '';
+    lines.push({
+      type: 'columns',
+      left: `Loyalty${ptsLabel}`,
+      right: `-$${tx.loyalty_discount.toFixed(2)}`,
     });
   }
 
@@ -326,7 +339,14 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   const totals: string[] = [];
   totals.push(row('Subtotal', `$${tx.subtotal.toFixed(2)}`));
   if (tx.tax_amount > 0) totals.push(row('Tax', `$${tx.tax_amount.toFixed(2)}`));
-  if (tx.discount_amount > 0) totals.push(row('Discount', `-$${tx.discount_amount.toFixed(2)}`, '#16a34a'));
+  if (tx.discount_amount > 0) {
+    const discountLabel = tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount';
+    totals.push(row(discountLabel, `-$${tx.discount_amount.toFixed(2)}`, '#16a34a'));
+  }
+  if (tx.loyalty_discount && tx.loyalty_discount > 0) {
+    const ptsLabel = tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : '';
+    totals.push(row(`Loyalty${ptsLabel}`, `-$${tx.loyalty_discount.toFixed(2)}`, '#d97706'));
+  }
   if (tx.tip_amount > 0) totals.push(row('Tip', `$${tx.tip_amount.toFixed(2)}`));
 
   const paymentRows = tx.payments

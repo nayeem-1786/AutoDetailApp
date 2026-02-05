@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
         total_amount: data.total_amount,
         payment_method: data.payment_method,
         coupon_id: data.coupon_id || null,
+        coupon_code: data.coupon_code || null,
         loyalty_points_earned: 0,
         loyalty_points_redeemed: data.loyalty_points_redeemed || 0,
         loyalty_discount: data.loyalty_discount || 0,

@@ -8,7 +8,8 @@ import { AppointmentCard } from '@/components/account/appointment-card';
 import { CouponCard } from '@/components/account/coupon-card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { formatPoints } from '@/lib/utils/format';
+import { formatPoints, formatCurrency } from '@/lib/utils/format';
+import { LOYALTY } from '@/lib/utils/constants';
 
 interface CouponRewardData {
   applies_to: string;
@@ -101,6 +102,9 @@ export default function AccountDashboardPage() {
           <p className="text-sm font-medium text-gray-600">Loyalty Points</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
             {formatPoints(customer.loyalty_points_balance)}
+          </p>
+          <p className="mt-1 text-sm text-gray-600">
+            That&apos;s {formatCurrency(customer.loyalty_points_balance * LOYALTY.REDEEM_RATE)} off your next visit
           </p>
           <p className="mt-1 text-xs text-gray-500">
             Tap to view rewards details

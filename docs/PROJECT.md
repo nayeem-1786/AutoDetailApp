@@ -52,6 +52,7 @@ This project is documented across multiple files. PROJECT.md is the master docum
 | **SERVICE_CATALOG.md** | Complete catalog of all 30 services with pricing, classifications, vehicle compatibility, add-on suggestion rules, combo pricing, mobile service rules, and service prerequisites | When building: service CRUD, POS service selection, booking service picker, pricing logic, add-on suggestion UI, mobile booking, or the 11 Labs service API endpoint |
 | **DATA_MIGRATION_RULES.md** | Square data import rules — customer tiers, phone normalization, product field mapping, transaction import sequence, vehicle inference, loyalty point seeding, and validation checks | When building: Phase 1 migration tool, CSV parser, import validation, or any logic that touches Square export data |
 | **DASHBOARD_RULES.md** | Complete admin dashboard navigation and UI structure — every page, every section, every feature organized by navigation area, with Square parity notes | When building: admin panel pages, designing navigation, or implementing any admin-facing feature |
+| **iPAD.md** | iPad POS optimization features — touch targets, numeric keyboards, sticky cart, PWA/offline support, gestures, dark mode, and planning requirements | When building: Phase 12 iPad optimizations, or any POS UI improvements for tablet use |
 
 **Rule:** If a decision is documented in a companion file, that file is the source of truth for that domain. PROJECT.md provides the overview; companion files provide the implementation detail.
 
@@ -1064,6 +1065,23 @@ Built but toggled OFF. Activate when business warrants:
 - Automated win-back campaigns for at-risk customers
 - Referral program: unique codes, track referrals, reward referrer
 - Seasonality insights
+
+### Phase 12 — iPad POS Optimization
+
+**Goal:** Native-like iPad experience with offline resilience.
+
+> **Detailed Spec:** See [`iPAD.md`](./iPAD.md) for full feature descriptions and planning requirements.
+
+- Larger touch targets (44px minimum per Apple HIG)
+- Numeric keyboard for quantity/amount fields (`inputMode="numeric"`)
+- Sticky cart sidebar (always visible during browsing)
+- PWA with offline support (service worker, sync queue, conflict resolution)
+- Quick "New Customer" inline form (create without leaving checkout)
+- Recent transactions shortcut (quick access for reprints/refunds)
+- Swipe-to-delete on cart items (intuitive gesture with undo)
+- Dark mode (system preference detection + manual toggle)
+
+**Planning Required:** Component audit, offline strategy, design work, technical decisions. See iPAD.md for details.
 
 ---
 

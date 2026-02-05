@@ -725,7 +725,7 @@ export default function CustomerProfilePage() {
             {/* Customer Type + Customer Journey Card */}
             <Card>
               <CardContent className="pt-6">
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
                   {/* Customer Type section */}
                   <div className="flex-shrink-0">
                     <CardTitle className="mb-3">Customer Type</CardTitle>
@@ -812,9 +812,9 @@ export default function CustomerProfilePage() {
                     <div className="h-3/4 w-px bg-gray-200" />
                   </div>
 
-                  {/* Account section */}
+                  {/* Online Access section */}
                   <div className="flex-shrink-0">
-                    <CardTitle className="mb-3">Account</CardTitle>
+                    <CardTitle className="mb-3">Online Access</CardTitle>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">Portal Access:</span>

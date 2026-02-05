@@ -68,6 +68,9 @@ export async function POST(request: NextRequest) {
       subtotal: tx.subtotal,
       tax_amount: tx.tax_amount,
       discount_amount: tx.discount_amount,
+      coupon_code: tx.coupon_code,
+      loyalty_discount: tx.loyalty_discount,
+      loyalty_points_redeemed: tx.loyalty_points_redeemed,
       tip_amount: tx.tip_amount,
       total_amount: tx.total_amount,
       customer: tx.customer,
@@ -103,7 +106,7 @@ ${itemLines}
 
 Subtotal: $${tx.subtotal.toFixed(2)}
 Tax: $${tx.tax_amount.toFixed(2)}
-${tx.discount_amount > 0 ? `Discount: -$${tx.discount_amount.toFixed(2)}\n` : ''}${tx.tip_amount > 0 ? `Tip: $${tx.tip_amount.toFixed(2)}\n` : ''}Total: $${tx.total_amount.toFixed(2)}
+${tx.discount_amount > 0 ? `${tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount'}: -$${tx.discount_amount.toFixed(2)}\n` : ''}${tx.loyalty_discount > 0 ? `Loyalty (${tx.loyalty_points_redeemed || 0} pts): -$${tx.loyalty_discount.toFixed(2)}\n` : ''}${tx.tip_amount > 0 ? `Tip: $${tx.tip_amount.toFixed(2)}\n` : ''}Total: $${tx.total_amount.toFixed(2)}
 
 Payment:
 ${paymentLines}

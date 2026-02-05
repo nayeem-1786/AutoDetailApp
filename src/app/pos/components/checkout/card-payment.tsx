@@ -88,6 +88,7 @@ export function CardPayment() {
           total_amount: ticket.total,
           payment_method: 'card',
           coupon_id: ticket.coupon?.id || null,
+          coupon_code: ticket.coupon?.code || null,
           loyalty_points_redeemed: ticket.loyaltyPointsToRedeem,
           loyalty_discount: ticket.loyaltyDiscount,
           notes: ticket.notes,

@@ -52,6 +52,8 @@ export async function PATCH(request: NextRequest) {
         phone: e164Phone,
         sms_consent: data.sms_consent,
         email_consent: data.email_consent,
+        notify_promotions: data.notify_promotions,
+        notify_loyalty: data.notify_loyalty,
         updated_at: new Date().toISOString(),
       })
       .eq('id', customer.id);

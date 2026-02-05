@@ -34,6 +34,7 @@ export function CheckPayment() {
           total_amount: ticket.total,
           payment_method: 'check',
           coupon_id: ticket.coupon?.id || null,
+          coupon_code: ticket.coupon?.code || null,
           loyalty_points_redeemed: ticket.loyaltyPointsToRedeem,
           loyalty_discount: ticket.loyaltyDiscount,
           notes: checkNumber ? `Check #${checkNumber}${ticket.notes ? ` — ${ticket.notes}` : ''}` : ticket.notes,

@@ -44,8 +44,9 @@ export async function POST(
       );
     }
 
-    // Send password reset email via Supabase Admin API
-    const { error: resetError } = await supabase.auth.admin.resetPasswordForEmail(
+    // Send password reset email via Supabase Auth
+    // Using the session client which has auth.resetPasswordForEmail
+    const { error: resetError } = await supabaseSession.auth.resetPasswordForEmail(
       customer.email,
       {
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/portal/reset-password`,
@@ -53,7 +54,7 @@ export async function POST(
     );
 
     if (resetError) {
-      console.error('Password reset error:', resetError);
+      console.error('Password reset email error:', resetError);
       return NextResponse.json(
         { error: 'Failed to send password reset email' },
         { status: 500 }

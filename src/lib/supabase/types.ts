@@ -71,6 +71,8 @@ export interface Customer {
   customer_type: CustomerType | null;
   sms_consent: boolean;
   email_consent: boolean;
+  notify_promotions: boolean;
+  notify_loyalty: boolean;
   first_visit_date: string | null;
   last_visit_date: string | null;
   visit_count: number;
@@ -289,6 +291,7 @@ export interface Transaction {
   total_amount: number;
   payment_method: PaymentMethod | null;
   coupon_id: string | null;
+  coupon_code: string | null;
   loyalty_points_earned: number;
   loyalty_points_redeemed: number;
   loyalty_discount: number;

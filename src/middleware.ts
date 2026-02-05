@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt', '/pos'];
+const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/unsubscribe', '/api/', '/services', '/products', '/sitemap.xml', '/robots.txt', '/pos'];
 
 // Allowed IPs for POS access (comma-separated in env var)
 const ALLOWED_POS_IPS: string[] | null = process.env.ALLOWED_POS_IPS

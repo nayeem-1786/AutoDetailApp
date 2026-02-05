@@ -107,18 +107,19 @@ ALTER TABLE customers
 - [x] Cleaner card layout showing Year Make Model, Color, Size, License Plate
 - [x] Human explanation: "Add all your vehicles here so we can track their service history"
 
-### Phase 5: Appointments Edit Flow
-- [ ] "Edit Appointment" button on upcoming appointments
-- [ ] Change date/time (calendar picker, respects cancellation window)
-- [ ] Change vehicle (dropdown of customer's vehicles)
-- [ ] Add/remove services (with live price update)
-- [ ] Show price difference: "This change will cost $X more" or "You'll save $X"
-- [ ] Confirmation before saving changes
+### Phase 5: Appointments Edit Flow ✓
+- [x] "Edit Appointment" button on upcoming appointments
+- [x] Change date/time (calendar picker, respects cancellation window)
+- [x] Change vehicle (dropdown of customer's vehicles)
+- [x] Add/remove services (with live price update)
+- [x] Show price difference: "This change will cost $X more" or "You'll save $X"
+- [x] Save button with validation (no confirmation needed - explicit user action)
 
-### Phase 6: Dashboard Polish
-- [ ] Coupons section with explanation: "These discounts are ready to use on your next booking"
-- [ ] Loyalty points with human explanation: "You have X points — that's $Y off your next visit"
-- [ ] Keep coupons on dashboard + show inline during booking
+### Phase 6: Dashboard Polish ✓
+- [x] Coupons section with explanation: "These discounts are ready to use on your next booking"
+- [x] Loyalty points with human explanation: "That's $Y off your next visit"
+- [x] Keep coupons on dashboard (inline during booking not yet implemented)
+- [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Session Instructions
 - Update this file at end of session or when asked
