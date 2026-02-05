@@ -855,19 +855,17 @@ export default function CustomerProfilePage() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle>Contact & Address</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-6 md:grid-cols-2">
+                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
                   <FormField label="First Name" error={errors.first_name?.message} required htmlFor="first_name">
                     <Input id="first_name" {...register('first_name')} />
                   </FormField>
-
                   <FormField label="Last Name" error={errors.last_name?.message} required htmlFor="last_name">
                     <Input id="last_name" {...register('last_name')} />
                   </FormField>
-
                   <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
                     <Input
                       id="phone"
@@ -880,45 +878,27 @@ export default function CustomerProfilePage() {
                       })}
                     />
                   </FormField>
-
                   <FormField label="Email" error={errors.email?.message} htmlFor="email">
                     <Input id="email" type="email" {...register('email')} />
                   </FormField>
-
                   <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
                     <Input id="birthday" type="date" {...register('birthday')} />
                   </FormField>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Address</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <FormField label="Address Line 1" htmlFor="address_line_1">
-                      <Input id="address_line_1" {...register('address_line_1')} />
-                    </FormField>
-                  </div>
-                  <div className="md:col-span-2">
-                    <FormField label="Address Line 2" htmlFor="address_line_2">
-                      <Input id="address_line_2" {...register('address_line_2')} />
-                    </FormField>
-                  </div>
+                  <FormField label="Address" htmlFor="address_line_1">
+                    <Input id="address_line_1" {...register('address_line_1')} placeholder="Street address" />
+                  </FormField>
+                  <FormField label="Address 2" htmlFor="address_line_2">
+                    <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt, suite, etc." />
+                  </FormField>
                   <FormField label="City" htmlFor="city">
                     <Input id="city" {...register('city')} />
                   </FormField>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField label="State" htmlFor="state">
-                      <Input id="state" {...register('state')} maxLength={2} />
-                    </FormField>
-                    <FormField label="ZIP" htmlFor="zip">
-                      <Input id="zip" {...register('zip')} />
-                    </FormField>
-                  </div>
+                  <FormField label="State" htmlFor="state">
+                    <Input id="state" {...register('state')} maxLength={2} placeholder="CA" />
+                  </FormField>
+                  <FormField label="ZIP" htmlFor="zip">
+                    <Input id="zip" {...register('zip')} placeholder="90717" />
+                  </FormField>
                 </div>
               </CardContent>
             </Card>
