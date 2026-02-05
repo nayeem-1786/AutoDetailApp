@@ -11,10 +11,14 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    console.log('[Edit Appointment GET] Starting - Appointment ID:', id);
+
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    console.log('[Edit Appointment GET] Auth user:', user?.id ?? 'null');
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -22,25 +26,37 @@ export async function GET(
 
     const admin = createAdminClient();
 
-    const { data: customer } = await admin
+    const { data: customer, error: custErr } = await admin
       .from('customers')
       .select('id')
       .eq('auth_user_id', user.id)
       .single();
 
+    console.log('[Edit Appointment GET] Customer lookup result:', customer?.id ?? 'null', 'Error:', custErr?.message ?? 'none');
+
     if (!customer) {
+      console.log('[Edit Appointment GET] Customer not found for auth_user_id:', user.id);
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
+
+    // Also check if appointment exists at all (without customer filter)
+    const { data: anyAppt } = await admin
+      .from('appointments')
+      .select('id, customer_id')
+      .eq('id', id)
+      .single();
+
+    console.log('[Edit Appointment GET] Appointment exists check:', anyAppt?.id ?? 'not found', 'Appointment customer_id:', anyAppt?.customer_id ?? 'N/A', 'Looking customer_id:', customer.id);
 
     // Fetch appointment with full details
     const { data: appointment, error } = await admin
       .from('appointments')
       .select(`
         id, status, scheduled_date, scheduled_start_time, scheduled_end_time,
-        total_amount, is_mobile, mobile_address, notes, vehicle_id,
+        total_amount, is_mobile, mobile_address, vehicle_id,
         appointment_services(
           id, service_id, price_at_booking,
-          services(id, name, base_price)
+          services(id, name, flat_price)
         ),
         vehicles(id, year, make, model, color)
       `)
@@ -49,6 +65,7 @@ export async function GET(
       .single();
 
     if (error || !appointment) {
+      console.log('[Edit Appointment] Appointment not found. ID:', id, 'Customer ID:', customer.id, 'Error:', error?.message);
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
     }
 
@@ -59,12 +76,26 @@ export async function GET(
       .eq('customer_id', customer.id)
       .order('created_at', { ascending: false });
 
-    // Get available services
+    // Get available services with pricing data
     const { data: services } = await admin
       .from('services')
-      .select('id, name, base_price, category_id, is_active')
+      .select(`
+        id, name, flat_price, category_id, is_active, pricing_model,
+        service_pricing(
+          tier_name, price, is_vehicle_size_aware,
+          vehicle_size_sedan_price, vehicle_size_truck_suv_price, vehicle_size_suv_van_price
+        )
+      `)
       .eq('is_active', true)
       .order('name');
+
+    // Log service pricing for debugging
+    console.log('[Edit Appointment] Services with pricing:', services?.map(s => ({
+      name: s.name,
+      pricing_model: s.pricing_model,
+      flat_price: s.flat_price,
+      tiers: s.service_pricing?.length || 0
+    })));
 
     return NextResponse.json({
       data: appointment,
@@ -171,14 +202,14 @@ export async function PATCH(
     // Get service prices
     const { data: services } = await admin
       .from('services')
-      .select('id, base_price')
+      .select('id, flat_price')
       .in('id', service_ids);
 
     if (!services || services.length !== service_ids.length) {
       return NextResponse.json({ error: 'Invalid services' }, { status: 400 });
     }
 
-    const totalAmount = services.reduce((sum, s) => sum + (s.base_price || 0), 0);
+    const totalAmount = services.reduce((sum, s) => sum + (s.flat_price || 0), 0);
 
     // Update appointment
     const { error: updateErr } = await admin
@@ -207,7 +238,7 @@ export async function PATCH(
     const appointmentServices = services.map((s) => ({
       appointment_id: id,
       service_id: s.id,
-      price_at_booking: s.base_price || 0,
+      price_at_booking: s.flat_price || 0,
     }));
 
     const { error: servicesErr } = await admin

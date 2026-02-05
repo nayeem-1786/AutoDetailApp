@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
@@ -18,25 +17,24 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { AlertTriangle } from 'lucide-react';
-import type { VehicleType, VehicleSizeClass } from '@/lib/supabase/types';
+import { AlertTriangle, Phone } from 'lucide-react';
+import type { VehicleType } from '@/lib/supabase/types';
 
 interface Vehicle {
   id: string;
   vehicle_type: VehicleType;
-  size_class: VehicleSizeClass | null;
   year: number | null;
   make: string | null;
   model: string | null;
   color: string | null;
 }
 
-interface Service {
-  id: string;
-  name: string;
-  base_price: number;
-  category_id: string | null;
-  is_active: boolean;
+interface AppointmentService {
+  service_id: string;
+  price_at_booking: number;
+  services: {
+    name: string;
+  };
 }
 
 interface AppointmentEditDialogProps {
@@ -61,12 +59,14 @@ export function AppointmentEditDialog({
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [vehicleId, setVehicleId] = useState<string | null>(null);
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+
+  // Original service IDs (kept unchanged)
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
 
   // Data
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [originalTotal, setOriginalTotal] = useState(0);
+  const [bookedServices, setBookedServices] = useState<AppointmentService[]>([]);
+  const [totalAmount, setTotalAmount] = useState(0);
 
   // Load appointment data
   useEffect(() => {
@@ -89,15 +89,15 @@ export function AppointmentEditDialog({
         setStartTime(appt.scheduled_start_time);
         setEndTime(appt.scheduled_end_time);
         setVehicleId(appt.vehicle_id);
-        setOriginalTotal(appt.total_amount);
+        setTotalAmount(appt.total_amount);
+        setBookedServices(appt.appointment_services || []);
 
-        const serviceIds = appt.appointment_services?.map(
+        const ids = appt.appointment_services?.map(
           (as: { service_id: string }) => as.service_id
         ) || [];
-        setSelectedServiceIds(serviceIds);
+        setServiceIds(ids);
 
         setVehicles(json.vehicles || []);
-        setServices(json.services || []);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to load');
@@ -107,13 +107,6 @@ export function AppointmentEditDialog({
       });
   }, [open, appointmentId]);
 
-  // Calculate new total
-  const newTotal = services
-    .filter((s) => selectedServiceIds.includes(s.id))
-    .reduce((sum, s) => sum + (s.base_price || 0), 0);
-
-  const priceDiff = newTotal - originalTotal;
-
   // Format vehicle for display
   function formatVehicle(v: Vehicle): string {
     const parts = [v.year, v.make, v.model].filter(Boolean);
@@ -121,22 +114,8 @@ export function AppointmentEditDialog({
     return `${label} (${VEHICLE_TYPE_LABELS[v.vehicle_type]})`;
   }
 
-  // Toggle service selection
-  function toggleService(serviceId: string) {
-    setSelectedServiceIds((prev) =>
-      prev.includes(serviceId)
-        ? prev.filter((id) => id !== serviceId)
-        : [...prev, serviceId]
-    );
-  }
-
   // Handle save
   async function handleSave() {
-    if (selectedServiceIds.length === 0) {
-      toast.error('Please select at least one service');
-      return;
-    }
-
     setSaving(true);
 
     try {
@@ -148,7 +127,7 @@ export function AppointmentEditDialog({
           scheduled_start_time: startTime,
           scheduled_end_time: endTime,
           vehicle_id: vehicleId,
-          service_ids: selectedServiceIds,
+          service_ids: serviceIds, // Keep original services
         }),
       });
 
@@ -163,7 +142,7 @@ export function AppointmentEditDialog({
         return;
       }
 
-      toast.success('Appointment updated');
+      toast.success('Appointment rescheduled');
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
@@ -180,7 +159,7 @@ export function AppointmentEditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogClose onClose={() => onOpenChange(false)} />
       <DialogHeader>
-        <DialogTitle>Edit Appointment</DialogTitle>
+        <DialogTitle>Reschedule Appointment</DialogTitle>
       </DialogHeader>
       <DialogContent className="max-h-[70vh] overflow-y-auto">
         {loading ? (
@@ -196,7 +175,7 @@ export function AppointmentEditDialog({
           <div className="space-y-6">
             {/* Date & Time */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Date & Time</h3>
+              <h3 className="mb-3 text-sm font-semibold text-gray-700">New Date & Time</h3>
               <div className="grid gap-4 sm:grid-cols-3">
                 <FormField label="Date" required htmlFor="edit-date">
                   <Input
@@ -245,59 +224,44 @@ export function AppointmentEditDialog({
               </FormField>
             </div>
 
-            {/* Services */}
+            {/* Current Services (Read-only) */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Services</h3>
-              <div className="space-y-2 rounded-lg border border-gray-200 p-3">
-                {services.map((service) => {
-                  const isSelected = selectedServiceIds.includes(service.id);
-                  return (
-                    <label
-                      key={service.id}
-                      className={`flex cursor-pointer items-center justify-between rounded-md border p-3 transition-colors ${
-                        isSelected
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => toggleService(service.id)}
-                        />
-                        <span className="text-sm font-medium text-gray-900">
-                          {service.name}
-                        </span>
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {formatCurrency(service.base_price)}
-                      </span>
-                    </label>
-                  );
-                })}
+              <h3 className="mb-3 text-sm font-semibold text-gray-700">Booked Services</h3>
+              <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                {bookedServices.map((as) => (
+                  <div
+                    key={as.service_id}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="text-gray-700">{as.services?.name}</span>
+                    <span className="text-gray-600">
+                      {formatCurrency(as.price_at_booking)}
+                    </span>
+                  </div>
+                ))}
+                <div className="mt-2 border-t border-gray-200 pt-2">
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="text-gray-700">Total</span>
+                    <span className="text-gray-900">{formatCurrency(totalAmount)}</span>
+                  </div>
+                </div>
               </div>
-              {selectedServiceIds.length === 0 && (
-                <p className="mt-2 text-xs text-red-500">
-                  Please select at least one service
-                </p>
-              )}
             </div>
 
-            {/* Price Summary */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">New Total</span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(newTotal)}
-                </span>
+            {/* Service Change Notice */}
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Need to change services?
+                  </p>
+                  <p className="mt-1 text-sm text-blue-700">
+                    Please call us at <a href="tel:+13109551779" className="font-medium underline">(310) 955-1779</a> to
+                    modify your services. Our team will help you find the best options for your vehicle.
+                  </p>
+                </div>
               </div>
-              {priceDiff !== 0 && (
-                <p className={`mt-1 text-sm ${priceDiff > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                  {priceDiff > 0
-                    ? `This change will cost ${formatCurrency(priceDiff)} more`
-                    : `You'll save ${formatCurrency(Math.abs(priceDiff))}`}
-                </p>
-              )}
             </div>
           </div>
         )}
@@ -307,11 +271,8 @@ export function AppointmentEditDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saving || selectedServiceIds.length === 0}
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Reschedule'}
           </Button>
         </DialogFooter>
       )}

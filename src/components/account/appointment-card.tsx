@@ -142,7 +142,7 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
                   size="sm"
                   onClick={() => setEditOpen(true)}
                 >
-                  Edit
+                  Reschedule
                 </Button>
               )}
               {canCancel && (

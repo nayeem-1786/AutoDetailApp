@@ -81,11 +81,22 @@ export function phoneToE164(phone: string): string {
 }
 
 export function formatDate(date: string | Date): string {
+  // Handle date-only strings (YYYY-MM-DD) to avoid timezone shift
+  // When passed to new Date(), "2025-02-12" is interpreted as UTC midnight,
+  // which shifts backwards in timezones behind UTC (e.g., Pacific)
+  let d: Date;
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // Parse as local date by splitting and using Date constructor
+    const [year, month, day] = date.split('-').map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(date);
+  }
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  }).format(new Date(date));
+  }).format(d);
 }
 
 export function formatDateTime(date: string | Date): string {
