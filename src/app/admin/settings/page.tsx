@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -61,6 +61,13 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Set how long the POS stays active before auto-logout.',
         href: '/admin/settings/pos-idle-timeout',
         icon: Timer,
+        roles: ['super_admin'],
+      },
+      {
+        title: 'Receipt Printer',
+        description: 'Configure receipt printer, branding, logo, and custom text.',
+        href: '/admin/settings/receipt-printer',
+        icon: Printer,
         roles: ['super_admin'],
       },
     ],

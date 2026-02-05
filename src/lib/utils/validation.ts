@@ -188,6 +188,8 @@ export const businessProfileSchema = z.object({
     state: requiredString,
     zip: requiredString,
   }),
+  business_email: emailSchema,
+  business_website: z.string().url('Enter a valid URL').or(z.literal('')).optional().nullable(),
 });
 
 export const taxConfigSchema = z.object({

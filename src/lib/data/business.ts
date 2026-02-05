@@ -16,6 +16,8 @@ export interface BusinessInfo {
   city: string;
   state: string;
   zip: string;
+  email: string | null;
+  website: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,7 +38,7 @@ async function fetchBusinessInfo(): Promise<BusinessInfo> {
   const { data } = await supabase
     .from('business_settings')
     .select('key, value')
-    .in('key', ['business_name', 'business_phone', 'business_address']);
+    .in('key', ['business_name', 'business_phone', 'business_address', 'business_email', 'business_website']);
 
   const settings: Record<string, unknown> = {};
   for (const row of data ?? []) {
@@ -58,6 +60,8 @@ async function fetchBusinessInfo(): Promise<BusinessInfo> {
     city: addr.city,
     state: addr.state,
     zip: addr.zip,
+    email: (settings.business_email as string) || null,
+    website: (settings.business_website as string) || null,
   };
 }
 

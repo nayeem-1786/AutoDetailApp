@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { generateReceiptLines } from '../lib/receipt-template';
+import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 import { printReceipt } from '../lib/star-printer';
 
 interface ReceiptOptionsProps {
@@ -48,7 +49,8 @@ export function ReceiptOptions({
         return;
       }
 
-      const lines = generateReceiptLines(json.data.transaction);
+      const rcfg: MergedReceiptConfig | undefined = json.data.receipt_config ?? undefined;
+      const lines = generateReceiptLines(json.data.transaction, rcfg);
       await printReceipt(json.data.printer_ip, lines);
       setPrinted(true);
       toast.success('Receipt printed');

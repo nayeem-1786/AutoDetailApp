@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 
 export async function POST(request: NextRequest) {
   try {
+    // Accept POS token auth OR admin Supabase session auth
     const posEmployee = authenticatePosRequest(request);
     if (!posEmployee) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const supabaseSession = await createClient();
+      const { data: { user } } = await supabaseSession.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
     const supabase = createAdminClient();
 
@@ -26,6 +33,7 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         customer:customers(first_name, last_name, phone),
+        employee:employees(first_name, last_name),
         vehicle:vehicles(year, make, model, color),
         items:transaction_items(*),
         payments(*)
@@ -40,27 +48,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch printer IP from business settings
-    const { data: printerSetting } = await supabase
-      .from('business_settings')
-      .select('value')
-      .eq('key', 'star_printer_ip')
-      .maybeSingle();
+    // Fetch receipt config (includes printer_ip from receipt_config or legacy star_printer_ip)
+    const { merged, printer_ip } = await fetchReceiptConfig(supabase);
 
-    const printerIp = printerSetting?.value as string | null;
-
-    if (!printerIp) {
+    if (!printer_ip) {
       return NextResponse.json(
-        { error: 'Printer not configured. Set star_printer_ip in business settings.' },
+        { error: 'Printer not configured. Set printer IP in Settings > Receipt Printer.' },
         { status: 400 }
       );
     }
 
-    // Return receipt data for client-side Star WebPRNT printing
+    // Return receipt data + config for client-side Star WebPRNT printing
     return NextResponse.json({
       data: {
-        printer_ip: printerIp,
+        printer_ip,
         transaction,
+        receipt_config: merged,
       },
     });
   } catch (err) {

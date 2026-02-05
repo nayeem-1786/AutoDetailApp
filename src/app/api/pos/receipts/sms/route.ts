@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
-import { BUSINESS } from '@/lib/utils/constants';
+import { generateReceiptLines, receiptToPlainText } from '@/app/pos/lib/receipt-template';
+import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 
 export async function POST(request: NextRequest) {
   try {
+    // Accept POS token auth OR admin Supabase session auth
     const posEmployee = authenticatePosRequest(request);
     if (!posEmployee) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const supabaseSession = await createClient();
+      const { data: { user } } = await supabaseSession.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
     const supabase = createAdminClient();
 
@@ -22,10 +29,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch transaction
+    // Fetch transaction with full relations for formatted receipt
     const { data: transaction, error } = await supabase
       .from('transactions')
-      .select('receipt_number, total_amount, tip_amount')
+      .select(`
+        *,
+        customer:customers(first_name, last_name, phone),
+        employee:employees(first_name, last_name),
+        vehicle:vehicles(year, make, model, color),
+        items:transaction_items(*),
+        payments(*)
+      `)
       .eq('id', transaction_id)
       .single();
 
@@ -36,14 +50,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const smsBody =
-      `Receipt from ${BUSINESS.NAME}\n` +
-      `#${transaction.receipt_number || 'N/A'}\n` +
-      `Total: $${transaction.total_amount.toFixed(2)}` +
-      (transaction.tip_amount > 0
-        ? ` (incl. $${transaction.tip_amount.toFixed(2)} tip)`
-        : '') +
-      `\nThank you!`;
+    // Fetch dynamic receipt config
+    const { merged } = await fetchReceiptConfig(supabase);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tx = transaction as any;
+    const receiptLines = generateReceiptLines({
+      receipt_number: tx.receipt_number,
+      transaction_date: tx.transaction_date,
+      subtotal: tx.subtotal,
+      tax_amount: tx.tax_amount,
+      discount_amount: tx.discount_amount,
+      tip_amount: tx.tip_amount,
+      total_amount: tx.total_amount,
+      customer: tx.customer,
+      employee: tx.employee,
+      vehicle: tx.vehicle,
+      items: tx.items ?? [],
+      payments: tx.payments ?? [],
+    }, merged);
+    const smsBody = receiptToPlainText(receiptLines, 40);
 
     const result = await sendSms(phone, smsBody);
 

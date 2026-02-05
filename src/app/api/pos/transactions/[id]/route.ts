@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { fetchReceiptConfig } from '@/lib/data/receipt-config';
+
+async function authenticate(request: NextRequest): Promise<boolean> {
+  const posEmployee = authenticatePosRequest(request);
+  if (posEmployee) return true;
+  const supabaseSession = await createClient();
+  const { data: { user } } = await supabaseSession.auth.getUser();
+  return !!user;
+}
 
 export async function GET(
   request: NextRequest,
@@ -8,8 +18,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const posEmployee = authenticatePosRequest(request);
-    if (!posEmployee) {
+    if (!await authenticate(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const supabase = createAdminClient();
@@ -34,7 +43,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ data: transaction });
+    // Fetch receipt config so callers can render branded receipts
+    const { merged: receipt_config } = await fetchReceiptConfig(supabase);
+
+    return NextResponse.json({ data: transaction, receipt_config });
   } catch (err) {
     console.error('Transaction GET error:', err);
     return NextResponse.json(
@@ -50,8 +62,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const posEmployee = authenticatePosRequest(request);
-    if (!posEmployee) {
+    if (!await authenticate(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const supabase = createAdminClient();

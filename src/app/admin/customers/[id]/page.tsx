@@ -50,8 +50,13 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart } from 'lucide-react';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
+import { generateReceiptLines, generateReceiptHtml } from '@/app/pos/lib/receipt-template';
+import type { ReceiptTransaction } from '@/app/pos/lib/receipt-template';
+import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
+import { printReceipt } from '@/app/pos/lib/star-printer';
+import { useAuth } from '@/lib/auth/auth-provider';
 import type { ColumnDef } from '@tanstack/react-table';
 
 export default function CustomerProfilePage() {
@@ -59,6 +64,7 @@ export default function CustomerProfilePage() {
   const params = useParams();
   const id = params.id as string;
   const supabase = createClient();
+  const { employee: adminEmployee } = useAuth();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -79,6 +85,24 @@ export default function CustomerProfilePage() {
   const [loyaltyDialogOpen, setLoyaltyDialogOpen] = useState(false);
   const [loyaltyAdjust, setLoyaltyAdjust] = useState({ points_change: 0, description: '', action: 'adjusted' as LoyaltyAction });
   const [adjustingLoyalty, setAdjustingLoyalty] = useState(false);
+
+  // Receipt dialog state
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [receiptTransaction, setReceiptTransaction] = useState<any>(null);
+  const [receiptHtml, setReceiptHtml] = useState('');
+  const [receiptConfig, setReceiptConfig] = useState<MergedReceiptConfig | undefined>(undefined);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [receiptPrinting, setReceiptPrinting] = useState(false);
+  const [receiptPrinted, setReceiptPrinted] = useState(false);
+  const [receiptEmailing, setReceiptEmailing] = useState(false);
+  const [receiptEmailed, setReceiptEmailed] = useState(false);
+  const [receiptSmsing, setReceiptSmsing] = useState(false);
+  const [receiptSmsed, setReceiptSmsed] = useState(false);
+  const [showReceiptEmailInput, setShowReceiptEmailInput] = useState(false);
+  const [receiptEmailInput, setReceiptEmailInput] = useState('');
+  const [showReceiptSmsInput, setShowReceiptSmsInput] = useState(false);
+  const [receiptSmsInput, setReceiptSmsInput] = useState('');
 
   // Customer edit form
   const {
@@ -342,7 +366,7 @@ export default function CustomerProfilePage() {
           action: loyaltyAdjust.action,
           points_change: loyaltyAdjust.points_change,
           points_balance: newBalance,
-          description: loyaltyAdjust.description || 'Manual adjustment',
+          description: `${loyaltyAdjust.description || 'Manual adjustment'} (by ${adminEmployee?.first_name ?? 'Admin'} ${adminEmployee?.last_name ?? ''})`.trim(),
         });
 
       if (ledgerError) throw ledgerError;
@@ -364,6 +388,125 @@ export default function CustomerProfilePage() {
       toast.error('Failed to adjust points');
     } finally {
       setAdjustingLoyalty(false);
+    }
+  }
+
+  // --- Receipt Dialog ---
+  async function openReceiptDialog(transactionId: string) {
+    setLoadingReceipt(true);
+    setReceiptDialogOpen(true);
+    setReceiptPrinted(false);
+    setReceiptEmailed(false);
+    setReceiptSmsed(false);
+    setShowReceiptEmailInput(false);
+    setShowReceiptSmsInput(false);
+    try {
+      const res = await fetch(`/api/pos/transactions/${transactionId}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to load transaction');
+      const tx = json.data;
+      const rcfg: MergedReceiptConfig | undefined = json.receipt_config ?? undefined;
+      setReceiptTransaction(tx);
+      setReceiptConfig(rcfg);
+      setReceiptEmailInput(tx.customer?.email || customer?.email || '');
+      setReceiptSmsInput(tx.customer?.phone ? formatPhone(tx.customer.phone) : customer?.phone ? formatPhone(customer.phone) : '');
+      const html = generateReceiptHtml({
+        receipt_number: tx.receipt_number,
+        transaction_date: tx.transaction_date,
+        subtotal: tx.subtotal,
+        tax_amount: tx.tax_amount,
+        discount_amount: tx.discount_amount,
+        tip_amount: tx.tip_amount,
+        total_amount: tx.total_amount,
+        customer: tx.customer,
+        employee: tx.employee,
+        vehicle: tx.vehicle,
+        items: tx.items ?? [],
+        payments: tx.payments ?? [],
+      }, rcfg);
+      setReceiptHtml(html);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load receipt');
+      setReceiptDialogOpen(false);
+    } finally {
+      setLoadingReceipt(false);
+    }
+  }
+
+  async function handleReceiptPrint() {
+    if (!receiptTransaction) return;
+    setReceiptPrinting(true);
+    try {
+      const res = await fetch('/api/pos/receipts/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: receiptTransaction.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Print failed');
+      const printConfig: MergedReceiptConfig | undefined = json.data.receipt_config ?? receiptConfig;
+      const lines = generateReceiptLines(json.data.transaction, printConfig);
+      await printReceipt(json.data.printer_ip, lines);
+      setReceiptPrinted(true);
+      toast.success('Receipt printed');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      setReceiptPrinting(false);
+    }
+  }
+
+  function handleReceiptCopierPrint() {
+    const printWindow = window.open('', '_blank', 'width=450,height=700');
+    if (!printWindow) {
+      toast.error('Pop-up blocked — allow pop-ups and try again');
+      return;
+    }
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
+  async function handleReceiptEmail(email: string) {
+    if (!email || !receiptTransaction) return;
+    setReceiptEmailing(true);
+    try {
+      const res = await fetch('/api/pos/receipts/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: receiptTransaction.id, email }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Email failed');
+      setReceiptEmailed(true);
+      setShowReceiptEmailInput(false);
+      toast.success(`Receipt emailed to ${email}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send email');
+    } finally {
+      setReceiptEmailing(false);
+    }
+  }
+
+  async function handleReceiptSms(phone: string) {
+    if (!phone || !receiptTransaction) return;
+    setReceiptSmsing(true);
+    try {
+      const res = await fetch('/api/pos/receipts/sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: receiptTransaction.id, phone }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'SMS failed');
+      setReceiptSmsed(true);
+      setShowReceiptSmsInput(false);
+      toast.success('Receipt sent via SMS');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send SMS');
+    } finally {
+      setReceiptSmsing(false);
     }
   }
 
@@ -436,9 +579,19 @@ export default function CustomerProfilePage() {
     {
       id: 'receipt',
       header: 'Receipt #',
-      cell: ({ row }) => (
-        <span className="text-sm font-mono text-gray-900">{row.original.receipt_number ?? '—'}</span>
-      ),
+      cell: ({ row }) => {
+        const receiptNum = row.original.receipt_number;
+        if (!receiptNum) return <span className="text-sm text-gray-400">—</span>;
+        return (
+          <button
+            type="button"
+            onClick={() => openReceiptDialog(row.original.id)}
+            className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline"
+          >
+            {receiptNum}
+          </button>
+        );
+      },
     },
     {
       id: 'employee',
@@ -1013,7 +1166,7 @@ export default function CustomerProfilePage() {
                   <Input
                     id="points_change"
                     type="number"
-                    value={loyaltyAdjust.points_change}
+                    value={loyaltyAdjust.points_change || ''}
                     onChange={(e) => setLoyaltyAdjust((prev) => ({ ...prev, points_change: parseInt(e.target.value) || 0 }))}
                   />
                   <p className="mt-1 text-xs text-gray-500">
@@ -1047,6 +1200,54 @@ export default function CustomerProfilePage() {
 
         {/* ===== HISTORY TAB ===== */}
         <TabsContent value="history">
+          {/* Stat cards */}
+          <div className="mb-4 grid gap-4 sm:grid-cols-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <CalendarDays className="h-4 w-4" />
+                  Customer Since
+                </div>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {customer.first_visit_date
+                    ? formatDate(customer.first_visit_date)
+                    : customer.created_at
+                      ? formatDate(customer.created_at)
+                      : 'N/A'}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <ShoppingCart className="h-4 w-4" />
+                  Total Transactions
+                </div>
+                <p className="mt-1 text-2xl font-bold text-gray-900">{transactions.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <DollarSign className="h-4 w-4" />
+                  Lifetime Spend
+                </div>
+                <p className="mt-1 text-2xl font-bold text-gray-900">{formatCurrency(customer.lifetime_spend)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Clock className="h-4 w-4" />
+                  Last Purchase
+                </div>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {customer.last_visit_date ? formatDate(customer.last_visit_date) : 'N/A'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1065,29 +1266,151 @@ export default function CustomerProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Quick stats */}
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">Total Visits</p>
-                <p className="text-2xl font-bold text-gray-900">{customer.visit_count}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">Lifetime Spend</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(customer.lifetime_spend)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">First Visit</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {customer.first_visit_date ? formatDate(customer.first_visit_date) : 'N/A'}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Receipt Detail Dialog */}
+          <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
+            <DialogClose onClose={() => setReceiptDialogOpen(false)} />
+            <DialogHeader>
+              <DialogTitle>
+                Receipt {receiptTransaction?.receipt_number ? `#${receiptTransaction.receipt_number}` : ''}
+              </DialogTitle>
+            </DialogHeader>
+            <DialogContent className="max-h-[60vh] overflow-y-auto">
+              {loadingReceipt ? (
+                <div className="flex items-center justify-center py-8">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                <div
+                  className="rounded border border-gray-200 bg-gray-50 p-2"
+                  dangerouslySetInnerHTML={{ __html: receiptHtml }}
+                />
+              )}
+            </DialogContent>
+            {!loadingReceipt && receiptTransaction && (
+              <DialogFooter className="flex-col items-stretch gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReceiptPrint}
+                    disabled={receiptPrinting || receiptPrinted}
+                  >
+                    {receiptPrinting ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : receiptPrinted ? (
+                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
+                    ) : (
+                      <Printer className="mr-1.5 h-4 w-4" />
+                    )}
+                    Receipt Printer
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReceiptCopierPrint}
+                  >
+                    <Copy className="mr-1.5 h-4 w-4" />
+                    Print (Copier)
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const email = receiptTransaction.customer?.email || customer?.email;
+                      if (email) {
+                        handleReceiptEmail(email);
+                      } else {
+                        setShowReceiptEmailInput(true);
+                      }
+                    }}
+                    disabled={receiptEmailing || receiptEmailed}
+                  >
+                    {receiptEmailing ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : receiptEmailed ? (
+                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
+                    ) : (
+                      <Mail className="mr-1.5 h-4 w-4" />
+                    )}
+                    Email
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const phone = receiptTransaction.customer?.phone || customer?.phone;
+                      if (phone) {
+                        handleReceiptSms(phone);
+                      } else {
+                        setShowReceiptSmsInput(true);
+                      }
+                    }}
+                    disabled={receiptSmsing || receiptSmsed}
+                  >
+                    {receiptSmsing ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : receiptSmsed ? (
+                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
+                    ) : (
+                      <MessageSquare className="mr-1.5 h-4 w-4" />
+                    )}
+                    SMS
+                  </Button>
+                </div>
+
+                {/* Email input */}
+                {showReceiptEmailInput && (
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      value={receiptEmailInput}
+                      onChange={(e) => setReceiptEmailInput(e.target.value)}
+                      placeholder="customer@email.com"
+                      className="h-8 text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleReceiptEmail(receiptEmailInput);
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8"
+                      onClick={() => handleReceiptEmail(receiptEmailInput)}
+                      disabled={!receiptEmailInput || receiptEmailing}
+                    >
+                      Send
+                    </Button>
+                  </div>
+                )}
+
+                {/* SMS input */}
+                {showReceiptSmsInput && (
+                  <div className="flex gap-2">
+                    <Input
+                      type="tel"
+                      value={receiptSmsInput}
+                      onChange={(e) => setReceiptSmsInput(e.target.value)}
+                      placeholder="(310) 555-0123"
+                      className="h-8 text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleReceiptSms(receiptSmsInput);
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8"
+                      onClick={() => handleReceiptSms(receiptSmsInput)}
+                      disabled={!receiptSmsInput || receiptSmsing}
+                    >
+                      Send
+                    </Button>
+                  </div>
+                )}
+              </DialogFooter>
+            )}
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>

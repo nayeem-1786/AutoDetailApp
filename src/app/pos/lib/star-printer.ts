@@ -7,9 +7,75 @@ import type { ReceiptLine } from './receipt-template';
  */
 
 /**
+ * Convert an image URL to a Star WebPRNT base64 monochrome bitmap.
+ * Uses Canvas API to load, resize, and convert to 1-bit monochrome.
+ */
+export async function imageToStarBitmap(
+  url: string,
+  targetWidth: number
+): Promise<string> {
+  // Load image
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('Failed to load receipt logo'));
+    img.src = url;
+  });
+
+  // Calculate height maintaining aspect ratio
+  const aspect = img.naturalHeight / img.naturalWidth;
+  const width = Math.min(targetWidth, 576); // max 576px for 3-inch receipt paper
+  // Star printers require width to be a multiple of 8
+  const alignedWidth = Math.ceil(width / 8) * 8;
+  const height = Math.round(alignedWidth * aspect);
+
+  // Draw to canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = alignedWidth;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, alignedWidth, height);
+  ctx.drawImage(img, 0, 0, alignedWidth, height);
+
+  // Get pixel data and convert to monochrome 1-bit
+  const imageData = ctx.getImageData(0, 0, alignedWidth, height);
+  const pixels = imageData.data;
+  const bytesPerRow = alignedWidth / 8;
+  const bitmapBytes = new Uint8Array(bytesPerRow * height);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < alignedWidth; x++) {
+      const idx = (y * alignedWidth + x) * 4;
+      const r = pixels[idx];
+      const g = pixels[idx + 1];
+      const b = pixels[idx + 2];
+      // Luminance threshold: dark pixels = ink (1), light = paper (0)
+      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (luminance < 128) {
+        const byteIndex = y * bytesPerRow + Math.floor(x / 8);
+        const bitIndex = 7 - (x % 8);
+        bitmapBytes[byteIndex] |= 1 << bitIndex;
+      }
+    }
+  }
+
+  // Convert to base64
+  let binary = '';
+  for (let i = 0; i < bitmapBytes.length; i++) {
+    binary += String.fromCharCode(bitmapBytes[i]);
+  }
+  const base64 = btoa(binary);
+
+  // Return the Star WebPRNT bit-image XML element
+  return `<bit-image width="${alignedWidth}" height="${height}">${base64}</bit-image>\n`;
+}
+
+/**
  * Build a Star WebPRNT XML document from receipt lines.
  */
-function buildWebPRNTXml(lines: ReceiptLine[]): string {
+async function buildWebPRNTXml(lines: ReceiptLine[]): Promise<string> {
   let body = '';
 
   for (const line of lines) {
@@ -45,6 +111,22 @@ function buildWebPRNTXml(lines: ReceiptLine[]): string {
       case 'spacer':
         body += `<text>\n</text>\n`;
         break;
+
+      case 'image':
+        if (line.url) {
+          try {
+            // Star WebPRNT alignment: left/center/right
+            const align = line.alignment || 'center';
+            body += `<alignment position="${align}" />\n`;
+            const bitmapXml = await imageToStarBitmap(line.url, line.width ?? 200);
+            body += bitmapXml;
+            // Reset to left alignment after image
+            body += `<alignment position="left" />\n`;
+          } catch {
+            // Skip image on failure — don't block receipt printing
+          }
+        }
+        break;
     }
   }
 
@@ -75,7 +157,7 @@ export async function printReceipt(
   printerIp: string,
   lines: ReceiptLine[]
 ): Promise<void> {
-  const xml = buildWebPRNTXml(lines);
+  const xml = await buildWebPRNTXml(lines);
   const url = `http://${printerIp}/StarWebPRNT/SendMessage`;
 
   const res = await fetch(url, {

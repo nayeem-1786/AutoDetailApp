@@ -59,6 +59,8 @@ export default function BusinessProfilePage() {
         state: '',
         zip: '',
       },
+      business_email: '',
+      business_website: '',
     },
   });
 
@@ -69,7 +71,7 @@ export default function BusinessProfilePage() {
       const { data, error } = await supabase
         .from('business_settings')
         .select('key, value')
-        .in('key', ['business_name', 'business_phone', 'business_address', 'business_hours']);
+        .in('key', ['business_name', 'business_phone', 'business_address', 'business_email', 'business_website', 'business_hours']);
 
       if (error) {
         toast.error('Failed to load business settings', {
@@ -97,6 +99,8 @@ export default function BusinessProfilePage() {
           state: '',
           zip: '',
         },
+        business_email: (settings.business_email as string) || '',
+        business_website: (settings.business_website as string) || '',
       });
 
       // Load business hours
@@ -121,6 +125,8 @@ export default function BusinessProfilePage() {
       { key: 'business_name', value: formData.business_name },
       { key: 'business_phone', value: formData.business_phone },
       { key: 'business_address', value: formData.business_address },
+      { key: 'business_email', value: formData.business_email || null },
+      { key: 'business_website', value: formData.business_website || null },
     ];
 
     for (const entry of entries) {
@@ -250,6 +256,32 @@ export default function BusinessProfilePage() {
                     setValue('business_phone', formatted, { shouldDirty: true, shouldValidate: true });
                   },
                 })}
+              />
+            </FormField>
+
+            <FormField
+              label="Business Email"
+              error={errors.business_email?.message}
+              htmlFor="business_email"
+            >
+              <Input
+                id="business_email"
+                type="email"
+                placeholder="info@yourbusiness.com"
+                {...register('business_email')}
+              />
+            </FormField>
+
+            <FormField
+              label="Website"
+              error={errors.business_website?.message}
+              htmlFor="business_website"
+            >
+              <Input
+                id="business_website"
+                type="url"
+                placeholder="https://yourbusiness.com"
+                {...register('business_website')}
               />
             </FormField>
 
