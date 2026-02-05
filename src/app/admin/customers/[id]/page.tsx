@@ -27,7 +27,7 @@ import type {
   VehicleSizeClass,
   LoyaltyAction,
 } from '@/lib/supabase/types';
-import { formatCurrency, formatPhone, formatDate, formatDateTime, formatPoints, normalizePhone } from '@/lib/utils/format';
+import { formatCurrency, formatPhone, formatPhoneInput, formatDate, formatDateTime, formatPoints, normalizePhone } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -869,7 +869,16 @@ export default function CustomerProfilePage() {
                   </FormField>
 
                   <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
-                    <Input id="phone" {...register('phone')} placeholder="(310) 555-1234" />
+                    <Input
+                      id="phone"
+                      placeholder="(310) 555-1234"
+                      {...register('phone', {
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                          const formatted = formatPhoneInput(e.target.value);
+                          setValue('phone', formatted, { shouldDirty: true });
+                        },
+                      })}
+                    />
                   </FormField>
 
                   <FormField label="Email" error={errors.email?.message} htmlFor="email">

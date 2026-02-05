@@ -302,7 +302,13 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       <div className="shrink-0 px-4 pb-4">
         <TicketTotals />
         <div className="mt-3">
-          <TicketActions />
+          <TicketActions
+            onRequireVehicle={() => {
+              if (ticket.customer) {
+                setShowVehicleSelector(true);
+              }
+            }}
+          />
         </div>
       </div>
 

@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { vendorSchema, type VendorInput } from '@/lib/utils/validation';
 import type { Vendor } from '@/lib/supabase/types';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,7 @@ export default function VendorsPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<VendorInput>({
     resolver: formResolver(vendorSchema),
@@ -343,7 +344,16 @@ export default function VendorsPage() {
               </FormField>
 
               <FormField label="Mobile" error={errors.phone?.message} htmlFor="vendor-phone">
-                <Input id="vendor-phone" {...register('phone')} placeholder="(310) 555-1234" />
+                <Input
+                  id="vendor-phone"
+                  placeholder="(310) 555-1234"
+                  {...register('phone', {
+                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const formatted = formatPhoneInput(e.target.value);
+                      setValue('phone', formatted, { shouldDirty: true });
+                    },
+                  })}
+                />
               </FormField>
             </div>
 

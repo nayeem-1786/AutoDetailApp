@@ -7,6 +7,7 @@ import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { employeeCreateSchema, type EmployeeCreateInput } from '@/lib/utils/validation';
 import { ROLE_LABELS } from '@/lib/utils/constants';
+import { formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,7 +98,16 @@ export default function NewStaffPage() {
               </FormField>
 
               <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
-                <Input id="phone" {...register('phone')} placeholder="(310) 555-1234" />
+                <Input
+                  id="phone"
+                  placeholder="(310) 555-1234"
+                  {...register('phone', {
+                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const formatted = formatPhoneInput(e.target.value);
+                      setValue('phone', formatted, { shouldDirty: true });
+                    },
+                  })}
+                />
               </FormField>
 
               <FormField label="Role" error={errors.role?.message} required htmlFor="role">

@@ -139,13 +139,13 @@ export function CustomerCreateDialog({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">
-              Phone
+              Mobile
             </label>
             <Input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
-              placeholder="(310) 555-0123"
+              placeholder="(310) 555-1234"
             />
           </div>
           <div>

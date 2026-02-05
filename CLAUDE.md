@@ -121,6 +121,21 @@ ALTER TABLE customers
 - [x] Keep coupons on dashboard (inline during booking not yet implemented)
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
+## Recent Updates
+
+### Phone → Mobile Labeling (Global)
+- All "Phone" field labels changed to "Mobile" across admin, customer portal, auth pages
+- Removed "(XXX) XXX-XXXX" description hints; placeholders used instead
+- Validation error messages updated to "Enter valid mobile number"
+- Phone numbers stored as E.164 (+1XXXXXXXXXX) for Twilio, displayed as (310) 555-1234
+- Phone inputs auto-format E.164 pasted values (e.g., +14243637450 → (424) 363-7450)
+
+### Booking Flow Improvements
+- **Auto-assign detailer:** Online bookings auto-assign first available detailer (checks for scheduling conflicts if multiple detailers)
+- **Customer type auto-set:** Online bookings automatically mark customers as "enthusiast" (removed selector)
+- **Vehicle selection UX:** Logged-in customers see saved vehicles as selectable buttons + "Add New Vehicle" toggle
+- **Vehicle required:** Booking cannot proceed without selecting or creating a vehicle (customer portal + POS checkout)
+
 ## Session Instructions
 - Update this file at end of session or when asked
 - Reference `docs/PROJECT.md` for full specs, `docs/DASHBOARD_RULES.md` for admin UI structure

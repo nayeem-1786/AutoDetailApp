@@ -9,7 +9,11 @@ import { useCheckout } from '../context/checkout-context';
 import { useHeldTickets } from '../context/held-tickets-context';
 import { CustomerTypePrompt } from './customer-type-prompt';
 
-export function TicketActions() {
+interface TicketActionsProps {
+  onRequireVehicle?: () => void;
+}
+
+export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
   const { ticket, dispatch } = useTicket();
   const { openCheckout } = useCheckout();
   const { holdTicket } = useHeldTickets();
@@ -60,6 +64,12 @@ export function TicketActions() {
           className="flex-1 bg-green-600 hover:bg-green-700"
           disabled={!hasItems}
           onClick={() => {
+            // Require vehicle selection if customer is selected but no vehicle
+            if (ticket.customer && !ticket.vehicle) {
+              toast.error('Please select a vehicle before checkout');
+              onRequireVehicle?.();
+              return;
+            }
             if (ticket.customer && !ticket.customer.customer_type) {
               setShowTypePrompt(true);
             } else {

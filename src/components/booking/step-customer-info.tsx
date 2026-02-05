@@ -81,6 +81,8 @@ export function StepCustomerInfo({
   const [selectedSavedVehicleId, setSelectedSavedVehicleId] = useState<string | null>(null);
   // Track if user explicitly chose to add new vehicle
   const [isAddingNew, setIsAddingNew] = useState(savedVehicles.length === 0);
+  // Vehicle selection error state
+  const [vehicleError, setVehicleError] = useState<string | null>(null);
 
   const vehicleType = watch('vehicle.vehicle_type');
   const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[vehicleType] ?? [];
@@ -88,6 +90,7 @@ export function StepCustomerInfo({
   function handleSelectSavedVehicle(v: SavedVehicle) {
     setSelectedSavedVehicleId(v.id);
     setIsAddingNew(false);
+    setVehicleError(null);
     setValue('vehicle.vehicle_type', v.vehicle_type, { shouldDirty: true });
     setValue('vehicle.size_class', v.size_class ?? undefined, { shouldDirty: true });
     setValue('vehicle.year', v.year ?? undefined, { shouldDirty: true });
@@ -120,6 +123,22 @@ export function StepCustomerInfo({
   }
 
   function onSubmit(data: CustomerInfoFormData) {
+    // Validate vehicle selection
+    // If user has saved vehicles and hasn't selected one OR isn't adding new, show error
+    if (hasSavedVehicles && !selectedSavedVehicleId && !isAddingNew) {
+      setVehicleError('Please select a vehicle or add a new one');
+      return;
+    }
+
+    // If adding new vehicle, require vehicle_type at minimum
+    if (isAddingNew || !hasSavedVehicles) {
+      if (!data.vehicle.vehicle_type) {
+        setVehicleError('Please select a vehicle type');
+        return;
+      }
+    }
+
+    setVehicleError(null);
     // All online bookings are enthusiasts by default
     onContinue(data.customer, data.vehicle);
   }
@@ -203,7 +222,17 @@ export function StepCustomerInfo({
 
       {/* Vehicle Info */}
       <div className="mt-8">
-        <h3 className="text-sm font-semibold text-gray-700">Vehicle Details</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">Vehicle Details</h3>
+          <span className="text-sm text-red-500">*Required</span>
+        </div>
+
+        {/* Vehicle error message */}
+        {vehicleError && (
+          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+            {vehicleError}
+          </div>
+        )}
 
         {/* Saved Vehicle Picker for logged-in customers */}
         {hasSavedVehicles && (

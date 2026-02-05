@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { employeeUpdateSchema, type EmployeeUpdateInput } from '@/lib/utils/validation';
 import { ROLE_LABELS } from '@/lib/utils/constants';
+import { formatPhoneInput } from '@/lib/utils/format';
 import type { Employee, Permission, UserRole } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -384,7 +385,16 @@ export default function StaffDetailPage() {
                   </FormField>
 
                   <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
-                    <Input id="phone" {...register('phone')} placeholder="(310) 555-1234" />
+                    <Input
+                      id="phone"
+                      placeholder="(310) 555-1234"
+                      {...register('phone', {
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                          const formatted = formatPhoneInput(e.target.value);
+                          setValue('phone', formatted, { shouldDirty: true });
+                        },
+                      })}
+                    />
                   </FormField>
 
                   <FormField label="Role" error={errors.role?.message} required htmlFor="role">

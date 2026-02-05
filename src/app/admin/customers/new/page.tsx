@@ -7,7 +7,7 @@ import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { customerCreateSchema, type CustomerCreateInput } from '@/lib/utils/validation';
-import { normalizePhone, formatPhone } from '@/lib/utils/format';
+import { normalizePhone, formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,11 +56,12 @@ export default function NewCustomerPage() {
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
-    // Let the form register handle the value
-    register('phone').onChange(e);
+    // Format the input value and update form
+    const formatted = formatPhoneInput(raw);
+    setValue('phone', formatted, { shouldDirty: true });
 
-    if (raw.length >= 3) {
-      const normalized = normalizePhone(raw);
+    if (formatted.length >= 3) {
+      const normalized = normalizePhone(formatted);
       if (normalized) {
         setPhonePreview({
           normalized,
