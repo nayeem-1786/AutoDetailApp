@@ -777,11 +777,11 @@ export default function CustomerProfilePage() {
                   </div>
 
                   {/* Customer Journey section */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-shrink-0">
                     <CardTitle className="mb-3">Customer Journey</CardTitle>
                     <div className="flex gap-2">
-                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
-                        <span className="text-xs text-gray-500">Since </span>
+                      <div className="flex flex-col items-center rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Customer Since</span>
                         <span className="text-sm font-medium text-gray-700">
                           {customer.first_visit_date
                             ? formatDate(customer.first_visit_date)
@@ -790,16 +790,16 @@ export default function CustomerProfilePage() {
                               : 'N/A'}
                         </span>
                       </div>
-                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
-                        <span className="text-xs text-gray-500">Visits </span>
+                      <div className="flex flex-col items-center rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Visits</span>
                         <span className="text-sm font-medium text-gray-700">{transactions.length}</span>
                       </div>
-                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
-                        <span className="text-xs text-gray-500">Lifetime </span>
+                      <div className="flex flex-col items-center rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Lifetime Spend</span>
                         <span className="text-sm font-medium text-gray-700">{formatCurrency(customer.lifetime_spend)}</span>
                       </div>
-                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
-                        <span className="text-xs text-gray-500">Last Visit </span>
+                      <div className="flex flex-col items-center rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
+                        <span className="text-xs text-gray-500">Last Visit</span>
                         <span className="text-sm font-medium text-gray-700">
                           {customer.last_visit_date ? formatDate(customer.last_visit_date) : 'N/A'}
                         </span>
