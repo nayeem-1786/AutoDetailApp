@@ -86,6 +86,9 @@ export default function CustomerProfilePage() {
   const [loyaltyAdjust, setLoyaltyAdjust] = useState({ points_change: 0, description: '', action: 'adjusted' as LoyaltyAction });
   const [adjustingLoyalty, setAdjustingLoyalty] = useState(false);
 
+  // Password reset state
+  const [sendingReset, setSendingReset] = useState(false);
+
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -416,6 +419,9 @@ export default function CustomerProfilePage() {
         subtotal: tx.subtotal,
         tax_amount: tx.tax_amount,
         discount_amount: tx.discount_amount,
+        coupon_code: tx.coupon_code,
+        loyalty_discount: tx.loyalty_discount,
+        loyalty_points_redeemed: tx.loyalty_points_redeemed,
         tip_amount: tx.tip_amount,
         total_amount: tx.total_amount,
         customer: tx.customer,
@@ -457,7 +463,7 @@ export default function CustomerProfilePage() {
   }
 
   function handleReceiptCopierPrint() {
-    const printWindow = window.open('', '_blank', 'width=450,height=700');
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) {
       toast.error('Pop-up blocked — allow pop-ups and try again');
       return;
@@ -507,6 +513,24 @@ export default function CustomerProfilePage() {
       toast.error(err instanceof Error ? err.message : 'Failed to send SMS');
     } finally {
       setReceiptSmsing(false);
+    }
+  }
+
+  // --- Password Reset ---
+  async function handleSendPasswordReset() {
+    if (!customer) return;
+    setSendingReset(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customer.id}/reset-password`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to send reset email');
+      toast.success('Password reset email sent');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send password reset');
+    } finally {
+      setSendingReset(false);
     }
   }
 
@@ -780,6 +804,50 @@ export default function CustomerProfilePage() {
                           {customer.last_visit_date ? formatDate(customer.last_visit_date) : 'N/A'}
                         </span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Vertical divider */}
+                  <div className="hidden sm:flex sm:items-center sm:px-10 self-stretch">
+                    <div className="h-3/4 w-px bg-gray-200" />
+                  </div>
+
+                  {/* Account section */}
+                  <div className="flex-shrink-0">
+                    <CardTitle className="mb-3">Account</CardTitle>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Portal Access:</span>
+                        {customer.auth_user_id ? (
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-green-600">
+                            <span className="h-2 w-2 rounded-full bg-green-500" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-500">
+                            <span className="h-2 w-2 rounded-full bg-gray-400" />
+                            None
+                          </span>
+                        )}
+                      </div>
+                      {customer.auth_user_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSendPasswordReset}
+                          disabled={sendingReset || !customer.email}
+                          title={!customer.email ? 'No email address on file' : undefined}
+                        >
+                          {sendingReset ? (
+                            <>
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            'Send Password Reset'
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
