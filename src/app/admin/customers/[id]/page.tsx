@@ -876,24 +876,25 @@ export default function CustomerProfilePage() {
                     </CardTitle>
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
-                        {/* Active toggle - clickable to reactivate when inactive */}
+                        {/* Active option */}
                         <button
                           type="button"
-                          onClick={() => !customer.auth_user_id && customer.deactivated_auth_user_id && handleReactivatePortal()}
-                          disabled={!!customer.auth_user_id || !customer.deactivated_auth_user_id || reactivatingPortal}
+                          onClick={() => {
+                            if (!customer.auth_user_id && customer.deactivated_auth_user_id) {
+                              handleReactivatePortal();
+                            }
+                          }}
                           title={
                             customer.auth_user_id
-                              ? 'Customer can sign in to the portal'
+                              ? 'Portal access is active'
                               : customer.deactivated_auth_user_id
                               ? 'Click to restore portal access'
-                              : 'Customer has never had portal access'
+                              : 'No previous access to restore'
                           }
                           className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                             customer.auth_user_id
-                              ? 'text-green-600 cursor-default'
-                              : customer.deactivated_auth_user_id
-                              ? 'text-gray-300 hover:text-green-600 [&:hover>span]:bg-green-500 cursor-pointer'
-                              : 'text-gray-300 cursor-not-allowed'
+                              ? 'text-green-600'
+                              : 'text-gray-300 hover:text-green-600 [&:hover>span]:bg-green-500'
                           }`}
                         >
                           <span
@@ -903,26 +904,31 @@ export default function CustomerProfilePage() {
                           />
                           {reactivatingPortal ? 'Activating...' : 'Active'}
                         </button>
-                        {/* Deactivate toggle */}
+                        {/* Deactivated option */}
                         <button
                           type="button"
-                          onClick={() => customer.auth_user_id && setConfirmDeactivateOpen(true)}
-                          disabled={!customer.auth_user_id}
+                          onClick={() => {
+                            if (customer.auth_user_id) {
+                              setConfirmDeactivateOpen(true);
+                            }
+                          }}
                           title={
                             customer.auth_user_id
-                              ? 'Click to revoke portal access (can be restored later)'
-                              : 'Portal access is already inactive'
+                              ? 'Click to deactivate portal access'
+                              : 'Portal access is deactivated'
                           }
                           className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                            customer.auth_user_id
-                              ? 'text-gray-300 hover:text-red-600 [&:hover>span]:bg-red-500 cursor-pointer'
-                              : 'text-gray-300 cursor-not-allowed'
+                            !customer.auth_user_id
+                              ? 'text-red-600'
+                              : 'text-gray-300 hover:text-red-600 [&:hover>span]:bg-red-500'
                           }`}
                         >
                           <span
-                            className={`h-2 w-2 rounded-full transition-colors bg-gray-300`}
+                            className={`h-2 w-2 rounded-full transition-colors ${
+                              !customer.auth_user_id ? 'bg-red-500' : 'bg-gray-300'
+                            }`}
                           />
-                          Deactivate
+                          Deactivated
                         </button>
                       </div>
                       {customer.auth_user_id && (
