@@ -80,14 +80,19 @@ export default function AccountDashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back, {customer.first_name}
-        </h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Manage your appointments, vehicles, and profile.
-        </p>
+      {/* Welcome Banner + Book Button */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Welcome back, {customer.first_name}
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Manage your appointments, vehicles, and profile.
+          </p>
+        </div>
+        <Link href="/book" className="flex-shrink-0">
+          <Button>Book New Appointment</Button>
+        </Link>
       </div>
 
       {/* Loyalty Points */}
@@ -109,6 +114,9 @@ export default function AccountDashboardPage() {
           <h2 className="text-lg font-semibold text-gray-900">
             Your Coupons
           </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            These discounts are ready to use on your next booking.
+          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {coupons.map((coupon) => (
               <CouponCard key={coupon.id} coupon={{ ...coupon, rewards: coupon.coupon_rewards }} />
@@ -149,19 +157,6 @@ export default function AccountDashboardPage() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-3">
-        <Link href="/book">
-          <Button>Book New Appointment</Button>
-        </Link>
-        <Link href="/account/transactions">
-          <Button variant="outline">View Transactions</Button>
-        </Link>
-        <Link href="/account/appointments">
-          <Button variant="outline">View All Appointments</Button>
-        </Link>
       </div>
     </div>
   );

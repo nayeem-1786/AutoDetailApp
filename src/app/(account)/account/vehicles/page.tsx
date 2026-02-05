@@ -164,7 +164,7 @@ export default function AccountVehiclesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     {typeVehicles.map((vehicle) => {
                       const label = [vehicle.year, vehicle.make, vehicle.model]
                         .filter(Boolean)
@@ -173,7 +173,7 @@ export default function AccountVehiclesPage() {
                       return (
                         <div
                           key={vehicle.id}
-                          className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4"
+                          className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-5"
                         >
                           <div className="min-w-0 flex-1">
                             <h4 className="font-medium text-gray-900">{label}</h4>

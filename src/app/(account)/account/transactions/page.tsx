@@ -173,49 +173,56 @@ export default function AccountTransactionsPage() {
   const columns: ColumnDef<TransactionSummary, unknown>[] = [
     {
       id: 'date',
-      header: 'Date',
+      header: () => <div className="text-center">Date</div>,
+      size: 110,
       accessorFn: (row) => row.transaction_date,
       cell: ({ row }) => (
-        <span className="text-sm text-gray-600">
+        <div className="text-center text-sm text-gray-600">
           {formatDate(row.original.transaction_date)}
-        </span>
+        </div>
       ),
     },
     {
       id: 'receipt',
-      header: 'Receipt #',
+      header: () => <div className="text-center">Receipt #</div>,
+      size: 100,
       cell: ({ row }) => {
         const receiptNum = row.original.receipt_number;
-        if (!receiptNum) return <span className="text-sm text-gray-400">—</span>;
+        if (!receiptNum) return <div className="text-center text-sm text-gray-400">—</div>;
         return (
-          <button
-            type="button"
-            onClick={() => openReceiptDialog(row.original.id)}
-            className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline"
-          >
-            {receiptNum}
-          </button>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => openReceiptDialog(row.original.id)}
+              className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              {receiptNum}
+            </button>
+          </div>
         );
       },
     },
     {
       id: 'vehicle',
-      header: 'Vehicle',
+      header: () => <div className="text-center">Vehicle</div>,
       cell: ({ row }) => (
-        <span className="text-sm text-gray-600">
+        <div className="text-center text-sm text-gray-600">
           {formatVehicle(row.original.vehicles)}
-        </span>
+        </div>
       ),
     },
     {
       id: 'status',
-      header: 'Status',
+      header: () => <div className="text-center">Status</div>,
+      size: 100,
       cell: ({ row }) => {
         const status = row.original.status;
         return (
-          <Badge variant={STATUS_VARIANTS[status] || 'default'}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </Badge>
+          <div className="text-center">
+            <Badge variant={STATUS_VARIANTS[status] || 'default'}>
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </Badge>
+          </div>
         );
       },
     },

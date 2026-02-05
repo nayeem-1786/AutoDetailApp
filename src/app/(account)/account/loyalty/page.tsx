@@ -73,9 +73,10 @@ export default function AccountLoyaltyPage() {
     {
       id: 'date',
       header: 'Date',
+      size: 100,
       accessorFn: (row) => row.created_at,
       cell: ({ row }) => (
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 whitespace-nowrap">
           {formatDate(row.original.created_at)}
         </span>
       ),
@@ -83,6 +84,7 @@ export default function AccountLoyaltyPage() {
     {
       id: 'action',
       header: 'Action',
+      size: 90,
       cell: ({ row }) => {
         const action = row.original.action;
         return (
@@ -95,10 +97,11 @@ export default function AccountLoyaltyPage() {
     {
       id: 'points',
       header: 'Points',
+      size: 80,
       cell: ({ row }) => {
         const change = row.original.points_change;
         return (
-          <span className={`text-sm font-medium ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <span className={`text-sm font-medium whitespace-nowrap ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
             {change > 0 ? '+' : ''}{formatPoints(change)}
           </span>
         );
@@ -107,8 +110,9 @@ export default function AccountLoyaltyPage() {
     {
       id: 'balance',
       header: 'Balance',
+      size: 80,
       cell: ({ row }) => (
-        <span className="text-sm text-gray-900">
+        <span className="text-sm text-gray-900 whitespace-nowrap">
           {formatPoints(row.original.points_balance)}
         </span>
       ),
