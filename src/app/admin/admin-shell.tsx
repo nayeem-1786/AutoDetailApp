@@ -235,6 +235,32 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   const [commandOpen, setCommandOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
 
+  // Global fetch interceptor for 401 errors - redirect to login on session expiry
+  useEffect(() => {
+    const originalFetch = window.fetch;
+
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+
+      // Check for 401 Unauthorized - session expired
+      if (response.status === 401) {
+        const currentPath = window.location.pathname;
+        // Only redirect if we're in admin area
+        if (currentPath.startsWith('/admin')) {
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
+          // Return a never-resolving promise to stop further execution
+          return new Promise(() => {});
+        }
+      }
+
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
+
   useEffect(() => {
     if (!loading && !employee) {
       router.push('/login?redirect=' + pathname);

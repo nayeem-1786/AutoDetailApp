@@ -1,9 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Employee, Permission, UserRole } from '@/lib/supabase/types';
+
+// How often to validate session (in ms)
+const SESSION_CHECK_INTERVAL = 60000; // 1 minute
 
 interface AuthContextType {
   session: Session | null;
@@ -31,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
+  const sessionCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   const supabase = createClient();
 
@@ -86,6 +91,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, [supabase, loadEmployeeData]);
+
+  // Periodic session validation - redirect to login if session expired
+  useEffect(() => {
+    // Only run checks if we have an active session
+    if (!session || loading) return;
+
+    const validateSession = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+
+        // Session expired or invalid
+        if (error || !currentSession) {
+          // Clear local state
+          setSession(null);
+          setUser(null);
+          setEmployee(null);
+          setPermissions([]);
+
+          // Redirect to login
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/admin';
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
+        }
+      } catch (err) {
+        console.error('Session validation error:', err);
+      }
+    };
+
+    // Start periodic checks
+    sessionCheckRef.current = setInterval(validateSession, SESSION_CHECK_INTERVAL);
+
+    // Also validate on window focus (user returns to tab)
+    const handleFocus = () => validateSession();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      if (sessionCheckRef.current) {
+        clearInterval(sessionCheckRef.current);
+      }
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [session, loading, supabase]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
