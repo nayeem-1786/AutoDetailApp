@@ -140,27 +140,64 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Create vehicle linked to customer
+    // 5. Find existing or create vehicle linked to customer
     let vehicleId: string | null = null;
     if (data.vehicle) {
-      const { data: newVehicle, error: vehErr } = await supabase
+      // Check for existing vehicle with same make, model, year, color for this customer
+      const vehicleQuery = supabase
         .from('vehicles')
-        .insert({
-          customer_id: customerId,
-          vehicle_type: data.vehicle.vehicle_type || 'standard',
-          size_class: data.vehicle.size_class || null,
-          year: data.vehicle.year || null,
-          make: data.vehicle.make || null,
-          model: data.vehicle.model || null,
-          color: data.vehicle.color || null,
-        })
         .select('id')
-        .single();
+        .eq('customer_id', customerId)
+        .eq('vehicle_type', data.vehicle.vehicle_type || 'standard');
 
-      if (vehErr) {
-        console.error('Vehicle creation failed:', vehErr.message);
+      // Add optional field filters (treat null/empty as equivalent)
+      if (data.vehicle.make) {
+        vehicleQuery.eq('make', data.vehicle.make);
       } else {
-        vehicleId = newVehicle?.id ?? null;
+        vehicleQuery.is('make', null);
+      }
+      if (data.vehicle.model) {
+        vehicleQuery.eq('model', data.vehicle.model);
+      } else {
+        vehicleQuery.is('model', null);
+      }
+      if (data.vehicle.year) {
+        vehicleQuery.eq('year', data.vehicle.year);
+      } else {
+        vehicleQuery.is('year', null);
+      }
+      if (data.vehicle.color) {
+        vehicleQuery.eq('color', data.vehicle.color);
+      } else {
+        vehicleQuery.is('color', null);
+      }
+
+      const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
+
+      if (existingVehicle) {
+        // Use existing vehicle
+        vehicleId = existingVehicle.id;
+      } else {
+        // Create new vehicle
+        const { data: newVehicle, error: vehErr } = await supabase
+          .from('vehicles')
+          .insert({
+            customer_id: customerId,
+            vehicle_type: data.vehicle.vehicle_type || 'standard',
+            size_class: data.vehicle.size_class || null,
+            year: data.vehicle.year || null,
+            make: data.vehicle.make || null,
+            model: data.vehicle.model || null,
+            color: data.vehicle.color || null,
+          })
+          .select('id')
+          .single();
+
+        if (vehErr) {
+          console.error('Vehicle creation failed:', vehErr.message);
+        } else {
+          vehicleId = newVehicle?.id ?? null;
+        }
       }
     }
 
@@ -227,8 +264,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. Create appointment
-    // Auto-confirm if paid online, otherwise pending for review
+    // Auto-confirm if paid online (deposit or full), otherwise pending for review
     const initialStatus = data.payment_intent_id ? 'confirmed' : 'pending';
+
+    // Calculate total with all discounts
+    const couponDiscount = data.coupon_discount ?? 0;
+    const loyaltyDiscount = data.loyalty_discount ?? 0;
+    const totalAfterDiscount = subtotal - couponDiscount - loyaltyDiscount;
 
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
@@ -247,9 +289,18 @@ export async function POST(request: NextRequest) {
         mobile_surcharge: mobileSurcharge,
         subtotal,
         tax_amount: 0,
-        discount_amount: 0,
-        total_amount: subtotal,
+        discount_amount: couponDiscount + loyaltyDiscount,
+        total_amount: totalAfterDiscount,
         job_notes: data.notes || null,
+        // New payment options fields
+        payment_type: data.payment_option || (data.payment_intent_id ? 'deposit' : 'pay_on_site'),
+        deposit_amount: data.deposit_amount || null,
+        coupon_code: data.coupon_code || null,
+        coupon_discount: couponDiscount || null,
+        // Note: loyalty_points_used and loyalty_discount could be stored in internal_notes or a new column
+        internal_notes: data.loyalty_points_used
+          ? `Loyalty points used: ${data.loyalty_points_used} (${loyaltyDiscount.toFixed(2)} discount)`
+          : null,
       })
       .select('id, scheduled_date, scheduled_start_time, scheduled_end_time, total_amount, is_mobile, mobile_address, mobile_surcharge, status, channel, subtotal')
       .single();
@@ -286,13 +337,18 @@ export async function POST(request: NextRequest) {
       console.error('Appointment services insertion failed:', junctionErr.message);
     }
 
-    // 8b. If payment was made online, update payment status
+    // 8b. If payment was made online (deposit), update payment status
     if (data.payment_intent_id) {
+      // For deposits, payment_status remains 'pending' since only partial payment was made
+      // Only mark as 'paid' if full amount was charged (deposit === total)
+      const depositAmount = data.deposit_amount ?? 0;
+      const isPaidInFull = depositAmount >= totalAfterDiscount;
+
       await supabase
         .from('appointments')
         .update({
           stripe_payment_intent_id: data.payment_intent_id,
-          payment_status: 'paid',
+          payment_status: isPaidInFull ? 'paid' : 'pending',
         })
         .eq('id', appointment.id);
     }

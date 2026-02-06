@@ -287,6 +287,14 @@ export const bookingSubmitSchema = z.object({
   notes: optionalString,
   channel: z.enum(['online', 'portal']).default('online'),
   payment_intent_id: optionalString,
+  // Payment options
+  payment_option: z.enum(['deposit', 'pay_on_site', 'full']).optional(),
+  deposit_amount: positiveNumber.optional().nullable(),
+  coupon_code: optionalString,
+  coupon_discount: positiveNumber.optional().nullable(),
+  // Loyalty points
+  loyalty_points_used: z.number().int().min(0).optional(),
+  loyalty_discount: positiveNumber.optional().nullable(),
 });
 
 // Business hours day schema (open/close times or null for closed)

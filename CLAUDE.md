@@ -20,11 +20,20 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | Staff Scheduling | ⏳ Pending | Weekly schedules, blocked dates |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Test Online Booking Payment
-1. **Check feature flag:** `SELECT * FROM feature_flags WHERE key = 'online_booking_payment';` — ensure `enabled = true`
-2. **Test booking flow:** Go to `/book`, complete booking, verify payment step appears
-3. **Verify auto-confirm:** After payment, appointment status should be `confirmed` not `pending`
-4. **Verify detailer assignment:** Check appointment has detailer assigned (or Nayeem as fallback)
+### 🧪 NEXT SESSION: Test Online Booking Payment Options & Coupons
+1. **Run migrations:** `npx supabase db push` — adds payment columns + coupon_rewards RLS policies
+2. **Check feature flag:** `SELECT * FROM feature_flags WHERE key = 'online_booking_payment';` — ensure `enabled = true`
+3. **Test portal booking:** Sign in as customer, go to `/account`, click "Book New Appointment"
+   - Should NOT see "Your Info" card (already signed in)
+   - Should see loyalty points section if balance >= 100 points
+   - Should see available coupons assigned to customer
+4. **Test payment thresholds:**
+   - Services under $100: Full payment required (no deposit option)
+   - Services $100+: $50 deposit OR Pay on Site (existing customers only)
+5. **Test coupon application:** Apply coupon, verify discount in price summary
+6. **Test loyalty points:** Use slider to apply points, verify discount calculation
+7. **Verify cancellation disclaimer:** Should see $50 fee warning for no-shows/late cancellations
+8. **Verify database:** Check appointments table has payment_type, deposit_amount, coupon_code, coupon_discount populated
 
 ### Bugs Found (Pending)
 | # | Module | Description | Status |
@@ -38,6 +47,20 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 2 | Booking | No fallback when no bookable detailers exist | Added fallback to super_admin (Nayeem) if no detailers found |
 | 3 | Booking | Paid online bookings start as "pending" | Auto-confirm paid bookings (payment_intent_id exists → status = 'confirmed') |
 | 4 | Booking | Payment step never integrated into wizard | Integrated StepPayment into BookingWizard as step 6, controlled by `online_booking_payment` feature flag |
+| 5 | Marketing | Coupons and Campaigns pages show empty (data exists in DB) | Admin pages used `createClient()` (anon key) which respects RLS. Fixed API routes to use `createAdminClient()` (service role) to bypass RLS. Updated: `api/marketing/coupons/route.ts`, `api/marketing/coupons/[id]/route.ts`, `api/marketing/campaigns/route.ts`, `api/marketing/campaigns/[id]/route.ts`, and admin list pages to fetch via API |
+| 6 | Booking | Flexible payment options (deposit vs pay on site) | Implemented deposit ($50 or service total if less) and pay on site options. New customers must pay deposit; existing customers (visit_count > 0) can choose. Added coupon validation in Review step. New DB columns: payment_type, deposit_amount, coupon_code, coupon_discount |
+| 7 | Booking | Phone field shows E.164 format on prefill | Added `formatInitialPhone()` to convert E.164 (`+14243637450`) to display format `(424) 363-7450` on form load |
+| 8 | Booking | Duplicate vehicles created on repeat bookings | Added duplicate check in `/api/book` - reuses existing vehicle if same make/model/year/color for customer |
+| 9 | Booking | Coupon section unclear | Improved UX with explanatory text, tooltips, detailed coupon info (discount, requirements, expiry) |
+| 10 | Booking | Missing loyalty points redemption | Added loyalty points section for portal users with 100+ points, slider to select points, live discount calculation |
+| 11 | Booking | Payment rules not enforced | Under $100: full payment required. $100+: $50 deposit. Added cancellation/no-show $50 fee disclaimer |
+| 12 | Booking | "Your Info" shown for signed-in users | Hidden for portal bookings since customer already known |
+| 13 | Booking | coupon_rewards table missing RLS policies | Added RLS policies for coupon_rewards + anon select policies for public booking flow |
+
+### Known Issues (Low Priority)
+| # | Module | Description | Workaround |
+|---|--------|-------------|------------|
+| 1 | Admin | Other admin pages (39 total) use direct `createClient()` queries which could fail if RLS `is_employee()` check doesn't evaluate correctly | RLS policies use `is_employee()` which SHOULD work for logged-in staff. If any admin page shows empty data, fix by: 1) Create/update API route to use `createAdminClient()` after auth check, 2) Update page to fetch via API. Already fixed: coupons, campaigns. Monitor other pages. |
 
 ### Test Checklist Template
 When testing each module, verify:

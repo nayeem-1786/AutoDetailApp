@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { couponSchema } from '@/lib/utils/validation';
 
 function generateCode(): string {
@@ -17,7 +18,9 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    // Use admin client to bypass RLS for auth check
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -33,7 +36,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || '';
     const offset = (page - 1) * limit;
 
-    let query = supabase
+    // Use admin client to bypass RLS for data query
+    let query = admin
       .from('coupons')
       .select('*, coupon_rewards(*)', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -62,7 +66,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    // Use admin client to bypass RLS
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -94,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     // Check for duplicate code (skip for drafts)
     if (insertStatus !== 'draft') {
-      const { data: existing } = await supabase
+      const { data: existing } = await admin
         .from('coupons')
         .select('id')
         .eq('code', parsed.data.code)
@@ -106,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert the coupon
-    const { data: coupon, error: couponError } = await supabase
+    const { data: coupon, error: couponError } = await admin
       .from('coupons')
       .insert({
         ...parsed.data,
@@ -132,7 +138,7 @@ export async function POST(request: NextRequest) {
         target_service_category_id: reward.target_service_category_id ?? null,
       }));
 
-      const { data: rewardsData, error: rewardsError } = await supabase
+      const { data: rewardsData, error: rewardsError } = await admin
         .from('coupon_rewards')
         .insert(rewardRows)
         .select();

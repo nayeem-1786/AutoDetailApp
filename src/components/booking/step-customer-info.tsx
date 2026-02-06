@@ -50,6 +50,15 @@ export function StepCustomerInfo({
   onContinue,
   onBack,
 }: StepCustomerInfoProps) {
+  // Format initial phone from E.164 to display format if needed
+  const formatInitialPhone = (phone: string | undefined): string => {
+    if (!phone) return '';
+    // If already in display format, return as-is
+    if (/^\(\d{3}\) \d{3}-\d{4}$/.test(phone)) return phone;
+    // Otherwise, format it (handles E.164 and other formats)
+    return formatPhoneInput(phone);
+  };
+
   const {
     register,
     handleSubmit,
@@ -63,7 +72,7 @@ export function StepCustomerInfo({
       customer: {
         first_name: initialCustomer.first_name ?? '',
         last_name: initialCustomer.last_name ?? '',
-        phone: initialCustomer.phone ?? '',
+        phone: formatInitialPhone(initialCustomer.phone),
         email: initialCustomer.email ?? '',
       },
       vehicle: {

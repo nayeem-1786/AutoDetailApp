@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import type { Coupon } from '@/lib/supabase/types';
 import { formatDate } from '@/lib/utils/format';
 import { COUPON_STATUS_LABELS, DISCOUNT_TYPE_LABELS } from '@/lib/utils/constants';
@@ -30,7 +29,6 @@ function discountSummary(coupon: Coupon): string {
 
 export default function CouponsListPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,16 +109,19 @@ export default function CouponsListPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data } = await supabase
-        .from('coupons')
-        .select('*, coupon_rewards(*)')
-        .order('created_at', { ascending: false });
-
-      if (data) setCoupons(data);
+      try {
+        const res = await fetch('/api/marketing/coupons?limit=1000');
+        if (res.ok) {
+          const { data } = await res.json();
+          if (data) setCoupons(data);
+        }
+      } catch (err) {
+        console.error('Failed to load coupons:', err);
+      }
       setLoading(false);
     }
     load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     return coupons.filter((c) => {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { campaignUpdateSchema } from '@/lib/utils/validation';
 
 export async function GET(
@@ -12,7 +13,8 @@ export async function GET(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -21,7 +23,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('campaigns')
       .select('*')
       .eq('id', id)
@@ -32,7 +34,7 @@ export async function GET(
     }
 
     // Get recipient stats
-    const { count: recipientCount } = await supabase
+    const { count: recipientCount } = await admin
       .from('campaign_recipients')
       .select('id', { count: 'exact', head: true })
       .eq('campaign_id', id);
@@ -56,7 +58,8 @@ export async function PATCH(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -66,7 +69,7 @@ export async function PATCH(
     }
 
     // Check current status — only draft/scheduled can be edited
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('campaigns')
       .select('status')
       .eq('id', id)
@@ -91,7 +94,7 @@ export async function PATCH(
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('campaigns')
       .update(parsed.data)
       .eq('id', id)
@@ -117,7 +120,8 @@ export async function DELETE(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -127,7 +131,7 @@ export async function DELETE(
     }
 
     // Only draft campaigns can be deleted
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('campaigns')
       .select('status')
       .eq('id', id)
@@ -143,7 +147,7 @@ export async function DELETE(
       );
     }
 
-    const { error } = await supabase
+    const { error } = await admin
       .from('campaigns')
       .delete()
       .eq('id', id);

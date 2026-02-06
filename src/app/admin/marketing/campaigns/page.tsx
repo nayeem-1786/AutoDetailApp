@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import type { Campaign } from '@/lib/supabase/types';
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_CHANNEL_LABELS } from '@/lib/utils/constants';
 import { formatDate } from '@/lib/utils/format';
@@ -19,7 +18,6 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 export default function CampaignsListPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,16 +29,19 @@ export default function CampaignsListPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data } = await supabase
-        .from('campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (data) setCampaigns(data);
+      try {
+        const res = await fetch('/api/marketing/campaigns?limit=1000');
+        if (res.ok) {
+          const { data } = await res.json();
+          if (data) setCampaigns(data);
+        }
+      } catch (err) {
+        console.error('Failed to load campaigns:', err);
+      }
       setLoading(false);
     }
     load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     return campaigns.filter((c) => {

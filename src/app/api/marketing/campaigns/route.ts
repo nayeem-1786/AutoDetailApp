@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { campaignCreateSchema } from '@/lib/utils/validation';
 
 export async function GET(request: NextRequest) {
@@ -8,7 +9,9 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    // Use admin client to bypass RLS for auth check and data query
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -24,7 +27,8 @@ export async function GET(request: NextRequest) {
     const channel = searchParams.get('channel') || '';
     const offset = (page - 1) * limit;
 
-    let query = supabase
+    // Use admin client to bypass RLS
+    let query = admin
       .from('campaigns')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -49,7 +53,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    // Use admin client to bypass RLS
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('id, role')
       .eq('auth_user_id', user.id)
@@ -67,7 +73,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('campaigns')
       .insert({
         ...parsed.data,

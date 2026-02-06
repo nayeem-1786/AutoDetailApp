@@ -12,11 +12,14 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 interface StepPaymentProps {
   amount: number;
+  totalAmount?: number;
+  remainingAmount?: number;
+  isDeposit?: boolean;
   onPaymentSuccess: (paymentIntentId: string) => void;
   onBack: () => void;
 }
 
-function PaymentForm({ amount, onPaymentSuccess, onBack }: StepPaymentProps) {
+function PaymentForm({ amount, totalAmount, remainingAmount, isDeposit, onPaymentSuccess, onBack }: StepPaymentProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -51,10 +54,34 @@ function PaymentForm({ amount, onPaymentSuccess, onBack }: StepPaymentProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Payment Details</h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Total: <span className="font-bold text-gray-900">{formatCurrency(amount)}</span>
-        </p>
+        <h3 className="text-lg font-semibold mb-4">
+          {isDeposit ? 'Deposit Payment' : 'Payment Details'}
+        </h3>
+
+        {isDeposit && totalAmount && remainingAmount !== undefined ? (
+          <div className="mb-4 rounded-lg bg-blue-50 p-4 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>Service Total</span>
+              <span className="font-medium text-gray-900">{formatCurrency(totalAmount)}</span>
+            </div>
+            <div className="flex justify-between mt-1 text-blue-700 font-medium">
+              <span>Deposit Now</span>
+              <span>{formatCurrency(amount)}</span>
+            </div>
+            <div className="flex justify-between mt-1 text-gray-500">
+              <span>Due at Service</span>
+              <span>{formatCurrency(remainingAmount)}</span>
+            </div>
+            <p className="mt-3 text-xs text-gray-600">
+              Your deposit secures your appointment. The remaining balance will be collected when the service is completed.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600 mb-4">
+            Total: <span className="font-bold text-gray-900">{formatCurrency(amount)}</span>
+          </p>
+        )}
+
         <PaymentElement />
         {error && (
           <p className="mt-4 text-sm text-red-600">{error}</p>
@@ -65,14 +92,20 @@ function PaymentForm({ amount, onPaymentSuccess, onBack }: StepPaymentProps) {
           Back
         </Button>
         <Button type="submit" disabled={!stripe || processing}>
-          {processing ? <Spinner className="h-4 w-4" /> : `Pay ${formatCurrency(amount)}`}
+          {processing ? (
+            <Spinner className="h-4 w-4" />
+          ) : isDeposit ? (
+            `Pay ${formatCurrency(amount)} Deposit`
+          ) : (
+            `Pay ${formatCurrency(amount)}`
+          )}
         </Button>
       </div>
     </form>
   );
 }
 
-export function StepPayment({ amount, onPaymentSuccess, onBack }: StepPaymentProps) {
+export function StepPayment({ amount, totalAmount, remainingAmount, isDeposit, onPaymentSuccess, onBack }: StepPaymentProps) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +154,14 @@ export function StepPayment({ amount, onPaymentSuccess, onBack }: StepPaymentPro
         appearance: { theme: 'stripe' },
       }}
     >
-      <PaymentForm amount={amount} onPaymentSuccess={onPaymentSuccess} onBack={onBack} />
+      <PaymentForm
+        amount={amount}
+        totalAmount={totalAmount}
+        remainingAmount={remainingAmount}
+        isDeposit={isDeposit}
+        onPaymentSuccess={onPaymentSuccess}
+        onBack={onBack}
+      />
     </Elements>
   );
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   _request: NextRequest,
@@ -11,7 +12,8 @@ export async function GET(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -20,7 +22,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('coupons')
       .select('*, coupon_rewards(*)')
       .eq('id', id)
@@ -47,7 +49,8 @@ export async function PATCH(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -93,7 +96,7 @@ export async function PATCH(
 
     // Update coupon fields if any were provided
     if (Object.keys(updates).length > 0) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await admin
         .from('coupons')
         .update(updates)
         .eq('id', id);
@@ -104,7 +107,7 @@ export async function PATCH(
     // If rewards array is provided, replace all existing rewards
     if (rewards && Array.isArray(rewards)) {
       // Delete existing rewards for this coupon
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await admin
         .from('coupon_rewards')
         .delete()
         .eq('coupon_id', id);
@@ -125,7 +128,7 @@ export async function PATCH(
           target_service_category_id: reward.target_service_category_id ?? null,
         }));
 
-        const { error: insertError } = await supabase
+        const { error: insertError } = await admin
           .from('coupon_rewards')
           .insert(rewardRows);
 
@@ -134,7 +137,7 @@ export async function PATCH(
     }
 
     // Fetch the updated coupon with rewards
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('coupons')
       .select('*, coupon_rewards(*)')
       .eq('id', id)
@@ -159,7 +162,8 @@ export async function DELETE(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -169,7 +173,7 @@ export async function DELETE(
     }
 
     // Soft-delete: set status to disabled
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('coupons')
       .update({ status: 'disabled' })
       .eq('id', id)
