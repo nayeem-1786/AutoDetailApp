@@ -118,10 +118,12 @@ export function StepReview({
   const remainingAmount = grandTotal - paymentAmount;
 
   // Calculate max loyalty points that can be used (can't exceed what they have or what would make total negative)
-  const maxLoyaltyPointsUsable = Math.min(
+  // Round down to nearest REDEEM_MINIMUM so the slider can reach the max
+  const maxLoyaltyPointsRaw = Math.min(
     loyaltyPointsBalance,
     Math.floor((subtotal - couponDiscount) / REDEEM_RATE)
   );
+  const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
   const loyaltyPointsValue = loyaltyPointsBalance * REDEEM_RATE;
 
   // Validate and apply coupon
@@ -687,7 +689,7 @@ export function StepReview({
             {requirePayment && paymentOption !== 'pay_on_site' && (
               <>
                 <div className="flex justify-between pt-1 text-blue-700">
-                  <span>{isFullPaymentRequired ? 'Pay now' : 'Deposit now'}</span>
+                  <span>{isFullPaymentRequired ? 'Amount Due' : 'Deposit now'}</span>
                   <span className="font-medium">{formatCurrency(paymentAmount)}</span>
                 </div>
                 {!isFullPaymentRequired && (
