@@ -172,17 +172,26 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Soft-delete: set status to disabled
-    const { data, error } = await admin
+    // Delete coupon rewards first (foreign key constraint)
+    const { error: rewardsError } = await admin
+      .from('coupon_rewards')
+      .delete()
+      .eq('coupon_id', id);
+
+    if (rewardsError) {
+      console.error('Delete coupon rewards error:', rewardsError);
+      throw rewardsError;
+    }
+
+    // Delete the coupon
+    const { error } = await admin
       .from('coupons')
-      .update({ status: 'disabled' })
-      .eq('id', id)
-      .select()
-      .single();
+      .delete()
+      .eq('id', id);
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Delete coupon error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
