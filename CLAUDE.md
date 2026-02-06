@@ -21,21 +21,24 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Test Quotes Module
-**Last session:** 2026-02-06 — Added quotes "Last Contacted" column + resend functionality, unified admin link styling
-**Migrations:** All applied
+**Last session:** 2026-02-06 — Added communication history, enhanced customer card, customer quotes tab, HTML emails, toast notifications
+**Migrations:** All applied (including `quote_communications` table)
 
 **Quotes Test Checklist:**
 - [ ] Create new quote
 - [ ] Edit draft quote (add/remove items, change vehicle, update notes)
-- [ ] Send quote via email
-- [ ] Send quote via SMS
+- [x] Send quote via email (HTML template with "View Your Estimate" button)
+- [x] Send quote via SMS (short URL /q/[token])
 - [ ] Send quote via both
 - [ ] View quote link (public page)
 - [ ] Accept quote (public page)
-- [ ] Resend quote (from non-draft detail page)
-- [ ] "Last Contacted" column shows in list
+- [x] Resend quote (from non-draft detail page)
+- [x] "Last Contacted" column shows in list
+- [x] Communication History shows all sends with timestamps
 - [ ] Convert accepted quote to appointment
 - [ ] Delete draft quote
+- [x] Customer card shows stats (member since, lifetime spend, loyalty points)
+- [x] Customer detail page has Quotes tab with stats and history
 
 **Appointments Test Checklist:**
 - [x] Calendar view loads with correct appointments (fixed date key normalization)
@@ -190,6 +193,7 @@ When testing each module, verify:
 - [x] Move staff schedules to individual staff profiles (Schedule tab)
 - [x] Move blocked dates to staff profiles (Time Off section)
 - [x] Add "Who's Working Today" dashboard to Staff Scheduling page
+- [ ] **URL Shortening for Customer Links** — Quote links, booking confirmations, and other customer-facing URLs should use a URL shortener service (Bitly API or custom short domain). Currently using `/q/[token]` which shortens path but token is still a full UUID. Options: 1) Generate shorter 8-char alphanumeric tokens, 2) Integrate Bitly/TinyURL API, 3) Custom short domain (e.g., sda.link/abc123).
 - [ ] **Admin Settings: Role Permissions** — Currently role permissions are only seeded via `supabase/seed.sql`. Need admin UI at `/admin/settings/roles-permissions` to view/edit default permissions per role (super_admin, admin, cashier, detailer). Individual employee overrides already work on staff detail page.
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
