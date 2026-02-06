@@ -57,6 +57,9 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Bugs Fixed (2026-02-06)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
+| 32 | Admin | Session expiry shows empty pages instead of redirecting | Added 3-layer protection: periodic check (60s), window focus check, global fetch interceptor for 401s. All admin pages now auto-redirect to login on session expiry. |
+| # | Module | Description | Fix Summary |
+|---|--------|-------------|-------------|
 | 31 | Portal | Header shows "My Account" instead of personalized greeting | Changed to "Hello, {first_name}" for logged-in customers in `site-header.tsx`. |
 | 30 | Booking | Confirmation shows $0.01 when discounts cover amount | Amounts under $0.50 now display as $0.00 with "Fully covered by discounts" message. |
 | 29 | Booking | Booking fails when discounts cover full amount | Set `payment_option: 'full'` and `deposit_amount: 0` when grandTotal < $0.50. Previously sent `pay_on_site` which was semantically incorrect. |
@@ -97,7 +100,6 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | # | Module | Description | Workaround |
 |---|--------|-------------|------------|
 | 1 | Admin | Other admin pages (39 total) use direct `createClient()` queries which could fail if RLS `is_employee()` check doesn't evaluate correctly | RLS policies use `is_employee()` which SHOULD work for logged-in staff. If any admin page shows empty data, fix by: 1) Create/update API route to use `createAdminClient()` after auth check, 2) Update page to fetch via API. Already fixed: coupons, campaigns. Monitor other pages. |
-| 2 | Admin | Session expiry handling not implemented on all pages | Only coupons page uses `adminFetch()` wrapper. Other admin pages still use regular `fetch()` and will show empty data on session expiry. Incrementally update pages to use `adminFetch()` from `@/lib/utils/admin-fetch`. |
 
 ### Test Checklist Template
 When testing each module, verify:
