@@ -1,9 +1,12 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Customer } from '@/lib/supabase/types';
+
+// How often to validate session (in ms)
+const SESSION_CHECK_INTERVAL = 60000; // 1 minute
 
 interface CustomerAuthContextType {
   session: Session | null;
@@ -28,6 +31,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
+  const sessionCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   const supabase = createClient();
 
@@ -71,6 +75,69 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
 
     return () => subscription.unsubscribe();
   }, [supabase, loadCustomerData]);
+
+  // Periodic session validation - redirect to signin if session expired
+  useEffect(() => {
+    if (!session || loading) return;
+
+    const validateSession = async () => {
+      try {
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+
+        if (error || !currentUser) {
+          // Clear local state
+          setSession(null);
+          setUser(null);
+          setCustomer(null);
+
+          // Redirect to signin
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/account';
+          window.location.href = `/signin?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
+        }
+      } catch (err) {
+        console.error('Session validation error:', err);
+      }
+    };
+
+    // Start periodic checks
+    sessionCheckRef.current = setInterval(validateSession, SESSION_CHECK_INTERVAL);
+
+    // Also validate on window focus (user returns to tab)
+    const handleFocus = () => validateSession();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      if (sessionCheckRef.current) {
+        clearInterval(sessionCheckRef.current);
+      }
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [session, loading, supabase]);
+
+  // Global fetch interceptor for 401 errors - redirect to signin on session expiry
+  useEffect(() => {
+    if (!session || loading) return;
+
+    const originalFetch = window.fetch;
+
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+
+      if (response.status === 401) {
+        const currentPath = window.location.pathname;
+        if (currentPath.startsWith('/account')) {
+          window.location.href = `/signin?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
+          return new Promise(() => {});
+        }
+      }
+
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [session, loading]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

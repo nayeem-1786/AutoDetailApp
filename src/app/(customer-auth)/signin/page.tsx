@@ -27,6 +27,8 @@ export default function CustomerSignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/account';
+  const reason = searchParams.get('reason');
+  const sessionExpired = reason === 'session_expired';
   const [mode, setMode] = useState<AuthMode>('phone');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -269,6 +271,11 @@ export default function CustomerSignInPage() {
 
         {/* Card Container */}
         <div className="rounded-2xl bg-white p-8 shadow-lg">
+          {sessionExpired && (
+            <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Your session has expired. Please sign in again.
+            </div>
+          )}
           {error && (
             <div className="mb-5 rounded-md bg-red-50 p-3 text-sm text-red-700">
               {error}

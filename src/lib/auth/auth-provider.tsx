@@ -99,10 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const validateSession = async () => {
       try {
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
 
         // Session expired or invalid
-        if (error || !currentSession) {
+        if (error || !currentUser) {
           // Clear local state
           setSession(null);
           setUser(null);
