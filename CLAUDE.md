@@ -20,9 +20,22 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Continue Testing Appointments Module
-**Last session:** 2026-02-06 — Fixed appointment bugs, refactored staff scheduling to staff profiles
+### 🧪 NEXT SESSION: Test Quotes Module
+**Last session:** 2026-02-06 — Added quotes "Last Contacted" column + resend functionality, unified admin link styling
 **Migrations:** All applied
+
+**Quotes Test Checklist:**
+- [ ] Create new quote
+- [ ] Edit draft quote (add/remove items, change vehicle, update notes)
+- [ ] Send quote via email
+- [ ] Send quote via SMS
+- [ ] Send quote via both
+- [ ] View quote link (public page)
+- [ ] Accept quote (public page)
+- [ ] Resend quote (from non-draft detail page)
+- [ ] "Last Contacted" column shows in list
+- [ ] Convert accepted quote to appointment
+- [ ] Delete draft quote
 
 **Appointments Test Checklist:**
 - [x] Calendar view loads with correct appointments (fixed date key normalization)
