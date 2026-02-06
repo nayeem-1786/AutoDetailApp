@@ -1,8 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fireWebhook } from '@/lib/utils/webhook';
-import { BUSINESS } from '@/lib/utils/constants';
 import { formatCurrency } from '@/lib/utils/format';
+
+interface BusinessInfo {
+  name: string;
+  phone: string;
+  address: string;
+  email: string | null;
+  website: string | null;
+}
+
+async function getBusinessInfo(supabase: ReturnType<typeof createAdminClient>): Promise<BusinessInfo> {
+  const { data } = await supabase
+    .from('business_settings')
+    .select('key, value')
+    .in('key', ['business_name', 'business_phone', 'business_address', 'business_email', 'business_website']);
+
+  const settings: Record<string, unknown> = {};
+  for (const row of data ?? []) {
+    settings[row.key] = row.value;
+  }
+
+  const rawAddr = settings.business_address;
+  const addr =
+    typeof rawAddr === 'object' && rawAddr !== null
+      ? (rawAddr as { line1: string; city: string; state: string; zip: string })
+      : { line1: '2021 Lomita Blvd', city: 'Lomita', state: 'CA', zip: '90717' };
+
+  return {
+    name: (settings.business_name as string) || 'Smart Detail Auto Spa & Supplies',
+    phone: (settings.business_phone as string) || '+13109990000',
+    address: `${addr.line1}, ${addr.city}, ${addr.state} ${addr.zip}`,
+    email: (settings.business_email as string) || null,
+    website: (settings.business_website as string) || null,
+  };
+}
 
 export async function POST(
   request: NextRequest,
@@ -14,6 +47,9 @@ export async function POST(
     const method: 'email' | 'sms' | 'both' = body.method || 'both';
 
     const supabase = createAdminClient();
+
+    // Fetch business info from database
+    const business = await getBusinessInfo(supabase);
 
     // Fetch the quote with customer info
     const { data: quote, error: fetchErr } = await supabase
@@ -56,6 +92,7 @@ export async function POST(
     // Build the public quote link
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const quoteLink = `${appUrl}/quote/${quote.access_token}`;
+    const shortLink = `${appUrl}/q/${quote.access_token}`;
 
     // Update sent_at (and status to 'sent' only if currently draft)
     // For resends (sent/viewed/accepted), keep the current status
@@ -115,8 +152,8 @@ export async function POST(
               )
               .join('\n');
 
-            const textBody = `Estimate from ${BUSINESS.NAME}
-${BUSINESS.ADDRESS}
+            const textBody = `Estimate from ${business.name}
+${business.address}
 
 Estimate #${quote.quote_number}
 Date: ${new Date(quote.created_at).toLocaleDateString()}
@@ -133,18 +170,107 @@ Total: ${formatCurrency(quote.total_amount)}
 View your estimate online:
 ${quoteLink}
 
-This estimate is valid for 30 days. If you have any questions, please call us at ${BUSINESS.PHONE}.
+This estimate is valid for 30 days. If you have any questions, please call us at ${business.phone}.
 
-Thank you for choosing ${BUSINESS.NAME}!`;
+Thank you for choosing ${business.name}!`;
+
+            const itemRowsHtml = items
+              .map(
+                (i) =>
+                  `<tr>
+                    <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">${i.item_name}${i.tier_name ? ` <span style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
+                    <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center;">${i.quantity}</td>
+                    <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(i.total_price)}</td>
+                  </tr>`
+              )
+              .join('');
+
+            const htmlBody = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
+      <!-- Header -->
+      <div style="background-color: #1e3a5f; padding: 24px 32px;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">${business.name}</h1>
+        <p style="margin: 8px 0 0; color: #94a3b8; font-size: 14px;">${business.address}</p>
+      </div>
+
+      <!-- Content -->
+      <div style="padding: 32px;">
+        <div style="margin-bottom: 24px;">
+          <h2 style="margin: 0 0 16px; color: #1e3a5f; font-size: 20px;">Estimate ${quote.quote_number}</h2>
+          <p style="margin: 0; color: #6b7280; font-size: 14px;">Date: ${new Date(quote.created_at).toLocaleDateString()}</p>
+        </div>
+
+        <div style="background-color: #f9fafb; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+          <p style="margin: 0 0 4px; font-size: 14px;"><strong>Customer:</strong> ${customerName}</p>
+          <p style="margin: 0; font-size: 14px;"><strong>Vehicle:</strong> ${vehicleStr}</p>
+        </div>
+
+        <!-- Items Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+          <thead>
+            <tr style="background-color: #f3f4f6;">
+              <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Item</th>
+              <th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Qty</th>
+              <th style="padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRowsHtml}
+          </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div style="border-top: 2px solid #e5e7eb; padding-top: 16px; margin-bottom: 32px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #6b7280;">Subtotal</span>
+            <span style="font-weight: 500;">${formatCurrency(quote.subtotal)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #6b7280;">Tax</span>
+            <span style="font-weight: 500;">${formatCurrency(quote.tax_amount)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+            <span style="font-size: 18px; font-weight: 600; color: #1e3a5f;">Total</span>
+            <span style="font-size: 18px; font-weight: 700; color: #1e3a5f;">${formatCurrency(quote.total_amount)}</span>
+          </div>
+        </div>
+
+        <!-- CTA Button -->
+        <div style="text-align: center; margin-bottom: 24px;">
+          <a href="${quoteLink}" style="display: inline-block; background-color: #1e3a5f; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">View Your Estimate</a>
+        </div>
+
+        <p style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
+          This estimate is valid for 30 days.<br>
+          Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="background-color: #f9fafb; padding: 24px 32px; text-align: center;">
+        <p style="margin: 0; color: #9ca3af; font-size: 12px;">Thank you for choosing ${business.name}!</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
 
             const formData = new URLSearchParams();
-            formData.append('from', `${BUSINESS.NAME} <quotes@${mailgunDomain}>`);
+            formData.append('from', `${business.name} <quotes@${mailgunDomain}>`);
             formData.append('to', customer.email);
             formData.append(
               'subject',
-              `Estimate ${quote.quote_number} from ${BUSINESS.NAME}`
+              `Estimate ${quote.quote_number} from ${business.name}`
             );
             formData.append('text', textBody);
+            formData.append('html', htmlBody);
 
             const mgRes = await fetch(
               `https://api.mailgun.net/v3/${mailgunDomain}/messages`,
@@ -161,8 +287,23 @@ Thank you for choosing ${BUSINESS.NAME}!`;
               const errText = await mgRes.text();
               console.error('Mailgun error:', errText);
               errors.push('Failed to send email');
+              // Log failed email
+              await supabase.from('quote_communications').insert({
+                quote_id: id,
+                channel: 'email',
+                sent_to: customer.email,
+                status: 'failed',
+                error_message: 'Mailgun delivery failed',
+              });
             } else {
               sentVia.push('email');
+              // Log successful email
+              await supabase.from('quote_communications').insert({
+                quote_id: id,
+                channel: 'email',
+                sent_to: customer.email,
+                status: 'sent',
+              });
             }
           } catch (emailErr) {
             console.error('Email send error:', emailErr);
@@ -176,6 +317,8 @@ Thank you for choosing ${BUSINESS.NAME}!`;
     if (shouldSms) {
       if (!customer?.phone) {
         errors.push('Customer has no phone number');
+      } else if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
+        errors.push('SMS with PDF requires a public URL. Set NEXT_PUBLIC_APP_URL to your production domain.');
       } else {
         const twilioSid = process.env.TWILIO_ACCOUNT_SID;
         const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
@@ -185,18 +328,22 @@ Thank you for choosing ${BUSINESS.NAME}!`;
           errors.push('SMS service (Twilio) not configured');
         } else {
           try {
-            const pdfUrl = `${appUrl}/api/quotes/${id}/pdf?token=${quote.access_token}`;
-
             const smsBody =
-              `Estimate ${quote.quote_number} from ${BUSINESS.NAME}\n` +
+              `Estimate ${quote.quote_number} from ${business.name}\n` +
               `Total: ${formatCurrency(quote.total_amount)}\n\n` +
-              `View online: ${quoteLink}`;
+              `View Your Estimate: ${shortLink}`;
 
             const formData = new URLSearchParams();
             formData.append('From', twilioFrom);
             formData.append('To', customer.phone);
             formData.append('Body', smsBody);
-            formData.append('MediaUrl', pdfUrl);
+
+            // Only attach PDF for production domains (ngrok free tier blocks MMS fetches)
+            const isProductionUrl = !appUrl.includes('ngrok') && !appUrl.includes('localhost');
+            if (isProductionUrl) {
+              const pdfUrl = `${appUrl}/api/quotes/${id}/pdf?token=${quote.access_token}`;
+              formData.append('MediaUrl', pdfUrl);
+            }
 
             const twRes = await fetch(
               `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
@@ -214,8 +361,23 @@ Thank you for choosing ${BUSINESS.NAME}!`;
               const errText = await twRes.text();
               console.error('Twilio error:', errText);
               errors.push('Failed to send SMS');
+              // Log failed SMS
+              await supabase.from('quote_communications').insert({
+                quote_id: id,
+                channel: 'sms',
+                sent_to: customer.phone,
+                status: 'failed',
+                error_message: 'Twilio delivery failed',
+              });
             } else {
               sentVia.push('sms');
+              // Log successful SMS
+              await supabase.from('quote_communications').insert({
+                quote_id: id,
+                channel: 'sms',
+                sent_to: customer.phone,
+                status: 'sent',
+              });
             }
           } catch (smsErr) {
             console.error('SMS send error:', smsErr);

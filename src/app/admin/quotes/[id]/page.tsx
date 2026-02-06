@@ -23,7 +23,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
-import { ArrowLeft, Save, Send, ArrowRightCircle, Plus, Trash2, Car, Mail, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Save, Send, ArrowRightCircle, Plus, Trash2, Car, Mail, MessageSquare, CheckCircle, AlertCircle, Copy, User, Calendar, DollarSign, Award, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { toast } from 'sonner';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -97,6 +99,25 @@ export default function QuoteDetailPage() {
   });
   const [addingVehicle, setAddingVehicle] = useState(false);
 
+  // Communication history
+  const [communications, setCommunications] = useState<{
+    id: string;
+    channel: 'email' | 'sms';
+    sent_to: string;
+    status: 'sent' | 'failed';
+    error_message: string | null;
+    created_at: string;
+  }[]>([]);
+
+  // Customer stats
+  const [customerStats, setCustomerStats] = useState<{
+    visitCount: number;
+    lifetimeSpend: number;
+    loyaltyPoints: number;
+    lastVisit: string | null;
+    memberSince: string | null;
+  } | null>(null);
+
   const isDraft = quote?.status === 'draft';
   const isAccepted = quote?.status === 'accepted';
 
@@ -155,6 +176,43 @@ export default function QuoteDetailPage() {
         .eq('customer_id', q.customer_id)
         .order('created_at', { ascending: false });
       if (vData) setVehicles(vData);
+    }
+
+    // Load communication history
+    const { data: commData } = await supabase
+      .from('quote_communications')
+      .select('*')
+      .eq('quote_id', id)
+      .order('created_at', { ascending: false });
+    if (commData) setCommunications(commData);
+
+    // Load customer stats if customer exists
+    if (q.customer_id) {
+      // Get transaction stats
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('total_amount, created_at')
+        .eq('customer_id', q.customer_id)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      // Get loyalty points balance
+      const { data: loyaltyData } = await supabase
+        .from('loyalty_ledger')
+        .select('points')
+        .eq('customer_id', q.customer_id);
+
+      const transactions = txData || [];
+      const loyaltyPoints = (loyaltyData || []).reduce((sum: number, row: { points: number | null }) => sum + (row.points || 0), 0);
+      const lifetimeSpend = transactions.reduce((sum: number, tx: { total_amount: number | null }) => sum + (tx.total_amount || 0), 0);
+
+      setCustomerStats({
+        visitCount: transactions.length,
+        lifetimeSpend,
+        loyaltyPoints,
+        lastVisit: transactions[0]?.created_at || null,
+        memberSince: q.customer?.created_at || null,
+      });
     }
 
     setLoading(false);
@@ -333,12 +391,13 @@ export default function QuoteDetailPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to update quote');
+        toast.error(data.error || 'Failed to update quote');
       } else {
+        toast.success('Quote saved successfully');
         await loadQuote();
       }
     } catch {
-      alert('An error occurred while saving');
+      toast.error('An error occurred while saving');
     } finally {
       setSaving(false);
     }
@@ -355,21 +414,39 @@ export default function QuoteDetailPage() {
       const data = await res.json();
       if (res.ok) {
         const sentChannels = (data.sent_via || []).join(' & ');
-        const errMsgs = (data.errors || []).join('\n');
-        let msg = sentChannels ? `Estimate sent via ${sentChannels}!` : 'Estimate marked as sent.';
+        const errors = data.errors || [];
+
+        // Copy link to clipboard
         if (data.link) {
           await navigator.clipboard.writeText(data.link).catch(() => {});
-          msg += `\nLink copied to clipboard.`;
         }
-        if (errMsgs) msg += `\n\nWarnings:\n${errMsgs}`;
-        alert(msg);
+
+        // Show success toast
+        if (sentChannels) {
+          toast.success(`Estimate sent via ${sentChannels}`, {
+            description: data.link ? 'Link copied to clipboard' : undefined,
+            icon: <CheckCircle className="h-4 w-4" />,
+          });
+        } else {
+          toast.success('Estimate marked as sent', {
+            description: data.link ? 'Link copied to clipboard' : undefined,
+          });
+        }
+
+        // Show warnings as separate toasts
+        for (const err of errors) {
+          toast.warning(err, {
+            icon: <AlertCircle className="h-4 w-4" />,
+          });
+        }
+
         setShowSendDialog(false);
         await loadQuote();
       } else {
-        alert(data.error || 'Failed to send estimate');
+        toast.error(data.error || 'Failed to send estimate');
       }
     } catch {
-      alert('An error occurred while sending');
+      toast.error('An error occurred while sending');
     } finally {
       setSending(false);
     }
@@ -393,7 +470,7 @@ export default function QuoteDetailPage() {
       if (res.ok) {
         const data = await res.json();
         setShowConvertDialog(false);
-        alert(`Appointment created successfully!`);
+        toast.success('Appointment created successfully');
         if (data.appointment?.id) {
           router.push(`/admin/appointments`);
         } else {
@@ -401,10 +478,10 @@ export default function QuoteDetailPage() {
         }
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to convert quote');
+        toast.error(data.error || 'Failed to convert quote');
       }
     } catch {
-      alert('An error occurred');
+      toast.error('An error occurred');
     } finally {
       setConverting(false);
     }
@@ -431,7 +508,7 @@ export default function QuoteDetailPage() {
         .single();
 
       if (error || !data) {
-        alert('Failed to add vehicle');
+        toast.error('Failed to add vehicle');
         return;
       }
 
@@ -439,8 +516,9 @@ export default function QuoteDetailPage() {
       setVehicleId(data.id);
       setShowAddVehicle(false);
       setNewVehicle({ vehicle_type: 'standard', size_class: '', year: '', make: '', model: '', color: '' });
+      toast.success('Vehicle added');
     } catch {
-      alert('An error occurred while adding the vehicle');
+      toast.error('An error occurred while adding the vehicle');
     } finally {
       setAddingVehicle(false);
     }
@@ -494,28 +572,116 @@ export default function QuoteDetailPage() {
         {/* Customer Info */}
         <Card>
           <CardHeader>
-            <CardTitle>Customer</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Customer</CardTitle>
+              {quote.customer && (
+                <Link
+                  href={`/admin/customers/${quote.customer.id}`}
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  View Profile →
+                </Link>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {quote.customer ? (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-900">
-                  {quote.customer.first_name} {quote.customer.last_name}
-                </p>
-                {quote.customer.phone && (
-                  <p className="text-sm text-gray-500">{formatPhone(quote.customer.phone)}</p>
+              <div className="space-y-4">
+                {/* Name and Type */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-gray-400" />
+                    <p className="text-base font-semibold text-gray-900">
+                      {quote.customer.first_name} {quote.customer.last_name}
+                    </p>
+                  </div>
+                  {quote.customer.customer_type && (
+                    <Badge variant={quote.customer.customer_type === 'professional' ? 'info' : 'default'}>
+                      {quote.customer.customer_type === 'professional' ? 'Professional' : 'Enthusiast'}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Contact Info */}
+                <div className="grid grid-cols-2 gap-3 rounded-md bg-gray-50 p-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Phone</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {quote.customer.phone ? formatPhone(quote.customer.phone) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Email</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {quote.customer.email || '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                {customerStats && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 rounded-md border border-gray-100 p-2">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-xs text-gray-500">Member Since</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {customerStats.memberSince ? formatDate(customerStats.memberSince) : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-md border border-gray-100 p-2">
+                      <Clock className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-xs text-gray-500">Last Visit</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {customerStats.lastVisit ? formatDate(customerStats.lastVisit) : 'Never'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-md border border-gray-100 p-2">
+                      <DollarSign className="h-4 w-4 text-green-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Lifetime Spend</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatCurrency(customerStats.lifetimeSpend)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-md border border-gray-100 p-2">
+                      <Award className="h-4 w-4 text-amber-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Loyalty Points</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {customerStats.loyaltyPoints.toLocaleString()} pts
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
-                {quote.customer.email && (
-                  <p className="text-sm text-gray-500">{quote.customer.email}</p>
+
+                {/* Visit Count Badge */}
+                {customerStats && customerStats.visitCount > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {customerStats.visitCount} {customerStats.visitCount === 1 ? 'visit' : 'visits'} on record
+                  </p>
+                )}
+
+                {/* Vehicle */}
+                {quote.vehicle && (
+                  <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+                    <Car className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">Vehicle</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {[quote.vehicle.year, quote.vehicle.make, quote.vehicle.model].filter(Boolean).join(' ')}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (
               <p className="text-sm text-gray-400">Unknown customer</p>
-            )}
-            {quote.vehicle && (
-              <p className="mt-2 text-sm text-gray-600">
-                Vehicle: {[quote.vehicle.year, quote.vehicle.make, quote.vehicle.model].filter(Boolean).join(' ')}
-              </p>
             )}
           </CardContent>
         </Card>
@@ -636,6 +802,50 @@ export default function QuoteDetailPage() {
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Communication History */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Communication History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {communications.length === 0 ? (
+              <p className="text-sm text-gray-400">No messages sent yet</p>
+            ) : (
+              <div className="space-y-3">
+                {communications.map((comm) => (
+                  <div
+                    key={comm.id}
+                    className="flex items-start justify-between rounded-md border border-gray-100 bg-gray-50 p-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 rounded-full p-1.5 ${comm.channel === 'email' ? 'bg-blue-100' : 'bg-green-100'}`}>
+                        {comm.channel === 'email' ? (
+                          <Mail className={`h-4 w-4 ${comm.status === 'sent' ? 'text-blue-600' : 'text-red-500'}`} />
+                        ) : (
+                          <MessageSquare className={`h-4 w-4 ${comm.status === 'sent' ? 'text-green-600' : 'text-red-500'}`} />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {comm.channel === 'email' ? 'Email' : 'SMS'}{' '}
+                          {comm.status === 'sent' ? 'sent' : 'failed'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          To: {comm.channel === 'email' ? comm.sent_to : formatPhone(comm.sent_to)}
+                        </p>
+                        {comm.error_message && (
+                          <p className="mt-1 text-xs text-red-500">{comm.error_message}</p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400">{formatDateTime(comm.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { BUSINESS } from '@/lib/utils/constants';
 import { formatCurrency } from '@/lib/utils/format';
 
 // --- Types -----------------------------------------------------------
+
+interface BusinessInfo {
+  name: string;
+  phone: string;
+  address: string;
+}
 
 interface QuoteItem {
   item_name: string;
@@ -29,13 +34,13 @@ interface QuoteData {
     last_name: string;
     phone: string | null;
     email: string | null;
-  };
+  } | null;
   vehicle: {
     year: number | null;
     make: string;
     model: string;
     color: string | null;
-  };
+  } | null;
   items: QuoteItem[];
 }
 
@@ -49,7 +54,7 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-function generatePdf(quote: QuoteData): Promise<Buffer> {
+function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: 'LETTER',
@@ -84,14 +89,14 @@ function generatePdf(quote: QuoteData): Promise<Buffer> {
       .font('Helvetica-Bold')
       .fontSize(22)
       .fillColor(primaryColor)
-      .text(BUSINESS.NAME, marginLeft, 50);
+      .text(business.name, marginLeft, 50);
 
     // Address
     doc
       .font('Helvetica')
       .fontSize(9)
       .fillColor(mediumGray)
-      .text(BUSINESS.ADDRESS, marginLeft, 76);
+      .text(business.address, marginLeft, 76);
 
     // "QUOTE" label on the right
     doc
@@ -152,16 +157,21 @@ function generatePdf(quote: QuoteData): Promise<Buffer> {
     ry += 16;
 
     doc.font('Helvetica').fontSize(10).fillColor(darkText);
-    doc.text(`${quote.customer.first_name} ${quote.customer.last_name}`, col2X, ry);
-    ry += 14;
-
-    if (quote.customer.phone) {
-      doc.text(quote.customer.phone, col2X, ry);
+    if (quote.customer) {
+      doc.text(`${quote.customer.first_name} ${quote.customer.last_name}`, col2X, ry);
       ry += 14;
-    }
 
-    if (quote.customer.email) {
-      doc.text(quote.customer.email, col2X, ry);
+      if (quote.customer.phone) {
+        doc.text(quote.customer.phone, col2X, ry);
+        ry += 14;
+      }
+
+      if (quote.customer.email) {
+        doc.text(quote.customer.email, col2X, ry);
+        ry += 14;
+      }
+    } else {
+      doc.text('N/A', col2X, ry);
       ry += 14;
     }
 
@@ -174,16 +184,21 @@ function generatePdf(quote: QuoteData): Promise<Buffer> {
     ry += 16;
 
     doc.font('Helvetica').fontSize(10).fillColor(darkText);
-    const vehicleParts = [
-      quote.vehicle.year,
-      quote.vehicle.make,
-      quote.vehicle.model,
-    ].filter(Boolean);
-    doc.text(vehicleParts.join(' '), col2X, ry);
-    ry += 14;
+    if (quote.vehicle) {
+      const vehicleParts = [
+        quote.vehicle.year,
+        quote.vehicle.make,
+        quote.vehicle.model,
+      ].filter(Boolean);
+      doc.text(vehicleParts.length > 0 ? vehicleParts.join(' ') : 'N/A', col2X, ry);
+      ry += 14;
 
-    if (quote.vehicle.color) {
-      doc.text(`Color: ${quote.vehicle.color}`, col2X, ry);
+      if (quote.vehicle.color) {
+        doc.text(`Color: ${quote.vehicle.color}`, col2X, ry);
+        ry += 14;
+      }
+    } else {
+      doc.text('N/A', col2X, ry);
       ry += 14;
     }
 
@@ -343,7 +358,7 @@ function generatePdf(quote: QuoteData): Promise<Buffer> {
       .fontSize(8)
       .fillColor(mediumGray)
       .text(
-        `${BUSINESS.NAME}  |  ${BUSINESS.ADDRESS}`,
+        `${business.name}  |  ${business.address}`,
         marginLeft,
         y,
         { width: contentWidth, align: 'center' }
@@ -378,6 +393,29 @@ export async function GET(
 
     const supabase = createAdminClient();
 
+    // Fetch business info from database
+    const { data: settingsData } = await supabase
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['business_name', 'business_phone', 'business_address']);
+
+    const settings: Record<string, unknown> = {};
+    for (const row of settingsData ?? []) {
+      settings[row.key] = row.value;
+    }
+
+    const rawAddr = settings.business_address;
+    const addr =
+      typeof rawAddr === 'object' && rawAddr !== null
+        ? (rawAddr as { line1: string; city: string; state: string; zip: string })
+        : { line1: '2021 Lomita Blvd', city: 'Lomita', state: 'CA', zip: '90717' };
+
+    const business: BusinessInfo = {
+      name: (settings.business_name as string) || 'Smart Detail Auto Spa & Supplies',
+      phone: (settings.business_phone as string) || '+13109990000',
+      address: `${addr.line1}, ${addr.city}, ${addr.state} ${addr.zip}`,
+    };
+
     // Fetch quote with relations
     const { data: quote, error } = await supabase
       .from('quotes')
@@ -406,7 +444,7 @@ export async function GET(
     }
 
     // Generate PDF
-    const pdfBuffer = await generatePdf(quote as unknown as QuoteData);
+    const pdfBuffer = await generatePdf(quote as unknown as QuoteData, business);
 
     const filename = `Quote-${quote.quote_number}.pdf`;
 

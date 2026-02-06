@@ -17,6 +17,7 @@ import {
   VEHICLE_SIZE_LABELS,
   VEHICLE_TYPE_SIZE_CLASSES,
   TRANSACTION_STATUS_LABELS,
+  QUOTE_STATUS_LABELS,
 } from '@/lib/utils/constants';
 import type {
   Customer,
@@ -26,6 +27,8 @@ import type {
   VehicleType,
   VehicleSizeClass,
   LoyaltyAction,
+  Quote,
+  QuoteStatus,
 } from '@/lib/supabase/types';
 import { formatCurrency, formatPhone, formatPhoneInput, formatDate, formatDateTime, formatPoints, normalizePhone } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
@@ -50,7 +53,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
 import { generateReceiptLines, generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import type { ReceiptTransaction } from '@/app/pos/lib/receipt-template';
@@ -70,6 +74,7 @@ export default function CustomerProfilePage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [ledger, setLedger] = useState<LoyaltyLedger[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState('info');
@@ -164,11 +169,12 @@ export default function CustomerProfilePage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [custRes, vehRes, ledgerRes, txRes] = await Promise.all([
+    const [custRes, vehRes, ledgerRes, txRes, quotesRes] = await Promise.all([
       supabase.from('customers').select('*').eq('id', id).single(),
       supabase.from('vehicles').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('loyalty_ledger').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('transactions').select('*, employee:employees(id, first_name, last_name)').eq('customer_id', id).order('transaction_date', { ascending: false }),
+      supabase.from('quotes').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
     ]);
 
     if (custRes.error || !custRes.data) {
@@ -198,6 +204,7 @@ export default function CustomerProfilePage() {
     if (vehRes.data) setVehicles(vehRes.data);
     if (ledgerRes.data) setLedger(ledgerRes.data);
     if (txRes.data) setTransactions(txRes.data);
+    if (quotesRes.data) setQuotes(quotesRes.data);
     setLoading(false);
   }, [id, supabase, router, reset]);
 
@@ -800,6 +807,7 @@ export default function CustomerProfilePage() {
           <TabsTrigger value="vehicles">Vehicles ({vehicles.length})</TabsTrigger>
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
           <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>
+          <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
         </TabsList>
 
         {/* ===== INFO TAB ===== */}
@@ -1659,6 +1667,184 @@ export default function CustomerProfilePage() {
               </DialogFooter>
             )}
           </Dialog>
+        </TabsContent>
+
+        {/* ===== QUOTES TAB ===== */}
+        <TabsContent value="quotes">
+          {/* Quote Stats */}
+          {(() => {
+            const totalQuotes = quotes.length;
+            // Accepted = customer accepted the quote (includes both 'accepted' and 'converted' statuses)
+            const acceptedQuotes = quotes.filter(q => q.status === 'accepted' || q.status === 'converted').length;
+            // Booked = quote was converted into an appointment
+            const bookedQuotes = quotes.filter(q => q.status === 'converted').length;
+            const totalQuotedValue = quotes.reduce((sum, q) => sum + (q.total_amount || 0), 0);
+            // Accepted value includes both accepted and converted quotes
+            const acceptedValue = quotes.filter(q => q.status === 'accepted' || q.status === 'converted').reduce((sum, q) => sum + (q.total_amount || 0), 0);
+            // Conversion rate = how many quotes were accepted by customers
+            const conversionRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
+
+            return (
+              <div className="space-y-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-md bg-blue-100 p-2">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{totalQuotes}</p>
+                          <p className="text-xs text-gray-500">Total Quotes</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-md bg-green-100 p-2">
+                          <Check className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{acceptedQuotes}</p>
+                          <p className="text-xs text-gray-500">Accepted</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-md bg-purple-100 p-2">
+                          <CalendarDays className="h-5 w-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{bookedQuotes}</p>
+                          <p className="text-xs text-gray-500">Booked</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-md bg-amber-100 p-2">
+                          <TrendingUp className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{conversionRate}%</p>
+                          <p className="text-xs text-gray-500">Conversion Rate</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-md bg-emerald-100 p-2">
+                          <DollarSign className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(acceptedValue)}</p>
+                          <p className="text-xs text-gray-500">Accepted Value</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Quotes Table */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Quote History</CardTitle>
+                      <Link href={`/admin/quotes/new?customer=${id}`}>
+                        <Button size="sm">
+                          <Plus className="h-4 w-4" />
+                          New Quote
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {quotes.length === 0 ? (
+                      <EmptyState
+                        icon={FileText}
+                        title="No quotes yet"
+                        description="Create a quote to send an estimate to this customer."
+                      />
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="pb-3 text-left font-medium text-gray-500">Quote #</th>
+                              <th className="pb-3 text-left font-medium text-gray-500">Date</th>
+                              <th className="pb-3 text-right font-medium text-gray-500">Amount</th>
+                              <th className="pb-3 text-center font-medium text-gray-500">Status</th>
+                              <th className="pb-3 text-left font-medium text-gray-500">Last Contacted</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {quotes.map((q) => {
+                              const statusVariant: Record<QuoteStatus, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
+                                draft: 'default',
+                                sent: 'info',
+                                viewed: 'warning',
+                                accepted: 'success',
+                                expired: 'destructive',
+                                converted: 'secondary',
+                              };
+                              return (
+                                <tr key={q.id} className="border-b border-gray-100">
+                                  <td className="py-3">
+                                    <Link
+                                      href={`/admin/quotes/${q.id}`}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    >
+                                      {q.quote_number}
+                                    </Link>
+                                  </td>
+                                  <td className="py-3 text-gray-600">
+                                    {formatDate(q.created_at)}
+                                  </td>
+                                  <td className="py-3 text-right font-medium text-gray-900">
+                                    {formatCurrency(q.total_amount)}
+                                  </td>
+                                  <td className="py-3 text-center">
+                                    <Badge variant={statusVariant[q.status]}>
+                                      {QUOTE_STATUS_LABELS[q.status] ?? q.status}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-3 text-gray-500">
+                                    {q.sent_at ? formatDateTime(q.sent_at) : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Value Summary */}
+                {totalQuotes > 0 && (
+                  <div className="rounded-md bg-gray-50 p-4 text-sm text-gray-600">
+                    <p>
+                      Total quoted value: <span className="font-semibold text-gray-900">{formatCurrency(totalQuotedValue)}</span>
+                      {acceptedValue > 0 && (
+                        <> · Accepted: <span className="font-semibold text-green-600">{formatCurrency(acceptedValue)}</span></>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
