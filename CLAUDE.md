@@ -21,7 +21,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Test Quotes Module
-**Last session:** 2026-02-06 — Fixed session expiry (admin + customer), replaced all hardcoded business info with database values (26 files)
+**Last session:** 2026-02-06 — Built POS-style browsable service picker dialog for quotes; replaced flat service dropdown with category tiles, search, tier selection; made unit price always editable for custom pricing; new items prepend to top; added "New Customer" quick-create button; renamed Customer→Assigned Customer, Line Items→Services
 **Migrations:** All applied (including `quote_communications` table)
 
 **Quotes Test Checklist:**
@@ -258,6 +258,19 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Quote Service Picker Dialog (2026-02-06)
+- **New component:** `src/app/admin/quotes/_components/service-picker-dialog.tsx` — POS-style browsable service selection
+- **3-view navigation:** Category tiles → Service cards → Tier/size detail selection
+- **Search:** Debounced search across all categories with flat results grid
+- **Smart auto-add:** Flat-price or single-tier services add immediately without showing detail view
+- **Vehicle size pricing:** Picker resolves correct price based on selected vehicle's size class
+- **Unit price always editable:** Service picker pre-fills price, but admin can override with custom pricing on any item
+- **New items prepend:** "+ Add Item" inserts new blank item at top (newest first)
+- **"New Customer" button:** Quick-create opens `/admin/customers/new` in new tab from quote page
+- **Renamed labels:** "Customer" → "Assigned Customer", "Line Items" → "Services"
+- **Removed from both pages:** Old flat `<Select>` service dropdown, per-item tier picker, per-item vehicle size selector — all replaced by dialog
+- **Files changed:** `quotes/new/page.tsx`, `quotes/[id]/page.tsx` (both create and edit views)
 
 ### Quotes Last Contacted & Resend (2026-02-06)
 - **Quotes list page:** Added "Last Contacted" column showing when quote was last sent
