@@ -141,16 +141,14 @@ export function BottomNav() {
               <ExternalLink className="h-4 w-4 text-gray-400" />
               Go to Admin
             </Link>
-            <button
-              onClick={() => {
-                setMoreOpen(false);
-                // Settings placeholder - no settings page yet
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+            <Link
+              href="/admin/settings"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
             >
               <Settings className="h-4 w-4 text-gray-400" />
               Settings
-            </button>
+            </Link>
           </div>
         )}
       </div>

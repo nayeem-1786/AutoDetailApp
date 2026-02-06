@@ -22,8 +22,9 @@ interface StepReviewProps {
   vehicle: BookingVehicleInput;
   addons: BookingAddonInput[];
   couponCode?: string | null;
-  onConfirm: () => Promise<void>;
+  onConfirm: () => void | Promise<void>;
   onBack: () => void;
+  confirmButtonText?: string;
 }
 
 export function StepReview({
@@ -42,6 +43,7 @@ export function StepReview({
   couponCode,
   onConfirm,
   onBack,
+  confirmButtonText = 'Confirm Booking',
 }: StepReviewProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -182,9 +184,6 @@ export function StepReview({
               <span>Total</span>
               <span>{formatCurrency(grandTotal)}</span>
             </div>
-            <p className="text-xs text-gray-500">
-              Payment collected at time of service
-            </p>
           </div>
         </div>
 
@@ -221,10 +220,10 @@ export function StepReview({
             {submitting ? (
               <>
                 <Spinner size="sm" className="text-white" />
-                Booking...
+                Processing...
               </>
             ) : (
-              'Confirm Booking'
+              confirmButtonText
             )}
           </Button>
         </div>

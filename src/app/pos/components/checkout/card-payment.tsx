@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
-import { TIP_PRESETS } from '@/lib/utils/constants';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -23,13 +22,35 @@ export function CardPayment() {
   const amountDue = ticket.total;
   const [status, setStatus] = useState<CardStatus>('creating-intent');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const isProcessingRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   const processCard = useCallback(async () => {
+    // Prevent double execution from React 18 Strict Mode or re-renders
+    if (isProcessingRef.current) {
+      console.log('[CardPayment] Already processing, skipping...');
+      return;
+    }
+    isProcessingRef.current = true;
+
     setStatus('creating-intent');
     setErrorMsg(null);
 
     try {
-      // 1. Create PaymentIntent with base amount (no tip baked in)
+      // Import terminal functions
+      const { collectPaymentMethod, processPayment, cancelCollect, isCollectInProgress } = await import(
+        '../../lib/stripe-terminal'
+      );
+
+      // Cancel any pending operations if there's one in progress
+      if (isCollectInProgress()) {
+        console.log('[CardPayment] Cancelling previous collect operation...');
+        await cancelCollect();
+        // Wait for SDK cleanup
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+
+      // 1. Create PaymentIntent
       const amountCents = Math.round(amountDue * 100);
       const piRes = await posFetch('/api/pos/stripe/payment-intent', {
         method: 'POST',
@@ -47,20 +68,8 @@ export function CardPayment() {
 
       setStatus('waiting-for-card');
 
-      // 2. Collect payment method via terminal with on-reader tipping
-      const { collectPaymentMethod, processPayment } = await import(
-        '../../lib/stripe-terminal'
-      );
-
-      const subtotalCents = Math.round(ticket.subtotal * 100);
-      const tipOptions = TIP_PRESETS.map((pct) => ({
-        amount: Math.round(subtotalCents * pct / 100),
-        label: `${pct}%`,
-      }));
-
-      const paymentIntent = await collectPaymentMethod(piJson.client_secret, {
-        tip_configuration: { options: tipOptions },
-      });
+      // 2. Collect payment (ensureConnected is called internally)
+      const paymentIntent = await collectPaymentMethod(piJson.client_secret);
 
       setStatus('processing');
 
@@ -174,14 +183,27 @@ export function CardPayment() {
       dispatch({ type: 'CLEAR_TICKET' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Card payment failed';
-      setStatus('error');
-      setErrorMsg(msg);
-      toast.error(msg);
+      if (isMountedRef.current) {
+        setStatus('error');
+        setErrorMsg(msg);
+        toast.error(msg);
+      }
+    } finally {
+      isProcessingRef.current = false;
     }
   }, [amountDue, ticket, checkout, dispatch]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     processCard();
+
+    return () => {
+      isMountedRef.current = false;
+      // Cancel on unmount
+      import('../../lib/stripe-terminal').then(({ cancelCollect }) => {
+        cancelCollect();
+      });
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -264,7 +286,10 @@ export function CardPayment() {
         {status === 'error' && (
           <Button
             size="lg"
-            onClick={() => processCard()}
+            onClick={() => {
+              isProcessingRef.current = false; // Reset to allow retry
+              processCard();
+            }}
             className="bg-blue-600 hover:bg-blue-700"
           >
             Retry

@@ -3,19 +3,30 @@
 import { cn } from '@/lib/utils/cn';
 import { Check } from 'lucide-react';
 
-const STEPS = [
+const DEFAULT_STEPS = [
   { label: 'Service' },
   { label: 'Configure' },
   { label: 'Schedule' },
   { label: 'Info' },
   { label: 'Review' },
-] as const;
+];
+
+const STEPS_WITH_PAYMENT = [
+  { label: 'Service' },
+  { label: 'Configure' },
+  { label: 'Schedule' },
+  { label: 'Info' },
+  { label: 'Review' },
+  { label: 'Payment' },
+];
 
 interface StepIndicatorProps {
   currentStep: number;
+  requirePayment?: boolean;
 }
 
-export function StepIndicator({ currentStep }: StepIndicatorProps) {
+export function StepIndicator({ currentStep, requirePayment = false }: StepIndicatorProps) {
+  const STEPS = requirePayment ? STEPS_WITH_PAYMENT : DEFAULT_STEPS;
   return (
     <nav aria-label="Booking progress" className="mb-8">
       <ol className="flex items-center justify-between">

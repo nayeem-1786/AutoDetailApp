@@ -211,16 +211,32 @@ export async function POST(request: NextRequest) {
         // Assign available detailer, or first one if all busy
         assignedEmployeeId = availableDetailer?.id ?? detailers[0].id;
       }
+    } else {
+      // No bookable detailers found - fall back to super_admin (Nayeem)
+      const { data: superAdmin } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('role', 'super_admin')
+        .eq('status', 'active')
+        .limit(1)
+        .single();
+
+      if (superAdmin) {
+        assignedEmployeeId = superAdmin.id;
+      }
     }
 
     // 7. Create appointment
+    // Auto-confirm if paid online, otherwise pending for review
+    const initialStatus = data.payment_intent_id ? 'confirmed' : 'pending';
+
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .insert({
         customer_id: customerId,
         vehicle_id: vehicleId,
         employee_id: assignedEmployeeId,
-        status: 'pending',
+        status: initialStatus,
         channel: data.channel || 'online',
         scheduled_date: data.date,
         scheduled_start_time: data.time,
@@ -338,6 +354,16 @@ export async function POST(request: NextRequest) {
     fireWebhook('booking_created', webhookPayload, supabase).catch((err) =>
       console.error('Webhook fire failed:', err)
     );
+
+    // If auto-confirmed (paid online), also fire appointment_confirmed webhook
+    if (initialStatus === 'confirmed') {
+      fireWebhook('appointment_confirmed', {
+        ...webhookPayload,
+        event: 'appointment.confirmed',
+      }, supabase).catch((err) =>
+        console.error('Confirmed webhook fire failed:', err)
+      );
+    }
 
     return NextResponse.json(
       {

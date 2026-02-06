@@ -116,7 +116,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           </h1>
           <p className="mt-3 text-lg text-gray-600">
             Select a service, configure your options, and pick a time that works
-            for you. Payment is collected at time of service.
+            for you.
           </p>
         </div>
 

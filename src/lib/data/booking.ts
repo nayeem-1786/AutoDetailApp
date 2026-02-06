@@ -59,6 +59,7 @@ export interface BookingConfig {
   advance_days_min: number;
   advance_days_max: number;
   slot_interval_minutes: number;
+  require_payment: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -227,23 +228,43 @@ export async function getBusinessHours(): Promise<BusinessHours> {
 export async function getBookingConfig(): Promise<BookingConfig> {
   const supabase = await getClient();
 
-  const { data } = await supabase
-    .from('business_settings')
-    .select('value')
-    .eq('key', 'booking_config')
-    .single();
+  // Fetch booking config and payment feature flag in parallel
+  const [configResult, flagResult] = await Promise.all([
+    supabase
+      .from('business_settings')
+      .select('value')
+      .eq('key', 'booking_config')
+      .single(),
+    supabase
+      .from('feature_flags')
+      .select('enabled')
+      .eq('key', 'online_booking_payment')
+      .single(),
+  ]);
 
-  if (!data?.value) {
+  const defaults: BookingConfig = {
+    advance_days_min: 1,
+    advance_days_max: 30,
+    slot_interval_minutes: 30,
+    require_payment: true, // Default to requiring payment
+  };
+
+  if (!configResult.data?.value) {
     return {
-      advance_days_min: 1,
-      advance_days_max: 30,
-      slot_interval_minutes: 30,
+      ...defaults,
+      require_payment: flagResult.data?.enabled ?? true,
     };
   }
 
   // Handle double-serialized JSON (string instead of object)
-  const val = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-  return val as BookingConfig;
+  const val = typeof configResult.data.value === 'string'
+    ? JSON.parse(configResult.data.value)
+    : configResult.data.value;
+
+  return {
+    ...val,
+    require_payment: flagResult.data?.enabled ?? true,
+  } as BookingConfig;
 }
 
 // ---------------------------------------------------------------------------

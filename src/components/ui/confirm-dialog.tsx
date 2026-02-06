@@ -40,7 +40,7 @@ function ConfirmDialog({
     }
   }, [open]);
 
-  const isConfirmDisabled = loading || (requireConfirmText && confirmInput !== requireConfirmText);
+  const isConfirmDisabled = loading || Boolean(requireConfirmText && confirmInput !== requireConfirmText);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -7,6 +7,7 @@ import { StepConfigure, type ConfigureResult } from './step-configure';
 import { StepSchedule } from './step-schedule';
 import { StepCustomerInfo } from './step-customer-info';
 import { StepReview } from './step-review';
+import { StepPayment } from './step-payment';
 import { BookingConfirmation } from './booking-confirmation';
 import type { BookableCategory, BookableService, BusinessHours, BookingConfig, RebookData } from '@/lib/data/booking';
 import type { MobileZone, VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
@@ -48,6 +49,7 @@ interface BookingState {
   time: string | null;
   customer: BookingCustomerInput | null;
   vehicle: BookingVehicleInput | null;
+  paymentIntentId: string | null;
 }
 
 interface ConfirmationData {
@@ -108,7 +110,11 @@ export function BookingWizard({
     time: null,
     customer: null,
     vehicle: null,
+    paymentIntentId: null,
   });
+
+  // Whether payment is required for online bookings
+  const requirePayment = bookingConfig.require_payment;
 
   // Whether this is a portal booking (logged-in customer)
   const isPortal = !!customerData;
@@ -162,8 +168,23 @@ export function BookingWizard({
     setStep(5);
   }
 
-  // Step 5: Confirm booking
-  async function handleConfirm() {
+  // Step 5: Review complete - go to payment or confirm directly
+  function handleReviewContinue() {
+    if (requirePayment) {
+      setStep(6); // Go to payment step
+    } else {
+      handleConfirm(); // Confirm directly without payment
+    }
+  }
+
+  // Step 6: Payment success
+  function handlePaymentSuccess(paymentIntentId: string) {
+    setState((prev) => ({ ...prev, paymentIntentId }));
+    handleConfirm(paymentIntentId);
+  }
+
+  // Final: Confirm booking
+  async function handleConfirm(paymentIntentId?: string) {
     const { service, config, date, time, customer, vehicle } = state;
     if (!service || !config || !date || !time || !customer || !vehicle) {
       throw new Error('Missing booking data');
@@ -192,6 +213,7 @@ export function BookingWizard({
         tier_name: a.tier_name,
       })),
       channel: isPortal ? 'portal' as const : 'online' as const,
+      payment_intent_id: paymentIntentId ?? state.paymentIntentId ?? undefined,
     };
 
     const res = await fetch('/api/book', {
@@ -238,7 +260,7 @@ export function BookingWizard({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <StepIndicator currentStep={step} />
+      <StepIndicator currentStep={step} requirePayment={requirePayment} />
 
       {step === 1 && (
         <StepServiceSelect
@@ -337,10 +359,23 @@ export function BookingWizard({
             vehicle={state.vehicle}
             addons={state.config.addons as BookingAddonInput[]}
             couponCode={couponCode ?? null}
-            onConfirm={handleConfirm}
+            onConfirm={handleReviewContinue}
             onBack={() => setStep(4)}
+            confirmButtonText={requirePayment ? 'Continue to Payment' : 'Confirm Booking'}
           />
         )}
+
+      {step === 6 && state.config && (
+        <StepPayment
+          amount={
+            state.config.price +
+            state.config.addons.reduce((sum, a) => sum + a.price, 0) +
+            (state.config.mobile_surcharge ?? 0)
+          }
+          onPaymentSuccess={handlePaymentSuccess}
+          onBack={() => setStep(5)}
+        />
+      )}
     </div>
   );
 }

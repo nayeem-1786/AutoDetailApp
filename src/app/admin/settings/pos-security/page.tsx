@@ -243,7 +243,7 @@ export default function PosSecurityPage() {
   // Check if any non-empty IP has a validation error
   const hasErrors = entries.some((entry, index) => entry.ip.trim() && errors[index]);
 
-  const isCurrentIpAdded = currentIp && currentIp !== 'unknown' && entries.some((e) => e.ip === currentIp);
+  const isCurrentIpAdded = Boolean(currentIp && currentIp !== 'unknown' && entries.some((e) => e.ip === currentIp));
 
   if (loading) {
     return (

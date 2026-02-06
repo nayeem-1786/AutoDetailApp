@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -75,6 +75,13 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Manage IP whitelist for POS access restriction.',
         href: '/admin/settings/pos-security',
         icon: Shield,
+        roles: ['super_admin'],
+      },
+      {
+        title: 'Card Reader',
+        description: 'Register and manage Stripe Terminal card readers.',
+        href: '/admin/settings/card-reader',
+        icon: CreditCard,
         roles: ['super_admin'],
       },
     ],

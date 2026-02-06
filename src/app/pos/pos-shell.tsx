@@ -12,12 +12,16 @@ import {
   Keyboard,
   X,
   Lock,
+  CreditCard,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { canAccessRoute } from '@/lib/auth/roles';
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
 import { TicketProvider, useTicket } from './context/ticket-context';
 import { CheckoutProvider, useCheckout } from './context/checkout-context';
 import { HeldTicketsProvider, useHeldTickets } from './context/held-tickets-context';
+import { ReaderProvider, useReader } from './context/reader-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
 import { HeldTicketsPanel } from './components/held-tickets-panel';
@@ -182,12 +186,13 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   const displayName = employee.first_name || employee.email.split('@')[0];
 
   return (
-    <TicketProvider>
-      <CheckoutProvider>
-        <HeldTicketsProvider>
-          <PosShellContent displayName={displayName} clock={clock} role={role}>
-            {children}
-          </PosShellContent>
+    <ReaderProvider>
+      <TicketProvider>
+        <CheckoutProvider>
+          <HeldTicketsProvider>
+            <PosShellContent displayName={displayName} clock={clock} role={role}>
+              {children}
+            </PosShellContent>
 
           {/* Lock screen overlay */}
           {locked && (
@@ -255,9 +260,10 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
               `}</style>
             </div>
           )}
-        </HeldTicketsProvider>
-      </CheckoutProvider>
-    </TicketProvider>
+          </HeldTicketsProvider>
+        </CheckoutProvider>
+      </TicketProvider>
+    </ReaderProvider>
   );
 }
 
@@ -277,6 +283,7 @@ function PosShellContent({
   const { ticket, dispatch } = useTicket();
   const { openCheckout, isOpen: checkoutOpen } = useCheckout();
   const { heldTickets } = useHeldTickets();
+  const { connectedReader, isConnecting, discoverAndConnect } = useReader();
   const [heldPanelOpen, setHeldPanelOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -354,8 +361,35 @@ function PosShellContent({
           </span>
         </div>
 
-        {/* Right: Scanner indicator + Held tickets + Employee + Clock + Shortcuts help */}
+        {/* Right: Reader status + Scanner indicator + Held tickets + Employee + Clock + Shortcuts help */}
         <div className="flex items-center gap-3">
+          {/* Card Reader Status */}
+          {isConnecting ? (
+            <div className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="hidden text-xs font-medium sm:inline">Connecting...</span>
+            </div>
+          ) : connectedReader ? (
+            <div
+              className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-green-700"
+              title={`Reader: ${connectedReader.label || 'Connected'}`}
+            >
+              <Wifi className="h-4 w-4" />
+              <span className="hidden text-xs font-medium sm:inline">
+                {connectedReader.label || 'Reader'}
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={discoverAndConnect}
+              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Click to connect reader"
+            >
+              <WifiOff className="h-4 w-4" />
+              <span className="hidden text-xs sm:inline">No Reader</span>
+            </button>
+          )}
+
           {/* P5: Scanner Connection Indicator */}
           <div className="flex items-center gap-1" title="Scanner: disconnected">
             <ScanLine className="h-4 w-4 text-gray-400" />
