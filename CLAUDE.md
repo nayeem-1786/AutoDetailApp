@@ -20,20 +20,23 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | Staff Scheduling | ⏳ Pending | Weekly schedules, blocked dates |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Test Online Booking Payment Options & Coupons
-1. **Run migrations:** `npx supabase db push` — adds payment columns + coupon_rewards RLS policies
-2. **Check feature flag:** `SELECT * FROM feature_flags WHERE key = 'online_booking_payment';` — ensure `enabled = true`
-3. **Test portal booking:** Sign in as customer, go to `/account`, click "Book New Appointment"
-   - Should NOT see "Your Info" card (already signed in)
-   - Should see loyalty points section if balance >= 100 points
-   - Should see available coupons assigned to customer
-4. **Test payment thresholds:**
-   - Services under $100: Full payment required (no deposit option)
-   - Services $100+: $50 deposit OR Pay on Site (existing customers only)
-5. **Test coupon application:** Apply coupon, verify discount in price summary
-6. **Test loyalty points:** Use slider to apply points, verify discount calculation
-7. **Verify cancellation disclaimer:** Should see $50 fee warning for no-shows/late cancellations
-8. **Verify database:** Check appointments table has payment_type, deposit_amount, coupon_code, coupon_discount populated
+### 🧪 NEXT SESSION: Complete Online Booking Testing
+**Migrations:** Run `npx supabase db push` if not already done
+
+**Completed Tests:**
+- [x] Portal booking hides "Your Info" card for signed-in users
+- [x] Loyalty points slider works, reaches max value
+- [x] Coupon eligibility shows for service-restricted coupons
+- [x] Ineligible coupons display with reason and disabled Apply button
+- [x] Payment step simplified (security badges + Powered by Stripe only)
+
+**Still Need to Test:**
+1. **End-to-end payment flow:** Complete a booking with Stripe payment
+2. **Payment thresholds:** Under $100 = full payment, $100+ = deposit option
+3. **Pay on Site:** Existing customers can skip payment step
+4. **Coupon + loyalty combined:** Apply both discounts together
+5. **Database verification:** Check `payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount` columns populated
+6. **Guest booking flow:** New customer path with mandatory deposit
 
 ### Bugs Found (Pending)
 | # | Module | Description | Status |
@@ -56,6 +59,10 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 | Booking | Payment rules not enforced | Under $100: full payment required. $100+: $50 deposit. Added cancellation/no-show $50 fee disclaimer |
 | 12 | Booking | "Your Info" shown for signed-in users | Hidden for portal bookings since customer already known |
 | 13 | Booking | coupon_rewards table missing RLS policies | Added RLS policies for coupon_rewards + anon select policies for public booking flow |
+| 14 | Booking | Coupons not validated against service requirements | Added service-based validation in `/api/book/validate-coupon` - checks `requires_service_ids`, `requires_service_category_ids`, and reward target services. Shows clear error when coupon doesn't apply to selected services |
+| 15 | Booking | Available coupons show without eligibility info | Updated `/api/book/check-customer` to return `is_eligible` and `ineligibility_reason` for each coupon. UI shows disabled coupons with warning badge and reason |
+| 16 | Booking | Loyalty slider can't reach max value | Fixed by rounding `maxLoyaltyPointsUsable` down to nearest 100 (REDEEM_MINIMUM) |
+| 17 | Booking | Payment step UI inconsistent | Simplified to show only security badges + "Powered by Stripe". Removed all card/wallet logos. Changed "Pay now" to "Amount Due" |
 
 ### Known Issues (Low Priority)
 | # | Module | Description | Workaround |
