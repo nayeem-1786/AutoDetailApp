@@ -63,7 +63,7 @@ export default function StaffPage() {
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
       cell: ({ row }) => (
         <button
-          className="text-left font-medium text-gray-900 hover:text-blue-600"
+          className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
           onClick={() => router.push(`/admin/staff/${row.original.id}`)}
         >
           {row.original.first_name} {row.original.last_name}

@@ -126,7 +126,7 @@ export default function ProductsPage() {
       header: 'Name',
       cell: ({ row }) => (
         <button
-          className="text-left font-medium text-gray-900 hover:text-blue-600"
+          className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
           onClick={() => router.push(`/admin/catalog/products/${row.original.id}`)}
         >
           {row.original.name}

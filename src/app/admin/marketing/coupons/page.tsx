@@ -173,7 +173,7 @@ export default function CouponsListPage() {
           : `/admin/marketing/coupons/${c.id}`;
         return (
           <button
-            className="text-sm font-medium text-gray-900 hover:text-blue-600"
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
             onClick={() => router.push(href)}
           >
             {c.name || 'Untitled'}

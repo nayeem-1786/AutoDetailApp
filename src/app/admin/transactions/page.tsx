@@ -871,15 +871,31 @@ function TransactionTableRow({
         <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
           {tx.receipt_number ?? '---'}
         </td>
-        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-          {tx.customer
-            ? `${tx.customer.first_name} ${tx.customer.last_name}`
-            : 'Walk-in'}
+        <td className="whitespace-nowrap px-4 py-3">
+          {tx.customer ? (
+            <a
+              href={`/admin/customers/${tx.customer.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              {tx.customer.first_name} {tx.customer.last_name}
+            </a>
+          ) : (
+            <span className="text-gray-600">Walk-in</span>
+          )}
         </td>
-        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-          {tx.employee
-            ? `${tx.employee.first_name} ${tx.employee.last_name}`
-            : '---'}
+        <td className="whitespace-nowrap px-4 py-3">
+          {tx.employee ? (
+            <a
+              href={`/admin/staff/${tx.employee.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              {tx.employee.first_name} {tx.employee.last_name}
+            </a>
+          ) : (
+            <span className="text-gray-600">---</span>
+          )}
         </td>
         <td className="whitespace-nowrap px-4 py-3 text-gray-600">
           {tx.payment_method

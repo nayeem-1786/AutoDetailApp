@@ -139,7 +139,7 @@ export default function QuotesPage() {
       header: 'Quote #',
       cell: ({ row }) => (
         <button
-          className="font-medium text-gray-900 hover:text-blue-600"
+          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
           onClick={() => router.push(`/admin/quotes/${row.original.id}`)}
         >
           {row.original.quote_number}
