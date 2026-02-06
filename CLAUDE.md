@@ -46,6 +46,8 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Bugs Fixed (2026-02-05)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
+| 21 | Coupons | Customer search doesn't work in coupon wizard | Wizard was using POS endpoint (`/api/pos/customers/search`) which requires POS auth. Created new admin endpoint `/api/admin/customers/search` that searches by name or phone with admin auth. |
+| 22 | Coupons | Duplicate coupon code not validated before next step | Added validation in `goNext()` on basics step - checks if code already exists (excluding current coupon). Shows inline error and toast. Prevents navigation until fixed. |
 | 20 | Coupons | Editing used coupon doesn't warn about side effects | Added warning dialog when editing a coupon with `use_count > 0`. Shows usage stats and explains that single-use checks will still apply. Options: Cancel, Update Anyway, or Create as New Coupon. |
 | 19 | Admin | Session expiry shows empty pages instead of redirecting to login | Created `adminFetch()` wrapper that handles 401 responses by redirecting to `/login?reason=session_expired`. Updated coupons page to use it. Login page now shows "Your session has expired" message when redirected. |
 | 18 | Portal | Customer dashboard coupons not displaying | `/api/customer/coupons` was filtering `.eq('customer_id', customer.id)` which only matched coupons assigned to specific customers. Fixed to use `.or('customer_id.eq.X,customer_id.is.null')` to include global coupons (NULL = anyone). Also added tag-based filtering for coupons with `customer_tags` requirements. |

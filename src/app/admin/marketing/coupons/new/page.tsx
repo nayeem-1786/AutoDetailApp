@@ -309,6 +309,7 @@ export default function NewCouponPage() {
   const [code, setCode] = useState('');
   const [autoGenerate, setAutoGenerate] = useState(true);
   const [autoApply, setAutoApply] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   // Step 2: Targeting
   const [targetCustomerType, setTargetCustomerType] = useState<string>('');
@@ -553,7 +554,7 @@ export default function NewCouponPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/pos/customers/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q)}`);
       if (res.ok) {
         const { data } = await res.json();
         setCustomerResults(data || []);
@@ -773,6 +774,9 @@ export default function NewCouponPage() {
           body: JSON.stringify(payload),
         });
       } else {
+        // Only try to create draft if we haven't already failed due to duplicate code
+        if (codeError) return;
+
         const res = await fetch('/api/marketing/coupons', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -781,6 +785,9 @@ export default function NewCouponPage() {
         if (res.ok) {
           const result = await res.json();
           setCouponId(result.data.id);
+        } else if (res.status === 409) {
+          // Duplicate code - don't save, but don't show error (goNext will handle it)
+          console.log('Draft save skipped: duplicate code');
         }
       }
     } catch {
@@ -797,10 +804,35 @@ export default function NewCouponPage() {
   const canPrev = stepIndex > 0;
 
   async function goNext() {
-    if (canNext) {
-      await silentSave();
-      setStep(STEPS[stepIndex + 1].key);
+    if (!canNext) return;
+
+    // Validate basics step before proceeding
+    if (step === 'basics') {
+      if (!name.trim()) {
+        toast.error('Enter a coupon name');
+        return;
+      }
+      if (!autoGenerate && code.trim()) {
+        // Check for duplicate code (only if not editing this coupon)
+        const normalizedCode = code.toUpperCase().replace(/\s/g, '').trim();
+        const res = await fetch(`/api/marketing/coupons?search=${encodeURIComponent(normalizedCode)}&limit=1`);
+        if (res.ok) {
+          const { data } = await res.json();
+          const duplicate = data?.find((c: { code: string; id: string }) =>
+            c.code.toUpperCase() === normalizedCode && c.id !== couponId
+          );
+          if (duplicate) {
+            setCodeError(`Code "${normalizedCode}" is already in use`);
+            toast.error(`Coupon code "${normalizedCode}" already exists`);
+            return;
+          }
+        }
+        setCodeError(null);
+      }
     }
+
+    await silentSave();
+    setStep(STEPS[stepIndex + 1].key);
   }
 
   async function goPrev() {
@@ -1177,13 +1209,16 @@ export default function NewCouponPage() {
 
                 {!autoGenerate && (
                   <div className="mt-3">
-                    <FormField label="Coupon Code" htmlFor="coupon-code">
+                    <FormField label="Coupon Code" htmlFor="coupon-code" error={codeError || undefined}>
                       <Input
                         id="coupon-code"
                         value={code}
-                        onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                        onChange={(e) => {
+                          setCode(e.target.value.toUpperCase().replace(/\s/g, ''));
+                          setCodeError(null); // Clear error on change
+                        }}
                         placeholder="e.g. SPRING25"
-                        className="font-mono uppercase"
+                        className={`font-mono uppercase ${codeError ? 'border-red-500' : ''}`}
                       />
                     </FormField>
                   </div>
