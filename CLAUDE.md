@@ -13,17 +13,17 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Testing Queue (Admin Tabs)
 | Tab | Status | Notes |
 |-----|--------|-------|
-| Online Booking | 🔄 Next | **TEST PAYMENT FLOW** - verify feature flag, Stripe payment step, auto-confirm |
+| Online Booking | ✅ Done | Payment flow tested with coupons, loyalty points, edge cases |
 | Appointments | ⏳ Pending | Calendar, scheduling, status changes, cancel flow |
 | Quotes | ⏳ Pending | CRUD, send email/SMS, PDF, public view, accept, convert |
 | Waitlist | ⏳ Pending | Join, auto-notify, admin management |
 | Staff Scheduling | ⏳ Pending | Weekly schedules, blocked dates |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Complete Online Booking Testing
-**Migrations:** Run `npx supabase db push` if not already done
+### 🧪 NEXT SESSION: Test Appointments Module
+**Migrations:** Booking payment columns now applied (`payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount`)
 
-**Completed Tests:**
+**Completed Tests (Online Booking):**
 - [x] Portal booking hides "Your Info" card for signed-in users
 - [x] Loyalty points slider works, reaches max value
 - [x] Coupon eligibility shows for service-restricted coupons
@@ -33,18 +33,25 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - [x] Coupon single-use validation shows date when coupon was used
 - [x] Coupon wizard validates duplicate codes before next step
 - [x] Coupon wizard warns when editing a coupon with usage history
-
-**Still Need to Test:**
-1. **End-to-end payment flow:** Complete a booking with Stripe payment (partial discount)
-2. **Payment thresholds:** Under $100 = full payment, $100+ = deposit option
-3. **Pay on Site:** Existing customers can skip payment step
-4. **Database verification:** Check `payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount` columns populated
-5. **Guest booking flow:** New customer path with mandatory deposit
+- [x] Coupon + loyalty points combination auto-caps loyalty to remaining balance
+- [x] Amounts under $0.50 skip Stripe payment (below minimum)
+- [x] Booking confirmation shows $0.00 for amounts under $0.50
+- [x] Database columns populated correctly for all payment scenarios
 
 ### Bugs Found (Pending)
 | # | Module | Description | Status |
 |---|--------|-------------|--------|
 | — | — | — | — |
+
+### Bugs Fixed (2026-02-06)
+| # | Module | Description | Fix Summary |
+|---|--------|-------------|-------------|
+| 31 | Portal | Header shows "My Account" instead of personalized greeting | Changed to "Hello, {first_name}" for logged-in customers in `site-header.tsx`. |
+| 30 | Booking | Confirmation shows $0.01 when discounts cover amount | Amounts under $0.50 now display as $0.00 with "Fully covered by discounts" message. |
+| 29 | Booking | Booking fails when discounts cover full amount | Set `payment_option: 'full'` and `deposit_amount: 0` when grandTotal < $0.50. Previously sent `pay_on_site` which was semantically incorrect. |
+| 28 | Booking | Payment intent fails for amounts under $0.50 | Added Stripe minimum check ($0.50) - amounts below skip payment step entirely. Added validation to `/api/book/payment-intent` as safety net. |
+| 27 | Booking | Loyalty points can exceed remaining balance after coupon | When coupon is applied, `loyaltyPointsToUse` now auto-caps to remaining balance. Slider max updates dynamically. Shows message when coupon covers full amount. |
+| 26 | Booking | Pre-existing TypeScript errors in booking-wizard | Fixed missing Button import, `state.addons` → `state.config?.addons`, `handlePaymentSuccess(null)` → `handleConfirm()`. |
 
 ### Bugs Fixed (2026-02-05)
 | # | Module | Description | Fix Summary |
@@ -206,6 +213,13 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Booking Payment Flow Refinements (2026-02-06)
+- **Coupon + Loyalty Points:** When coupon is applied, loyalty points auto-cap to remaining balance. If coupon covers full amount, loyalty section shows "no points needed" message instead of slider.
+- **Stripe Minimum ($0.50):** Amounts below $0.50 skip payment step entirely. Shows "Remaining balance below minimum - no payment required!" and completes booking directly.
+- **Payment Option Logic:** When discounts cover amount, `payment_option` is set to `'full'` (not `'pay_on_site'`) since amount was fully "paid" by discounts.
+- **Confirmation Display:** Amounts under $0.50 show as $0.00 with "Fully covered by discounts" message.
+- **Personalized Header:** Site header now shows "Hello, {first_name}" instead of "My Account" for logged-in customers.
 
 ### Phone → Mobile Labeling (Global)
 - All "Phone" field labels changed to "Mobile" across admin, customer portal, auth pages

@@ -13,6 +13,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
+    // Stripe minimum is $0.50 USD
+    const STRIPE_MINIMUM = 0.50;
+    if (amount < STRIPE_MINIMUM) {
+      return NextResponse.json(
+        { error: `Amount must be at least $${STRIPE_MINIMUM.toFixed(2)}` },
+        { status: 400 }
+      );
+    }
+
     // Convert dollars to cents for Stripe
     const amountInCents = Math.round(amount * 100);
 

@@ -496,37 +496,52 @@ export function StepReview({
             </div>
             <p className="mt-1 text-xs text-gray-500">
               You have <span className="font-semibold text-amber-600">{loyaltyPointsBalance.toLocaleString()} points</span> worth{' '}
-              <span className="font-semibold text-green-600">{formatCurrency(loyaltyPointsValue)}</span>. Apply them to reduce your total.
+              <span className="font-semibold text-green-600">{formatCurrency(loyaltyPointsValue)}</span>.
+              {maxLoyaltyPointsUsable > 0 ? ' Apply them to reduce your total.' : ''}
             </p>
 
-            <div className="mt-3">
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-gray-700">Points to use:</label>
-                <input
-                  type="range"
-                  min={0}
-                  max={maxLoyaltyPointsUsable}
-                  step={REDEEM_MINIMUM}
-                  value={loyaltyPointsToUse}
-                  onChange={(e) => onLoyaltyPointsChange(Number(e.target.value))}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                />
-                <span className="text-sm font-medium text-gray-900 w-20 text-right">
-                  {loyaltyPointsToUse.toLocaleString()} pts
-                </span>
-              </div>
-
-              {loyaltyPointsToUse > 0 && (
-                <div className="mt-2 flex items-center justify-between rounded-lg bg-amber-50 border border-amber-200 p-2">
-                  <span className="text-sm text-amber-800">Points discount:</span>
-                  <span className="text-sm font-semibold text-amber-800">-{formatCurrency(loyaltyDiscount)}</span>
+            {maxLoyaltyPointsUsable > 0 ? (
+              <div className="mt-3">
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-gray-700">Points to use:</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={maxLoyaltyPointsUsable}
+                    step={REDEEM_MINIMUM}
+                    value={loyaltyPointsToUse}
+                    onChange={(e) => onLoyaltyPointsChange(Number(e.target.value))}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <span className="text-sm font-medium text-gray-900 w-20 text-right">
+                    {loyaltyPointsToUse.toLocaleString()} pts
+                  </span>
                 </div>
-              )}
 
-              <p className="mt-2 text-xs text-gray-400">
-                Points are redeemed in increments of {REDEEM_MINIMUM}. Each {REDEEM_MINIMUM} points = {formatCurrency(REDEEM_MINIMUM * REDEEM_RATE)} off.
-              </p>
-            </div>
+                {loyaltyPointsToUse > 0 && (
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-amber-50 border border-amber-200 p-2">
+                    <span className="text-sm text-amber-800">Points discount:</span>
+                    <span className="text-sm font-semibold text-amber-800">-{formatCurrency(loyaltyDiscount)}</span>
+                  </div>
+                )}
+
+                {maxLoyaltyPointsUsable < loyaltyPointsBalance && (
+                  <p className="mt-2 text-xs text-amber-600">
+                    Only {maxLoyaltyPointsUsable.toLocaleString()} points needed to cover remaining balance.
+                  </p>
+                )}
+
+                <p className="mt-2 text-xs text-gray-400">
+                  Points are redeemed in increments of {REDEEM_MINIMUM}. Each {REDEEM_MINIMUM} points = {formatCurrency(REDEEM_MINIMUM * REDEEM_RATE)} off.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-lg bg-green-50 border border-green-200 p-2">
+                <p className="text-xs text-green-700">
+                  Your coupon already covers the remaining balance — no points needed! Your points will be saved for a future visit.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

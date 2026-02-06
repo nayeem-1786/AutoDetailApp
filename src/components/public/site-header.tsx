@@ -8,8 +8,8 @@ import { createClient } from '@/lib/supabase/server';
 export async function SiteHeader() {
   const biz = await getBusinessInfo();
 
-  // Check if the current user is a customer (for "My Account" / "Sign In" link)
-  let isCustomer = false;
+  // Check if the current user is a customer (for "Hello, Name" / "Sign In" link)
+  let customerName: string | null = null;
   try {
     const supabase = await createClient();
     const {
@@ -18,10 +18,12 @@ export async function SiteHeader() {
     if (user) {
       const { data: cust } = await supabase
         .from('customers')
-        .select('id')
+        .select('id, first_name')
         .eq('auth_user_id', user.id)
         .single();
-      isCustomer = !!cust;
+      if (cust?.first_name) {
+        customerName = cust.first_name;
+      }
     }
   } catch {
     // Not authenticated or server component without cookies — ignore
@@ -73,16 +75,16 @@ export async function SiteHeader() {
             <Phone className="h-5 w-5" />
           </a>
           <Link
-            href={isCustomer ? '/account' : '/signin'}
+            href={customerName ? '/account' : '/signin'}
             className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
           >
             <User className="h-4 w-4" />
-            <span>{isCustomer ? 'My Account' : 'Sign In'}</span>
+            <span>{customerName ? `Hello, ${customerName}` : 'Sign In'}</span>
           </Link>
           <Link
-            href={isCustomer ? '/account' : '/signin'}
+            href={customerName ? '/account' : '/signin'}
             className="inline-flex sm:hidden items-center justify-center h-9 w-9 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
-            aria-label={isCustomer ? 'My Account' : 'Sign In'}
+            aria-label={customerName ? `Hello, ${customerName}` : 'Sign In'}
           >
             <User className="h-5 w-5" />
           </Link>

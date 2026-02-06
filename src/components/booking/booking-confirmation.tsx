@@ -76,11 +76,14 @@ export function BookingConfirmation({
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">Total</span>
               <span className="text-lg font-bold text-gray-900">
-                {formatCurrency(appointment.total)}
+                {/* Don't show amounts under $0.50 - will be collected at store */}
+                {formatCurrency(appointment.total < 0.50 ? 0 : appointment.total)}
               </span>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              Payment collected at time of service
+              {appointment.total >= 0.50
+                ? 'Payment collected at time of service'
+                : 'Fully covered by discounts'}
             </p>
           </div>
           {couponCode && (

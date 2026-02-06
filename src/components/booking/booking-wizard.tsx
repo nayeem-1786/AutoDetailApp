@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StepIndicator } from './step-indicator';
 import { StepServiceSelect } from './step-service-select';
 import { StepConfigure, type ConfigureResult } from './step-configure';
@@ -9,6 +9,7 @@ import { StepCustomerInfo } from './step-customer-info';
 import { StepReview } from './step-review';
 import { StepPayment } from './step-payment';
 import { BookingConfirmation } from './booking-confirmation';
+import { Button } from '@/components/ui/button';
 import type { BookableCategory, BookableService, BusinessHours, BookingConfig, RebookData } from '@/lib/data/booking';
 import type { MobileZone, VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
@@ -127,6 +128,12 @@ export function BookingWizard({
   const requirePayment = bookingConfig.require_payment;
 
   const [step, setStep] = useState(initialStep);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
+
   const [state, setState] = useState<BookingState>({
     service: rebookService ?? preSelectedService,
     config: rebookData && rebookService
@@ -213,7 +220,7 @@ export function BookingWizard({
             phone: customer.phone,
             email: customer.email,
             service_id: state.service?.id,
-            addon_ids: state.addons?.map((a) => a.service_id) || [],
+            addon_ids: state.config?.addons?.map((a) => a.service_id) || [],
           }),
         });
 
@@ -286,13 +293,55 @@ export function BookingWizard({
   }
 
   // Handler for coupon application from review step
+  // When coupon changes, adjust loyalty points if they now exceed the remaining balance
   function handleCouponApply(coupon: AppliedCoupon | null) {
-    setState((prev) => ({ ...prev, appliedCoupon: coupon }));
+    setState((prev) => {
+      const couponDiscount = coupon?.discount ?? 0;
+      const subtotal = (prev.config?.price ?? 0) +
+        (prev.config?.addons ?? []).reduce((sum, a) => sum + a.price, 0) +
+        (prev.config?.mobile_surcharge ?? 0);
+      const remainingAfterCoupon = subtotal - couponDiscount;
+
+      // Calculate max loyalty points that can be used (can't make total negative)
+      const REDEEM_RATE = 0.05;
+      const REDEEM_MINIMUM = 100;
+      const maxPointsForBalance = Math.floor(remainingAfterCoupon / REDEEM_RATE);
+      const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
+      const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
+
+      // Cap current loyalty points to the new max
+      const adjustedLoyaltyPoints = Math.min(prev.loyaltyPointsToUse, maxLoyaltyPointsUsable);
+
+      return {
+        ...prev,
+        appliedCoupon: coupon,
+        loyaltyPointsToUse: adjustedLoyaltyPoints,
+      };
+    });
   }
 
   // Handler for loyalty points usage from review step
+  // Only use what's needed - cap at remaining balance after coupon
   function handleLoyaltyPointsChange(points: number) {
-    setState((prev) => ({ ...prev, loyaltyPointsToUse: points }));
+    setState((prev) => {
+      const couponDiscount = prev.appliedCoupon?.discount ?? 0;
+      const subtotal = (prev.config?.price ?? 0) +
+        (prev.config?.addons ?? []).reduce((sum, a) => sum + a.price, 0) +
+        (prev.config?.mobile_surcharge ?? 0);
+      const remainingAfterCoupon = subtotal - couponDiscount;
+
+      // Calculate max loyalty points that can be used
+      const REDEEM_RATE = 0.05;
+      const REDEEM_MINIMUM = 100;
+      const maxPointsForBalance = Math.floor(remainingAfterCoupon / REDEEM_RATE);
+      const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
+      const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
+
+      // Cap requested points to the max usable
+      const cappedPoints = Math.min(points, maxLoyaltyPointsUsable);
+
+      return { ...prev, loyaltyPointsToUse: cappedPoints };
+    });
   }
 
   // Step 6: Payment success
@@ -323,6 +372,17 @@ export function BookingWizard({
     const isFullPayment = grandTotal < 100;
     const depositAmount = paymentIntentId ? (isFullPayment ? grandTotal : 50) : undefined;
 
+    // Determine payment option:
+    // - If discounts cover the full amount (< $0.50), treat as 'full' (paid by discounts)
+    // - If user selected an option, use that
+    // - If payment was made, use 'full' or 'deposit' based on amount
+    // - Otherwise 'pay_on_site'
+    const STRIPE_MINIMUM = 0.50;
+    const discountsCoverAmount = grandTotal < STRIPE_MINIMUM;
+    const effectivePaymentOption = discountsCoverAmount
+      ? 'full'
+      : paymentOption ?? (paymentIntentId ? (isFullPayment ? 'full' : 'deposit') : 'pay_on_site');
+
     const body = {
       service_id: service.id,
       tier_name: config.tier_name,
@@ -348,8 +408,8 @@ export function BookingWizard({
       channel: isPortal ? 'portal' as const : 'online' as const,
       payment_intent_id: paymentIntentId ?? state.paymentIntentId ?? undefined,
       // New payment options fields
-      payment_option: paymentOption ?? (paymentIntentId ? (isFullPayment ? 'full' : 'deposit') : 'pay_on_site'),
-      deposit_amount: depositAmount,
+      payment_option: effectivePaymentOption,
+      deposit_amount: discountsCoverAmount ? 0 : depositAmount,
       coupon_code: appliedCoupon?.code ?? undefined,
       coupon_discount: appliedCoupon?.discount ?? undefined,
       // Loyalty points
@@ -538,20 +598,23 @@ export function BookingWizard({
             loyaltyDiscount
           );
 
-          // If total is $0 or less, skip payment and complete booking directly
-          if (grandTotal <= 0) {
+          // Stripe minimum is $0.50 - skip payment for amounts below that
+          const STRIPE_MINIMUM = 0.50;
+          if (grandTotal < STRIPE_MINIMUM) {
             return (
               <div className="space-y-4">
                 <div className="rounded-lg border border-green-200 bg-green-50 p-4">
                   <p className="text-sm font-medium text-green-800">
-                    Your discounts cover the full amount - no payment required!
+                    {grandTotal <= 0
+                      ? 'Your discounts cover the full amount - no payment required!'
+                      : `Remaining balance of $${grandTotal.toFixed(2)} is below minimum - no payment required!`}
                   </p>
                 </div>
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={() => setStep(5)}>
                     Back
                   </Button>
-                  <Button onClick={() => handlePaymentSuccess(null)}>
+                  <Button onClick={() => handleConfirm()}>
                     Complete Booking
                   </Button>
                 </div>

@@ -306,9 +306,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (apptErr || !appointment) {
-      console.error('Appointment creation failed:', apptErr?.message);
+      console.error('Appointment creation failed:', apptErr?.message, apptErr?.details, apptErr?.hint);
       return NextResponse.json(
-        { error: 'Failed to create appointment' },
+        { error: `Failed to create appointment: ${apptErr?.message || 'Unknown error'}` },
         { status: 500 }
       );
     }
