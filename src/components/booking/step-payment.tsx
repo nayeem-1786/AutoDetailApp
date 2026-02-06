@@ -141,6 +141,13 @@ export function StepPayment({ amount, totalAmount, remainingAmount, isDeposit, o
 
   // Create payment intent on mount
   useEffect(() => {
+    // If amount is 0 or less, no payment needed
+    if (amount <= 0) {
+      setError('No payment required - total is covered by discounts');
+      setLoading(false);
+      return;
+    }
+
     fetch('/api/book/payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -151,7 +158,7 @@ export function StepPayment({ amount, totalAmount, remainingAmount, isDeposit, o
         if (data.clientSecret) {
           setClientSecret(data.clientSecret);
         } else {
-          setError('Failed to initialize payment');
+          setError(data.error || 'Failed to initialize payment');
         }
       })
       .catch(() => setError('Failed to initialize payment'))

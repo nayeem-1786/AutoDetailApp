@@ -530,12 +530,34 @@ export function BookingWizard({
           // Calculate loyalty points value (5 cents per point)
           const loyaltyDiscount = state.loyaltyPointsToUse * 0.05;
 
-          const grandTotal =
+          const grandTotal = Math.max(0,
             state.config.price +
             state.config.addons.reduce((sum, a) => sum + a.price, 0) +
             (state.config.mobile_surcharge ?? 0) -
             (state.appliedCoupon?.discount ?? 0) -
-            loyaltyDiscount;
+            loyaltyDiscount
+          );
+
+          // If total is $0 or less, skip payment and complete booking directly
+          if (grandTotal <= 0) {
+            return (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <p className="text-sm font-medium text-green-800">
+                    Your discounts cover the full amount - no payment required!
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={() => setStep(5)}>
+                    Back
+                  </Button>
+                  <Button onClick={() => handlePaymentSuccess(null)}>
+                    Complete Booking
+                  </Button>
+                </div>
+              </div>
+            );
+          }
 
           // Under $100: full payment required
           // $100+: $50 deposit
