@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { Quote, QuoteItem, QuoteStatus, Customer, Vehicle, Service, ServicePricing } from '@/lib/supabase/types';
+import type { Quote, QuoteItem, QuoteStatus, Customer, Vehicle } from '@/lib/supabase/types';
 import { formatCurrency, formatDate, formatDateTime, formatPhone } from '@/lib/utils/format';
 import { TAX_RATE, QUOTE_STATUS_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
@@ -23,7 +23,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
-import { ArrowLeft, Save, Send, ArrowRightCircle, Plus, Trash2, Car, Mail, MessageSquare, CheckCircle, AlertCircle, Copy, User, Calendar, DollarSign, Award, Clock } from 'lucide-react';
+import { ArrowLeft, Save, Send, ArrowRightCircle, Plus, Trash2, Car, Mail, MessageSquare, CheckCircle, AlertCircle, Copy, User, Calendar, DollarSign, Award, Clock, ShoppingBag, X } from 'lucide-react';
+import { ServicePickerDialog } from '../_components/service-picker-dialog';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -73,7 +74,10 @@ export default function QuoteDetailPage() {
   const [notes, setNotes] = useState('');
   const [vehicleId, setVehicleId] = useState('');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
+
+  // Service picker dialog
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerItemKey, setPickerItemKey] = useState<string | null>(null);
 
   // Send dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
@@ -216,23 +220,12 @@ export default function QuoteDetailPage() {
     loadQuote();
   }, [loadQuote]);
 
-  useEffect(() => {
-    async function loadServices() {
-      const { data } = await supabase
-        .from('services')
-        .select('id, name, flat_price, pricing_model, is_active, pricing:service_pricing(id, tier_name, tier_label, price, is_vehicle_size_aware, vehicle_size_sedan_price, vehicle_size_truck_suv_price, vehicle_size_suv_van_price, display_order)')
-        .eq('is_active', true)
-        .order('name');
-      if (data) setServices(data as (Service & { pricing: ServicePricing[] })[]);
-    }
-    loadServices();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Line item management
   function addItem() {
     setItems((prev) => [
-      ...prev,
       { key: generateKey(), item_name: '', quantity: 1, unit_price: 0, service_id: null, product_id: null, tier_name: null, notes: null },
+      ...prev,
     ]);
   }
 
@@ -253,78 +246,26 @@ export default function QuoteDetailPage() {
     return v?.size_class ?? null;
   }, [vehicleId, vehicles]);
 
-  function getServicePriceTiers(service: Service & { pricing?: ServicePricing[] }): ServicePricing[] {
-    return (service.pricing ?? []).sort((a, b) => a.display_order - b.display_order);
-  }
-
-  function resolveTierPrice(tier: ServicePricing, sizeClass: string | null): number {
-    if (tier.is_vehicle_size_aware && sizeClass) {
-      if (sizeClass === 'sedan' && tier.vehicle_size_sedan_price != null) return tier.vehicle_size_sedan_price;
-      if (sizeClass === 'truck_suv_2row' && tier.vehicle_size_truck_suv_price != null) return tier.vehicle_size_truck_suv_price;
-      if (sizeClass === 'suv_3row_van' && tier.vehicle_size_suv_van_price != null) return tier.vehicle_size_suv_van_price;
-    }
-    return tier.price;
-  }
-
-  function handleServiceSelect(key: string, serviceId: string) {
-    const service = services.find((s) => s.id === serviceId) as (Service & { pricing?: ServicePricing[] }) | undefined;
-    if (!service) {
-      setItems((prev) =>
-        prev.map((item) => item.key === key ? { ...item, service_id: null, item_name: '', unit_price: 0, tier_name: null } : item)
-      );
-      return;
-    }
-
-    const tiers = getServicePriceTiers(service);
-
-    if (service.pricing_model === 'flat' || tiers.length === 0) {
-      setItems((prev) =>
-        prev.map((item) => {
-          if (item.key !== key) return item;
-          return { ...item, service_id: serviceId, product_id: null, item_name: service.name, unit_price: service.flat_price ?? 0, tier_name: null };
-        })
-      );
-    } else {
-      const firstTier = tiers[0];
-      const price = resolveTierPrice(firstTier, selectedVehicleSizeClass);
-      setItems((prev) =>
-        prev.map((item) => {
-          if (item.key !== key) return item;
-          return { ...item, service_id: serviceId, product_id: null, item_name: service.name, unit_price: price, tier_name: firstTier.tier_name };
-        })
-      );
-    }
-  }
-
-  function handleTierSelect(key: string, tierName: string) {
-    const item = items.find((i) => i.key === key);
-    if (!item?.service_id) return;
-
-    const service = services.find((s) => s.id === item.service_id) as (Service & { pricing?: ServicePricing[] }) | undefined;
-    if (!service) return;
-
-    const tier = (service.pricing ?? []).find((t) => t.tier_name === tierName);
-    if (!tier) return;
-
-    const price = resolveTierPrice(tier, selectedVehicleSizeClass);
+  // Handle service picker selection
+  function handlePickerSelect(selection: {
+    service_id: string;
+    item_name: string;
+    unit_price: number;
+    tier_name: string | null;
+  }) {
+    if (!pickerItemKey) return;
     setItems((prev) =>
-      prev.map((i) => i.key === key ? { ...i, tier_name: tierName, unit_price: price } : i)
-    );
-  }
-
-  function handleItemSizeClassChange(key: string, sizeClass: string) {
-    const item = items.find((i) => i.key === key);
-    if (!item?.service_id || !item.tier_name) return;
-
-    const service = services.find((s) => s.id === item.service_id) as (Service & { pricing?: ServicePricing[] }) | undefined;
-    if (!service) return;
-
-    const tier = (service.pricing ?? []).find((t) => t.tier_name === item.tier_name);
-    if (!tier || !tier.is_vehicle_size_aware) return;
-
-    const price = resolveTierPrice(tier, sizeClass || null);
-    setItems((prev) =>
-      prev.map((i) => i.key === key ? { ...i, unit_price: price } : i)
+      prev.map((item) => {
+        if (item.key !== pickerItemKey) return item;
+        return {
+          ...item,
+          service_id: selection.service_id,
+          product_id: null,
+          item_name: selection.item_name,
+          unit_price: selection.unit_price,
+          tier_name: selection.tier_name,
+        };
+      })
     );
   }
 
@@ -567,7 +508,7 @@ export default function QuoteDetailPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Customer</CardTitle>
+              <CardTitle>Assigned Customer</CardTitle>
               {quote.customer && (
                 <Link
                   href={`/admin/customers/${quote.customer.id}`}
@@ -680,10 +621,10 @@ export default function QuoteDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Line Items */}
+        {/* Services */}
         <Card>
           <CardHeader>
-            <CardTitle>Line Items</CardTitle>
+            <CardTitle>Services</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -976,7 +917,7 @@ export default function QuoteDetailPage() {
       {/* Customer Info (read-only for edit) */}
       <Card>
         <CardHeader>
-          <CardTitle>Customer</CardTitle>
+          <CardTitle>Assigned Customer</CardTitle>
         </CardHeader>
         <CardContent>
           {quote.customer ? (
@@ -1102,11 +1043,11 @@ export default function QuoteDetailPage() {
         </DialogFooter>
       </Dialog>
 
-      {/* Line Items */}
+      {/* Services */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Line Items</CardTitle>
+            <CardTitle>Services</CardTitle>
             <Button variant="outline" size="sm" onClick={addItem}>
               <Plus className="h-4 w-4" />
               Add Item
@@ -1127,68 +1068,57 @@ export default function QuoteDetailPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-                <FormField label="Service" className="sm:col-span-2 lg:col-span-3">
-                  <Select
-                    value={item.service_id || ''}
-                    onChange={(e) => handleServiceSelect(item.key, e.target.value)}
-                  >
-                    <option value="">Custom item...</option>
-                    {services.map((svc) => (
-                      <option key={svc.id} value={svc.id}>
-                        {svc.name}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-
-                <FormField label="Item Name" required error={errors[`item_${index}_name`]} className="sm:col-span-2 lg:col-span-3">
-                  <Input
-                    value={item.item_name}
-                    onChange={(e) => updateItem(item.key, 'item_name', e.target.value)}
-                    placeholder="Service or product name"
-                    readOnly={!!item.service_id}
-                  />
-                </FormField>
-
-                {/* Tier picker — shown when service has pricing tiers */}
-                {(() => {
-                  const svc = item.service_id ? services.find((s) => s.id === item.service_id) as (Service & { pricing?: ServicePricing[] }) | undefined : null;
-                  const tiers = svc ? getServicePriceTiers(svc) : [];
-                  const selectedTier = tiers.find((t) => t.tier_name === item.tier_name);
-                  const showSizeClass = selectedTier?.is_vehicle_size_aware;
-
-                  if (tiers.length === 0) return null;
-
-                  return (
-                    <>
-                      <FormField label="Pricing Tier" className="sm:col-span-2 lg:col-span-3">
-                        <Select
-                          value={item.tier_name || ''}
-                          onChange={(e) => handleTierSelect(item.key, e.target.value)}
-                        >
-                          {tiers.map((tier) => (
-                            <option key={tier.tier_name} value={tier.tier_name}>
-                              {tier.tier_label || tier.tier_name} — {formatCurrency(tier.price)}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormField>
-                      {showSizeClass && (
-                        <FormField label="Vehicle Size" className="lg:col-span-2">
-                          <Select
-                            value={selectedVehicleSizeClass || ''}
-                            onChange={(e) => handleItemSizeClassChange(item.key, e.target.value)}
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <div className="flex items-start gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-[22px] shrink-0"
+                      onClick={() => {
+                        setPickerItemKey(item.key);
+                        setPickerOpen(true);
+                      }}
+                    >
+                      <ShoppingBag className="h-4 w-4" />
+                      Browse Services
+                    </Button>
+                    <FormField
+                      label="Item Name"
+                      required
+                      error={errors[`item_${index}_name`]}
+                      className="flex-1"
+                    >
+                      <div className="relative">
+                        <Input
+                          value={item.item_name}
+                          onChange={(e) => updateItem(item.key, 'item_name', e.target.value)}
+                          placeholder="Custom item or browse services..."
+                          readOnly={!!item.service_id}
+                          className={item.service_id ? 'pr-8' : ''}
+                        />
+                        {item.service_id && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateItem(item.key, 'service_id', null);
+                              updateItem(item.key, 'item_name', '');
+                              updateItem(item.key, 'unit_price', 0);
+                              updateItem(item.key, 'tier_name', null);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            title="Clear service"
                           >
-                            <option value="">Select size...</option>
-                            <option value="sedan">{VEHICLE_SIZE_LABELS['sedan']}</option>
-                            <option value="truck_suv_2row">{VEHICLE_SIZE_LABELS['truck_suv_2row']}</option>
-                            <option value="suv_3row_van">{VEHICLE_SIZE_LABELS['suv_3row_van']}</option>
-                          </Select>
-                        </FormField>
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {item.tier_name && (
+                        <p className="mt-0.5 text-xs text-gray-500">{item.tier_name}</p>
                       )}
-                    </>
-                  );
-                })()}
+                    </FormField>
+                  </div>
+                </div>
 
                 <FormField label="Qty" className="lg:col-span-1">
                   <Input
@@ -1206,7 +1136,6 @@ export default function QuoteDetailPage() {
                     step={0.01}
                     value={item.unit_price || ''}
                     onChange={(e) => updateItem(item.key, 'unit_price', e.target.value === '' ? 0 : parseFloat(e.target.value))}
-                    readOnly={!!item.service_id}
                   />
                 </FormField>
 
@@ -1295,6 +1224,14 @@ export default function QuoteDetailPage() {
           Send Estimate
         </Button>
       </div>
+
+      {/* Service Picker Dialog */}
+      <ServicePickerDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handlePickerSelect}
+        vehicleSizeClass={selectedVehicleSizeClass}
+      />
 
       {/* Send Estimate Dialog */}
       <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
