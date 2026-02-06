@@ -196,14 +196,8 @@ export default function QuoteDetailPage() {
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
-      // Get loyalty points balance
-      const { data: loyaltyData } = await supabase
-        .from('loyalty_ledger')
-        .select('points')
-        .eq('customer_id', q.customer_id);
-
       const transactions = txData || [];
-      const loyaltyPoints = (loyaltyData || []).reduce((sum: number, row: { points: number | null }) => sum + (row.points || 0), 0);
+      const loyaltyPoints = (q.customer as Customer | null)?.loyalty_points_balance ?? 0;
       const lifetimeSpend = transactions.reduce((sum: number, tx: { total_amount: number | null }) => sum + (tx.total_amount || 0), 0);
 
       setCustomerStats({

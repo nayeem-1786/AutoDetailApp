@@ -21,7 +21,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Test Quotes Module
-**Last session:** 2026-02-06 — Added communication history, enhanced customer card, customer quotes tab, HTML emails, toast notifications
+**Last session:** 2026-02-06 — Fixed session expiry (admin + customer), replaced all hardcoded business info with database values (26 files)
 **Migrations:** All applied (including `quote_communications` table)
 
 **Quotes Test Checklist:**
@@ -70,7 +70,15 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 |---|--------|-------------|--------|
 | — | — | — | — |
 
-### Bugs Fixed (2026-02-06)
+### Bugs Fixed (2026-02-06 — Session 2)
+| # | Module | Description | Fix Summary |
+|---|--------|-------------|-------------|
+| 38 | Portal | Customer portal has zero session expiry protection | Added full 3-layer protection to `customer-auth-provider.tsx`: periodic `getUser()` validation (60s), window focus check, global fetch interceptor for 401s on `/account` routes. Redirects to `/signin?reason=session_expired`. |
+| 37 | Admin | Session periodic check uses cached `getSession()` — never detects expired tokens | Changed `getSession()` → `getUser()` in `auth-provider.tsx` validateSession. `getUser()` makes actual HTTP call to Supabase to verify token validity. |
+| 39 | Auth | Customer signin page doesn't show session expired message | Added `?reason=session_expired` query param handling with amber notification banner on signin page. |
+| 40 | All | Business name/phone/address hardcoded across 26 files | Created `useBusinessInfo()` hook for client components, converted all pages to use `getBusinessInfo()` or the hook. Removed `BUSINESS` object and `SITE_NAME` from constants.ts. SEO metadata functions now accept `businessName` parameter. |
+
+### Bugs Fixed (2026-02-06 — Session 1)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
 | 36 | Appointments | Calendar doesn't show appointments for today | Fixed date key normalization - `scheduled_date.split('T')[0]` handles both `2026-02-06` and `2026-02-06T00:00:00` formats. |
@@ -179,6 +187,7 @@ When testing each module, verify:
 - Email: Mailgun | SMS: Twilio | Payments: Stripe | Workflows: N8N
 - All admin pages use `'use client'` behind auth; public pages use Server Components for SEO
 - **POS Auth:** HMAC-SHA256 token in `sessionStorage` (`pos_session` key), validated via `X-POS-Session` header. Token utilities in `src/lib/pos/session.ts`, API helper in `src/lib/pos/api-auth.ts`, React context in `src/app/pos/context/pos-auth-context.tsx`, fetch wrapper in `src/app/pos/lib/pos-fetch.ts`
+- **Session Expiry Protection (3-layer):** Both admin (`auth-provider.tsx`) and customer (`customer-auth-provider.tsx`) use: (1) periodic `getUser()` validation every 60s, (2) window focus revalidation, (3) global `window.fetch` interceptor catching 401s. Admin redirects to `/login?reason=session_expired`, customer to `/signin?reason=session_expired`. **CRITICAL:** Use `getUser()` (server-validated) NOT `getSession()` (cached) for session checks.
 - **POS API routes** use `authenticatePosRequest()` + `createAdminClient()` (service role). Admin routes still use cookie-based `createClient()` + `supabase.auth.getUser()`
 - **POS components** use `usePosAuth()` from `pos-auth-context` and `posFetch()` for all API calls. Admin components use `useAuth()` from `auth-provider` unchanged
 
@@ -307,11 +316,14 @@ When testing each module, verify:
 - **Testing:** Use ngrok (`~/bin/ngrok http 3000`) to test from external locations
 - See `docs/POS_SECURITY.md` for full documentation
 
-### Dynamic Business Info
-- Business phone/email/address now fetched from database instead of hardcoded constants
-- API at `/api/public/business-info` for client components
-- Server components use `getBusinessInfo()` from `src/lib/data/business.ts`
-- Customer-facing pages (account shell, appointment dialogs) pull from Settings > Business Profile
+### Dynamic Business Info (Fully Enforced)
+- **ALL** business name/phone/address/email references now come from database — zero hardcoded values remain
+- **Server components:** `getBusinessInfo()` from `src/lib/data/business.ts` (React.cache wrapped)
+- **Client components:** `useBusinessInfo()` hook from `src/lib/hooks/use-business-info.ts` (fetches from `/api/public/business-info` with module-level cache)
+- **SEO metadata:** All `generateMetadata()` functions fetch business name from DB. SEO utility functions (`metadata.ts`, `json-ld.ts`) accept `businessName` parameter instead of reading constants.
+- **Email sender:** `email.ts` fetches business name for Mailgun `from` field
+- **Affected files (26 total):** Login pages, signup, admin shell sidebar, POS login, email.ts, quote pages, campaign routes, campaign wizard, receipt template, all public pages metadata, SEO utilities, constants.ts
+- **Removed from constants.ts:** `BUSINESS` object, `SITE_NAME` — these must NEVER be re-added
 
 ### Twilio SMS Configuration
 - Supabase Phone Auth configured with Twilio

@@ -113,8 +113,10 @@ export async function POST(request: NextRequest) {
     const taxAmount = Math.round(taxableAmount * TAX_RATE * 100) / 100;
     const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
 
-    // Generate access token for public quote link
-    const accessToken = crypto.randomUUID();
+    // Generate short access token for public quote link (6 chars, 56.8B combos)
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(6));
+    const accessToken = Array.from(bytes, (b) => chars[b % chars.length]).join('');
 
     // Insert quote
     const { data: quote, error: quoteError } = await supabase
