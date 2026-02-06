@@ -21,7 +21,18 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Test Appointments Module
-**Migrations:** Booking payment columns now applied (`payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount`)
+**Last session:** 2026-02-06 — Online Booking payment flow fully tested and working
+**Migrations:** All applied (`payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount`)
+
+**Appointments Test Checklist:**
+- [ ] Calendar view loads with correct appointments
+- [ ] Create new appointment (admin-side)
+- [ ] Edit appointment (date/time/services/vehicle)
+- [ ] Cancel appointment with confirmation
+- [ ] Status changes (pending → confirmed → completed)
+- [ ] Reschedule flow
+- [ ] Email/SMS notifications sent correctly
+- [ ] Mobile responsive layout
 
 **Completed Tests (Online Booking):**
 - [x] Portal booking hides "Your Info" card for signed-in users
