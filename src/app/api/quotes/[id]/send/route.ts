@@ -57,14 +57,19 @@ export async function POST(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const quoteLink = `${appUrl}/quote/${quote.access_token}`;
 
-    // Update status to 'sent' and set sent_at
+    // Update sent_at (and status to 'sent' only if currently draft)
+    // For resends (sent/viewed/accepted), keep the current status
+    const updatePayload: Record<string, unknown> = {
+      sent_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (quote.status === 'draft') {
+      updatePayload.status = 'sent';
+    }
+
     const { data: updated, error: updateErr } = await supabase
       .from('quotes')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select('*')
       .single();

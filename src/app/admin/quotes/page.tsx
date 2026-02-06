@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Quote, QuoteStatus } from '@/lib/supabase/types';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format';
 import { QUOTE_STATUS_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -204,6 +204,17 @@ export default function QuotesPage() {
       cell: ({ row }) => (
         <span className="text-sm text-gray-500">{formatDate(row.original.created_at)}</span>
       ),
+    },
+    {
+      id: 'last_contacted',
+      header: 'Last Contacted',
+      cell: ({ row }) => {
+        const sentAt = row.original.sent_at;
+        if (!sentAt) return <span className="text-sm text-gray-400">--</span>;
+        return (
+          <span className="text-sm text-gray-500">{formatDateTime(sentAt)}</span>
+        );
+      },
     },
     {
       id: 'actions',

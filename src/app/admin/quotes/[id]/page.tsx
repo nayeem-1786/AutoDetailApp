@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Quote, QuoteItem, QuoteStatus, Customer, Vehicle, Service, ServicePricing } from '@/lib/supabase/types';
-import { formatCurrency, formatDate, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatDateTime, formatPhone } from '@/lib/utils/format';
 import { TAX_RATE, QUOTE_STATUS_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -578,12 +578,12 @@ export default function QuoteDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Details */}
+        {/* Details & Communication */}
         <Card>
           <CardHeader>
             <CardTitle>Details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-500">Created:</span>{' '}
@@ -593,12 +593,6 @@ export default function QuoteDetailPage() {
                 <div>
                   <span className="text-gray-500">Valid Until:</span>{' '}
                   <span className="text-gray-900">{formatDate(quote.valid_until)}</span>
-                </div>
-              )}
-              {quote.sent_at && (
-                <div>
-                  <span className="text-gray-500">Sent:</span>{' '}
-                  <span className="text-gray-900">{formatDate(quote.sent_at)}</span>
                 </div>
               )}
               {quote.viewed_at && (
@@ -615,11 +609,33 @@ export default function QuoteDetailPage() {
               )}
             </div>
             {quote.notes && (
-              <div className="mt-3">
+              <div>
                 <span className="text-sm text-gray-500">Notes:</span>
                 <p className="mt-1 text-sm text-gray-700">{quote.notes}</p>
               </div>
             )}
+
+            {/* Last Contacted & Resend */}
+            <div className="border-t border-gray-200 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Last Contacted</p>
+                  {quote.sent_at ? (
+                    <p className="text-sm text-gray-500">{formatDateTime(quote.sent_at)}</p>
+                  ) : (
+                    <p className="text-sm text-gray-400">Never sent</p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSendDialog(true)}
+                >
+                  <Send className="h-4 w-4" />
+                  {quote.sent_at ? 'Resend' : 'Send'}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -660,6 +676,76 @@ export default function QuoteDetailPage() {
             <Button onClick={handleConvert} disabled={converting || !convertDate || !convertTime}>
               {converting ? <Spinner size="sm" /> : <ArrowRightCircle className="h-4 w-4" />}
               Create Appointment
+            </Button>
+          </DialogFooter>
+        </Dialog>
+
+        {/* Send/Resend Estimate Dialog */}
+        <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+          <DialogHeader>
+            <DialogTitle>{quote.sent_at ? 'Resend Estimate' : 'Send Estimate'}</DialogTitle>
+          </DialogHeader>
+          <DialogContent className="space-y-4">
+            <p className="text-sm text-gray-600">
+              How would you like to send this estimate to{' '}
+              <span className="font-medium">{quote.customer?.first_name} {quote.customer?.last_name}</span>?
+            </p>
+            <div className="space-y-2">
+              <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="sendMethod"
+                  value="email"
+                  checked={sendMethod === 'email'}
+                  onChange={() => setSendMethod('email')}
+                />
+                <Mail className="h-5 w-5 text-gray-500" />
+                <div>
+                  <div className="text-sm font-medium">Email</div>
+                  <div className="text-xs text-gray-500">
+                    {quote.customer?.email || 'No email on file'}
+                  </div>
+                </div>
+              </label>
+              <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="sendMethod"
+                  value="sms"
+                  checked={sendMethod === 'sms'}
+                  onChange={() => setSendMethod('sms')}
+                />
+                <MessageSquare className="h-5 w-5 text-gray-500" />
+                <div>
+                  <div className="text-sm font-medium">SMS (with PDF)</div>
+                  <div className="text-xs text-gray-500">
+                    {quote.customer?.phone || 'No phone on file'}
+                  </div>
+                </div>
+              </label>
+              <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="sendMethod"
+                  value="both"
+                  checked={sendMethod === 'both'}
+                  onChange={() => setSendMethod('both')}
+                />
+                <Send className="h-5 w-5 text-gray-500" />
+                <div>
+                  <div className="text-sm font-medium">Both Email & SMS</div>
+                  <div className="text-xs text-gray-500">Send via all available channels</div>
+                </div>
+              </label>
+            </div>
+          </DialogContent>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={sending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSend} disabled={sending}>
+              {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
+              {quote.sent_at ? 'Resend' : 'Send'}
             </Button>
           </DialogFooter>
         </Dialog>
