@@ -46,6 +46,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Bugs Fixed (2026-02-05)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
+| 18 | Portal | Customer dashboard coupons not displaying | `/api/customer/coupons` was filtering `.eq('customer_id', customer.id)` which only matched coupons assigned to specific customers. Fixed to use `.or('customer_id.eq.X,customer_id.is.null')` to include global coupons (NULL = anyone). Also added tag-based filtering for coupons with `customer_tags` requirements. |
 | 1 | POS | Stripe Terminal WisePOS E "No established connection" | Added `collectInProgress` flag + `isProcessingRef` guard for React 18 Strict Mode |
 | 2 | Booking | No fallback when no bookable detailers exist | Added fallback to super_admin (Nayeem) if no detailers found |
 | 3 | Booking | Paid online bookings start as "pending" | Auto-confirm paid bookings (payment_intent_id exists → status = 'confirmed') |
