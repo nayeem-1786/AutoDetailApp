@@ -12,7 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, Plus, X, Info } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ArrowLeft, ArrowRight, Plus, X, Info, AlertTriangle } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -289,6 +290,10 @@ export default function NewCouponPage() {
   const [step, setStep] = useState<Step>('basics');
   const [draftLoaded, setDraftLoaded] = useState(!editId); // true if no draft to load
 
+  // Usage tracking (for warning when editing used coupons)
+  const [useCount, setUseCount] = useState(0);
+  const [showUsageWarning, setShowUsageWarning] = useState(false);
+
   // Reference data
   const [products, setProducts] = useState<{ id: string; name: string; sku: string | null; category_id: string | null; vendor: { name: string } | null }[]>([]);
   const [services, setServices] = useState<{ id: string; name: string; category_id: string | null }[]>([]);
@@ -408,6 +413,7 @@ export default function NewCouponPage() {
         }
         const { data: c } = await res.json();
         setCouponId(c.id);
+        setUseCount(c.use_count || 0);
         setName(c.name || '');
         if (c.code) {
           setCode(c.code);
@@ -855,7 +861,7 @@ export default function NewCouponPage() {
   // Submit (activate the coupon)
   // -------------------------------------------------------------------------
 
-  async function handleCreate() {
+  async function handleCreate(forceUpdate = false) {
     if (!name.trim()) {
       toast.error('Name is required');
       return;
@@ -870,6 +876,12 @@ export default function NewCouponPage() {
     }
     if (expiresAt && new Date(expiresAt) < new Date()) {
       toast.error('Expiration date is in the past — update it or clear it before saving');
+      return;
+    }
+
+    // Warn if editing a coupon that has been used
+    if (editId && useCount > 0 && !forceUpdate) {
+      setShowUsageWarning(true);
       return;
     }
 
@@ -908,6 +920,35 @@ export default function NewCouponPage() {
 
       toast.success(`Coupon ${resultData.code} ${editId ? 'updated' : 'created'}`);
       router.push(`/admin/marketing/coupons/${resultData.id}`);
+    } catch {
+      toast.error('Failed to create coupon');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  // Create as new coupon (duplicate with new ID)
+  async function handleCreateAsNew() {
+    setShowUsageWarning(false);
+    setCreating(true);
+    try {
+      const payload = buildPayload();
+      // Force a new code if not auto-generating
+      if (!autoGenerate) {
+        payload.code = code + '-NEW';
+      }
+      const res = await fetch('/api/marketing/coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error || 'Failed to create coupon');
+        return;
+      }
+      toast.success(`New coupon ${result.data.code} created`);
+      router.push(`/admin/marketing/coupons/${result.data.id}`);
     } catch {
       toast.error('Failed to create coupon');
     } finally {
@@ -2112,7 +2153,7 @@ export default function NewCouponPage() {
               <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={handleCreate} disabled={creating}>
+            <Button onClick={() => handleCreate()} disabled={creating}>
               {creating
                 ? (editId ? 'Updating...' : 'Creating...')
                 : (editId ? 'Update Coupon' : 'Create Coupon')}
@@ -2120,6 +2161,57 @@ export default function NewCouponPage() {
           )}
         </div>
       </div>
+
+      {/* Usage Warning Dialog */}
+      {showUsageWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setShowUsageWarning(false)} />
+          <div className="relative z-50 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">Coupon Has Been Used</h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  This coupon has been used <strong>{useCount} time{useCount !== 1 ? 's' : ''}</strong> in transactions.
+                  Editing it will affect:
+                </p>
+                <ul className="mt-2 list-inside list-disc text-sm text-gray-600">
+                  <li>Single-use checks (customers who used it can&apos;t use it again)</li>
+                  <li>Usage analytics may become misleading</li>
+                  <li>Historical transaction records reference this coupon</li>
+                </ul>
+                <p className="mt-3 text-sm font-medium text-gray-700">
+                  We recommend creating a new coupon instead.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowUsageWarning(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => { setShowUsageWarning(false); handleCreate(true); }}
+                className="w-full sm:w-auto"
+              >
+                Update Anyway
+              </Button>
+              <Button
+                onClick={handleCreateAsNew}
+                className="w-full sm:w-auto"
+              >
+                Create as New Coupon
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -46,6 +46,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Bugs Fixed (2026-02-05)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
+| 20 | Coupons | Editing used coupon doesn't warn about side effects | Added warning dialog when editing a coupon with `use_count > 0`. Shows usage stats and explains that single-use checks will still apply. Options: Cancel, Update Anyway, or Create as New Coupon. |
 | 19 | Admin | Session expiry shows empty pages instead of redirecting to login | Created `adminFetch()` wrapper that handles 401 responses by redirecting to `/login?reason=session_expired`. Updated coupons page to use it. Login page now shows "Your session has expired" message when redirected. |
 | 18 | Portal | Customer dashboard coupons not displaying | `/api/customer/coupons` was filtering `.eq('customer_id', customer.id)` which only matched coupons assigned to specific customers. Fixed to use `.or('customer_id.eq.X,customer_id.is.null')` to include global coupons (NULL = anyone). Also added tag-based filtering for coupons with `customer_tags` requirements. |
 | 1 | POS | Stripe Terminal WisePOS E "No established connection" | Added `collectInProgress` flag + `isProcessingRef` guard for React 18 Strict Mode |

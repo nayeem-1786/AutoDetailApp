@@ -138,14 +138,16 @@ export async function POST(request: NextRequest) {
     if (coupon.is_single_use && customer_id) {
       const { data: existingUse } = await supabase
         .from('transactions')
-        .select('id')
+        .select('id, created_at')
         .eq('coupon_id', coupon.id)
         .eq('customer_id', customer_id)
+        .order('created_at', { ascending: false })
         .limit(1);
 
       if (existingUse && existingUse.length > 0) {
+        const usedDate = new Date(existingUse[0].created_at).toLocaleDateString();
         return NextResponse.json(
-          { error: 'You have already used this coupon' },
+          { error: `This customer already used this coupon on ${usedDate}` },
           { status: 400 }
         );
       }
