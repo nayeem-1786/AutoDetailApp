@@ -224,6 +224,8 @@ export async function POST(request: NextRequest) {
 
     // 8. Check conditions
     const conditions: boolean[] = [];
+    const serviceItems = services || [];
+    const serviceIds = serviceItems.map((s) => s.service_id);
 
     // Check min_purchase
     if (coupon.min_purchase != null) {
@@ -235,14 +237,36 @@ export async function POST(request: NextRequest) {
       conditions.push(visitCount <= coupon.max_customer_visits);
     }
 
-    // Check service requirements
-    const serviceItems = services || [];
+    // Check service requirements (requires_service_ids)
     if (coupon.requires_service_ids && coupon.requires_service_ids.length > 0) {
       conditions.push(
-        serviceItems.some(
-          (item) => coupon.requires_service_ids.includes(item.service_id)
+        serviceItems.some((item) =>
+          coupon.requires_service_ids.includes(item.service_id)
         )
       );
+    }
+
+    // Check service category requirements (requires_service_category_ids)
+    let serviceCategoryMatch = true;
+    if (
+      coupon.requires_service_category_ids &&
+      coupon.requires_service_category_ids.length > 0
+    ) {
+      // Get categories for the selected services
+      const { data: servicesWithCategories } = await supabase
+        .from('services')
+        .select('id, category_id')
+        .in('id', serviceIds);
+
+      const customerServiceCategoryIds =
+        servicesWithCategories
+          ?.map((s: { category_id: string | null }) => s.category_id)
+          .filter(Boolean) || [];
+
+      serviceCategoryMatch = coupon.requires_service_category_ids.some(
+        (catId: string) => customerServiceCategoryIds.includes(catId)
+      );
+      conditions.push(serviceCategoryMatch);
     }
 
     if (conditions.length > 0) {
@@ -285,16 +309,39 @@ export async function POST(request: NextRequest) {
             .in('id', coupon.requires_service_ids);
           const names = svcs?.map((s: { name: string }) => s.name) || [];
           if (names.length > 1) {
-            failedParts.push(`purchase of one of: ${names.join(', ')}`);
+            failedParts.push(`one of these services: ${names.join(', ')}`);
           } else {
-            failedParts.push(`purchase of ${names[0] || 'a specific service'}`);
+            failedParts.push(`the "${names[0] || 'required'}" service`);
           }
         }
 
-        const joiner = (coupon.condition_logic || 'and') === 'and' ? ' and ' : ' or ';
+        if (
+          coupon.requires_service_category_ids &&
+          coupon.requires_service_category_ids.length > 0 &&
+          !serviceCategoryMatch
+        ) {
+          const { data: cats } = await supabase
+            .from('service_categories')
+            .select('name')
+            .in('id', coupon.requires_service_category_ids);
+          const catNames =
+            cats?.map((c: { name: string }) => c.name) || [];
+          if (catNames.length > 1) {
+            failedParts.push(
+              `a service from one of these categories: ${catNames.join(', ')}`
+            );
+          } else {
+            failedParts.push(
+              `a service from the "${catNames[0] || 'required'}" category`
+            );
+          }
+        }
+
+        const joiner =
+          (coupon.condition_logic || 'and') === 'and' ? ' and ' : ' or ';
         return NextResponse.json(
           {
-            error: `Coupon requires ${failedParts.join(joiner)}`,
+            error: `This coupon does not apply to your selected services. It requires ${failedParts.join(joiner)}.`,
           },
           { status: 400 }
         );
@@ -304,6 +351,7 @@ export async function POST(request: NextRequest) {
     // 9. Calculate discounts from coupon_rewards
     const rewards: CouponReward[] = coupon.coupon_rewards || [];
     const rewardResults: RewardResult[] = [];
+    const unmatchedTargetServices: string[] = [];
 
     for (const reward of rewards) {
       let discountAmount = 0;
@@ -321,11 +369,45 @@ export async function POST(request: NextRequest) {
           if (matchingService) {
             targetName = matchingService.name;
             discountAmount = calculateRewardDiscount(reward, matchingService.price);
+          } else {
+            // Track that this reward's target service isn't in the cart
+            unmatchedTargetServices.push(reward.target_service_id);
+          }
+        } else if (reward.target_service_category_id) {
+          // Check if any selected service is in the target category
+          const { data: servicesInCategory } = await supabase
+            .from('services')
+            .select('id, name')
+            .eq('category_id', reward.target_service_category_id)
+            .in('id', serviceIds);
+
+          if (servicesInCategory && servicesInCategory.length > 0) {
+            // Apply discount to matching services
+            const matchingPrices = serviceItems.filter((s) =>
+              servicesInCategory.some(
+                (svc: { id: string }) => svc.id === s.service_id
+              )
+            );
+            const totalMatchingPrice = matchingPrices.reduce(
+              (sum, s) => sum + s.price,
+              0
+            );
+            targetName =
+              matchingPrices.length === 1
+                ? matchingPrices[0].name
+                : 'Matching Services';
+            discountAmount = calculateRewardDiscount(reward, totalMatchingPrice);
+          } else {
+            // No services from target category in cart
+            unmatchedTargetServices.push(reward.target_service_category_id);
           }
         } else {
           // Applies to all services
           targetName = 'Services';
-          const totalServicePrice = serviceItems.reduce((sum, s) => sum + s.price, 0);
+          const totalServicePrice = serviceItems.reduce(
+            (sum, s) => sum + s.price,
+            0
+          );
           discountAmount = calculateRewardDiscount(reward, totalServicePrice);
         }
       }
@@ -339,6 +421,61 @@ export async function POST(request: NextRequest) {
           target_name: targetName,
           discount_amount: discountAmount,
         });
+      }
+    }
+
+    // If ALL rewards targeted specific services/categories and NONE matched,
+    // the coupon doesn't apply to the selected services
+    if (rewards.length > 0 && rewardResults.length === 0) {
+      // Get names of services the coupon targets
+      const targetServiceIds = rewards
+        .filter((r) => r.target_service_id)
+        .map((r) => r.target_service_id);
+      const targetCategoryIds = rewards
+        .filter((r) => r.target_service_category_id)
+        .map((r) => r.target_service_category_id);
+
+      const errorParts: string[] = [];
+
+      if (targetServiceIds.length > 0) {
+        const { data: targetServices } = await supabase
+          .from('services')
+          .select('name')
+          .in('id', targetServiceIds.filter(Boolean) as string[]);
+        const serviceNames =
+          targetServices?.map((s: { name: string }) => s.name) || [];
+        if (serviceNames.length > 0) {
+          errorParts.push(
+            serviceNames.length === 1
+              ? `the "${serviceNames[0]}" service`
+              : `one of these services: ${serviceNames.join(', ')}`
+          );
+        }
+      }
+
+      if (targetCategoryIds.length > 0) {
+        const { data: targetCategories } = await supabase
+          .from('service_categories')
+          .select('name')
+          .in('id', targetCategoryIds.filter(Boolean) as string[]);
+        const catNames =
+          targetCategories?.map((c: { name: string }) => c.name) || [];
+        if (catNames.length > 0) {
+          errorParts.push(
+            catNames.length === 1
+              ? `a service from the "${catNames[0]}" category`
+              : `a service from one of these categories: ${catNames.join(', ')}`
+          );
+        }
+      }
+
+      if (errorParts.length > 0) {
+        return NextResponse.json(
+          {
+            error: `This coupon only applies to ${errorParts.join(' or ')}. Please select an eligible service to use this coupon.`,
+          },
+          { status: 400 }
+        );
       }
     }
 

@@ -212,6 +212,8 @@ export function BookingWizard({
           body: JSON.stringify({
             phone: customer.phone,
             email: customer.email,
+            service_id: state.service?.id,
+            addon_ids: state.addons?.map((a) => a.service_id) || [],
           }),
         });
 

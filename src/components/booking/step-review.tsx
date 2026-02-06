@@ -23,6 +23,8 @@ interface AvailableCoupon {
     discount_value: number;
     max_discount: number | null;
   }[];
+  is_eligible?: boolean;
+  ineligibility_reason?: string | null;
 }
 
 interface AppliedCoupon {
@@ -371,28 +373,46 @@ export function StepReview({
               <div className="space-y-2">
                 {availableCoupons.map((coupon) => {
                   const details = getCouponDetails(coupon);
+                  const isEligible = coupon.is_eligible !== false; // Default to eligible if not specified
                   return (
                     <div
                       key={coupon.id}
-                      className="rounded-lg border border-dashed border-purple-200 bg-purple-50/50 p-3"
+                      className={`rounded-lg border border-dashed p-3 ${
+                        isEligible
+                          ? 'border-purple-200 bg-purple-50/50'
+                          : 'border-gray-200 bg-gray-50/50 opacity-75'
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <Tag className="h-4 w-4 flex-shrink-0 text-purple-500" />
-                            <span className="font-mono text-sm font-bold text-gray-900">
+                            <Tag className={`h-4 w-4 flex-shrink-0 ${isEligible ? 'text-purple-500' : 'text-gray-400'}`} />
+                            <span className={`font-mono text-sm font-bold ${isEligible ? 'text-gray-900' : 'text-gray-500'}`}>
                               {coupon.code}
                             </span>
+                            {!isEligible && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200">
+                                Not applicable
+                              </Badge>
+                            )}
                           </div>
                           {coupon.name && (
-                            <p className="mt-0.5 text-sm text-gray-700">{coupon.name}</p>
+                            <p className={`mt-0.5 text-sm ${isEligible ? 'text-gray-700' : 'text-gray-500'}`}>{coupon.name}</p>
+                          )}
+
+                          {/* Ineligibility reason */}
+                          {!isEligible && coupon.ineligibility_reason && (
+                            <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              {coupon.ineligibility_reason}
+                            </p>
                           )}
 
                           {/* Detailed description */}
                           <ul className="mt-2 space-y-0.5">
                             {details.map((detail, i) => (
-                              <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                                <span className="text-purple-400 mt-0.5">•</span>
+                              <li key={i} className={`text-xs flex items-start gap-1.5 ${isEligible ? 'text-gray-600' : 'text-gray-400'}`}>
+                                <span className={`mt-0.5 ${isEligible ? 'text-purple-400' : 'text-gray-300'}`}>•</span>
                                 {detail}
                               </li>
                             ))}
@@ -403,10 +423,11 @@ export function StepReview({
                           variant="outline"
                           size="sm"
                           onClick={() => handleApplyCoupon(coupon.code)}
-                          disabled={couponLoading}
+                          disabled={couponLoading || !isEligible}
                           className="flex-shrink-0"
+                          title={!isEligible ? coupon.ineligibility_reason || 'Not applicable to selected services' : undefined}
                         >
-                          {couponLoading ? <Spinner size="sm" /> : 'Apply'}
+                          {couponLoading ? <Spinner size="sm" /> : isEligible ? 'Apply' : 'N/A'}
                         </Button>
                       </div>
                     </div>
