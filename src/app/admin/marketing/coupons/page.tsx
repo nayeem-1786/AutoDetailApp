@@ -16,6 +16,7 @@ import { Info, Plus, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 
 function discountSummary(coupon: Coupon): string {
   const rewards = (coupon as any).coupon_rewards || coupon.rewards || [];
@@ -42,7 +43,7 @@ export default function CouponsListPage() {
   async function toggleAutoApply(coupon: Coupon) {
     setTogglingAutoId(coupon.id);
     try {
-      const res = await fetch(`/api/marketing/coupons/${coupon.id}`, {
+      const res = await adminFetch(`/api/marketing/coupons/${coupon.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ auto_apply: !coupon.auto_apply }),
@@ -66,7 +67,7 @@ export default function CouponsListPage() {
     const newStatus = coupon.status === 'active' ? 'disabled' : 'active';
     setTogglingId(coupon.id);
     try {
-      const res = await fetch(`/api/marketing/coupons/${coupon.id}`, {
+      const res = await adminFetch(`/api/marketing/coupons/${coupon.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -90,7 +91,7 @@ export default function CouponsListPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/marketing/coupons/${deleteTarget.id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/marketing/coupons/${deleteTarget.id}`, { method: 'DELETE' });
       if (res.ok) {
         setCoupons((prev) => prev.filter((c) => c.id !== deleteTarget.id));
         toast.success('Coupon deleted');
@@ -110,13 +111,17 @@ export default function CouponsListPage() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch('/api/marketing/coupons?limit=1000');
+        const res = await adminFetch('/api/marketing/coupons?limit=1000');
+        const json = await res.json();
         if (res.ok) {
-          const { data } = await res.json();
-          if (data) setCoupons(data);
+          if (json.data) setCoupons(json.data);
+        } else {
+          console.error('Failed to load coupons:', res.status, json);
+          toast.error(`Failed to load coupons: ${json.error || res.statusText}`);
         }
       } catch (err) {
         console.error('Failed to load coupons:', err);
+        toast.error('Failed to load coupons');
       }
       setLoading(false);
     }

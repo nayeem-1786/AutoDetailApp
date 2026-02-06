@@ -46,6 +46,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Bugs Fixed (2026-02-05)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
+| 19 | Admin | Session expiry shows empty pages instead of redirecting to login | Created `adminFetch()` wrapper that handles 401 responses by redirecting to `/login?reason=session_expired`. Updated coupons page to use it. Login page now shows "Your session has expired" message when redirected. |
 | 18 | Portal | Customer dashboard coupons not displaying | `/api/customer/coupons` was filtering `.eq('customer_id', customer.id)` which only matched coupons assigned to specific customers. Fixed to use `.or('customer_id.eq.X,customer_id.is.null')` to include global coupons (NULL = anyone). Also added tag-based filtering for coupons with `customer_tags` requirements. |
 | 1 | POS | Stripe Terminal WisePOS E "No established connection" | Added `collectInProgress` flag + `isProcessingRef` guard for React 18 Strict Mode |
 | 2 | Booking | No fallback when no bookable detailers exist | Added fallback to super_admin (Nayeem) if no detailers found |
@@ -69,6 +70,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | # | Module | Description | Workaround |
 |---|--------|-------------|------------|
 | 1 | Admin | Other admin pages (39 total) use direct `createClient()` queries which could fail if RLS `is_employee()` check doesn't evaluate correctly | RLS policies use `is_employee()` which SHOULD work for logged-in staff. If any admin page shows empty data, fix by: 1) Create/update API route to use `createAdminClient()` after auth check, 2) Update page to fetch via API. Already fixed: coupons, campaigns. Monitor other pages. |
+| 2 | Admin | Session expiry handling not implemented on all pages | Only coupons page uses `adminFetch()` wrapper. Other admin pages still use regular `fetch()` and will show empty data on session expiry. Incrementally update pages to use `adminFetch()` from `@/lib/utils/admin-fetch`. |
 
 ### Test Checklist Template
 When testing each module, verify:
