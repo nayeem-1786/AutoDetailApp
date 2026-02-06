@@ -15,7 +15,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 |-----|--------|-------|
 | Online Booking | ✅ Done | Payment flow tested with coupons, loyalty points, edge cases |
 | Appointments | 🔄 In Progress | Cancel flow fixed, calendar date key fixed, status dropdown fixed |
-| Quotes | ⏳ Pending | CRUD, send email/SMS, PDF, public view, accept, convert |
+| Quotes | ⏳ Pending | CRUD, send email/SMS, PDF, public view, accept, convert, resend, last contacted |
 | Waitlist | ⏳ Pending | Join, auto-notify, admin management |
 | Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
@@ -232,6 +232,12 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Quotes Last Contacted & Resend (2026-02-06)
+- **Quotes list page:** Added "Last Contacted" column showing when quote was last sent
+- **Quote detail page:** Added "Last Contacted" section in Details card with date/time and Resend button
+- **Resend functionality:** Non-draft quotes can be resent (keeps current status, updates sent_at)
+- Send API modified to preserve status for resends (draft→sent, others keep current status)
 
 ### Admin Link Styling Unified (2026-02-06)
 - All clickable links in DataTables now use consistent styling: `text-blue-600 hover:text-blue-800 hover:underline`
