@@ -233,6 +233,12 @@ When testing each module, verify:
 
 ## Recent Updates
 
+### Admin Link Styling Unified (2026-02-06)
+- All clickable links in DataTables now use consistent styling: `text-blue-600 hover:text-blue-800 hover:underline`
+- Matches the Receipt # links in Customer History tab
+- Updated pages: Coupons, Campaigns, Automations, Quotes, Transactions, Customers, Products, Services, Staff
+- Transactions page: Customer and Employee names now link to their respective profiles
+
 ### Staff Scheduling Refactor (2026-02-06)
 - **Schedule on Staff Profile:** Weekly schedule moved from `/admin/appointments/scheduling` to individual staff profile pages (`/admin/staff/[id]` → Schedule tab). Only shows for bookable employees.
 - **Blocked Dates on Staff Profile:** Individual employee time off (vacation, sick days) now managed on their profile in the "Time Off / Blocked Dates" section.

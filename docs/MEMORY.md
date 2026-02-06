@@ -31,6 +31,11 @@
 - `/api/book/payment-intent` - Stripe payment intent for booking
 - `/api/book/validate-coupon` - Validates coupon for booking services
 
+### UI Styling Patterns
+- **Clickable links in DataTables**: `text-blue-600 hover:text-blue-800 hover:underline`
+- Reference: Customer History tab Receipt # links in `src/app/admin/customers/[id]/page.tsx`
+- Applied to all admin list pages: Coupons, Campaigns, Automations, Quotes, Transactions, Customers, Products, Services, Staff
+
 ### Key Files
 - `src/lib/supabase/admin.ts` - Service role client (bypasses RLS)
 - `src/lib/supabase/server.ts` - Cookie-based auth client
