@@ -29,14 +29,17 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - [x] Coupon eligibility shows for service-restricted coupons
 - [x] Ineligible coupons display with reason and disabled Apply button
 - [x] Payment step simplified (security badges + Powered by Stripe only)
+- [x] 100% discount coupons skip payment step (shows "Complete Booking" button)
+- [x] Coupon single-use validation shows date when coupon was used
+- [x] Coupon wizard validates duplicate codes before next step
+- [x] Coupon wizard warns when editing a coupon with usage history
 
 **Still Need to Test:**
-1. **End-to-end payment flow:** Complete a booking with Stripe payment
+1. **End-to-end payment flow:** Complete a booking with Stripe payment (partial discount)
 2. **Payment thresholds:** Under $100 = full payment, $100+ = deposit option
 3. **Pay on Site:** Existing customers can skip payment step
-4. **Coupon + loyalty combined:** Apply both discounts together
-5. **Database verification:** Check `payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount` columns populated
-6. **Guest booking flow:** New customer path with mandatory deposit
+4. **Database verification:** Check `payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount` columns populated
+5. **Guest booking flow:** New customer path with mandatory deposit
 
 ### Bugs Found (Pending)
 | # | Module | Description | Status |
@@ -46,6 +49,9 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Bugs Fixed (2026-02-05)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
+| 25 | Booking | Payment fails when coupon covers full amount | Booking wizard now handles $0 totals - shows "Your discounts cover the full amount" message with "Complete Booking" button instead of trying to initialize Stripe payment. |
+| 24 | Coupons | Delete coupon only disables instead of deleting | DELETE endpoint was soft-deleting (setting status to 'disabled'). Changed to actually delete coupon_rewards first, then delete the coupon. |
+| 23 | Coupons | Single-use error message unclear | Changed "You have already used this coupon" to "This customer already used this coupon on [date]" with the actual usage date shown. |
 | 21 | Coupons | Customer search doesn't work in coupon wizard | Wizard was using POS endpoint (`/api/pos/customers/search`) which requires POS auth. Created new admin endpoint `/api/admin/customers/search` that searches by name or phone with admin auth. |
 | 22 | Coupons | Duplicate coupon code not validated before next step | Added validation in `goNext()` on basics step - checks if code already exists (excluding current coupon). Shows inline error and toast. Prevents navigation until fixed. |
 | 20 | Coupons | Editing used coupon doesn't warn about side effects | Added warning dialog when editing a coupon with `use_count > 0`. Shows usage stats and explains that single-use checks will still apply. Options: Cancel, Update Anyway, or Create as New Coupon. |
