@@ -4,6 +4,55 @@
 Smart Details Auto Spa — custom POS, booking, portal, and admin system replacing Square.
 Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `docs/COUPONS.md`, `docs/DASHBOARD_RULES.md`, `docs/DATA_MIGRATION_RULES.md`, `docs/SERVICE_CATALOG.md`, `docs/iPAD.md`, `docs/POS_SECURITY.md`
 
+---
+
+## 🔴 ACTIVE WORK — Phase 3 Testing & Bug Fixes
+
+**Strategy:** Test each module thoroughly, fix bugs before moving to next phase.
+
+### Testing Queue (Admin Tabs)
+| Tab | Status | Notes |
+|-----|--------|-------|
+| Online Booking | 🔄 Next | **TEST PAYMENT FLOW** - verify feature flag, Stripe payment step, auto-confirm |
+| Appointments | ⏳ Pending | Calendar, scheduling, status changes, cancel flow |
+| Quotes | ⏳ Pending | CRUD, send email/SMS, PDF, public view, accept, convert |
+| Waitlist | ⏳ Pending | Join, auto-notify, admin management |
+| Staff Scheduling | ⏳ Pending | Weekly schedules, blocked dates |
+| 11 Labs API | ⏳ Pending | All 6 endpoints |
+
+### 🧪 NEXT SESSION: Test Online Booking Payment
+1. **Check feature flag:** `SELECT * FROM feature_flags WHERE key = 'online_booking_payment';` — ensure `enabled = true`
+2. **Test booking flow:** Go to `/book`, complete booking, verify payment step appears
+3. **Verify auto-confirm:** After payment, appointment status should be `confirmed` not `pending`
+4. **Verify detailer assignment:** Check appointment has detailer assigned (or Nayeem as fallback)
+
+### Bugs Found (Pending)
+| # | Module | Description | Status |
+|---|--------|-------------|--------|
+| — | — | — | — |
+
+### Bugs Fixed (2026-02-05)
+| # | Module | Description | Fix Summary |
+|---|--------|-------------|-------------|
+| 1 | POS | Stripe Terminal WisePOS E "No established connection" | Added `collectInProgress` flag + `isProcessingRef` guard for React 18 Strict Mode |
+| 2 | Booking | No fallback when no bookable detailers exist | Added fallback to super_admin (Nayeem) if no detailers found |
+| 3 | Booking | Paid online bookings start as "pending" | Auto-confirm paid bookings (payment_intent_id exists → status = 'confirmed') |
+| 4 | Booking | Payment step never integrated into wizard | Integrated StepPayment into BookingWizard as step 6, controlled by `online_booking_payment` feature flag |
+
+### Test Checklist Template
+When testing each module, verify:
+- [ ] List view loads correctly
+- [ ] Create new item works
+- [ ] Edit existing item works
+- [ ] Delete/cancel works with confirmation
+- [ ] Status changes work
+- [ ] Related data updates (e.g., customer, vehicle)
+- [ ] Email/SMS sends correctly (where applicable)
+- [ ] Error states handled gracefully
+- [ ] Mobile/responsive layout works
+
+---
+
 ## Current Status
 - **Phases 1–4:** Complete (Foundation, POS, Booking/Quotes/11Labs, Customer Portal)
 - **Phase 5 (Marketing, Coupons & Campaigns):** In progress — partially built
@@ -63,9 +112,10 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - [x] Delete customer with double confirmation
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
+- [ ] POS session caching bug — multiple browser tabs cause stale session state; expired session still shows POS screen after hard refresh; investigate sessionStorage sync across tabs
 
 ## Next Priority Tasks
-- [ ] Setup Stripe handheld device (card reader) for testing with POS transactions
+- [x] **FIXED: Stripe Terminal WisePOS E connection** — Race condition in `collectPaymentMethod` caused by React 18 Strict Mode double-mounting. Fixed by adding `collectInProgress` state tracking in `stripe-terminal.ts` and `isProcessingRef` guard in `card-payment.tsx`.
 - [ ] Setup receipt printer integration for POS
 
 ## Customer Portal Redesign
