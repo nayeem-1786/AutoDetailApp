@@ -1,4 +1,4 @@
-import { SITE_URL, SITE_NAME } from '@/lib/utils/constants';
+import { SITE_URL } from '@/lib/utils/constants';
 import { formatCurrency, phoneToE164 } from '@/lib/utils/format';
 import type { BusinessInfo } from '@/lib/data/business';
 import type { Service, ServiceCategory, Product, ProductCategory, ServicePricing } from '@/lib/supabase/types';
@@ -66,7 +66,7 @@ export function generateServiceSchema(
     '@context': 'https://schema.org',
     '@type': 'Service',
     name: service.name,
-    description: service.description ?? `${service.name} service at ${SITE_NAME}`,
+    description: service.description ?? `${service.name} service at ${business.name}`,
     url,
     provider: localBusinessReference(business),
     category: category.name,
@@ -157,7 +157,8 @@ function buildServiceOffers(
 
 export function generateProductSchema(
   product: Product,
-  category: ProductCategory
+  category: ProductCategory,
+  businessName: string
 ) {
   const url = `${SITE_URL}/products/${category.slug}/${product.slug}`;
 
@@ -165,13 +166,13 @@ export function generateProductSchema(
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    description: product.description ?? `${product.name} available at ${SITE_NAME}`,
+    description: product.description ?? `${product.name} available at ${businessName}`,
     url,
     image: product.image_url ?? undefined,
     sku: product.sku ?? undefined,
     brand: {
       '@type': 'Organization',
-      name: SITE_NAME,
+      name: businessName,
     },
     offers: {
       '@type': 'Offer',

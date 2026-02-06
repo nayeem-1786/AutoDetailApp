@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/utils/constants';
+import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -227,6 +228,7 @@ function CommandPalette({
 
 function AdminContent({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, signOut } = useAuth();
+  const { info: businessInfo } = useBusinessInfo();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -416,7 +418,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="flex h-14 items-center justify-between border-b border-gray-200 px-4">
           <span className="text-sm font-bold text-gray-900">
-            Smart Detail Auto Spa
+            {businessInfo?.name || 'Admin'}
           </span>
           <button
             className="lg:hidden"

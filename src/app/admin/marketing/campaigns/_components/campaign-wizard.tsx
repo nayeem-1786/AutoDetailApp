@@ -24,7 +24,8 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { ArrowLeft, ArrowRight, Users, Send, Plus, Eye, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-import { BUSINESS, SITE_URL } from '@/lib/utils/constants';
+import { SITE_URL } from '@/lib/utils/constants';
+import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 
 type Step = 'basics' | 'audience' | 'message' | 'coupon' | 'review';
 
@@ -72,6 +73,7 @@ function couponRewardsSummary(coupon: Coupon): string {
 export function CampaignWizard({ initialData }: CampaignWizardProps) {
   const router = useRouter();
   const supabase = createClient();
+  const { info: businessInfo } = useBusinessInfo();
 
   const [campaignId, setCampaignId] = useState<string | null>(initialData?.id ?? null);
   const [step, setStep] = useState<Step>('basics');
@@ -388,7 +390,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       first_name: customer.first_name,
       last_name: customer.last_name,
       coupon_code: sampleCode,
-      business_name: BUSINESS.NAME,
+      business_name: businessInfo?.name || '',
       booking_url: `${SITE_URL}/book`,
       book_now_url: `${SITE_URL}/book?service=example-service&coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`,
     };

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Shield, Truck, ShoppingBag, DollarSign } from 'lucide-react';
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/utils/constants';
+import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
 import { getBusinessInfo } from '@/lib/data/business';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
@@ -9,25 +9,28 @@ import { ServiceCategoryCard } from '@/components/public/service-category-card';
 import { CtaSection } from '@/components/public/cta-section';
 import { JsonLd } from '@/components/public/json-ld';
 
-export const metadata: Metadata = {
-  title: SITE_NAME,
-  description: SITE_DESCRIPTION,
-  alternates: {
-    canonical: SITE_URL,
-  },
-  openGraph: {
-    title: SITE_NAME,
+export async function generateMetadata(): Promise<Metadata> {
+  const businessInfo = await getBusinessInfo();
+  return {
+    title: businessInfo.name,
     description: SITE_DESCRIPTION,
-    url: SITE_URL,
-    siteName: SITE_NAME,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: SITE_NAME,
-    description: SITE_DESCRIPTION,
-  },
-};
+    alternates: {
+      canonical: SITE_URL,
+    },
+    openGraph: {
+      title: businessInfo.name,
+      description: SITE_DESCRIPTION,
+      url: SITE_URL,
+      siteName: businessInfo.name,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: businessInfo.name,
+      description: SITE_DESCRIPTION,
+    },
+  };
+}
 
 const features = [
   {
@@ -97,7 +100,7 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-              Why Choose {SITE_NAME}?
+              Why Choose {businessInfo.name}?
             </h2>
           </div>
 

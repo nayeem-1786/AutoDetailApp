@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { loginSchema, type LoginInput } from '@/lib/utils/validation';
+import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/admin';
   const reason = searchParams.get('reason');
+  const { info: businessInfo } = useBusinessInfo();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -54,7 +56,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Smart Detail Auto Spa</CardTitle>
+          <CardTitle className="text-2xl">{businessInfo?.name || 'Staff Login'}</CardTitle>
           <CardDescription>Sign in to your staff account</CardDescription>
         </CardHeader>
         <CardContent>

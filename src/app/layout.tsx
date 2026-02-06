@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { getBusinessInfo } from "@/lib/data/business";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,10 +14,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Smart Detail Auto Spa",
-  description: "Professional auto detailing management platform",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const businessInfo = await getBusinessInfo();
+  return {
+    title: businessInfo.name,
+    description: `${businessInfo.name} — management platform`,
+  };
+}
 
 export default function RootLayout({
   children,

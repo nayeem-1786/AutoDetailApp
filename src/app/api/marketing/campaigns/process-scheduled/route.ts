@@ -5,7 +5,8 @@ import { renderTemplate } from '@/lib/utils/template';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
-import { BUSINESS, SITE_URL } from '@/lib/utils/constants';
+import { getBusinessInfo } from '@/lib/data/business';
+import { SITE_URL } from '@/lib/utils/constants';
 import type { CampaignChannel } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createAdminClient();
+    const businessInfo = await getBusinessInfo();
 
     // Find all scheduled campaigns that are due
     const { data: campaigns, error: queryError } = await adminClient
@@ -154,7 +156,7 @@ export async function POST(request: NextRequest) {
           first_name: customer.first_name,
           last_name: customer.last_name,
           coupon_code: couponCode,
-          business_name: BUSINESS.NAME,
+          business_name: businessInfo.name,
           booking_url: `${SITE_URL}/book`,
           book_now_url: bookNowUrl,
         };

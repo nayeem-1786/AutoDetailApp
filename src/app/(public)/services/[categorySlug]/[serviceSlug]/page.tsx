@@ -28,7 +28,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: 'Service Not Found' };
   }
 
-  return generateServiceMetadata(result.service, result.category);
+  const businessInfo = await getBusinessInfo();
+  return generateServiceMetadata(result.service, result.category, businessInfo.name);
 }
 
 export async function generateStaticParams() {

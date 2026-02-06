@@ -11,19 +11,23 @@ import {
 import { getCustomerFromSession } from '@/lib/auth/customer-helpers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { SITE_NAME, SITE_URL } from '@/lib/utils/constants';
+import { SITE_URL } from '@/lib/utils/constants';
+import { getBusinessInfo } from '@/lib/data/business';
 
-export const metadata: Metadata = {
-  title: `Book an Appointment | ${SITE_NAME}`,
-  description:
-    'Schedule your auto detailing, ceramic coating, or car care appointment online. Choose your service, pick a time, and book instantly.',
-  openGraph: {
-    title: `Book an Appointment | ${SITE_NAME}`,
+export async function generateMetadata(): Promise<Metadata> {
+  const businessInfo = await getBusinessInfo();
+  return {
+    title: `Book an Appointment | ${businessInfo.name}`,
     description:
-      'Schedule your auto detailing appointment online. Choose your service, pick a time, and book instantly.',
-    url: `${SITE_URL}/book`,
-  },
-};
+      'Schedule your auto detailing, ceramic coating, or car care appointment online. Choose your service, pick a time, and book instantly.',
+    openGraph: {
+      title: `Book an Appointment | ${businessInfo.name}`,
+      description:
+        'Schedule your auto detailing appointment online. Choose your service, pick a time, and book instantly.',
+      url: `${SITE_URL}/book`,
+    },
+  };
+}
 
 interface BookPageProps {
   searchParams: Promise<{ service?: string; rebook?: string; coupon?: string; email?: string }>;

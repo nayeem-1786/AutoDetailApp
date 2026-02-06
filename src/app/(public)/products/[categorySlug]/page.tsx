@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProductCategories, getProductsByCategory } from '@/lib/data/products';
+import { getBusinessInfo } from '@/lib/data/business';
 import { generateCategoryMetadata } from '@/lib/seo/metadata';
 import { ProductCard } from '@/components/public/product-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
@@ -18,7 +19,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: 'Category Not Found' };
   }
 
-  return generateCategoryMetadata(result.category, 'product');
+  const businessInfo = await getBusinessInfo();
+  return generateCategoryMetadata(result.category, 'product', businessInfo.name);
 }
 
 export async function generateStaticParams() {

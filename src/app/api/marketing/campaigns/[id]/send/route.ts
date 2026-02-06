@@ -6,7 +6,7 @@ import { renderTemplate } from '@/lib/utils/template';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
-import { BUSINESS } from '@/lib/utils/constants';
+import { getBusinessInfo } from '@/lib/data/business';
 import { SITE_URL } from '@/lib/utils/constants';
 import type { CampaignChannel } from '@/lib/supabase/types';
 import crypto from 'crypto';
@@ -68,6 +68,8 @@ export async function POST(
         .eq('id', id);
       return NextResponse.json({ data: { status: 'scheduled', scheduled_at: body.schedule_at } });
     }
+
+    const businessInfo = await getBusinessInfo();
 
     // Mark as sending
     await supabase
@@ -159,7 +161,7 @@ export async function POST(
         first_name: customer.first_name,
         last_name: customer.last_name,
         coupon_code: couponCode,
-        business_name: BUSINESS.NAME,
+        business_name: businessInfo.name,
         booking_url: `${SITE_URL}/book`,
         book_now_url: bookNowUrl,
       };

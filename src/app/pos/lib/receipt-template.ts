@@ -1,4 +1,3 @@
-import { BUSINESS } from '@/lib/utils/constants';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 
 interface ReceiptItem {
@@ -46,11 +45,11 @@ export interface ReceiptLine {
   alignment?: 'left' | 'center' | 'right';
 }
 
-// Hardcoded fallback when no config is passed (backwards compatibility)
+// Fallback when no config is passed (callers should always pass DB config)
 const FALLBACK_CONFIG: MergedReceiptConfig = {
-  name: BUSINESS.NAME,
-  phone: BUSINESS.PHONE.replace('+1', '(').replace(/(\d{3})(\d{3})(\d{4})/, '$1) $2-$3'),
-  address: BUSINESS.ADDRESS,
+  name: '',
+  phone: '',
+  address: '',
   email: null,
   website: null,
   logo_url: null,

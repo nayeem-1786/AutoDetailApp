@@ -1,6 +1,8 @@
 // Shared Mailgun email helper
 // Extracted from src/app/api/pos/receipts/email/route.ts
 
+import { getBusinessInfo } from '@/lib/data/business';
+
 interface EmailResult {
   success: true;
   id: string;
@@ -37,8 +39,9 @@ export async function sendEmail(
   }
 
   try {
+    const businessInfo = await getBusinessInfo();
     const formData = new URLSearchParams();
-    formData.append('from', `Smart Detail Auto Spa <noreply@${mailgunDomain}>`);
+    formData.append('from', `${businessInfo.name} <noreply@${mailgunDomain}>`);
     formData.append('to', to);
     formData.append('subject', subject);
     formData.append('text', text);

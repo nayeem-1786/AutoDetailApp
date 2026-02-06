@@ -1,32 +1,35 @@
 import type { Metadata } from 'next';
-import { SITE_URL, SITE_NAME } from '@/lib/utils/constants';
+import { SITE_URL } from '@/lib/utils/constants';
+import { getBusinessInfo } from '@/lib/data/business';
 import { getServiceCategories } from '@/lib/data/services';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 
-export const metadata: Metadata = {
-  title: `Auto Detailing Services — ${SITE_NAME}`,
-  description:
-    'Browse our full range of professional auto detailing services including ceramic coatings, paint correction, interior detailing, and more. Serving Lomita and the South Bay area.',
-  alternates: {
-    canonical: `${SITE_URL}/services`,
-  },
-  openGraph: {
-    title: `Auto Detailing Services — ${SITE_NAME}`,
-    description:
-      'Browse our full range of professional auto detailing services including ceramic coatings, paint correction, interior detailing, and more.',
-    url: `${SITE_URL}/services`,
-    siteName: SITE_NAME,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: `Auto Detailing Services — ${SITE_NAME}`,
-    description:
-      'Browse our full range of professional auto detailing services including ceramic coatings, paint correction, interior detailing, and more.',
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const businessInfo = await getBusinessInfo();
+  return {
+    title: `Auto Detailing Services — ${businessInfo.name}`,
+    description: `Browse our full range of professional auto detailing services at ${businessInfo.name}.`,
+    alternates: {
+      canonical: `${SITE_URL}/services`,
+    },
+    openGraph: {
+      title: `Auto Detailing Services — ${businessInfo.name}`,
+      description:
+        'Browse our full range of professional auto detailing services including ceramic coatings, paint correction, interior detailing, and more.',
+      url: `${SITE_URL}/services`,
+      siteName: businessInfo.name,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: `Auto Detailing Services — ${businessInfo.name}`,
+      description:
+        'Browse our full range of professional auto detailing services including ceramic coatings, paint correction, interior detailing, and more.',
+    },
+  };
+}
 
 export default async function ServicesPage() {
   const categories = await getServiceCategories();

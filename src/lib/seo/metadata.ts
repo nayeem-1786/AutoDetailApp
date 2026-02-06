@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/utils/constants';
+import { SITE_URL } from '@/lib/utils/constants';
 import type { Service, ServiceCategory, Product, ProductCategory } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -9,12 +9,13 @@ import type { Service, ServiceCategory, Product, ProductCategory } from '@/lib/s
 
 export function generateServiceMetadata(
   service: Service,
-  category: ServiceCategory
+  category: ServiceCategory,
+  businessName: string
 ): Metadata {
-  const title = `${service.name} \u2014 ${category.name} | ${SITE_NAME}`;
+  const title = `${service.name} \u2014 ${category.name} | ${businessName}`;
   const description =
     service.description ??
-    `Professional ${service.name.toLowerCase()} service in ${category.name.toLowerCase()} at ${SITE_NAME}. Serving Lomita and the South Bay area.`;
+    `Professional ${service.name.toLowerCase()} service in ${category.name.toLowerCase()} at ${businessName}.`;
   const url = `${SITE_URL}/services/${category.slug}/${service.slug}`;
 
   return {
@@ -27,7 +28,7 @@ export function generateServiceMetadata(
       title,
       description,
       url,
-      siteName: SITE_NAME,
+      siteName: businessName,
       type: 'website',
     },
     twitter: {
@@ -45,13 +46,14 @@ export function generateServiceMetadata(
 
 export function generateCategoryMetadata(
   category: ServiceCategory | ProductCategory,
-  type: 'service' | 'product'
+  type: 'service' | 'product',
+  businessName: string
 ): Metadata {
   const typeLabel = type === 'service' ? 'Services' : 'Products';
-  const title = `${category.name} ${typeLabel} \u2014 ${SITE_NAME}`;
+  const title = `${category.name} ${typeLabel} \u2014 ${businessName}`;
   const description =
     category.description ??
-    `Browse our ${category.name.toLowerCase()} ${typeLabel.toLowerCase()} at ${SITE_NAME}. Serving Lomita and the South Bay area.`;
+    `Browse our ${category.name.toLowerCase()} ${typeLabel.toLowerCase()} at ${businessName}.`;
   const slug = type === 'service' ? 'services' : 'products';
   const url = `${SITE_URL}/${slug}/${category.slug}`;
 
@@ -65,7 +67,7 @@ export function generateCategoryMetadata(
       title,
       description,
       url,
-      siteName: SITE_NAME,
+      siteName: businessName,
       type: 'website',
     },
     twitter: {
@@ -83,12 +85,13 @@ export function generateCategoryMetadata(
 
 export function generateProductMetadata(
   product: Product,
-  category: ProductCategory
+  category: ProductCategory,
+  businessName: string
 ): Metadata {
-  const title = `${product.name} \u2014 ${category.name} | ${SITE_NAME}`;
+  const title = `${product.name} \u2014 ${category.name} | ${businessName}`;
   const description =
     product.description ??
-    `${product.name} available in ${category.name.toLowerCase()} at ${SITE_NAME}. Serving Lomita and the South Bay area.`;
+    `${product.name} available in ${category.name.toLowerCase()} at ${businessName}.`;
   const url = `${SITE_URL}/products/${category.slug}/${product.slug}`;
 
   const metadata: Metadata = {
@@ -101,7 +104,7 @@ export function generateProductMetadata(
       title,
       description,
       url,
-      siteName: SITE_NAME,
+      siteName: businessName,
       type: 'website',
     },
     twitter: {
@@ -126,25 +129,25 @@ export function generateProductMetadata(
 // Default Metadata for the site root / fallback pages.
 // ---------------------------------------------------------------------------
 
-export function generateBaseMetadata(overrides?: Partial<Metadata>): Metadata {
+export function generateBaseMetadata(businessName: string, description: string, overrides?: Partial<Metadata>): Metadata {
   return {
-    title: SITE_NAME,
-    description: SITE_DESCRIPTION,
+    title: businessName,
+    description,
     metadataBase: new URL(SITE_URL),
     alternates: {
       canonical: SITE_URL,
     },
     openGraph: {
-      title: SITE_NAME,
-      description: SITE_DESCRIPTION,
+      title: businessName,
+      description,
       url: SITE_URL,
-      siteName: SITE_NAME,
+      siteName: businessName,
       type: 'website',
     },
     twitter: {
       card: 'summary',
-      title: SITE_NAME,
-      description: SITE_DESCRIPTION,
+      title: businessName,
+      description,
     },
     ...overrides,
   };

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Package } from 'lucide-react';
 import { getProductBySlug, getAllProductsForSitemap } from '@/lib/data/products';
+import { getBusinessInfo } from '@/lib/data/business';
 import { generateProductMetadata } from '@/lib/seo/metadata';
 import { generateProductSchema, generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { SITE_URL } from '@/lib/utils/constants';
@@ -22,7 +23,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: 'Product Not Found' };
   }
 
-  return generateProductMetadata(result.product, result.category);
+  const businessInfo = await getBusinessInfo();
+  return generateProductMetadata(result.product, result.category, businessInfo.name);
 }
 
 export async function generateStaticParams() {
@@ -42,6 +44,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   const { product, category } = result;
+  const businessInfo = await getBusinessInfo();
 
   // Build breadcrumb data for JSON-LD
   const breadcrumbItems = [
@@ -58,7 +61,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   return (
     <>
-      <JsonLd data={generateProductSchema(product, category)} />
+      <JsonLd data={generateProductSchema(product, category, businessInfo.name)} />
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
       <article className="bg-white py-12 sm:py-16">

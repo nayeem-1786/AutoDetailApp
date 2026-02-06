@@ -15,7 +15,7 @@ import {
   type PhoneOtpVerifyInput,
 } from '@/lib/utils/validation';
 import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
-import { BUSINESS } from '@/lib/utils/constants';
+import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
@@ -29,6 +29,7 @@ export default function CustomerSignInPage() {
   const redirectTo = searchParams.get('redirect') || '/account';
   const reason = searchParams.get('reason');
   const sessionExpired = reason === 'session_expired';
+  const { info: businessInfo } = useBusinessInfo();
   const [mode, setMode] = useState<AuthMode>('phone');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -265,7 +266,7 @@ export default function CustomerSignInPage() {
             SD
           </div>
           <h1 className="mt-4 text-2xl font-bold text-gray-900">
-            Welcome to {BUSINESS.NAME.split(' & ')[0]}
+            Welcome to {businessInfo?.name || 'Our Portal'}
           </h1>
         </div>
 

@@ -15,7 +15,7 @@ import {
   type PhoneOtpVerifyInput,
 } from '@/lib/utils/validation';
 import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
-import { BUSINESS } from '@/lib/utils/constants';
+import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
@@ -37,6 +37,7 @@ export default function CustomerSignUpPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phoneParam = searchParams.get('phone');
+  const { info: businessInfo } = useBusinessInfo();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<SignupMode>('full');
@@ -259,8 +260,8 @@ export default function CustomerSignUpPage() {
           </h1>
           <p className="mt-1 text-sm text-gray-600">
             {mode === 'otp-profile'
-              ? `Sign up to manage your appointments at ${BUSINESS.NAME.split(' & ')[0]}`
-              : `Join ${BUSINESS.NAME.split(' & ')[0]} to book and manage appointments`}
+              ? `Sign up to manage your appointments at ${businessInfo?.name || 'our shop'}`
+              : `Join ${businessInfo?.name || 'us'} to book and manage appointments`}
           </p>
         </div>
 

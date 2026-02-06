@@ -1,32 +1,35 @@
 import type { Metadata } from 'next';
-import { SITE_URL, SITE_NAME } from '@/lib/utils/constants';
+import { SITE_URL } from '@/lib/utils/constants';
+import { getBusinessInfo } from '@/lib/data/business';
 import { getProductCategories } from '@/lib/data/products';
 import { ProductCategoryCard } from '@/components/public/product-category-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 
-export const metadata: Metadata = {
-  title: `Car Care Products & Supplies — ${SITE_NAME}`,
-  description:
-    'Shop premium car care products and auto detailing supplies. Ceramic coating kits, wash solutions, interior cleaners, and more at Smart Detail Auto Spa & Supplies in Lomita, CA.',
-  alternates: {
-    canonical: `${SITE_URL}/products`,
-  },
-  openGraph: {
-    title: `Car Care Products & Supplies — ${SITE_NAME}`,
-    description:
-      'Shop premium car care products and auto detailing supplies. Ceramic coating kits, wash solutions, interior cleaners, and more.',
-    url: `${SITE_URL}/products`,
-    siteName: SITE_NAME,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: `Car Care Products & Supplies — ${SITE_NAME}`,
-    description:
-      'Shop premium car care products and auto detailing supplies.',
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const businessInfo = await getBusinessInfo();
+  return {
+    title: `Car Care Products & Supplies — ${businessInfo.name}`,
+    description: `Shop premium car care products and auto detailing supplies at ${businessInfo.name}.`,
+    alternates: {
+      canonical: `${SITE_URL}/products`,
+    },
+    openGraph: {
+      title: `Car Care Products & Supplies — ${businessInfo.name}`,
+      description:
+        'Shop premium car care products and auto detailing supplies. Ceramic coating kits, wash solutions, interior cleaners, and more.',
+      url: `${SITE_URL}/products`,
+      siteName: businessInfo.name,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: `Car Care Products & Supplies — ${businessInfo.name}`,
+      description:
+        'Shop premium car care products and auto detailing supplies.',
+    },
+  };
+}
 
 export default async function ProductsPage() {
   const categories = await getProductCategories();

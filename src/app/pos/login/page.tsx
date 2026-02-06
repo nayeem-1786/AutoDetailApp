@@ -3,11 +3,13 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
+import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { PinPad } from '../components/pin-pad';
 import { storePosSession } from '../context/pos-auth-context';
 
 export default function PosLoginPage() {
   const router = useRouter();
+  const { info: businessInfo } = useBusinessInfo();
   const [digits, setDigits] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -73,7 +75,7 @@ export default function PosLoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / Business Name */}
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-white">Smart Detail POS</h1>
+          <h1 className="text-2xl font-bold text-white">{businessInfo?.name ? `${businessInfo.name} POS` : 'POS'}</h1>
           <p className="mt-2 text-sm text-gray-400">Enter passcode</p>
         </div>
 

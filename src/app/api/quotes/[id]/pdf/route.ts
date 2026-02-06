@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getBusinessInfo, type BusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 
 // --- Types -----------------------------------------------------------
-
-interface BusinessInfo {
-  name: string;
-  phone: string;
-  address: string;
-}
 
 interface QuoteItem {
   item_name: string;
@@ -394,27 +389,7 @@ export async function GET(
     const supabase = createAdminClient();
 
     // Fetch business info from database
-    const { data: settingsData } = await supabase
-      .from('business_settings')
-      .select('key, value')
-      .in('key', ['business_name', 'business_phone', 'business_address']);
-
-    const settings: Record<string, unknown> = {};
-    for (const row of settingsData ?? []) {
-      settings[row.key] = row.value;
-    }
-
-    const rawAddr = settings.business_address;
-    const addr =
-      typeof rawAddr === 'object' && rawAddr !== null
-        ? (rawAddr as { line1: string; city: string; state: string; zip: string })
-        : { line1: '2021 Lomita Blvd', city: 'Lomita', state: 'CA', zip: '90717' };
-
-    const business: BusinessInfo = {
-      name: (settings.business_name as string) || 'Smart Detail Auto Spa & Supplies',
-      phone: (settings.business_phone as string) || '+13109990000',
-      address: `${addr.line1}, ${addr.city}, ${addr.state} ${addr.zip}`,
-    };
+    const business = await getBusinessInfo();
 
     // Fetch quote with relations
     const { data: quote, error } = await supabase

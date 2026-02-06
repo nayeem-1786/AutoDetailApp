@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
-import { BUSINESS } from '@/lib/utils/constants';
+import { getBusinessInfo } from '@/lib/data/business';
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { AcceptQuoteButton } from './accept-button';
 
@@ -53,22 +53,22 @@ async function getQuote(token: string): Promise<QuoteWithRelations | null> {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { token } = await params;
-  const quote = await getQuote(token);
+  const [quote, businessInfo] = await Promise.all([getQuote(token), getBusinessInfo()]);
 
   if (!quote) {
-    return { title: 'Quote Not Found | Smart Detail Auto Spa & Supplies' };
+    return { title: `Quote Not Found | ${businessInfo.name}` };
   }
 
   return {
-    title: `Quote ${quote.quote_number} | Smart Detail Auto Spa & Supplies`,
-    description: `View your quote ${quote.quote_number} from Smart Detail Auto Spa & Supplies`,
+    title: `Quote ${quote.quote_number} | ${businessInfo.name}`,
+    description: `View your quote ${quote.quote_number} from ${businessInfo.name}`,
     robots: { index: false, follow: false },
   };
 }
 
 export default async function PublicQuotePage({ params }: PageProps) {
   const { token } = await params;
-  const quote = await getQuote(token);
+  const [quote, businessInfo] = await Promise.all([getQuote(token), getBusinessInfo()]);
 
   if (!quote) {
     return (
@@ -90,8 +90,8 @@ export default async function PublicQuotePage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
       {/* Business Header */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">{BUSINESS.NAME}</h1>
-        <p className="mt-1 text-sm text-gray-500">{BUSINESS.ADDRESS}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{businessInfo.name}</h1>
+        <p className="mt-1 text-sm text-gray-500">{businessInfo.address}</p>
       </div>
 
       {/* Quote Header */}

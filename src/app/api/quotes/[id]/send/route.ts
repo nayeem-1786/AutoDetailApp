@@ -1,41 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getBusinessInfo } from '@/lib/data/business';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
-
-interface BusinessInfo {
-  name: string;
-  phone: string;
-  address: string;
-  email: string | null;
-  website: string | null;
-}
-
-async function getBusinessInfo(supabase: ReturnType<typeof createAdminClient>): Promise<BusinessInfo> {
-  const { data } = await supabase
-    .from('business_settings')
-    .select('key, value')
-    .in('key', ['business_name', 'business_phone', 'business_address', 'business_email', 'business_website']);
-
-  const settings: Record<string, unknown> = {};
-  for (const row of data ?? []) {
-    settings[row.key] = row.value;
-  }
-
-  const rawAddr = settings.business_address;
-  const addr =
-    typeof rawAddr === 'object' && rawAddr !== null
-      ? (rawAddr as { line1: string; city: string; state: string; zip: string })
-      : { line1: '2021 Lomita Blvd', city: 'Lomita', state: 'CA', zip: '90717' };
-
-  return {
-    name: (settings.business_name as string) || 'Smart Detail Auto Spa & Supplies',
-    phone: (settings.business_phone as string) || '+13109990000',
-    address: `${addr.line1}, ${addr.city}, ${addr.state} ${addr.zip}`,
-    email: (settings.business_email as string) || null,
-    website: (settings.business_website as string) || null,
-  };
-}
 
 export async function POST(
   request: NextRequest,
@@ -49,7 +16,7 @@ export async function POST(
     const supabase = createAdminClient();
 
     // Fetch business info from database
-    const business = await getBusinessInfo(supabase);
+    const business = await getBusinessInfo();
 
     // Fetch the quote with customer info
     const { data: quote, error: fetchErr } = await supabase
