@@ -89,14 +89,30 @@ export function AppointmentDetailDialog({
   if (!appointment) return null;
 
   const allStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
-  const recommendedStatuses = [appointment.status, ...STATUS_TRANSITIONS[appointment.status]];
-  const overrideStatuses = allStatuses.filter((s) => !recommendedStatuses.includes(s));
+  // Filter out 'cancelled' if user doesn't have permission to cancel (unless already cancelled)
+  const availableStatuses = canCancel || appointment.status === 'cancelled'
+    ? allStatuses
+    : allStatuses.filter((s) => s !== 'cancelled');
+  const recommendedStatuses = [appointment.status, ...STATUS_TRANSITIONS[appointment.status]].filter(s => availableStatuses.includes(s));
+  const overrideStatuses = availableStatuses.filter((s) => !recommendedStatuses.includes(s));
   const showCancelButton =
     canCancel && appointment.status !== 'cancelled';
   const services = appointment.appointment_services;
 
   async function onSubmit(data: AppointmentUpdateInput) {
     if (!appointment) return;
+
+    // If status is being changed to cancelled, redirect to cancel dialog
+    if (data.status === 'cancelled' && appointment.status !== 'cancelled') {
+      if (!canCancel) {
+        // User doesn't have permission to cancel
+        return;
+      }
+      onOpenChange(false);
+      onCancel(appointment);
+      return;
+    }
+
     setSaving(true);
     const payload = { ...data, employee_id: data.employee_id || null };
     const success = await onSave(appointment.id, payload);

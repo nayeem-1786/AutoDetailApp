@@ -14,22 +14,22 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | Tab | Status | Notes |
 |-----|--------|-------|
 | Online Booking | ✅ Done | Payment flow tested with coupons, loyalty points, edge cases |
-| Appointments | ⏳ Pending | Calendar, scheduling, status changes, cancel flow |
+| Appointments | 🔄 In Progress | Cancel flow fixed, calendar date key fixed, status dropdown fixed |
 | Quotes | ⏳ Pending | CRUD, send email/SMS, PDF, public view, accept, convert |
 | Waitlist | ⏳ Pending | Join, auto-notify, admin management |
-| Staff Scheduling | ⏳ Pending | Weekly schedules, blocked dates |
+| Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Test Appointments Module
-**Last session:** 2026-02-06 — Online Booking payment flow fully tested and working
-**Migrations:** All applied (`payment_type`, `deposit_amount`, `coupon_code`, `coupon_discount`)
+### 🧪 NEXT SESSION: Continue Testing Appointments Module
+**Last session:** 2026-02-06 — Fixed appointment bugs, refactored staff scheduling to staff profiles
+**Migrations:** All applied
 
 **Appointments Test Checklist:**
-- [ ] Calendar view loads with correct appointments
+- [x] Calendar view loads with correct appointments (fixed date key normalization)
 - [ ] Create new appointment (admin-side)
-- [ ] Edit appointment (date/time/services/vehicle)
-- [ ] Cancel appointment with confirmation
-- [ ] Status changes (pending → confirmed → completed)
+- [x] Edit appointment (date/time/services/vehicle) - fixed time format validation
+- [x] Cancel appointment with confirmation (fixed $0.00 fee, cancel via status dropdown now opens dialog)
+- [x] Status changes (pending → confirmed → completed) - fixed status dropdown cancellation interception
 - [ ] Reschedule flow
 - [ ] Email/SMS notifications sent correctly
 - [ ] Mobile responsive layout
@@ -57,9 +57,11 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 ### Bugs Fixed (2026-02-06)
 | # | Module | Description | Fix Summary |
 |---|--------|-------------|-------------|
+| 36 | Appointments | Calendar doesn't show appointments for today | Fixed date key normalization - `scheduled_date.split('T')[0]` handles both `2026-02-06` and `2026-02-06T00:00:00` formats. |
+| 35 | Appointments | Cancellation fee $0.00 shows "expected number, received string" | Added `valueAsNumber: true` to register, updated schema to handle NaN. |
+| 34 | Appointments | Selecting "Cancelled" status shows time format error | Fixed time regex to accept `HH:MM` and `HH:MM:SS`. Added status interception - selecting "Cancelled" now opens cancel dialog. |
+| 33 | Appointments | No times available for booking today | `booking_config.advance_days_min: 1` prevents same-day booking. User can change to 0 in database for same-day bookings. |
 | 32 | Admin | Session expiry shows empty pages instead of redirecting | Added 3-layer protection: periodic check (60s), window focus check, global fetch interceptor for 401s. All admin pages now auto-redirect to login on session expiry. |
-| # | Module | Description | Fix Summary |
-|---|--------|-------------|-------------|
 | 31 | Portal | Header shows "My Account" instead of personalized greeting | Changed to "Hello, {first_name}" for logged-in customers in `site-header.tsx`. |
 | 30 | Booking | Confirmation shows $0.01 when discounts cover amount | Amounts under $0.50 now display as $0.00 with "Fully covered by discounts" message. |
 | 29 | Booking | Booking fails when discounts cover full amount | Set `payment_option: 'full'` and `deposit_amount: 0` when grandTotal < $0.50. Previously sent `pay_on_site` which was semantically incorrect. |
@@ -172,6 +174,10 @@ When testing each module, verify:
 - [x] Portal access toggle (Active/Deactivated) with reactivation support
 - [x] Customer sign-in auto-links existing customer records by phone
 - [x] Delete customer with double confirmation
+- [x] Move staff schedules to individual staff profiles (Schedule tab)
+- [x] Move blocked dates to staff profiles (Time Off section)
+- [x] Add "Who's Working Today" dashboard to Staff Scheduling page
+- [ ] **Admin Settings: Role Permissions** — Currently role permissions are only seeded via `supabase/seed.sql`. Need admin UI at `/admin/settings/roles-permissions` to view/edit default permissions per role (super_admin, admin, cashier, detailer). Individual employee overrides already work on staff detail page.
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
 - [ ] POS session caching bug — multiple browser tabs cause stale session state; expired session still shows POS screen after hard refresh; investigate sessionStorage sync across tabs
@@ -226,6 +232,13 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Staff Scheduling Refactor (2026-02-06)
+- **Schedule on Staff Profile:** Weekly schedule moved from `/admin/appointments/scheduling` to individual staff profile pages (`/admin/staff/[id]` → Schedule tab). Only shows for bookable employees.
+- **Blocked Dates on Staff Profile:** Individual employee time off (vacation, sick days) now managed on their profile in the "Time Off / Blocked Dates" section.
+- **Shop Holidays:** The Staff Scheduling page now only handles shop-wide closures (holidays). Individual employee blocks are on their profiles.
+- **"Who's Working Today" Dashboard:** New card at top of Staff Scheduling page shows which staff are scheduled for today with their hours.
+- **Direct Link:** Clicking staff from scheduling overview goes directly to their Schedule tab (`?tab=schedule` query param).
 
 ### Booking Payment Flow Refinements (2026-02-06)
 - **Coupon + Loyalty Points:** When coupon is applied, loyalty points auto-cap to remaining balance. If coupon covers full amount, loyalty section shows "no points needed" message instead of slider.

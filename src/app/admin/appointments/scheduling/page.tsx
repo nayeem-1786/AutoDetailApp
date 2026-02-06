@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, Trash2, Plus, CalendarOff } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Trash2, Plus, CalendarOff, ExternalLink, User } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -16,10 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import type { EmployeeSchedule } from '@/lib/supabase/types';
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-// Display order: Mon(1), Tue(2), Wed(3), Thu(4), Fri(5), Sat(6), Sun(0)
-const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 interface EmployeeBasic {
   id: string;
@@ -32,13 +28,6 @@ interface EmployeeScheduleData {
   schedule: EmployeeSchedule[];
 }
 
-interface DaySchedule {
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  is_available: boolean;
-}
-
 interface BlockedDateRow {
   id: string;
   employee_id: string | null;
@@ -49,45 +38,24 @@ interface BlockedDateRow {
   employee?: { id: string; first_name: string; last_name: string } | null;
 }
 
-function buildDefaultWeek(): DaySchedule[] {
-  return DISPLAY_ORDER.map((day) => ({
-    day_of_week: day,
-    start_time: '09:00',
-    end_time: '17:00',
-    is_available: day >= 1 && day <= 5, // Mon-Fri default available
-  }));
-}
+function summarizeSchedule(schedule: EmployeeSchedule[]): string {
+  if (schedule.length === 0) return 'No schedule set';
 
-function mergeScheduleWithDefaults(existing: EmployeeSchedule[]): DaySchedule[] {
-  const defaults = buildDefaultWeek();
-  const existingMap = new Map(existing.map((s) => [s.day_of_week, s]));
+  const availableDays = schedule
+    .filter((s) => s.is_available)
+    .map((s) => DAY_NAMES[s.day_of_week])
+    .join(', ');
 
-  return defaults.map((d) => {
-    const ex = existingMap.get(d.day_of_week);
-    if (ex) {
-      return {
-        day_of_week: ex.day_of_week,
-        start_time: ex.start_time.slice(0, 5), // Ensure HH:MM format
-        end_time: ex.end_time.slice(0, 5),
-        is_available: ex.is_available,
-      };
-    }
-    return d;
-  });
+  return availableDays || 'No available days';
 }
 
 // ---------------------------------------------------------------------------
-// Weekly Schedules Tab
+// Weekly Schedules Tab - Now shows links to individual staff profiles
 // ---------------------------------------------------------------------------
 
 function WeeklySchedulesTab() {
   const [data, setData] = useState<EmployeeScheduleData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ id: string; type: 'success' | 'error'; message: string } | null>(null);
-
-  // Local editable state per employee
-  const [editState, setEditState] = useState<Record<string, DaySchedule[]>>({});
 
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
@@ -96,12 +64,6 @@ function WeeklySchedulesTab() {
       const json = await res.json();
       if (res.ok) {
         setData(json.schedules);
-        // Initialize edit state
-        const state: Record<string, DaySchedule[]> = {};
-        for (const item of json.schedules) {
-          state[item.employee.id] = mergeScheduleWithDefaults(item.schedule);
-        }
-        setEditState(state);
       }
     } catch (err) {
       console.error('Failed to fetch schedules:', err);
@@ -112,53 +74,6 @@ function WeeklySchedulesTab() {
   useEffect(() => {
     fetchSchedules();
   }, [fetchSchedules]);
-
-  function updateDay(employeeId: string, dayOfWeek: number, field: keyof DaySchedule, value: string | boolean) {
-    setEditState((prev) => {
-      const days = [...(prev[employeeId] ?? buildDefaultWeek())];
-      const idx = days.findIndex((d) => d.day_of_week === dayOfWeek);
-      if (idx >= 0) {
-        days[idx] = { ...days[idx], [field]: value };
-      }
-      return { ...prev, [employeeId]: days };
-    });
-  }
-
-  async function handleSave(employeeId: string) {
-    setSavingId(employeeId);
-    setFeedback(null);
-
-    const schedules = (editState[employeeId] ?? []).map((d) => ({
-      day_of_week: d.day_of_week,
-      start_time: d.start_time,
-      end_time: d.end_time,
-      is_available: d.is_available,
-    }));
-
-    try {
-      const res = await fetch(`/api/staff/schedules/${employeeId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schedules }),
-      });
-
-      if (res.ok) {
-        setFeedback({ id: employeeId, type: 'success', message: 'Schedule saved successfully' });
-      } else {
-        const json = await res.json();
-        setFeedback({ id: employeeId, type: 'error', message: json.error || 'Failed to save schedule' });
-      }
-    } catch {
-      setFeedback({ id: employeeId, type: 'error', message: 'Network error saving schedule' });
-    }
-
-    setSavingId(null);
-
-    // Auto-clear feedback after 3 seconds
-    setTimeout(() => {
-      setFeedback((prev) => (prev?.id === employeeId ? null : prev));
-    }, 3000);
-  }
 
   if (loading) {
     return (
@@ -174,115 +89,62 @@ function WeeklySchedulesTab() {
         icon={Calendar}
         title="No bookable employees"
         description="Add employees and mark them as bookable to set up schedules."
+        action={
+          <Link href="/admin/staff">
+            <Button>
+              <User className="h-4 w-4" />
+              Manage Staff
+            </Button>
+          </Link>
+        }
       />
     );
   }
 
   return (
-    <div className="space-y-6">
-      {data.map((item) => {
-        const employeeId = item.employee.id;
-        const days = editState[employeeId] ?? buildDefaultWeek();
-        const isSaving = savingId === employeeId;
-        const fb = feedback?.id === employeeId ? feedback : null;
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Bookable Staff</CardTitle>
+          <p className="text-sm text-gray-500">
+            Click on a staff member to view and edit their weekly schedule.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y divide-gray-100">
+            {data.map((item) => {
+              const scheduleSummary = summarizeSchedule(item.schedule);
+              const hasSchedule = item.schedule.length > 0;
 
-        return (
-          <Card key={employeeId}>
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle>
-                  {item.employee.first_name} {item.employee.last_name}
-                </CardTitle>
-                <div className="flex items-center gap-3">
-                  {fb && (
-                    <span
-                      className={
-                        fb.type === 'success'
-                          ? 'text-sm text-green-600'
-                          : 'text-sm text-red-600'
-                      }
-                    >
-                      {fb.message}
-                    </span>
-                  )}
-                  <Button
-                    onClick={() => handleSave(employeeId)}
-                    disabled={isSaving}
-                    size="sm"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Spinner size="sm" className="text-white" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {/* Header row */}
-                <div className="hidden sm:grid sm:grid-cols-[120px_80px_1fr_1fr] items-center gap-3 text-xs font-medium text-gray-500 uppercase tracking-wide px-1">
-                  <span>Day</span>
-                  <span>Available</span>
-                  <span>Start Time</span>
-                  <span>End Time</span>
-                </div>
-
-                {days.map((day) => (
-                  <div
-                    key={day.day_of_week}
-                    className="grid grid-cols-1 sm:grid-cols-[120px_80px_1fr_1fr] items-center gap-2 sm:gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2.5"
-                  >
-                    <span className="text-sm font-medium text-gray-700">
-                      {DAY_NAMES[day.day_of_week]}
-                    </span>
-
-                    <div className="flex items-center gap-2 sm:gap-0">
-                      <span className="text-xs text-gray-400 sm:hidden">Available:</span>
-                      <Switch
-                        checked={day.is_available}
-                        onCheckedChange={(val) =>
-                          updateDay(employeeId, day.day_of_week, 'is_available', val)
-                        }
-                      />
+              return (
+                <Link
+                  key={item.employee.id}
+                  href={`/admin/staff/${item.employee.id}?tab=schedule`}
+                  className="flex items-center justify-between py-3 first:pt-0 last:pb-0 hover:bg-gray-50 -mx-4 px-4 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                      <User className="h-5 w-5 text-gray-500" />
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-gray-400 sm:hidden whitespace-nowrap">Start:</Label>
-                      <Input
-                        type="time"
-                        value={day.start_time}
-                        onChange={(e) =>
-                          updateDay(employeeId, day.day_of_week, 'start_time', e.target.value)
-                        }
-                        disabled={!day.is_available}
-                        className="text-sm"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-gray-400 sm:hidden whitespace-nowrap">End:</Label>
-                      <Input
-                        type="time"
-                        value={day.end_time}
-                        onChange={(e) =>
-                          updateDay(employeeId, day.day_of_week, 'end_time', e.target.value)
-                        }
-                        disabled={!day.is_available}
-                        className="text-sm"
-                      />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {item.employee.first_name} {item.employee.last_name}
+                      </p>
+                      <p className="text-xs text-gray-500">{scheduleSummary}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+                  <div className="flex items-center gap-2">
+                    {!hasSchedule && (
+                      <Badge variant="warning">No schedule</Badge>
+                    )}
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -293,7 +155,6 @@ function WeeklySchedulesTab() {
 
 function BlockedDatesTab() {
   const [blockedDates, setBlockedDates] = useState<BlockedDateRow[]>([]);
-  const [employees, setEmployees] = useState<EmployeeBasic[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -301,25 +162,20 @@ function BlockedDatesTab() {
 
   // Form state
   const [formDate, setFormDate] = useState('');
-  const [formEmployeeId, setFormEmployeeId] = useState('');
   const [formReason, setFormReason] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [blockedRes, schedRes] = await Promise.all([
-        fetch('/api/staff/blocked-dates'),
-        fetch('/api/staff/schedules'),
-      ]);
-
+      const blockedRes = await fetch('/api/staff/blocked-dates');
       const blockedJson = await blockedRes.json();
-      const schedJson = await schedRes.json();
 
       if (blockedRes.ok) {
-        setBlockedDates(blockedJson.blocked_dates);
-      }
-      if (schedRes.ok) {
-        setEmployees(schedJson.schedules.map((s: EmployeeScheduleData) => s.employee));
+        // Only show shop-wide blocked dates (employee_id is null)
+        const shopWide = (blockedJson.blocked_dates || []).filter(
+          (bd: BlockedDateRow) => bd.employee_id === null
+        );
+        setBlockedDates(shopWide);
       }
     } catch (err) {
       console.error('Failed to fetch blocked dates:', err);
@@ -341,21 +197,20 @@ function BlockedDatesTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employee_id: formEmployeeId || null,
+          employee_id: null, // Shop-wide closure
           date: formDate,
           reason: formReason || null,
         }),
       });
 
       if (res.ok) {
-        setFeedback({ type: 'success', message: 'Blocked date added' });
+        setFeedback({ type: 'success', message: 'Shop holiday added' });
         setFormDate('');
-        setFormEmployeeId('');
         setFormReason('');
         fetchData();
       } else {
         const json = await res.json();
-        setFeedback({ type: 'error', message: json.error || 'Failed to add blocked date' });
+        setFeedback({ type: 'error', message: json.error || 'Failed to add holiday' });
       }
     } catch {
       setFeedback({ type: 'error', message: 'Network error' });
@@ -393,11 +248,15 @@ function BlockedDatesTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
-            Add Blocked Date
+            Add Shop Holiday / Closure
           </CardTitle>
+          <p className="text-sm text-gray-500">
+            Block dates when the entire shop is closed (holidays, special events).
+            For individual employee time off, use their Staff Profile → Schedule tab.
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <Label htmlFor="blocked-date">Date</Label>
               <Input
@@ -410,28 +269,11 @@ function BlockedDatesTab() {
             </div>
 
             <div>
-              <Label htmlFor="blocked-employee">Employee</Label>
-              <Select
-                id="blocked-employee"
-                value={formEmployeeId}
-                onChange={(e) => setFormEmployeeId(e.target.value)}
-                className="mt-1"
-              >
-                <option value="">All Staff</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.first_name} {emp.last_name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
               <Label htmlFor="blocked-reason">Reason (optional)</Label>
               <Input
                 id="blocked-reason"
                 type="text"
-                placeholder="e.g. Holiday, Vacation"
+                placeholder="e.g. Christmas, New Year's Day"
                 value={formReason}
                 onChange={(e) => setFormReason(e.target.value)}
                 className="mt-1"
@@ -452,7 +294,7 @@ function BlockedDatesTab() {
                 ) : (
                   <>
                     <Plus className="h-4 w-4" />
-                    Add
+                    Add Holiday
                   </>
                 )}
               </Button>
@@ -476,15 +318,15 @@ function BlockedDatesTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarOff className="h-4 w-4" />
-            Blocked Dates
+            Shop Holidays & Closures
           </CardTitle>
         </CardHeader>
         <CardContent>
           {blockedDates.length === 0 ? (
             <EmptyState
               icon={Calendar}
-              title="No blocked dates"
-              description="Add blocked dates to prevent bookings on specific days."
+              title="No shop holidays"
+              description="Add holidays when the entire shop is closed (e.g., Christmas, New Year's)."
               className="py-8"
             />
           ) : (
@@ -510,16 +352,9 @@ function BlockedDatesTab() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">{formattedDate}</p>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={bd.employee_id ? 'info' : 'warning'}>
-                            {bd.employee
-                              ? `${bd.employee.first_name} ${bd.employee.last_name}`
-                              : 'All Staff'}
-                          </Badge>
-                          {bd.reason && (
-                            <span className="text-xs text-gray-500">{bd.reason}</span>
-                          )}
-                        </div>
+                        {bd.reason && (
+                          <p className="text-xs text-gray-500">{bd.reason}</p>
+                        )}
                       </div>
                     </div>
 
@@ -548,6 +383,117 @@ function BlockedDatesTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Who's Working Today
+// ---------------------------------------------------------------------------
+
+function TodayStaffCard() {
+  const [data, setData] = useState<{ employee: EmployeeBasic; schedule: EmployeeSchedule[] }[]>([]);
+  const [blockedToday, setBlockedToday] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [schedRes, blockedRes] = await Promise.all([
+          fetch('/api/staff/schedules'),
+          fetch('/api/staff/blocked-dates'),
+        ]);
+
+        const schedJson = await schedRes.json();
+        const blockedJson = await blockedRes.json();
+
+        if (schedRes.ok) {
+          setData(schedJson.schedules || []);
+        }
+
+        if (blockedRes.ok) {
+          const today = new Date().toISOString().split('T')[0];
+          const blockedIds = (blockedJson.blocked_dates || [])
+            .filter((bd: BlockedDateRow) => bd.date === today)
+            .map((bd: BlockedDateRow) => bd.employee_id)
+            .filter(Boolean);
+          setBlockedToday(blockedIds);
+        }
+      } catch (err) {
+        console.error('Failed to fetch today\'s staff:', err);
+      }
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <Spinner size="md" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek];
+
+  const workingToday = data.filter((item) => {
+    // Check if blocked today
+    if (blockedToday.includes(item.employee.id)) return false;
+    // Check if scheduled for today
+    const todaySchedule = item.schedule.find((s) => s.day_of_week === dayOfWeek);
+    return todaySchedule?.is_available;
+  });
+
+  const formatTime = (time: string) => {
+    const [h, m] = time.split(':');
+    const hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${m} ${ampm}`;
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Clock className="h-4 w-4 text-green-600" />
+          Working Today ({dayName})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {workingToday.length === 0 ? (
+          <p className="text-sm text-gray-500">No staff scheduled for today.</p>
+        ) : (
+          <div className="space-y-2">
+            {workingToday.map((item) => {
+              const todaySchedule = item.schedule.find((s) => s.day_of_week === dayOfWeek);
+              return (
+                <div
+                  key={item.employee.id}
+                  className="flex items-center justify-between rounded-md bg-green-50 px-3 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    <span className="text-sm font-medium text-gray-900">
+                      {item.employee.first_name} {item.employee.last_name}
+                    </span>
+                  </div>
+                  {todaySchedule && (
+                    <span className="text-xs text-gray-500">
+                      {formatTime(todaySchedule.start_time)} - {formatTime(todaySchedule.end_time)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -558,7 +504,7 @@ export default function SchedulingPage() {
     <div>
       <PageHeader
         title="Staff Scheduling"
-        description="Manage employee work schedules and blocked dates"
+        description="View staff availability and manage shop-wide blocked dates"
         action={
           <Link href="/admin/appointments">
             <Button variant="outline" size="sm">
@@ -569,28 +515,31 @@ export default function SchedulingPage() {
         }
       />
 
-      <div className="mt-6">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="schedules">
-              <Clock className="mr-1.5 h-4 w-4" />
-              Weekly Schedules
-            </TabsTrigger>
-            <TabsTrigger value="blocked">
-              <CalendarOff className="mr-1.5 h-4 w-4" />
-              Blocked Dates
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="schedules">
-            <WeeklySchedulesTab />
-          </TabsContent>
-
-          <TabsContent value="blocked">
-            <BlockedDatesTab />
-          </TabsContent>
-        </Tabs>
+      {/* Today's Staff Dashboard */}
+      <div className="mt-6 mb-6">
+        <TodayStaffCard />
       </div>
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="schedules">
+            <Clock className="mr-1.5 h-4 w-4" />
+            Staff Schedules
+          </TabsTrigger>
+          <TabsTrigger value="blocked">
+            <CalendarOff className="mr-1.5 h-4 w-4" />
+            Shop Holidays
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="schedules">
+          <WeeklySchedulesTab />
+        </TabsContent>
+
+        <TabsContent value="blocked">
+          <BlockedDatesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

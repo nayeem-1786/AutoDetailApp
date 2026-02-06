@@ -103,7 +103,7 @@ export function CancelAppointmentDialog({
               step="0.01"
               min="0"
               placeholder="0.00"
-              {...register('cancellation_fee')}
+              {...register('cancellation_fee', { valueAsNumber: true })}
             />
           </FormField>
         </form>

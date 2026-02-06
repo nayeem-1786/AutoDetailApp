@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { employeeUpdateSchema, type EmployeeUpdateInput } from '@/lib/utils/validation';
 import { ROLE_LABELS } from '@/lib/utils/constants';
 import { formatPhoneInput } from '@/lib/utils/format';
-import type { Employee, Permission, UserRole } from '@/lib/supabase/types';
+import type { Employee, Permission, UserRole, EmployeeSchedule } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,45 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Calendar, Trash2, CalendarOff, Plus } from 'lucide-react';
+
+// Schedule constants
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
+
+interface DaySchedule {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
+}
+
+function buildDefaultWeek(): DaySchedule[] {
+  return DISPLAY_ORDER.map((day) => ({
+    day_of_week: day,
+    start_time: '09:00',
+    end_time: '17:00',
+    is_available: day >= 1 && day <= 5, // Mon-Fri default
+  }));
+}
+
+function mergeScheduleWithDefaults(existing: EmployeeSchedule[]): DaySchedule[] {
+  const defaults = buildDefaultWeek();
+  const existingMap = new Map(existing.map((s) => [s.day_of_week, s]));
+
+  return defaults.map((d) => {
+    const ex = existingMap.get(d.day_of_week);
+    if (ex) {
+      return {
+        day_of_week: ex.day_of_week,
+        start_time: ex.start_time.slice(0, 5),
+        end_time: ex.end_time.slice(0, 5),
+        is_available: ex.is_available,
+      };
+    }
+    return d;
+  });
+}
 
 // Permission categories and keys for the permission override UI
 const PERMISSION_CATEGORIES: Record<string, { label: string; keys: string[] }> = {
@@ -124,13 +162,17 @@ type OverrideState = 'default' | 'grant' | 'deny';
 export default function StaffDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const supabase = createClient();
+
+  // Get initial tab from URL query param (e.g., ?tab=schedule)
+  const initialTab = searchParams.get('tab') || 'profile';
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState('profile');
+  const [tab, setTab] = useState(initialTab);
   const [showDeactivate, setShowDeactivate] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
 
@@ -139,6 +181,23 @@ export default function StaffDetailPage() {
   const [employeePermissions, setEmployeePermissions] = useState<Permission[]>([]);
   const [overrides, setOverrides] = useState<Record<string, OverrideState>>({});
   const [savingPermissions, setSavingPermissions] = useState(false);
+
+  // Schedule state
+  const [schedule, setSchedule] = useState<DaySchedule[]>(buildDefaultWeek());
+  const [scheduleDirty, setScheduleDirty] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
+  // Blocked dates state
+  interface BlockedDate {
+    id: string;
+    date: string;
+    reason: string | null;
+  }
+  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
+  const [newBlockedDate, setNewBlockedDate] = useState('');
+  const [newBlockedReason, setNewBlockedReason] = useState('');
+  const [addingBlocked, setAddingBlocked] = useState(false);
+  const [deletingBlockedId, setDeletingBlockedId] = useState<string | null>(null);
 
   const {
     register,
@@ -179,8 +238,8 @@ export default function StaffDetailPage() {
       bookable_for_appointments: data.bookable_for_appointments,
     });
 
-    // Load permissions
-    const [rolePermsRes, empPermsRes] = await Promise.all([
+    // Load permissions, schedule, and blocked dates
+    const [rolePermsRes, empPermsRes, scheduleRes, blockedRes] = await Promise.all([
       supabase
         .from('permissions')
         .select('*')
@@ -190,6 +249,16 @@ export default function StaffDetailPage() {
         .from('permissions')
         .select('*')
         .eq('employee_id', id),
+      supabase
+        .from('employee_schedules')
+        .select('*')
+        .eq('employee_id', id)
+        .order('day_of_week'),
+      supabase
+        .from('blocked_dates')
+        .select('id, date, reason')
+        .eq('employee_id', id)
+        .order('date'),
     ]);
 
     if (rolePermsRes.data) setRolePermissions(rolePermsRes.data);
@@ -201,6 +270,17 @@ export default function StaffDetailPage() {
         ovMap[p.permission_key] = p.granted ? 'grant' : 'deny';
       });
       setOverrides(ovMap);
+    }
+
+    // Load schedule
+    if (scheduleRes.data) {
+      setSchedule(mergeScheduleWithDefaults(scheduleRes.data));
+    }
+    setScheduleDirty(false);
+
+    // Load blocked dates
+    if (blockedRes.data) {
+      setBlockedDates(blockedRes.data);
     }
 
     setLoading(false);
@@ -329,6 +409,102 @@ export default function StaffDetailPage() {
     }
   }
 
+  function updateScheduleDay(dayOfWeek: number, field: keyof DaySchedule, value: string | boolean) {
+    setSchedule((prev) => {
+      const days = [...prev];
+      const idx = days.findIndex((d) => d.day_of_week === dayOfWeek);
+      if (idx >= 0) {
+        days[idx] = { ...days[idx], [field]: value };
+      }
+      return days;
+    });
+    setScheduleDirty(true);
+  }
+
+  async function handleSaveSchedule() {
+    setSavingSchedule(true);
+    try {
+      // Delete existing schedules for this employee
+      const { error: deleteError } = await supabase
+        .from('employee_schedules')
+        .delete()
+        .eq('employee_id', id);
+
+      if (deleteError) throw deleteError;
+
+      // Insert all schedule entries
+      const rows = schedule.map((d) => ({
+        employee_id: id,
+        day_of_week: d.day_of_week,
+        start_time: d.start_time,
+        end_time: d.end_time,
+        is_available: d.is_available,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('employee_schedules')
+        .insert(rows);
+
+      if (insertError) throw insertError;
+
+      toast.success('Schedule saved successfully');
+      setScheduleDirty(false);
+    } catch (err) {
+      console.error('Save schedule error:', err);
+      toast.error('Failed to save schedule');
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
+  async function handleAddBlockedDate() {
+    if (!newBlockedDate) return;
+    setAddingBlocked(true);
+    try {
+      const { data, error } = await supabase
+        .from('blocked_dates')
+        .insert({
+          employee_id: id,
+          date: newBlockedDate,
+          reason: newBlockedReason || null,
+        })
+        .select('id, date, reason')
+        .single();
+
+      if (error) throw error;
+
+      setBlockedDates((prev) => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)));
+      setNewBlockedDate('');
+      setNewBlockedReason('');
+      toast.success('Blocked date added');
+    } catch (err) {
+      console.error('Add blocked date error:', err);
+      toast.error('Failed to add blocked date');
+    } finally {
+      setAddingBlocked(false);
+    }
+  }
+
+  async function handleDeleteBlockedDate(blockedId: string) {
+    setDeletingBlockedId(blockedId);
+    try {
+      const { error } = await supabase
+        .from('blocked_dates')
+        .delete()
+        .eq('id', blockedId);
+
+      if (error) throw error;
+
+      setBlockedDates((prev) => prev.filter((bd) => bd.id !== blockedId));
+      toast.success('Blocked date removed');
+    } catch (err) {
+      console.error('Delete blocked date error:', err);
+      toast.error('Failed to remove blocked date');
+    } finally {
+      setDeletingBlockedId(null);
+    }
+  }
+
   if (loading || !employee) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -353,6 +529,12 @@ export default function StaffDetailPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          {employee.bookable_for_appointments && (
+            <TabsTrigger value="schedule">
+              <Calendar className="mr-1.5 h-4 w-4" />
+              Schedule
+            </TabsTrigger>
+          )}
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
         </TabsList>
 
@@ -460,6 +642,195 @@ export default function StaffDetailPage() {
             </div>
           </form>
         </TabsContent>
+
+        {/* Schedule Tab */}
+        {employee.bookable_for_appointments && (
+          <TabsContent value="schedule">
+            <Card>
+              <CardHeader>
+                <CardTitle>Weekly Schedule</CardTitle>
+                <p className="text-sm text-gray-500">
+                  Set the days and times when {employee.first_name} is available for appointments.
+                  This schedule determines when customers can book services.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {/* Header row */}
+                  <div className="hidden sm:grid sm:grid-cols-[140px_80px_1fr_1fr] items-center gap-3 text-xs font-medium text-gray-500 uppercase tracking-wide px-1">
+                    <span>Day</span>
+                    <span>Available</span>
+                    <span>Start Time</span>
+                    <span>End Time</span>
+                  </div>
+
+                  {schedule.map((day) => (
+                    <div
+                      key={day.day_of_week}
+                      className="grid grid-cols-1 sm:grid-cols-[140px_80px_1fr_1fr] items-center gap-2 sm:gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2.5"
+                    >
+                      <span className="text-sm font-medium text-gray-700">
+                        {DAY_NAMES[day.day_of_week]}
+                      </span>
+
+                      <div className="flex items-center gap-2 sm:gap-0">
+                        <span className="text-xs text-gray-400 sm:hidden">Available:</span>
+                        <Switch
+                          checked={day.is_available}
+                          onCheckedChange={(val) =>
+                            updateScheduleDay(day.day_of_week, 'is_available', val)
+                          }
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 sm:hidden whitespace-nowrap">Start:</span>
+                        <Input
+                          type="time"
+                          value={day.start_time}
+                          onChange={(e) =>
+                            updateScheduleDay(day.day_of_week, 'start_time', e.target.value)
+                          }
+                          disabled={!day.is_available}
+                          className="text-sm"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 sm:hidden whitespace-nowrap">End:</span>
+                        <Input
+                          type="time"
+                          value={day.end_time}
+                          onChange={(e) =>
+                            updateScheduleDay(day.day_of_week, 'end_time', e.target.value)
+                          }
+                          disabled={!day.is_available}
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                  <Button
+                    onClick={handleSaveSchedule}
+                    disabled={savingSchedule || !scheduleDirty}
+                  >
+                    {savingSchedule ? 'Saving...' : 'Save Schedule'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Blocked Dates */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarOff className="h-4 w-4" />
+                  Time Off / Blocked Dates
+                </CardTitle>
+                <p className="text-sm text-gray-500">
+                  Block specific dates when {employee.first_name} is unavailable (vacation, sick days, etc.)
+                </p>
+              </CardHeader>
+              <CardContent>
+                {/* Add blocked date form */}
+                <div className="flex flex-wrap items-end gap-3 pb-4 border-b border-gray-100">
+                  <div>
+                    <label htmlFor="blocked-date" className="block text-xs font-medium text-gray-500 mb-1">
+                      Date
+                    </label>
+                    <Input
+                      id="blocked-date"
+                      type="date"
+                      value={newBlockedDate}
+                      onChange={(e) => setNewBlockedDate(e.target.value)}
+                      className="w-40"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label htmlFor="blocked-reason" className="block text-xs font-medium text-gray-500 mb-1">
+                      Reason (optional)
+                    </label>
+                    <Input
+                      id="blocked-reason"
+                      type="text"
+                      placeholder="e.g., Vacation, Doctor's appointment"
+                      value={newBlockedReason}
+                      onChange={(e) => setNewBlockedReason(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleAddBlockedDate}
+                    disabled={!newBlockedDate || addingBlocked}
+                    size="sm"
+                  >
+                    {addingBlocked ? (
+                      <Spinner size="sm" className="text-white" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    Add
+                  </Button>
+                </div>
+
+                {/* List of blocked dates */}
+                {blockedDates.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">
+                    No blocked dates. {employee.first_name} is available on all scheduled days.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-100 mt-3">
+                    {blockedDates.map((bd) => {
+                      const dateObj = new Date(bd.date + 'T12:00:00');
+                      const formattedDate = dateObj.toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      });
+                      const isPast = new Date(bd.date) < new Date(new Date().toDateString());
+
+                      return (
+                        <div
+                          key={bd.id}
+                          className={`flex items-center justify-between py-2.5 ${isPast ? 'opacity-50' : ''}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <CalendarOff className="h-4 w-4 text-red-400" />
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{formattedDate}</p>
+                              {bd.reason && (
+                                <p className="text-xs text-gray-500">{bd.reason}</p>
+                              )}
+                            </div>
+                            {isPast && (
+                              <Badge variant="secondary">Past</Badge>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteBlockedDate(bd.id)}
+                            disabled={deletingBlockedId === bd.id}
+                            className="text-gray-400 hover:text-red-600"
+                          >
+                            {deletingBlockedId === bd.id ? (
+                              <Spinner size="sm" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {/* Permissions Tab */}
         <TabsContent value="permissions">

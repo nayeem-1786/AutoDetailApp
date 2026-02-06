@@ -39,9 +39,11 @@ export default function AppointmentsPage() {
   const [activeAppointment, setActiveAppointment] = useState<AppointmentWithRelations | null>(null);
 
   // Group appointments by date for O(1) lookup
+  // Normalize date key to yyyy-MM-dd format (database may return with time component)
   const appointmentsByDate: Record<string, AppointmentWithRelations[]> = {};
   for (const appt of appointments) {
-    const key = appt.scheduled_date;
+    // Handle both '2026-02-06' and '2026-02-06T00:00:00' formats
+    const key = appt.scheduled_date.split('T')[0];
     if (!appointmentsByDate[key]) appointmentsByDate[key] = [];
     appointmentsByDate[key].push(appt);
   }

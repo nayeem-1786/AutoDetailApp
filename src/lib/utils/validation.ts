@@ -360,11 +360,12 @@ export const customerProfileSchema = z.object({
 });
 
 // Appointment update schema (admin edit)
+// Time regex accepts HH:MM or HH:MM:SS (database may return with seconds)
 export const appointmentUpdateSchema = z.object({
   status: z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show']).optional(),
   scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format').optional(),
-  scheduled_start_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional(),
-  scheduled_end_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format').optional(),
+  scheduled_start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Invalid time format').optional(),
+  scheduled_end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Invalid time format').optional(),
   employee_id: z.union([z.string().uuid(), z.literal('')]).optional().nullable(),
   job_notes: optionalString,
   internal_notes: optionalString,
@@ -373,7 +374,12 @@ export const appointmentUpdateSchema = z.object({
 // Appointment cancel schema
 export const appointmentCancelSchema = z.object({
   cancellation_reason: z.string().min(1, 'Cancellation reason is required'),
-  cancellation_fee: z.number().min(0, 'Must be 0 or greater').optional().nullable(),
+  cancellation_fee: z.union([
+    z.number().min(0, 'Must be 0 or greater'),
+    z.nan().transform(() => undefined),
+    z.undefined(),
+    z.null(),
+  ]).optional().nullable(),
 });
 
 // ---------------------------------------------------------------------------
