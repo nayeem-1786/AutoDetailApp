@@ -1,487 +1,127 @@
 # Auto Detail App — Session Context
 
 ## Project
-Smart Details Auto Spa — custom POS, booking, portal, and admin system replacing Square.
-Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `docs/COUPONS.md`, `docs/DASHBOARD_RULES.md`, `docs/DATA_MIGRATION_RULES.md`, `docs/SERVICE_CATALOG.md`, `docs/iPAD.md`, `docs/POS_SECURITY.md`
+Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacing Square.
+
+## Companion Documents
+| Document | When to Use |
+|----------|-------------|
+| `docs/PROJECT.md` | Master spec — architecture, tech stack, features, all 12 build phases, RBAC permissions, database schema. Start here for any planning. |
+| `docs/CONVENTIONS.md` | Component APIs, auth patterns, file naming, project conventions. Reference when writing new code. |
+| `docs/SERVICE_CATALOG.md` | All 30 services with pricing, vehicle compatibility, add-on rules, combo pricing. Reference when touching service/pricing logic. |
+| `docs/DASHBOARD_RULES.md` | Admin dashboard navigation and UI structure — every page, section, feature. Reference when building admin pages. |
+| `docs/DATA_MIGRATION_RULES.md` | Square data import rules — customer tiers, phone normalization, product mapping. Reference if revisiting migration. |
+| `docs/COUPONS.md` | Coupon engine rules, types, validation logic, lifecycle. Reference when touching coupon/discount code. |
+| `docs/POS_SECURITY.md` | POS IP whitelist, HMAC auth, idle timeout. Reference when touching POS auth or security. |
+| `docs/iPAD.md` | iPad POS optimization features — touch targets, PWA, offline support, gestures. Reference for Phase 12. |
+| `docs/CHANGELOG.md` | Archived session history — all bug fixes (44+), feature details, file lists. Reference for "what changed" questions. |
 
 ---
 
-## 🔴 ACTIVE WORK — Phase 3 Testing & Bug Fixes
+## Build Phase Status
 
-**Strategy:** Test each module thoroughly, fix bugs before moving to next phase.
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **1** | Foundation, Auth & Data Model | Done |
+| **2** | POS Application | Done |
+| **3** | Booking, Quotes & 11 Labs API | Done |
+| **4** | Customer Portal | Done |
+| **5** | Marketing, Coupons & Campaigns | Partial (see below) |
+| **6** | Inventory Management | Not started |
+| **7** | QuickBooks Integration & Reporting | Not started |
+| **8** | Photo Documentation | Not started |
+| **9** | Online Store (WooCommerce Sync) | Not started |
+| **10** | Recurring Services (Dormant) | Not started |
+| **11** | Intelligence & Growth | Not started |
+| **12** | iPad POS Optimization | Not started |
 
-### Testing Queue (Admin Tabs)
-| Tab | Status | Notes |
-|-----|--------|-------|
-| Online Booking | ✅ Done | Payment flow tested with coupons, loyalty points, edge cases |
-| Appointments | 🔄 In Progress | Cancel flow fixed, calendar date key fixed, status dropdown fixed |
-| Quotes | 🔄 In Progress | Admin refactored to read-only + POS deep-links. Create/edit via POS builder. Send/resend/convert tested. |
-| Waitlist | ⏳ Pending | Join, auto-notify, admin management |
-| Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
-| 11 Labs API | ⏳ Pending | All 6 endpoints |
+### Phase 5 — What's Done
+- Coupon engine (CRUD, validation, types, POS integration, wizard with duplicate/usage warnings)
+- Campaign system (CRUD, audience filters, scheduling, SMS/email, deep-links)
+- Dynamic receipt config (branding from DB, logo upload, printer settings)
+- Customer management (portal access toggle, auto-link by phone, delete with cascade)
+- Notification preferences (4-toggle system, public unsubscribe page)
+- Dark mode (all public pages + email templates + shared UI components)
+- Password reset flows (admin + customer login pages)
+- Unified SendMethodDialog (single component for all send flows)
+- Session expiry protection (3-layer: periodic check, focus check, fetch interceptor)
+- Dynamic business info (zero hardcoded values)
 
-### 🧪 NEXT SESSION: Review & Refine UI Changes
-**Last session:** 2026-02-07 — Admin quotes refactored to read-only with POS deep-links, PIN collision safeguards, dashboard open quotes fix, Week at a Glance on appointments page, calendar condensed.
-**Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable, `employees_pin_code_unique` index)
-
-**Remaining Quotes Test Checklist:**
-- [x] Create new quote — now via POS deep-link (`/pos/quotes?mode=builder`)
-- [x] Edit draft quote — now via POS deep-link (`/pos/quotes?mode=builder&quoteId=<id>`)
-- [x] Send quote via email (HTML template with "View Your Estimate" button)
-- [x] Send quote via SMS (short URL /q/[token])
-- [ ] Send quote via both
-- [ ] View quote link (public page)
-- [ ] Accept quote (public page)
-- [x] Resend quote (from non-draft detail page)
-- [x] "Last Contacted" column shows in list
-- [x] Communication History shows all sends with timestamps
-- [x] Convert quote to appointment (now works for any open status, creates as 'confirmed', shows send-confirmation dialog)
-- [ ] Delete draft quote — via POS builder
-- [x] Customer card shows stats (member since, lifetime spend, loyalty points)
-- [x] Customer detail page has Quotes tab with stats and history
-
-**Remaining Appointments Test Checklist:**
-- [x] Calendar view loads with correct appointments (fixed date key normalization)
-- [ ] Create new appointment (admin-side)
-- [x] Edit appointment (date/time/services/vehicle) - fixed time format validation
-- [x] Cancel appointment with confirmation (fixed $0.00 fee, cancel via status dropdown now opens dialog)
-- [x] Status changes (pending → confirmed → completed) - fixed status dropdown cancellation interception
-- [ ] Reschedule flow
-- [x] Email/SMS notifications sent correctly (post-conversion confirmation via NotifyCustomerDialog)
-- [ ] Mobile responsive layout
-
-**Completed Tests (Online Booking):**
-- [x] Portal booking hides "Your Info" card for signed-in users
-- [x] Loyalty points slider works, reaches max value
-- [x] Coupon eligibility shows for service-restricted coupons
-- [x] Ineligible coupons display with reason and disabled Apply button
-- [x] Payment step simplified (security badges + Powered by Stripe only)
-- [x] 100% discount coupons skip payment step (shows "Complete Booking" button)
-- [x] Coupon single-use validation shows date when coupon was used
-- [x] Coupon wizard validates duplicate codes before next step
-- [x] Coupon wizard warns when editing a coupon with usage history
-- [x] Coupon + loyalty points combination auto-caps loyalty to remaining balance
-- [x] Amounts under $0.50 skip Stripe payment (below minimum)
-- [x] Booking confirmation shows $0.00 for amounts under $0.50
-- [x] Database columns populated correctly for all payment scenarios
-
-### Bugs Found (Pending)
-| # | Module | Description | Status |
-|---|--------|-------------|--------|
-| — | — | — | — |
-
-### Bugs Fixed (2026-02-06 — Session 5)
-| # | Module | Description | Fix Summary |
-|---|--------|-------------|-------------|
-| 44 | Auth | No "Forgot Password?" on admin or customer login pages | Added inline forgot-password flow to both `/login` and `/signin` pages. New auth callback route (`/auth/callback`) for Supabase token exchange. New reset-password pages for admin (`/login/reset-password`) and customer (`/signin/reset-password`). |
-| 43 | Auth | Password reset redirectTo pointed to nonexistent `/portal/reset-password` | Fixed in customer profile page and admin reset-password API route to use `/auth/callback?next=/signin/reset-password`. |
-| 42 | Quotes | Accept quote has no confirmation dialog | Added confirmation step to public quote accept button — shows amount, "Yes, Accept" / "Go Back" buttons. |
-| 41 | Admin | Staff can't change their own password from admin dropdown | Added "Change Password" button to admin account dropdown menu. Sends reset email via `resetPasswordForEmail` redirecting to `/login/reset-password`. |
-| 40b | Admin | Staff email updates don't sync to Supabase Auth | Created API route `PATCH /api/admin/staff/[id]` that updates both `employees` table and `auth.users` via `auth.admin.updateUserById()`. Reverts on auth failure. Staff detail page now calls API instead of direct DB update. |
-
-### Bugs Fixed (2026-02-06 — Session 2)
-| # | Module | Description | Fix Summary |
-|---|--------|-------------|-------------|
-| 38 | Portal | Customer portal has zero session expiry protection | Added full 3-layer protection to `customer-auth-provider.tsx`: periodic `getUser()` validation (60s), window focus check, global fetch interceptor for 401s on `/account` routes. Redirects to `/signin?reason=session_expired`. |
-| 37 | Admin | Session periodic check uses cached `getSession()` — never detects expired tokens | Changed `getSession()` → `getUser()` in `auth-provider.tsx` validateSession. `getUser()` makes actual HTTP call to Supabase to verify token validity. |
-| 39 | Auth | Customer signin page doesn't show session expired message | Added `?reason=session_expired` query param handling with amber notification banner on signin page. |
-| 40 | All | Business name/phone/address hardcoded across 26 files | Created `useBusinessInfo()` hook for client components, converted all pages to use `getBusinessInfo()` or the hook. Removed `BUSINESS` object and `SITE_NAME` from constants.ts. SEO metadata functions now accept `businessName` parameter. |
-
-### Bugs Fixed (2026-02-06 — Session 1)
-| # | Module | Description | Fix Summary |
-|---|--------|-------------|-------------|
-| 36 | Appointments | Calendar doesn't show appointments for today | Fixed date key normalization - `scheduled_date.split('T')[0]` handles both `2026-02-06` and `2026-02-06T00:00:00` formats. |
-| 35 | Appointments | Cancellation fee $0.00 shows "expected number, received string" | Added `valueAsNumber: true` to register, updated schema to handle NaN. |
-| 34 | Appointments | Selecting "Cancelled" status shows time format error | Fixed time regex to accept `HH:MM` and `HH:MM:SS`. Added status interception - selecting "Cancelled" now opens cancel dialog. |
-| 33 | Appointments | No times available for booking today | `booking_config.advance_days_min: 1` prevents same-day booking. User can change to 0 in database for same-day bookings. |
-| 32 | Admin | Session expiry shows empty pages instead of redirecting | Added 3-layer protection: periodic check (60s), window focus check, global fetch interceptor for 401s. All admin pages now auto-redirect to login on session expiry. |
-| 31 | Portal | Header shows "My Account" instead of personalized greeting | Changed to "Hello, {first_name}" for logged-in customers in `site-header.tsx`. |
-| 30 | Booking | Confirmation shows $0.01 when discounts cover amount | Amounts under $0.50 now display as $0.00 with "Fully covered by discounts" message. |
-| 29 | Booking | Booking fails when discounts cover full amount | Set `payment_option: 'full'` and `deposit_amount: 0` when grandTotal < $0.50. Previously sent `pay_on_site` which was semantically incorrect. |
-| 28 | Booking | Payment intent fails for amounts under $0.50 | Added Stripe minimum check ($0.50) - amounts below skip payment step entirely. Added validation to `/api/book/payment-intent` as safety net. |
-| 27 | Booking | Loyalty points can exceed remaining balance after coupon | When coupon is applied, `loyaltyPointsToUse` now auto-caps to remaining balance. Slider max updates dynamically. Shows message when coupon covers full amount. |
-| 26 | Booking | Pre-existing TypeScript errors in booking-wizard | Fixed missing Button import, `state.addons` → `state.config?.addons`, `handlePaymentSuccess(null)` → `handleConfirm()`. |
-
-### Bugs Fixed (2026-02-05)
-| # | Module | Description | Fix Summary |
-|---|--------|-------------|-------------|
-| 25 | Booking | Payment fails when coupon covers full amount | Booking wizard now handles $0 totals - shows "Your discounts cover the full amount" message with "Complete Booking" button instead of trying to initialize Stripe payment. |
-| 24 | Coupons | Delete coupon only disables instead of deleting | DELETE endpoint was soft-deleting (setting status to 'disabled'). Changed to actually delete coupon_rewards first, then delete the coupon. |
-| 23 | Coupons | Single-use error message unclear | Changed "You have already used this coupon" to "This customer already used this coupon on [date]" with the actual usage date shown. |
-| 21 | Coupons | Customer search doesn't work in coupon wizard | Wizard was using POS endpoint (`/api/pos/customers/search`) which requires POS auth. Created new admin endpoint `/api/admin/customers/search` that searches by name or phone with admin auth. |
-| 22 | Coupons | Duplicate coupon code not validated before next step | Added validation in `goNext()` on basics step - checks if code already exists (excluding current coupon). Shows inline error and toast. Prevents navigation until fixed. |
-| 20 | Coupons | Editing used coupon doesn't warn about side effects | Added warning dialog when editing a coupon with `use_count > 0`. Shows usage stats and explains that single-use checks will still apply. Options: Cancel, Update Anyway, or Create as New Coupon. |
-| 19 | Admin | Session expiry shows empty pages instead of redirecting to login | Created `adminFetch()` wrapper that handles 401 responses by redirecting to `/login?reason=session_expired`. Updated coupons page to use it. Login page now shows "Your session has expired" message when redirected. |
-| 18 | Portal | Customer dashboard coupons not displaying | `/api/customer/coupons` was filtering `.eq('customer_id', customer.id)` which only matched coupons assigned to specific customers. Fixed to use `.or('customer_id.eq.X,customer_id.is.null')` to include global coupons (NULL = anyone). Also added tag-based filtering for coupons with `customer_tags` requirements. |
-| 1 | POS | Stripe Terminal WisePOS E "No established connection" | Added `collectInProgress` flag + `isProcessingRef` guard for React 18 Strict Mode |
-| 2 | Booking | No fallback when no bookable detailers exist | Added fallback to super_admin (Nayeem) if no detailers found |
-| 3 | Booking | Paid online bookings start as "pending" | Auto-confirm paid bookings (payment_intent_id exists → status = 'confirmed') |
-| 4 | Booking | Payment step never integrated into wizard | Integrated StepPayment into BookingWizard as step 6, controlled by `online_booking_payment` feature flag |
-| 5 | Marketing | Coupons and Campaigns pages show empty (data exists in DB) | Admin pages used `createClient()` (anon key) which respects RLS. Fixed API routes to use `createAdminClient()` (service role) to bypass RLS. Updated: `api/marketing/coupons/route.ts`, `api/marketing/coupons/[id]/route.ts`, `api/marketing/campaigns/route.ts`, `api/marketing/campaigns/[id]/route.ts`, and admin list pages to fetch via API |
-| 6 | Booking | Flexible payment options (deposit vs pay on site) | Implemented deposit ($50 or service total if less) and pay on site options. New customers must pay deposit; existing customers (visit_count > 0) can choose. Added coupon validation in Review step. New DB columns: payment_type, deposit_amount, coupon_code, coupon_discount |
-| 7 | Booking | Phone field shows E.164 format on prefill | Added `formatInitialPhone()` to convert E.164 (`+14243637450`) to display format `(424) 363-7450` on form load |
-| 8 | Booking | Duplicate vehicles created on repeat bookings | Added duplicate check in `/api/book` - reuses existing vehicle if same make/model/year/color for customer |
-| 9 | Booking | Coupon section unclear | Improved UX with explanatory text, tooltips, detailed coupon info (discount, requirements, expiry) |
-| 10 | Booking | Missing loyalty points redemption | Added loyalty points section for portal users with 100+ points, slider to select points, live discount calculation |
-| 11 | Booking | Payment rules not enforced | Under $100: full payment required. $100+: $50 deposit. Added cancellation/no-show $50 fee disclaimer |
-| 12 | Booking | "Your Info" shown for signed-in users | Hidden for portal bookings since customer already known |
-| 13 | Booking | coupon_rewards table missing RLS policies | Added RLS policies for coupon_rewards + anon select policies for public booking flow |
-| 14 | Booking | Coupons not validated against service requirements | Added service-based validation in `/api/book/validate-coupon` - checks `requires_service_ids`, `requires_service_category_ids`, and reward target services. Shows clear error when coupon doesn't apply to selected services |
-| 15 | Booking | Available coupons show without eligibility info | Updated `/api/book/check-customer` to return `is_eligible` and `ineligibility_reason` for each coupon. UI shows disabled coupons with warning badge and reason |
-| 16 | Booking | Loyalty slider can't reach max value | Fixed by rounding `maxLoyaltyPointsUsable` down to nearest 100 (REDEEM_MINIMUM) |
-| 17 | Booking | Payment step UI inconsistent | Simplified to show only security badges + "Powered by Stripe". Removed all card/wallet logos. Changed "Pay now" to "Amount Due" |
-
-### Known Issues (Low Priority)
-| # | Module | Description | Workaround |
-|---|--------|-------------|------------|
-| 1 | Admin | Other admin pages (39 total) use direct `createClient()` queries which could fail if RLS `is_employee()` check doesn't evaluate correctly | RLS policies use `is_employee()` which SHOULD work for logged-in staff. If any admin page shows empty data, fix by: 1) Create/update API route to use `createAdminClient()` after auth check, 2) Update page to fetch via API. Already fixed: coupons, campaigns. Monitor other pages. |
-
-### Test Checklist Template
-When testing each module, verify:
-- [ ] List view loads correctly
-- [ ] Create new item works
-- [ ] Edit existing item works
-- [ ] Delete/cancel works with confirmation
-- [ ] Status changes work
-- [ ] Related data updates (e.g., customer, vehicle)
-- [ ] Email/SMS sends correctly (where applicable)
-- [ ] Error states handled gracefully
-- [ ] Mobile/responsive layout works
-
----
-
-## Current Status
-- **Phases 1–4:** Complete (Foundation, POS, Booking/Quotes/11Labs, Customer Portal)
-- **Phase 5 (Marketing, Coupons & Campaigns):** In progress — partially built
-- **Phase 12 (iPad POS Optimization):** Planned — see `docs/iPAD.md`
-- **POS Auth Decoupling:** Complete — POS uses independent HMAC token auth, fully separated from admin Supabase sessions
-
-## Phase 5 — What's Done
-- Coupon engine: CRUD, code validation at POS, types (flat/$/%/free item/free product), expiry, single-use, min purchase, max discount cap
-- Coupon list UI: filters (active/draft/disabled/expired), search, delete with confirmation
-- Campaign system: CRUD, audience filters, message composer (SMS/email), coupon attachment, scheduling
-- Campaign list UI: status badges, delete with confirmation
-- Campaign deep-link: "Book Now" links with customer auto-fill
-- Mailgun webhook endpoint for email delivery tracking
-- Customer type/tags system (enthusiast, detailer) with POS badges
-- POS Promotions tab for applying coupons
-- Consent validation warnings on campaigns
-- Settings grouped into sections
-- CONVENTIONS.md shared foundation doc created and referenced from all module docs
-- **Dynamic Receipt Config:** Receipts pull branding from DB settings instead of hardcoded constants. Business Profile has website/email fields. Receipt Printer settings page with header overrides, logo upload (Supabase Storage `receipt-assets` bucket), logo width/position/alignment, custom text with placement options. All receipt API routes (print/email/sms) and client-side generators use `fetchReceiptConfig()` merge helper. Cashier first name shown on receipts. Preview button on settings page. Receipt buttons unified across admin and POS (Print, Email, SMS, Receipt) with consistent styling.
-- **Customer Detail Page:** Combined Customer Type + Customer Journey card with vertical divider. Journey shows Since/Visits/Lifetime/Last Visit as pill-shaped stats. Receipt popup with 4 unified action buttons.
-- **Receipt Discount Display:** Loyalty points now show as "Loyalty (X pts)" with amber color, separate from coupon discounts. Coupon discounts show as "Coupon (CODE)" with coupon code displayed. Print popup window doubled to 900px width.
-- **Notification Preferences:** Customer portal profile page has 4-toggle notification preferences (Appointments/Service Updates required, Promotions/Loyalty optional). Public unsubscribe page at `/unsubscribe/[customerId]` allows preference management without login. New columns: `notify_promotions`, `notify_loyalty` on customers table.
-- **Customer Portal Access Section:** Admin customer detail page (`/admin/customers/[id]`) now has an "Account" section showing portal access status (Active/Deactivated toggle). Admin can activate/deactivate portal access with click. Deactivation preserves auth_user_id in backup column for reactivation. If customer has portal access and email on file, admin can send password reset email. API endpoints at `/api/admin/customers/[id]/portal-access` (POST/DELETE) and `/api/admin/customers/[id]/reset-password`.
-- **Customer Sign-in Auto-Link:** When customers sign in via phone OTP, system automatically links to existing customer record by phone number. API at `/api/customer/link-by-phone` bypasses RLS to search across phone formats (E.164, 10-digit, formatted). Shows "Account Deactivated" message if customer exists but portal access is disabled.
-- **Delete Customer:** Admin customer detail page has red "Delete Customer" button with double confirmation (first warning, then type customer's first name). Cascading deletion removes vehicles, loyalty ledger, consent log, appointments, quotes; transactions are preserved but unlinked. API at `/api/admin/customers/[id]` (DELETE).
-
-## Phase 5 — What's Remaining
+### Phase 5 — What's Remaining
 - Lifecycle automation rules (service-based triggers, configurable timing, vehicle-aware reminders)
 - Two-way SMS (inbound routed to Telegram, reply via Telegram)
 - Google review request automation (post-service with direct link)
 - Campaign analytics (delivery, opens, redemptions, revenue attribution, ROI)
 - A/B testing for campaigns
-- Full TCPA compliance audit (consent capture, opt-out handling complete audit log)
+- Full TCPA compliance audit (consent capture, opt-out handling, audit log)
 
-## Known Gaps (from Phase 1)
-- Product and service edit pages partially implemented — list views exist but individual edit forms need completion
+---
+
+## Testing Checklist
+
+### Quotes (Remaining)
+- [ ] Send quote via both (email + SMS simultaneously)
+- [ ] View public quote link (`/quote/[access_token]`)
+- [ ] Accept quote from public page
+- [ ] Delete draft quote via POS builder
+
+### Appointments (Remaining)
+- [ ] Create new appointment (admin-side)
+- [ ] Reschedule flow
+- [ ] Mobile responsive layout
+
+### Untested Modules
+- [ ] Waitlist (join, auto-notify, admin management)
+- [ ] 11 Labs Voice Agent API (all 6 endpoints)
+- [ ] Dashboard widgets verification
+
+### Completed Tests
+- Online Booking: payment flow, coupons, loyalty, edge cases (all pass)
+- Staff Scheduling: profiles, blocked dates, "Who's Working Today"
+
+---
+
+## Pending Tasks
+
+| Task | Type | Priority |
+|------|------|----------|
+| Fix stale link in customer detail page (`/admin/quotes/new?customer=${id}` → POS deep-link) | Quick fix | High |
+| POS session caching bug (multi-tab stale state, expired session on hard refresh) | Bug fix | Medium |
+| Admin Settings: Role Permissions UI (`/admin/settings/roles-permissions`) | Feature | Medium |
+| Merge duplicate customers (detect and consolidate) | Feature | Medium |
+| URL shortening for customer links (shorter tokens or Bitly integration) | Enhancement | Low |
+| Setup receipt printer integration for POS | Hardware | Low |
+| Test dashboard sections marked as completed | Testing | Low |
+
+### Known Gaps (from Phase 1)
+- Product and service edit pages partially implemented (list views exist, individual edit forms need completion)
 - Some settings sections are placeholder/incomplete (integrations, notifications)
-- Business Profile now has website/email fields; Receipt Printer settings page is complete
+
+---
 
 ## Key Architecture Notes
-- Supabase project: `zwvahzymzardmxixyfim`
-- Super-Admin: nayeem@smartdetailautospa.com
-- Staff: Segundo Cadena (detailer), Joselyn Reyes (cashier), Joana Lira (cashier), Su Khan (admin)
-- Email: Mailgun | SMS: Twilio | Payments: Stripe | Workflows: N8N
-- All admin pages use `'use client'` behind auth; public pages use Server Components for SEO
-- **POS Auth:** HMAC-SHA256 token in `sessionStorage` (`pos_session` key), validated via `X-POS-Session` header. Token utilities in `src/lib/pos/session.ts`, API helper in `src/lib/pos/api-auth.ts`, React context in `src/app/pos/context/pos-auth-context.tsx`, fetch wrapper in `src/app/pos/lib/pos-fetch.ts`
-- **Session Expiry Protection (3-layer):** Both admin (`auth-provider.tsx`) and customer (`customer-auth-provider.tsx`) use: (1) periodic `getUser()` validation every 60s, (2) window focus revalidation, (3) global `window.fetch` interceptor catching 401s. Admin redirects to `/login?reason=session_expired`, customer to `/signin?reason=session_expired`. **CRITICAL:** Use `getUser()` (server-validated) NOT `getSession()` (cached) for session checks.
-- **POS API routes** use `authenticatePosRequest()` + `createAdminClient()` (service role). Admin routes still use cookie-based `createClient()` + `supabase.auth.getUser()`
-- **POS components** use `usePosAuth()` from `pos-auth-context` and `posFetch()` for all API calls. Admin components use `useAuth()` from `auth-provider` unchanged
 
-## Task List
-- [x] Fix loyalty points showing as "Discount" on receipt — now shows "Loyalty (X pts)"
-- [x] Store coupon code on transactions — receipts show "Coupon (CODE)"
-- [x] Notification preferences — 4-toggle system with public unsubscribe page
-- [x] Add Account section to customer detail page (portal access status + password reset)
-- [x] Portal access toggle (Active/Deactivated) with reactivation support
-- [x] Customer sign-in auto-links existing customer records by phone
-- [x] Delete customer with double confirmation
-- [x] Move staff schedules to individual staff profiles (Schedule tab)
-- [x] Move blocked dates to staff profiles (Time Off section)
-- [x] Add "Who's Working Today" dashboard to Staff Scheduling page
-- [ ] **URL Shortening for Customer Links** — Quote links, booking confirmations, and other customer-facing URLs should use a URL shortener service (Bitly API or custom short domain). Currently using `/q/[token]` which shortens path but token is still a full UUID. Options: 1) Generate shorter 8-char alphanumeric tokens, 2) Integrate Bitly/TinyURL API, 3) Custom short domain (e.g., sda.link/abc123).
-- [x] Post-conversion appointment confirmation (NotifyCustomerDialog + notification API endpoints)
-- [x] Dark mode for all public/outbound pages (19 pages + 4 email templates + 8 shared UI components)
-- [x] Replace all alert() popups with toast notifications and inline success states
-- [x] Detailer dropdown in Convert to Appointment dialog (admin + POS)
-- [x] Unified SendMethodDialog component — single reusable send dialog (email/SMS/both) replacing 5 separate implementations
-- [x] Password reset flow on admin and customer login pages (forgot password + reset password pages + auth callback)
-- [x] Accept quote confirmation dialog on public quote page
-- [x] Admin "Change Password" in account dropdown menu
-- [x] Staff email updates sync to Supabase Auth via API route
-- [x] Refactor admin quotes to read-only + POS deep-links (deleted ~1,226 lines, admin creates/edits via POS builder)
-- [x] Unique PIN constraint on employees table (partial unique index, duplicate check in create + update APIs)
-- [x] Dashboard open quotes count excludes drafts (separate card exists for drafts)
-- [x] Week at a Glance on appointments page (below calendar grid)
-- [x] Condensed appointment calendar vertically (h-14→h-10, tighter spacing)
-- [ ] Fix stale link in customer detail page (`/admin/quotes/new?customer=${id}` → POS deep-link)
-- [ ] **Admin Settings: Role Permissions** — Currently role permissions are only seeded via `supabase/seed.sql`. Need admin UI at `/admin/settings/roles-permissions` to view/edit default permissions per role (super_admin, admin, cashier, detailer). Individual employee overrides already work on staff detail page.
-- [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
-- [ ] Merge duplicate customers feature (detect and consolidate)
-- [ ] POS session caching bug — multiple browser tabs cause stale session state; expired session still shows POS screen after hard refresh; investigate sessionStorage sync across tabs
+- **Supabase project:** `zwvahzymzardmxixyfim`
+- **Super-Admin:** nayeem@smartdetailautospa.com
+- **Staff:** Segundo Cadena (detailer), Joselyn Reyes (cashier), Joana Lira (cashier), Su Khan (admin)
+- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | Workflows: N8N
+- **Public pages:** Server Components for SEO. Admin pages: `'use client'` behind auth.
 
-## Next Priority Tasks
-- [x] **FIXED: Stripe Terminal WisePOS E connection** — Race condition in `collectPaymentMethod` caused by React 18 Strict Mode double-mounting. Fixed by adding `collectInProgress` state tracking in `stripe-terminal.ts` and `isProcessingRef` guard in `card-payment.tsx`.
-- [ ] Setup receipt printer integration for POS
+### Auth Patterns
+- **Admin routes:** `createClient()` (cookie-based) + `supabase.auth.getUser()`, then `createAdminClient()` (service role) for data access
+- **POS routes:** `authenticatePosRequest()` (HMAC) + `createAdminClient()`. Components use `usePosAuth()` + `posFetch()`
+- **Customer portal:** `createClient()` with RLS — customers only see their own data
+- **Session checks:** Use `getUser()` (server-validated) NOT `getSession()` (cached)
+- **Session expiry:** `adminFetch()` from `@/lib/utils/admin-fetch` auto-redirects on 401
 
-## Customer Portal Redesign
+### Critical Rules
+- **NEVER hardcode** business name/phone/address/email. Use `getBusinessInfo()` from `@/lib/data/business.ts`
+- **Supabase `.or()` on related tables** doesn't work. Query related table first, then `.in('foreign_key', ids)`
+- **Admin quotes are READ-ONLY.** All creation/editing via POS builder deep-links
+- **POS deep-links:** `/pos/quotes?mode=builder` (new), `?mode=builder&quoteId=<id>` (edit), `?mode=detail&quoteId=<id>` (view)
+- **Customer search:** 2-char min, 300ms debounce, digits → phone search, text → name search
 
-### Design Principles
-- Human-friendly language — no jargon, explain what things do
-- Grouped cards — related items together with clear headers
-- Confirmation dialogs — when turning things off, explain what they'll lose
-- Mirror admin patterns — consistent UI language across the app
-
-### Phase 1: Profile Page Redesign ✓
-- [x] Card 1: Personal Information (First Name, Last Name, Phone, Email locked)
-- [x] Card 2: Communication Channels (SMS/Email toggles with confirmation dialogs)
-- [x] Card 3: Notification Preferences (Required items locked, optional with confirmations)
-- [x] Card 4: Account Security (Change Password, Sign Out All Devices)
-- [x] Human-friendly explanations and tooltips throughout
-
-### Phase 2: Transactions Page ✓
-- [x] Summary stat cards at top (Member Since, Total Visits, Lifetime Spend, Loyalty Balance)
-- [x] DataTable with columns: Date, Receipt #, Vehicle, Status, Total
-- [x] Receipt popup dialog (Print to browser, Email only — no SMS/thermal)
-- [x] Reuse `generateReceiptHtml` from POS
-
-### Phase 3: Loyalty Page ✓
-- [x] Balance card matching admin design (big number + dollar value + progress bar)
-- [x] "How it works" info card with earn/redeem rates in plain language
-- [x] DataTable for Points History: Date, Action, Points, Balance, Description
-
-### Phase 4: Vehicles Page ✓
-- [x] Group vehicles by type with icons (Car, Bike, Truck, Ship, Plane)
-- [x] Cleaner card layout showing Year Make Model, Color, Size, License Plate
-- [x] Human explanation: "Add all your vehicles here so we can track their service history"
-
-### Phase 5: Appointments Edit Flow ✓
-- [x] "Edit Appointment" button on upcoming appointments
-- [x] Change date/time (calendar picker, respects cancellation window)
-- [x] Change vehicle (dropdown of customer's vehicles)
-- [x] Add/remove services (with live price update)
-- [x] Show price difference: "This change will cost $X more" or "You'll save $X"
-- [x] Save button with validation (no confirmation needed - explicit user action)
-
-### Phase 6: Dashboard Polish ✓
-- [x] Coupons section with explanation: "These discounts are ready to use on your next booking"
-- [x] Loyalty points with human explanation: "That's $Y off your next visit"
-- [x] Keep coupons on dashboard (inline during booking not yet implemented)
-- [x] Moved "Book New Appointment" button to header, right-aligned
-
-## Recent Updates
-
-### Admin Quotes Read-Only Refactor, PIN Safeguards, Calendar Condensed (2026-02-07 — Session 6)
-
-**Part A: Admin Quotes → Read-Only + POS Deep-Links**
-- **Deleted** `src/app/admin/quotes/new/page.tsx` (790 lines) and `src/app/admin/quotes/_components/service-picker-dialog.tsx` (436 lines)
-- **Admin list page:** "New Quote" button opens POS builder in new tab (`/pos/quotes?mode=builder`). "Edit" dropdown changed to "Edit in POS" for all statuses via `window.open()`. Empty state button same pattern.
-- **Admin detail page:** Completely rewritten to read-only for all statuses including drafts. Removed all edit state, form fields, edit functions, draft edit JSX (~500 lines removed). Added "Edit in POS" button (primary for drafts, outline for others). Kept: send/resend, convert to appointment, communication history.
-- **POS deep-link support:** `src/app/pos/quotes/page.tsx` rewritten with `useSearchParams()` — `?mode=builder` opens new quote, `?mode=builder&quoteId=<id>` opens existing quote in builder, `?mode=detail&quoteId=<id>` opens detail. Wrapped in `<Suspense>` for Next.js compatibility. Internal navigation still works via callbacks.
-- **Net result:** ~1,700 lines removed (11 files changed, 440 insertions, 2,139 deletions)
-
-**Part B: Employee PIN Collision Safeguards**
-- **Database:** New migration `20260207000001_unique_pin_code.sql` — partial unique index on `pin_code WHERE pin_code IS NOT NULL` (allows multiple NULLs).
-- **Staff create API:** `src/app/api/staff/create/route.ts` — checks for duplicate PIN before creating auth user. Returns 409 with message "PIN already in use by {name}".
-- **Staff update API:** `src/app/api/admin/staff/[id]/route.ts` — same duplicate PIN check excluding current employee.
-
-**Part C: Dashboard & Appointments UI Fixes**
-- **Dashboard open quotes:** `totalOpenQuotes` now excludes drafts (only counts sent + viewed + accepted). Drafts have their own separate stat card.
-- **Appointments "Week at a Glance":** Added 7-day grid below calendar showing appointment count per day with status dots, clickable to select date. Reuses same data from existing `appointments` state.
-- **Calendar condensed:** Day cell height reduced `h-14` → `h-10`, weekday header padding `py-1.5` → `py-1`, header gap `mt-4` → `mt-2`.
-
-**Files changed (11 total, 1 commit):**
-- DELETED: `admin/quotes/new/page.tsx`, `admin/quotes/_components/service-picker-dialog.tsx`
-- MODIFIED: `admin/quotes/page.tsx`, `admin/quotes/[id]/page.tsx`, `pos/quotes/page.tsx`, `admin/appointments/page.tsx`, `admin/appointments/components/appointment-calendar.tsx`, `admin/page.tsx`, `api/admin/staff/[id]/route.ts`, `api/staff/create/route.ts`
-- NEW: `supabase/migrations/20260207000001_unique_pin_code.sql`
-
-### Password Reset, Accept Quote Confirmation, Staff Auth Sync (2026-02-06 — Session 5)
-
-**Part A: Password Reset on Login Pages**
-- **Auth callback route:** `src/app/auth/callback/route.ts` — server-side token exchange for Supabase recovery email links. Exchanges `code` query param for session, redirects to `next` param.
-- **Admin login (`/login`):** Added inline `forgotMode` — "Forgot password?" link toggles to email-only form, calls `resetPasswordForEmail`, shows success message, "Back to sign in" link.
-- **Customer signin (`/signin`):** Same pattern but only shown in email mode. Dark mode styling throughout.
-- **Admin reset page:** `src/app/(auth)/login/reset-password/page.tsx` — new password + confirm form, calls `updateUser({ password })`, redirects to `/admin`.
-- **Customer reset page:** `src/app/(customer-auth)/signin/reset-password/page.tsx` — same flow with customer layout (SiteHeader/SiteFooter), dark mode, redirects to `/account`.
-- **Fixed broken redirectTo:** Customer profile page and admin reset-password API route both pointed to nonexistent `/portal/reset-password`. Updated to `/auth/callback?next=/signin/reset-password`.
-- **Middleware:** Added `/auth/callback` to PUBLIC_ROUTES.
-- **Supabase config:** Added `http://127.0.0.1:3000/auth/callback` to `additional_redirect_urls`.
-
-**Part B: Accept Quote Confirmation**
-- **Public quote page:** Accept button now shows confirmation step with amount, "Yes, Accept" / "Go Back" buttons before calling the accept API.
-
-**Part C: Staff Password Change & Email Auth Sync**
-- **Admin dropdown:** Added "Change Password" button (KeyRound icon) to account dropdown in `admin-shell.tsx`. Sends `resetPasswordForEmail` with redirect to `/login/reset-password`.
-- **Staff update API:** New `PATCH /api/admin/staff/[id]` route — updates `employees` table AND syncs email to `auth.users` via `auth.admin.updateUserById()` when email changes. Reverts employee record on auth failure.
-- **Staff detail page:** `onSaveProfile` now calls API route instead of direct Supabase table update. Surfaces specific error messages.
-
-**Files changed (14 total across 2 commits):**
-- NEW: `auth/callback/route.ts`, `login/reset-password/page.tsx`, `signin/reset-password/page.tsx`, `api/admin/staff/[id]/route.ts`
-- MODIFIED: `login/page.tsx`, `signin/page.tsx`, `account/profile/page.tsx`, `api/admin/customers/[id]/reset-password/route.ts`, `middleware.ts`, `supabase/config.toml`, `admin-shell.tsx`, `admin/staff/[id]/page.tsx`, `quote/[token]/accept-button.tsx`, `quote/[token]/page.tsx`
-
-### Post-Conversion Flow, Dark Mode, Inline Success States (2026-02-06 — Session 4)
-
-**Part A: Post-Conversion Confirmation Flow**
-- **Appointment status:** Quote-to-appointment conversion now creates appointments with `status: 'confirmed'` (was `pending`). Fires `appointment_confirmed` webhook.
-- **NotifyCustomerDialog:** New shared component (`src/components/quotes/notify-customer-dialog.tsx`) — after conversion, prompts admin/cashier to send appointment confirmation via email/SMS/both. Radio button selection, missing-contact warnings, "Skip" to close without sending.
-- **Notification API endpoints:** `POST /api/appointments/[id]/notify` (admin) and `POST /api/pos/appointments/[id]/notify` (POS). Sends HTML email via Mailgun + SMS via Twilio with appointment details.
-- **QuoteBookDialog chaining:** `src/components/quotes/quote-book-dialog.tsx` — after successful booking, shows NotifyCustomerDialog if customer has contact info, then calls `onBooked()`. Props: `customerEmail`, `customerPhone`.
-- **Detailer dropdown:** Fixed broken employee fetch (was parsing API response incorrectly — `s.employee_id` instead of `s.employee.id`). Now filters to `role === 'detailer'` only. Label changed from "Assign Staff" to "Assign Detailer". Default remains "Auto-assign (recommended)".
-- **Auto-assign logic:** `src/lib/utils/assign-detailer.ts` — `findAvailableDetailer()` checks active detailers with `bookable_for_appointments: true`, picks first available (no scheduling conflict), falls back to first detailer, then super_admin.
-
-**Part B: Dark Mode for All Public/Outbound Pages**
-- **19 customer-facing pages** updated with `dark:` Tailwind v4 class variants (`prefers-color-scheme`).
-- **Pattern:** `bg-white` → `dark:bg-gray-900`, `text-gray-900` → `dark:text-gray-100`, `border-gray-200` → `dark:border-gray-700`, status banners with dark color-950 backgrounds, primary buttons inverted (`dark:bg-white dark:text-gray-900`).
-- **Pages:** Public quote page + accept button, site header, signin, signup, unsubscribe, breadcrumbs, service/product cards, category cards, homepage, services pages (3), products pages (3), book page.
-- **Email templates:** All 4 email templates (admin + POS quote send, admin + POS appointment notify) — added `<meta name="color-scheme" content="light dark">`, `<style>` block with `@media (prefers-color-scheme: dark)` overrides using CSS classes + `!important`.
-- **Shared UI components (critical fix):** 8 components had zero dark mode — `input.tsx`, `label.tsx`, `button.tsx` (all 6 variants), `switch.tsx`, `form-field.tsx`, `card.tsx`, `badge.tsx` (all 6 variants), `spinner.tsx`. These cascade to every page using them.
-- **Service pricing display:** `service-pricing-display.tsx` — 28 hardcoded color classes got dark variants.
-
-**Part C: Inline Success States & Toast Notifications**
-- **Send dialogs:** After successful send, button turns green with checkmark + "Sent" text, controls disabled, auto-closes after 3 seconds. Applied to: POS quote send dialog, admin quote detail send dialogs, new NotifyCustomerDialog.
-- **alert() → toast:** All `alert()` calls replaced with `toast.success()`/`toast.error()` from sonner. Files: `admin/quotes/page.tsx` (list), `admin/quotes/new/page.tsx` (create).
-
-**Part D: Unified SendMethodDialog Component**
-- **New shared component:** `src/components/ui/send-method-dialog.tsx` — single source of truth for all email/SMS/both send dialogs across the app.
-- **Props:** `open`, `onOpenChange`, `title`, `description?`, `customerEmail`, `customerPhone`, `onSend(method)`, `sending?`, `success?`, `sendLabel?`, `cancelLabel?`. Parent handles API calls via `onSend` callback.
-- **UI:** Standard HTML radio inputs (Email/SMS/Both) with icons, contact info display, green success state with CheckCircle + "Sent", disabled controls on success.
-- **Replaced 5 implementations:** 2 inline dialogs in `admin/quotes/[id]/page.tsx`, 1 inline dialog in `admin/quotes/new/page.tsx`, POS `quote-send-dialog.tsx` (now thin wrapper), `notify-customer-dialog.tsx` (now thin wrapper).
-- **Net result:** -276 lines (482 removed, 206 added).
-
-**Files changed (56 total across 3 commits):**
-- NEW: `components/ui/send-method-dialog.tsx`, `components/quotes/notify-customer-dialog.tsx`, `components/quotes/quote-book-dialog.tsx`, `lib/utils/assign-detailer.ts`, `api/appointments/[id]/notify/route.ts`, `api/pos/appointments/[id]/notify/route.ts`
-- MODIFIED: Both convert routes (status→confirmed), all 4 email templates (dark mode), staff schedules route (added role), admin quotes pages (3, unified send dialog), POS quote detail + send dialog (thin wrapper), 19 public-facing pages (dark mode), 8 shared UI components (dark mode), service-pricing-display (dark mode)
-
-### Dashboard & Admin List Page Enhancements (2026-02-06 — Session 3)
-- **Quote conversion unlocked:** Conversion now works for any open status (draft/sent/viewed/accepted), not just accepted. Both admin and POS API routes updated. Convert button visible on all quote detail views including drafts.
-- **Dashboard: Week at a Glance:** 7-day grid (Mon-Sun) showing appointment count per day, today highlighted in blue, up to 3 preview entries per day with color-coded status dots, "+N more" overflow.
-- **Dashboard: Quotes & Customers quick-stats:** 4 clickable stat cards — Open Quotes (with accepted badge), Drafts (with sent count), Total Customers (links to customer list), New This Month (with this week sub-stat). Hidden for detailer role.
-- **Quotes list:** Added Services column (first 2 names + "+N"), customer name as clickable link to profile, relative dates (Created & Last Contacted), Convert action available for all open statuses, `?status=` URL param for deep linking.
-- **Customers list:** Customer type badge inline next to name (Pro/Enth), relative dates for Last Visit with exact date on hover, email column max-width truncation.
-- **Transactions list:** Added Services column (first 2 items + "+N" with full list on hover), relative dates for Date column, CSV export includes Services.
-- **New utility:** `formatRelativeDate()` in format.ts — "Today", "Yesterday", "3d ago", "2w ago", "5mo ago".
-
-### Customer Search & Filters Overhaul (2026-02-06)
-- **Unified customer search:** All 5 search implementations (POS lookup, admin customer search API, admin quotes, compliance page, coupon wizard) now use same pattern: 2-char minimum, smart phone detection (digits→phone search, text→name search), 300ms debounce, `LIKE %digits%` for phone, `ILIKE %term%` for name.
-- **Admin Transactions search fix:** PostgREST doesn't support `.or()` on related table columns — customer name/phone search was silently failing. Fixed with two-step approach: search customers first, then filter transactions by matching IDs.
-- **Admin Customers page filters:** Added structured filter bar with 4 dropdowns:
-  - **Customer Type**: All / Enthusiast / Professional / No Type Set
-  - **Visit Status**: All / New (0 visits) / Returning (1-5) / Loyal (6+) / Inactive (90+ days)
-  - **Activity**: All / Has Open Quotes (draft/sent/viewed) / Has Upcoming Appointments (today+future, pending/confirmed)
-  - **Tags**: Existing freeform tag filter (unchanged)
-  - "Reset filters" link when any filter active. Tag filter button now always first, chips after, Clear all last.
-- **Wider search boxes:** Admin Quotes and Customers pages search inputs widened from `sm:w-72` to `sm:w-96`.
-- **Quote validity:** Changed from 30 days to 10 days in SMS text, HTML email, and voice agent (all 3 send routes + calculation).
-- **Command palette dedup:** Fixed duplicate React key warning for `/admin/inventory` in `flattenNavItems`.
-
-### POS Quotes Tab (2026-02-06)
-- **New POS route:** `/pos/quotes` — Full quote management for cashiers without leaving POS
-- **State management:** `QuoteProvider` + `useQuote()` hook with `useReducer` pattern mirroring `TicketProvider`. Mounted in `PosShell` so quote state persists across tab navigation.
-- **Quote builder:** Split-panel layout (catalog browser left, quote ticket panel right) matching POS workspace pattern. Reuses `CatalogBrowser` with optional callback props for backward compatibility.
-- **Catalog browser abstraction:** Added `onAddProduct?`, `onAddService?`, `vehicleSizeOverride?` props to `CatalogBrowser` and `ServiceDetail`. When callbacks provided, dispatches to them instead of ticket context. Existing POS workspace behavior unchanged.
-- **POS API endpoints:** 5 new routes under `/api/pos/quotes/` — list+create, get+update+delete, send (email/SMS), convert to booking, communications history. All use `authenticatePosRequest()` + `createAdminClient()`.
-- **Quote list:** Searchable (quote #, customer name/phone), filterable (All/Draft/Sent/Viewed/Accepted), paginated. Status badges with color coding.
-- **Quote detail:** Read-only view with items table, totals, customer/vehicle info, communication history, dates timeline. Context-sensitive action buttons by status (Draft: Edit/Send/Delete, Sent/Viewed: Edit/Resend, Accepted: Convert to Booking/Edit, Expired: Re-Quote, Converted: view appointment info).
-- **Dialogs:** Send (email/SMS/both with method selection and missing contact warnings), Convert to Booking (date/time/duration/staff picker), Delete (confirmation).
-- **Bottom nav:** Added "Quotes" tab with `FileText` icon between Transactions and More.
-- **Keyboard shortcut:** `F3` → navigate to `/pos/quotes`. Added to shortcuts help overlay.
-- **Files:** 20 new, 5 modified. TypeScript compiles clean.
-
-### Quote Service Picker Dialog (2026-02-06)
-- **New component:** `src/app/admin/quotes/_components/service-picker-dialog.tsx` — POS-style browsable service selection
-- **3-view navigation:** Category tiles → Service cards → Tier/size detail selection
-- **Search:** Debounced search across all categories with flat results grid
-- **Smart auto-add:** Flat-price or single-tier services add immediately without showing detail view
-- **Vehicle size pricing:** Picker resolves correct price based on selected vehicle's size class
-- **Unit price always editable:** Service picker pre-fills price, but admin can override with custom pricing on any item
-- **New items prepend:** "+ Add Item" inserts new blank item at top (newest first)
-- **"New Customer" button:** Quick-create opens `/admin/customers/new` in new tab from quote page
-- **Renamed labels:** "Customer" → "Assigned Customer", "Line Items" → "Services"
-- **Removed from both pages:** Old flat `<Select>` service dropdown, per-item tier picker, per-item vehicle size selector — all replaced by dialog
-- **Files changed:** `quotes/new/page.tsx`, `quotes/[id]/page.tsx` (both create and edit views)
-
-### Quotes Last Contacted & Resend (2026-02-06)
-- **Quotes list page:** Added "Last Contacted" column showing when quote was last sent
-- **Quote detail page:** Added "Last Contacted" section in Details card with date/time and Resend button
-- **Resend functionality:** Non-draft quotes can be resent (keeps current status, updates sent_at)
-- Send API modified to preserve status for resends (draft→sent, others keep current status)
-
-### Admin Link Styling Unified (2026-02-06)
-- All clickable links in DataTables now use consistent styling: `text-blue-600 hover:text-blue-800 hover:underline`
-- Matches the Receipt # links in Customer History tab
-- Updated pages: Coupons, Campaigns, Automations, Quotes, Transactions, Customers, Products, Services, Staff
-- Transactions page: Customer and Employee names now link to their respective profiles
-
-### Staff Scheduling Refactor (2026-02-06)
-- **Schedule on Staff Profile:** Weekly schedule moved from `/admin/appointments/scheduling` to individual staff profile pages (`/admin/staff/[id]` → Schedule tab). Only shows for bookable employees.
-- **Blocked Dates on Staff Profile:** Individual employee time off (vacation, sick days) now managed on their profile in the "Time Off / Blocked Dates" section.
-- **Shop Holidays:** The Staff Scheduling page now only handles shop-wide closures (holidays). Individual employee blocks are on their profiles.
-- **"Who's Working Today" Dashboard:** New card at top of Staff Scheduling page shows which staff are scheduled for today with their hours.
-- **Direct Link:** Clicking staff from scheduling overview goes directly to their Schedule tab (`?tab=schedule` query param).
-
-### Booking Payment Flow Refinements (2026-02-06)
-- **Coupon + Loyalty Points:** When coupon is applied, loyalty points auto-cap to remaining balance. If coupon covers full amount, loyalty section shows "no points needed" message instead of slider.
-- **Stripe Minimum ($0.50):** Amounts below $0.50 skip payment step entirely. Shows "Remaining balance below minimum - no payment required!" and completes booking directly.
-- **Payment Option Logic:** When discounts cover amount, `payment_option` is set to `'full'` (not `'pay_on_site'`) since amount was fully "paid" by discounts.
-- **Confirmation Display:** Amounts under $0.50 show as $0.00 with "Fully covered by discounts" message.
-- **Personalized Header:** Site header now shows "Hello, {first_name}" instead of "My Account" for logged-in customers.
-
-### Phone → Mobile Labeling (Global)
-- All "Phone" field labels changed to "Mobile" across admin, customer portal, auth pages
-- Removed "(XXX) XXX-XXXX" description hints; placeholders used instead
-- Validation error messages updated to "Enter valid mobile number"
-- Phone numbers stored as E.164 (+1XXXXXXXXXX) for Twilio, displayed as (310) 555-1234
-- Phone inputs auto-format E.164 pasted values (e.g., +14243637450 → (424) 363-7450)
-
-### Booking Flow Improvements
-- **Auto-assign detailer:** Online bookings auto-assign first available detailer (checks for scheduling conflicts if multiple detailers)
-- **Customer type auto-set:** Online bookings automatically mark customers as "enthusiast" (removed selector)
-- **Vehicle selection UX:** Logged-in customers see saved vehicles as selectable buttons + "Add New Vehicle" toggle
-- **Vehicle required:** Booking cannot proceed without selecting or creating a vehicle (customer portal + POS checkout)
-
-### Customer Management Improvements
-- **Portal Access Toggle:** Active/Deactivated toggle in customer detail page. Clicking toggles state. Deactivation backs up auth_user_id for easy reactivation. Reactivation can auto-recover by matching email/phone.
-- **Sign-in Auto-Link:** Phone OTP sign-in automatically links to existing customer record. Searches multiple phone formats. Handles duplicates by picking oldest record.
-- **Delete Customer:** Double confirmation with type-to-confirm. Cascading cleanup of related records. Transactions preserved but unlinked for accounting.
-- **Phone Display Fix:** Customer detail page now displays phone in formatted style on load (was showing E.164).
-
-### POS IP Whitelist Security
-- **Settings page:** `/admin/settings/pos-security/` with enable/disable toggle (auto-saves)
-- **Location names:** Each IP has optional friendly name (e.g., "Office", "Home", "Shop")
-- **IPv4 + IPv6:** Supports both address formats
-- **How it works:** Middleware checks `pos_ip_whitelist_enabled` and `pos_allowed_ips` from `business_settings` table
-- **When enabled:** Only whitelisted IPs can access `/pos/*` routes; others get 403
-- **When disabled:** POS accessible from any IP
-- **Cache:** 10-second TTL for fast updates during testing
-- **Fallback:** Falls back to `ALLOWED_POS_IPS` env var if database unavailable
-- **Testing:** Use ngrok (`~/bin/ngrok http 3000`) to test from external locations
-- See `docs/POS_SECURITY.md` for full documentation
-
-### Dynamic Business Info (Fully Enforced)
-- **ALL** business name/phone/address/email references now come from database — zero hardcoded values remain
-- **Server components:** `getBusinessInfo()` from `src/lib/data/business.ts` (React.cache wrapped)
-- **Client components:** `useBusinessInfo()` hook from `src/lib/hooks/use-business-info.ts` (fetches from `/api/public/business-info` with module-level cache)
-- **SEO metadata:** All `generateMetadata()` functions fetch business name from DB. SEO utility functions (`metadata.ts`, `json-ld.ts`) accept `businessName` parameter instead of reading constants.
-- **Email sender:** `email.ts` fetches business name for Mailgun `from` field
-- **Affected files (26 total):** Login pages, signup, admin shell sidebar, POS login, email.ts, quote pages, campaign routes, campaign wizard, receipt template, all public pages metadata, SEO utilities, constants.ts
-- **Removed from constants.ts:** `BUSINESS` object, `SITE_NAME` — these must NEVER be re-added
-
-### Twilio SMS Configuration
-- Supabase Phone Auth configured with Twilio
-- Use phone number directly in Supabase Auth settings (not Messaging Service SID) to avoid A2P registration issues
-- Phone number: +14244010094
+---
 
 ## Session Instructions
 - Update this file at end of session or when asked
