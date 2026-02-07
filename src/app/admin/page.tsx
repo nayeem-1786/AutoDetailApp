@@ -25,25 +25,15 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { formatTime, formatCurrency } from '@/lib/utils/format';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
-import type { AppointmentStatus } from '@/lib/supabase/types';
-
-interface TodayAppointment {
-  id: string;
-  scheduled_date: string;
-  scheduled_start_time: string;
-  scheduled_end_time: string;
-  status: AppointmentStatus;
-  customer: { first_name: string; last_name: string };
-  vehicle: { year: number | null; make: string | null; model: string | null } | null;
-  employee: { first_name: string; last_name: string } | null;
-  appointment_services: { service: { name: string } }[];
-}
+import { AppointmentDetailDialog } from './appointments/components/appointment-detail-dialog';
+import type { AppointmentWithRelations } from './appointments/types';
+import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
 interface WeekDay {
   date: string; // YYYY-MM-DD
   label: string; // "Mon 2/10"
   isToday: boolean;
-  appointments: TodayAppointment[];
+  appointments: AppointmentWithRelations[];
 }
 
 const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
@@ -58,8 +48,10 @@ const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 
 export default function AdminDashboard() {
   const { employee, role } = useAuth();
   const supabase = createClient();
-  const [appointments, setAppointments] = useState<TodayAppointment[]>([]);
-  const [weekAppointments, setWeekAppointments] = useState<TodayAppointment[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([]);
+  const [weekAppointments, setWeekAppointments] = useState<AppointmentWithRelations[]>([]);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [activeAppointment, setActiveAppointment] = useState<AppointmentWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [quoteStats, setQuoteStats] = useState({ draft: 0, sent: 0, viewed: 0, accepted: 0 });
   const [customerStats, setCustomerStats] = useState({ total: 0, newThisWeek: 0, newThisMonth: 0 });
@@ -77,11 +69,11 @@ export default function AdminDashboard() {
       supabase
         .from('appointments')
         .select(`
-          id, scheduled_date, scheduled_start_time, scheduled_end_time, status,
-          customer:customers!customer_id(first_name, last_name),
-          vehicle:vehicles!vehicle_id(year, make, model),
-          employee:employees!employee_id(first_name, last_name),
-          appointment_services(service:services!service_id(name))
+          *,
+          customer:customers!customer_id(id, first_name, last_name, phone, email),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color),
+          employee:employees!employee_id(id, first_name, last_name, role),
+          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
         `)
         .eq('scheduled_date', today)
         .neq('status', 'cancelled')
@@ -91,11 +83,11 @@ export default function AdminDashboard() {
       supabase
         .from('appointments')
         .select(`
-          id, scheduled_date, scheduled_start_time, scheduled_end_time, status,
-          customer:customers!customer_id(first_name, last_name),
-          vehicle:vehicles!vehicle_id(year, make, model),
-          employee:employees!employee_id(first_name, last_name),
-          appointment_services(service:services!service_id(name))
+          *,
+          customer:customers!customer_id(id, first_name, last_name, phone, email),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color),
+          employee:employees!employee_id(id, first_name, last_name, role),
+          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
         `)
         .gte('scheduled_date', weekStart)
         .lte('scheduled_date', weekEnd)
@@ -127,10 +119,10 @@ export default function AdminDashboard() {
     ]);
 
     if (todayRes.data) {
-      setAppointments(todayRes.data as unknown as TodayAppointment[]);
+      setAppointments(todayRes.data as unknown as AppointmentWithRelations[]);
     }
     if (weekRes.data) {
-      setWeekAppointments(weekRes.data as unknown as TodayAppointment[]);
+      setWeekAppointments(weekRes.data as unknown as AppointmentWithRelations[]);
     }
     if (quotesRes.data) {
       const counts = { draft: 0, sent: 0, viewed: 0, accepted: 0 };
@@ -157,6 +149,9 @@ export default function AdminDashboard() {
   const inProgress = appointments.filter((a) => a.status === 'in_progress').length;
   const completed = appointments.filter((a) => a.status === 'completed').length;
   const remaining = pending + confirmed + inProgress;
+
+  // Schedule display: only confirmed + in_progress (not pending/completed/no_show)
+  const scheduleAppointments = appointments.filter((a) => a.status === 'confirmed' || a.status === 'in_progress');
 
   // Build week days for "Week at a Glance"
   const weekDays: WeekDay[] = [];
@@ -414,21 +409,26 @@ export default function AdminDashboard() {
             <div className="mt-6 flex items-center justify-center py-12">
               <Spinner size="lg" />
             </div>
-          ) : appointments.length === 0 ? (
+          ) : scheduleAppointments.length === 0 ? (
             <div className="mt-4 flex items-center justify-center rounded-lg border border-dashed border-gray-300 p-8">
-              <p className="text-sm text-gray-400">No appointments scheduled for today</p>
+              <p className="text-sm text-gray-400">No confirmed appointments for today</p>
             </div>
           ) : (
             <div className="mt-3 space-y-2">
-              {appointments.map((appt) => {
+              {scheduleAppointments.map((appt) => {
                 const services = appt.appointment_services
                   .map((as) => as.service?.name || 'Service')
                   .join(', ');
 
                 return (
-                  <div
+                  <button
                     key={appt.id}
-                    className="rounded-lg border border-gray-200 p-3"
+                    type="button"
+                    onClick={() => {
+                      setActiveAppointment(appt);
+                      setDetailOpen(true);
+                    }}
+                    className="w-full rounded-lg border border-gray-200 p-3 text-left transition-colors hover:border-gray-300 hover:bg-gray-50"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-900">
@@ -456,7 +456,7 @@ export default function AdminDashboard() {
                         Detailer: {appt.employee.first_name} {appt.employee.last_name}
                       </p>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -504,6 +504,18 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Appointment detail dialog — opens when clicking a schedule item */}
+      <AppointmentDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        appointment={activeAppointment}
+        employees={[]}
+        onSave={async () => false}
+        onCancel={() => {}}
+        canReschedule={false}
+        canCancel={false}
+      />
     </div>
   );
 }
