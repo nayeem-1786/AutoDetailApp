@@ -31,6 +31,22 @@ export async function PATCH(
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
+    // Check for duplicate PIN
+    if (pin_code) {
+      const { data: existing } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name')
+        .eq('pin_code', pin_code)
+        .neq('id', id)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json(
+          { error: `PIN already in use by ${existing.first_name} ${existing.last_name}` },
+          { status: 409 }
+        );
+      }
+    }
+
     // Update employee record
     const { error: updateError } = await supabase
       .from('employees')

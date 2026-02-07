@@ -172,7 +172,7 @@ export default function AdminDashboard() {
     });
   }
 
-  const totalOpenQuotes = quoteStats.draft + quoteStats.sent + quoteStats.viewed + quoteStats.accepted;
+  const totalOpenQuotes = quoteStats.sent + quoteStats.viewed + quoteStats.accepted;
 
   // Role-appropriate quick actions
   const quickActions: { label: string; href: string; icon: typeof CalendarDays; description: string }[] = [];

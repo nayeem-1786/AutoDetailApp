@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Plus, MoreHorizontal, Eye, Pencil, Send, ArrowRightCircle, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Eye, Send, ArrowRightCircle, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -247,12 +247,10 @@ export default function QuotesPage() {
                 <Eye className="mr-2 h-4 w-4" />
                 View
               </DropdownMenuItem>
-              {q.status === 'draft' && (
-                <DropdownMenuItem onClick={() => router.push(`/admin/quotes/${q.id}`)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem onClick={() => window.open(`/pos/quotes?mode=builder&quoteId=${q.id}`, '_blank', 'noopener,noreferrer')}>
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Edit in POS
+              </DropdownMenuItem>
               {q.status === 'draft' && (
                 <DropdownMenuItem onClick={() => handleSend(q)}>
                   <Send className="mr-2 h-4 w-4" />
@@ -296,10 +294,12 @@ export default function QuotesPage() {
         title="Quotes"
         description={`${quotes.length} total quotes`}
         action={
-          <Button onClick={() => router.push('/admin/quotes/new')}>
-            <Plus className="h-4 w-4" />
-            New Quote
-          </Button>
+          <a href="/pos/quotes?mode=builder" target="_blank" rel="noopener noreferrer">
+            <Button>
+              <Plus className="h-4 w-4" />
+              New Quote
+            </Button>
+          </a>
         }
       />
 
@@ -330,10 +330,12 @@ export default function QuotesPage() {
         emptyTitle="No quotes found"
         emptyDescription="Create your first quote to get started."
         emptyAction={
-          <Button onClick={() => router.push('/admin/quotes/new')}>
-            <Plus className="h-4 w-4" />
-            New Quote
-          </Button>
+          <a href="/pos/quotes?mode=builder" target="_blank" rel="noopener noreferrer">
+            <Button>
+              <Plus className="h-4 w-4" />
+              New Quote
+            </Button>
+          </a>
         }
       />
 

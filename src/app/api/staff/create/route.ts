@@ -18,6 +18,21 @@ export async function POST(request: NextRequest) {
     const { password, pin_code, ...employeeData } = parsed.data;
     const adminClient = createAdminClient();
 
+    // Check for duplicate PIN
+    if (pin_code) {
+      const { data: existing } = await adminClient
+        .from('employees')
+        .select('id, first_name, last_name')
+        .eq('pin_code', pin_code)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json(
+          { error: `PIN already in use by ${existing.first_name} ${existing.last_name}` },
+          { status: 409 }
+        );
+      }
+    }
+
     // Create Supabase auth user
     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
       email: employeeData.email,

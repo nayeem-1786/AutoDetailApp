@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { Clock, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { formatTime } from '@/lib/utils/format';
 import { AppointmentCalendar } from './components/appointment-calendar';
 import { DayAppointmentsList } from './components/day-appointments-list';
 import { AppointmentDetailDialog } from './components/appointment-detail-dialog';
@@ -295,6 +296,83 @@ export default function AppointmentsPage() {
           />
         </div>
       </div>
+
+      {/* Week at a Glance */}
+      {(() => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const weekStartDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const weekEndDate = endOfWeek(new Date(), { weekStartsOn: 1 });
+        const weekStart = format(weekStartDate, 'yyyy-MM-dd');
+        const weekEnd = format(weekEndDate, 'yyyy-MM-dd');
+        const weekAppts = appointments.filter((a) => {
+          const d = a.scheduled_date.split('T')[0];
+          return d >= weekStart && d <= weekEnd && a.status !== 'cancelled';
+        });
+        const weekDays = Array.from({ length: 7 }, (_, i) => {
+          const d = addDays(weekStartDate, i);
+          const dateStr = format(d, 'yyyy-MM-dd');
+          return {
+            date: dateStr,
+            label: format(d, 'EEE M/d'),
+            isToday: dateStr === today,
+            appointments: weekAppts.filter((a) => a.scheduled_date.split('T')[0] === dateStr),
+          };
+        });
+        return (
+          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
+            <h3 className="text-sm font-semibold text-gray-900">Week at a Glance</h3>
+            {loading ? (
+              <div className="mt-4 flex items-center justify-center py-8">
+                <Spinner size="lg" />
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-7 gap-2">
+                {weekDays.map((day) => (
+                  <button
+                    key={day.date}
+                    type="button"
+                    onClick={() => handleDateSelect(new Date(day.date + 'T12:00:00'))}
+                    className={`rounded-lg border p-2 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/50 ${
+                      day.isToday
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <p className={`text-xs font-medium ${day.isToday ? 'text-blue-700' : 'text-gray-500'}`}>
+                      {day.label}
+                    </p>
+                    <p className={`mt-1 text-lg font-bold ${
+                      day.appointments.length === 0 ? 'text-gray-300' : day.isToday ? 'text-blue-700' : 'text-gray-900'
+                    }`}>
+                      {day.appointments.length}
+                    </p>
+                    {day.appointments.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {day.appointments.slice(0, 3).map((appt) => (
+                          <div key={appt.id} className="flex items-center gap-1 truncate">
+                            <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                              appt.status === 'completed' ? 'bg-green-500' :
+                              appt.status === 'in_progress' ? 'bg-amber-500' :
+                              appt.status === 'confirmed' ? 'bg-blue-500' :
+                              'bg-gray-400'
+                            }`} />
+                            <span className="truncate text-[10px] text-gray-600">
+                              {formatTime(appt.scheduled_start_time)} {appt.customer.first_name}
+                            </span>
+                          </div>
+                        ))}
+                        {day.appointments.length > 3 && (
+                          <p className="text-[10px] text-gray-400">+{day.appointments.length - 3} more</p>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Detail + Edit dialog */}
       <AppointmentDetailDialog

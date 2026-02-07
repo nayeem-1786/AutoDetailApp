@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { QuoteList } from '../components/quotes/quote-list';
 import { QuoteDetail } from '../components/quotes/quote-detail';
 import { QuoteBuilder } from '../components/quotes/quote-builder';
@@ -10,8 +11,24 @@ type View =
   | { mode: 'detail'; quoteId: string }
   | { mode: 'builder'; quoteId: string | null };
 
-export default function QuotesPage() {
+function QuotesPageInner() {
+  const searchParams = useSearchParams();
   const [view, setView] = useState<View>({ mode: 'list' });
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (initialized) return;
+    const mode = searchParams.get('mode');
+    const quoteId = searchParams.get('quoteId');
+    if (mode === 'builder') {
+      setView({ mode: 'builder', quoteId: quoteId || null });
+    } else if (mode === 'detail' && quoteId) {
+      setView({ mode: 'detail', quoteId });
+    }
+    setInitialized(true);
+  }, [searchParams, initialized]);
+
+  if (!initialized) return null;
 
   if (view.mode === 'detail') {
     return (
@@ -39,5 +56,13 @@ export default function QuotesPage() {
       onSelect={(quoteId) => setView({ mode: 'detail', quoteId })}
       onNewQuote={() => setView({ mode: 'builder', quoteId: null })}
     />
+  );
+}
+
+export default function QuotesPage() {
+  return (
+    <Suspense>
+      <QuotesPageInner />
+    </Suspense>
   );
 }
