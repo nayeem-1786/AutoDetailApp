@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useForm } from 'react-hook-form';
@@ -20,8 +20,20 @@ export default function LoginPage() {
   const { info: businessInfo } = useBusinessInfo();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const signedOutRef = useRef(false);
 
   const sessionExpired = reason === 'session_expired';
+
+  // When redirected here due to session expiry, sign out to clear the
+  // refresh token from cookies. Without this, navigating back to /admin
+  // would silently auto-refresh the token and bypass the login screen.
+  useEffect(() => {
+    if (sessionExpired && !signedOutRef.current) {
+      signedOutRef.current = true;
+      const supabase = createClient();
+      supabase.auth.signOut();
+    }
+  }, [sessionExpired]);
 
   const {
     register,

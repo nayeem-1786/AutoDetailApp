@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -35,6 +35,18 @@ export default function CustomerSignInPage() {
   const [loading, setLoading] = useState(false);
   const [otpPhone, setOtpPhone] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const signedOutRef = useRef(false);
+
+  // When redirected here due to session expiry, sign out to clear the
+  // refresh token from cookies. Without this, navigating back to /account
+  // would silently auto-refresh the token and bypass the login screen.
+  useEffect(() => {
+    if (sessionExpired && !signedOutRef.current) {
+      signedOutRef.current = true;
+      const supabase = createClient();
+      supabase.auth.signOut();
+    }
+  }, [sessionExpired]);
 
   // Cooldown timer
   useEffect(() => {
