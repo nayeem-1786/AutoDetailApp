@@ -10,13 +10,12 @@ import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { CategoryTile } from './category-tile';
 import { ProductGrid, ServiceGrid } from './catalog-grid';
 import { ProductDetail } from './product-detail';
-import { ServiceDetail } from './service-detail';
+import { ServiceDetailDialog } from './service-detail-dialog';
 import { ServicePricingPicker } from './service-pricing-picker';
 
 type BrowseState =
   | { view: 'categories' }
-  | { view: 'items'; categoryId: string; categoryName: string }
-  | { view: 'service-detail'; service: CatalogService; categoryName: string };
+  | { view: 'items'; categoryId: string; categoryName: string };
 
 interface CatalogBrowserProps {
   type: 'products' | 'services';
@@ -37,6 +36,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   const [browseState, setBrowseState] = useState<BrowseState>({ view: 'categories' });
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
   const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
+  const [detailService, setDetailService] = useState<CatalogService | null>(null);
 
   const items = type === 'products' ? products : services;
   const vehicleSizeClass = vehicleSizeOverride !== undefined
@@ -122,11 +122,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   }
 
   function handleTapService(service: CatalogService) {
-    const catName =
-      browseState.view === 'items'
-        ? browseState.categoryName
-        : service.category?.name ?? 'Services';
-    setBrowseState({ view: 'service-detail', service, categoryName: catName });
+    setDetailService(service);
   }
 
   function handleTapServiceDirect(service: CatalogService) {
@@ -213,6 +209,15 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
           onClose={() => setDetailProduct(null)}
         />
       )}
+      {detailService && (
+        <ServiceDetailDialog
+          service={detailService}
+          open={!!detailService}
+          onClose={() => setDetailService(null)}
+          onAdd={onAddService}
+          vehicleSizeOverride={vehicleSizeOverride}
+        />
+      )}
     </>
   );
 
@@ -234,28 +239,6 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         )}
         {dialogs}
       </div>
-    );
-  }
-
-  // Service detail (full page)
-  if (browseState.view === 'service-detail') {
-    return (
-      <ServiceDetail
-        service={browseState.service}
-        categoryName={browseState.categoryName}
-        onBack={() =>
-          setBrowseState({
-            view: 'items',
-            categoryId:
-              browseState.service.category_id ?? '__uncategorized__',
-            categoryName: browseState.categoryName,
-          })
-        }
-        onAdd={onAddService ? (service, pricing, vsc) => {
-          onAddService(service, pricing, vsc);
-        } : undefined}
-        vehicleSizeOverride={vehicleSizeOverride}
-      />
     );
   }
 
