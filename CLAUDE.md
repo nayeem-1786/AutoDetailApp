@@ -21,7 +21,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Review & Refine UI Changes
-**Last session:** 2026-02-06 — Post-conversion confirmation flow, dark mode for all public pages, inline success states, detailer dropdown in convert dialog.
+**Last session:** 2026-02-06 — Post-conversion confirmation flow, dark mode for all public pages, inline success states, detailer dropdown, unified SendMethodDialog component.
 **Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable)
 
 **Remaining Quotes Test Checklist:**
@@ -204,9 +204,10 @@ When testing each module, verify:
 - [x] Add "Who's Working Today" dashboard to Staff Scheduling page
 - [ ] **URL Shortening for Customer Links** — Quote links, booking confirmations, and other customer-facing URLs should use a URL shortener service (Bitly API or custom short domain). Currently using `/q/[token]` which shortens path but token is still a full UUID. Options: 1) Generate shorter 8-char alphanumeric tokens, 2) Integrate Bitly/TinyURL API, 3) Custom short domain (e.g., sda.link/abc123).
 - [x] Post-conversion appointment confirmation (NotifyCustomerDialog + notification API endpoints)
-- [x] Dark mode for all public/outbound pages (19 pages + email templates)
+- [x] Dark mode for all public/outbound pages (19 pages + 4 email templates + 8 shared UI components)
 - [x] Replace all alert() popups with toast notifications and inline success states
 - [x] Detailer dropdown in Convert to Appointment dialog (admin + POS)
+- [x] Unified SendMethodDialog component — single reusable send dialog (email/SMS/both) replacing 5 separate implementations
 - [ ] **Admin Settings: Role Permissions** — Currently role permissions are only seeded via `supabase/seed.sql`. Need admin UI at `/admin/settings/roles-permissions` to view/edit default permissions per role (super_admin, admin, cashier, detailer). Individual employee overrides already work on staff detail page.
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
@@ -277,15 +278,24 @@ When testing each module, verify:
 - **19 customer-facing pages** updated with `dark:` Tailwind v4 class variants (`prefers-color-scheme`).
 - **Pattern:** `bg-white` → `dark:bg-gray-900`, `text-gray-900` → `dark:text-gray-100`, `border-gray-200` → `dark:border-gray-700`, status banners with dark color-950 backgrounds, primary buttons inverted (`dark:bg-white dark:text-gray-900`).
 - **Pages:** Public quote page + accept button, site header, signin, signup, unsubscribe, breadcrumbs, service/product cards, category cards, homepage, services pages (3), products pages (3), book page.
-- **Email templates:** Both admin and POS quote send routes (`send/route.ts`) — added `<meta name="color-scheme" content="light dark">`, `<style>` block with `@media (prefers-color-scheme: dark)` overrides using CSS classes + `!important`.
+- **Email templates:** All 4 email templates (admin + POS quote send, admin + POS appointment notify) — added `<meta name="color-scheme" content="light dark">`, `<style>` block with `@media (prefers-color-scheme: dark)` overrides using CSS classes + `!important`.
+- **Shared UI components (critical fix):** 8 components had zero dark mode — `input.tsx`, `label.tsx`, `button.tsx` (all 6 variants), `switch.tsx`, `form-field.tsx`, `card.tsx`, `badge.tsx` (all 6 variants), `spinner.tsx`. These cascade to every page using them.
+- **Service pricing display:** `service-pricing-display.tsx` — 28 hardcoded color classes got dark variants.
 
 **Part C: Inline Success States & Toast Notifications**
 - **Send dialogs:** After successful send, button turns green with checkmark + "Sent" text, controls disabled, auto-closes after 3 seconds. Applied to: POS quote send dialog, admin quote detail send dialogs, new NotifyCustomerDialog.
 - **alert() → toast:** All `alert()` calls replaced with `toast.success()`/`toast.error()` from sonner. Files: `admin/quotes/page.tsx` (list), `admin/quotes/new/page.tsx` (create).
 
-**Files changed (39 total):**
-- NEW: `components/quotes/notify-customer-dialog.tsx`, `components/quotes/quote-book-dialog.tsx`, `lib/utils/assign-detailer.ts`, `api/appointments/[id]/notify/route.ts`, `api/pos/appointments/[id]/notify/route.ts`
-- MODIFIED: Both convert routes (status→confirmed), both send routes (email dark mode), staff schedules route (added role), admin quotes pages (3), POS quote detail + send dialog, 19 public-facing pages (dark mode)
+**Part D: Unified SendMethodDialog Component**
+- **New shared component:** `src/components/ui/send-method-dialog.tsx` — single source of truth for all email/SMS/both send dialogs across the app.
+- **Props:** `open`, `onOpenChange`, `title`, `description?`, `customerEmail`, `customerPhone`, `onSend(method)`, `sending?`, `success?`, `sendLabel?`, `cancelLabel?`. Parent handles API calls via `onSend` callback.
+- **UI:** Standard HTML radio inputs (Email/SMS/Both) with icons, contact info display, green success state with CheckCircle + "Sent", disabled controls on success.
+- **Replaced 5 implementations:** 2 inline dialogs in `admin/quotes/[id]/page.tsx`, 1 inline dialog in `admin/quotes/new/page.tsx`, POS `quote-send-dialog.tsx` (now thin wrapper), `notify-customer-dialog.tsx` (now thin wrapper).
+- **Net result:** -276 lines (482 removed, 206 added).
+
+**Files changed (56 total across 3 commits):**
+- NEW: `components/ui/send-method-dialog.tsx`, `components/quotes/notify-customer-dialog.tsx`, `components/quotes/quote-book-dialog.tsx`, `lib/utils/assign-detailer.ts`, `api/appointments/[id]/notify/route.ts`, `api/pos/appointments/[id]/notify/route.ts`
+- MODIFIED: Both convert routes (status→confirmed), all 4 email templates (dark mode), staff schedules route (added role), admin quotes pages (3, unified send dialog), POS quote detail + send dialog (thin wrapper), 19 public-facing pages (dark mode), 8 shared UI components (dark mode), service-pricing-display (dark mode)
 
 ### Dashboard & Admin List Page Enhancements (2026-02-06 — Session 3)
 - **Quote conversion unlocked:** Conversion now works for any open status (draft/sent/viewed/accepted), not just accepted. Both admin and POS API routes updated. Convert button visible on all quote detail views including drafts.
