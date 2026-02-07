@@ -282,7 +282,7 @@ export default function CustomerSignUpPage() {
                   id="otp-phone"
                   value={otpPhone || phoneParam || ''}
                   readOnly
-                  className="bg-gray-50 text-gray-500"
+                  className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
                 />
               </FormField>
 

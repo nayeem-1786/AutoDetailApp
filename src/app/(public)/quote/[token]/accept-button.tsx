@@ -52,7 +52,7 @@ export function AcceptQuoteButton({ quoteId, accessToken }: AcceptQuoteButtonPro
       <button
         onClick={handleAccept}
         disabled={accepting}
-        className="inline-flex items-center justify-center rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:opacity-50"
+        className="inline-flex items-center justify-center rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm dark:shadow-gray-900/50 transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:opacity-50"
       >
         {accepting ? 'Accepting...' : 'Accept Quote'}
       </button>

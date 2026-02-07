@@ -14,7 +14,7 @@ function Spinner({ className, size = 'md' }: SpinnerProps) {
   };
 
   return (
-    <Loader2 className={cn('animate-spin text-gray-400', sizeClasses[size], className)} />
+    <Loader2 className={cn('animate-spin text-gray-400 dark:text-gray-500', sizeClasses[size], className)} />
   );
 }
 

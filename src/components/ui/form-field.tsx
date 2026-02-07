@@ -21,9 +21,9 @@ function FormField({ label, error, description, required, className, children, h
       </Label>
       {children}
       {description && !error && (
-        <p className="text-xs text-gray-500">{description}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );
 }

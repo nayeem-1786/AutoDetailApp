@@ -111,8 +111,8 @@ Thank you for choosing ${business.name}!`;
 
         const serviceRowsHtml = services
           .map((s) => `<tr>
-            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb;">${s.service?.name || 'Service'}${s.tier_name ? ` <span style="color: #6b7280;">(${s.tier_name})</span>` : ''}</td>
-            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(s.price_at_booking)}</td>
+            <td class="email-td" style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${s.tier_name ? ` <span class="email-text-muted" style="color: #6b7280;">(${s.tier_name})</span>` : ''}</td>
+            <td class="email-td" style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(s.price_at_booking)}</td>
           </tr>`)
           .join('');
 
@@ -158,8 +158,8 @@ Thank you for choosing ${business.name}!`;
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
           <thead>
             <tr class="email-th" style="background-color: #f3f4f6;">
-              <th style="padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Service</th>
-              <th style="padding: 10px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Price</th>
+              <th class="email-th" style="padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Service</th>
+              <th class="email-th" style="padding: 10px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Price</th>
             </tr>
           </thead>
           <tbody>
@@ -168,8 +168,8 @@ Thank you for choosing ${business.name}!`;
         </table>` : ''}
         <div class="email-border" style="border-top: 2px solid #e5e7eb; padding-top: 16px; margin-bottom: 32px;">
           <div style="display: flex; justify-content: space-between;">
-            <span style="font-size: 18px; font-weight: 600; color: #1e3a5f;">Total</span>
-            <span style="font-size: 18px; font-weight: 700; color: #1e3a5f;">${formatCurrency(appointment.total_amount)}</span>
+            <span class="email-text" style="font-size: 18px; font-weight: 600; color: #1e3a5f;">Total</span>
+            <span class="email-text" style="font-size: 18px; font-weight: 700; color: #1e3a5f;">${formatCurrency(appointment.total_amount)}</span>
           </div>
         </div>
         <p class="email-text-muted" style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">

@@ -21,21 +21,8 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Review & Refine UI Changes
-**Last session:** 2026-02-06 — Dashboard improvements (Week at a Glance, Quotes/Customers quick-stats), quote-to-appointment conversion for all open statuses, admin list page enhancements (services columns, relative dates, clickable links, customer type badges).
+**Last session:** 2026-02-06 — Post-conversion confirmation flow, dark mode for all public pages, inline success states, detailer dropdown in convert dialog.
 **Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable)
-
-**Handoff Task List — User will review each section and request changes:**
-
-| # | Section | What was built | Files |
-|---|---------|---------------|-------|
-| 1 | Quote-to-Appointment Conversion | Conversion works for any open status (draft/sent/viewed/accepted), not just accepted. Button on admin detail + draft view + POS detail. | `api/quotes/[id]/convert/route.ts`, `api/pos/quotes/[id]/convert/route.ts`, `admin/quotes/[id]/page.tsx`, `pos/components/quotes/quote-detail.tsx` |
-| 2 | Dashboard: Week at a Glance | 7-day grid (Mon-Sun) with appointment counts, today highlighted, up to 3 preview entries per day with status dots, "+N more" overflow. | `admin/page.tsx` |
-| 3 | Dashboard: Quotes & Customers Stats | 4 quick-stat cards — Open Quotes (with accepted badge), Drafts (with sent count), Total Customers, New This Month (with this week sub-stat). Clickable links. Hidden for detailer role. | `admin/page.tsx` |
-| 4 | Quotes List Improvements | Services column (first 2 + "+N"), customer name as clickable link, relative dates on Created & Last Contacted, Convert action for all open statuses, `?status=` URL param support. | `admin/quotes/page.tsx` |
-| 5 | Customers List Improvements | Customer type badge inline (Pro/Enth), relative dates for Last Visit with hover tooltip, email column truncation. | `admin/customers/page.tsx` |
-| 6 | Transactions List Improvements | Services column (first 2 items + "+N" with hover tooltip), relative dates for Date column, updated CSV export with Services column. | `admin/transactions/page.tsx` |
-
-**Shared utility:** `formatRelativeDate()` in `src/lib/utils/format.ts` — "Today", "Yesterday", "3d ago", "2w ago", "5mo ago", falls back to full date for 1yr+.
 
 **Remaining Quotes Test Checklist:**
 - [ ] Create new quote
@@ -48,7 +35,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - [x] Resend quote (from non-draft detail page)
 - [x] "Last Contacted" column shows in list
 - [x] Communication History shows all sends with timestamps
-- [x] Convert quote to appointment (now works for any open status)
+- [x] Convert quote to appointment (now works for any open status, creates as 'confirmed', shows send-confirmation dialog)
 - [ ] Delete draft quote
 - [x] Customer card shows stats (member since, lifetime spend, loyalty points)
 - [x] Customer detail page has Quotes tab with stats and history
@@ -60,7 +47,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - [x] Cancel appointment with confirmation (fixed $0.00 fee, cancel via status dropdown now opens dialog)
 - [x] Status changes (pending → confirmed → completed) - fixed status dropdown cancellation interception
 - [ ] Reschedule flow
-- [ ] Email/SMS notifications sent correctly
+- [x] Email/SMS notifications sent correctly (post-conversion confirmation via NotifyCustomerDialog)
 - [ ] Mobile responsive layout
 
 **Completed Tests (Online Booking):**
@@ -216,6 +203,10 @@ When testing each module, verify:
 - [x] Move blocked dates to staff profiles (Time Off section)
 - [x] Add "Who's Working Today" dashboard to Staff Scheduling page
 - [ ] **URL Shortening for Customer Links** — Quote links, booking confirmations, and other customer-facing URLs should use a URL shortener service (Bitly API or custom short domain). Currently using `/q/[token]` which shortens path but token is still a full UUID. Options: 1) Generate shorter 8-char alphanumeric tokens, 2) Integrate Bitly/TinyURL API, 3) Custom short domain (e.g., sda.link/abc123).
+- [x] Post-conversion appointment confirmation (NotifyCustomerDialog + notification API endpoints)
+- [x] Dark mode for all public/outbound pages (19 pages + email templates)
+- [x] Replace all alert() popups with toast notifications and inline success states
+- [x] Detailer dropdown in Convert to Appointment dialog (admin + POS)
 - [ ] **Admin Settings: Role Permissions** — Currently role permissions are only seeded via `supabase/seed.sql`. Need admin UI at `/admin/settings/roles-permissions` to view/edit default permissions per role (super_admin, admin, cashier, detailer). Individual employee overrides already work on staff detail page.
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
@@ -271,6 +262,30 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Post-Conversion Flow, Dark Mode, Inline Success States (2026-02-06 — Session 4)
+
+**Part A: Post-Conversion Confirmation Flow**
+- **Appointment status:** Quote-to-appointment conversion now creates appointments with `status: 'confirmed'` (was `pending`). Fires `appointment_confirmed` webhook.
+- **NotifyCustomerDialog:** New shared component (`src/components/quotes/notify-customer-dialog.tsx`) — after conversion, prompts admin/cashier to send appointment confirmation via email/SMS/both. Radio button selection, missing-contact warnings, "Skip" to close without sending.
+- **Notification API endpoints:** `POST /api/appointments/[id]/notify` (admin) and `POST /api/pos/appointments/[id]/notify` (POS). Sends HTML email via Mailgun + SMS via Twilio with appointment details.
+- **QuoteBookDialog chaining:** `src/components/quotes/quote-book-dialog.tsx` — after successful booking, shows NotifyCustomerDialog if customer has contact info, then calls `onBooked()`. Props: `customerEmail`, `customerPhone`.
+- **Detailer dropdown:** Fixed broken employee fetch (was parsing API response incorrectly — `s.employee_id` instead of `s.employee.id`). Now filters to `role === 'detailer'` only. Label changed from "Assign Staff" to "Assign Detailer". Default remains "Auto-assign (recommended)".
+- **Auto-assign logic:** `src/lib/utils/assign-detailer.ts` — `findAvailableDetailer()` checks active detailers with `bookable_for_appointments: true`, picks first available (no scheduling conflict), falls back to first detailer, then super_admin.
+
+**Part B: Dark Mode for All Public/Outbound Pages**
+- **19 customer-facing pages** updated with `dark:` Tailwind v4 class variants (`prefers-color-scheme`).
+- **Pattern:** `bg-white` → `dark:bg-gray-900`, `text-gray-900` → `dark:text-gray-100`, `border-gray-200` → `dark:border-gray-700`, status banners with dark color-950 backgrounds, primary buttons inverted (`dark:bg-white dark:text-gray-900`).
+- **Pages:** Public quote page + accept button, site header, signin, signup, unsubscribe, breadcrumbs, service/product cards, category cards, homepage, services pages (3), products pages (3), book page.
+- **Email templates:** Both admin and POS quote send routes (`send/route.ts`) — added `<meta name="color-scheme" content="light dark">`, `<style>` block with `@media (prefers-color-scheme: dark)` overrides using CSS classes + `!important`.
+
+**Part C: Inline Success States & Toast Notifications**
+- **Send dialogs:** After successful send, button turns green with checkmark + "Sent" text, controls disabled, auto-closes after 3 seconds. Applied to: POS quote send dialog, admin quote detail send dialogs, new NotifyCustomerDialog.
+- **alert() → toast:** All `alert()` calls replaced with `toast.success()`/`toast.error()` from sonner. Files: `admin/quotes/page.tsx` (list), `admin/quotes/new/page.tsx` (create).
+
+**Files changed (39 total):**
+- NEW: `components/quotes/notify-customer-dialog.tsx`, `components/quotes/quote-book-dialog.tsx`, `lib/utils/assign-detailer.ts`, `api/appointments/[id]/notify/route.ts`, `api/pos/appointments/[id]/notify/route.ts`
+- MODIFIED: Both convert routes (status→confirmed), both send routes (email dark mode), staff schedules route (added role), admin quotes pages (3), POS quote detail + send dialog, 19 public-facing pages (dark mode)
 
 ### Dashboard & Admin List Page Enhancements (2026-02-06 — Session 3)
 - **Quote conversion unlocked:** Conversion now works for any open status (draft/sent/viewed/accepted), not just accepted. Both admin and POS API routes updated. Convert button visible on all quote detail views including drafts.

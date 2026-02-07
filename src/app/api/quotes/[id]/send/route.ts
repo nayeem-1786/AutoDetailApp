@@ -145,9 +145,9 @@ Thank you for choosing ${business.name}!`;
               .map(
                 (i) =>
                   `<tr>
-                    <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">${i.item_name}${i.tier_name ? ` <span style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
-                    <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center;">${i.quantity}</td>
-                    <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(i.total_price)}</td>
+                    <td class="email-td" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${i.item_name}${i.tier_name ? ` <span class="email-text-muted" style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
+                    <td class="email-td" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${i.quantity}</td>
+                    <td class="email-td" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(i.total_price)}</td>
                   </tr>`
               )
               .join('');
@@ -198,9 +198,9 @@ Thank you for choosing ${business.name}!`;
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
           <thead>
             <tr class="email-th" style="background-color: #f3f4f6;">
-              <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Item</th>
-              <th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Qty</th>
-              <th style="padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Total</th>
+              <th class="email-th" style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Item</th>
+              <th class="email-th" style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Qty</th>
+              <th class="email-th" style="padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -219,8 +219,8 @@ Thank you for choosing ${business.name}!`;
             <span class="email-text" style="font-weight: 500;">${formatCurrency(quote.tax_amount)}</span>
           </div>
           <div class="email-border" style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-            <span style="font-size: 18px; font-weight: 600; color: #1e3a5f;">Total</span>
-            <span style="font-size: 18px; font-weight: 700; color: #1e3a5f;">${formatCurrency(quote.total_amount)}</span>
+            <span class="email-text" style="font-size: 18px; font-weight: 600; color: #1e3a5f;">Total</span>
+            <span class="email-text" style="font-size: 18px; font-weight: 700; color: #1e3a5f;">${formatCurrency(quote.total_amount)}</span>
           </div>
         </div>
 
