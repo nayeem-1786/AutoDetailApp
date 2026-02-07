@@ -138,7 +138,7 @@ Total: ${formatCurrency(quote.total_amount)}
 View your estimate online:
 ${quoteLink}
 
-This estimate is valid for 30 days. If you have any questions, please call us at ${business.phone}.
+This estimate is valid for 10 days. If you have any questions, please call us at ${business.phone}.
 
 Thank you for choosing ${business.name}!`;
 
@@ -205,7 +205,7 @@ Thank you for choosing ${business.name}!`;
           <a href="${quoteLink}" style="display: inline-block; background-color: #1e3a5f; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">View Your Estimate</a>
         </div>
         <p style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
-          This estimate is valid for 30 days.<br>
+          This estimate is valid for 10 days.<br>
           Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
         </p>
       </div>

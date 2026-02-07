@@ -201,9 +201,9 @@ export async function POST(request: NextRequest) {
     const status = send_sms ? 'sent' : 'draft';
     const sentAt = send_sms ? now : null;
 
-    // Set valid_until to 30 days from now
+    // Set valid_until to 10 days from now
     const validUntil = new Date(
-      Date.now() + 30 * 24 * 60 * 60 * 1000
+      Date.now() + 10 * 24 * 60 * 60 * 1000
     ).toISOString();
 
     // Create quote

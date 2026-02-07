@@ -17,6 +17,9 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { BulkAction } from '@/components/ui/data-table';
 
 type SortOption = 'name' | 'last_visit' | 'spend';
+type CustomerTypeFilter = 'all' | 'enthusiast' | 'professional' | 'unset';
+type VisitStatusFilter = 'all' | 'new' | 'returning' | 'loyal' | 'inactive';
+type ActivityFilter = 'all' | 'open_quotes' | 'pending_appointments';
 
 function BulkTagDialog({
   open,
@@ -179,33 +182,7 @@ function TagFilterDropdown({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Selected tag chips */}
-      {selectedTags.map((tag) => (
-        <span
-          key={tag}
-          className="inline-flex items-center gap-1 rounded-full bg-gray-900 py-0.5 pl-2.5 pr-1 text-xs font-medium text-white"
-        >
-          {tag}
-          <button
-            onClick={() => onToggleTag(tag)}
-            className="rounded-full p-0.5 hover:bg-gray-700"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
-
-      {/* Clear all */}
-      {selectedTags.length > 0 && (
-        <button
-          onClick={onClearAll}
-          className="text-xs font-medium text-gray-500 hover:text-gray-700"
-        >
-          Clear all
-        </button>
-      )}
-
-      {/* Dropdown trigger */}
+      {/* Dropdown trigger — always first */}
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => { setOpen(!open); setTagSearch(''); }}
@@ -261,6 +238,32 @@ function TagFilterDropdown({
           </div>
         )}
       </div>
+
+      {/* Selected tag chips */}
+      {selectedTags.map((tag) => (
+        <span
+          key={tag}
+          className="inline-flex items-center gap-1 rounded-full bg-gray-900 py-0.5 pl-2.5 pr-1 text-xs font-medium text-white"
+        >
+          {tag}
+          <button
+            onClick={() => onToggleTag(tag)}
+            className="rounded-full p-0.5 hover:bg-gray-700"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+
+      {/* Clear all — always last */}
+      {selectedTags.length > 0 && (
+        <button
+          onClick={onClearAll}
+          className="text-xs font-medium text-gray-500 hover:text-gray-700"
+        >
+          Clear all
+        </button>
+      )}
     </div>
   );
 }
@@ -274,6 +277,11 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [tagFilters, setTagFilters] = useState<string[]>([]);
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilter>('all');
+  const [visitStatusFilter, setVisitStatusFilter] = useState<VisitStatusFilter>('all');
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
+  const [openQuoteCustomerIds, setOpenQuoteCustomerIds] = useState<Set<string>>(new Set());
+  const [pendingApptCustomerIds, setPendingApptCustomerIds] = useState<Set<string>>(new Set());
 
   // Bulk tag state
   const [bulkTagMode, setBulkTagMode] = useState<'add' | 'remove'>('add');
@@ -338,22 +346,56 @@ export default function CustomersPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('first_name');
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-      if (error) {
-        console.error('Error loading customers:', error);
+      const [custRes, quotesRes, apptsRes] = await Promise.all([
+        supabase.from('customers').select('*').order('first_name'),
+        // Open quotes: anything not yet accepted, converted, or expired
+        supabase
+          .from('quotes')
+          .select('customer_id')
+          .in('status', ['draft', 'sent', 'viewed'])
+          .not('customer_id', 'is', null),
+        // Upcoming appointments: today or future, any non-terminal status
+        supabase
+          .from('appointments')
+          .select('customer_id')
+          .gte('scheduled_date', todayStr)
+          .in('status', ['pending', 'confirmed'])
+          .not('customer_id', 'is', null),
+      ]);
+
+      if (custRes.error) {
+        console.error('Error loading customers:', custRes.error);
       }
-      if (data) setCustomers(data);
+      if (custRes.data) setCustomers(custRes.data);
+
+      if (quotesRes.error) {
+        console.error('Error loading quotes:', quotesRes.error);
+      }
+      if (quotesRes.data) {
+        setOpenQuoteCustomerIds(new Set(quotesRes.data.map((q: { customer_id: string }) => q.customer_id)));
+      }
+
+      if (apptsRes.error) {
+        console.error('Error loading appointments:', apptsRes.error);
+      }
+      if (apptsRes.data) {
+        setPendingApptCustomerIds(new Set(apptsRes.data.map((a: { customer_id: string }) => a.customer_id)));
+      }
+
       setLoading(false);
     }
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
+    const now = new Date();
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
     let result = customers.filter((c) => {
+      // Text search
       if (search) {
         const q = search.toLowerCase();
         const matchesName = `${c.first_name} ${c.last_name}`.toLowerCase().includes(q);
@@ -361,11 +403,47 @@ export default function CustomersPage() {
         const matchesEmail = c.email?.toLowerCase().includes(q);
         if (!matchesName && !matchesPhone && !matchesEmail) return false;
       }
+
+      // Customer type filter
+      if (customerTypeFilter !== 'all') {
+        if (customerTypeFilter === 'unset') {
+          if (c.customer_type) return false;
+        } else {
+          if (c.customer_type !== customerTypeFilter) return false;
+        }
+      }
+
+      // Visit status filter
+      if (visitStatusFilter !== 'all') {
+        switch (visitStatusFilter) {
+          case 'new':
+            if (c.visit_count !== 0) return false;
+            break;
+          case 'returning':
+            if (c.visit_count < 1 || c.visit_count > 5) return false;
+            break;
+          case 'loyal':
+            if (c.visit_count < 6) return false;
+            break;
+          case 'inactive':
+            if (!c.last_visit_date || c.last_visit_date > ninetyDaysAgo) return false;
+            break;
+        }
+      }
+
+      // Activity filter
+      if (activityFilter === 'open_quotes') {
+        if (!openQuoteCustomerIds.has(c.id)) return false;
+      } else if (activityFilter === 'pending_appointments') {
+        if (!pendingApptCustomerIds.has(c.id)) return false;
+      }
+
+      // Tag filter (AND logic)
       if (tagFilters.length > 0) {
         if (!c.tags || !Array.isArray(c.tags)) return false;
-        // AND logic: customer must have ALL selected tags
         if (!tagFilters.every((t) => c.tags!.includes(t))) return false;
       }
+
       return true;
     });
 
@@ -386,7 +464,7 @@ export default function CustomersPage() {
     });
 
     return result;
-  }, [customers, search, sortBy, tagFilters]);
+  }, [customers, search, sortBy, tagFilters, customerTypeFilter, visitStatusFilter, activityFilter, openQuoteCustomerIds, pendingApptCustomerIds]);
 
   const columns: ColumnDef<Customer, unknown>[] = [
     {
@@ -499,7 +577,7 @@ export default function CustomersPage() {
           value={search}
           onChange={setSearch}
           placeholder="Search by name, phone, or email..."
-          className="w-full sm:w-72"
+          className="w-full sm:w-96"
         />
         <Select
           value={sortBy}
@@ -512,19 +590,69 @@ export default function CustomersPage() {
         </Select>
       </div>
 
-      {/* Tag filter dropdown + selected chips */}
-      {allTags.length > 0 && (
-        <TagFilterDropdown
-          allTags={allTags}
-          selectedTags={tagFilters}
-          onToggleTag={(tag) =>
-            setTagFilters((prev) =>
-              prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-            )
-          }
-          onClearAll={() => setTagFilters([])}
-        />
-      )}
+      {/* Quick filters + tag filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          value={customerTypeFilter}
+          onChange={(e) => setCustomerTypeFilter(e.target.value as CustomerTypeFilter)}
+          className="w-auto text-sm"
+        >
+          <option value="all">All Types</option>
+          <option value="enthusiast">Enthusiast</option>
+          <option value="professional">Professional</option>
+          <option value="unset">No Type Set</option>
+        </Select>
+
+        <Select
+          value={visitStatusFilter}
+          onChange={(e) => setVisitStatusFilter(e.target.value as VisitStatusFilter)}
+          className="w-auto text-sm"
+        >
+          <option value="all">All Visits</option>
+          <option value="new">New (0 visits)</option>
+          <option value="returning">Returning (1-5)</option>
+          <option value="loyal">Loyal (6+)</option>
+          <option value="inactive">Inactive (90+ days)</option>
+        </Select>
+
+        <Select
+          value={activityFilter}
+          onChange={(e) => setActivityFilter(e.target.value as ActivityFilter)}
+          className="w-auto text-sm"
+        >
+          <option value="all">All Activity</option>
+          <option value="open_quotes">Has Open Quotes</option>
+          <option value="pending_appointments">Has Upcoming Appointments</option>
+        </Select>
+
+        {allTags.length > 0 && (
+          <TagFilterDropdown
+            allTags={allTags}
+            selectedTags={tagFilters}
+            onToggleTag={(tag) =>
+              setTagFilters((prev) =>
+                prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+              )
+            }
+            onClearAll={() => setTagFilters([])}
+          />
+        )}
+
+        {/* Reset all filters */}
+        {(customerTypeFilter !== 'all' || visitStatusFilter !== 'all' || activityFilter !== 'all' || tagFilters.length > 0) && (
+          <button
+            onClick={() => {
+              setCustomerTypeFilter('all');
+              setVisitStatusFilter('all');
+              setActivityFilter('all');
+              setTagFilters([]);
+            }}
+            className="text-xs font-medium text-red-500 hover:text-red-700"
+          >
+            Reset filters
+          </button>
+        )}
+      </div>
 
       <DataTable
         columns={columns}

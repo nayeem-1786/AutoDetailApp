@@ -20,9 +20,9 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Test POS Quotes Tab
-**Last session:** 2026-02-06 — Built complete POS Quotes tab at `/pos/quotes` with catalog browser integration, split-panel builder, state management, API endpoints, detail view with communication history, send/convert/delete dialogs. F3 keyboard shortcut to navigate to quotes.
-**Migrations:** All applied (including `quote_communications` table)
+### 🧪 NEXT SESSION: Continue POS Quotes Tab Testing
+**Last session:** 2026-02-06 — Built POS Quotes tab, unified customer search (name+phone, 2-char min) across all 5 search implementations, fixed admin transactions search (PostgREST .or() on related tables), added customer filters (type/visits/activity/tags), changed quote validity from 30→10 days.
+**Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable)
 
 **Quotes Test Checklist:**
 - [ ] Create new quote
@@ -258,6 +258,19 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Customer Search & Filters Overhaul (2026-02-06)
+- **Unified customer search:** All 5 search implementations (POS lookup, admin customer search API, admin quotes, compliance page, coupon wizard) now use same pattern: 2-char minimum, smart phone detection (digits→phone search, text→name search), 300ms debounce, `LIKE %digits%` for phone, `ILIKE %term%` for name.
+- **Admin Transactions search fix:** PostgREST doesn't support `.or()` on related table columns — customer name/phone search was silently failing. Fixed with two-step approach: search customers first, then filter transactions by matching IDs.
+- **Admin Customers page filters:** Added structured filter bar with 4 dropdowns:
+  - **Customer Type**: All / Enthusiast / Professional / No Type Set
+  - **Visit Status**: All / New (0 visits) / Returning (1-5) / Loyal (6+) / Inactive (90+ days)
+  - **Activity**: All / Has Open Quotes (draft/sent/viewed) / Has Upcoming Appointments (today+future, pending/confirmed)
+  - **Tags**: Existing freeform tag filter (unchanged)
+  - "Reset filters" link when any filter active. Tag filter button now always first, chips after, Clear all last.
+- **Wider search boxes:** Admin Quotes and Customers pages search inputs widened from `sm:w-72` to `sm:w-96`.
+- **Quote validity:** Changed from 30 days to 10 days in SMS text, HTML email, and voice agent (all 3 send routes + calculation).
+- **Command palette dedup:** Fixed duplicate React key warning for `/admin/inventory` in `flattenNavItems`.
 
 ### POS Quotes Tab (2026-02-06)
 - **New POS route:** `/pos/quotes` — Full quote management for cashiers without leaving POS

@@ -294,7 +294,7 @@ export default function QuotesPage() {
           value={search}
           onChange={setSearch}
           placeholder="Search by quote # or customer..."
-          className="w-full sm:w-72"
+          className="w-full sm:w-96"
         />
         <Select
           value={statusFilter}
