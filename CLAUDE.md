@@ -21,7 +21,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Review & Refine UI Changes
-**Last session:** 2026-02-06 — Post-conversion confirmation flow, dark mode for all public pages, inline success states, detailer dropdown, unified SendMethodDialog component.
+**Last session:** 2026-02-06 — Password reset on login pages, accept quote confirmation, staff email sync to Supabase Auth, admin "Change Password" in dropdown.
 **Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable)
 
 **Remaining Quotes Test Checklist:**
@@ -69,6 +69,15 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | # | Module | Description | Status |
 |---|--------|-------------|--------|
 | — | — | — | — |
+
+### Bugs Fixed (2026-02-06 — Session 5)
+| # | Module | Description | Fix Summary |
+|---|--------|-------------|-------------|
+| 44 | Auth | No "Forgot Password?" on admin or customer login pages | Added inline forgot-password flow to both `/login` and `/signin` pages. New auth callback route (`/auth/callback`) for Supabase token exchange. New reset-password pages for admin (`/login/reset-password`) and customer (`/signin/reset-password`). |
+| 43 | Auth | Password reset redirectTo pointed to nonexistent `/portal/reset-password` | Fixed in customer profile page and admin reset-password API route to use `/auth/callback?next=/signin/reset-password`. |
+| 42 | Quotes | Accept quote has no confirmation dialog | Added confirmation step to public quote accept button — shows amount, "Yes, Accept" / "Go Back" buttons. |
+| 41 | Admin | Staff can't change their own password from admin dropdown | Added "Change Password" button to admin account dropdown menu. Sends reset email via `resetPasswordForEmail` redirecting to `/login/reset-password`. |
+| 40b | Admin | Staff email updates don't sync to Supabase Auth | Created API route `PATCH /api/admin/staff/[id]` that updates both `employees` table and `auth.users` via `auth.admin.updateUserById()`. Reverts on auth failure. Staff detail page now calls API instead of direct DB update. |
 
 ### Bugs Fixed (2026-02-06 — Session 2)
 | # | Module | Description | Fix Summary |
@@ -208,6 +217,10 @@ When testing each module, verify:
 - [x] Replace all alert() popups with toast notifications and inline success states
 - [x] Detailer dropdown in Convert to Appointment dialog (admin + POS)
 - [x] Unified SendMethodDialog component — single reusable send dialog (email/SMS/both) replacing 5 separate implementations
+- [x] Password reset flow on admin and customer login pages (forgot password + reset password pages + auth callback)
+- [x] Accept quote confirmation dialog on public quote page
+- [x] Admin "Change Password" in account dropdown menu
+- [x] Staff email updates sync to Supabase Auth via API route
 - [ ] **Admin Settings: Role Permissions** — Currently role permissions are only seeded via `supabase/seed.sql`. Need admin UI at `/admin/settings/roles-permissions` to view/edit default permissions per role (super_admin, admin, cashier, detailer). Individual employee overrides already work on staff detail page.
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
@@ -263,6 +276,30 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Password Reset, Accept Quote Confirmation, Staff Auth Sync (2026-02-06 — Session 5)
+
+**Part A: Password Reset on Login Pages**
+- **Auth callback route:** `src/app/auth/callback/route.ts` — server-side token exchange for Supabase recovery email links. Exchanges `code` query param for session, redirects to `next` param.
+- **Admin login (`/login`):** Added inline `forgotMode` — "Forgot password?" link toggles to email-only form, calls `resetPasswordForEmail`, shows success message, "Back to sign in" link.
+- **Customer signin (`/signin`):** Same pattern but only shown in email mode. Dark mode styling throughout.
+- **Admin reset page:** `src/app/(auth)/login/reset-password/page.tsx` — new password + confirm form, calls `updateUser({ password })`, redirects to `/admin`.
+- **Customer reset page:** `src/app/(customer-auth)/signin/reset-password/page.tsx` — same flow with customer layout (SiteHeader/SiteFooter), dark mode, redirects to `/account`.
+- **Fixed broken redirectTo:** Customer profile page and admin reset-password API route both pointed to nonexistent `/portal/reset-password`. Updated to `/auth/callback?next=/signin/reset-password`.
+- **Middleware:** Added `/auth/callback` to PUBLIC_ROUTES.
+- **Supabase config:** Added `http://127.0.0.1:3000/auth/callback` to `additional_redirect_urls`.
+
+**Part B: Accept Quote Confirmation**
+- **Public quote page:** Accept button now shows confirmation step with amount, "Yes, Accept" / "Go Back" buttons before calling the accept API.
+
+**Part C: Staff Password Change & Email Auth Sync**
+- **Admin dropdown:** Added "Change Password" button (KeyRound icon) to account dropdown in `admin-shell.tsx`. Sends `resetPasswordForEmail` with redirect to `/login/reset-password`.
+- **Staff update API:** New `PATCH /api/admin/staff/[id]` route — updates `employees` table AND syncs email to `auth.users` via `auth.admin.updateUserById()` when email changes. Reverts employee record on auth failure.
+- **Staff detail page:** `onSaveProfile` now calls API route instead of direct Supabase table update. Surfaces specific error messages.
+
+**Files changed (14 total across 2 commits):**
+- NEW: `auth/callback/route.ts`, `login/reset-password/page.tsx`, `signin/reset-password/page.tsx`, `api/admin/staff/[id]/route.ts`
+- MODIFIED: `login/page.tsx`, `signin/page.tsx`, `account/profile/page.tsx`, `api/admin/customers/[id]/reset-password/route.ts`, `middleware.ts`, `supabase/config.toml`, `admin-shell.tsx`, `admin/staff/[id]/page.tsx`, `quote/[token]/accept-button.tsx`, `quote/[token]/page.tsx`
 
 ### Post-Conversion Flow, Dark Mode, Inline Success States (2026-02-06 — Session 4)
 
