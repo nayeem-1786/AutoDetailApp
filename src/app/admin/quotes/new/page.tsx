@@ -22,9 +22,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
-import { Plus, Trash2, ArrowLeft, Save, Send, Car, Mail, MessageSquare, ShoppingBag, X, UserPlus } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Save, Send, Car, ShoppingBag, X, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { ServicePickerDialog } from '../_components/service-picker-dialog';
+import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
 
 interface LineItem {
   key: string; // local key for React
@@ -94,7 +95,6 @@ export default function NewQuotePage() {
 
   // Send dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
-  const [sendMethod, setSendMethod] = useState<'email' | 'sms' | 'both'>('email');
 
 
   // Close customer dropdown on outside click
@@ -304,7 +304,7 @@ export default function NewQuotePage() {
     return Object.keys(newErrors).length === 0;
   }
 
-  async function handleSave(sendVia?: 'email' | 'sms' | 'both') {
+  async function handleSave(sendVia?: SendMethod) {
     if (!validate()) return;
     setSaving(true);
 
@@ -773,74 +773,17 @@ export default function NewQuotePage() {
       />
 
       {/* Send Estimate Dialog */}
-      <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
-        <DialogHeader>
-          <DialogTitle>Send Estimate</DialogTitle>
-        </DialogHeader>
-        <DialogContent className="space-y-4">
-          <p className="text-sm text-gray-600">
-            How would you like to send this estimate to{' '}
-            <span className="font-medium">{selectedCustomer?.first_name} {selectedCustomer?.last_name}</span>?
-          </p>
-          <div className="space-y-2">
-            <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
-              <input
-                type="radio"
-                name="sendMethod"
-                value="email"
-                checked={sendMethod === 'email'}
-                onChange={() => setSendMethod('email')}
-              />
-              <Mail className="h-5 w-5 text-gray-500" />
-              <div>
-                <div className="text-sm font-medium">Email</div>
-                <div className="text-xs text-gray-500">
-                  {selectedCustomer?.email || 'No email on file'}
-                </div>
-              </div>
-            </label>
-            <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
-              <input
-                type="radio"
-                name="sendMethod"
-                value="sms"
-                checked={sendMethod === 'sms'}
-                onChange={() => setSendMethod('sms')}
-              />
-              <MessageSquare className="h-5 w-5 text-gray-500" />
-              <div>
-                <div className="text-sm font-medium">SMS (with PDF)</div>
-                <div className="text-xs text-gray-500">
-                  {selectedCustomer?.phone || 'No phone on file'}
-                </div>
-              </div>
-            </label>
-            <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
-              <input
-                type="radio"
-                name="sendMethod"
-                value="both"
-                checked={sendMethod === 'both'}
-                onChange={() => setSendMethod('both')}
-              />
-              <Send className="h-5 w-5 text-gray-500" />
-              <div>
-                <div className="text-sm font-medium">Both Email & SMS</div>
-                <div className="text-xs text-gray-500">Send via all available channels</div>
-              </div>
-            </label>
-          </div>
-        </DialogContent>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={() => handleSave(sendMethod)} disabled={saving}>
-            {saving ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
-            Save & Send
-          </Button>
-        </DialogFooter>
-      </Dialog>
+      <SendMethodDialog
+        open={showSendDialog}
+        onOpenChange={setShowSendDialog}
+        title="Send Estimate"
+        description={`How would you like to send this estimate to ${selectedCustomer?.first_name} ${selectedCustomer?.last_name}?`}
+        customerEmail={selectedCustomer?.email ?? null}
+        customerPhone={selectedCustomer?.phone ?? null}
+        onSend={(method) => handleSave(method)}
+        sending={saving}
+        sendLabel="Save & Send"
+      />
     </div>
   );
 }

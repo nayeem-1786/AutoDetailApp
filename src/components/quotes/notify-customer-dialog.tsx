@@ -1,19 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogHeader,
-  DialogTitle,
-  DialogContent,
-  DialogClose,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Mail, MessageSquare, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils/cn';
-
-type SendMethod = 'email' | 'sms' | 'both';
 
 interface NotifyCustomerDialogProps {
   open: boolean;
@@ -22,7 +11,7 @@ interface NotifyCustomerDialogProps {
   customerEmail: string | null;
   customerPhone: string | null;
   fetchFn?: typeof fetch;
-  apiBasePath: string; // "/api/appointments" or "/api/pos/appointments"
+  apiBasePath: string;
 }
 
 export function NotifyCustomerDialog({
@@ -34,14 +23,10 @@ export function NotifyCustomerDialog({
   fetchFn = fetch,
   apiBasePath,
 }: NotifyCustomerDialogProps) {
-  const [method, setMethod] = useState<SendMethod>('both');
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const canEmail = !!customerEmail;
-  const canSms = !!customerPhone;
-
-  async function handleSend() {
+  async function handleSend(method: SendMethod) {
     setSending(true);
     try {
       const res = await fetchFn(`${apiBasePath}/${appointmentId}/notify`, {
@@ -63,7 +48,7 @@ export function NotifyCustomerDialog({
         data.errors.forEach((err: string) => toast.warning(err));
       }
 
-      setSent(true);
+      setSuccess(true);
       setTimeout(() => {
         onClose();
       }, 3000);
@@ -74,115 +59,19 @@ export function NotifyCustomerDialog({
     }
   }
 
-  function handleOpenChange(isOpen: boolean) {
-    if (!isOpen && !sent) {
-      onClose();
-    }
-  }
-
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogClose onClose={() => { if (!sent) onClose(); }} />
-      <DialogHeader>
-        <DialogTitle>Send Appointment Confirmation</DialogTitle>
-      </DialogHeader>
-      <DialogContent>
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Send a confirmation to the customer about their scheduled appointment.
-          </p>
-
-          {/* Method selection */}
-          <div className="space-y-2">
-            {[
-              { key: 'email' as SendMethod, icon: Mail, label: 'Email', contact: customerEmail, available: canEmail },
-              { key: 'sms' as SendMethod, icon: MessageSquare, label: 'SMS', contact: customerPhone, available: canSms },
-              { key: 'both' as SendMethod, icon: Mail, label: 'Both', contact: null, available: canEmail || canSms },
-            ].map(({ key, icon: Icon, label, contact, available }) => (
-              <button
-                key={key}
-                onClick={() => setMethod(key)}
-                disabled={!available || sent}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-all',
-                  method === key
-                    ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
-                    : available && !sent
-                    ? 'border-gray-200 hover:border-gray-300'
-                    : 'cursor-not-allowed border-gray-100 opacity-50'
-                )}
-              >
-                <div
-                  className={cn(
-                    'flex h-5 w-5 items-center justify-center rounded-full border-2',
-                    method === key ? 'border-blue-500' : 'border-gray-300'
-                  )}
-                >
-                  {method === key && (
-                    <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                  )}
-                </div>
-                <Icon className="h-4 w-4 text-gray-500" />
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-gray-900">{label}</span>
-                  {contact && (
-                    <p className="text-xs text-gray-500">{contact}</p>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Warnings */}
-          {!sent && method === 'email' && !canEmail && (
-            <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-700">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              Customer has no email address on file.
-            </div>
-          )}
-          {!sent && method === 'sms' && !canSms && (
-            <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-700">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              Customer has no phone number on file.
-            </div>
-          )}
-          {!sent && method === 'both' && (!canEmail || !canSms) && (
-            <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-700">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              {!canEmail && !canSms
-                ? 'Customer has no email or phone on file.'
-                : !canEmail
-                ? 'Customer has no email — will send via SMS only.'
-                : 'Customer has no phone — will send via email only.'}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={sending || sent} className="flex-1">
-              {sent ? 'Close' : 'Skip'}
-            </Button>
-            {sent ? (
-              <Button className="flex-1 bg-green-600 hover:bg-green-600 text-white cursor-default" disabled>
-                <CheckCircle className="h-4 w-4" />
-                Sent
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSend}
-                disabled={sending || (!canEmail && !canSms)}
-                className="flex-1"
-              >
-                {sending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  'Send Confirmation'
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <SendMethodDialog
+      open={open}
+      onOpenChange={(isOpen) => { if (!isOpen && !success) onClose(); }}
+      title="Send Appointment Confirmation"
+      description="Send a confirmation to the customer about their scheduled appointment."
+      customerEmail={customerEmail}
+      customerPhone={customerPhone}
+      onSend={handleSend}
+      sending={sending}
+      success={success}
+      sendLabel="Send Confirmation"
+      cancelLabel="Skip"
+    />
   );
 }

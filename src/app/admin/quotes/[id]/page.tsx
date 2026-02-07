@@ -23,9 +23,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
-import { ArrowLeft, Save, Send, ArrowRightCircle, Plus, Trash2, Car, Mail, MessageSquare, CheckCircle, AlertCircle, Copy, User, Calendar, DollarSign, Award, Clock, ShoppingBag, X } from 'lucide-react';
+import { ArrowLeft, Save, Send, ArrowRightCircle, Plus, Trash2, Car, Mail, MessageSquare, CheckCircle, AlertCircle, User, Calendar, DollarSign, Award, Clock, ShoppingBag, X } from 'lucide-react';
 import { ServicePickerDialog } from '../_components/service-picker-dialog';
 import { QuoteBookDialog } from '@/components/quotes/quote-book-dialog';
+import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -82,7 +83,6 @@ export default function QuoteDetailPage() {
 
   // Send dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
-  const [sendMethod, setSendMethod] = useState<'email' | 'sms' | 'both'>('email');
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
 
@@ -336,13 +336,13 @@ export default function QuoteDetailPage() {
     }
   }
 
-  async function handleSend() {
+  async function handleSend(method: SendMethod) {
     setSending(true);
     try {
       const res = await fetch(`/api/quotes/${id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: sendMethod }),
+        body: JSON.stringify({ method }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -804,84 +804,18 @@ export default function QuoteDetailPage() {
         />
 
         {/* Send/Resend Estimate Dialog */}
-        <Dialog open={showSendDialog} onOpenChange={(open) => { if (!open && !sendSuccess) setShowSendDialog(false); }}>
-          <DialogHeader>
-            <DialogTitle>{quote.sent_at ? 'Resend Estimate' : 'Send Estimate'}</DialogTitle>
-          </DialogHeader>
-          <DialogContent className="space-y-4">
-            <p className="text-sm text-gray-600">
-              How would you like to send this estimate to{' '}
-              <span className="font-medium">{quote.customer?.first_name} {quote.customer?.last_name}</span>?
-            </p>
-            <div className="space-y-2">
-              <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  name="sendMethod"
-                  value="email"
-                  checked={sendMethod === 'email'}
-                  onChange={() => setSendMethod('email')}
-                  disabled={sendSuccess}
-                />
-                <Mail className="h-5 w-5 text-gray-500" />
-                <div>
-                  <div className="text-sm font-medium">Email</div>
-                  <div className="text-xs text-gray-500">
-                    {quote.customer?.email || 'No email on file'}
-                  </div>
-                </div>
-              </label>
-              <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  name="sendMethod"
-                  value="sms"
-                  checked={sendMethod === 'sms'}
-                  onChange={() => setSendMethod('sms')}
-                  disabled={sendSuccess}
-                />
-                <MessageSquare className="h-5 w-5 text-gray-500" />
-                <div>
-                  <div className="text-sm font-medium">SMS (with PDF)</div>
-                  <div className="text-xs text-gray-500">
-                    {quote.customer?.phone || 'No phone on file'}
-                  </div>
-                </div>
-              </label>
-              <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  name="sendMethod"
-                  value="both"
-                  checked={sendMethod === 'both'}
-                  onChange={() => setSendMethod('both')}
-                  disabled={sendSuccess}
-                />
-                <Send className="h-5 w-5 text-gray-500" />
-                <div>
-                  <div className="text-sm font-medium">Both Email & SMS</div>
-                  <div className="text-xs text-gray-500">Send via all available channels</div>
-                </div>
-              </label>
-            </div>
-          </DialogContent>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={sending || sendSuccess}>
-              Cancel
-            </Button>
-            {sendSuccess ? (
-              <Button className="bg-green-600 hover:bg-green-600 text-white cursor-default" disabled>
-                <CheckCircle className="h-4 w-4" />
-                Sent
-              </Button>
-            ) : (
-              <Button onClick={handleSend} disabled={sending}>
-                {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
-                {quote.sent_at ? 'Resend' : 'Send'}
-              </Button>
-            )}
-          </DialogFooter>
-        </Dialog>
+        <SendMethodDialog
+          open={showSendDialog}
+          onOpenChange={(open) => { if (!open) setShowSendDialog(false); }}
+          title={quote.sent_at ? 'Resend Estimate' : 'Send Estimate'}
+          description={`How would you like to send this estimate to ${quote.customer?.first_name} ${quote.customer?.last_name}?`}
+          customerEmail={quote.customer?.email ?? null}
+          customerPhone={quote.customer?.phone ?? null}
+          onSend={handleSend}
+          sending={sending}
+          success={sendSuccess}
+          sendLabel={quote.sent_at ? 'Resend' : 'Send'}
+        />
       </div>
     );
   }
@@ -1226,84 +1160,17 @@ export default function QuoteDetailPage() {
       />
 
       {/* Send Estimate Dialog */}
-      <Dialog open={showSendDialog} onOpenChange={(open) => { if (!open && !sendSuccess) setShowSendDialog(false); }}>
-        <DialogHeader>
-          <DialogTitle>Send Estimate</DialogTitle>
-        </DialogHeader>
-        <DialogContent className="space-y-4">
-          <p className="text-sm text-gray-600">
-            How would you like to send this estimate to{' '}
-            <span className="font-medium">{quote.customer?.first_name} {quote.customer?.last_name}</span>?
-          </p>
-          <div className="space-y-2">
-            <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
-              <input
-                type="radio"
-                name="sendMethod"
-                value="email"
-                checked={sendMethod === 'email'}
-                onChange={() => setSendMethod('email')}
-                disabled={sendSuccess}
-              />
-              <Mail className="h-5 w-5 text-gray-500" />
-              <div>
-                <div className="text-sm font-medium">Email</div>
-                <div className="text-xs text-gray-500">
-                  {quote.customer?.email || 'No email on file'}
-                </div>
-              </div>
-            </label>
-            <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
-              <input
-                type="radio"
-                name="sendMethod"
-                value="sms"
-                checked={sendMethod === 'sms'}
-                onChange={() => setSendMethod('sms')}
-                disabled={sendSuccess}
-              />
-              <MessageSquare className="h-5 w-5 text-gray-500" />
-              <div>
-                <div className="text-sm font-medium">SMS (with PDF)</div>
-                <div className="text-xs text-gray-500">
-                  {quote.customer?.phone || 'No phone on file'}
-                </div>
-              </div>
-            </label>
-            <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
-              <input
-                type="radio"
-                name="sendMethod"
-                value="both"
-                checked={sendMethod === 'both'}
-                onChange={() => setSendMethod('both')}
-                disabled={sendSuccess}
-              />
-              <Send className="h-5 w-5 text-gray-500" />
-              <div>
-                <div className="text-sm font-medium">Both Email & SMS</div>
-                <div className="text-xs text-gray-500">Send via all available channels</div>
-              </div>
-            </label>
-          </div>
-        </DialogContent>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={sending || sendSuccess}>
-            Cancel
-          </Button>
-          {sendSuccess ? (
-            <Button className="bg-green-600 hover:bg-green-600 text-white cursor-default" disabled>
-              <CheckCircle className="h-4 w-4" />
-              Sent
-            </Button>
-          ) : (
-            <Button onClick={handleSend} disabled={sending}>
-              {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
-              Send
-            </Button>
-          )}
-        </DialogFooter>
-      </Dialog>
+      <SendMethodDialog
+        open={showSendDialog}
+        onOpenChange={(open) => { if (!open) setShowSendDialog(false); }}
+        title="Send Estimate"
+        description={`How would you like to send this estimate to ${quote.customer?.first_name} ${quote.customer?.last_name}?`}
+        customerEmail={quote.customer?.email ?? null}
+        customerPhone={quote.customer?.phone ?? null}
+        onSend={handleSend}
+        sending={sending}
+        success={sendSuccess}
+      />
 
       {/* Convert to Appointment Dialog */}
       <QuoteBookDialog
