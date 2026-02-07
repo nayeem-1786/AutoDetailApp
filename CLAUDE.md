@@ -20,11 +20,24 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Continue POS Quotes Tab Testing
-**Last session:** 2026-02-06 — Built POS Quotes tab, unified customer search (name+phone, 2-char min) across all 5 search implementations, fixed admin transactions search (PostgREST .or() on related tables), added customer filters (type/visits/activity/tags), changed quote validity from 30→10 days.
+### 🧪 NEXT SESSION: Review & Refine UI Changes
+**Last session:** 2026-02-06 — Dashboard improvements (Week at a Glance, Quotes/Customers quick-stats), quote-to-appointment conversion for all open statuses, admin list page enhancements (services columns, relative dates, clickable links, customer type badges).
 **Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable)
 
-**Quotes Test Checklist:**
+**Handoff Task List — User will review each section and request changes:**
+
+| # | Section | What was built | Files |
+|---|---------|---------------|-------|
+| 1 | Quote-to-Appointment Conversion | Conversion works for any open status (draft/sent/viewed/accepted), not just accepted. Button on admin detail + draft view + POS detail. | `api/quotes/[id]/convert/route.ts`, `api/pos/quotes/[id]/convert/route.ts`, `admin/quotes/[id]/page.tsx`, `pos/components/quotes/quote-detail.tsx` |
+| 2 | Dashboard: Week at a Glance | 7-day grid (Mon-Sun) with appointment counts, today highlighted, up to 3 preview entries per day with status dots, "+N more" overflow. | `admin/page.tsx` |
+| 3 | Dashboard: Quotes & Customers Stats | 4 quick-stat cards — Open Quotes (with accepted badge), Drafts (with sent count), Total Customers, New This Month (with this week sub-stat). Clickable links. Hidden for detailer role. | `admin/page.tsx` |
+| 4 | Quotes List Improvements | Services column (first 2 + "+N"), customer name as clickable link, relative dates on Created & Last Contacted, Convert action for all open statuses, `?status=` URL param support. | `admin/quotes/page.tsx` |
+| 5 | Customers List Improvements | Customer type badge inline (Pro/Enth), relative dates for Last Visit with hover tooltip, email column truncation. | `admin/customers/page.tsx` |
+| 6 | Transactions List Improvements | Services column (first 2 items + "+N" with hover tooltip), relative dates for Date column, updated CSV export with Services column. | `admin/transactions/page.tsx` |
+
+**Shared utility:** `formatRelativeDate()` in `src/lib/utils/format.ts` — "Today", "Yesterday", "3d ago", "2w ago", "5mo ago", falls back to full date for 1yr+.
+
+**Remaining Quotes Test Checklist:**
 - [ ] Create new quote
 - [ ] Edit draft quote (add/remove items, change vehicle, update notes)
 - [x] Send quote via email (HTML template with "View Your Estimate" button)
@@ -35,12 +48,12 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - [x] Resend quote (from non-draft detail page)
 - [x] "Last Contacted" column shows in list
 - [x] Communication History shows all sends with timestamps
-- [ ] Convert accepted quote to appointment
+- [x] Convert quote to appointment (now works for any open status)
 - [ ] Delete draft quote
 - [x] Customer card shows stats (member since, lifetime spend, loyalty points)
 - [x] Customer detail page has Quotes tab with stats and history
 
-**Appointments Test Checklist:**
+**Remaining Appointments Test Checklist:**
 - [x] Calendar view loads with correct appointments (fixed date key normalization)
 - [ ] Create new appointment (admin-side)
 - [x] Edit appointment (date/time/services/vehicle) - fixed time format validation
@@ -258,6 +271,15 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Dashboard & Admin List Page Enhancements (2026-02-06 — Session 3)
+- **Quote conversion unlocked:** Conversion now works for any open status (draft/sent/viewed/accepted), not just accepted. Both admin and POS API routes updated. Convert button visible on all quote detail views including drafts.
+- **Dashboard: Week at a Glance:** 7-day grid (Mon-Sun) showing appointment count per day, today highlighted in blue, up to 3 preview entries per day with color-coded status dots, "+N more" overflow.
+- **Dashboard: Quotes & Customers quick-stats:** 4 clickable stat cards — Open Quotes (with accepted badge), Drafts (with sent count), Total Customers (links to customer list), New This Month (with this week sub-stat). Hidden for detailer role.
+- **Quotes list:** Added Services column (first 2 names + "+N"), customer name as clickable link to profile, relative dates (Created & Last Contacted), Convert action available for all open statuses, `?status=` URL param for deep linking.
+- **Customers list:** Customer type badge inline next to name (Pro/Enth), relative dates for Last Visit with exact date on hover, email column max-width truncation.
+- **Transactions list:** Added Services column (first 2 items + "+N" with full list on hover), relative dates for Date column, CSV export includes Services.
+- **New utility:** `formatRelativeDate()` in format.ts — "Today", "Yesterday", "3d ago", "2w ago", "5mo ago".
 
 ### Customer Search & Filters Overhaul (2026-02-06)
 - **Unified customer search:** All 5 search implementations (POS lookup, admin customer search API, admin quotes, compliance page, coupon wizard) now use same pattern: 2-char minimum, smart phone detection (digits→phone search, text→name search), 300ms debounce, `LIKE %digits%` for phone, `ILIKE %term%` for name.
