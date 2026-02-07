@@ -3,9 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Plus, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { formatRelativeDate } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
-import { STATUS_BADGE_CONFIG, formatQuoteDate, formatCurrency } from './quote-helpers';
+import { STATUS_BADGE_CONFIG, formatCurrency } from './quote-helpers';
 import type { QuoteStatus } from '../../types';
+
+interface QuoteItem {
+  id: string;
+  item_name: string;
+}
 
 interface QuoteRow {
   id: string;
@@ -29,6 +35,7 @@ interface QuoteRow {
     make: string;
     model: string;
   } | null;
+  items: QuoteItem[];
 }
 
 type StatusFilter = 'all' | QuoteStatus;
@@ -95,6 +102,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
   }, [fetchQuotes]);
 
   const totalPages = Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
 
   return (
     <div className="flex h-full flex-col">
@@ -112,6 +120,27 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
 
       {/* Search + Filters */}
       <div className="shrink-0 space-y-3 border-b border-gray-200 bg-white px-4 py-3">
+        {/* Status tabs */}
+        <div className="flex flex-wrap gap-2">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setStatusFilter(tab.key);
+                setPage(1);
+              }}
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                statusFilter === tab.key
+                  ? 'bg-gray-900 text-white'
+                  : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Search bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -123,30 +152,9 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
             className="h-9 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-blue-300 focus:bg-white focus:ring-1 focus:ring-blue-200"
           />
         </div>
-
-        {/* Status tabs */}
-        <div className="flex gap-1">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                setStatusFilter(tab.key);
-                setPage(1);
-              }}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                statusFilter === tab.key
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* List */}
+      {/* Table */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex h-40 items-center justify-center">
@@ -163,89 +171,128 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {quotes.map((quote) => {
-              const badge = STATUS_BADGE_CONFIG[quote.status];
-              const customerName = quote.customer
-                ? `${quote.customer.first_name} ${quote.customer.last_name}`
-                : 'No Customer';
-              const vehicleStr = quote.vehicle
-                ? `${quote.vehicle.year} ${quote.vehicle.make} ${quote.vehicle.model}`
-                : '';
+          <>
+            {/* Showing count */}
+            <div className="border-b border-gray-200 px-4 py-2">
+              <p className="text-xs text-gray-500">
+                Showing {startIndex + 1}-{Math.min(startIndex + limit, total)} of {total}
+              </p>
+            </div>
 
-              return (
-                <button
-                  key={quote.id}
-                  onClick={() => onSelect(quote.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
-                >
-                  {/* Left: Quote info */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">
-                        {quote.quote_number}
-                      </span>
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                          badge.bg,
-                          badge.text
-                        )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Quote #</th>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Services</th>
+                    <th className="px-4 py-3">Vehicle</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {quotes.map((quote) => {
+                    const badge = STATUS_BADGE_CONFIG[quote.status];
+                    const customerName = quote.customer
+                      ? `${quote.customer.first_name} ${quote.customer.last_name}`
+                      : 'No Customer';
+                    const vehicleStr = quote.vehicle
+                      ? `${quote.vehicle.year} ${quote.vehicle.make} ${quote.vehicle.model}`
+                      : '';
+
+                    return (
+                      <tr
+                        key={quote.id}
+                        onClick={() => onSelect(quote.id)}
+                        className="cursor-pointer transition-colors hover:bg-gray-50"
                       >
-                        {badge.label}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 truncate text-sm text-gray-600">
-                      {customerName}
-                      {vehicleStr && (
-                        <span className="text-gray-400"> — {vehicleStr}</span>
-                      )}
-                    </p>
-                    {quote.sent_at && (
-                      <p className="mt-0.5 text-xs text-gray-400">
-                        Last contacted: {formatQuoteDate(quote.sent_at)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Right: Total + Date */}
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold tabular-nums text-gray-900">
-                      {formatCurrency(quote.total_amount)}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {formatQuoteDate(quote.created_at)}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                        <td
+                          className="whitespace-nowrap px-4 py-3 text-gray-600"
+                          title={new Date(quote.created_at).toLocaleString()}
+                        >
+                          {formatRelativeDate(quote.created_at)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
+                          {quote.quote_number}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                          {customerName}
+                        </td>
+                        <td
+                          className="max-w-[200px] truncate px-4 py-3 text-gray-600"
+                          title={
+                            quote.items
+                              ?.map((i) => i.item_name)
+                              .join(', ') || ''
+                          }
+                        >
+                          {quote.items && quote.items.length > 0 ? (
+                            <>
+                              {quote.items
+                                .slice(0, 2)
+                                .map((i) => i.item_name)
+                                .join(', ')}
+                              {quote.items.length > 2 && (
+                                <span className="text-gray-400">
+                                  {' '}
+                                  +{quote.items.length - 2}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400">--</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                          {vehicleStr || <span className="text-gray-400">--</span>}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                              badge.bg,
+                              badge.text
+                            )}
+                          >
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900">
+                          {formatCurrency(quote.total_amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-2">
-          <span className="text-xs text-gray-500">
-            {total} quote{total !== 1 ? 's' : ''}
-          </span>
-          <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-3">
+          <p className="text-sm text-gray-600">
+            Page {page} of {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30"
+              className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" />
+              Previous
             </button>
-            <span className="text-xs tabular-nums text-gray-600">
-              {page} / {totalPages}
-            </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30"
+              className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
+              Next
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>

@@ -43,13 +43,17 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   const [lockSubmitting, setLockSubmitting] = useState(false);
   const [lockShake, setLockShake] = useState(false);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated — preserve intended destination
   useEffect(() => {
     if (loading) return;
     if (!employee) {
-      router.replace('/pos/login');
+      const dest = pathname + (typeof window !== 'undefined' && window.location.search ? window.location.search : '');
+      const loginUrl = dest && dest !== '/pos' && dest !== '/pos/login'
+        ? `/pos/login?next=${encodeURIComponent(dest)}`
+        : '/pos/login';
+      router.replace(loginUrl);
     }
-  }, [loading, employee, router]);
+  }, [loading, employee, router, pathname]);
 
   // Idle timeout — set locked = true (shows PIN overlay)
   const handleIdleTimeout = useCallback(() => {

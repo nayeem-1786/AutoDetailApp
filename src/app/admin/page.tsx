@@ -194,6 +194,27 @@ export default function AdminDashboard() {
         description={format(new Date(), 'EEEE, MMMM d, yyyy')}
       />
 
+      {/* Needs Attention banner */}
+      {!loading && pending > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <h3 className="text-sm font-semibold text-amber-900">Needs Attention</h3>
+              <p className="text-xs text-amber-700">
+                {pending} appointment{pending !== 1 ? 's' : ''} pending confirmation
+              </p>
+            </div>
+            <Link
+              href="/admin/appointments"
+              className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900"
+            >
+              Review <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -484,24 +505,6 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Alerts placeholder for pending confirmations */}
-          {!loading && pending > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <h3 className="text-sm font-semibold text-amber-900">Needs Attention</h3>
-              </div>
-              <p className="mt-1 text-xs text-amber-700">
-                {pending} appointment{pending !== 1 ? 's' : ''} pending confirmation
-              </p>
-              <Link
-                href="/admin/appointments"
-                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900"
-              >
-                Review <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          )}
         </div>
       </div>
 

@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { PinPad } from '../components/pin-pad';
 import { storePosSession } from '../context/pos-auth-context';
 
-export default function PosLoginPage() {
+function PosLoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get('next');
   const { info: businessInfo } = useBusinessInfo();
   const [digits, setDigits] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +42,9 @@ export default function PosLoginPage() {
         idleTimeoutMinutes: data.idle_timeout_minutes,
       });
 
-      router.replace('/pos');
+      // Redirect to intended destination or default POS home
+      const dest = nextUrl && nextUrl.startsWith('/pos') ? nextUrl : '/pos';
+      router.replace(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid PIN');
       setDigits('');
@@ -128,5 +133,13 @@ export default function PosLoginPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function PosLoginPage() {
+  return (
+    <Suspense>
+      <PosLoginInner />
+    </Suspense>
   );
 }
