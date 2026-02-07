@@ -404,6 +404,7 @@ export async function GET(
       `
       )
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (error || !quote) {

@@ -28,6 +28,7 @@ export async function GET(
       `
       )
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (error || !quote) {
@@ -69,6 +70,7 @@ export async function PATCH(
       .from('quotes')
       .select('id, status')
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (fetchErr || !current) {
@@ -179,6 +181,7 @@ export async function DELETE(
       .from('quotes')
       .select('id, status')
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (fetchErr || !quote) {
@@ -192,11 +195,10 @@ export async function DELETE(
       );
     }
 
-    await supabase.from('quote_items').delete().eq('quote_id', id);
-
+    // Soft-delete: set deleted_at timestamp
     const { error: deleteErr } = await supabase
       .from('quotes')
-      .delete()
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (deleteErr) {

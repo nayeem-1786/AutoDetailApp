@@ -33,6 +33,7 @@ export async function POST(
       `
       )
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (fetchErr || !quote) {
@@ -171,6 +172,8 @@ Thank you for choosing ${business.name}!`;
       .email-footer-text { color: #64748b !important; }
       .email-th { background-color: #1e293b !important; color: #e2e8f0 !important; }
       .email-td { border-color: #334155 !important; color: #e2e8f0 !important; }
+      .email-link { color: #93c5fd !important; }
+      .email-header-text { color: #f1f5f9 !important; }
     }
   </style>
 </head>
@@ -179,7 +182,7 @@ Thank you for choosing ${business.name}!`;
     <div class="email-card" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
       <div style="background-color: #1e3a5f; padding: 24px 32px;">
         <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">${business.name}</h1>
-        <p style="margin: 8px 0 0; color: #94a3b8; font-size: 14px;">${business.address}</p>
+        <p class="email-header-text" style="margin: 8px 0 0; color: #cbd5e1; font-size: 14px;">${business.address}</p>
       </div>
       <div style="padding: 32px;">
         <div style="margin-bottom: 24px;">
@@ -221,7 +224,7 @@ Thank you for choosing ${business.name}!`;
         </div>
         <p class="email-text-muted" style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
           This estimate is valid for 10 days.<br>
-          Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
+          Questions? Call us at <a class="email-link" href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
         </p>
       </div>
       <div class="email-footer" style="background-color: #f9fafb; padding: 24px 32px; text-align: center;">
@@ -257,21 +260,23 @@ Thank you for choosing ${business.name}!`;
               const errText = await mgRes.text();
               console.error('Mailgun error:', errText);
               errors.push('Failed to send email');
-              await supabase.from('quote_communications').insert({
+              const { error: commErr1 } = await supabase.from('quote_communications').insert({
                 quote_id: id,
                 channel: 'email',
                 sent_to: customer.email,
                 status: 'failed',
                 error_message: 'Mailgun delivery failed',
               });
+              if (commErr1) console.error('Failed to record communication:', commErr1.message);
             } else {
               sentVia.push('email');
-              await supabase.from('quote_communications').insert({
+              const { error: commErr2 } = await supabase.from('quote_communications').insert({
                 quote_id: id,
                 channel: 'email',
                 sent_to: customer.email,
                 status: 'sent',
               });
+              if (commErr2) console.error('Failed to record communication:', commErr2.message);
             }
           } catch (emailErr) {
             console.error('Email send error:', emailErr);
@@ -328,21 +333,23 @@ Thank you for choosing ${business.name}!`;
               const errText = await twRes.text();
               console.error('Twilio error:', errText);
               errors.push('Failed to send SMS');
-              await supabase.from('quote_communications').insert({
+              const { error: commErr3 } = await supabase.from('quote_communications').insert({
                 quote_id: id,
                 channel: 'sms',
                 sent_to: customer.phone,
                 status: 'failed',
                 error_message: 'Twilio delivery failed',
               });
+              if (commErr3) console.error('Failed to record communication:', commErr3.message);
             } else {
               sentVia.push('sms');
-              await supabase.from('quote_communications').insert({
+              const { error: commErr4 } = await supabase.from('quote_communications').insert({
                 quote_id: id,
                 channel: 'sms',
                 sent_to: customer.phone,
                 status: 'sent',
               });
+              if (commErr4) console.error('Failed to record communication:', commErr4.message);
             }
           } catch (smsErr) {
             console.error('SMS send error:', smsErr);

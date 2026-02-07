@@ -98,7 +98,8 @@ export default function AdminDashboard() {
       supabase
         .from('quotes')
         .select('status')
-        .in('status', ['draft', 'sent', 'viewed', 'accepted']),
+        .in('status', ['draft', 'sent', 'viewed', 'accepted'])
+        .is('deleted_at', null),
 
       // Total customers
       supabase

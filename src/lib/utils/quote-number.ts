@@ -11,7 +11,7 @@ export async function generateQuoteNumber(
   const { data } = await client
     .from('quotes')
     .select('quote_number')
-    .order('created_at', { ascending: false })
+    .order('quote_number', { ascending: false })
     .limit(1)
     .single();
 

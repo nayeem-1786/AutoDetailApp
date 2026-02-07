@@ -66,7 +66,8 @@ export default function QuotesPage() {
         items:quote_items(*)
       `
       )
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .is('deleted_at', null);
 
     if (error) {
       console.error('Error loading quotes:', error);

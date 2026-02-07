@@ -82,6 +82,7 @@ export default function QuoteDetailPage() {
       `
       )
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (error || !data) {
@@ -94,11 +95,12 @@ export default function QuoteDetailPage() {
     setQuote(q);
 
     // Load communication history
-    const { data: commData } = await supabase
+    const { data: commData, error: commErr } = await supabase
       .from('quote_communications')
       .select('*')
       .eq('quote_id', id)
       .order('created_at', { ascending: false });
+    if (commErr) console.error('Failed to load communications:', commErr.message);
     if (commData) setCommunications(commData);
 
     // Load customer stats if customer exists

@@ -174,7 +174,7 @@ export default function CustomerProfilePage() {
       supabase.from('vehicles').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('loyalty_ledger').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('transactions').select('*, employee:employees(id, first_name, last_name)').eq('customer_id', id).order('transaction_date', { ascending: false }),
-      supabase.from('quotes').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('quotes').select('*').eq('customer_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
     ]);
 
     if (custRes.error || !custRes.data) {

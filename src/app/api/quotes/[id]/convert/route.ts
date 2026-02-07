@@ -41,6 +41,7 @@ export async function POST(
       `
       )
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (fetchErr || !quote) {

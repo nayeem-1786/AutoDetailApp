@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatPhone } from '@/lib/utils/format';
+import { Phone } from 'lucide-react';
 import { getBusinessInfo } from '@/lib/data/business';
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { AcceptQuoteButton } from './accept-button';
@@ -33,6 +34,9 @@ async function getQuote(token: string): Promise<QuoteWithRelations | null> {
 
   if (error || !data) return null;
 
+  // Don't mark deleted quotes as viewed — return data as-is for friendly messaging
+  if (data.deleted_at) return data as QuoteWithRelations;
+
   // Mark as viewed if status is 'sent'
   if (data.status === 'sent' && !data.viewed_at) {
     await supabase
@@ -59,6 +63,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: `Quote Not Found | ${businessInfo.name}` };
   }
 
+  if (quote.deleted_at) {
+    return {
+      title: `Estimate No Longer Available | ${businessInfo.name}`,
+      robots: { index: false, follow: false },
+    };
+  }
+
   return {
     title: `Quote ${quote.quote_number} | ${businessInfo.name}`,
     description: `View your quote ${quote.quote_number} from ${businessInfo.name}`,
@@ -77,6 +88,42 @@ export default async function PublicQuotePage({ params }: PageProps) {
         <p className="mt-2 text-gray-500 dark:text-gray-400">
           This quote link is invalid or has expired. Please contact us for assistance.
         </p>
+      </div>
+    );
+  }
+
+  if (quote.deleted_at) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16">
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{businessInfo.name}</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{businessInfo.address}</p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-8 shadow-sm dark:shadow-gray-900/50 text-center">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            This Estimate Is No Longer Available
+          </h2>
+          <p className="mt-3 text-gray-500 dark:text-gray-400">
+            This estimate is no longer active. We&apos;d love to help you with a new one!
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <a
+              href={`tel:${businessInfo.phone}`}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <Phone className="h-4 w-4" />
+              Call {formatPhone(businessInfo.phone)}
+            </a>
+            <a
+              href="/book"
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            >
+              Book Online
+            </a>
+          </div>
+        </div>
       </div>
     );
   }
