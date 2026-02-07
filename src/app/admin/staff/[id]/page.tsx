@@ -322,9 +322,10 @@ export default function StaffDetailPage() {
   async function onSaveProfile(data: EmployeeUpdateInput) {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('employees')
-        .update({
+      const res = await fetch(`/api/admin/staff/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           first_name: data.first_name,
           last_name: data.last_name,
           email: data.email,
@@ -333,16 +334,17 @@ export default function StaffDetailPage() {
           pin_code: data.pin_code || null,
           hourly_rate: data.hourly_rate ?? null,
           bookable_for_appointments: data.bookable_for_appointments,
-        })
-        .eq('id', id);
+        }),
+      });
 
-      if (error) throw error;
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to update profile');
 
       toast.success('Profile updated successfully');
       await loadEmployee();
     } catch (err) {
       console.error('Update employee error:', err);
-      toast.error('Failed to update profile');
+      toast.error(err instanceof Error ? err.message : 'Failed to update profile');
     } finally {
       setSaving(false);
     }

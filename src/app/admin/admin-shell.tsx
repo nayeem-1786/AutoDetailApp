@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
+import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 import { getNavForRole, canAccessRoute, type NavItem } from '@/lib/auth/roles';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils/cn';
@@ -26,6 +28,7 @@ import {
   Zap,
   ShieldCheck,
   LogOut,
+  KeyRound,
   ChevronDown,
   ChevronRight,
   Menu,
@@ -564,6 +567,24 @@ function AdminContent({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
                 <div className="my-1 border-t border-gray-100" />
+                <button
+                  onClick={async () => {
+                    setAccountOpen(false);
+                    const supabase = createClient();
+                    const { error } = await supabase.auth.resetPasswordForEmail(employee.email, {
+                      redirectTo: `${window.location.origin}/auth/callback?next=/login/reset-password`,
+                    });
+                    if (error) {
+                      toast.error('Failed to send reset email');
+                    } else {
+                      toast.success('Password reset email sent. Check your inbox.');
+                    }
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  Change Password
+                </button>
                 <button
                   onClick={() => {
                     setAccountOpen(false);
