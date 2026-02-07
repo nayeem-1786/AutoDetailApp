@@ -43,11 +43,11 @@ export function SendMethodDialog({
   sendLabel = 'Send',
   cancelLabel = 'Cancel',
 }: SendMethodDialogProps) {
-  const [method, setMethod] = useState<SendMethod>('email');
+  const [method, setMethod] = useState<SendMethod>('both');
 
   // Reset method when dialog opens
   useEffect(() => {
-    if (open) setMethod('email');
+    if (open) setMethod('both');
   }, [open]);
 
   return (

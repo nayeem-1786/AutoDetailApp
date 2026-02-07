@@ -168,6 +168,16 @@ Thank you for choosing ${business.name}!`;
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <style>
+    /* Override auto-detected address/phone links in header */
+    .email-header-text a,
+    .email-header-text a[x-apple-data-detectors],
+    .email-header-text a[href^="x-apple-data-detectors:"],
+    .email-header-text a[href^="tel:"],
+    .email-header-text a[href^="mailto:"],
+    .email-header-text a[href*="maps"] {
+      color: #cbd5e1 !important;
+      text-decoration: none !important;
+    }
     @media (prefers-color-scheme: dark) {
       .email-body { background-color: #1a1a2e !important; }
       .email-card { background-color: #16213e !important; }
@@ -180,7 +190,7 @@ Thank you for choosing ${business.name}!`;
       .email-th { background-color: #1e293b !important; color: #e2e8f0 !important; }
       .email-td { border-color: #334155 !important; color: #e2e8f0 !important; }
       .email-link { color: #93c5fd !important; }
-      .email-header-text { color: #f1f5f9 !important; }
+      .email-header-text, .email-header-text a, .email-header-text a[x-apple-data-detectors] { color: #f1f5f9 !important; }
     }
   </style>
 </head>

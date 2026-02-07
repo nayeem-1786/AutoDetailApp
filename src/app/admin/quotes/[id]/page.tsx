@@ -11,9 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Send, ArrowRightCircle, Car, Mail, MessageSquare, CheckCircle, AlertCircle, User, Calendar, DollarSign, Award, Clock, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Send, ArrowRightCircle, Car, Mail, MessageSquare, CheckCircle, AlertCircle, User, Calendar, DollarSign, Award, Clock, ExternalLink, Trash2 } from 'lucide-react';
 import { QuoteBookDialog } from '@/components/quotes/quote-book-dialog';
 import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -47,6 +48,10 @@ export default function QuoteDetailPage() {
 
   // Book appointment dialog
   const [showBookDialog, setShowBookDialog] = useState(false);
+
+  // Delete confirmation
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Communication history
   const [communications, setCommunications] = useState<{
@@ -182,6 +187,20 @@ export default function QuoteDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    setDeleting(true);
+    const res = await fetch(`/api/quotes/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      toast.success('Quote deleted');
+      router.push('/admin/quotes');
+    } else {
+      const data = await res.json();
+      toast.error(data.error || 'Failed to delete quote');
+    }
+    setDeleting(false);
+    setShowDeleteDialog(false);
+  }
+
   // Calculate default duration from services' base_duration_minutes
   const [serviceDurations, setServiceDurations] = useState<Record<string, number>>({});
 
@@ -258,6 +277,12 @@ export default function QuoteDetailPage() {
               <Button onClick={() => setShowBookDialog(true)}>
                 <ArrowRightCircle className="h-4 w-4" />
                 Convert to Appointment
+              </Button>
+            )}
+            {quote.status === 'draft' && (
+              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete
               </Button>
             )}
             <Button variant="outline" onClick={() => router.push('/admin/quotes')}>
@@ -575,6 +600,18 @@ export default function QuoteDetailPage() {
         sending={sending}
         success={sendSuccess}
         sendLabel={quote.sent_at ? 'Resend' : 'Send'}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => { if (!open) setShowDeleteDialog(false); }}
+        title="Delete Quote"
+        description={`Are you sure you want to delete ${quote.quote_number}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleting}
+        onConfirm={handleDelete}
       />
     </div>
   );
