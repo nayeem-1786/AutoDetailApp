@@ -242,51 +242,20 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto p-4">
-      {/* Header row: dollar display + note input, right-aligned to keypad column */}
-      <div className="mb-2 flex justify-end">
-        <div className="w-1/2 pl-2">
-          <div className="mb-3 flex items-center justify-center py-4">
-            <span
-              className={cn(
-                'tabular-nums font-bold',
-                cents === 0 ? 'text-gray-300' : 'text-gray-900',
-                display.length > 8 ? 'text-4xl' : 'text-6xl'
-              )}
-            >
-              ${display}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-3">
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Description..."
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-              maxLength={100}
-            />
-            {note && (
-              <button
-                onClick={() => setNote('')}
-                className="shrink-0 text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main grid: favorites + numpad aligned */}
+      {/* Main grid: favorites + (dollar display + description + numpad) */}
       <div className="grid flex-1 grid-cols-2 gap-4">
         {/* Left — Favorites (3 cols) */}
-        <div>
+        <div className="flex flex-col">
+          {/* Spacer to align favorites top with description input */}
+          <div className="mb-3 flex items-center justify-center py-4">
+            <span className="text-6xl font-bold text-transparent select-none" aria-hidden="true">&nbsp;</span>
+          </div>
           {favLoading ? (
             <div className="flex h-40 items-center justify-center">
               <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
             </div>
           ) : favorites.length > 0 ? (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2" style={{ gridAutoRows: 'minmax(64px, 1fr)' }}>
               {favorites.slice(0, 15).map((fav) => {
                 const colors = getTileColors(fav.color, fav.colorShade);
                 const Icon = TYPE_ICONS[fav.type] ?? Package;
@@ -295,8 +264,8 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
                     key={fav.id}
                     onClick={() => handleTapFavorite(fav)}
                     className={cn(
-                      'flex flex-col items-center justify-center gap-1.5 rounded-lg px-2 py-3 transition-all',
-                      'min-h-[64px] active:scale-[0.97]',
+                      'flex h-full flex-col items-center justify-center gap-1.5 rounded-lg px-2 py-3 transition-all',
+                      'active:scale-[0.97]',
                       colors.bg,
                       colors.text,
                       colors.hover
@@ -317,15 +286,46 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           )}
         </div>
 
-        {/* Right — Numpad */}
-        <div ref={keypadRef}>
-          <PinPad
-            onDigit={handleDigit}
-            onBackspace={handleBackspace}
-            onAction={handleAddToTicket}
-            actionLabel="Add to Ticket"
-            size="default"
-          />
+        {/* Right — Dollar display + description + numpad */}
+        <div>
+          <div className="mb-3 flex items-center justify-center py-4">
+            <span
+              className={cn(
+                'tabular-nums font-bold',
+                cents === 0 ? 'text-gray-300' : 'text-gray-900',
+                display.length > 8 ? 'text-4xl' : 'text-6xl'
+              )}
+            >
+              ${display}
+            </span>
+          </div>
+          <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-3">
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Description..."
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              maxLength={100}
+            />
+            {note && (
+              <button
+                onClick={() => setNote('')}
+                className="shrink-0 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div ref={keypadRef}>
+            <PinPad
+              onDigit={handleDigit}
+              onBackspace={handleBackspace}
+              onAction={handleAddToTicket}
+              actionLabel="Add to Ticket"
+              size="default"
+            />
+          </div>
         </div>
       </div>
 

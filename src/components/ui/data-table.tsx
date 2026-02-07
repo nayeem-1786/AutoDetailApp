@@ -56,6 +56,7 @@ function DataTable<TData>({
 
     const selectColumn: ColumnDef<TData, unknown> = {
       id: '_select',
+      size: 32,
       header: ({ table }) => (
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}

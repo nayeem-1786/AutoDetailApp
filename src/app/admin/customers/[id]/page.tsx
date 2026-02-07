@@ -816,7 +816,7 @@ export default function CustomerProfilePage() {
             {/* Customer Type + Customer Journey Card */}
             <Card>
               <CardContent className="pt-6">
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                   {/* Customer Type section */}
                   <div className="flex-shrink-0">
                     <CardTitle className="mb-3">Customer Type</CardTitle>
@@ -863,12 +863,12 @@ export default function CustomerProfilePage() {
                   </div>
 
                   {/* Vertical divider */}
-                  <div className="hidden sm:flex sm:items-center sm:px-10 self-stretch">
+                  <div className="hidden lg:flex lg:items-center lg:px-6 self-stretch">
                     <div className="h-3/4 w-px bg-gray-200" />
                   </div>
 
                   {/* Customer Journey section */}
-                  <div className="flex-shrink-0">
+                  <div className="min-w-0">
                     <CardTitle className="mb-3">Customer Journey</CardTitle>
                     <div className="flex gap-2">
                       <div className="flex flex-col items-center rounded-lg border-2 border-gray-200 bg-gray-50 px-4 py-2">
@@ -899,12 +899,12 @@ export default function CustomerProfilePage() {
                   </div>
 
                   {/* Vertical divider */}
-                  <div className="hidden sm:flex sm:items-center sm:px-10 self-stretch">
+                  <div className="hidden lg:flex lg:items-center lg:px-6 self-stretch">
                     <div className="h-3/4 w-px bg-gray-200" />
                   </div>
 
                   {/* Online Access section */}
-                  <div className="flex-shrink-0">
+                  <div className="min-w-0">
                     <CardTitle
                       className="mb-3 cursor-help"
                       title="Portal access allows customers to sign in to view appointments, transaction history, and manage their profile. Access is created when a customer signs up via the portal with email/password or phone OTP."

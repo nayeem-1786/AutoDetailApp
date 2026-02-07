@@ -15,18 +15,18 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 |-----|--------|-------|
 | Online Booking | ✅ Done | Payment flow tested with coupons, loyalty points, edge cases |
 | Appointments | 🔄 In Progress | Cancel flow fixed, calendar date key fixed, status dropdown fixed |
-| Quotes | ⏳ Pending | CRUD, send email/SMS, PDF, public view, accept, convert, resend, last contacted |
+| Quotes | 🔄 In Progress | Admin refactored to read-only + POS deep-links. Create/edit via POS builder. Send/resend/convert tested. |
 | Waitlist | ⏳ Pending | Join, auto-notify, admin management |
 | Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
 ### 🧪 NEXT SESSION: Review & Refine UI Changes
-**Last session:** 2026-02-06 — Password reset on login pages, accept quote confirmation, staff email sync to Supabase Auth, admin "Change Password" in dropdown.
-**Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable)
+**Last session:** 2026-02-07 — Admin quotes refactored to read-only with POS deep-links, PIN collision safeguards, dashboard open quotes fix, Week at a Glance on appointments page, calendar condensed.
+**Migrations:** All applied (including `quote_communications` table, `quotes.customer_id` nullable, `employees_pin_code_unique` index)
 
 **Remaining Quotes Test Checklist:**
-- [ ] Create new quote
-- [ ] Edit draft quote (add/remove items, change vehicle, update notes)
+- [x] Create new quote — now via POS deep-link (`/pos/quotes?mode=builder`)
+- [x] Edit draft quote — now via POS deep-link (`/pos/quotes?mode=builder&quoteId=<id>`)
 - [x] Send quote via email (HTML template with "View Your Estimate" button)
 - [x] Send quote via SMS (short URL /q/[token])
 - [ ] Send quote via both
@@ -36,7 +36,7 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 - [x] "Last Contacted" column shows in list
 - [x] Communication History shows all sends with timestamps
 - [x] Convert quote to appointment (now works for any open status, creates as 'confirmed', shows send-confirmation dialog)
-- [ ] Delete draft quote
+- [ ] Delete draft quote — via POS builder
 - [x] Customer card shows stats (member since, lifetime spend, loyalty points)
 - [x] Customer detail page has Quotes tab with stats and history
 
@@ -221,6 +221,12 @@ When testing each module, verify:
 - [x] Accept quote confirmation dialog on public quote page
 - [x] Admin "Change Password" in account dropdown menu
 - [x] Staff email updates sync to Supabase Auth via API route
+- [x] Refactor admin quotes to read-only + POS deep-links (deleted ~1,226 lines, admin creates/edits via POS builder)
+- [x] Unique PIN constraint on employees table (partial unique index, duplicate check in create + update APIs)
+- [x] Dashboard open quotes count excludes drafts (separate card exists for drafts)
+- [x] Week at a Glance on appointments page (below calendar grid)
+- [x] Condensed appointment calendar vertically (h-14→h-10, tighter spacing)
+- [ ] Fix stale link in customer detail page (`/admin/quotes/new?customer=${id}` → POS deep-link)
 - [ ] **Admin Settings: Role Permissions** — Currently role permissions are only seeded via `supabase/seed.sql`. Need admin UI at `/admin/settings/roles-permissions` to view/edit default permissions per role (super_admin, admin, cashier, detailer). Individual employee overrides already work on staff detail page.
 - [ ] Test Dashboard sections marked as completed — verify all widgets and data are working correctly
 - [ ] Merge duplicate customers feature (detect and consolidate)
@@ -276,6 +282,30 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### Admin Quotes Read-Only Refactor, PIN Safeguards, Calendar Condensed (2026-02-07 — Session 6)
+
+**Part A: Admin Quotes → Read-Only + POS Deep-Links**
+- **Deleted** `src/app/admin/quotes/new/page.tsx` (790 lines) and `src/app/admin/quotes/_components/service-picker-dialog.tsx` (436 lines)
+- **Admin list page:** "New Quote" button opens POS builder in new tab (`/pos/quotes?mode=builder`). "Edit" dropdown changed to "Edit in POS" for all statuses via `window.open()`. Empty state button same pattern.
+- **Admin detail page:** Completely rewritten to read-only for all statuses including drafts. Removed all edit state, form fields, edit functions, draft edit JSX (~500 lines removed). Added "Edit in POS" button (primary for drafts, outline for others). Kept: send/resend, convert to appointment, communication history.
+- **POS deep-link support:** `src/app/pos/quotes/page.tsx` rewritten with `useSearchParams()` — `?mode=builder` opens new quote, `?mode=builder&quoteId=<id>` opens existing quote in builder, `?mode=detail&quoteId=<id>` opens detail. Wrapped in `<Suspense>` for Next.js compatibility. Internal navigation still works via callbacks.
+- **Net result:** ~1,700 lines removed (11 files changed, 440 insertions, 2,139 deletions)
+
+**Part B: Employee PIN Collision Safeguards**
+- **Database:** New migration `20260207000001_unique_pin_code.sql` — partial unique index on `pin_code WHERE pin_code IS NOT NULL` (allows multiple NULLs).
+- **Staff create API:** `src/app/api/staff/create/route.ts` — checks for duplicate PIN before creating auth user. Returns 409 with message "PIN already in use by {name}".
+- **Staff update API:** `src/app/api/admin/staff/[id]/route.ts` — same duplicate PIN check excluding current employee.
+
+**Part C: Dashboard & Appointments UI Fixes**
+- **Dashboard open quotes:** `totalOpenQuotes` now excludes drafts (only counts sent + viewed + accepted). Drafts have their own separate stat card.
+- **Appointments "Week at a Glance":** Added 7-day grid below calendar showing appointment count per day with status dots, clickable to select date. Reuses same data from existing `appointments` state.
+- **Calendar condensed:** Day cell height reduced `h-14` → `h-10`, weekday header padding `py-1.5` → `py-1`, header gap `mt-4` → `mt-2`.
+
+**Files changed (11 total, 1 commit):**
+- DELETED: `admin/quotes/new/page.tsx`, `admin/quotes/_components/service-picker-dialog.tsx`
+- MODIFIED: `admin/quotes/page.tsx`, `admin/quotes/[id]/page.tsx`, `pos/quotes/page.tsx`, `admin/appointments/page.tsx`, `admin/appointments/components/appointment-calendar.tsx`, `admin/page.tsx`, `api/admin/staff/[id]/route.ts`, `api/staff/create/route.ts`
+- NEW: `supabase/migrations/20260207000001_unique_pin_code.sql`
 
 ### Password Reset, Accept Quote Confirmation, Staff Auth Sync (2026-02-06 — Session 5)
 

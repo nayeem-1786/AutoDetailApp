@@ -470,6 +470,7 @@ export default function CustomersPage() {
     {
       id: 'name',
       header: 'Name',
+      size: 220,
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
@@ -490,6 +491,7 @@ export default function CustomersPage() {
     {
       id: 'phone',
       header: 'Mobile',
+      size: 160,
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">
           {row.original.phone ? formatPhone(row.original.phone) : '--'}
@@ -506,6 +508,7 @@ export default function CustomersPage() {
     {
       accessorKey: 'visit_count',
       header: 'Visits',
+      size: 70,
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">{row.original.visit_count}</span>
       ),
@@ -513,6 +516,7 @@ export default function CustomersPage() {
     {
       accessorKey: 'lifetime_spend',
       header: 'Lifetime Spend',
+      size: 110,
       cell: ({ row }) => (
         <span className="text-sm font-medium text-gray-900">
           {formatCurrency(row.original.lifetime_spend)}
@@ -522,6 +526,7 @@ export default function CustomersPage() {
     {
       accessorKey: 'loyalty_points_balance',
       header: 'Points',
+      size: 70,
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">
           {formatPoints(row.original.loyalty_points_balance)}
@@ -531,6 +536,7 @@ export default function CustomersPage() {
     {
       id: 'last_visit',
       header: 'Last Visit',
+      size: 90,
       cell: ({ row }) => {
         const d = row.original.last_visit_date;
         if (!d) return <span className="text-sm text-gray-400">Never</span>;
@@ -540,25 +546,6 @@ export default function CustomersPage() {
           </span>
         );
       },
-    },
-    {
-      id: 'tags',
-      header: 'Tags',
-      cell: ({ row }) => {
-        const tags = row.original.tags;
-        if (!tags || !Array.isArray(tags) || tags.length === 0) return null;
-        return (
-          <div className="flex flex-wrap gap-1">
-            {tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary">{tag}</Badge>
-            ))}
-            {tags.length > 3 && (
-              <Badge variant="secondary">+{tags.length - 3}</Badge>
-            )}
-          </div>
-        );
-      },
-      enableSorting: false,
     },
   ];
 
