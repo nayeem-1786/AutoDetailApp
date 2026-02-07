@@ -35,10 +35,8 @@ export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
   // Load existing quote into state
   useEffect(() => {
     if (!quoteId) {
-      // New quote — clear state if dirty from a previous quote
-      if (quote.quoteId) {
-        dispatch({ type: 'CLEAR_QUOTE' });
-      }
+      // New quote — always start fresh (clears stale items from unsaved quotes)
+      dispatch({ type: 'CLEAR_QUOTE' });
       return;
     }
 

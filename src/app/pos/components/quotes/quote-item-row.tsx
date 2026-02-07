@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Minus, Plus, X, StickyNote } from 'lucide-react';
 import type { TicketItem } from '../../types';
+import type { VehicleSizeClass } from '@/lib/supabase/types';
+import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import { useQuote } from '../../context/quote-context';
 
 interface QuoteItemRowProps {
@@ -64,42 +66,44 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
     }
   }
 
+  const sizeLabel = item.vehicleSizeClass
+    ? VEHICLE_SIZE_LABELS[item.vehicleSizeClass as VehicleSizeClass]
+    : null;
+  const subParts = [sizeLabel, item.tierName].filter(Boolean);
+  const subText = subParts.join(' \u00B7 ');
+
   return (
     <div className="border-b border-gray-100 py-2">
-      <div className="flex items-center gap-2">
-        {/* Name + tier */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <p className="truncate text-sm font-medium text-gray-900">
-              {item.itemName}
-            </p>
-            <button
-              onClick={() => {
-                setNoteValue(item.notes ?? '');
-                setNoteOpen(!noteOpen);
-              }}
-              className={`shrink-0 rounded p-0.5 ${
-                item.notes
-                  ? 'text-amber-500 hover:text-amber-600'
-                  : 'text-gray-300 hover:text-gray-500'
-              }`}
-              title={item.notes ? `Note: ${item.notes}` : 'Add note'}
-            >
-              <StickyNote className="h-3 w-3" />
-            </button>
-          </div>
-          {item.tierName && (
-            <p className="truncate text-xs text-gray-500">{item.tierName}</p>
+      {/* Line 1: Full item name */}
+      <p className="text-sm font-medium leading-snug text-gray-900">
+        {item.itemName}
+      </p>
+
+      {/* Line 2: Sub-text + note icon | qty + price + remove */}
+      <div className="mt-1 flex items-center gap-2">
+        {/* Left: sub-text + note icon */}
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          {subText && (
+            <span className="truncate text-xs text-gray-500">{subText}</span>
           )}
-          {item.notes && !noteOpen && (
-            <p className="truncate text-xs text-gray-400 italic">
-              {item.notes}
-            </p>
-          )}
+          <button
+            onClick={() => {
+              setNoteValue(item.notes ?? '');
+              setNoteOpen(!noteOpen);
+            }}
+            className={`shrink-0 rounded p-0.5 ${
+              item.notes
+                ? 'text-amber-500 hover:text-amber-600'
+                : 'text-gray-300 hover:text-gray-500'
+            }`}
+            title={item.notes ? `Note: ${item.notes}` : 'Add note'}
+          >
+            <StickyNote className="h-3 w-3" />
+          </button>
         </div>
 
-        {/* Quantity controls */}
-        <div className="flex items-center gap-1">
+        {/* Right: qty controls + price + remove */}
+        <div className="flex shrink-0 items-center gap-1">
           <button
             onClick={() =>
               dispatch({
@@ -147,32 +151,39 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
           >
             <Plus className="h-3 w-3" />
           </button>
-        </div>
 
-        {/* Price */}
-        <div className="w-16 text-right">
-          <p className="text-sm font-medium tabular-nums text-gray-900">
-            ${item.totalPrice.toFixed(2)}
-          </p>
-          {item.taxAmount > 0 && (
-            <p className="text-xs tabular-nums text-gray-400">
-              +${item.taxAmount.toFixed(2)}
+          {/* Price */}
+          <div className="w-16 text-right">
+            <p className="text-sm font-medium tabular-nums text-gray-900">
+              ${item.totalPrice.toFixed(2)}
             </p>
-          )}
-        </div>
+            {item.taxAmount > 0 && (
+              <p className="text-xs tabular-nums text-gray-400">
+                +${item.taxAmount.toFixed(2)}
+              </p>
+            )}
+          </div>
 
-        {/* Remove */}
-        <button
-          onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: item.id })}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+          {/* Remove */}
+          <button
+            onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: item.id })}
+            className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
+
+      {/* Note text (when exists and note input is closed) */}
+      {item.notes && !noteOpen && (
+        <p className="mt-0.5 truncate text-xs text-gray-400 italic">
+          {item.notes}
+        </p>
+      )}
 
       {/* Inline note input */}
       {noteOpen && (
-        <div className="mt-1.5 flex items-center gap-1.5 pl-1">
+        <div className="mt-1.5 flex items-center gap-1.5">
           <input
             ref={noteInputRef}
             type="text"
