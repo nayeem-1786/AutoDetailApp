@@ -112,7 +112,7 @@ export function ticketReducer(
         totalPrice,
         taxAmount: calculateItemTax(totalPrice, service.is_taxable),
         isTaxable: service.is_taxable,
-        tierName: pricing.tier_name,
+        tierName: pricing.tier_label || pricing.tier_name,
         vehicleSizeClass,
         notes: null,
       };

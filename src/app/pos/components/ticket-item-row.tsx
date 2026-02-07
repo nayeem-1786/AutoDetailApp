@@ -69,7 +69,20 @@ export function TicketItemRow({ item }: TicketItemRowProps) {
   const sizeLabel = item.vehicleSizeClass
     ? VEHICLE_SIZE_LABELS[item.vehicleSizeClass as VehicleSizeClass]
     : null;
-  const subParts = [sizeLabel, item.tierName].filter(Boolean);
+
+  // Build tier display: skip "default", skip if redundant with vehicle size
+  let tierLabel: string | null = null;
+  if (item.tierName && item.tierName !== 'default') {
+    const formatted = item.tierName
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    // Skip if it duplicates the vehicle size label (e.g., "Sedan" and "Sedan")
+    if (!sizeLabel || formatted.toLowerCase() !== sizeLabel.toLowerCase()) {
+      tierLabel = formatted;
+    }
+  }
+
+  const subParts = [sizeLabel, tierLabel].filter(Boolean);
   const subText = subParts.join(' \u00B7 ');
 
   return (

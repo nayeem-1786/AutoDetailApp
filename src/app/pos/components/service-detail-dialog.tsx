@@ -48,12 +48,24 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
       }]
     : [];
 
+  // Detect if tiers represent vehicle sizes (e.g., "sedan", "truck_suv_2row", "suv_3row_van")
+  const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
+  const isVehicleSizeTiers = tiers.length > 1
+    && tiers.every((t) => VEHICLE_SIZE_CLASSES.has(t.tier_name));
+  const autoMatchIdx = isVehicleSizeTiers && vehicleSizeClass
+    ? tiers.findIndex((t) => t.tier_name === vehicleSizeClass)
+    : -1;
+
   const [selectedTierIdx, setSelectedTierIdx] = useState(0);
 
-  // Reset tier selection when service changes (dialog persists in DOM)
+  // Auto-select matching tier when service or vehicle changes
   useEffect(() => {
-    setSelectedTierIdx(0);
-  }, [service.id]);
+    if (autoMatchIdx >= 0) {
+      setSelectedTierIdx(autoMatchIdx);
+    } else {
+      setSelectedTierIdx(0);
+    }
+  }, [service.id, autoMatchIdx]);
 
   const selectedTier = tiers[selectedTierIdx] ?? null;
 
@@ -106,20 +118,27 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
           {/* Tier selection */}
           {tiers.length > 1 && (
             <div className="mt-5">
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">Select Tier</h3>
+              <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                {isVehicleSizeTiers ? 'Vehicle Size Pricing' : 'Select Tier'}
+              </h3>
               <div className="flex flex-col gap-2">
                 {tiers.map((tier, idx) => {
                   const price = getDisplayPrice(tier);
                   const isSelected = idx === selectedTierIdx;
                   const isVehicleAware = tier.is_vehicle_size_aware && vehicleSizeClass;
+                  // Disable non-matching vehicle-size tiers when vehicle is known
+                  const isDisabled = autoMatchIdx >= 0 && idx !== autoMatchIdx;
 
                   return (
                     <button
                       key={tier.id}
-                      onClick={() => setSelectedTierIdx(idx)}
+                      onClick={() => { if (!isDisabled) setSelectedTierIdx(idx); }}
+                      disabled={isDisabled}
                       className={cn(
                         'flex items-center justify-between rounded-lg border p-4 text-left transition-all',
-                        isSelected
+                        isDisabled
+                          ? 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-50'
+                          : isSelected
                           ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
                           : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                       )}
@@ -128,31 +147,44 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                         <div
                           className={cn(
                             'flex h-5 w-5 items-center justify-center rounded-full border-2',
-                            isSelected ? 'border-blue-500' : 'border-gray-300'
+                            isDisabled
+                              ? 'border-gray-200'
+                              : isSelected ? 'border-blue-500' : 'border-gray-300'
                           )}
                         >
-                          {isSelected && (
+                          {isSelected && !isDisabled && (
                             <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
                           )}
                         </div>
                         <div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {tier.tier_label || tier.tier_name}
+                          <span className={cn(
+                            'text-sm font-medium',
+                            isDisabled ? 'text-gray-400' : 'text-gray-900'
+                          )}>
+                            {tier.tier_label || VEHICLE_SIZE_LABELS[tier.tier_name] || tier.tier_name}
                           </span>
-                          {isVehicleAware && (
+                          {isVehicleAware && !isDisabled && (
                             <span className="ml-2 text-xs text-blue-600">
                               {VEHICLE_SIZE_LABELS[vehicleSizeClass as VehicleSizeClass]}
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className="text-sm font-semibold text-gray-700">
+                      <span className={cn(
+                        'text-sm font-semibold',
+                        isDisabled ? 'text-gray-300' : 'text-gray-700'
+                      )}>
                         ${price.toFixed(2)}
                       </span>
                     </button>
                   );
                 })}
               </div>
+              {autoMatchIdx >= 0 && (
+                <p className="mt-2 text-xs text-blue-600">
+                  Auto-selected based on vehicle size
+                </p>
+              )}
             </div>
           )}
 

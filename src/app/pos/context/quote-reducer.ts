@@ -114,7 +114,7 @@ export function quoteReducer(
         totalPrice,
         taxAmount: calculateItemTax(totalPrice, service.is_taxable),
         isTaxable: service.is_taxable,
-        tierName: pricing.tier_name,
+        tierName: pricing.tier_label || pricing.tier_name,
         vehicleSizeClass,
         notes: null,
       };
@@ -262,7 +262,10 @@ export function quoteReducer(
     }
 
     case 'CLEAR_QUOTE': {
-      return { ...initialQuoteState };
+      const defaultValidUntil = new Date();
+      defaultValidUntil.setDate(defaultValidUntil.getDate() + 10);
+      const validUntil = defaultValidUntil.toISOString().split('T')[0];
+      return { ...initialQuoteState, validUntil };
     }
 
     default:
