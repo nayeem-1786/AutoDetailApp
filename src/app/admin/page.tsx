@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { format } from 'date-fns';
+import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import Link from 'next/link';
 import {
   CalendarDays,
@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  FileText,
+  UserPlus,
+  TrendingUp,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/auth-provider';
@@ -20,7 +23,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { formatTime } from '@/lib/utils/format';
+import { formatTime, formatCurrency } from '@/lib/utils/format';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import type { AppointmentStatus } from '@/lib/supabase/types';
 
@@ -36,6 +39,13 @@ interface TodayAppointment {
   appointment_services: { service: { name: string } }[];
 }
 
+interface WeekDay {
+  date: string; // YYYY-MM-DD
+  label: string; // "Mon 2/10"
+  isToday: boolean;
+  appointments: TodayAppointment[];
+}
+
 const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   pending: 'warning',
   confirmed: 'info',
@@ -49,39 +59,120 @@ export default function AdminDashboard() {
   const { employee, role } = useAuth();
   const supabase = createClient();
   const [appointments, setAppointments] = useState<TodayAppointment[]>([]);
+  const [weekAppointments, setWeekAppointments] = useState<TodayAppointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quoteStats, setQuoteStats] = useState({ draft: 0, sent: 0, viewed: 0, accepted: 0 });
+  const [customerStats, setCustomerStats] = useState({ total: 0, newThisWeek: 0, newThisMonth: 0 });
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const fetchTodayAppointments = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('appointments')
-      .select(`
-        id, scheduled_date, scheduled_start_time, scheduled_end_time, status,
-        customer:customers!customer_id(first_name, last_name),
-        vehicle:vehicles!vehicle_id(year, make, model),
-        employee:employees!employee_id(first_name, last_name),
-        appointment_services(service:services!service_id(name))
-      `)
-      .eq('scheduled_date', today)
-      .neq('status', 'cancelled')
-      .order('scheduled_start_time');
+    const now = new Date();
+    const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const monthStart = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
 
-    if (data) {
-      setAppointments(data as unknown as TodayAppointment[]);
+    const [todayRes, weekRes, quotesRes, custTotalRes, custWeekRes, custMonthRes] = await Promise.all([
+      // Today's appointments
+      supabase
+        .from('appointments')
+        .select(`
+          id, scheduled_date, scheduled_start_time, scheduled_end_time, status,
+          customer:customers!customer_id(first_name, last_name),
+          vehicle:vehicles!vehicle_id(year, make, model),
+          employee:employees!employee_id(first_name, last_name),
+          appointment_services(service:services!service_id(name))
+        `)
+        .eq('scheduled_date', today)
+        .neq('status', 'cancelled')
+        .order('scheduled_start_time'),
+
+      // This week's appointments (for Week at a Glance)
+      supabase
+        .from('appointments')
+        .select(`
+          id, scheduled_date, scheduled_start_time, scheduled_end_time, status,
+          customer:customers!customer_id(first_name, last_name),
+          vehicle:vehicles!vehicle_id(year, make, model),
+          employee:employees!employee_id(first_name, last_name),
+          appointment_services(service:services!service_id(name))
+        `)
+        .gte('scheduled_date', weekStart)
+        .lte('scheduled_date', weekEnd)
+        .neq('status', 'cancelled')
+        .order('scheduled_start_time'),
+
+      // Open quotes by status
+      supabase
+        .from('quotes')
+        .select('status')
+        .in('status', ['draft', 'sent', 'viewed', 'accepted']),
+
+      // Total customers
+      supabase
+        .from('customers')
+        .select('id', { count: 'exact', head: true }),
+
+      // New customers this week
+      supabase
+        .from('customers')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', `${weekStart}T00:00:00`),
+
+      // New customers this month
+      supabase
+        .from('customers')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', `${monthStart}T00:00:00`),
+    ]);
+
+    if (todayRes.data) {
+      setAppointments(todayRes.data as unknown as TodayAppointment[]);
     }
+    if (weekRes.data) {
+      setWeekAppointments(weekRes.data as unknown as TodayAppointment[]);
+    }
+    if (quotesRes.data) {
+      const counts = { draft: 0, sent: 0, viewed: 0, accepted: 0 };
+      quotesRes.data.forEach((q: { status: string }) => {
+        if (q.status in counts) counts[q.status as keyof typeof counts]++;
+      });
+      setQuoteStats(counts);
+    }
+    setCustomerStats({
+      total: custTotalRes.count ?? 0,
+      newThisWeek: custWeekRes.count ?? 0,
+      newThisMonth: custMonthRes.count ?? 0,
+    });
+
     setLoading(false);
   }, [supabase, today]);
 
   useEffect(() => {
-    fetchTodayAppointments();
-  }, [fetchTodayAppointments]);
+    fetchData();
+  }, [fetchData]);
 
   const pending = appointments.filter((a) => a.status === 'pending').length;
   const confirmed = appointments.filter((a) => a.status === 'confirmed').length;
   const inProgress = appointments.filter((a) => a.status === 'in_progress').length;
   const completed = appointments.filter((a) => a.status === 'completed').length;
   const remaining = pending + confirmed + inProgress;
+
+  // Build week days for "Week at a Glance"
+  const weekDays: WeekDay[] = [];
+  const weekStartDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(weekStartDate, i);
+    const dateStr = format(d, 'yyyy-MM-dd');
+    weekDays.push({
+      date: dateStr,
+      label: format(d, 'EEE M/d'),
+      isToday: dateStr === today,
+      appointments: weekAppointments.filter((a) => a.scheduled_date?.split('T')[0] === dateStr),
+    });
+  }
+
+  const totalOpenQuotes = quoteStats.draft + quoteStats.sent + quoteStats.viewed + quoteStats.accepted;
 
   // Role-appropriate quick actions
   const quickActions: { label: string; href: string; icon: typeof CalendarDays; description: string }[] = [];
@@ -173,6 +264,136 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Quotes & Customers quick stats */}
+      {role !== 'detailer' && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Link href="/admin/quotes" className="group">
+            <Card className="transition-colors group-hover:border-gray-300">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="rounded-lg bg-blue-50 p-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{loading ? '-' : totalOpenQuotes}</p>
+                  <p className="text-xs text-gray-500">Open Quotes</p>
+                </div>
+                {!loading && quoteStats.accepted > 0 && (
+                  <Badge variant="success" className="ml-auto">{quoteStats.accepted} accepted</Badge>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/admin/quotes?status=draft" className="group">
+            <Card className="transition-colors group-hover:border-gray-300">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="rounded-lg bg-gray-100 p-2">
+                  <FileText className="h-5 w-5 text-gray-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{loading ? '-' : quoteStats.draft}</p>
+                  <p className="text-xs text-gray-500">Drafts</p>
+                </div>
+                {!loading && quoteStats.sent > 0 && (
+                  <span className="ml-auto text-xs text-gray-400">{quoteStats.sent} sent</span>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/admin/customers" className="group">
+            <Card className="transition-colors group-hover:border-gray-300">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="rounded-lg bg-green-50 p-2">
+                  <Users className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{loading ? '-' : customerStats.total}</p>
+                  <p className="text-xs text-gray-500">Total Customers</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Card>
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="rounded-lg bg-purple-50 p-2">
+                <UserPlus className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{loading ? '-' : customerStats.newThisMonth}</p>
+                <p className="text-xs text-gray-500">New This Month</p>
+              </div>
+              {!loading && customerStats.newThisWeek > 0 && (
+                <span className="ml-auto text-xs text-gray-400">{customerStats.newThisWeek} this week</span>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Week at a Glance */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Week at a Glance</h3>
+          <Link
+            href="/admin/appointments"
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+          >
+            View Calendar
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="mt-4 flex items-center justify-center py-8">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-7 gap-2">
+            {weekDays.map((day) => (
+              <div
+                key={day.date}
+                className={`rounded-lg border p-2 ${
+                  day.isToday
+                    ? 'border-blue-300 bg-blue-50'
+                    : 'border-gray-200 bg-white'
+                }`}
+              >
+                <p className={`text-xs font-medium ${day.isToday ? 'text-blue-700' : 'text-gray-500'}`}>
+                  {day.label}
+                </p>
+                <p className={`mt-1 text-lg font-bold ${
+                  day.appointments.length === 0 ? 'text-gray-300' : day.isToday ? 'text-blue-700' : 'text-gray-900'
+                }`}>
+                  {day.appointments.length}
+                </p>
+                {day.appointments.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {day.appointments.slice(0, 3).map((appt) => (
+                      <div key={appt.id} className="flex items-center gap-1 truncate">
+                        <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                          appt.status === 'completed' ? 'bg-green-500' :
+                          appt.status === 'in_progress' ? 'bg-amber-500' :
+                          appt.status === 'confirmed' ? 'bg-blue-500' :
+                          'bg-gray-400'
+                        }`} />
+                        <span className="truncate text-[10px] text-gray-600">
+                          {formatTime(appt.scheduled_start_time)} {appt.customer.first_name}
+                        </span>
+                      </div>
+                    ))}
+                    {day.appointments.length > 3 && (
+                      <p className="text-[10px] text-gray-400">+{day.appointments.length - 3} more</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr,300px]">

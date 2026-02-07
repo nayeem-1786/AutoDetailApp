@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { Quote, QuoteStatus } from '@/lib/supabase/types';
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format';
+import type { Quote, QuoteItem, QuoteStatus } from '@/lib/supabase/types';
+import { formatCurrency, formatRelativeDate } from '@/lib/utils/format';
 import { QUOTE_STATUS_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 type QuoteWithRelations = Quote & {
   customer?: { id: string; first_name: string; last_name: string; phone: string | null } | null;
   vehicle?: { id: string; year: number | null; make: string | null; model: string | null } | null;
+  items?: QuoteItem[];
 };
 
 const STATUS_BADGE_VARIANT: Record<QuoteStatus, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
@@ -40,12 +41,13 @@ const STATUS_BADGE_VARIANT: Record<QuoteStatus, 'default' | 'info' | 'warning' |
 
 export default function QuotesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [quotes, setQuotes] = useState<QuoteWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<QuoteWithRelations | null>(null);
@@ -155,23 +157,27 @@ export default function QuotesPage() {
         const c = row.original.customer;
         if (!c) return <span className="text-sm text-gray-400">Unknown</span>;
         return (
-          <div>
-            <div className="text-sm font-medium text-gray-900">
-              {c.first_name} {c.last_name}
-            </div>
-          </div>
+          <button
+            className="text-left text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            onClick={() => router.push(`/admin/customers/${c.id}`)}
+          >
+            {c.first_name} {c.last_name}
+          </button>
         );
       },
     },
     {
-      id: 'vehicle',
-      header: 'Vehicle',
+      id: 'services',
+      header: 'Services',
       cell: ({ row }) => {
-        const v = row.original.vehicle;
-        if (!v) return <span className="text-sm text-gray-400">--</span>;
+        const items = row.original.items || [];
+        if (items.length === 0) return <span className="text-sm text-gray-400">--</span>;
+        const names = items.map((i) => i.item_name).filter(Boolean);
+        const display = names.slice(0, 2).join(', ');
+        const extra = names.length > 2 ? ` +${names.length - 2}` : '';
         return (
-          <span className="text-sm text-gray-600">
-            {[v.year, v.make, v.model].filter(Boolean).join(' ')}
+          <span className="text-sm text-gray-600" title={names.join(', ')}>
+            {display}{extra && <span className="text-gray-400">{extra}</span>}
           </span>
         );
       },
@@ -202,7 +208,9 @@ export default function QuotesPage() {
       accessorKey: 'created_at',
       header: 'Created',
       cell: ({ row }) => (
-        <span className="text-sm text-gray-500">{formatDate(row.original.created_at)}</span>
+        <span className="text-sm text-gray-500" title={new Date(row.original.created_at).toLocaleString()}>
+          {formatRelativeDate(row.original.created_at)}
+        </span>
       ),
     },
     {
@@ -212,7 +220,9 @@ export default function QuotesPage() {
         const sentAt = row.original.sent_at;
         if (!sentAt) return <span className="text-sm text-gray-400">--</span>;
         return (
-          <span className="text-sm text-gray-500">{formatDateTime(sentAt)}</span>
+          <span className="text-sm text-gray-500" title={new Date(sentAt).toLocaleString()}>
+            {formatRelativeDate(sentAt)}
+          </span>
         );
       },
     },
@@ -221,6 +231,7 @@ export default function QuotesPage() {
       header: '',
       cell: ({ row }) => {
         const q = row.original;
+        const canConvert = q.status !== 'expired' && q.status !== 'converted';
         return (
           <DropdownMenu>
             <DropdownMenuTrigger>
@@ -245,7 +256,7 @@ export default function QuotesPage() {
                   Send
                 </DropdownMenuItem>
               )}
-              {q.status === 'accepted' && (
+              {canConvert && (
                 <DropdownMenuItem onClick={() => router.push(`/admin/quotes/${q.id}`)}>
                   <ArrowRightCircle className="mr-2 h-4 w-4" />
                   Convert to Appointment

@@ -123,7 +123,7 @@ export default function QuoteDetailPage() {
   } | null>(null);
 
   const isDraft = quote?.status === 'draft';
-  const isAccepted = quote?.status === 'accepted';
+  const canConvert = quote?.status !== 'expired' && quote?.status !== 'converted';
 
   const loadQuote = useCallback(async () => {
     setLoading(true);
@@ -490,7 +490,7 @@ export default function QuoteDetailPage() {
               <Badge variant={STATUS_BADGE_VARIANT[quote.status]}>
                 {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
               </Badge>
-              {isAccepted && (
+              {canConvert && (
                 <Button onClick={() => setShowConvertDialog(true)}>
                   <ArrowRightCircle className="h-4 w-4" />
                   Convert to Appointment
@@ -1223,6 +1223,10 @@ export default function QuoteDetailPage() {
           <Send className="h-4 w-4" />
           Send Estimate
         </Button>
+        <Button variant="outline" onClick={() => setShowConvertDialog(true)} disabled={saving}>
+          <ArrowRightCircle className="h-4 w-4" />
+          Convert to Appointment
+        </Button>
       </div>
 
       {/* Service Picker Dialog */}
@@ -1299,6 +1303,47 @@ export default function QuoteDetailPage() {
           <Button onClick={handleSend} disabled={sending}>
             {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
             Send
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Convert to Appointment Dialog */}
+      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
+        <DialogHeader>
+          <DialogTitle>Convert to Appointment</DialogTitle>
+        </DialogHeader>
+        <DialogContent className="space-y-4">
+          <FormField label="Date" required>
+            <Input
+              type="date"
+              value={convertDate}
+              onChange={(e) => setConvertDate(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Time" required>
+            <Input
+              type="time"
+              value={convertTime}
+              onChange={(e) => setConvertTime(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Duration (minutes)">
+            <Input
+              type="number"
+              min={15}
+              step={15}
+              value={convertDuration}
+              onChange={(e) => setConvertDuration(parseInt(e.target.value) || 60)}
+            />
+          </FormField>
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowConvertDialog(false)} disabled={converting}>
+            Cancel
+          </Button>
+          <Button onClick={handleConvert} disabled={converting || !convertDate || !convertTime}>
+            {converting ? <Spinner size="sm" /> : <ArrowRightCircle className="h-4 w-4" />}
+            Create Appointment
           </Button>
         </DialogFooter>
       </Dialog>

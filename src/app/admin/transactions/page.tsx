@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatDateTime, formatPhone, formatRelativeDate } from '@/lib/utils/format';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import type {
   Transaction,
@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 type TransactionRow = Transaction & {
   customer: Pick<Customer, 'id' | 'first_name' | 'last_name' | 'phone'> | null;
   employee: Pick<Employee, 'id' | 'first_name' | 'last_name'> | null;
+  items: Pick<TransactionItem, 'id' | 'item_name'>[];
 };
 
 type FullTransaction = Transaction & {
@@ -614,7 +615,7 @@ export default function AdminTransactionsPage() {
         let query = supabase
           .from('transactions')
           .select(
-            '*, customer:customers(id, first_name, last_name, phone), employee:employees(id, first_name, last_name)',
+            '*, customer:customers(id, first_name, last_name, phone), employee:employees(id, first_name, last_name), items:transaction_items(id, item_name)',
             { count: 'exact' }
           )
           .order('transaction_date', { ascending: false })
@@ -817,6 +818,7 @@ export default function AdminTransactionsPage() {
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Receipt #</th>
                       <th className="px-4 py-3">Customer</th>
+                      <th className="px-4 py-3">Services</th>
                       <th className="px-4 py-3">Employee</th>
                       <th className="px-4 py-3">Method</th>
                       <th className="px-4 py-3">Status</th>
@@ -893,8 +895,8 @@ function TransactionTableRow({
         onClick={onToggle}
         className="cursor-pointer transition-colors hover:bg-gray-50"
       >
-        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-          {formatDateTime(tx.transaction_date)}
+        <td className="whitespace-nowrap px-4 py-3 text-gray-600" title={formatDateTime(tx.transaction_date)}>
+          {formatRelativeDate(tx.transaction_date)}
         </td>
         <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
           {tx.receipt_number ?? '---'}
@@ -910,6 +912,18 @@ function TransactionTableRow({
             </a>
           ) : (
             <span className="text-gray-600">Walk-in</span>
+          )}
+        </td>
+        <td className="max-w-[200px] truncate px-4 py-3 text-sm text-gray-600" title={
+          tx.items?.map((i: { item_name: string }) => i.item_name).join(', ') || ''
+        }>
+          {tx.items && tx.items.length > 0 ? (
+            <>
+              {tx.items.slice(0, 2).map((i: { item_name: string }) => i.item_name).join(', ')}
+              {tx.items.length > 2 && <span className="text-gray-400"> +{tx.items.length - 2}</span>}
+            </>
+          ) : (
+            <span className="text-gray-400">--</span>
           )}
         </td>
         <td className="whitespace-nowrap px-4 py-3">
@@ -961,7 +975,7 @@ function TransactionTableRow({
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={8} className="p-0">
+          <td colSpan={9} className="p-0">
             <TransactionDetailPanel
               transactionId={tx.id}
               onClose={onToggle}
@@ -979,7 +993,7 @@ function TransactionTableRow({
 
 function ExportButton({ transactions }: { transactions: TransactionRow[] }) {
   const handleExport = useCallback(() => {
-    const headers = ['Date', 'Receipt #', 'Customer', 'Employee', 'Method', 'Status', 'Total'];
+    const headers = ['Date', 'Receipt #', 'Customer', 'Services', 'Employee', 'Method', 'Status', 'Total'];
 
     const rows = transactions.map((tx) => [
       tx.transaction_date ? new Date(tx.transaction_date).toLocaleString() : '',
@@ -987,6 +1001,7 @@ function ExportButton({ transactions }: { transactions: TransactionRow[] }) {
       tx.customer
         ? `${tx.customer.first_name} ${tx.customer.last_name}`
         : 'Walk-in',
+      tx.items?.map((i: { item_name: string }) => i.item_name).join('; ') || '',
       tx.employee
         ? `${tx.employee.first_name} ${tx.employee.last_name}`
         : '',

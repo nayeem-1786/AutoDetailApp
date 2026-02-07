@@ -57,9 +57,9 @@ export async function POST(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
     }
 
-    if (quote.status !== 'accepted') {
+    if (quote.status === 'expired' || quote.status === 'converted') {
       return NextResponse.json(
-        { error: 'Only accepted quotes can be converted to appointments' },
+        { error: 'Expired or already-converted quotes cannot be converted to appointments' },
         { status: 400 }
       );
     }

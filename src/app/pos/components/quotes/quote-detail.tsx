@@ -197,7 +197,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">
-          {/* Draft: Edit, Send, Delete */}
+          {/* Draft: Edit, Send, Convert, Delete */}
           {quote.status === 'draft' && (
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
@@ -207,6 +207,10 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
               <Button size="sm" onClick={() => setSendDialogOpen(true)}>
                 <Send className="mr-1.5 h-3.5 w-3.5" />
                 Send
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
+                <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                Book
               </Button>
               <Button
                 variant="outline"
@@ -219,7 +223,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
             </>
           )}
 
-          {/* Sent/Viewed: Edit, Resend */}
+          {/* Sent/Viewed: Edit, Resend, Convert */}
           {(quote.status === 'sent' || quote.status === 'viewed') && (
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
@@ -229,6 +233,10 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
               <Button size="sm" onClick={() => setSendDialogOpen(true)}>
                 <Send className="mr-1.5 h-3.5 w-3.5" />
                 Resend
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
+                <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                Book
               </Button>
             </>
           )}
@@ -428,15 +436,13 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
         onSent={handleSendComplete}
       />
 
-      {quote.status === 'accepted' && (
-        <QuoteConvertDialog
-          open={convertDialogOpen}
-          onClose={() => setConvertDialogOpen(false)}
-          quoteId={quoteId}
-          totalDurationMinutes={totalDurationMinutes}
-          onConverted={handleConvertComplete}
-        />
-      )}
+      <QuoteConvertDialog
+        open={convertDialogOpen}
+        onClose={() => setConvertDialogOpen(false)}
+        quoteId={quoteId}
+        totalDurationMinutes={totalDurationMinutes}
+        onConverted={handleConvertComplete}
+      />
 
       {quote.status === 'draft' && (
         <QuoteDeleteDialog

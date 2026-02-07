@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Customer } from '@/lib/supabase/types';
-import { formatCurrency, formatPhone, formatDate, formatPoints } from '@/lib/utils/format';
+import { formatCurrency, formatPhone, formatRelativeDate, formatPoints } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
@@ -472,12 +472,19 @@ export default function CustomersPage() {
       header: 'Name',
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
       cell: ({ row }) => (
-        <button
-          className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
-          onClick={() => router.push(`/admin/customers/${row.original.id}`)}
-        >
-          {row.original.first_name} {row.original.last_name}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            onClick={() => router.push(`/admin/customers/${row.original.id}`)}
+          >
+            {row.original.first_name} {row.original.last_name}
+          </button>
+          {row.original.customer_type && (
+            <Badge variant={row.original.customer_type === 'professional' ? 'info' : 'default'} className="text-[10px] px-1.5 py-0">
+              {row.original.customer_type === 'professional' ? 'Pro' : 'Enth'}
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -493,7 +500,7 @@ export default function CustomersPage() {
       accessorKey: 'email',
       header: 'Email',
       cell: ({ row }) => (
-        <span className="text-sm text-gray-600">{row.original.email || '--'}</span>
+        <span className="text-sm text-gray-600 truncate max-w-[180px] block">{row.original.email || '--'}</span>
       ),
     },
     {
@@ -524,11 +531,15 @@ export default function CustomersPage() {
     {
       id: 'last_visit',
       header: 'Last Visit',
-      cell: ({ row }) => (
-        <span className="text-sm text-gray-500">
-          {row.original.last_visit_date ? formatDate(row.original.last_visit_date) : 'Never'}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const d = row.original.last_visit_date;
+        if (!d) return <span className="text-sm text-gray-400">Never</span>;
+        return (
+          <span className="text-sm text-gray-500" title={new Date(d).toLocaleDateString()}>
+            {formatRelativeDate(d)}
+          </span>
+        );
+      },
     },
     {
       id: 'tags',
