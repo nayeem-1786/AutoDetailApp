@@ -73,10 +73,10 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
       <Card className="h-full transition-shadow hover:shadow-md">
         <CardHeader>
           <div className="flex items-start justify-between">
-            <CardTitle className="group-hover:text-gray-700 transition-colors">
+            <CardTitle className="group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
               {service.name}
             </CardTitle>
-            <ArrowRight className="ml-3 mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-gray-600" />
+            <ArrowRight className="ml-3 mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
           </div>
           {service.description && (
             <CardDescription className="mt-1.5">
@@ -86,7 +86,7 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-base font-semibold text-gray-900">
+            <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {priceDisplay}
             </span>
             <Badge variant="secondary">

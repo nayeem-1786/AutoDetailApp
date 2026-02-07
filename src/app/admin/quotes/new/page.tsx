@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
 import { Plus, Trash2, ArrowLeft, Save, Send, Car, Mail, MessageSquare, ShoppingBag, X, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 import { ServicePickerDialog } from '../_components/service-picker-dialog';
 
 interface LineItem {
@@ -208,7 +209,7 @@ export default function NewQuotePage() {
         .single();
 
       if (error || !data) {
-        alert('Failed to add vehicle');
+        toast.error('Failed to add vehicle');
         return;
       }
 
@@ -217,7 +218,7 @@ export default function NewQuotePage() {
       setShowAddVehicle(false);
       setNewVehicle({ vehicle_type: 'standard', size_class: '', year: '', make: '', model: '', color: '' });
     } catch {
-      alert('An error occurred while adding the vehicle');
+      toast.error('An error occurred while adding the vehicle');
     } finally {
       setAddingVehicle(false);
     }
@@ -334,7 +335,7 @@ export default function NewQuotePage() {
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to create quote');
+        toast.error(data.error || 'Failed to create quote');
         setSaving(false);
         return;
       }
@@ -353,17 +354,18 @@ export default function NewQuotePage() {
             await navigator.clipboard.writeText(sendData.link).catch(() => {});
           }
           const sentChannels = (sendData.sent_via || []).join(' & ');
-          const errMsgs = (sendData.errors || []).join('\n');
-          let msg = sentChannels ? `Estimate saved and sent via ${sentChannels}!` : 'Estimate saved and marked as sent.';
-          if (errMsgs) msg += `\n\nWarnings:\n${errMsgs}`;
-          alert(msg);
+          const sentMsg = sentChannels ? `Estimate saved and sent via ${sentChannels}!` : 'Estimate saved and marked as sent.';
+          toast.success(sentMsg);
+          if (sendData.errors?.length) {
+            sendData.errors.forEach((err: string) => toast.warning(err));
+          }
         }
       }
 
       setShowSendDialog(false);
       router.push('/admin/quotes');
     } catch {
-      alert('An error occurred while saving the quote');
+      toast.error('An error occurred while saving the quote');
     } finally {
       setSaving(false);
     }

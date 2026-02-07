@@ -74,7 +74,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
       <JsonLd data={generateServiceSchema(service, category, businessInfo)} />
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
-      <article className="bg-white py-12 sm:py-16">
+      <article className="bg-white dark:bg-gray-900 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
@@ -86,11 +86,11 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
           {/* Header */}
           <div className="max-w-3xl">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
               {service.name}
             </h1>
             {service.description && (
-              <p className="mt-4 text-lg leading-relaxed text-gray-600">
+              <p className="mt-4 text-lg leading-relaxed text-gray-600 dark:text-gray-400">
                 {service.description}
               </p>
             )}
@@ -100,7 +100,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
           <div className="mt-12 grid gap-10 lg:grid-cols-3">
             {/* Left column: pricing (takes 2/3 on large screens) */}
             <div className="lg:col-span-2">
-              <h2 className="text-xl font-semibold text-gray-900">Pricing</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Pricing</h2>
               <div className="mt-4">
                 <ServicePricingDisplay service={serviceWithPricing} />
               </div>
@@ -108,20 +108,20 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
             {/* Right column: service details sidebar */}
             <aside className="lg:col-span-1">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
-                <h2 className="text-lg font-semibold text-gray-900">
+              <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Service Details
                 </h2>
                 <dl className="mt-4 space-y-4">
                   {/* Duration */}
                   {service.base_duration_minutes > 0 && (
                     <div className="flex items-start gap-3">
-                      <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400" />
+                      <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
                           Estimated Duration
                         </dt>
-                        <dd className="mt-0.5 text-sm text-gray-900">
+                        <dd className="mt-0.5 text-sm text-gray-900 dark:text-gray-100">
                           {service.base_duration_minutes >= 60
                             ? `${Math.floor(service.base_duration_minutes / 60)}h ${service.base_duration_minutes % 60 > 0 ? `${service.base_duration_minutes % 60}m` : ''}`
                             : `${service.base_duration_minutes} minutes`}
@@ -132,12 +132,12 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
                   {/* Mobile eligibility */}
                   <div className="flex items-start gap-3">
-                    <Truck className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400" />
+                    <Truck className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">
+                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
                         Mobile Service
                       </dt>
-                      <dd className="mt-0.5 text-sm text-gray-900">
+                      <dd className="mt-0.5 text-sm text-gray-900 dark:text-gray-100">
                         {service.mobile_eligible
                           ? 'Available — we come to you'
                           : 'In-shop only'}
@@ -147,12 +147,12 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
                   {/* Classification */}
                   <div className="flex items-start gap-3">
-                    <Tag className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400" />
+                    <Tag className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">
+                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
                         Service Type
                       </dt>
-                      <dd className="mt-0.5 text-sm text-gray-900">
+                      <dd className="mt-0.5 text-sm text-gray-900 dark:text-gray-100">
                         {CLASSIFICATION_LABELS[service.classification] ??
                           service.classification}
                       </dd>
@@ -161,11 +161,11 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
                   {/* Special requirements */}
                   {service.special_requirements && (
-                    <div className="border-t border-gray-200 pt-4">
-                      <dt className="text-sm font-medium text-gray-500">
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
                         Special Requirements
                       </dt>
-                      <dd className="mt-1 text-sm text-gray-900">
+                      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                         {service.special_requirements}
                       </dd>
                     </div>
@@ -173,10 +173,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
                   {/* Book This Service CTA */}
                   {service.online_bookable && (
-                    <div className="border-t border-gray-200 pt-4">
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                       <Link
                         href={`/book?service=${service.slug}`}
-                        className="flex w-full items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+                        className="flex w-full items-center justify-center gap-2 rounded-md bg-gray-900 dark:bg-white px-4 py-2.5 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
                       >
                         <CalendarDays className="h-4 w-4" />
                         Book This Service
@@ -191,10 +191,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
           {/* Suggested Add-Ons */}
           {addonSuggestions.length > 0 && (
             <section className="mt-16">
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 Recommended Add-Ons
               </h2>
-              <p className="mt-2 text-gray-600">
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
                 Enhance your {service.name.toLowerCase()} with these popular
                 add-on services.
               </p>
@@ -220,24 +220,24 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <Link
                       key={suggestion.id}
                       href={addonHref}
-                      className="group flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 transition-all hover:border-gray-300 hover:shadow-sm"
+                      className="group flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 transition-all hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm dark:hover:shadow-gray-900/50"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
                           {addon.name}
                         </h3>
                         {addon.description && (
-                          <p className="mt-1 text-xs text-gray-500 line-clamp-2">
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
                             {addon.description}
                           </p>
                         )}
                         {priceLabel && (
-                          <p className="mt-1 text-sm font-medium text-gray-900">
+                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100">
                             {priceLabel}
                           </p>
                         )}
                       </div>
-                      <ArrowRight className="ml-3 h-4 w-4 flex-shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-gray-600" />
+                      <ArrowRight className="ml-3 h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
                     </Link>
                   );
                 })}

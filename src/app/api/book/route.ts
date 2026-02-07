@@ -4,6 +4,7 @@ import { bookingSubmitSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { fireWebhook } from '@/lib/utils/webhook';
+import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 
 export async function POST(request: NextRequest) {
   try {
@@ -211,57 +212,12 @@ export async function POST(request: NextRequest) {
     );
 
     // 6b. Auto-assign detailer
-    let assignedEmployeeId: string | null = null;
-
-    // Get all active detailers who can be booked
-    const { data: detailers } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('role', 'detailer')
-      .eq('status', 'active')
-      .eq('bookable_for_appointments', true)
-      .order('created_at', { ascending: true });
-
-    if (detailers && detailers.length > 0) {
-      if (detailers.length === 1) {
-        // Only one detailer - assign them regardless
-        assignedEmployeeId = detailers[0].id;
-      } else {
-        // Multiple detailers - find one who's free at this time
-        const detailerIds = detailers.map((d) => d.id);
-
-        // Find detailers with overlapping appointments
-        const { data: busyAppointments } = await supabase
-          .from('appointments')
-          .select('employee_id')
-          .eq('scheduled_date', data.date)
-          .in('employee_id', detailerIds)
-          .neq('status', 'cancelled')
-          .lt('scheduled_start_time', scheduledEndTime)
-          .gt('scheduled_end_time', data.time);
-
-        const busyIds = new Set(busyAppointments?.map((a) => a.employee_id) || []);
-
-        // Find first available detailer
-        const availableDetailer = detailers.find((d) => !busyIds.has(d.id));
-
-        // Assign available detailer, or first one if all busy
-        assignedEmployeeId = availableDetailer?.id ?? detailers[0].id;
-      }
-    } else {
-      // No bookable detailers found - fall back to super_admin (Nayeem)
-      const { data: superAdmin } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('role', 'super_admin')
-        .eq('status', 'active')
-        .limit(1)
-        .single();
-
-      if (superAdmin) {
-        assignedEmployeeId = superAdmin.id;
-      }
-    }
+    const assignedEmployeeId = await findAvailableDetailer(
+      supabase,
+      data.date,
+      data.time,
+      scheduledEndTime
+    );
 
     // 7. Create appointment
     // Auto-confirm if paid online (deposit or full), otherwise pending for review
@@ -446,14 +402,6 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = h * 60 + m + minutes;
-  const newH = Math.floor(total / 60) % 24;
-  const newM = total % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-}
 
 function computeExpectedPrice(
   service: {

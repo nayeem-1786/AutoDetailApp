@@ -12,27 +12,28 @@ import { Button } from '@/components/ui/button';
 import { Mail, MessageSquare, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
-import { posFetch } from '../../lib/pos-fetch';
 
 type SendMethod = 'email' | 'sms' | 'both';
 
-interface QuoteSendDialogProps {
+interface NotifyCustomerDialogProps {
   open: boolean;
   onClose: () => void;
-  quoteId: string;
+  appointmentId: string;
   customerEmail: string | null;
   customerPhone: string | null;
-  onSent: () => void;
+  fetchFn?: typeof fetch;
+  apiBasePath: string; // "/api/appointments" or "/api/pos/appointments"
 }
 
-export function QuoteSendDialog({
+export function NotifyCustomerDialog({
   open,
   onClose,
-  quoteId,
+  appointmentId,
   customerEmail,
   customerPhone,
-  onSent,
-}: QuoteSendDialogProps) {
+  fetchFn = fetch,
+  apiBasePath,
+}: NotifyCustomerDialogProps) {
   const [method, setMethod] = useState<SendMethod>('both');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -43,7 +44,7 @@ export function QuoteSendDialog({
   async function handleSend() {
     setSending(true);
     try {
-      const res = await posFetch(`/api/pos/quotes/${quoteId}/send`, {
+      const res = await fetchFn(`${apiBasePath}/${appointmentId}/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method }),
@@ -56,7 +57,7 @@ export function QuoteSendDialog({
       }
 
       const sentVia = data.sent_via?.join(' & ') || method;
-      toast.success(`Quote sent via ${sentVia}`);
+      toast.success(`Confirmation sent via ${sentVia}`);
 
       if (data.errors?.length) {
         data.errors.forEach((err: string) => toast.warning(err));
@@ -64,25 +65,31 @@ export function QuoteSendDialog({
 
       setSent(true);
       setTimeout(() => {
-        onSent();
+        onClose();
       }, 3000);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send quote');
+      toast.error(err instanceof Error ? err.message : 'Failed to send confirmation');
     } finally {
       setSending(false);
     }
   }
 
+  function handleOpenChange(isOpen: boolean) {
+    if (!isOpen && !sent) {
+      onClose();
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !sent) onClose(); }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogClose onClose={() => { if (!sent) onClose(); }} />
       <DialogHeader>
-        <DialogTitle>Send Quote</DialogTitle>
+        <DialogTitle>Send Appointment Confirmation</DialogTitle>
       </DialogHeader>
       <DialogContent>
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Choose how to send this quote to the customer.
+            Send a confirmation to the customer about their scheduled appointment.
           </p>
 
           {/* Method selection */}
@@ -127,19 +134,19 @@ export function QuoteSendDialog({
           </div>
 
           {/* Warnings */}
-          {method === 'email' && !canEmail && (
+          {!sent && method === 'email' && !canEmail && (
             <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-700">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               Customer has no email address on file.
             </div>
           )}
-          {method === 'sms' && !canSms && (
+          {!sent && method === 'sms' && !canSms && (
             <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-700">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               Customer has no phone number on file.
             </div>
           )}
-          {method === 'both' && (!canEmail || !canSms) && (
+          {!sent && method === 'both' && (!canEmail || !canSms) && (
             <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-700">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               {!canEmail && !canSms
@@ -153,7 +160,7 @@ export function QuoteSendDialog({
           {/* Actions */}
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={sending || sent} className="flex-1">
-              Cancel
+              {sent ? 'Close' : 'Skip'}
             </Button>
             {sent ? (
               <Button className="flex-1 bg-green-600 hover:bg-green-600 text-white cursor-default" disabled>
@@ -169,7 +176,7 @@ export function QuoteSendDialog({
                 {sending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  'Send'
+                  'Send Confirmation'
                 )}
               </Button>
             )}

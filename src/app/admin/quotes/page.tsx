@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Plus, MoreHorizontal, Eye, Pencil, Send, ArrowRightCircle, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type QuoteWithRelations = Quote & {
@@ -107,7 +108,7 @@ export default function QuotesPage() {
       setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id));
     } else {
       const data = await res.json();
-      alert(data.error || 'Failed to delete quote');
+      toast.error(data.error || 'Failed to delete quote');
     }
 
     setDeleting(false);
@@ -127,11 +128,13 @@ export default function QuotesPage() {
       // Copy link to clipboard
       if (data.link) {
         await navigator.clipboard.writeText(data.link).catch(() => {});
-        alert(`Quote sent! Link copied to clipboard:\n${data.link}`);
       }
+      toast.success('Quote sent!', {
+        description: data.link ? 'Link copied to clipboard' : undefined,
+      });
     } else {
       const data = await res.json();
-      alert(data.error || 'Failed to send quote');
+      toast.error(data.error || 'Failed to send quote');
     }
   }
 

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { appointmentUpdateSchema } from '@/lib/utils/validation';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { fireWebhook } from '@/lib/utils/webhook';
+import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 
 export async function PATCH(
   request: NextRequest,
@@ -141,10 +142,3 @@ export async function PATCH(
   }
 }
 
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = h * 60 + m + minutes;
-  const newH = Math.floor(total / 60) % 24;
-  const newM = total % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-}

@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
+import { APPOINTMENT } from '@/lib/utils/constants';
+import { fireWebhook } from '@/lib/utils/webhook';
 import { z } from 'zod';
 
 const convertSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:MM)'),
   duration_minutes: z.coerce.number().int().min(1, 'Duration must be at least 1 minute'),
+  employee_id: z.string().uuid().optional().nullable(),
 });
-
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = h * 60 + m + minutes;
-  const newH = Math.floor(total / 60) % 24;
-  const newM = total % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-}
 
 export async function POST(
   request: NextRequest,
@@ -32,7 +28,7 @@ export async function POST(
       );
     }
 
-    const { date, time, duration_minutes } = parsed.data;
+    const { date, time, duration_minutes, employee_id } = parsed.data;
     const supabase = createAdminClient();
 
     // Fetch quote with items
@@ -59,6 +55,13 @@ export async function POST(
     }
 
     const endTime = addMinutesToTime(time, duration_minutes);
+    const endTimeWithBuffer = addMinutesToTime(time, duration_minutes + APPOINTMENT.BUFFER_MINUTES);
+
+    // Auto-assign detailer if none provided
+    let assignedEmployeeId = employee_id ?? null;
+    if (!assignedEmployeeId) {
+      assignedEmployeeId = await findAvailableDetailer(supabase, date, time, endTimeWithBuffer);
+    }
 
     // Create the appointment
     const { data: appointment, error: apptErr } = await supabase
@@ -66,7 +69,8 @@ export async function POST(
       .insert({
         customer_id: quote.customer_id,
         vehicle_id: quote.vehicle_id,
-        status: 'pending',
+        employee_id: assignedEmployeeId,
+        status: 'confirmed',
         channel: 'phone',
         scheduled_date: date,
         scheduled_start_time: time,
@@ -96,14 +100,12 @@ export async function POST(
     if (serviceItems.length > 0) {
       const apptServices = serviceItems.map((item: {
         service_id: string;
-        item_name: string;
         unit_price: number;
         tier_name: string | null;
       }) => ({
         appointment_id: appointment.id,
         service_id: item.service_id,
-        service_name: item.item_name,
-        price: item.unit_price,
+        price_at_booking: item.unit_price,
         tier_name: item.tier_name || null,
       }));
 
@@ -113,7 +115,6 @@ export async function POST(
 
       if (svcErr) {
         console.error('Error creating appointment services:', svcErr.message);
-        // Non-critical: appointment was created, just log the error
       }
     }
 
@@ -130,6 +131,9 @@ export async function POST(
     if (updateErr) {
       console.error('Error updating quote status:', updateErr.message);
     }
+
+    // Fire webhook for appointment confirmation
+    fireWebhook('appointment_confirmed', appointment, supabase).catch(() => {});
 
     return NextResponse.json({
       success: true,

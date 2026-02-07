@@ -25,6 +25,7 @@ import {
 import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
 import { ArrowLeft, Save, Send, ArrowRightCircle, Plus, Trash2, Car, Mail, MessageSquare, CheckCircle, AlertCircle, Copy, User, Calendar, DollarSign, Award, Clock, ShoppingBag, X } from 'lucide-react';
 import { ServicePickerDialog } from '../_components/service-picker-dialog';
+import { QuoteBookDialog } from '@/components/quotes/quote-book-dialog';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -83,13 +84,10 @@ export default function QuoteDetailPage() {
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [sendMethod, setSendMethod] = useState<'email' | 'sms' | 'both'>('email');
   const [sending, setSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
 
-  // Convert dialog
-  const [showConvertDialog, setShowConvertDialog] = useState(false);
-  const [convertDate, setConvertDate] = useState('');
-  const [convertTime, setConvertTime] = useState('');
-  const [convertDuration, setConvertDuration] = useState(60);
-  const [converting, setConverting] = useState(false);
+  // Book appointment dialog
+  const [showBookDialog, setShowBookDialog] = useState(false);
 
   // Add vehicle dialog
   const [showAddVehicle, setShowAddVehicle] = useState(false);
@@ -375,8 +373,12 @@ export default function QuoteDetailPage() {
           });
         }
 
-        setShowSendDialog(false);
-        await loadQuote();
+        setSendSuccess(true);
+        setTimeout(async () => {
+          setShowSendDialog(false);
+          setSendSuccess(false);
+          await loadQuote();
+        }, 3000);
       } else {
         toast.error(data.error || 'Failed to send estimate');
       }
@@ -387,40 +389,42 @@ export default function QuoteDetailPage() {
     }
   }
 
-  async function handleConvert() {
-    if (!convertDate || !convertTime) return;
-    setConverting(true);
+  // Calculate default duration from services' base_duration_minutes
+  const [serviceDurations, setServiceDurations] = useState<Record<string, number>>({});
 
-    try {
-      const res = await fetch(`/api/quotes/${id}/convert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: convertDate,
-          time: convertTime,
-          duration_minutes: convertDuration,
-        }),
-      });
+  useEffect(() => {
+    if (!quote?.items) return;
+    const serviceIds = (quote.items || [])
+      .filter((item) => item.service_id)
+      .map((item) => item.service_id as string);
+    if (serviceIds.length === 0) return;
 
-      if (res.ok) {
-        const data = await res.json();
-        setShowConvertDialog(false);
-        toast.success('Appointment created successfully');
-        if (data.appointment?.id) {
-          router.push(`/admin/appointments`);
-        } else {
-          await loadQuote();
+    const supabaseClient = createClient();
+    supabaseClient
+      .from('services')
+      .select('id, base_duration_minutes')
+      .in('id', serviceIds)
+      .then(({ data }: { data: { id: string; base_duration_minutes: number }[] | null }) => {
+        if (data) {
+          const map: Record<string, number> = {};
+          for (const s of data) {
+            map[s.id] = s.base_duration_minutes;
+          }
+          setServiceDurations(map);
         }
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to convert quote');
+      });
+  }, [quote?.items]);
+
+  const defaultDuration = useMemo(() => {
+    if (!quote?.items) return 60;
+    const total = (quote.items || []).reduce((sum, item) => {
+      if (item.service_id && serviceDurations[item.service_id]) {
+        return sum + serviceDurations[item.service_id];
       }
-    } catch {
-      toast.error('An error occurred');
-    } finally {
-      setConverting(false);
-    }
-  }
+      return sum;
+    }, 0);
+    return total > 0 ? total : 60;
+  }, [quote?.items, serviceDurations]);
 
   async function handleAddVehicle() {
     if (!quote?.customer_id) return;
@@ -491,7 +495,7 @@ export default function QuoteDetailPage() {
                 {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
               </Badge>
               {canConvert && (
-                <Button onClick={() => setShowConvertDialog(true)}>
+                <Button onClick={() => setShowBookDialog(true)}>
                   <ArrowRightCircle className="h-4 w-4" />
                   Convert to Appointment
                 </Button>
@@ -785,48 +789,22 @@ export default function QuoteDetailPage() {
         </Card>
 
         {/* Convert to Appointment Dialog */}
-        <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
-          <DialogHeader>
-            <DialogTitle>Convert to Appointment</DialogTitle>
-          </DialogHeader>
-          <DialogContent className="space-y-4">
-            <FormField label="Date" required>
-              <Input
-                type="date"
-                value={convertDate}
-                onChange={(e) => setConvertDate(e.target.value)}
-              />
-            </FormField>
-            <FormField label="Time" required>
-              <Input
-                type="time"
-                value={convertTime}
-                onChange={(e) => setConvertTime(e.target.value)}
-              />
-            </FormField>
-            <FormField label="Duration (minutes)">
-              <Input
-                type="number"
-                min={15}
-                step={15}
-                value={convertDuration}
-                onChange={(e) => setConvertDuration(parseInt(e.target.value) || 60)}
-              />
-            </FormField>
-          </DialogContent>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConvertDialog(false)} disabled={converting}>
-              Cancel
-            </Button>
-            <Button onClick={handleConvert} disabled={converting || !convertDate || !convertTime}>
-              {converting ? <Spinner size="sm" /> : <ArrowRightCircle className="h-4 w-4" />}
-              Create Appointment
-            </Button>
-          </DialogFooter>
-        </Dialog>
+        <QuoteBookDialog
+          open={showBookDialog}
+          onClose={() => setShowBookDialog(false)}
+          quoteId={id}
+          defaultDuration={defaultDuration}
+          apiBasePath="/api/quotes"
+          customerEmail={quote.customer?.email ?? null}
+          customerPhone={quote.customer?.phone ?? null}
+          onBooked={() => {
+            setShowBookDialog(false);
+            router.push('/admin/appointments');
+          }}
+        />
 
         {/* Send/Resend Estimate Dialog */}
-        <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <Dialog open={showSendDialog} onOpenChange={(open) => { if (!open && !sendSuccess) setShowSendDialog(false); }}>
           <DialogHeader>
             <DialogTitle>{quote.sent_at ? 'Resend Estimate' : 'Send Estimate'}</DialogTitle>
           </DialogHeader>
@@ -836,13 +814,14 @@ export default function QuoteDetailPage() {
               <span className="font-medium">{quote.customer?.first_name} {quote.customer?.last_name}</span>?
             </p>
             <div className="space-y-2">
-              <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+              <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
                 <input
                   type="radio"
                   name="sendMethod"
                   value="email"
                   checked={sendMethod === 'email'}
                   onChange={() => setSendMethod('email')}
+                  disabled={sendSuccess}
                 />
                 <Mail className="h-5 w-5 text-gray-500" />
                 <div>
@@ -852,13 +831,14 @@ export default function QuoteDetailPage() {
                   </div>
                 </div>
               </label>
-              <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+              <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
                 <input
                   type="radio"
                   name="sendMethod"
                   value="sms"
                   checked={sendMethod === 'sms'}
                   onChange={() => setSendMethod('sms')}
+                  disabled={sendSuccess}
                 />
                 <MessageSquare className="h-5 w-5 text-gray-500" />
                 <div>
@@ -868,13 +848,14 @@ export default function QuoteDetailPage() {
                   </div>
                 </div>
               </label>
-              <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+              <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
                 <input
                   type="radio"
                   name="sendMethod"
                   value="both"
                   checked={sendMethod === 'both'}
                   onChange={() => setSendMethod('both')}
+                  disabled={sendSuccess}
                 />
                 <Send className="h-5 w-5 text-gray-500" />
                 <div>
@@ -885,13 +866,20 @@ export default function QuoteDetailPage() {
             </div>
           </DialogContent>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={sending}>
+            <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={sending || sendSuccess}>
               Cancel
             </Button>
-            <Button onClick={handleSend} disabled={sending}>
-              {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
-              {quote.sent_at ? 'Resend' : 'Send'}
-            </Button>
+            {sendSuccess ? (
+              <Button className="bg-green-600 hover:bg-green-600 text-white cursor-default" disabled>
+                <CheckCircle className="h-4 w-4" />
+                Sent
+              </Button>
+            ) : (
+              <Button onClick={handleSend} disabled={sending}>
+                {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
+                {quote.sent_at ? 'Resend' : 'Send'}
+              </Button>
+            )}
           </DialogFooter>
         </Dialog>
       </div>
@@ -1223,7 +1211,7 @@ export default function QuoteDetailPage() {
           <Send className="h-4 w-4" />
           Send Estimate
         </Button>
-        <Button variant="outline" onClick={() => setShowConvertDialog(true)} disabled={saving}>
+        <Button variant="outline" onClick={() => setShowBookDialog(true)} disabled={saving}>
           <ArrowRightCircle className="h-4 w-4" />
           Convert to Appointment
         </Button>
@@ -1238,7 +1226,7 @@ export default function QuoteDetailPage() {
       />
 
       {/* Send Estimate Dialog */}
-      <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+      <Dialog open={showSendDialog} onOpenChange={(open) => { if (!open && !sendSuccess) setShowSendDialog(false); }}>
         <DialogHeader>
           <DialogTitle>Send Estimate</DialogTitle>
         </DialogHeader>
@@ -1248,13 +1236,14 @@ export default function QuoteDetailPage() {
             <span className="font-medium">{quote.customer?.first_name} {quote.customer?.last_name}</span>?
           </p>
           <div className="space-y-2">
-            <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+            <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
               <input
                 type="radio"
                 name="sendMethod"
                 value="email"
                 checked={sendMethod === 'email'}
                 onChange={() => setSendMethod('email')}
+                disabled={sendSuccess}
               />
               <Mail className="h-5 w-5 text-gray-500" />
               <div>
@@ -1264,13 +1253,14 @@ export default function QuoteDetailPage() {
                 </div>
               </div>
             </label>
-            <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+            <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
               <input
                 type="radio"
                 name="sendMethod"
                 value="sms"
                 checked={sendMethod === 'sms'}
                 onChange={() => setSendMethod('sms')}
+                disabled={sendSuccess}
               />
               <MessageSquare className="h-5 w-5 text-gray-500" />
               <div>
@@ -1280,13 +1270,14 @@ export default function QuoteDetailPage() {
                 </div>
               </div>
             </label>
-            <label className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+            <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${sendSuccess ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
               <input
                 type="radio"
                 name="sendMethod"
                 value="both"
                 checked={sendMethod === 'both'}
                 onChange={() => setSendMethod('both')}
+                disabled={sendSuccess}
               />
               <Send className="h-5 w-5 text-gray-500" />
               <div>
@@ -1297,56 +1288,37 @@ export default function QuoteDetailPage() {
           </div>
         </DialogContent>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={sending}>
+          <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={sending || sendSuccess}>
             Cancel
           </Button>
-          <Button onClick={handleSend} disabled={sending}>
-            {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
-            Send
-          </Button>
+          {sendSuccess ? (
+            <Button className="bg-green-600 hover:bg-green-600 text-white cursor-default" disabled>
+              <CheckCircle className="h-4 w-4" />
+              Sent
+            </Button>
+          ) : (
+            <Button onClick={handleSend} disabled={sending}>
+              {sending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
+              Send
+            </Button>
+          )}
         </DialogFooter>
       </Dialog>
 
       {/* Convert to Appointment Dialog */}
-      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
-        <DialogHeader>
-          <DialogTitle>Convert to Appointment</DialogTitle>
-        </DialogHeader>
-        <DialogContent className="space-y-4">
-          <FormField label="Date" required>
-            <Input
-              type="date"
-              value={convertDate}
-              onChange={(e) => setConvertDate(e.target.value)}
-            />
-          </FormField>
-          <FormField label="Time" required>
-            <Input
-              type="time"
-              value={convertTime}
-              onChange={(e) => setConvertTime(e.target.value)}
-            />
-          </FormField>
-          <FormField label="Duration (minutes)">
-            <Input
-              type="number"
-              min={15}
-              step={15}
-              value={convertDuration}
-              onChange={(e) => setConvertDuration(parseInt(e.target.value) || 60)}
-            />
-          </FormField>
-        </DialogContent>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setShowConvertDialog(false)} disabled={converting}>
-            Cancel
-          </Button>
-          <Button onClick={handleConvert} disabled={converting || !convertDate || !convertTime}>
-            {converting ? <Spinner size="sm" /> : <ArrowRightCircle className="h-4 w-4" />}
-            Create Appointment
-          </Button>
-        </DialogFooter>
-      </Dialog>
+      <QuoteBookDialog
+        open={showBookDialog}
+        onClose={() => setShowBookDialog(false)}
+        quoteId={id}
+        defaultDuration={defaultDuration}
+        apiBasePath="/api/quotes"
+        customerEmail={quote.customer?.email ?? null}
+        customerPhone={quote.customer?.phone ?? null}
+        onBooked={() => {
+          setShowBookDialog(false);
+          router.push('/admin/appointments');
+        }}
+      />
     </div>
   );
 }

@@ -42,7 +42,7 @@ export default async function ProductCategoryPage({ params }: PageProps) {
 
   return (
     <>
-      <section className="bg-white py-12 sm:py-16">
+      <section className="bg-white dark:bg-gray-900 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
@@ -51,11 +51,11 @@ export default async function ProductCategoryPage({ params }: PageProps) {
             ]}
           />
 
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
             {category.name}
           </h1>
           {category.description && (
-            <p className="mt-4 max-w-3xl text-lg text-gray-600">
+            <p className="mt-4 max-w-3xl text-lg text-gray-600 dark:text-gray-400">
               {category.description}
             </p>
           )}
@@ -71,7 +71,7 @@ export default async function ProductCategoryPage({ params }: PageProps) {
               ))}
             </div>
           ) : (
-            <p className="mt-12 text-gray-500">
+            <p className="mt-12 text-gray-500 dark:text-gray-400">
               No products are currently available in this category. Please check
               back soon.
             </p>

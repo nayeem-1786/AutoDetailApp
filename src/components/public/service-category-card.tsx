@@ -17,7 +17,7 @@ export function ServiceCategoryCard({ category, serviceCount }: ServiceCategoryC
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <CardTitle className="group-hover:text-gray-700 transition-colors">
+              <CardTitle className="group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
                 {category.name}
               </CardTitle>
               {category.description && (
@@ -26,7 +26,7 @@ export function ServiceCategoryCard({ category, serviceCount }: ServiceCategoryC
                 </CardDescription>
               )}
             </div>
-            <ArrowRight className="ml-4 mt-1 h-5 w-5 flex-shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-gray-600" />
+            <ArrowRight className="ml-4 mt-1 h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
           </div>
         </CardHeader>
         {typeof serviceCount === 'number' && (

@@ -36,16 +36,16 @@ export default async function ProductsPage() {
 
   return (
     <>
-      <section className="bg-white py-12 sm:py-16">
+      <section className="bg-white dark:bg-gray-900 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[{ label: 'Products' }]}
           />
 
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
             Car Care Products &amp; Supplies
           </h1>
-          <p className="mt-4 max-w-3xl text-lg text-gray-600">
+          <p className="mt-4 max-w-3xl text-lg text-gray-600 dark:text-gray-400">
             Professional-grade car care products for every need. Whether
             you&apos;re maintaining a ceramic coating, detailing your interior,
             or washing your vehicle at home, we carry the products our
@@ -59,7 +59,7 @@ export default async function ProductsPage() {
               ))}
             </div>
           ) : (
-            <p className="mt-12 text-gray-500">
+            <p className="mt-12 text-gray-500 dark:text-gray-400">
               No product categories are currently available. Please check back
               soon.
             </p>

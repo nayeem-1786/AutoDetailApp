@@ -75,7 +75,7 @@ export default function UnsubscribePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <Spinner size="lg" />
       </div>
     );
@@ -83,10 +83,10 @@ export default function UnsubscribePage() {
 
   if (error || !prefs) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
-          <h1 className="text-xl font-semibold text-gray-900">Link Expired</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Link Expired</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             This unsubscribe link is no longer valid.
           </p>
         </div>
@@ -96,11 +96,11 @@ export default function UnsubscribePage() {
 
   if (saved) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="mx-auto max-w-md rounded-lg bg-white p-8 shadow-sm text-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="mx-auto max-w-md rounded-lg bg-white dark:bg-gray-900 p-8 shadow-sm dark:shadow-gray-900/50 text-center">
           <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
-          <h1 className="mt-4 text-xl font-semibold text-gray-900">Preferences Updated</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="mt-4 text-xl font-semibold text-gray-900 dark:text-gray-100">Preferences Updated</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Your notification preferences have been saved.
           </p>
         </div>
@@ -109,23 +109,23 @@ export default function UnsubscribePage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
-      <div className="mx-auto w-full max-w-md rounded-lg bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-gray-900">Notification Preferences</h1>
-        <p className="mt-1 text-sm text-gray-600">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 py-12">
+      <div className="mx-auto w-full max-w-md rounded-lg bg-white dark:bg-gray-900 p-8 shadow-sm dark:shadow-gray-900/50">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Notification Preferences</h1>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Manage how we communicate with you.
         </p>
 
         {/* Communication Channels */}
         <div className="mt-6 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-700">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
             Communication Channels
           </h3>
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">SMS Messages</p>
-              <p className="text-xs text-gray-500">Receive messages via text</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">SMS Messages</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Receive messages via text</p>
             </div>
             <Switch
               checked={prefs.sms_consent}
@@ -135,8 +135,8 @@ export default function UnsubscribePage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Email Messages</p>
-              <p className="text-xs text-gray-500">Receive messages via email</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Email Messages</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Receive messages via email</p>
             </div>
             <Switch
               checked={prefs.email_consent}
@@ -147,36 +147,36 @@ export default function UnsubscribePage() {
 
         {/* Notification Types */}
         <div className="mt-6 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-700">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
             Notification Types
           </h3>
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Appointment Reminders</p>
-              <p className="text-xs text-gray-500">Booking confirmations and reminders</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Appointment Reminders</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Booking confirmations and reminders</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">Required</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">Required</span>
               <Switch checked disabled className="opacity-60" onCheckedChange={() => {}} />
             </div>
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Service Updates</p>
-              <p className="text-xs text-gray-500">Status updates and completion notices</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Service Updates</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Status updates and completion notices</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">Required</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">Required</span>
               <Switch checked disabled className="opacity-60" onCheckedChange={() => {}} />
             </div>
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Promotions & Offers</p>
-              <p className="text-xs text-gray-500">Special deals and discount codes</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Promotions & Offers</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Special deals and discount codes</p>
             </div>
             <Switch
               checked={prefs.notify_promotions}
@@ -186,8 +186,8 @@ export default function UnsubscribePage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Loyalty Updates</p>
-              <p className="text-xs text-gray-500">Points earned and reward notifications</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Loyalty Updates</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Points earned and reward notifications</p>
             </div>
             <Switch
               checked={prefs.notify_loyalty}

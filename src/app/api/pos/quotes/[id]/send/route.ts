@@ -158,26 +158,41 @@ Thank you for choosing ${business.name}!`;
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .email-body { background-color: #1a1a2e !important; }
+      .email-card { background-color: #16213e !important; }
+      .email-info-box { background-color: #1a1a2e !important; }
+      .email-text { color: #e2e8f0 !important; }
+      .email-text-muted { color: #94a3b8 !important; }
+      .email-border { border-color: #334155 !important; }
+      .email-footer { background-color: #1a1a2e !important; }
+      .email-footer-text { color: #64748b !important; }
+      .email-th { background-color: #1e293b !important; color: #e2e8f0 !important; }
+      .email-td { border-color: #334155 !important; color: #e2e8f0 !important; }
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+<body class="email-body" style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; color-scheme: light dark;">
   <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-    <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
+    <div class="email-card" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
       <div style="background-color: #1e3a5f; padding: 24px 32px;">
         <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">${business.name}</h1>
         <p style="margin: 8px 0 0; color: #94a3b8; font-size: 14px;">${business.address}</p>
       </div>
       <div style="padding: 32px;">
         <div style="margin-bottom: 24px;">
-          <h2 style="margin: 0 0 16px; color: #1e3a5f; font-size: 20px;">Estimate ${quote.quote_number}</h2>
-          <p style="margin: 0; color: #6b7280; font-size: 14px;">Date: ${new Date(quote.created_at).toLocaleDateString()}</p>
+          <h2 class="email-text" style="margin: 0 0 16px; color: #1e3a5f; font-size: 20px;">Estimate ${quote.quote_number}</h2>
+          <p class="email-text-muted" style="margin: 0; color: #6b7280; font-size: 14px;">Date: ${new Date(quote.created_at).toLocaleDateString()}</p>
         </div>
-        <div style="background-color: #f9fafb; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
-          <p style="margin: 0 0 4px; font-size: 14px;"><strong>Customer:</strong> ${customerName}</p>
-          <p style="margin: 0; font-size: 14px;"><strong>Vehicle:</strong> ${vehicleStr}</p>
+        <div class="email-info-box" style="background-color: #f9fafb; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+          <p class="email-text" style="margin: 0 0 4px; font-size: 14px;"><strong>Customer:</strong> ${customerName}</p>
+          <p class="email-text" style="margin: 0; font-size: 14px;"><strong>Vehicle:</strong> ${vehicleStr}</p>
         </div>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
           <thead>
-            <tr style="background-color: #f3f4f6;">
+            <tr class="email-th" style="background-color: #f3f4f6;">
               <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Item</th>
               <th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Qty</th>
               <th style="padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Total</th>
@@ -187,16 +202,16 @@ Thank you for choosing ${business.name}!`;
             ${itemRowsHtml}
           </tbody>
         </table>
-        <div style="border-top: 2px solid #e5e7eb; padding-top: 16px; margin-bottom: 32px;">
+        <div class="email-border" style="border-top: 2px solid #e5e7eb; padding-top: 16px; margin-bottom: 32px;">
           <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="color: #6b7280;">Subtotal</span>
-            <span style="font-weight: 500;">${formatCurrency(quote.subtotal)}</span>
+            <span class="email-text-muted" style="color: #6b7280;">Subtotal</span>
+            <span class="email-text" style="font-weight: 500;">${formatCurrency(quote.subtotal)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="color: #6b7280;">Tax</span>
-            <span style="font-weight: 500;">${formatCurrency(quote.tax_amount)}</span>
+            <span class="email-text-muted" style="color: #6b7280;">Tax</span>
+            <span class="email-text" style="font-weight: 500;">${formatCurrency(quote.tax_amount)}</span>
           </div>
-          <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+          <div class="email-border" style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
             <span style="font-size: 18px; font-weight: 600; color: #1e3a5f;">Total</span>
             <span style="font-size: 18px; font-weight: 700; color: #1e3a5f;">${formatCurrency(quote.total_amount)}</span>
           </div>
@@ -204,13 +219,13 @@ Thank you for choosing ${business.name}!`;
         <div style="text-align: center; margin-bottom: 24px;">
           <a href="${quoteLink}" style="display: inline-block; background-color: #1e3a5f; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">View Your Estimate</a>
         </div>
-        <p style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
+        <p class="email-text-muted" style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
           This estimate is valid for 10 days.<br>
           Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
         </p>
       </div>
-      <div style="background-color: #f9fafb; padding: 24px 32px; text-align: center;">
-        <p style="margin: 0; color: #9ca3af; font-size: 12px;">Thank you for choosing ${business.name}!</p>
+      <div class="email-footer" style="background-color: #f9fafb; padding: 24px 32px; text-align: center;">
+        <p class="email-footer-text" style="margin: 0; color: #9ca3af; font-size: 12px;">Thank you for choosing ${business.name}!</p>
       </div>
     </div>
   </div>

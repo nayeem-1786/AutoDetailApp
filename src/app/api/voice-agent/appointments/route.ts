@@ -4,6 +4,7 @@ import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone } from '@/lib/utils/format';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { APPOINTMENT } from '@/lib/utils/constants';
+import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 
 // ---------------------------------------------------------------------------
 // GET — Look up upcoming appointments by customer phone
@@ -386,14 +387,6 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = h * 60 + m + minutes;
-  const newH = Math.floor(total / 60) % 24;
-  const newM = total % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-}
 
 function splitName(fullName: string): {
   firstName: string;

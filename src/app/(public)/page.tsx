@@ -72,13 +72,13 @@ export default async function HomePage() {
       <HeroSection />
 
       {/* Our Services */}
-      <section className="bg-white py-16 sm:py-20">
+      <section className="bg-white dark:bg-gray-900 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-3xl">
               Our Services
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-gray-600">
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-400">
               From basic washes to full ceramic coating packages, we offer a
               comprehensive range of auto detailing services tailored to your
               vehicle&apos;s needs.
@@ -96,10 +96,10 @@ export default async function HomePage() {
       </section>
 
       {/* Why Choose Us */}
-      <section className="bg-gray-50 py-16 sm:py-20">
+      <section className="bg-gray-50 dark:bg-gray-950 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-3xl">
               Why Choose {businessInfo.name}?
             </h2>
           </div>
@@ -109,13 +109,13 @@ export default async function HomePage() {
               const Icon = feature.icon;
               return (
                 <div key={feature.title} className="text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 text-white">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900">
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mt-4 text-lg font-semibold text-gray-900">
+                  <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {feature.title}
                   </h3>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                     {feature.description}
                   </p>
                 </div>

@@ -8,7 +8,7 @@ export async function GET() {
     // Get all active, bookable employees
     const { data: employees, error: empError } = await supabase
       .from('employees')
-      .select('id, first_name, last_name, bookable_for_appointments')
+      .select('id, first_name, last_name, role, bookable_for_appointments')
       .eq('bookable_for_appointments', true)
       .eq('status', 'active')
       .order('first_name');
@@ -55,6 +55,7 @@ export async function GET() {
         id: emp.id,
         first_name: emp.first_name,
         last_name: emp.last_name,
+        role: emp.role,
       },
       schedule: schedulesByEmployee[emp.id] ?? [],
     }));

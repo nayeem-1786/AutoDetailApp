@@ -64,7 +64,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
       <JsonLd data={generateProductSchema(product, category, businessInfo.name)} />
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
-      <article className="bg-white py-12 sm:py-16">
+      <article className="bg-white dark:bg-gray-900 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
@@ -76,7 +76,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
           <div className="mt-2 grid gap-10 lg:grid-cols-2">
             {/* Left column: product image */}
-            <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100">
+            <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
               {product.image_url ? (
                 <img
                   src={product.image_url}
@@ -85,29 +85,29 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <Package className="h-24 w-24 text-gray-300" />
+                  <Package className="h-24 w-24 text-gray-300 dark:text-gray-600" />
                 </div>
               )}
             </div>
 
             {/* Right column: product details */}
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
                 {product.name}
               </h1>
 
-              <p className="mt-4 text-3xl font-bold text-gray-900">
+              <p className="mt-4 text-3xl font-bold text-gray-900 dark:text-gray-100">
                 {formatCurrency(product.retail_price)}
               </p>
 
               {/* Availability */}
               <div className="mt-4">
                 {inStock ? (
-                  <span className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
+                  <span className="inline-flex items-center rounded-full bg-green-50 dark:bg-green-950 px-3 py-1 text-sm font-medium text-green-700 dark:text-green-300">
                     In Stock
                   </span>
                 ) : (
-                  <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-sm font-medium text-red-700">
+                  <span className="inline-flex items-center rounded-full bg-red-50 dark:bg-red-950 px-3 py-1 text-sm font-medium text-red-700 dark:text-red-300">
                     Out of Stock
                   </span>
                 )}
@@ -116,38 +116,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
               {/* Description */}
               {product.description && (
                 <div className="mt-8">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     Description
                   </h2>
-                  <div className="mt-3 text-gray-600 leading-relaxed whitespace-pre-line">
+                  <div className="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">
                     {product.description}
                   </div>
                 </div>
               )}
 
               {/* Product details */}
-              <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
-                <h2 className="text-lg font-semibold text-gray-900">
+              <div className="mt-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Product Details
                 </h2>
                 <dl className="mt-4 space-y-3 text-sm">
                   {product.sku && (
                     <div className="flex justify-between">
-                      <dt className="text-gray-500">SKU</dt>
-                      <dd className="font-medium text-gray-900">
+                      <dt className="text-gray-500 dark:text-gray-400">SKU</dt>
+                      <dd className="font-medium text-gray-900 dark:text-gray-100">
                         {product.sku}
                       </dd>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <dt className="text-gray-500">Category</dt>
-                    <dd className="font-medium text-gray-900">
+                    <dt className="text-gray-500 dark:text-gray-400">Category</dt>
+                    <dd className="font-medium text-gray-900 dark:text-gray-100">
                       {category.name}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-gray-500">Availability</dt>
-                    <dd className="font-medium text-gray-900">
+                    <dt className="text-gray-500 dark:text-gray-400">Availability</dt>
+                    <dd className="font-medium text-gray-900 dark:text-gray-100">
                       {inStock ? 'Available in store' : 'Currently unavailable'}
                     </dd>
                   </div>

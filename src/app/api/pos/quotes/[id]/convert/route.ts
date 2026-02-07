@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
+import { APPOINTMENT } from '@/lib/utils/constants';
+import { fireWebhook } from '@/lib/utils/webhook';
 import { z } from 'zod';
 
 const convertSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:MM)'),
   duration_minutes: z.coerce.number().int().min(1, 'Duration must be at least 1 minute'),
-  assigned_employee_id: z.string().uuid().optional().nullable(),
+  employee_id: z.string().uuid().optional().nullable(),
 });
-
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = h * 60 + m + minutes;
-  const newH = Math.floor(total / 60) % 24;
-  const newM = total % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-}
 
 export async function POST(
   request: NextRequest,
@@ -39,7 +34,7 @@ export async function POST(
       );
     }
 
-    const { date, time, duration_minutes, assigned_employee_id } = parsed.data;
+    const { date, time, duration_minutes, employee_id } = parsed.data;
     const supabase = createAdminClient();
 
     const { data: quote, error: fetchErr } = await supabase
@@ -65,32 +60,34 @@ export async function POST(
     }
 
     const endTime = addMinutesToTime(time, duration_minutes);
+    const endTimeWithBuffer = addMinutesToTime(time, duration_minutes + APPOINTMENT.BUFFER_MINUTES);
 
-    const appointmentData: Record<string, unknown> = {
-      customer_id: quote.customer_id,
-      vehicle_id: quote.vehicle_id,
-      status: 'pending',
-      channel: 'phone',
-      scheduled_date: date,
-      scheduled_start_time: time,
-      scheduled_end_time: endTime,
-      is_mobile: false,
-      mobile_surcharge: 0,
-      payment_status: 'pending',
-      subtotal: quote.subtotal,
-      tax_amount: quote.tax_amount,
-      discount_amount: 0,
-      total_amount: quote.total_amount,
-      job_notes: quote.notes,
-    };
-
-    if (assigned_employee_id) {
-      appointmentData.assigned_employee_id = assigned_employee_id;
+    // Auto-assign detailer if none provided
+    let assignedEmployeeId = employee_id ?? null;
+    if (!assignedEmployeeId) {
+      assignedEmployeeId = await findAvailableDetailer(supabase, date, time, endTimeWithBuffer);
     }
 
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
-      .insert(appointmentData)
+      .insert({
+        customer_id: quote.customer_id,
+        vehicle_id: quote.vehicle_id,
+        employee_id: assignedEmployeeId,
+        status: 'confirmed',
+        channel: 'phone',
+        scheduled_date: date,
+        scheduled_start_time: time,
+        scheduled_end_time: endTime,
+        is_mobile: false,
+        mobile_surcharge: 0,
+        payment_status: 'pending',
+        subtotal: quote.subtotal,
+        tax_amount: quote.tax_amount,
+        discount_amount: 0,
+        total_amount: quote.total_amount,
+        job_notes: quote.notes,
+      })
       .select('*')
       .single();
 
@@ -107,14 +104,12 @@ export async function POST(
     if (serviceItems.length > 0) {
       const apptServices = serviceItems.map((item: {
         service_id: string;
-        item_name: string;
         unit_price: number;
         tier_name: string | null;
       }) => ({
         appointment_id: appointment.id,
         service_id: item.service_id,
-        service_name: item.item_name,
-        price: item.unit_price,
+        price_at_booking: item.unit_price,
         tier_name: item.tier_name || null,
       }));
 
@@ -140,6 +135,9 @@ export async function POST(
     if (updateErr) {
       console.error('Error updating quote status:', updateErr.message);
     }
+
+    // Fire webhook for appointment confirmation
+    fireWebhook('appointment_confirmed', appointment, supabase).catch(() => {});
 
     return NextResponse.json({
       success: true,

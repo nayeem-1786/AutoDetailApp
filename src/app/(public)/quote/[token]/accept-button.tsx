@@ -38,9 +38,9 @@ export function AcceptQuoteButton({ quoteId, accessToken }: AcceptQuoteButtonPro
 
   if (accepted) {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 px-6 py-4">
-        <p className="text-lg font-semibold text-green-800">Quote Accepted!</p>
-        <p className="mt-1 text-sm text-green-600">
+      <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 px-6 py-4">
+        <p className="text-lg font-semibold text-green-800 dark:text-green-200">Quote Accepted!</p>
+        <p className="mt-1 text-sm text-green-600 dark:text-green-400">
           Thank you! We will contact you shortly to schedule your appointment.
         </p>
       </div>
@@ -56,8 +56,8 @@ export function AcceptQuoteButton({ quoteId, accessToken }: AcceptQuoteButtonPro
       >
         {accepting ? 'Accepting...' : 'Accept Quote'}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <p className="text-xs text-gray-400">
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         By accepting this quote, you agree to the services and pricing listed above.
       </p>
     </div>

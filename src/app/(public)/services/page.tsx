@@ -36,16 +36,16 @@ export default async function ServicesPage() {
 
   return (
     <>
-      <section className="bg-white py-12 sm:py-16">
+      <section className="bg-white dark:bg-gray-900 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[{ label: 'Services' }]}
           />
 
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
             Our Auto Detailing Services
           </h1>
-          <p className="mt-4 max-w-3xl text-lg text-gray-600">
+          <p className="mt-4 max-w-3xl text-lg text-gray-600 dark:text-gray-400">
             We offer a comprehensive range of auto detailing services designed
             to protect and enhance your vehicle. From express washes to
             multi-year ceramic coating packages, our trained technicians deliver
@@ -59,7 +59,7 @@ export default async function ServicesPage() {
               ))}
             </div>
           ) : (
-            <p className="mt-12 text-gray-500">
+            <p className="mt-12 text-gray-500 dark:text-gray-400">
               No service categories are currently available. Please check back
               soon.
             </p>

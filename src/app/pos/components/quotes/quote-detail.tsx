@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ArrowLeft,
   Loader2,
   Send,
   Edit3,
   Trash2,
-  Calendar,
+  ArrowRightCircle,
   Copy,
   Mail,
   MessageSquare,
@@ -25,7 +25,7 @@ import {
   formatCurrency,
 } from './quote-helpers';
 import { QuoteSendDialog } from './quote-send-dialog';
-import { QuoteConvertDialog } from './quote-convert-dialog';
+import { QuoteBookDialog } from '@/components/quotes/quote-book-dialog';
 import { QuoteDeleteDialog } from './quote-delete-dialog';
 import type { QuoteStatus } from '../../types';
 
@@ -138,7 +138,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
     fetchQuote(); // Refresh
   }
 
-  function handleConvertComplete() {
+  function handleConvertComplete(_appointmentId?: string) {
     setConvertDialogOpen(false);
     fetchQuote(); // Refresh
   }
@@ -147,6 +147,41 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
     setDeleteDialogOpen(false);
     onBack();
   }
+
+  // Calculate total duration from service items (hooks must be before early returns)
+  const [serviceDurations, setServiceDurations] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!quote?.items) return;
+    const serviceIds = quote.items
+      .filter((item) => item.service_id)
+      .map((item) => item.service_id as string);
+    if (serviceIds.length === 0) return;
+
+    posFetch(`/api/pos/services/durations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service_ids: serviceIds }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          setServiceDurations(data.durations || {});
+        }
+      })
+      .catch(() => {});
+  }, [quote?.items]);
+
+  const totalDurationMinutes = useMemo(() => {
+    if (!quote?.items) return 60;
+    const total = quote.items.reduce((sum, item) => {
+      if (item.service_id && serviceDurations[item.service_id]) {
+        return sum + serviceDurations[item.service_id];
+      }
+      return sum;
+    }, 0);
+    return total > 0 ? total : 60;
+  }, [quote?.items, serviceDurations]);
 
   if (loading || !quote) {
     return (
@@ -163,9 +198,6 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
   const vehicleStr = quote.vehicle
     ? `${quote.vehicle.year} ${quote.vehicle.make} ${quote.vehicle.model}${quote.vehicle.color ? ` (${quote.vehicle.color})` : ''}`
     : 'No Vehicle';
-
-  // Calculate total duration from service items (estimate)
-  const totalDurationMinutes = 60; // Default fallback
 
   return (
     <div className="flex h-full flex-col">
@@ -209,8 +241,8 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 Send
               </Button>
               <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
-                <Calendar className="mr-1.5 h-3.5 w-3.5" />
-                Book
+                <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
+                Convert to Appointment
               </Button>
               <Button
                 variant="outline"
@@ -235,8 +267,8 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 Resend
               </Button>
               <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
-                <Calendar className="mr-1.5 h-3.5 w-3.5" />
-                Book
+                <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
+                Convert to Appointment
               </Button>
             </>
           )}
@@ -249,8 +281,8 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 Edit
               </Button>
               <Button size="sm" onClick={() => setConvertDialogOpen(true)}>
-                <Calendar className="mr-1.5 h-3.5 w-3.5" />
-                Convert to Booking
+                <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
+                Convert to Appointment
               </Button>
             </>
           )}
@@ -436,12 +468,16 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
         onSent={handleSendComplete}
       />
 
-      <QuoteConvertDialog
+      <QuoteBookDialog
         open={convertDialogOpen}
         onClose={() => setConvertDialogOpen(false)}
         quoteId={quoteId}
-        totalDurationMinutes={totalDurationMinutes}
-        onConverted={handleConvertComplete}
+        defaultDuration={totalDurationMinutes}
+        fetchFn={posFetch}
+        apiBasePath="/api/pos/quotes"
+        customerEmail={quote.customer?.email ?? null}
+        customerPhone={quote.customer?.phone ?? null}
+        onBooked={handleConvertComplete}
       />
 
       {quote.status === 'draft' && (

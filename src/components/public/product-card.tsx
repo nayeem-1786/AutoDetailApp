@@ -21,7 +21,7 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
     <Link href={`/products/${categorySlug}/${product.slug}`} className="group block">
       <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
         {/* Image or Placeholder */}
-        <div className="relative aspect-[4/3] w-full bg-gray-100">
+        <div className="relative aspect-[4/3] w-full bg-gray-100 dark:bg-gray-800">
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -30,17 +30,17 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <Package className="h-12 w-12 text-gray-300" />
+              <Package className="h-12 w-12 text-gray-300 dark:text-gray-600" />
             </div>
           )}
         </div>
 
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
-            <CardTitle className="text-base group-hover:text-gray-700 transition-colors">
+            <CardTitle className="text-base group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
               {product.name}
             </CardTitle>
-            <ArrowRight className="ml-2 mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-gray-600" />
+            <ArrowRight className="ml-2 mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
           </div>
           {product.description && (
             <CardDescription className="mt-1">
@@ -50,7 +50,7 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
         </CardHeader>
 
         <CardContent>
-          <span className="text-lg font-semibold text-gray-900">
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {formatCurrency(product.retail_price)}
           </span>
         </CardContent>
