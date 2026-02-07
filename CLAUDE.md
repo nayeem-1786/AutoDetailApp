@@ -46,6 +46,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Unified SendMethodDialog (single component for all send flows)
 - Session expiry protection (3-layer: periodic check, focus check, fetch interceptor)
 - Dynamic business info (zero hardcoded values)
+- Quote soft-delete (`deleted_at` timestamp), number reuse fix, email dark mode fix
 
 ### Phase 5 — What's Remaining
 - Lifecycle automation rules (service-based triggers, configurable timing, vehicle-aware reminders)
@@ -63,7 +64,9 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - [ ] Send quote via both (email + SMS simultaneously)
 - [ ] View public quote link (`/quote/[access_token]`)
 - [ ] Accept quote from public page
-- [ ] Delete draft quote via POS builder
+- [ ] Delete draft quote via POS builder (soft-delete)
+- [ ] Verify deleted quote shows friendly page at public link
+- [ ] Verify deleted quotes hidden from all admin/POS lists
 
 ### Appointments (Remaining)
 - [ ] Create new appointment (admin-side)
@@ -120,6 +123,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Admin quotes are READ-ONLY.** All creation/editing via POS builder deep-links
 - **POS deep-links:** `/pos/quotes?mode=builder` (new), `?mode=builder&quoteId=<id>` (edit), `?mode=detail&quoteId=<id>` (view)
 - **Customer search:** 2-char min, 300ms debounce, digits → phone search, text → name search
+- **Quotes use soft-delete** (`deleted_at` column). All quote queries MUST include `.is('deleted_at', null)` — except `quote-number.ts` (needs all quotes to prevent number reuse) and public quote page (needs deleted quotes for friendly messaging)
 
 ---
 
