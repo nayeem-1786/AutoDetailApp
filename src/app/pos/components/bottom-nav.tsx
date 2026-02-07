@@ -7,6 +7,7 @@ import {
   LogOut,
   Vault,
   Receipt,
+  FileText,
   MoreHorizontal,
   ExternalLink,
   Settings,
@@ -115,6 +116,18 @@ export function BottomNav() {
       >
         <Receipt className="h-5 w-5" />
         <span className="text-[10px] font-medium leading-tight">Transactions</span>
+      </Link>
+
+      {/* Quotes */}
+      <Link
+        href="/pos/quotes"
+        className={cn(
+          'flex flex-col items-center gap-0.5 px-3 py-1',
+          pathname.startsWith('/pos/quotes') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+        )}
+      >
+        <FileText className="h-5 w-5" />
+        <span className="text-[10px] font-medium leading-tight">Quotes</span>
       </Link>
 
       {/* More */}

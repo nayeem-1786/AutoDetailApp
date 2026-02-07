@@ -30,30 +30,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: [] });
     }
 
-    const query = q.toLowerCase();
-    const digits = q.replace(/\D/g, '');
+    const term = q.trim();
+    const digits = term.replace(/\D/g, '');
+    const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
 
-    // Search by name or phone
-    let customers;
-    if (digits.length >= 4) {
-      // Search by phone
-      const { data } = await admin
-        .from('customers')
-        .select('id, first_name, last_name, phone')
-        .like('phone', `%${digits}`)
-        .order('last_name')
-        .limit(10);
-      customers = data;
+    let dbQuery = admin
+      .from('customers')
+      .select('id, first_name, last_name, phone')
+      .order('last_name')
+      .limit(10);
+
+    if (isPhoneSearch) {
+      dbQuery = dbQuery.like('phone', `%${digits}%`);
     } else {
-      // Search by name
-      const { data } = await admin
-        .from('customers')
-        .select('id, first_name, last_name, phone')
-        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
-        .order('last_name')
-        .limit(10);
-      customers = data;
+      dbQuery = dbQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
     }
+
+    const { data: customers } = await dbQuery;
 
     return NextResponse.json({ data: customers ?? [] });
   } catch (err) {

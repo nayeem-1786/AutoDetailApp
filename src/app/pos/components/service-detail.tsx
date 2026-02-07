@@ -14,12 +14,19 @@ interface ServiceDetailProps {
   service: CatalogService;
   categoryName: string;
   onBack: () => void;
+  /** When provided, use this callback instead of dispatching to ticket context */
+  onAdd?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null) => void;
+  /** Override vehicle size class */
+  vehicleSizeOverride?: VehicleSizeClass | null;
 }
 
-export function ServiceDetail({ service, categoryName, onBack }: ServiceDetailProps) {
-  const { ticket, dispatch } = useTicket();
+export function ServiceDetail({ service, categoryName, onBack, onAdd, vehicleSizeOverride }: ServiceDetailProps) {
+  const { ticket, dispatch: ticketDispatch } = useTicket();
+  const dispatch = onAdd ? undefined : ticketDispatch;
   const pricing = service.pricing ?? [];
-  const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
+  const vehicleSizeClass = vehicleSizeOverride !== undefined
+    ? vehicleSizeOverride
+    : (ticket.vehicle?.size_class ?? null);
 
   // If flat price and no tiers, create synthetic tier
   const tiers: ServicePricing[] = pricing.length > 0
@@ -53,12 +60,16 @@ export function ServiceDetail({ service, categoryName, onBack }: ServiceDetailPr
       toast.error('No pricing available');
       return;
     }
-    dispatch({
-      type: 'ADD_SERVICE',
-      service,
-      pricing: selectedTier,
-      vehicleSizeClass,
-    });
+    if (onAdd) {
+      onAdd(service, selectedTier, vehicleSizeClass);
+    } else if (dispatch) {
+      dispatch({
+        type: 'ADD_SERVICE',
+        service,
+        pricing: selectedTier,
+        vehicleSizeClass,
+      });
+    }
     toast.success(`Added ${service.name}`);
     onBack();
   }

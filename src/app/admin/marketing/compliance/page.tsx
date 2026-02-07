@@ -84,17 +84,28 @@ export default function CompliancePage() {
 
   async function searchCustomers(query: string) {
     setCustomerSearch(query);
-    if (query.length < 2) {
+    if (query.trim().length < 2) {
       setCustomerResults([]);
       return;
     }
 
-    const { data } = await supabase
+    const term = query.trim();
+    const digits = term.replace(/\D/g, '');
+    const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
+
+    let dbQuery = supabase
       .from('customers')
       .select('id, first_name, last_name, phone, email, sms_consent, email_consent')
-      .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+      .order('last_name')
       .limit(10);
 
+    if (isPhoneSearch) {
+      dbQuery = dbQuery.like('phone', `%${digits}%`);
+    } else {
+      dbQuery = dbQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+    }
+
+    const { data } = await dbQuery;
     setCustomerResults((data ?? []) as CustomerResult[]);
   }
 
@@ -256,7 +267,7 @@ export default function CompliancePage() {
                     type="text"
                     value={customerSearch}
                     onChange={(e) => searchCustomers(e.target.value)}
-                    placeholder="Type customer name..."
+                    placeholder="Search by name or phone..."
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
                   />
                   {customerResults.length > 0 && !selectedCustomer && (

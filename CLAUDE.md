@@ -20,8 +20,8 @@ Full project spec: `docs/PROJECT.md` | Companion docs: `docs/CONVENTIONS.md`, `d
 | Staff Scheduling | ✅ Done | Moved to staff profiles, added "Who's Working Today" dashboard |
 | 11 Labs API | ⏳ Pending | All 6 endpoints |
 
-### 🧪 NEXT SESSION: Test Quotes Module
-**Last session:** 2026-02-06 — Built POS-style browsable service picker dialog for quotes; replaced flat service dropdown with category tiles, search, tier selection; made unit price always editable for custom pricing; new items prepend to top; added "New Customer" quick-create button; renamed Customer→Assigned Customer, Line Items→Services
+### 🧪 NEXT SESSION: Test POS Quotes Tab
+**Last session:** 2026-02-06 — Built complete POS Quotes tab at `/pos/quotes` with catalog browser integration, split-panel builder, state management, API endpoints, detail view with communication history, send/convert/delete dialogs. F3 keyboard shortcut to navigate to quotes.
 **Migrations:** All applied (including `quote_communications` table)
 
 **Quotes Test Checklist:**
@@ -258,6 +258,19 @@ When testing each module, verify:
 - [x] Moved "Book New Appointment" button to header, right-aligned
 
 ## Recent Updates
+
+### POS Quotes Tab (2026-02-06)
+- **New POS route:** `/pos/quotes` — Full quote management for cashiers without leaving POS
+- **State management:** `QuoteProvider` + `useQuote()` hook with `useReducer` pattern mirroring `TicketProvider`. Mounted in `PosShell` so quote state persists across tab navigation.
+- **Quote builder:** Split-panel layout (catalog browser left, quote ticket panel right) matching POS workspace pattern. Reuses `CatalogBrowser` with optional callback props for backward compatibility.
+- **Catalog browser abstraction:** Added `onAddProduct?`, `onAddService?`, `vehicleSizeOverride?` props to `CatalogBrowser` and `ServiceDetail`. When callbacks provided, dispatches to them instead of ticket context. Existing POS workspace behavior unchanged.
+- **POS API endpoints:** 5 new routes under `/api/pos/quotes/` — list+create, get+update+delete, send (email/SMS), convert to booking, communications history. All use `authenticatePosRequest()` + `createAdminClient()`.
+- **Quote list:** Searchable (quote #, customer name/phone), filterable (All/Draft/Sent/Viewed/Accepted), paginated. Status badges with color coding.
+- **Quote detail:** Read-only view with items table, totals, customer/vehicle info, communication history, dates timeline. Context-sensitive action buttons by status (Draft: Edit/Send/Delete, Sent/Viewed: Edit/Resend, Accepted: Convert to Booking/Edit, Expired: Re-Quote, Converted: view appointment info).
+- **Dialogs:** Send (email/SMS/both with method selection and missing contact warnings), Convert to Booking (date/time/duration/staff picker), Delete (confirmation).
+- **Bottom nav:** Added "Quotes" tab with `FileText` icon between Transactions and More.
+- **Keyboard shortcut:** `F3` → navigate to `/pos/quotes`. Added to shortcuts help overlay.
+- **Files:** 20 new, 5 modified. TypeScript compiles clean.
 
 ### Quote Service Picker Dialog (2026-02-06)
 - **New component:** `src/app/admin/quotes/_components/service-picker-dialog.tsx` — POS-style browsable service selection

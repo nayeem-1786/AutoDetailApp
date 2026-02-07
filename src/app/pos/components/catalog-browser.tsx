@@ -21,17 +21,27 @@ type BrowseState =
 interface CatalogBrowserProps {
   type: 'products' | 'services';
   search: string;
+  /** When provided, use this callback instead of dispatching to ticket context */
+  onAddProduct?: (product: CatalogProduct) => void;
+  /** When provided, use this callback instead of dispatching to ticket context */
+  onAddService?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null) => void;
+  /** Override vehicle size class (for quote builder where vehicle is in a different context) */
+  vehicleSizeOverride?: VehicleSizeClass | null;
 }
 
-export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
+export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride }: CatalogBrowserProps) {
   const { products, services } = useCatalog();
-  const { ticket, dispatch } = useTicket();
+  const { ticket, dispatch: ticketDispatch } = useTicket();
+  const hasCallbacks = !!onAddProduct || !!onAddService;
+  const dispatch = hasCallbacks ? undefined : ticketDispatch;
   const [browseState, setBrowseState] = useState<BrowseState>({ view: 'categories' });
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
   const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
 
   const items = type === 'products' ? products : services;
-  const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
+  const vehicleSizeClass = vehicleSizeOverride !== undefined
+    ? vehicleSizeOverride
+    : (ticket.vehicle?.size_class ?? null);
 
   // Build categories with counts and image
   const categories = useMemo(() => {
@@ -104,6 +114,10 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
   }, [search, type, products, services]);
 
   function handleTapProduct(product: CatalogProduct) {
+    if (onAddProduct) {
+      onAddProduct(product);
+      return;
+    }
     setDetailProduct(product);
   }
 
@@ -118,12 +132,16 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
   function handleTapServiceDirect(service: CatalogService) {
     const pricing = service.pricing ?? [];
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
-      dispatch({
-        type: 'ADD_SERVICE',
-        service,
-        pricing: pricing[0],
-        vehicleSizeClass,
-      });
+      if (onAddService) {
+        onAddService(service, pricing[0], vehicleSizeClass);
+      } else if (dispatch) {
+        dispatch({
+          type: 'ADD_SERVICE',
+          service,
+          pricing: pricing[0],
+          vehicleSizeClass,
+        });
+      }
       toast.success(`Added ${service.name}`);
       return;
     }
@@ -141,12 +159,16 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
         vehicle_size_suv_van_price: null,
         created_at: '',
       };
-      dispatch({
-        type: 'ADD_SERVICE',
-        service,
-        pricing: syntheticPricing,
-        vehicleSizeClass,
-      });
+      if (onAddService) {
+        onAddService(service, syntheticPricing, vehicleSizeClass);
+      } else if (dispatch) {
+        dispatch({
+          type: 'ADD_SERVICE',
+          service,
+          pricing: syntheticPricing,
+          vehicleSizeClass,
+        });
+      }
       toast.success(`Added ${service.name}`);
       return;
     }
@@ -158,12 +180,16 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
     vsc: VehicleSizeClass | null
   ) {
     if (!pickerService) return;
-    dispatch({
-      type: 'ADD_SERVICE',
-      service: pickerService,
-      pricing,
-      vehicleSizeClass: vsc,
-    });
+    if (onAddService) {
+      onAddService(pickerService, pricing, vsc);
+    } else if (dispatch) {
+      dispatch({
+        type: 'ADD_SERVICE',
+        service: pickerService,
+        pricing,
+        vehicleSizeClass: vsc,
+      });
+    }
     toast.success(`Added ${pickerService.name}`);
     setPickerService(null);
   }
@@ -211,7 +237,7 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
     );
   }
 
-  // Service detail (full page, unchanged)
+  // Service detail (full page)
   if (browseState.view === 'service-detail') {
     return (
       <ServiceDetail
@@ -225,6 +251,10 @@ export function CatalogBrowser({ type, search }: CatalogBrowserProps) {
             categoryName: browseState.categoryName,
           })
         }
+        onAdd={onAddService ? (service, pricing, vsc) => {
+          onAddService(service, pricing, vsc);
+        } : undefined}
+        vehicleSizeOverride={vehicleSizeOverride}
       />
     );
   }

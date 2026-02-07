@@ -92,10 +92,19 @@ function formatBreadcrumbSegment(segment: string): string | null {
 // Flatten nav items for global search
 function flattenNavItems(items: NavItem[]): NavItem[] {
   const result: NavItem[] = [];
+  const seen = new Set<string>();
   for (const item of items) {
-    result.push(item);
+    if (!seen.has(item.href)) {
+      result.push(item);
+      seen.add(item.href);
+    }
     if (item.children) {
-      result.push(...item.children);
+      for (const child of item.children) {
+        if (!seen.has(child.href)) {
+          result.push(child);
+          seen.add(child.href);
+        }
+      }
     }
   }
   return result;

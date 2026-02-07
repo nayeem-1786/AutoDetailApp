@@ -638,12 +638,40 @@ export default function AdminTransactionsPage() {
           );
         }
 
-        // Search filter
+        // Search filter — PostgREST doesn't support .or() on related tables,
+        // so we search customers first, then filter transactions by matching IDs.
         if (searchQuery.trim()) {
-          const q = `%${searchQuery.trim()}%`;
-          query = query.or(
-            `receipt_number.ilike.${q},customer.first_name.ilike.${q},customer.last_name.ilike.${q},customer.phone.ilike.${q}`
-          );
+          const term = searchQuery.trim();
+          const digits = term.replace(/\D/g, '');
+          const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
+
+          // Always try receipt number match
+          const receiptPattern = `%${term}%`;
+
+          // Search customers separately to get matching IDs
+          let customerQuery = supabase
+            .from('customers')
+            .select('id')
+            .limit(50);
+
+          if (isPhoneSearch) {
+            customerQuery = customerQuery.like('phone', `%${digits}%`);
+          } else {
+            customerQuery = customerQuery.or(
+              `first_name.ilike.%${term}%,last_name.ilike.%${term}%`
+            );
+          }
+
+          const { data: matchingCustomers } = await customerQuery;
+          const customerIds = (matchingCustomers ?? []).map((c: { id: string }) => c.id);
+
+          if (customerIds.length > 0) {
+            query = query.or(
+              `receipt_number.ilike.${receiptPattern},customer_id.in.(${customerIds.join(',')})`
+            );
+          } else {
+            query = query.ilike('receipt_number', receiptPattern);
+          }
         }
 
         const { data, count, error } = await query;

@@ -110,16 +110,28 @@ export default function NewQuotePage() {
   // Search customers
   const searchCustomers = useCallback(
     async (query: string) => {
-      if (query.length < 2) {
+      if (query.trim().length < 2) {
         setCustomerResults([]);
         return;
       }
       setSearchingCustomers(true);
-      const { data } = await supabase
+      const term = query.trim();
+      const digits = term.replace(/\D/g, '');
+      const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
+
+      let dbQuery = supabase
         .from('customers')
         .select('*')
-        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,phone.ilike.%${query}%`)
+        .order('last_name')
         .limit(10);
+
+      if (isPhoneSearch) {
+        dbQuery = dbQuery.like('phone', `%${digits}%`);
+      } else {
+        dbQuery = dbQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+      }
+
+      const { data } = await dbQuery;
       if (data) setCustomerResults(data);
       setSearchingCustomers(false);
     },
@@ -388,7 +400,7 @@ export default function NewQuotePage() {
           <div ref={customerDropdownRef} className="relative">
             <FormField label="Search Customer" required error={errors.customer}>
               <Input
-                placeholder="Type customer name or phone..."
+                placeholder="Search by name or phone..."
                 value={customerSearch}
                 onChange={(e) => {
                   setCustomerSearch(e.target.value);

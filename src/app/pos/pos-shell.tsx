@@ -22,6 +22,7 @@ import { TicketProvider, useTicket } from './context/ticket-context';
 import { CheckoutProvider, useCheckout } from './context/checkout-context';
 import { HeldTicketsProvider, useHeldTickets } from './context/held-tickets-context';
 import { ReaderProvider, useReader } from './context/reader-context';
+import { QuoteProvider } from './context/quote-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
 import { HeldTicketsPanel } from './components/held-tickets-panel';
@@ -190,6 +191,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
       <TicketProvider>
         <CheckoutProvider>
           <HeldTicketsProvider>
+            <QuoteProvider>
             <PosShellContent displayName={displayName} clock={clock} role={role}>
               {children}
             </PosShellContent>
@@ -260,6 +262,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
               `}</style>
             </div>
           )}
+          </QuoteProvider>
           </HeldTicketsProvider>
         </CheckoutProvider>
       </TicketProvider>
@@ -280,6 +283,7 @@ function PosShellContent({
   role: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { ticket, dispatch } = useTicket();
   const { openCheckout, isOpen: checkoutOpen } = useCheckout();
   const { heldTickets } = useHeldTickets();
@@ -314,6 +318,10 @@ function PosShellContent({
             openCheckout();
           }
           break;
+        case 'F3':
+          e.preventDefault();
+          router.push('/pos/quotes');
+          break;
         case 'Escape':
           e.preventDefault();
           if (shortcutsOpen) {
@@ -341,7 +349,7 @@ function PosShellContent({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, ticket.items.length, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen]);
+  }, [dispatch, ticket.items.length, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen, router]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
@@ -478,6 +486,12 @@ function PosShellContent({
                 <span className="text-sm text-gray-600">Go to payment / checkout</span>
                 <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                   F2
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Go to quotes</span>
+                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                  F3
                 </kbd>
               </div>
               <div className="flex items-center justify-between">

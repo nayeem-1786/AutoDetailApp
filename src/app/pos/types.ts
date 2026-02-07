@@ -93,3 +93,48 @@ export interface FavoriteItem {
 }
 
 export type FavoriteColor = 'red' | 'orange' | 'fuchsia' | 'lime' | 'cyan' | 'teal' | 'blue' | 'indigo' | 'purple' | 'pink' | 'rose' | 'slate';
+
+// ─── Quote Types ──────────────────────────────────────────────
+
+export type QuoteStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'expired' | 'converted';
+
+export interface QuoteState {
+  // Same shape as TicketState for item management
+  items: TicketItem[];
+  customer: Customer | null;
+  vehicle: Vehicle | null;
+  coupon: { id: string; code: string; discount: number; isAutoApplied?: boolean } | null;
+  loyaltyPointsToRedeem: number;
+  loyaltyDiscount: number;
+  manualDiscount: { type: 'dollar' | 'percent'; value: number; label: string } | null;
+  notes: string | null;
+  // Computed totals
+  subtotal: number;
+  taxAmount: number;
+  discountAmount: number;
+  total: number;
+  // Quote-specific
+  quoteId: string | null;
+  quoteNumber: string | null;
+  validUntil: string | null;
+  status: QuoteStatus | null;
+}
+
+export type QuoteAction =
+  | { type: 'ADD_PRODUCT'; product: Product }
+  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null }
+  | { type: 'ADD_CUSTOM_ITEM'; name: string; price: number; isTaxable: boolean }
+  | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
+  | { type: 'REMOVE_ITEM'; itemId: string }
+  | { type: 'SET_CUSTOMER'; customer: Customer | null }
+  | { type: 'SET_VEHICLE'; vehicle: Vehicle | null }
+  | { type: 'RECALCULATE_VEHICLE_PRICES'; vehicle: Vehicle | null; services: Service[] }
+  | { type: 'SET_COUPON'; coupon: { id: string; code: string; discount: number; isAutoApplied?: boolean } | null }
+  | { type: 'SET_LOYALTY_REDEEM'; points: number; discount: number }
+  | { type: 'SET_NOTES'; notes: string | null }
+  | { type: 'UPDATE_ITEM_NOTE'; itemId: string; note: string | null }
+  | { type: 'APPLY_MANUAL_DISCOUNT'; discountType: 'dollar' | 'percent'; value: number; label: string }
+  | { type: 'REMOVE_MANUAL_DISCOUNT' }
+  | { type: 'LOAD_QUOTE'; state: QuoteState }
+  | { type: 'SET_VALID_UNTIL'; date: string | null }
+  | { type: 'CLEAR_QUOTE' };

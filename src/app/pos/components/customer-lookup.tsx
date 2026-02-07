@@ -31,14 +31,14 @@ export function CustomerLookup({
   onGuest,
   onCreateNew,
 }: CustomerLookupProps) {
-  const [phoneInput, setPhoneInput] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const searchCustomers = useCallback(async (digits: string) => {
-    if (digits.length < 4) {
+  const searchCustomers = useCallback(async (query: string) => {
+    if (query.length < 2) {
       setResults([]);
       setSearched(false);
       return;
@@ -46,7 +46,7 @@ export function CustomerLookup({
 
     setLoading(true);
     try {
-      const res = await posFetch(`/api/pos/customers/search?phone=${digits}`);
+      const res = await posFetch(`/api/pos/customers/search?q=${encodeURIComponent(query)}`);
       const json = await res.json();
       setResults(json.data ?? []);
       setSearched(true);
@@ -58,13 +58,21 @@ export function CustomerLookup({
     }
   }, []);
 
-  function handlePhoneChange(value: string) {
-    const formatted = formatPhoneInput(value);
-    setPhoneInput(formatted);
-
+  function handleInputChange(value: string) {
+    // If it looks like a phone number, format it
     const digits = value.replace(/\D/g, '');
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => searchCustomers(digits), 300);
+    const isPhone = digits.length > 0 && digits.length === value.replace(/[\s()-]/g, '').length;
+
+    if (isPhone) {
+      const formatted = formatPhoneInput(value);
+      setSearchInput(formatted);
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => searchCustomers(digits), 300);
+    } else {
+      setSearchInput(value);
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => searchCustomers(value.trim()), 300);
+    }
   }
 
   function handleSelectResult(result: SearchResult) {
@@ -78,10 +86,10 @@ export function CustomerLookup({
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <input
-          type="tel"
-          value={phoneInput}
-          onChange={(e) => handlePhoneChange(e.target.value)}
-          placeholder="Search by phone..."
+          type="text"
+          value={searchInput}
+          onChange={(e) => handleInputChange(e.target.value)}
+          placeholder="Search by name or phone..."
           autoFocus
           className="h-10 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
         />

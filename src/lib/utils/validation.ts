@@ -471,7 +471,7 @@ export const quoteItemSchema = z.object({
 });
 
 export const createQuoteSchema = z.object({
-  customer_id: z.string().uuid(),
+  customer_id: z.string().uuid().nullable().optional(),
   vehicle_id: z.string().uuid().optional().nullable(),
   items: z.array(quoteItemSchema).min(1, 'At least one item is required'),
   notes: optionalString,

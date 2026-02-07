@@ -5,11 +5,11 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const phone = searchParams.get('phone');
+    const q = searchParams.get('q') || searchParams.get('phone') || '';
 
-    if (!phone || phone.replace(/\D/g, '').length < 4) {
+    if (q.trim().length < 2) {
       return NextResponse.json(
-        { error: 'Provide at least 4 digits to search' },
+        { error: 'Provide at least 2 characters to search' },
         { status: 400 }
       );
     }
@@ -20,15 +20,27 @@ export async function GET(request: NextRequest) {
     }
     const supabase = createAdminClient();
 
-    const digits = phone.replace(/\D/g, '');
+    const term = q.trim();
+    const digits = term.replace(/\D/g, '');
+    const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
 
-    // Search by phone — partial match on last digits
-    const { data: customers, error } = await supabase
+    let query = supabase
       .from('customers')
       .select('id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags, customer_type')
-      .like('phone', `%${digits}`)
       .order('last_name')
       .limit(10);
+
+    if (isPhoneSearch) {
+      // Phone search — partial match anywhere in the number
+      query = query.like('phone', `%${digits}%`);
+    } else {
+      // Name search — match first or last name (case-insensitive)
+      query = query.or(
+        `first_name.ilike.%${term}%,last_name.ilike.%${term}%`
+      );
+    }
+
+    const { data: customers, error } = await query;
 
     if (error) {
       console.error('Customer search error:', error);
