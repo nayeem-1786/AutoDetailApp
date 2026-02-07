@@ -49,7 +49,7 @@ export async function POST(
     const { error: resetError } = await supabaseSession.auth.resetPasswordForEmail(
       customer.email,
       {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/portal/reset-password`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/signin/reset-password`,
       }
     );
 

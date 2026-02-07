@@ -35,6 +35,9 @@ export default function CustomerSignInPage() {
   const [loading, setLoading] = useState(false);
   const [otpPhone, setOtpPhone] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const signedOutRef = useRef(false);
 
   // When redirected here due to session expiry, sign out to clear the
@@ -269,6 +272,32 @@ export default function CustomerSignInPage() {
     router.refresh();
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!resetEmail.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+
+    const supabase = createClient();
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/signin/reset-password`,
+    });
+
+    if (resetError) {
+      setError(resetError.message);
+      setLoading(false);
+      return;
+    }
+
+    setResetSent(true);
+    setLoading(false);
+  };
+
   return (
     <section className="flex items-center justify-center py-12 sm:py-16">
       <div className="w-full max-w-md space-y-6">
@@ -409,7 +438,7 @@ export default function CustomerSignInPage() {
           )}
 
           {/* Email Sign-in Mode */}
-          {mode === 'email' && (
+          {mode === 'email' && !forgotMode && (
             <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-5">
               <FormField
                 label="Email"
@@ -449,6 +478,17 @@ export default function CustomerSignInPage() {
                 {loading ? <Spinner size="sm" /> : 'Sign In'}
               </Button>
 
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotMode(true);
+                  setError(null);
+                }}
+                className="block w-full text-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+              >
+                Forgot password?
+              </button>
+
               {/* Divider */}
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
@@ -467,6 +507,68 @@ export default function CustomerSignInPage() {
                 Sign in with phone
               </button>
             </form>
+          )}
+
+          {/* Forgot Password Mode */}
+          {mode === 'email' && forgotMode && (
+            <div className="space-y-5">
+              {resetSent ? (
+                <div className="space-y-4">
+                  <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3 text-sm text-green-800 dark:text-green-200">
+                    Check your email for a reset link. It may take a minute to arrive.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotMode(false);
+                      setResetSent(false);
+                      setResetEmail('');
+                      setError(null);
+                    }}
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  >
+                    &larr; Back to sign in
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-5">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Enter your email address and we&apos;ll send you a link to reset your password.
+                  </p>
+
+                  <FormField label="Email" required htmlFor="reset-email">
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      autoComplete="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@example.com"
+                    />
+                  </FormField>
+
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                  >
+                    {loading ? <Spinner size="sm" /> : 'Send Reset Link'}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotMode(false);
+                      setResetEmail('');
+                      setError(null);
+                    }}
+                    className="block text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  >
+                    &larr; Back to sign in
+                  </button>
+                </form>
+              )}
+            </div>
           )}
         </div>
 

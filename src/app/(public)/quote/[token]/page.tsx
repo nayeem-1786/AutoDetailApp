@@ -237,7 +237,7 @@ export default async function PublicQuotePage({ params }: PageProps) {
       {/* Accept Button */}
       {canAccept && (
         <div className="text-center">
-          <AcceptQuoteButton quoteId={quote.id} accessToken={quote.access_token!} />
+          <AcceptQuoteButton quoteId={quote.id} accessToken={quote.access_token!} totalAmount={formatCurrency(quote.total_amount)} />
         </div>
       )}
     </div>
