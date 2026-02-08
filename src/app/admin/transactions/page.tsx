@@ -29,6 +29,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { RevenueStats } from './components/revenue-stats';
+import { PaymentBreakdown } from './components/payment-breakdown';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -594,10 +596,48 @@ export default function AdminTransactionsPage() {
   const [dateFrom, setDateFrom] = useState(initialRange.from);
   const [dateTo, setDateTo] = useState(initialRange.to);
 
+  // Stats
+  const [stats, setStats] = useState<{
+    revenue: number;
+    transactionCount: number;
+    avgTicket: number;
+    tips: number;
+    newCustomers: number;
+    winBacks: number;
+    paymentMethods: Array<{
+      method: string;
+      total: number;
+      count: number;
+      percentage: number;
+    }>;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   // Detail expansion
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // ---------- Stats fetching ----------
+
+  const fetchStats = useCallback(async (status: string, from: string, to: string) => {
+    setStatsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (status !== 'all') params.set('status', status);
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const res = await fetch(`/api/admin/transactions/stats?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error('Error fetching transaction stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   // ---------- Data fetching ----------
 
@@ -699,6 +739,9 @@ export default function AdminTransactionsPage() {
   // Initial load and page changes
   useEffect(() => {
     fetchTransactions(search, statusFilter, dateFrom, dateTo, page);
+    if (page === 0) {
+      fetchStats(statusFilter, dateFrom, dateTo);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
@@ -718,6 +761,7 @@ export default function AdminTransactionsPage() {
     setStatusFilter(value);
     setPage(0);
     fetchTransactions(search, value, dateFrom, dateTo, 0);
+    fetchStats(value, dateFrom, dateTo);
   }
 
   function handlePresetClick(preset: DatePreset) {
@@ -727,6 +771,7 @@ export default function AdminTransactionsPage() {
     setDateTo(range.to);
     setPage(0);
     fetchTransactions(search, statusFilter, range.from, range.to, 0);
+    fetchStats(statusFilter, range.from, range.to);
   }
 
   const startIndex = page * PAGE_SIZE;
@@ -739,6 +784,23 @@ export default function AdminTransactionsPage() {
         description={
           loading ? 'Loading...' : `${totalCount} transaction${totalCount !== 1 ? 's' : ''}`
         }
+      />
+
+      {/* Revenue Stats */}
+      <RevenueStats
+        revenue={stats?.revenue ?? 0}
+        transactionCount={stats?.transactionCount ?? 0}
+        avgTicket={stats?.avgTicket ?? 0}
+        tips={stats?.tips ?? 0}
+        newCustomers={stats?.newCustomers ?? 0}
+        winBacks={stats?.winBacks ?? 0}
+        loading={statsLoading}
+      />
+
+      {/* Payment Breakdown */}
+      <PaymentBreakdown
+        methods={stats?.paymentMethods ?? []}
+        loading={statsLoading}
       />
 
       {/* Filters row */}
