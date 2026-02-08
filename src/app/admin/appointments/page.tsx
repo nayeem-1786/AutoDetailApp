@@ -1,23 +1,31 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from 'date-fns';
-import { Clock, ClipboardList } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { cn } from '@/lib/utils/cn';
 import { PageHeader } from '@/components/ui/page-header';
-import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { formatTime } from '@/lib/utils/format';
 import { AppointmentCalendar } from './components/appointment-calendar';
 import { DayAppointmentsList } from './components/day-appointments-list';
 import { AppointmentDetailDialog } from './components/appointment-detail-dialog';
 import { CancelAppointmentDialog } from './components/cancel-appointment-dialog';
+import { AppointmentStats } from './components/appointment-stats';
+import { AppointmentFilters } from './components/appointment-filters';
 import type { AppointmentWithRelations } from './types';
 import type { Employee } from '@/lib/supabase/types';
 import type { AppointmentUpdateInput, AppointmentCancelInput } from '@/lib/utils/validation';
+
+interface AppointmentStatsData {
+  today: { count: number; revenue: number };
+  thisWeek: { count: number; revenue: number };
+  pending: number;
+  newBookings: number;
+  bookedRevenue: number;
+}
 
 export default function AppointmentsPage() {
   const supabase = createClient();
@@ -39,24 +47,88 @@ export default function AppointmentsPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [activeAppointment, setActiveAppointment] = useState<AppointmentWithRelations | null>(null);
 
-  // Group appointments by date for O(1) lookup
-  // Normalize date key to yyyy-MM-dd format (database may return with time component)
-  const appointmentsByDate: Record<string, AppointmentWithRelations[]> = {};
-  for (const appt of appointments) {
-    // Handle both '2026-02-06' and '2026-02-06T00:00:00' formats
-    const key = appt.scheduled_date.split('T')[0];
-    if (!appointmentsByDate[key]) appointmentsByDate[key] = [];
-    appointmentsByDate[key].push(appt);
-  }
+  // Stats
+  const [stats, setStats] = useState<AppointmentStatsData | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  const selectedDayAppointments = appointmentsByDate[selectedDateKey] || [];
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [employeeFilter, setEmployeeFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'day' | 'week'>('day');
+
+  // Client-side filtering
+  const filteredAppointments = useMemo(() => {
+    let filtered = appointments;
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(a => a.status === statusFilter);
+    }
+
+    if (employeeFilter !== 'all') {
+      if (employeeFilter === 'unassigned') {
+        filtered = filtered.filter(a => !a.employee_id);
+      } else {
+        filtered = filtered.filter(a => a.employee_id === employeeFilter);
+      }
+    }
+
+    if (search.trim()) {
+      const term = search.trim().toLowerCase();
+      filtered = filtered.filter(a => {
+        const name = `${a.customer?.first_name || ''} ${a.customer?.last_name || ''}`.toLowerCase();
+        const phone = a.customer?.phone || '';
+        return name.includes(term) || phone.includes(term);
+      });
+    }
+
+    return filtered;
+  }, [appointments, statusFilter, employeeFilter, search]);
+
+  // Group filtered appointments by date for calendar dots and day list
+  const appointmentsByDate: Record<string, AppointmentWithRelations[]> = useMemo(() => {
+    const grouped: Record<string, AppointmentWithRelations[]> = {};
+    for (const appt of filteredAppointments) {
+      const key = appt.scheduled_date.split('T')[0];
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(appt);
+    }
+    return grouped;
+  }, [filteredAppointments]);
+
+  // Filtered appointments for selected day
+  const filteredSelectedDayAppointments = useMemo(() => {
+    if (!selectedDate) return [];
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return filteredAppointments.filter(a => {
+      const d = typeof a.scheduled_date === 'string' ? a.scheduled_date.split('T')[0] : '';
+      return d === dateStr;
+    });
+  }, [filteredAppointments, selectedDate]);
+
+  // Stats fetch
+  async function fetchStats() {
+    setStatsLoading(true);
+    try {
+      const res = await fetch('/api/admin/appointments/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error('Error fetching appointment stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }
 
   const fetchAppointments = useCallback(async (month: Date) => {
     setLoading(true);
 
     if (canViewFullCalendar) {
-      // Full month fetch for calendar view
+      const { startOfMonth, endOfMonth } = await import('date-fns');
       const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
@@ -83,7 +155,6 @@ export default function AppointmentsPage() {
         setAppointments(data as unknown as AppointmentWithRelations[]);
       }
     } else {
-      // Detailer: today only
       const today = format(new Date(), 'yyyy-MM-dd');
 
       const { data, error } = await supabase
@@ -123,6 +194,7 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     fetchAppointments(currentMonth);
+    fetchStats();
   }, [currentMonth, fetchAppointments]);
 
   useEffect(() => {
@@ -147,6 +219,10 @@ export default function AppointmentsPage() {
     setCancelOpen(true);
   }
 
+  function handlePendingClick() {
+    setStatusFilter(prev => prev === 'pending' ? 'all' : 'pending');
+  }
+
   async function handleSave(id: string, data: AppointmentUpdateInput): Promise<boolean> {
     try {
       const payload = {
@@ -169,6 +245,7 @@ export default function AppointmentsPage() {
 
       toast.success('Appointment updated');
       fetchAppointments(currentMonth);
+      fetchStats();
       return true;
     } catch {
       toast.error('Failed to update appointment');
@@ -193,6 +270,7 @@ export default function AppointmentsPage() {
 
       toast.success('Appointment cancelled');
       fetchAppointments(currentMonth);
+      fetchStats();
       return true;
     } catch {
       toast.error('Failed to cancel appointment');
@@ -200,11 +278,17 @@ export default function AppointmentsPage() {
     }
   }
 
-  // Detailer view: today only, no calendar
+  // Detailer view: today only, no calendar — UNCHANGED
   if (!canViewFullCalendar) {
     const today = new Date();
     const todayKey = format(today, 'yyyy-MM-dd');
-    const todayAppointments = appointmentsByDate[todayKey] || [];
+    const allByDate: Record<string, AppointmentWithRelations[]> = {};
+    for (const appt of appointments) {
+      const key = appt.scheduled_date.split('T')[0];
+      if (!allByDate[key]) allByDate[key] = [];
+      allByDate[key].push(appt);
+    }
+    const todayAppointments = allByDate[todayKey] || [];
 
     return (
       <div>
@@ -243,35 +327,169 @@ export default function AppointmentsPage() {
     );
   }
 
+  // Week view data
+  const weekStartDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekEndDate = endOfWeek(new Date(), { weekStartsOn: 1 });
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const weekStart = format(weekStartDate, 'yyyy-MM-dd');
+  const weekEnd = format(weekEndDate, 'yyyy-MM-dd');
+  const weekFilteredAppts = filteredAppointments.filter((a) => {
+    const d = a.scheduled_date.split('T')[0];
+    return d >= weekStart && d <= weekEnd && a.status !== 'cancelled';
+  });
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(weekStartDate, i);
+    const dateStr = format(d, 'yyyy-MM-dd');
+    return {
+      date: d,
+      dateStr,
+      label: format(d, 'EEE M/d'),
+      isToday: dateStr === todayStr,
+      appointments: weekFilteredAppts.filter((a) => a.scheduled_date.split('T')[0] === dateStr),
+    };
+  });
+
   // Full calendar view for super_admin, admin, cashier
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Appointments"
         description={loading ? undefined : `${appointments.length} appointments this month`}
-        action={
-          (role === 'super_admin' || role === 'admin') ? (
-            <div className="flex items-center gap-2">
-              <Link href="/admin/appointments/waitlist">
-                <Button variant="outline" size="sm">
-                  <ClipboardList className="h-4 w-4" />
-                  Waitlist
-                </Button>
-              </Link>
-              <Link href="/admin/appointments/scheduling">
-                <Button variant="outline" size="sm">
-                  <Clock className="h-4 w-4" />
-                  Staff Scheduling
-                </Button>
-              </Link>
-            </div>
-          ) : undefined
-        }
       />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,400px]">
-        {/* Calendar */}
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
+      {/* Stats */}
+      <AppointmentStats
+        today={stats?.today ?? { count: 0, revenue: 0 }}
+        thisWeek={stats?.thisWeek ?? { count: 0, revenue: 0 }}
+        pending={stats?.pending ?? 0}
+        newBookings={stats?.newBookings ?? 0}
+        bookedRevenue={stats?.bookedRevenue ?? 0}
+        activePendingFilter={statusFilter === 'pending'}
+        onPendingClick={handlePendingClick}
+        loading={statsLoading}
+      />
+
+      {/* Filters */}
+      <AppointmentFilters
+        search={search}
+        onSearchChange={setSearch}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        employeeFilter={employeeFilter}
+        onEmployeeChange={setEmployeeFilter}
+        employees={employees}
+      />
+
+      {/* Main content: Schedule (left) + Calendar sidebar (right) */}
+      <div className="grid gap-6 lg:grid-cols-[1fr,340px]">
+        {/* Left: Schedule view with Day/Week tabs */}
+        <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+          {/* Tab bar */}
+          <div className="flex border-b border-gray-200">
+            <button
+              type="button"
+              onClick={() => setActiveTab('day')}
+              className={cn(
+                'px-4 py-2.5 text-sm font-medium transition-colors',
+                activeTab === 'day'
+                  ? 'border-b-2 border-gray-900 text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              Day
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('week')}
+              className={cn(
+                'px-4 py-2.5 text-sm font-medium transition-colors',
+                activeTab === 'week'
+                  ? 'border-b-2 border-gray-900 text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              Week
+            </button>
+          </div>
+
+          {/* Tab content */}
+          <div className="p-4">
+            {activeTab === 'day' ? (
+              loading ? (
+                <div className="flex h-60 items-center justify-center">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                <DayAppointmentsList
+                  selectedDate={selectedDate}
+                  appointments={filteredSelectedDayAppointments}
+                  onSelect={handleAppointmentSelect}
+                />
+              )
+            ) : (
+              /* Week view */
+              loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-7 gap-2">
+                  {weekDays.map((day) => (
+                    <button
+                      key={day.dateStr}
+                      type="button"
+                      onClick={() => {
+                        handleDateSelect(day.date);
+                        setActiveTab('day');
+                      }}
+                      className={cn(
+                        'rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-gray-300 hover:bg-gray-50 cursor-pointer',
+                        day.isToday && 'border-blue-300 bg-blue-50/50'
+                      )}
+                    >
+                      <p className={cn(
+                        'text-xs font-medium text-gray-500',
+                        day.isToday && 'text-blue-700'
+                      )}>
+                        {day.label}
+                      </p>
+                      <p className={cn(
+                        'mt-1 text-lg font-bold tabular-nums text-gray-900',
+                        day.appointments.length === 0 && 'text-gray-300'
+                      )}>
+                        {day.appointments.length}
+                      </p>
+                      {day.appointments.length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          {day.appointments.slice(0, 3).map((appt) => (
+                            <div key={appt.id} className="flex items-center gap-1 truncate">
+                              <span className={cn(
+                                'inline-block h-1.5 w-1.5 shrink-0 rounded-full',
+                                appt.status === 'completed' ? 'bg-green-500' :
+                                appt.status === 'in_progress' ? 'bg-amber-500' :
+                                appt.status === 'confirmed' ? 'bg-blue-500' :
+                                'bg-gray-400'
+                              )} />
+                              <span className="truncate text-[10px] text-gray-600">
+                                {formatTime(appt.scheduled_start_time)} {appt.customer.first_name}
+                              </span>
+                            </div>
+                          ))}
+                          {day.appointments.length > 3 && (
+                            <p className="text-[10px] text-gray-400">+{day.appointments.length - 3} more</p>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Right: Calendar sidebar */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           {loading ? (
             <div className="flex h-80 items-center justify-center">
               <Spinner size="lg" />
@@ -282,97 +500,14 @@ export default function AppointmentsPage() {
               selectedDate={selectedDate}
               appointmentsByDate={appointmentsByDate}
               onMonthChange={handleMonthChange}
-              onDateSelect={handleDateSelect}
+              onDateSelect={(date) => {
+                handleDateSelect(date);
+                setActiveTab('day');
+              }}
             />
           )}
         </div>
-
-        {/* Day detail panel */}
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <DayAppointmentsList
-            selectedDate={selectedDate}
-            appointments={selectedDayAppointments}
-            onSelect={handleAppointmentSelect}
-          />
-        </div>
       </div>
-
-      {/* Week at a Glance */}
-      {(() => {
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const weekStartDate = startOfWeek(new Date(), { weekStartsOn: 1 });
-        const weekEndDate = endOfWeek(new Date(), { weekStartsOn: 1 });
-        const weekStart = format(weekStartDate, 'yyyy-MM-dd');
-        const weekEnd = format(weekEndDate, 'yyyy-MM-dd');
-        const weekAppts = appointments.filter((a) => {
-          const d = a.scheduled_date.split('T')[0];
-          return d >= weekStart && d <= weekEnd && a.status !== 'cancelled';
-        });
-        const weekDays = Array.from({ length: 7 }, (_, i) => {
-          const d = addDays(weekStartDate, i);
-          const dateStr = format(d, 'yyyy-MM-dd');
-          return {
-            date: dateStr,
-            label: format(d, 'EEE M/d'),
-            isToday: dateStr === today,
-            appointments: weekAppts.filter((a) => a.scheduled_date.split('T')[0] === dateStr),
-          };
-        });
-        return (
-          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">Week at a Glance</h3>
-            {loading ? (
-              <div className="mt-4 flex items-center justify-center py-8">
-                <Spinner size="lg" />
-              </div>
-            ) : (
-              <div className="mt-3 grid grid-cols-7 gap-2">
-                {weekDays.map((day) => (
-                  <button
-                    key={day.date}
-                    type="button"
-                    onClick={() => handleDateSelect(new Date(day.date + 'T12:00:00'))}
-                    className={`rounded-lg border p-2 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/50 ${
-                      day.isToday
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <p className={`text-xs font-medium ${day.isToday ? 'text-blue-700' : 'text-gray-500'}`}>
-                      {day.label}
-                    </p>
-                    <p className={`mt-1 text-lg font-bold ${
-                      day.appointments.length === 0 ? 'text-gray-300' : day.isToday ? 'text-blue-700' : 'text-gray-900'
-                    }`}>
-                      {day.appointments.length}
-                    </p>
-                    {day.appointments.length > 0 && (
-                      <div className="mt-1 space-y-0.5">
-                        {day.appointments.slice(0, 3).map((appt) => (
-                          <div key={appt.id} className="flex items-center gap-1 truncate">
-                            <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-                              appt.status === 'completed' ? 'bg-green-500' :
-                              appt.status === 'in_progress' ? 'bg-amber-500' :
-                              appt.status === 'confirmed' ? 'bg-blue-500' :
-                              'bg-gray-400'
-                            }`} />
-                            <span className="truncate text-[10px] text-gray-600">
-                              {formatTime(appt.scheduled_start_time)} {appt.customer.first_name}
-                            </span>
-                          </div>
-                        ))}
-                        {day.appointments.length > 3 && (
-                          <p className="text-[10px] text-gray-400">+{day.appointments.length - 3} more</p>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Detail + Edit dialog */}
       <AppointmentDetailDialog

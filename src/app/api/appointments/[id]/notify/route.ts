@@ -4,6 +4,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
+import { sendSms } from '@/lib/utils/sms';
 
 export async function POST(
   request: NextRequest,
@@ -24,6 +25,7 @@ export async function POST(
         *,
         customer:customers(id, first_name, last_name, phone, email),
         vehicle:vehicles(id, year, make, model),
+        employee:employees(id, first_name, last_name, phone),
         services:appointment_services(
           price_at_booking,
           tier_name,
@@ -54,6 +56,10 @@ export async function POST(
     } | null;
     const vehicleStr = vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'N/A';
 
+    const employee = appointment.employee as {
+      id: string; first_name: string; last_name: string; phone: string | null;
+    } | null;
+
     const services = (appointment.services as {
       price_at_booking: number;
       tier_name: string | null;
@@ -70,6 +76,7 @@ export async function POST(
     const period = h >= 12 ? 'PM' : 'AM';
     const displayHour = h % 12 || 12;
     const displayTime = `${displayHour}:${m.toString().padStart(2, '0')} ${period}`;
+    const serviceNames = services.map(s => s.service?.name || 'Service').join(', ');
 
     const sentVia: string[] = [];
     const errors: string[] = [];
@@ -253,6 +260,26 @@ Thank you for choosing ${business.name}!`;
             errors.push('Failed to send SMS');
           }
         }
+      }
+    }
+
+    // --- Notify assigned detailer via SMS (non-blocking) ---
+    if (appointment.employee_id && employee?.phone) {
+      try {
+        const detailerBody =
+          `New job assigned: ${serviceNames}` +
+          (vehicle ? ` – ${vehicleStr}` : '') +
+          `\n${dateStr} at ${displayTime}` +
+          (appointment.mobile_address ? `\n${appointment.mobile_address}` : '') +
+          `\nTotal: ${formatCurrency(appointment.total_amount)}`;
+        const smsResult = await sendSms(employee.phone, detailerBody);
+        if (smsResult.success) {
+          console.log(`Detailer SMS sent to ${employee.first_name} ${employee.last_name}`);
+        } else {
+          console.error(`Detailer SMS failed for ${employee.first_name}:`, smsResult.error);
+        }
+      } catch (detailerErr) {
+        console.error('Detailer SMS error (non-blocking):', detailerErr);
       }
     }
 
