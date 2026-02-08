@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { getBusinessInfo } from '@/lib/data/business';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
+import { createShortLink } from '@/lib/utils/short-link';
 
 interface QuoteCustomer {
   id: string;
@@ -65,7 +66,9 @@ export async function sendQuote(
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const quoteLink = `${appUrl}/quote/${quote.access_token}`;
-  const shortLink = `${appUrl}/q/${quote.access_token}`;
+
+  // Generate short link for SMS (falls back to full URL on failure)
+  const shortLink = await createShortLink(`${appUrl}/quote/${quote.access_token}`);
 
   // Update sent_at (and status to 'sent' only if currently draft)
   const updatePayload: Record<string, unknown> = {
