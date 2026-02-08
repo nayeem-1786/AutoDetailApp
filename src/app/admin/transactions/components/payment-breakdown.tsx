@@ -25,6 +25,7 @@ const METHOD_DOT_COLORS: Record<string, string> = {
 };
 
 function formatMethodName(method: string): string {
+  if (!method) return 'Other';
   switch (method) {
     case 'card':
       return 'Card';

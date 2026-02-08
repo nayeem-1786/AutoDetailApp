@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Plus, Tag, X, Check, ChevronDown, Tags, Minus } from 'lucide-react';
+import { CustomerStats } from './components/customer-stats';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BulkAction } from '@/components/ui/data-table';
 
@@ -350,7 +351,7 @@ export default function CustomersPage() {
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
       const [custRes, quotesRes, apptsRes] = await Promise.all([
-        supabase.from('customers').select('*').order('first_name'),
+        supabase.from('customers').select('*').order('first_name').limit(5000),
         // Open quotes: anything not yet accepted, converted, or expired
         supabase
           .from('quotes')
@@ -388,6 +389,7 @@ export default function CustomersPage() {
       setLoading(false);
     }
     load();
+    fetchStats();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
@@ -466,32 +468,98 @@ export default function CustomersPage() {
     return result;
   }, [customers, search, sortBy, tagFilters, customerTypeFilter, visitStatusFilter, activityFilter, openQuoteCustomerIds, pendingApptCustomerIds]);
 
+  interface CustomerStatsData {
+    total: number;
+    newThisMonth: number;
+    repeatCount: number;
+    repeatRate: number;
+    lifetimeRevenue: number;
+    avgPerCustomer: number;
+    atRiskCount: number;
+    uncategorizedCount: number;
+  }
+
+  const [stats, setStats] = useState<CustomerStatsData | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  async function fetchStats() {
+    setStatsLoading(true);
+    try {
+      const res = await fetch('/api/admin/customers/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error('Error fetching customer stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }
+
+  function handleAtRiskClick() {
+    setVisitStatusFilter(prev => prev === 'inactive' ? 'all' : 'inactive');
+  }
+
+  async function handleToggleCustomerType(id: string, current: Customer['customer_type']) {
+    const next: Customer['customer_type'] = !current ? 'enthusiast' : current === 'enthusiast' ? 'professional' : null;
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, customer_type: next } : c));
+    const { error } = await supabase.from('customers').update({ customer_type: next }).eq('id', id);
+    if (error) {
+      console.error('Error updating customer type:', error);
+      setCustomers(prev => prev.map(c => c.id === id ? { ...c, customer_type: current } : c));
+    }
+  }
+
+  function handleUncategorizedClick() {
+    setCustomerTypeFilter(prev => prev === 'unset' ? 'all' : 'unset');
+  }
+
   const columns: ColumnDef<Customer, unknown>[] = [
     {
       id: 'name',
       header: 'Name',
-      size: 220,
+      size: 180,
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <button
-            className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
-            onClick={() => router.push(`/admin/customers/${row.original.id}`)}
-          >
-            {row.original.first_name} {row.original.last_name}
-          </button>
-          {row.original.customer_type && (
-            <Badge variant={row.original.customer_type === 'professional' ? 'info' : 'default'} className="text-[10px] px-1.5 py-0">
-              {row.original.customer_type === 'professional' ? 'Pro' : 'Enth'}
-            </Badge>
-          )}
-        </div>
+        <button
+          className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
+          onClick={() => router.push(`/admin/customers/${row.original.id}`)}
+        >
+          {row.original.first_name} {row.original.last_name}
+        </button>
       ),
+    },
+    {
+      id: 'type',
+      header: 'Type',
+      size: 90,
+      cell: ({ row }) => {
+        const t = row.original.customer_type;
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleCustomerType(row.original.id, t);
+            }}
+            className="cursor-pointer"
+            title="Click to change type"
+          >
+            <Badge
+              variant={t === 'professional' ? 'info' : t === 'enthusiast' ? 'success' : 'secondary'}
+              className="text-[10px] px-1.5 py-0 hover:opacity-80"
+            >
+              {t === 'professional' ? 'Professional' : t === 'enthusiast' ? 'Enthusiast' : 'Unknown'}
+            </Badge>
+          </button>
+        );
+      },
     },
     {
       id: 'phone',
       header: 'Mobile',
-      size: 160,
+      size: 140,
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">
           {row.original.phone ? formatPhone(row.original.phone) : '--'}
@@ -568,6 +636,22 @@ export default function CustomersPage() {
             Add Customer
           </Button>
         }
+      />
+
+      <CustomerStats
+        total={stats?.total ?? 0}
+        newThisMonth={stats?.newThisMonth ?? 0}
+        repeatCount={stats?.repeatCount ?? 0}
+        repeatRate={stats?.repeatRate ?? 0}
+        lifetimeRevenue={stats?.lifetimeRevenue ?? 0}
+        avgPerCustomer={stats?.avgPerCustomer ?? 0}
+        atRiskCount={stats?.atRiskCount ?? 0}
+        uncategorizedCount={stats?.uncategorizedCount ?? 0}
+        activeAtRiskFilter={visitStatusFilter === 'inactive'}
+        activeUncategorizedFilter={customerTypeFilter === 'unset'}
+        onAtRiskClick={handleAtRiskClick}
+        onUncategorizedClick={handleUncategorizedClick}
+        loading={statsLoading}
       />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

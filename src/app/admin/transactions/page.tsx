@@ -877,15 +877,15 @@ export default function AdminTransactionsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Receipt #</th>
-                      <th className="px-4 py-3">Customer</th>
-                      <th className="px-4 py-3">Services</th>
-                      <th className="px-4 py-3">Employee</th>
-                      <th className="px-4 py-3">Method</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Total</th>
-                      <th className="px-4 py-3 w-10"></th>
+                      <th className="px-3 py-3 w-[72px]">Date</th>
+                      <th className="px-3 py-3 w-[72px]">Receipt #</th>
+                      <th className="px-3 py-3 w-[144px]">Customer</th>
+                      <th className="px-3 py-3">Services</th>
+                      <th className="px-3 py-3 w-[100px]">Employee</th>
+                      <th className="px-3 py-3 w-[70px]">Method</th>
+                      <th className="px-3 py-3 w-[90px]">Status</th>
+                      <th className="px-3 py-3 w-[80px] text-right">Total</th>
+                      <th className="px-2 py-3 w-8"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -957,13 +957,13 @@ function TransactionTableRow({
         onClick={onToggle}
         className="cursor-pointer transition-colors hover:bg-gray-50"
       >
-        <td className="whitespace-nowrap px-4 py-3 text-gray-600" title={formatDateTime(tx.transaction_date)}>
+        <td className="whitespace-nowrap px-3 py-3 text-gray-600" title={formatDateTime(tx.transaction_date)}>
           {formatRelativeDate(tx.transaction_date)}
         </td>
-        <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
+        <td className="whitespace-nowrap px-3 py-3 font-medium text-gray-900">
           {tx.receipt_number ?? '---'}
         </td>
-        <td className="whitespace-nowrap px-4 py-3">
+        <td className="px-3 py-3 max-w-[144px] truncate">
           {tx.customer ? (
             <a
               href={`/admin/customers/${tx.customer.id}`}
@@ -976,37 +976,32 @@ function TransactionTableRow({
             <span className="text-gray-600">Walk-in</span>
           )}
         </td>
-        <td className="max-w-[200px] truncate px-4 py-3 text-sm text-gray-600" title={
-          tx.items?.map((i: { item_name: string }) => i.item_name).join(', ') || ''
-        }>
+        <td className="px-3 py-3 text-sm text-gray-600">
           {tx.items && tx.items.length > 0 ? (
-            <>
-              {tx.items.slice(0, 2).map((i: { item_name: string }) => i.item_name).join(', ')}
-              {tx.items.length > 2 && <span className="text-gray-400"> +{tx.items.length - 2}</span>}
-            </>
+            tx.items.map((i: { item_name: string }) => i.item_name).join(', ')
           ) : (
             <span className="text-gray-400">--</span>
           )}
         </td>
-        <td className="whitespace-nowrap px-4 py-3">
+        <td className="px-3 py-3 max-w-[100px] truncate">
           {tx.employee ? (
             <a
               href={`/admin/staff/${tx.employee.id}`}
               onClick={(e) => e.stopPropagation()}
               className="text-blue-600 hover:text-blue-800 hover:underline"
             >
-              {tx.employee.first_name} {tx.employee.last_name}
+              {tx.employee.first_name}
             </a>
           ) : (
             <span className="text-gray-600">---</span>
           )}
         </td>
-        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+        <td className="whitespace-nowrap px-3 py-3 text-gray-600">
           {tx.payment_method
             ? tx.payment_method.charAt(0).toUpperCase() + tx.payment_method.slice(1)
             : '---'}
         </td>
-        <td className="whitespace-nowrap px-4 py-3">
+        <td className="whitespace-nowrap px-3 py-3">
           <span
             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
               STATUS_BADGE_CLASSES[tx.status] ?? 'bg-gray-100 text-gray-500'
@@ -1015,10 +1010,10 @@ function TransactionTableRow({
             {TRANSACTION_STATUS_LABELS[tx.status] ?? tx.status}
           </span>
         </td>
-        <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900">
+        <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-gray-900">
           {formatCurrency(tx.total_amount)}
         </td>
-        <td className="whitespace-nowrap px-4 py-3">
+        <td className="whitespace-nowrap px-2 py-3">
           <button
             onClick={(e) => {
               e.stopPropagation();

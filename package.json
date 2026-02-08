@@ -14,7 +14,7 @@
     "@stripe/stripe-js": "^8.7.0",
     "@stripe/terminal-js": "^0.26.0",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.93.3",
+    "@supabase/supabase-js": "^2.95.3",
     "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",
