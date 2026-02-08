@@ -1760,7 +1760,7 @@ export default function CustomerProfilePage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Quote History</CardTitle>
-                      <Link href={`/admin/quotes/new?customer=${id}`}>
+                      <Link href={`/pos/quotes?mode=builder&customer=${id}`}>
                         <Button size="sm">
                           <Plus className="h-4 w-4" />
                           New Quote

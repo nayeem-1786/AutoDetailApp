@@ -88,7 +88,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 
 | Task | Type | Priority |
 |------|------|----------|
-| Fix stale link in customer detail page (`/admin/quotes/new?customer=${id}` → POS deep-link) | Quick fix | High |
 | POS session caching bug (multi-tab stale state, expired session on hard refresh) | Bug fix | Medium |
 | Admin Settings: Role Permissions UI (`/admin/settings/roles-permissions`) | Feature | Medium |
 | Merge duplicate customers (detect and consolidate) | Feature | Medium |
