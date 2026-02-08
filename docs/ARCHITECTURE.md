@@ -16,8 +16,9 @@
 6. [State Management Patterns](#6-state-management-patterns)
 7. [API Route Patterns](#7-api-route-patterns)
 8. [Page Architecture Patterns](#8-page-architecture-patterns)
-9. [Known Duplication Debt](#9-known-duplication-debt)
-10. [Rules for Adding New Code](#10-rules-for-adding-new-code)
+9. [Quote Service Layer](#9-quote-service-layer-srclibquotes)
+10. [Known Duplication Debt](#10-known-duplication-debt)
+11. [Rules for Adding New Code](#11-rules-for-adding-new-code)
 
 ---
 
@@ -416,23 +417,41 @@ See `CONVENTIONS.md` for the full inline edit code pattern.
 
 ---
 
-## 9. Known Duplication Debt
+## 9. Quote Service Layer (`src/lib/quotes/`)
 
-These are areas where code was duplicated between admin and POS. The fix is to extract shared services.
+Shared business logic for quotes, consumed by both admin and POS API routes. Each function takes an authenticated `SupabaseClient` as its first parameter — auth stays in the route, logic lives here.
 
-| What's Duplicated | Admin Location | POS Location | Fix |
-|-------------------|---------------|--------------|-----|
-| Quote CRUD logic | `src/app/api/quotes/` (inline) | `src/app/api/pos/quotes/` (inline) | Extract to `src/lib/quotes/quote-service.ts` |
-| Quote send logic | `src/app/api/quotes/[id]/send/` | `src/app/api/pos/quotes/[id]/send/` | Extract to `src/lib/quotes/send-service.ts` |
-| Quote convert logic | `src/app/api/quotes/[id]/convert/` | `src/app/api/pos/quotes/[id]/convert/` | Extract to `src/lib/quotes/convert-service.ts` |
-| Timeline rendering | Admin quote detail (inline JSX) | POS quote detail (inline JSX) | Extract to `src/components/quotes/quote-timeline.tsx` |
-| Currency/date formatters | `src/app/pos/components/quotes/quote-helpers.ts` | `src/lib/utils/format.ts` | Remove POS helpers, use shared `format.ts` |
+| File | Functions | Purpose |
+|------|-----------|---------|
+| `quote-service.ts` | `listQuotes()`, `createQuote()`, `getQuoteById()`, `updateQuote()`, `softDeleteQuote()` | All CRUD operations, tax calculation, access token generation, item management |
+| `send-service.ts` | `sendQuote()` | Email (Mailgun) + SMS (Twilio MMS) delivery, email HTML/text template generation, communication record logging, status update, webhook dispatch |
+| `convert-service.ts` | `convertQuote()` | Quote-to-appointment conversion, appointment_services creation, detailer auto-assignment, status update, webhook dispatch |
 
-See `QUOTES_AUDIT.md` Part 9 for the full shared service layer proposal.
+**Error handling:** `quote-service.ts` exports `QuoteNotFoundError` and `QuoteDraftOnlyError` classes. API routes catch these to return the correct HTTP status codes (404, 400).
+
+**Usage pattern:**
+```typescript
+// In API route — auth stays here, logic delegates to service
+const supabase = createAdminClient();
+const result = await sendQuote(supabase, id, method);
+if (!result.success) {
+  return NextResponse.json({ error: result.error }, { status: result.status });
+}
+return NextResponse.json(result);
+```
 
 ---
 
-## 10. Rules for Adding New Code
+## 10. Known Duplication Debt
+
+| What's Duplicated | Admin Location | POS Location | Fix |
+|-------------------|---------------|--------------|-----|
+| Timeline rendering | Admin quote detail (inline JSX) | POS quote detail (inline JSX) | Extract to `src/components/quotes/quote-timeline.tsx` |
+| Currency/date formatters | `src/app/pos/components/quotes/quote-helpers.ts` | `src/lib/utils/format.ts` | Remove POS helpers, use shared `format.ts` |
+
+---
+
+## 11. Rules for Adding New Code
 
 ### Before Writing ANY Code
 

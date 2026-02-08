@@ -487,6 +487,13 @@ export const updateQuoteSchema = z.object({
   status: z.enum(['draft', 'sent', 'viewed', 'accepted', 'expired', 'converted']).optional(),
 });
 
+export const convertSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+  time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:MM)'),
+  duration_minutes: z.coerce.number().int().min(1, 'Duration must be at least 1 minute'),
+  employee_id: z.string().uuid().optional().nullable(),
+});
+
 // ---------------------------------------------------------------------------
 // Waitlist schemas
 // ---------------------------------------------------------------------------
@@ -593,6 +600,7 @@ export type CashDrawerCloseInput = z.infer<typeof cashDrawerCloseSchema>;
 export type QuoteItemInput = z.infer<typeof quoteItemSchema>;
 export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
 export type UpdateQuoteInput = z.infer<typeof updateQuoteSchema>;
+export type ConvertQuoteInput = z.infer<typeof convertSchema>;
 export type WaitlistEntryInput = z.infer<typeof waitlistEntrySchema>;
 export type EmployeeScheduleInput = z.infer<typeof employeeScheduleSchema>;
 export type EmployeeWeeklyScheduleInput = z.infer<typeof employeeWeeklyScheduleSchema>;
