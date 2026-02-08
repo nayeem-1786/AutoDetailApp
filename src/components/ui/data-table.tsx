@@ -163,64 +163,68 @@ function DataTable<TData>({
 
   return (
     <div className="space-y-4">
-      {exportFilename && (
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={handleExportCsv}>
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-        </div>
-      )}
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
-                const colSize = header.column.columnDef.size;
-                return (
-                <TableHead key={header.id} style={colSize ? { width: colSize } : undefined}>
-                  {header.isPlaceholder ? null : (
-                    <div
-                      className={cn(
-                        'flex items-center gap-1',
-                        header.column.getCanSort() && 'cursor-pointer select-none'
-                      )}
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {header.column.getCanSort() && (
-                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                      )}
-                    </div>
-                  )}
-                </TableHead>
-                );
-              })}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
-              {row.getVisibleCells().map((cell) => {
-                const colSize = cell.column.columnDef.size;
-                return (
-                <TableCell key={cell.id} style={colSize ? { width: colSize } : undefined}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-                );
-              })}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {table.getPageCount() > 1 && (
-        <Pagination
-          currentPage={table.getState().pagination.pageIndex + 1}
-          totalPages={table.getPageCount()}
-          onPageChange={(page) => table.setPageIndex(page - 1)}
-        />
-      )}
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        {exportFilename && (
+          <div className="flex justify-end border-b border-gray-200 px-4 py-3">
+            <Button variant="outline" size="sm" onClick={handleExportCsv}>
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          </div>
+        )}
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const colSize = header.column.columnDef.size;
+                  return (
+                  <TableHead key={header.id} style={colSize ? { width: colSize } : undefined}>
+                    {header.isPlaceholder ? null : (
+                      <div
+                        className={cn(
+                          'flex items-center gap-1',
+                          header.column.getCanSort() && 'cursor-pointer select-none'
+                        )}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.column.getCanSort() && (
+                          <ArrowUpDown className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    )}
+                  </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => {
+                  const colSize = cell.column.columnDef.size;
+                  return (
+                  <TableCell key={cell.id} style={colSize ? { width: colSize } : undefined}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {table.getPageCount() > 1 && (
+          <div className="border-t border-gray-200 px-4 py-3">
+            <Pagination
+              currentPage={table.getState().pagination.pageIndex + 1}
+              totalPages={table.getPageCount()}
+              onPageChange={(page) => table.setPageIndex(page - 1)}
+            />
+          </div>
+        )}
+      </div>
       {bulkActions && bulkActions.length > 0 && selectedRows.length > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
           <div className="flex items-center gap-3 rounded-lg bg-gray-900 px-4 py-3 text-white shadow-lg">
