@@ -12,7 +12,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Tag, X, Check, ChevronDown, Tags, Minus } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Tag, X, Check, ChevronDown, Tags, Minus, Users } from 'lucide-react';
 import { CustomerStats } from './components/customer-stats';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BulkAction } from '@/components/ui/data-table';
@@ -631,10 +632,18 @@ export default function CustomersPage() {
         title="Customers"
         description={`${customers.length} customers`}
         action={
-          <Button onClick={() => router.push('/admin/customers/new')}>
-            <Plus className="h-4 w-4" />
-            Add Customer
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/admin/customers/duplicates">
+              <Button variant="outline" size="sm">
+                <Users className="h-4 w-4" />
+                Review Duplicates
+              </Button>
+            </Link>
+            <Button onClick={() => router.push('/admin/customers/new')}>
+              <Plus className="h-4 w-4" />
+              Add Customer
+            </Button>
+          </div>
         }
       />
 

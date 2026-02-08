@@ -137,7 +137,7 @@ export default function MigrationPage() {
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
-                    {getStepIcon(isCurrent && stepState.status === 'pending' ? 'in_progress' : stepState.status)}
+                    {getStepIcon(stepState.status)}
                     <span
                       className={`text-xs font-medium ${
                         isCurrent ? 'text-gray-900' : 'text-gray-500'
