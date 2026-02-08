@@ -89,8 +89,8 @@ export default function DuplicateCustomersPage() {
     });
 
     if (error) {
-      console.error('Error merging customers:', error);
-      toast.error('Failed to merge customers');
+      console.error('Error merging customers:', JSON.stringify(error, null, 2));
+      toast.error(error.message || 'Failed to merge customers');
     } else {
       const keepCustomer = group.customers.find((c) => c.id === keepId);
       const name = keepCustomer
@@ -123,8 +123,8 @@ export default function DuplicateCustomersPage() {
       });
 
       if (error) {
-        console.error(`Error merging group ${group.group_id}:`, error);
-        toast.error(`Failed to merge group: ${group.match_reason}`);
+        console.error(`Error merging group ${group.group_id}:`, JSON.stringify(error, null, 2));
+        toast.error(error.message || `Failed to merge group: ${group.match_reason}`);
         break;
       }
 

@@ -1,5 +1,4 @@
--- Merge duplicate customers: reassign all related records to keep_id,
--- recompute stats, and delete merged records. Atomic transaction.
+-- Fix: Add SECURITY DEFINER to merge_customers so it can bypass RLS
 
 CREATE OR REPLACE FUNCTION merge_customers(keep_id UUID, merge_ids UUID[])
 RETURNS json

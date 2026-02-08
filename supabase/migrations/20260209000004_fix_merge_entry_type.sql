@@ -1,5 +1,5 @@
--- Merge duplicate customers: reassign all related records to keep_id,
--- recompute stats, and delete merged records. Atomic transaction.
+-- Fix: loyalty_ledger uses "action" not "entry_type", "points_change" not "points"
+-- points_change is already signed (positive=earn, negative=redeem), so just SUM it
 
 CREATE OR REPLACE FUNCTION merge_customers(keep_id UUID, merge_ids UUID[])
 RETURNS json
@@ -103,12 +103,7 @@ BEGIN
       WHERE customer_id = keep_id AND status = 'completed'
     ),
     loyalty_points_balance = (
-      SELECT COALESCE(SUM(
-        CASE WHEN entry_type IN ('earned', 'adjustment') THEN points
-             WHEN entry_type = 'redeemed' THEN -points
-             ELSE 0
-        END
-      ), 0)
+      SELECT COALESCE(SUM(points_change), 0)
       FROM loyalty_ledger
       WHERE customer_id = keep_id
     ),
