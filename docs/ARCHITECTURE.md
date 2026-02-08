@@ -41,7 +41,7 @@ src/
 │   │   └── appointments/               # Calendar view, waitlist
 │   │
 │   ├── api/                            # REST API routes
-│   │   ├── admin/                      # Admin-specific (current-ip, customers/search)
+│   │   ├── admin/                      # Admin-specific (current-ip, customers/search, quotes oversight)
 │   │   ├── marketing/coupons/          # Coupon CRUD
 │   │   ├── quotes/                     # Quote CRUD, send, convert, activities, stats
 │   │   ├── pos/                        # POS-specific routes (HMAC auth)
@@ -249,6 +249,7 @@ Located in `src/components/ui/`. These are the building blocks for ALL pages.
 | `SendMethodDialog` | Unified email/SMS/both send dialog | Quotes, receipts, notifications |
 | `LogActivityDialog` | Quote follow-up activity logger | Admin quotes, POS quotes |
 | `Skeleton` | Loading placeholder | Data-loading views |
+| `SlideOver` | Right slide-in panel (md/lg/xl/2xl widths) | Quote detail preview, detail panels |
 
 **Rules:**
 - NEVER create a new button, badge, input, or dialog component. Use the existing ones.
@@ -423,7 +424,7 @@ Shared business logic for quotes, consumed by both admin and POS API routes. Eac
 
 | File | Functions | Purpose |
 |------|-----------|---------|
-| `quote-service.ts` | `listQuotes()`, `createQuote()`, `getQuoteById()`, `updateQuote()`, `softDeleteQuote()` | All CRUD operations, tax calculation, access token generation, item management |
+| `quote-service.ts` | `listQuotes()`, `createQuote()`, `getQuoteById()`, `updateQuote()`, `softDeleteQuote()`, `getQuotePipelineStats()`, `getQuoteMetrics()`, `getQuoteSentCounts()`, `listQuotesAdmin()` | CRUD operations, tax calculation, access token generation, item management, pipeline analytics, admin oversight queries |
 | `send-service.ts` | `sendQuote()` | Email (Mailgun) + SMS (Twilio MMS) delivery, email HTML/text template generation, communication record logging, status update, webhook dispatch |
 | `convert-service.ts` | `convertQuote()` | Quote-to-appointment conversion, appointment_services creation, detailer auto-assignment, status update, webhook dispatch |
 

@@ -358,6 +358,236 @@ export async function softDeleteQuote(
 }
 
 // ---------------------------------------------------------------------------
+// getQuotePipelineStats
+// ---------------------------------------------------------------------------
+
+interface PipelineStat {
+  status: string;
+  count: number;
+  totalAmount: number;
+}
+
+export async function getQuotePipelineStats(
+  supabase: SupabaseClient
+): Promise<PipelineStat[]> {
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('status, total_amount')
+    .is('deleted_at', null);
+
+  if (error) {
+    console.error('Error fetching pipeline stats:', error.message);
+    throw new Error('Failed to fetch pipeline stats');
+  }
+
+  const grouped = new Map<string, { count: number; totalAmount: number }>();
+
+  for (const row of data || []) {
+    const existing = grouped.get(row.status);
+    if (existing) {
+      existing.count += 1;
+      existing.totalAmount += row.total_amount ?? 0;
+    } else {
+      grouped.set(row.status, { count: 1, totalAmount: row.total_amount ?? 0 });
+    }
+  }
+
+  return Array.from(grouped.entries()).map(([status, agg]) => ({
+    status,
+    count: agg.count,
+    totalAmount: Math.round(agg.totalAmount * 100) / 100,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getQuoteMetrics
+// ---------------------------------------------------------------------------
+
+interface QuoteMetrics {
+  averageValue: number;
+  conversionRate: number;
+  avgDaysToConvert: number;
+  totalQuotes: number;
+}
+
+export async function getQuoteMetrics(
+  supabase: SupabaseClient
+): Promise<QuoteMetrics> {
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('status, total_amount, created_at, updated_at')
+    .is('deleted_at', null);
+
+  if (error) {
+    console.error('Error fetching quote metrics:', error.message);
+    throw new Error('Failed to fetch quote metrics');
+  }
+
+  const quotes = data || [];
+  const totalQuotes = quotes.length;
+
+  if (totalQuotes === 0) {
+    return { averageValue: 0, conversionRate: 0, avgDaysToConvert: 0, totalQuotes: 0 };
+  }
+
+  // Average value
+  const totalAmount = quotes.reduce((sum, q) => sum + (q.total_amount ?? 0), 0);
+  const averageValue = Math.round((totalAmount / totalQuotes) * 100) / 100;
+
+  // Conversion rate: (accepted + converted) / (total - drafts) * 100
+  const draftCount = quotes.filter((q) => q.status === 'draft').length;
+  const acceptedOrConverted = quotes.filter(
+    (q) => q.status === 'accepted' || q.status === 'converted'
+  ).length;
+  const denominator = totalQuotes - draftCount;
+  const conversionRate =
+    denominator > 0
+      ? Math.round((acceptedOrConverted / denominator) * 100 * 100) / 100
+      : 0;
+
+  // Avg days to convert
+  const convertedQuotes = quotes.filter((q) => q.status === 'converted');
+  let avgDaysToConvert = 0;
+  if (convertedQuotes.length > 0) {
+    const totalDays = convertedQuotes.reduce((sum, q) => {
+      const created = new Date(q.created_at).getTime();
+      const updated = new Date(q.updated_at).getTime();
+      return sum + (updated - created) / (1000 * 60 * 60 * 24);
+    }, 0);
+    avgDaysToConvert = Math.round((totalDays / convertedQuotes.length) * 100) / 100;
+  }
+
+  return { averageValue, conversionRate, avgDaysToConvert, totalQuotes };
+}
+
+// ---------------------------------------------------------------------------
+// getQuoteSentCounts
+// ---------------------------------------------------------------------------
+
+export async function getQuoteSentCounts(
+  supabase: SupabaseClient,
+  quoteIds: string[]
+): Promise<Record<string, number>> {
+  if (quoteIds.length === 0) {
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from('quote_communications')
+    .select('quote_id')
+    .in('quote_id', quoteIds);
+
+  if (error) {
+    console.error('Error fetching quote sent counts:', error.message);
+    throw new Error('Failed to fetch quote sent counts');
+  }
+
+  const counts: Record<string, number> = {};
+  for (const row of data || []) {
+    counts[row.quote_id] = (counts[row.quote_id] || 0) + 1;
+  }
+
+  return counts;
+}
+
+// ---------------------------------------------------------------------------
+// listQuotesAdmin
+// ---------------------------------------------------------------------------
+
+interface ListQuotesAdminOptions {
+  status?: string | null;
+  search?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  createdBy?: string | null;
+  page?: number;
+  limit?: number;
+}
+
+interface ListQuotesAdminResult {
+  quotes: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function listQuotesAdmin(
+  supabase: SupabaseClient,
+  options: ListQuotesAdminOptions = {}
+): Promise<ListQuotesAdminResult> {
+  const {
+    status,
+    search,
+    dateFrom,
+    dateTo,
+    createdBy,
+    page = 1,
+    limit = 20,
+  } = options;
+  const offset = (page - 1) * limit;
+
+  let query = supabase
+    .from('quotes')
+    .select(QUOTE_LIST_SELECT, { count: 'exact' })
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  if (dateFrom) {
+    query = query.gte('created_at', dateFrom);
+  }
+
+  if (dateTo) {
+    query = query.lte('created_at', `${dateTo}T23:59:59`);
+  }
+
+  if (createdBy) {
+    query = query.eq('created_by', createdBy);
+  }
+
+  if (search) {
+    query = query.or(`quote_number.ilike.%${search}%`);
+  }
+
+  const { data: quotes, error, count } = await query;
+
+  if (error) {
+    console.error('Error fetching admin quotes:', error.message);
+    throw new Error('Failed to fetch quotes');
+  }
+
+  // Post-fetch filter for customer name search (same pattern as listQuotes)
+  let filtered = quotes || [];
+  if (search && filtered.length > 0) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter((quote) => {
+      const matchesNumber = quote.quote_number?.toLowerCase().includes(q);
+      const cust = quote.customer as {
+        first_name?: string;
+        last_name?: string;
+      } | null;
+      const matchesName = cust
+        ? `${cust.first_name ?? ''} ${cust.last_name ?? ''}`
+            .toLowerCase()
+            .includes(q)
+        : false;
+      return matchesNumber || matchesName;
+    });
+  }
+
+  return {
+    quotes: filtered,
+    total: search ? filtered.length : (count ?? 0),
+    page,
+    limit,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Error classes for typed error handling in routes
 // ---------------------------------------------------------------------------
 

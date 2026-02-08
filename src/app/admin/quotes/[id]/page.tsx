@@ -1,22 +1,18 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { Quote, QuoteItem, QuoteStatus, Customer } from '@/lib/supabase/types';
+import type { Quote, QuoteItem, Customer } from '@/lib/supabase/types';
 import { formatCurrency, formatDate, formatDateTime, formatPhone } from '@/lib/utils/format';
-import { QUOTE_STATUS_LABELS } from '@/lib/utils/constants';
+import { QUOTE_STATUS_LABELS, QUOTE_STATUS_BADGE_VARIANT } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Send, ArrowRightCircle, Car, Mail, MessageSquare, CheckCircle, AlertCircle, User, Calendar, DollarSign, Award, Clock, ExternalLink, Trash2 } from 'lucide-react';
-import { QuoteBookDialog } from '@/components/quotes/quote-book-dialog';
-import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ArrowLeft, Car, Mail, MessageSquare, User, Calendar, DollarSign, Award, Clock, ExternalLink, Eye } from 'lucide-react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -24,14 +20,6 @@ type QuoteWithRelations = Quote & {
   items?: QuoteItem[];
 };
 
-const STATUS_BADGE_VARIANT: Record<QuoteStatus, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
-  draft: 'default',
-  sent: 'info',
-  viewed: 'warning',
-  accepted: 'success',
-  expired: 'destructive',
-  converted: 'secondary',
-};
 
 export default function QuoteDetailPage() {
   const router = useRouter();
@@ -40,18 +28,6 @@ export default function QuoteDetailPage() {
 
   const [quote, setQuote] = useState<QuoteWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Send dialog
-  const [showSendDialog, setShowSendDialog] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [sendSuccess, setSendSuccess] = useState(false);
-
-  // Book appointment dialog
-  const [showBookDialog, setShowBookDialog] = useState(false);
-
-  // Delete confirmation
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   // Communication history
   const [communications, setCommunications] = useState<{
@@ -71,8 +47,6 @@ export default function QuoteDetailPage() {
     lastVisit: string | null;
     memberSince: string | null;
   } | null>(null);
-
-  const canConvert = quote?.status !== 'expired' && quote?.status !== 'converted';
 
   const loadQuote = useCallback(async () => {
     setLoading(true);
@@ -137,107 +111,6 @@ export default function QuoteDetailPage() {
     loadQuote();
   }, [loadQuote]);
 
-  async function handleSend(method: SendMethod) {
-    setSending(true);
-    try {
-      const res = await fetch(`/api/quotes/${id}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        const sentChannels = (data.sent_via || []).join(' & ');
-        const errors = data.errors || [];
-
-        if (data.link) {
-          await navigator.clipboard.writeText(data.link).catch(() => {});
-        }
-
-        if (sentChannels) {
-          toast.success(`Estimate sent via ${sentChannels}`, {
-            description: data.link ? 'Link copied to clipboard' : undefined,
-            icon: <CheckCircle className="h-4 w-4" />,
-          });
-        } else {
-          toast.success('Estimate marked as sent', {
-            description: data.link ? 'Link copied to clipboard' : undefined,
-          });
-        }
-
-        for (const err of errors) {
-          toast.warning(err, {
-            icon: <AlertCircle className="h-4 w-4" />,
-          });
-        }
-
-        setSendSuccess(true);
-        setTimeout(async () => {
-          setShowSendDialog(false);
-          setSendSuccess(false);
-          await loadQuote();
-        }, 3000);
-      } else {
-        toast.error(data.error || 'Failed to send estimate');
-      }
-    } catch {
-      toast.error('An error occurred while sending');
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleDelete() {
-    setDeleting(true);
-    const res = await fetch(`/api/quotes/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      toast.success('Quote deleted');
-      router.push('/admin/quotes');
-    } else {
-      const data = await res.json();
-      toast.error(data.error || 'Failed to delete quote');
-    }
-    setDeleting(false);
-    setShowDeleteDialog(false);
-  }
-
-  // Calculate default duration from services' base_duration_minutes
-  const [serviceDurations, setServiceDurations] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    if (!quote?.items) return;
-    const serviceIds = (quote.items || [])
-      .filter((item) => item.service_id)
-      .map((item) => item.service_id as string);
-    if (serviceIds.length === 0) return;
-
-    const supabaseClient = createClient();
-    supabaseClient
-      .from('services')
-      .select('id, base_duration_minutes')
-      .in('id', serviceIds)
-      .then(({ data }: { data: { id: string; base_duration_minutes: number }[] | null }) => {
-        if (data) {
-          const map: Record<string, number> = {};
-          for (const s of data) {
-            map[s.id] = s.base_duration_minutes;
-          }
-          setServiceDurations(map);
-        }
-      });
-  }, [quote?.items]);
-
-  const defaultDuration = useMemo(() => {
-    if (!quote?.items) return 60;
-    const total = (quote.items || []).reduce((sum, item) => {
-      if (item.service_id && serviceDurations[item.service_id]) {
-        return sum + serviceDurations[item.service_id];
-      }
-      return sum;
-    }, 0);
-    return total > 0 ? total : 60;
-  }, [quote?.items, serviceDurations]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -264,27 +137,21 @@ export default function QuoteDetailPage() {
         title={`Quote ${quote.quote_number}`}
         action={
           <div className="flex items-center gap-3">
-            <Badge variant={STATUS_BADGE_VARIANT[quote.status]}>
+            <Badge variant={QUOTE_STATUS_BADGE_VARIANT[quote.status]}>
               {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
             </Badge>
             <a href={`/pos/quotes?mode=builder&quoteId=${id}`} target="_blank" rel="noopener noreferrer">
-              <Button variant={quote.status === 'draft' ? 'default' : 'outline'}>
+              <Button>
                 <ExternalLink className="h-4 w-4" />
                 Edit in POS
               </Button>
             </a>
-            {canConvert && (
-              <Button onClick={() => setShowBookDialog(true)}>
-                <ArrowRightCircle className="h-4 w-4" />
-                Convert to Appointment
+            <a href={`/pos/quotes?mode=detail&quoteId=${id}`} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">
+                <Eye className="h-4 w-4" />
+                View in POS
               </Button>
-            )}
-            {quote.status === 'draft' && (
-              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-            )}
+            </a>
             <Button variant="outline" onClick={() => router.push('/admin/quotes')}>
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -331,13 +198,13 @@ export default function QuoteDetailPage() {
                 <div>
                   <p className="text-xs text-gray-500">Phone</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {quote.customer.phone ? formatPhone(quote.customer.phone) : '—'}
+                    {quote.customer.phone ? formatPhone(quote.customer.phone) : '\u2014'}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Email</p>
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {quote.customer.email || '—'}
+                    {quote.customer.email || '\u2014'}
                   </p>
                 </div>
               </div>
@@ -350,7 +217,7 @@ export default function QuoteDetailPage() {
                     <div>
                       <p className="text-xs text-gray-500">Member Since</p>
                       <p className="text-sm font-medium text-gray-900">
-                        {customerStats.memberSince ? formatDate(customerStats.memberSince) : '—'}
+                        {customerStats.memberSince ? formatDate(customerStats.memberSince) : '\u2014'}
                       </p>
                     </div>
                   </div>
@@ -468,7 +335,7 @@ export default function QuoteDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Details & Communication */}
+      {/* Details */}
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
@@ -505,25 +372,15 @@ export default function QuoteDetailPage() {
             </div>
           )}
 
-          {/* Last Contacted & Resend */}
+          {/* Last Contacted (read-only, no send button) */}
           <div className="border-t border-gray-200 pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Last Contacted</p>
-                {quote.sent_at ? (
-                  <p className="text-sm text-gray-500">{formatDateTime(quote.sent_at)}</p>
-                ) : (
-                  <p className="text-sm text-gray-400">Never sent</p>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSendDialog(true)}
-              >
-                <Send className="h-4 w-4" />
-                {quote.sent_at ? 'Resend' : 'Send'}
-              </Button>
+            <div>
+              <p className="text-sm font-medium text-gray-900">Last Contacted</p>
+              {quote.sent_at ? (
+                <p className="text-sm text-gray-500">{formatDateTime(quote.sent_at)}</p>
+              ) : (
+                <p className="text-sm text-gray-400">Never sent</p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -572,47 +429,6 @@ export default function QuoteDetailPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Convert to Appointment Dialog */}
-      <QuoteBookDialog
-        open={showBookDialog}
-        onClose={() => setShowBookDialog(false)}
-        quoteId={id}
-        defaultDuration={defaultDuration}
-        apiBasePath="/api/quotes"
-        customerEmail={quote.customer?.email ?? null}
-        customerPhone={quote.customer?.phone ?? null}
-        onBooked={() => {
-          setShowBookDialog(false);
-          router.push('/admin/appointments');
-        }}
-      />
-
-      {/* Send/Resend Estimate Dialog */}
-      <SendMethodDialog
-        open={showSendDialog}
-        onOpenChange={(open) => { if (!open) setShowSendDialog(false); }}
-        title={quote.sent_at ? 'Resend Estimate' : 'Send Estimate'}
-        description={`How would you like to send this estimate to ${quote.customer?.first_name} ${quote.customer?.last_name}?`}
-        customerEmail={quote.customer?.email ?? null}
-        customerPhone={quote.customer?.phone ?? null}
-        onSend={handleSend}
-        sending={sending}
-        success={sendSuccess}
-        sendLabel={quote.sent_at ? 'Resend' : 'Send'}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        open={showDeleteDialog}
-        onOpenChange={(open) => { if (!open) setShowDeleteDialog(false); }}
-        title="Delete Quote"
-        description={`Are you sure you want to delete ${quote.quote_number}? This action cannot be undone.`}
-        confirmLabel="Delete"
-        variant="destructive"
-        loading={deleting}
-        onConfirm={handleDelete}
-      />
     </div>
   );
 }

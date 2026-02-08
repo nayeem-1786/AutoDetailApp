@@ -109,6 +109,16 @@ export const QUOTE_STATUS_LABELS: Record<string, string> = {
   converted: 'Converted',
 } as const;
 
+// Quote status badge variants (maps to Badge component variants)
+export const QUOTE_STATUS_BADGE_VARIANT: Record<string, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
+  draft: 'default',
+  sent: 'info',
+  viewed: 'warning',
+  accepted: 'success',
+  expired: 'destructive',
+  converted: 'secondary',
+} as const;
+
 // Size classes valid for each vehicle type
 export const VEHICLE_TYPE_SIZE_CLASSES: Record<string, string[]> = {
   standard: ['sedan', 'truck_suv_2row', 'suv_3row_van'],
