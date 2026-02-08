@@ -40,11 +40,11 @@ npx tsc --noEmit
 | C17 | `quotes/stats/route.ts` missing role check | **FIXED** | Employee role check added |
 | C18 | `quotes/[id]/activities/route.ts` GET missing role check | **FIXED** | Uses `requireAdmin()` helper |
 | C19 | `quotes/[id]/activities/route.ts` POST missing role check | **FIXED** | Uses `requireAdmin()` helper |
-| C20 | `quotes/[id]/pdf/route.ts` weak auth | **DEFERRED** | Per override: needs design decision |
+| C20 | `quotes/[id]/pdf/route.ts` weak auth | **FIXED** | Replaced Referer check with session+role auth; public token path unchanged |
 | C21 | `auth-provider.tsx` uses `getSession()` | **DEFERRED** | Per override: accepted client-side exception |
 | C22 | `customer-auth-provider.tsx` uses `getSession()` | **DEFERRED** | Per override: accepted client-side exception |
 
-**Summary: 19 fixed, 3 deferred, 0 remaining**
+**Summary: 20 fixed, 2 deferred, 0 remaining**
 
 ### High Fixes (H1-H22)
 
@@ -259,7 +259,6 @@ npx tsc --noEmit
 
 | # | Item | Justification |
 |---|------|---------------|
-| C20 | PDF endpoint weak auth | Needs design decision on token vs session auth approach |
 | C21 | `getSession()` in auth-provider.tsx | Accepted client-side exception; initial hydration only |
 | C22 | `getSession()` in customer-auth-provider.tsx | Same as C21 |
 

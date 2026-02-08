@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { getBusinessInfo, type BusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 
@@ -374,12 +375,26 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
 
-    // Determine access: public via token OR internal referrer
-    const referer = request.headers.get('referer') || '';
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const isInternal = referer.startsWith(appUrl);
+    // Auth: internal employee session OR public access_token
+    let authenticated = false;
 
-    if (!token && !isInternal) {
+    if (!token) {
+      // Internal access — verify employee session
+      const authClient = await createClient();
+      const { data: { user } } = await authClient.auth.getUser();
+      if (user) {
+        const { data: employee } = await authClient
+          .from('employees')
+          .select('role')
+          .eq('auth_user_id', user.id)
+          .single();
+        if (employee) {
+          authenticated = true;
+        }
+      }
+    }
+
+    if (!authenticated && !token) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -411,7 +426,7 @@ export async function GET(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
     }
 
-    // If accessed via public token, validate it
+    // Public access — validate token matches quote
     if (token && quote.access_token !== token) {
       return NextResponse.json(
         { error: 'Invalid access token' },
