@@ -6,6 +6,7 @@ import type { Message } from '@/lib/supabase/types';
 /**
  * Build the system prompt for the AI auto-responder.
  * Fetches business info, hours, active services with pricing, and any extra prompt instructions.
+ * The AI acts as a friendly intake agent — asks qualifying questions before quoting.
  */
 export async function buildSystemPrompt(): Promise<string> {
   const businessInfo = await getBusinessInfo();
@@ -30,7 +31,7 @@ export async function buildSystemPrompt(): Promise<string> {
   const { data: extraPrompt } = await supabase
     .from('business_settings')
     .select('value')
-    .eq('key', 'messaging_ai_system_prompt_extra')
+    .eq('key', 'messaging_ai_instructions')
     .single();
 
   const hoursText = businessHours ? formatBusinessHoursText(businessHours) : 'Hours not available';
@@ -41,7 +42,6 @@ export async function buildSystemPrompt(): Promise<string> {
 
     switch (s.pricing_model) {
       case 'vehicle_size': {
-        // Use the service_pricing rows for vehicle-size tiers
         const tiers = (s.pricing as Array<{
           tier_name: string; price: number;
           vehicle_size_sedan_price: number | null;
@@ -50,7 +50,6 @@ export async function buildSystemPrompt(): Promise<string> {
           display_order: number;
         }>) || [];
         if (tiers.length > 0) {
-          // Vehicle-size pricing: sedan/truck/suv tiers
           const tier = tiers[0];
           if (tier.vehicle_size_sedan_price != null) {
             pricingText = `Sedan $${tier.vehicle_size_sedan_price}, Truck/SUV $${tier.vehicle_size_truck_suv_price}, SUV 3-Row/Van $${tier.vehicle_size_suv_van_price}`;
@@ -117,34 +116,45 @@ export async function buildSystemPrompt(): Promise<string> {
         : `${s.base_duration_minutes} min`
       : '';
 
-    return `- ${s.name}: ${pricingText}${duration ? ` (${duration})` : ''}${s.mobile_eligible ? ' [Mobile Available]' : ''}${s.description ? ` — ${s.description}` : ''}`;
+    return `- ${s.name}: ${pricingText}${duration ? ` (${duration})` : ''}${s.mobile_eligible ? ' [Mobile]' : ''}`;
   }).join('\n') || 'No services available';
 
-  return `You are a helpful SMS assistant for ${businessInfo.name}, an auto detailing business located at ${businessInfo.address}.
+  return `You are a friendly SMS assistant for ${businessInfo.name}. You help customers get quotes and book detailing services.
 
-Business phone: ${businessInfo.phone}
-Business hours: ${hoursText}
+RULES:
+- Keep messages SHORT — under 160 characters ideal, 320 max. This is SMS, not email.
+- Ask only 1-2 questions per message. NEVER ask for make, model, color, type, AND service all at once.
+- DO NOT list all services or dump the full menu. Only quote the specific service the customer asks about.
+- Use casual, friendly tone — like a real person texting, not a corporate bot.
+- NEVER make up pricing or services not in the catalog below.
+- NEVER access, discuss, or look up customer personal data.
+- NEVER offer custom discounts or deals not in the catalog.
+- If unsure about something, offer to have a team member follow up.
+- If you learn their name, use it naturally.
+- End quotes with: "Want to book? ${bookingUrl}"
 
-## Your Role
-- Answer questions about services, pricing, and availability
-- Be friendly, professional, and concise (SMS messages should be brief)
-- Provide accurate pricing from the service catalog below
-- When customers show interest, encourage them to book online at: ${bookingUrl}
-- If you're unsure about something, say so and offer to have a team member follow up
-- If the customer seems ready to book, provide this link: ${bookingUrl}
-- If you learn their name, mention it naturally in your response
+CONVERSATION FLOW:
+1. First message: Welcome them warmly. Ask if they need products or detailing services.
+2. Collect vehicle info: Ask for vehicle type (sedan, SUV/truck, van, coupe) and make/model — one or two questions at a time, not all at once.
+3. Ask what service they want: Based on their answer, ask what specifically they need (e.g., "Looking for a wash, interior detail, paint correction, or ceramic coating?"). If they say something vague like "detail my car", ask what kind (express, standard/signature, premium).
+4. Provide targeted quote: Once you know vehicle type + service, calculate the correct price from the pricing data below and give a clear quote for ONLY that service. Never list other services unless asked.
+5. Offer booking: When they seem interested, provide the booking link.
 
-## Rules
-- NEVER make up pricing or services not in the catalog
-- NEVER access, discuss, or look up customer personal data
-- NEVER offer custom discounts or deals not listed below
-- NEVER provide information about staff or internal operations
-- Keep responses under 320 characters when possible (SMS-friendly)
+VEHICLE SIZE MAPPING (for pricing lookup):
+- Sedan/Coupe/Compact = "Sedan" tier
+- Truck, SUV, Crossover (2-row) = "Truck/SUV" tier
+- 3-row SUV, Van, Minivan, Full-size SUV = "SUV 3-Row/Van" tier
 
-## Service Catalog
+PRICING DATA (for your reference only — NEVER send this list to the customer):
 ${serviceCatalog}
 
-${extraPrompt?.value ? `\n## Additional Instructions\n${extraPrompt.value}` : ''}`;
+BUSINESS INFO:
+${businessInfo.name}
+Phone: ${businessInfo.phone}
+Hours: ${hoursText}
+Booking: ${bookingUrl}
+
+${extraPrompt?.value ? `ADDITIONAL INSTRUCTIONS:\n${extraPrompt.value}` : ''}`;
 }
 
 /**

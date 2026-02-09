@@ -204,12 +204,14 @@ export async function POST(request: NextRequest) {
     for (const row of settingsRows || []) {
       settings[row.key] = row.value;
     }
+    console.log('[Messaging] Settings:', settings);
 
     let autoReply: string | null = null;
     let senderType: 'ai' | 'system' = 'ai';
 
     // AI auto-reply: unknown number + AI globally enabled + conversation AI enabled
-    if (!conversation.customer_id && settings.messaging_ai_enabled === true && conversation.is_ai_enabled) {
+    console.log('[Messaging] AI check:', { customerId: conversation.customer_id, globalAI: settings.messaging_ai_enabled, conversationAI: conversation.is_ai_enabled });
+    if (!conversation.customer_id && settings.messaging_ai_enabled === 'true' && conversation.is_ai_enabled) {
       // Rate limiting: count AI replies in the last hour
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { count: recentAiCount } = await admin
@@ -230,6 +232,7 @@ export async function POST(request: NextRequest) {
             .limit(20);
 
           autoReply = await getAIResponse(history || [], body);
+          console.log('[Messaging] AI replied:', autoReply?.substring(0, 50));
         } catch (err) {
           console.error('AI auto-reply failed:', err);
           // Don't send a reply if AI fails — staff will see the unread message
@@ -237,7 +240,7 @@ export async function POST(request: NextRequest) {
       } else {
         console.warn(`[Messaging] Rate limit hit: ${recentAiCount} AI replies in last hour for conversation ${conversation.id}`);
       }
-    } else if (conversation.customer_id && settings.messaging_after_hours_enabled === true) {
+    } else if (conversation.customer_id && settings.messaging_after_hours_enabled === 'true') {
       // Known customer + after-hours enabled → template reply
       autoReply = await getAfterHoursReply();
       senderType = 'system';
