@@ -37,6 +37,8 @@ import {
   Shield,
   MonitorSmartphone,
   Search,
+  MessageSquare,
+  FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/utils/constants';
@@ -61,6 +63,8 @@ const iconMap: Record<string, LucideIcon> = {
   Send,
   Zap,
   ShieldCheck,
+  MessageSquare,
+  FileText,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
@@ -247,6 +251,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [messagingUnread, setMessagingUnread] = useState(0);
   const accountRef = useRef<HTMLDivElement>(null);
 
   // Global fetch interceptor for 401 errors - redirect to login on session expiry
@@ -312,6 +317,43 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Fetch messaging unread count
+  useEffect(() => {
+    if (!role || !['super_admin', 'admin'].includes(role)) return;
+
+    async function fetchUnread() {
+      try {
+        const res = await fetch('/api/messaging/unread-count');
+        if (res.ok) {
+          const json = await res.json();
+          setMessagingUnread(json.data?.count || 0);
+        }
+      } catch {
+        // Silent fail
+      }
+    }
+    fetchUnread();
+
+    // Poll every 30 seconds for unread count
+    const interval = setInterval(fetchUnread, 30000);
+
+    // Also subscribe to realtime conversation updates
+    const supabase = createClient();
+    const channel = supabase
+      .channel('sidebar-unread')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversations' },
+        () => { fetchUnread(); }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [role]);
+
   // Auto-expand parent nav item when child is active
   useEffect(() => {
     if (!role) return;
@@ -372,6 +414,11 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         >
           <Icon className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">{item.label}</span>
+          {item.href === '/admin/messaging' && messagingUnread > 0 && (
+            <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-medium text-white">
+              {messagingUnread > 99 ? '99+' : messagingUnread}
+            </span>
+          )}
           {hasChildren &&
             (isExpanded ? (
               <ChevronDown className="h-4 w-4" />
