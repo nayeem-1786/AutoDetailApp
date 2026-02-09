@@ -19,7 +19,8 @@ import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
 
 type ProductWithRelations = Product & {
   product_categories: Pick<ProductCategory, 'id' | 'name'> | null;
@@ -115,25 +116,6 @@ export default function ProductDetailPage() {
     }
     loadData();
   }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB');
-      return;
-    }
-
-    setImageFile(file);
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
-  }
 
   async function uploadImage(): Promise<string | null> {
     if (!imageFile) return null;
@@ -354,39 +336,19 @@ export default function ProductDetailPage() {
 
         <Card>
           <CardContent className="pt-6">
-            <FormField label="Product Image">
-              <div className="flex items-start gap-4">
-                {imagePreview ? (
-                  <div className="relative h-24 w-24 rounded-lg border border-gray-200 overflow-hidden">
-                    <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        setImagePreview(null);
-                      }}
-                      className="absolute right-1 top-1 rounded-full bg-white/80 p-0.5 text-gray-600 hover:bg-white"
-                    >
-                      <span className="sr-only">Remove</span>
-                      &times;
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300">
-                    <Upload className="h-6 w-6 text-gray-400" />
-                  </div>
-                )}
-                <div>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="w-auto"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">PNG, JPG up to 5MB</p>
-                </div>
-              </div>
-            </FormField>
+            <p className="mb-3 text-sm font-medium text-gray-700">Product Image</p>
+            <ImageUpload
+              imageUrl={imagePreview}
+              onUpload={async (file) => {
+                setImageFile(file);
+                setImagePreview(URL.createObjectURL(file));
+              }}
+              onRemove={async () => {
+                setImageFile(null);
+                setImagePreview(null);
+              }}
+              uploading={saving}
+            />
           </CardContent>
         </Card>
 

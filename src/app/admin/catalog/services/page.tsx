@@ -15,7 +15,7 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Check, X as XIcon } from 'lucide-react';
+import { Plus, Check, X as XIcon, Wrench } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ServiceWithCategory = Service & {
@@ -135,6 +135,25 @@ export default function ServicesPage() {
 
   const columns: ColumnDef<ServiceWithCategory, unknown>[] = [
     {
+      id: 'image',
+      header: '',
+      size: 40,
+      cell: ({ row }) => (
+        <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 overflow-hidden">
+          {row.original.image_url ? (
+            <img
+              src={row.original.image_url}
+              alt={row.original.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Wrench className="h-4 w-4 text-gray-400" />
+          )}
+        </div>
+      ),
+      enableSorting: false,
+    },
+    {
       accessorKey: 'name',
       header: 'Name',
       cell: ({ row }) => (
@@ -155,18 +174,21 @@ export default function ServicesPage() {
     {
       id: 'classification',
       header: 'Classification',
+      size: 120,
       cell: ({ row }) => getClassificationBadge(row.original.classification),
       enableSorting: false,
     },
     {
       id: 'pricing_model',
       header: 'Pricing',
+      size: 100,
       cell: ({ row }) => getPricingModelBadge(row.original.pricing_model),
       enableSorting: false,
     },
     {
       accessorKey: 'base_duration_minutes',
       header: 'Duration',
+      size: 80,
       cell: ({ row }) => {
         const mins = row.original.base_duration_minutes;
         if (mins >= 60) {
@@ -180,6 +202,7 @@ export default function ServicesPage() {
     {
       id: 'mobile',
       header: 'Mobile',
+      size: 64,
       cell: ({ row }) =>
         row.original.mobile_eligible ? (
           <Check className="h-4 w-4 text-green-600" />
@@ -191,6 +214,7 @@ export default function ServicesPage() {
     {
       id: 'status',
       header: 'Status',
+      size: 130,
       cell: ({ row }) => {
         const s = row.original;
         if (!s.is_active) {

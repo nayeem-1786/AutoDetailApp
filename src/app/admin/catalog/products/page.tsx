@@ -167,8 +167,9 @@ export default function ProductsPage() {
     {
       id: 'image',
       header: '',
+      size: 40,
       cell: ({ row }) => (
-        <div className="flex h-10 w-10 items-center justify-center rounded bg-gray-100 overflow-hidden">
+        <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 overflow-hidden">
           {row.original.image_url ? (
             <img
               src={row.original.image_url}
@@ -176,7 +177,7 @@ export default function ProductsPage() {
               className="h-full w-full object-cover"
             />
           ) : (
-            <Package className="h-5 w-5 text-gray-400" />
+            <Package className="h-4 w-4 text-gray-400" />
           )}
         </div>
       ),
@@ -197,6 +198,7 @@ export default function ProductsPage() {
     {
       accessorKey: 'sku',
       header: 'SKU',
+      size: 80,
       cell: ({ row }) => (
         <span className="font-mono text-xs text-gray-500">
           {row.original.sku || '--'}
@@ -206,6 +208,7 @@ export default function ProductsPage() {
     {
       id: 'category',
       header: 'Category',
+      size: 120,
       cell: ({ row }) => row.original.product_categories?.name || '--',
       enableSorting: false,
     },
@@ -218,16 +221,19 @@ export default function ProductsPage() {
     {
       accessorKey: 'retail_price',
       header: 'Price',
+      size: 80,
       cell: ({ row }) => formatCurrency(row.original.retail_price),
     },
     {
       accessorKey: 'quantity_on_hand',
       header: 'Stock',
+      size: 64,
       cell: ({ row }) => row.original.quantity_on_hand,
     },
     {
       id: 'status',
       header: 'Status',
+      size: 130,
       cell: ({ row }) => {
         const p = row.original;
         if (!p.is_active) {

@@ -182,6 +182,7 @@ export interface Service {
   is_taxable: boolean;
   vehicle_compatibility: VehicleType[];
   special_requirements: string | null;
+  image_url: string | null;
   is_active: boolean;
   display_order: number;
   created_at: string;

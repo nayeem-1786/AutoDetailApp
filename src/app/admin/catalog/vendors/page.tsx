@@ -202,23 +202,29 @@ export default function VendorsPage() {
     },
     {
       accessorKey: 'contact_name',
-      header: 'Contact Name',
+      header: 'Contact',
+      size: 140,
       cell: ({ row }) => row.original.contact_name || '--',
     },
     {
       accessorKey: 'email',
       header: 'Email',
-      cell: ({ row }) => row.original.email || '--',
+      size: 180,
+      cell: ({ row }) => (
+        <span className="truncate">{row.original.email || '--'}</span>
+      ),
     },
     {
       accessorKey: 'phone',
       header: 'Phone',
+      size: 120,
       cell: ({ row }) =>
         row.original.phone ? formatPhone(row.original.phone) : '--',
     },
     {
       id: 'products',
       header: 'Products',
+      size: 80,
       cell: ({ row }) => (
         <Badge variant="secondary">{row.original.product_count}</Badge>
       ),
@@ -227,6 +233,7 @@ export default function VendorsPage() {
     {
       id: 'status',
       header: 'Status',
+      size: 80,
       cell: ({ row }) =>
         row.original.is_active ? (
           <Badge variant="success">Active</Badge>
@@ -238,6 +245,7 @@ export default function VendorsPage() {
     {
       id: 'actions',
       header: '',
+      size: 80,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1">
           <Button

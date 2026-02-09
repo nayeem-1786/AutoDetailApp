@@ -27,6 +27,7 @@ import {
 } from '@/components/service-pricing-form';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
+import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
 
 const PRICING_MODEL_DESCRIPTIONS: Record<PricingModel, string> = {
   vehicle_size: 'Different price for sedan, truck/SUV, and SUV 3-row/van',
@@ -46,6 +47,8 @@ export default function NewServicePage() {
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [pricingValue, setPricingValue] = useState<PricingValue>(
     getDefaultPricingValue('vehicle_size')
   );
@@ -77,6 +80,8 @@ export default function NewServicePage() {
       is_taxable: false,
       vehicle_compatibility: ['standard'],
       special_requirements: '',
+      is_active: true,
+      display_order: 0,
     },
   });
 
@@ -111,6 +116,29 @@ export default function NewServicePage() {
     }
   }
 
+  async function uploadImage(serviceId: string): Promise<string | null> {
+    if (!imageFile) return null;
+
+    const ext = imageFile.name.split('.').pop();
+    const path = `services/${serviceId}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('service-images')
+      .upload(path, imageFile, { upsert: true });
+
+    if (error) {
+      console.error('Image upload error:', error);
+      toast.error('Failed to upload image');
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('service-images')
+      .getPublicUrl(path);
+
+    return urlData.publicUrl;
+  }
+
   async function onSubmit(formData: ServiceCreateInput) {
     setSaving(true);
     try {
@@ -128,8 +156,8 @@ export default function NewServicePage() {
         is_taxable: formData.is_taxable,
         vehicle_compatibility: formData.vehicle_compatibility,
         special_requirements: formData.special_requirements || null,
-        is_active: true,
-        display_order: 0,
+        is_active: formData.is_active,
+        display_order: formData.display_order,
       };
 
       // Set model-specific fields on the service row
@@ -199,6 +227,17 @@ export default function NewServicePage() {
         if (pricingRows.length > 0) {
           const { error: pricingError } = await supabase.from('service_pricing').insert(pricingRows);
           if (pricingError) throw pricingError;
+        }
+      }
+
+      // Upload image if selected
+      if (imageFile && service) {
+        const imageUrl = await uploadImage(service.id);
+        if (imageUrl) {
+          await supabase
+            .from('services')
+            .update({ image_url: imageUrl })
+            .eq('id', service.id);
         }
       }
 
@@ -358,6 +397,67 @@ export default function NewServicePage() {
                     )}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Display Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  label="Display Order"
+                  description="Lower numbers appear first in POS and booking"
+                  error={errors.display_order?.message}
+                >
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    {...register('display_order')}
+                  />
+                </FormField>
+
+                <Controller
+                  name="is_active"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Active</p>
+                        <p className="text-xs text-gray-500">
+                          {field.value
+                            ? 'Service is visible in POS and booking'
+                            : 'Service is hidden from POS and booking'}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </div>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Service Image</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ImageUpload
+                  imageUrl={imagePreview}
+                  onUpload={async (file) => {
+                    setImageFile(file);
+                    setImagePreview(URL.createObjectURL(file));
+                  }}
+                  onRemove={async () => {
+                    setImageFile(null);
+                    setImagePreview(null);
+                  }}
+                  uploading={saving}
+                />
               </CardContent>
             </Card>
           </div>

@@ -259,6 +259,7 @@ export default function CategoriesPage() {
       {
         accessorKey: 'slug',
         header: 'Slug',
+        size: 160,
         cell: ({ row }) => (
           <span className="font-mono text-xs text-gray-500">{row.original.slug}</span>
         ),
@@ -266,11 +267,13 @@ export default function CategoriesPage() {
       {
         accessorKey: 'display_order',
         header: 'Order',
+        size: 64,
         cell: ({ row }) => row.original.display_order,
       },
       {
         id: 'items',
         header: itemLabel,
+        size: 80,
         cell: ({ row }) => (
           <Badge variant="secondary">{counts[row.original.id] || 0}</Badge>
         ),
@@ -279,6 +282,7 @@ export default function CategoriesPage() {
       {
         id: 'status',
         header: 'Status',
+        size: 80,
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="success">Active</Badge>
@@ -290,6 +294,7 @@ export default function CategoriesPage() {
       {
         id: 'actions',
         header: '',
+        size: 80,
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-1">
             <Button

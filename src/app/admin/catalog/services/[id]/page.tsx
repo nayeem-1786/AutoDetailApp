@@ -53,6 +53,7 @@ import {
 } from '@/components/service-pricing-form';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Pencil, Trash2 } from 'lucide-react';
+import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
 
 type ServiceWithRelations = Service & {
   service_categories: Pick<ServiceCategory, 'id' | 'name'> | null;
@@ -95,9 +96,15 @@ export default function ServiceDetailPage() {
   const [prerequisites, setPrerequisites] = useState<PrerequisiteWithService[]>([]);
   const [activeTab, setActiveTab] = useState('details');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Deactivate confirm dialog state
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Pricing state
   const [pricingValue, setPricingValue] = useState<PricingValue>(getDefaultPricingValue('vehicle_size'));
@@ -221,6 +228,9 @@ export default function ServiceDetailPage() {
       display_order: svc.display_order,
     });
 
+    // Set image preview from existing URL
+    if (svc.image_url) setImagePreview(svc.image_url);
+
     // Build pricing value from existing rows
     buildPricingValue(svc.pricing_model, pricingRes.data || [], svc);
     setLoading(false);
@@ -314,10 +324,89 @@ export default function ServiceDetailPage() {
     setShowDeactivateDialog(false);
   }
 
+  // ---- Delete (soft-delete via is_active = false) ----
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('services')
+        .update({ is_active: false })
+        .eq('id', serviceId);
+
+      if (error) throw error;
+
+      toast.success('Service deleted');
+      router.push('/admin/catalog/services');
+    } catch (err) {
+      console.error('Delete service error:', err);
+      toast.error('Failed to delete service');
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  }
+
+  // ---- Image Upload ----
+  async function uploadImage(): Promise<string | null> {
+    if (!imageFile) return null;
+
+    const ext = imageFile.name.split('.').pop();
+    const path = `services/${serviceId}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('service-images')
+      .upload(path, imageFile, { upsert: true });
+
+    if (error) {
+      console.error('Image upload error:', error);
+      toast.error('Failed to upload image');
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('service-images')
+      .getPublicUrl(path);
+
+    return urlData.publicUrl;
+  }
+
+  async function handleRemoveImage() {
+    if (service?.image_url) {
+      // Extract path from URL
+      const url = new URL(service.image_url);
+      const pathMatch = url.pathname.match(/service-images\/(.+)/);
+      if (pathMatch) {
+        await supabase.storage.from('service-images').remove([pathMatch[1]]);
+      }
+    }
+
+    const { error } = await supabase
+      .from('services')
+      .update({ image_url: null })
+      .eq('id', serviceId);
+
+    if (error) {
+      toast.error('Failed to remove image');
+      return;
+    }
+
+    setImageFile(null);
+    setImagePreview(null);
+    toast.success('Image removed');
+    loadData();
+  }
+
   // ---- Save Details ----
   async function onSaveDetails(formData: ServiceCreateInput) {
     setSaving(true);
     try {
+      let imageUrl = service?.image_url || null;
+
+      if (imageFile) {
+        const newUrl = await uploadImage();
+        if (newUrl) imageUrl = newUrl;
+      }
+
       const payload: Record<string, unknown> = {
         name: formData.name,
         description: formData.description || null,
@@ -332,6 +421,7 @@ export default function ServiceDetailPage() {
         special_requirements: formData.special_requirements || null,
         is_active: formData.is_active,
         display_order: formData.display_order,
+        image_url: imageUrl,
       };
 
       const { error } = await supabase
@@ -340,6 +430,7 @@ export default function ServiceDetailPage() {
         .eq('id', serviceId);
 
       if (error) throw error;
+      setImageFile(null);
       toast.success('Service details updated');
       loadData();
     } catch (err) {
@@ -717,10 +808,16 @@ export default function ServiceDetailPage() {
         }
         description={`${PRICING_MODEL_LABELS[service.pricing_model]} pricing - ${CLASSIFICATION_LABELS[service.classification]}`}
         action={
-          <Button variant="outline" onClick={() => router.push('/admin/catalog/services')}>
-            <ArrowLeft className="h-4 w-4" />
-            Back to Services
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => router.push('/admin/catalog/services')}>
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+          </div>
         }
       />
 
@@ -905,7 +1002,31 @@ export default function ServiceDetailPage() {
                 </CardContent>
               </Card>
 
-              <div className="flex justify-end">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Service Image</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ImageUpload
+                    imageUrl={imagePreview}
+                    onUpload={async (file) => {
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }}
+                    onRemove={handleRemoveImage}
+                    uploading={saving}
+                  />
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push('/admin/catalog/services')}
+                >
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={saving}>
                   {saving ? 'Saving...' : 'Save Details'}
                 </Button>
@@ -1232,6 +1353,18 @@ export default function ServiceDetailPage() {
         confirmLabel="Deactivate"
         variant="destructive"
         onConfirm={confirmDeactivate}
+      />
+
+      {/* ---- Delete Confirmation ---- */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Delete Service"
+        description={`Are you sure you want to delete "${service.name}"? This will deactivate the service from the catalog.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleting}
+        onConfirm={handleDelete}
       />
     </div>
   );
