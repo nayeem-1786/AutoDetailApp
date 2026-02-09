@@ -142,6 +142,11 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           toast.error('Service not found');
           return;
         }
+        // Per-unit services always need the quantity picker
+        if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+          setPickerService(service);
+          break;
+        }
         const pricing = service.pricing ?? [];
         if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
           dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass });
@@ -204,9 +209,9 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
     }
   }
 
-  function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null) {
+  function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) {
     if (!pickerService) return;
-    dispatch({ type: 'ADD_SERVICE', service: pickerService, pricing, vehicleSizeClass: vsc });
+    dispatch({ type: 'ADD_SERVICE', service: pickerService, pricing, vehicleSizeClass: vsc, perUnitQty });
     toast.success(`Added ${pickerService.name}`);
     setPickerService(null);
   }

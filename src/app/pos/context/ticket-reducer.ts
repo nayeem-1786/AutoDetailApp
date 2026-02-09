@@ -91,6 +91,9 @@ export function ticketReducer(
           tierName: null,
           vehicleSizeClass: null,
           notes: null,
+          perUnitQty: null,
+          perUnitLabel: null,
+          perUnitPrice: null,
         };
         items = [...state.items, newItem];
       }
@@ -98,8 +101,11 @@ export function ticketReducer(
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass } = action;
-      const unitPrice = resolveServicePrice(pricing, vehicleSizeClass);
+      const { service, pricing, vehicleSizeClass, perUnitQty } = action;
+      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
+      const unitPrice = isPerUnit
+        ? service.per_unit_price! * perUnitQty
+        : resolveServicePrice(pricing, vehicleSizeClass);
       const totalPrice = unitPrice;
       const newItem: TicketItem = {
         id: generateId(),
@@ -115,6 +121,9 @@ export function ticketReducer(
         tierName: pricing.tier_label || pricing.tier_name,
         vehicleSizeClass,
         notes: null,
+        perUnitQty: isPerUnit ? perUnitQty : null,
+        perUnitLabel: isPerUnit ? (service.per_unit_label ?? null) : null,
+        perUnitPrice: isPerUnit ? service.per_unit_price! : null,
       };
       return recalculateTotals({
         ...state,
@@ -138,6 +147,9 @@ export function ticketReducer(
         tierName: null,
         vehicleSizeClass: null,
         notes: null,
+        perUnitQty: null,
+        perUnitLabel: null,
+        perUnitPrice: null,
       };
       return recalculateTotals({
         ...state,

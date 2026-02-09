@@ -25,6 +25,10 @@ export interface TicketItem {
   tierName: string | null;
   vehicleSizeClass: VehicleSizeClass | null;
   notes: string | null;
+  // Per-unit pricing display info (optional, for per_unit services)
+  perUnitQty: number | null;        // e.g., 2 (headlights, panels)
+  perUnitLabel: string | null;       // e.g., "panel", "headlight"
+  perUnitPrice: number | null;       // e.g., 150 (price per single unit)
 }
 
 // ─── Ticket State ──────────────────────────────────────────────
@@ -49,7 +53,7 @@ export interface TicketState {
 
 export type TicketAction =
   | { type: 'ADD_PRODUCT'; product: Product }
-  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null }
+  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number }
   | { type: 'ADD_CUSTOM_ITEM'; name: string; price: number; isTaxable: boolean }
   | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
   | { type: 'REMOVE_ITEM'; itemId: string }
@@ -122,7 +126,7 @@ export interface QuoteState {
 
 export type QuoteAction =
   | { type: 'ADD_PRODUCT'; product: Product }
-  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null }
+  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number }
   | { type: 'ADD_CUSTOM_ITEM'; name: string; price: number; isTaxable: boolean }
   | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
   | { type: 'REMOVE_ITEM'; itemId: string }

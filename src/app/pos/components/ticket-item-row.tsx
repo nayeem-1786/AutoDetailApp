@@ -82,7 +82,12 @@ export function TicketItemRow({ item }: TicketItemRowProps) {
     }
   }
 
-  const subParts = [sizeLabel, tierLabel].filter(Boolean);
+  // Per-unit display: "2 panels x $150.00"
+  const perUnitText = item.perUnitQty && item.perUnitPrice != null
+    ? `${item.perUnitQty} ${item.perUnitLabel || 'unit'}${item.perUnitQty > 1 ? 's' : ''} \u00D7 $${item.perUnitPrice.toFixed(2)}`
+    : null;
+
+  const subParts = [sizeLabel, tierLabel, perUnitText].filter(Boolean);
   const subText = subParts.join(' \u00B7 ');
 
   return (

@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { UserRole } from '@/lib/supabase/types';
@@ -53,10 +54,31 @@ const PosAuthContext = createContext<PosAuthContextType>({
   replaceSession: () => {},
 });
 
+/** Decode JWT payload without verification (client-side expiry check only). */
+function decodeTokenExp(token: string): number | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    // base64url → base64
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(payload);
+    const parsed = JSON.parse(json);
+    return typeof parsed.exp === 'number' ? parsed.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string): boolean {
+  const exp = decodeTokenExp(token);
+  if (exp === null) return false; // Can't determine — assume valid
+  return exp < Date.now() / 1000;
+}
+
 function readSession(): PosSessionData | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = sessionStorage.getItem(POS_SESSION_KEY);
+    const raw = localStorage.getItem(POS_SESSION_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as PosSessionData;
   } catch {
@@ -65,11 +87,11 @@ function readSession(): PosSessionData | null {
 }
 
 function writeSession(data: PosSessionData) {
-  sessionStorage.setItem(POS_SESSION_KEY, JSON.stringify(data));
+  localStorage.setItem(POS_SESSION_KEY, JSON.stringify(data));
 }
 
 function clearSession() {
-  sessionStorage.removeItem(POS_SESSION_KEY);
+  localStorage.removeItem(POS_SESSION_KEY);
 }
 
 export function PosAuthProvider({ children }: { children: ReactNode }) {
@@ -78,14 +100,19 @@ export function PosAuthProvider({ children }: { children: ReactNode }) {
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [idleTimeoutMinutes, setIdleTimeoutMinutes] = useState(15);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Read session on mount
+  // Read session on mount — check token expiry before restoring
   useEffect(() => {
     const session = readSession();
     if (session) {
-      setEmployee(session.employee);
-      setToken(session.token);
-      setIdleTimeoutMinutes(session.idleTimeoutMinutes);
+      if (isTokenExpired(session.token)) {
+        clearSession();
+      } else {
+        setEmployee(session.employee);
+        setToken(session.token);
+        setIdleTimeoutMinutes(session.idleTimeoutMinutes);
+      }
     }
     setLoading(false);
   }, []);
@@ -95,6 +122,55 @@ export function PosAuthProvider({ children }: { children: ReactNode }) {
     setEmployee(null);
     setToken(null);
     setLocked(false);
+  }, []);
+
+  // Periodic expiry check — every 60s, verify token hasn't expired
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      if (token && isTokenExpired(token)) {
+        signOut();
+      }
+    }, 60_000);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [token, signOut]);
+
+  // Cross-tab sync via storage event
+  useEffect(() => {
+    function handleStorageChange(e: StorageEvent) {
+      if (e.key !== POS_SESSION_KEY) return;
+      if (e.newValue === null) {
+        // Signed out in another tab
+        setEmployee(null);
+        setToken(null);
+        setLocked(false);
+      } else {
+        // New session from another tab
+        try {
+          const session = JSON.parse(e.newValue) as PosSessionData;
+          if (isTokenExpired(session.token)) {
+            clearSession();
+            setEmployee(null);
+            setToken(null);
+            setLocked(false);
+          } else {
+            setEmployee(session.employee);
+            setToken(session.token);
+            setIdleTimeoutMinutes(session.idleTimeoutMinutes);
+            setLocked(false);
+          }
+        } catch {
+          // Corrupted data — sign out
+          setEmployee(null);
+          setToken(null);
+          setLocked(false);
+        }
+      }
+    }
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const lock = useCallback(() => {
@@ -108,7 +184,7 @@ export function PosAuthProvider({ children }: { children: ReactNode }) {
       setToken(tok);
       setLocked(false);
 
-      // Update sessionStorage with potentially refreshed token
+      // Update localStorage with potentially refreshed token
       const session = readSession();
       if (session) {
         writeSession({ ...session, employee: emp, token: tok });
@@ -153,12 +229,12 @@ export function usePosAuth() {
   return context;
 }
 
-/** Write a new POS session to sessionStorage (used by login page). */
+/** Write a new POS session to localStorage (used by login page). */
 export function storePosSession(data: PosSessionData) {
   writeSession(data);
 }
 
-/** Get the current POS token from sessionStorage (used by posFetch). */
+/** Get the current POS token from localStorage (used by posFetch). */
 export function getPosToken(): string | null {
   const session = readSession();
   return session?.token ?? null;

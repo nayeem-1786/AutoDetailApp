@@ -23,7 +23,7 @@ interface CatalogBrowserProps {
   /** When provided, use this callback instead of dispatching to ticket context */
   onAddProduct?: (product: CatalogProduct) => void;
   /** When provided, use this callback instead of dispatching to ticket context */
-  onAddService?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null) => void;
+  onAddService?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
   /** Override vehicle size class (for quote builder where vehicle is in a different context) */
   vehicleSizeOverride?: VehicleSizeClass | null;
 }
@@ -126,6 +126,12 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   }
 
   function handleTapServiceDirect(service: CatalogService) {
+    // Per-unit services always need the quantity picker
+    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+      setPickerService(service);
+      return;
+    }
+
     const pricing = service.pricing ?? [];
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
       if (onAddService) {
@@ -173,17 +179,19 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
 
   function handlePricingSelect(
     pricing: ServicePricing,
-    vsc: VehicleSizeClass | null
+    vsc: VehicleSizeClass | null,
+    perUnitQty?: number
   ) {
     if (!pickerService) return;
     if (onAddService) {
-      onAddService(pickerService, pricing, vsc);
+      onAddService(pickerService, pricing, vsc, perUnitQty);
     } else if (dispatch) {
       dispatch({
         type: 'ADD_SERVICE',
         service: pickerService,
         pricing,
         vehicleSizeClass: vsc,
+        perUnitQty,
       });
     }
     toast.success(`Added ${pickerService.name}`);

@@ -78,7 +78,10 @@ export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
           tierName: item.tier_name,
           vehicleSizeClass: q.vehicle?.size_class ?? null,
           notes: item.notes,
-        }));
+          perUnitQty: null,
+          perUnitLabel: null,
+          perUnitPrice: null,
+        } as TicketItem));
 
         const loadState: QuoteState = {
           items,
@@ -119,8 +122,8 @@ export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
     toast.success(`Added ${product.name}`);
   }, [dispatch]);
 
-  const handleAddService = useCallback((service: CatalogService, pricing: ServicePricing, vsc: VehicleSizeClass | null) => {
-    dispatch({ type: 'ADD_SERVICE', service, pricing, vehicleSizeClass: vsc });
+  const handleAddService = useCallback((service: CatalogService, pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) => {
+    dispatch({ type: 'ADD_SERVICE', service, pricing, vehicleSizeClass: vsc, perUnitQty });
     toast.success(`Added ${service.name}`);
   }, [dispatch]);
 
@@ -140,6 +143,12 @@ export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
     : [];
 
   function handleTapServiceSearch(service: CatalogService) {
+    // Per-unit services always need the quantity picker
+    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+      setPickerService(service);
+      return;
+    }
+
     const pricing = service.pricing ?? [];
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
       handleAddService(service, pricing[0], vehicleSizeClass);
@@ -165,9 +174,9 @@ export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
     setPickerService(service);
   }
 
-  function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null) {
+  function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) {
     if (!pickerService) return;
-    handleAddService(pickerService, pricing, vsc);
+    handleAddService(pickerService, pricing, vsc, perUnitQty);
     setPickerService(null);
   }
 

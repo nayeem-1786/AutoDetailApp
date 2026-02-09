@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Service, ServiceCategory, PricingModel, ServiceClassification } from '@/lib/supabase/types';
 import { PRICING_MODEL_LABELS, CLASSIFICATION_LABELS } from '@/lib/utils/constants';
@@ -11,8 +12,10 @@ import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Wrench, Check, X as XIcon } from 'lucide-react';
+import { Plus, Check, X as XIcon } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ServiceWithCategory = Service & {
@@ -30,32 +33,80 @@ export default function ServicesPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [classificationFilter, setClassificationFilter] = useState('');
   const [pricingModelFilter, setPricingModelFilter] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [servicesRes, categoriesRes] = await Promise.all([
-        supabase
-          .from('services')
-          .select('*, service_categories(id, name)')
-          .order('display_order')
-          .order('name'),
-        supabase
-          .from('service_categories')
-          .select('*')
-          .eq('is_active', true)
-          .order('display_order'),
-      ]);
 
-      if (servicesRes.data) setServices(servicesRes.data as ServiceWithCategory[]);
-      if (categoriesRes.data) setCategories(categoriesRes.data);
-      setLoading(false);
+      try {
+        const [servicesRes, categoriesRes] = await Promise.all([
+          supabase
+            .from('services')
+            .select('*, service_categories(id, name)')
+            .order('display_order')
+            .order('name'),
+          supabase
+            .from('service_categories')
+            .select('*')
+            .eq('is_active', true)
+            .order('display_order'),
+        ]);
+
+        if (servicesRes.error) {
+          console.error('Failed to load services:', servicesRes.error);
+          toast.error('Failed to load services');
+          setLoading(false);
+          return;
+        }
+
+        setServices((servicesRes.data ?? []) as ServiceWithCategory[]);
+
+        if (categoriesRes.error) {
+          console.error('Failed to load categories:', categoriesRes.error);
+        } else {
+          setCategories(categoriesRes.data ?? []);
+        }
+      } catch (err) {
+        console.error('Failed to load services:', err);
+        toast.error('Failed to load services');
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function handleReactivate(service: ServiceWithCategory) {
+    if (!window.confirm(`Reactivate "${service.name}"?`)) return;
+
+    setReactivatingId(service.id);
+    try {
+      const { error } = await supabase
+        .from('services')
+        .update({ is_active: true })
+        .eq('id', service.id);
+
+      if (error) throw error;
+
+      setServices((prev) =>
+        prev.map((s) => (s.id === service.id ? { ...s, is_active: true } : s))
+      );
+      toast.success(`${service.name} reactivated`);
+    } catch (err) {
+      console.error('Reactivate service error:', err);
+      toast.error('Failed to reactivate service');
+    } finally {
+      setReactivatingId(null);
+    }
+  }
+
   const filtered = useMemo(() => {
     return services.filter((s) => {
+      // Active/inactive filter
+      if (!showInactive && !s.is_active) return false;
+      // Search filter
       if (search) {
         const q = search.toLowerCase();
         const matchesName = s.name.toLowerCase().includes(q);
@@ -67,7 +118,7 @@ export default function ServicesPage() {
       if (pricingModelFilter && s.pricing_model !== pricingModelFilter) return false;
       return true;
     });
-  }, [services, search, categoryFilter, classificationFilter, pricingModelFilter]);
+  }, [services, search, categoryFilter, classificationFilter, pricingModelFilter, showInactive]);
 
   function getClassificationBadge(classification: ServiceClassification) {
     const variants: Record<ServiceClassification, 'info' | 'warning' | 'success'> = {
@@ -140,12 +191,29 @@ export default function ServicesPage() {
     {
       id: 'status',
       header: 'Status',
-      cell: ({ row }) =>
-        row.original.is_active ? (
-          <Badge variant="success">Active</Badge>
-        ) : (
-          <Badge variant="secondary">Inactive</Badge>
-        ),
+      cell: ({ row }) => {
+        const s = row.original;
+        if (!s.is_active) {
+          return (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">Inactive</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                disabled={reactivatingId === s.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReactivate(s);
+                }}
+              >
+                {reactivatingId === s.id ? 'Activating...' : 'Activate'}
+              </Button>
+            </div>
+          );
+        }
+        return <Badge variant="success">Active</Badge>;
+      },
       enableSorting: false,
     },
   ];
@@ -211,6 +279,14 @@ export default function ServicesPage() {
           <option value="flat">Flat Rate</option>
           <option value="custom">Custom Quote</option>
         </Select>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <Switch
+            id="show-inactive-services"
+            checked={showInactive}
+            onCheckedChange={setShowInactive}
+          />
+          <Label htmlFor="show-inactive-services">Show Inactive</Label>
+        </div>
       </div>
 
       <DataTable

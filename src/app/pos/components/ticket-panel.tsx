@@ -26,6 +26,7 @@ import { VehicleCreateDialog } from './vehicle-create-dialog';
 import { CouponInput } from './coupon-input';
 import { LoyaltyPanel } from './loyalty-panel';
 import { CustomerTypePrompt } from './customer-type-prompt';
+import { AddonSuggestions } from './addon-suggestions';
 import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
 interface TicketPanelProps {
@@ -178,6 +179,11 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           </div>
         )}
       </div>
+
+      {/* Add-on Suggestions */}
+      {ticket.items.some((i) => i.itemType === 'service') && (
+        <AddonSuggestions />
+      )}
 
       {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (

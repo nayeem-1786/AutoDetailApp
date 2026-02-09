@@ -79,6 +79,12 @@ export function PosWorkspace() {
   }
 
   function handleTapService(service: CatalogService) {
+    // Per-unit services always need the quantity picker
+    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+      setPickerService(service);
+      return;
+    }
+
     const pricing = service.pricing ?? [];
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
       dispatch({
@@ -118,7 +124,8 @@ export function PosWorkspace() {
 
   function handlePricingSelect(
     pricing: ServicePricing,
-    vehicleSizeClass: VehicleSizeClass | null
+    vehicleSizeClass: VehicleSizeClass | null,
+    perUnitQty?: number
   ) {
     if (!pickerService) return;
     dispatch({
@@ -126,6 +133,7 @@ export function PosWorkspace() {
       service: pickerService,
       pricing,
       vehicleSizeClass,
+      perUnitQty,
     });
     toast.success(`Added ${pickerService.name}`);
     setPickerService(null);

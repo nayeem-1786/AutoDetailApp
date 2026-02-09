@@ -69,6 +69,12 @@ function getServicePriceDisplay(
   service: CatalogService,
   vehicleSizeClass: string | null
 ): string {
+  // Per-unit pricing: "$150/panel"
+  if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+    const label = service.per_unit_label || 'unit';
+    return `$${service.per_unit_price.toFixed(2)}/${label}`;
+  }
+
   if (service.flat_price != null) {
     return `$${service.flat_price.toFixed(2)}`;
   }

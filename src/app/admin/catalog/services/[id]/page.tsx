@@ -96,9 +96,14 @@ export default function ServiceDetailPage() {
   const [activeTab, setActiveTab] = useState('details');
   const [saving, setSaving] = useState(false);
 
+  // Deactivate confirm dialog state
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+
   // Pricing state
   const [pricingValue, setPricingValue] = useState<PricingValue>(getDefaultPricingValue('vehicle_size'));
   const [savingPricing, setSavingPricing] = useState(false);
+  // Track original pricing row IDs so we can detect deletions on save
+  const [originalPricingIds, setOriginalPricingIds] = useState<string[]>([]);
 
   // Add-on dialog state
   const [addonDialogOpen, setAddonDialogOpen] = useState(false);
@@ -140,6 +145,7 @@ export default function ServiceDetailPage() {
   });
 
   const vehicleCompatibility = watch('vehicle_compatibility') || [];
+  const isActive = watch('is_active');
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -211,6 +217,8 @@ export default function ServiceDetailPage() {
       is_taxable: svc.is_taxable,
       vehicle_compatibility: svc.vehicle_compatibility,
       special_requirements: svc.special_requirements || '',
+      is_active: svc.is_active,
+      display_order: svc.display_order,
     });
 
     // Build pricing value from existing rows
@@ -219,6 +227,9 @@ export default function ServiceDetailPage() {
   }, [serviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function buildPricingValue(model: PricingModel, rows: ServicePricing[], svc: Service) {
+    // Track original row IDs so we can detect deletions on save
+    setOriginalPricingIds(rows.map((r) => r.id));
+
     switch (model) {
       case 'vehicle_size': {
         const vsp: VehicleSizePricing = { sedan: '', truck_suv_2row: '', suv_3row_van: '' };
@@ -287,6 +298,22 @@ export default function ServiceDetailPage() {
     }
   }
 
+  // Handle deactivate toggle — show confirm when toggling OFF
+  function handleIsActiveToggle(checked: boolean) {
+    if (!checked) {
+      // Deactivating — show confirm dialog
+      setShowDeactivateDialog(true);
+    } else {
+      // Reactivating — no confirm needed
+      setValue('is_active', true);
+    }
+  }
+
+  function confirmDeactivate() {
+    setValue('is_active', false);
+    setShowDeactivateDialog(false);
+  }
+
   // ---- Save Details ----
   async function onSaveDetails(formData: ServiceCreateInput) {
     setSaving(true);
@@ -303,6 +330,8 @@ export default function ServiceDetailPage() {
         is_taxable: formData.is_taxable,
         vehicle_compatibility: formData.vehicle_compatibility,
         special_requirements: formData.special_requirements || null,
+        is_active: formData.is_active,
+        display_order: formData.display_order,
       };
 
       const { error } = await supabase
@@ -349,56 +378,133 @@ export default function ServiceDetailPage() {
 
       // Handle pricing rows for models that use service_pricing table
       if (['vehicle_size', 'scope', 'specialty'].includes(model)) {
-        // Delete existing pricing rows
-        const { error: deleteError } = await supabase
-          .from('service_pricing')
-          .delete()
-          .eq('service_id', serviceId);
-        if (deleteError) throw deleteError;
 
-        // Insert new rows
-        let newRows: Record<string, unknown>[] = [];
-
+        // ---- Vehicle Size: use upsert on (service_id, tier_name) unique constraint ----
         if (model === 'vehicle_size' && pricingValue.model === 'vehicle_size') {
-          newRows = [
+          const upsertRows = [
             { service_id: serviceId, tier_name: 'sedan', tier_label: 'Sedan', price: typeof pricingValue.data.sedan === 'number' ? pricingValue.data.sedan : 0, display_order: 0, is_vehicle_size_aware: false },
             { service_id: serviceId, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price: typeof pricingValue.data.truck_suv_2row === 'number' ? pricingValue.data.truck_suv_2row : 0, display_order: 1, is_vehicle_size_aware: false },
             { service_id: serviceId, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price: typeof pricingValue.data.suv_3row_van === 'number' ? pricingValue.data.suv_3row_van : 0, display_order: 2, is_vehicle_size_aware: false },
           ];
+          const { error: upsertError } = await supabase
+            .from('service_pricing')
+            .upsert(upsertRows, { onConflict: 'service_id,tier_name' });
+          if (upsertError) throw upsertError;
         }
 
+        // ---- Scope: update existing, insert new, delete removed ----
         if (model === 'scope' && pricingValue.model === 'scope') {
-          newRows = pricingValue.data
-            .filter((t: ScopeTier) => t.tier_name.trim() !== '')
-            .map((t: ScopeTier, i: number) => ({
-              service_id: serviceId,
-              tier_name: t.tier_name,
-              tier_label: t.tier_label || null,
-              price: typeof t.price === 'number' ? t.price : 0,
-              display_order: i,
-              is_vehicle_size_aware: t.is_vehicle_size_aware,
-              vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
-              vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
-              vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
-            }));
+          const validTiers = pricingValue.data.filter((t: ScopeTier) => t.tier_name.trim() !== '');
+          const existingTiers = validTiers.filter((t: ScopeTier) => t.id);
+          const newTiers = validTiers.filter((t: ScopeTier) => !t.id);
+
+          // Determine which original IDs were removed by the user
+          const currentIds = existingTiers.map((t: ScopeTier) => t.id as string);
+          const removedIds = originalPricingIds.filter((id) => !currentIds.includes(id));
+
+          // Delete removed tiers
+          if (removedIds.length > 0) {
+            const { error: deleteError } = await supabase
+              .from('service_pricing')
+              .delete()
+              .in('id', removedIds);
+            if (deleteError) throw deleteError;
+          }
+
+          // Update existing tiers
+          for (let i = 0; i < existingTiers.length; i++) {
+            const t = existingTiers[i];
+            // Find the overall index for display_order
+            const displayOrder = validTiers.indexOf(t);
+            const { error: updateError } = await supabase
+              .from('service_pricing')
+              .update({
+                tier_name: t.tier_name,
+                tier_label: t.tier_label || null,
+                price: typeof t.price === 'number' ? t.price : 0,
+                display_order: displayOrder,
+                is_vehicle_size_aware: t.is_vehicle_size_aware,
+                vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
+                vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
+                vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
+              })
+              .eq('id', t.id as string);
+            if (updateError) throw updateError;
+          }
+
+          // Insert new tiers
+          if (newTiers.length > 0) {
+            const insertRows = newTiers.map((t: ScopeTier) => {
+              const displayOrder = validTiers.indexOf(t);
+              return {
+                service_id: serviceId,
+                tier_name: t.tier_name,
+                tier_label: t.tier_label || null,
+                price: typeof t.price === 'number' ? t.price : 0,
+                display_order: displayOrder,
+                is_vehicle_size_aware: t.is_vehicle_size_aware,
+                vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
+                vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
+                vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
+              };
+            });
+            const { error: insertError } = await supabase.from('service_pricing').insert(insertRows);
+            if (insertError) throw insertError;
+          }
         }
 
+        // ---- Specialty: update existing, insert new, delete removed ----
         if (model === 'specialty' && pricingValue.model === 'specialty') {
-          newRows = pricingValue.data
-            .filter((t: SpecialtyTier) => t.tier_name.trim() !== '')
-            .map((t: SpecialtyTier, i: number) => ({
-              service_id: serviceId,
-              tier_name: t.tier_name,
-              tier_label: t.tier_label || null,
-              price: typeof t.price === 'number' ? t.price : 0,
-              display_order: i,
-              is_vehicle_size_aware: false,
-            }));
-        }
+          const validTiers = pricingValue.data.filter((t: SpecialtyTier) => t.tier_name.trim() !== '');
+          const existingTiers = validTiers.filter((t: SpecialtyTier) => t.id);
+          const newTiers = validTiers.filter((t: SpecialtyTier) => !t.id);
 
-        if (newRows.length > 0) {
-          const { error: insertError } = await supabase.from('service_pricing').insert(newRows);
-          if (insertError) throw insertError;
+          // Determine which original IDs were removed by the user
+          const currentIds = existingTiers.map((t: SpecialtyTier) => t.id as string);
+          const removedIds = originalPricingIds.filter((id) => !currentIds.includes(id));
+
+          // Delete removed tiers
+          if (removedIds.length > 0) {
+            const { error: deleteError } = await supabase
+              .from('service_pricing')
+              .delete()
+              .in('id', removedIds);
+            if (deleteError) throw deleteError;
+          }
+
+          // Update existing tiers
+          for (let i = 0; i < existingTiers.length; i++) {
+            const t = existingTiers[i];
+            const displayOrder = validTiers.indexOf(t);
+            const { error: updateError } = await supabase
+              .from('service_pricing')
+              .update({
+                tier_name: t.tier_name,
+                tier_label: t.tier_label || null,
+                price: typeof t.price === 'number' ? t.price : 0,
+                display_order: displayOrder,
+                is_vehicle_size_aware: false,
+              })
+              .eq('id', t.id as string);
+            if (updateError) throw updateError;
+          }
+
+          // Insert new tiers
+          if (newTiers.length > 0) {
+            const insertRows = newTiers.map((t: SpecialtyTier) => {
+              const displayOrder = validTiers.indexOf(t);
+              return {
+                service_id: serviceId,
+                tier_name: t.tier_name,
+                tier_label: t.tier_label || null,
+                price: typeof t.price === 'number' ? t.price : 0,
+                display_order: displayOrder,
+                is_vehicle_size_aware: false,
+              };
+            });
+            const { error: insertError } = await supabase.from('service_pricing').insert(insertRows);
+            if (insertError) throw insertError;
+          }
         }
       }
 
@@ -601,7 +707,14 @@ export default function ServiceDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={service.name}
+        title={
+          <span className="flex items-center gap-3">
+            {service.name}
+            <Badge variant={service.is_active ? 'success' : 'secondary'}>
+              {service.is_active ? 'Active' : 'Inactive'}
+            </Badge>
+          </span>
+        }
         description={`${PRICING_MODEL_LABELS[service.pricing_model]} pricing - ${CLASSIFICATION_LABELS[service.classification]}`}
         action={
           <Button variant="outline" onClick={() => router.push('/admin/catalog/services')}>
@@ -748,6 +861,47 @@ export default function ServiceDetailPage() {
                       )}
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Display Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    label="Display Order"
+                    description="Lower numbers appear first in POS and booking"
+                    error={errors.display_order?.message}
+                  >
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      {...register('display_order')}
+                    />
+                  </FormField>
+
+                  <Controller
+                    name="is_active"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Active</p>
+                          <p className="text-xs text-gray-500">
+                            {field.value
+                              ? 'Service is visible in POS and booking'
+                              : 'Service is hidden from POS and booking'}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={handleIsActiveToggle}
+                        />
+                      </div>
+                    )}
+                  />
                 </CardContent>
               </Card>
 
@@ -1067,6 +1221,17 @@ export default function ServiceDetailPage() {
         confirmLabel="Remove"
         variant="destructive"
         onConfirm={deletePrereq}
+      />
+
+      {/* ---- Deactivate Confirmation ---- */}
+      <ConfirmDialog
+        open={showDeactivateDialog}
+        onOpenChange={setShowDeactivateDialog}
+        title={`Deactivate ${service.name}?`}
+        description="It will be hidden from POS and booking. You can reactivate it later."
+        confirmLabel="Deactivate"
+        variant="destructive"
+        onConfirm={confirmDeactivate}
       />
     </div>
   );

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogHeader,
@@ -19,7 +21,7 @@ interface ServicePricingPickerProps {
   onClose: () => void;
   service: CatalogService;
   vehicleSizeClass: VehicleSizeClass | null;
-  onSelect: (pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null) => void;
+  onSelect: (pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
 }
 
 export function ServicePricingPicker({
@@ -30,12 +32,26 @@ export function ServicePricingPicker({
   onSelect,
 }: ServicePricingPickerProps) {
   const pricing = service.pricing ?? [];
+  const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
 
   const VEHICLE_SIZES: VehicleSizeClass[] = ['sedan', 'truck_suv_2row', 'suv_3row_van'];
 
   function handleSelect(tier: ServicePricing, sizeOverride?: VehicleSizeClass) {
     onSelect(tier, sizeOverride ?? vehicleSizeClass);
     onClose();
+  }
+
+  // Per-unit pricing UI
+  if (isPerUnit) {
+    return (
+      <PerUnitPicker
+        open={open}
+        onClose={onClose}
+        service={service}
+        onSelect={onSelect}
+        vehicleSizeClass={vehicleSizeClass}
+      />
+    );
   }
 
   return (
@@ -145,6 +161,135 @@ export function ServicePricingPicker({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Per-Unit Quantity Picker ──────────────────────────────────
+
+interface PerUnitPickerProps {
+  open: boolean;
+  onClose: () => void;
+  service: CatalogService;
+  vehicleSizeClass: VehicleSizeClass | null;
+  onSelect: (pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
+}
+
+function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: PerUnitPickerProps) {
+  const perUnitPrice = service.per_unit_price!;
+  const perUnitMax = service.per_unit_max ?? 10;
+  const perUnitLabel = service.per_unit_label || 'unit';
+  const [quantity, setQuantity] = useState(1);
+
+  const total = quantity * perUnitPrice;
+
+  // Create a synthetic ServicePricing for the dispatch
+  const syntheticPricing: ServicePricing = {
+    id: 'per_unit',
+    service_id: service.id,
+    tier_name: 'default',
+    tier_label: null,
+    price: total,
+    display_order: 0,
+    is_vehicle_size_aware: false,
+    vehicle_size_sedan_price: null,
+    vehicle_size_truck_suv_price: null,
+    vehicle_size_suv_van_price: null,
+    created_at: '',
+  };
+
+  function handleAdd() {
+    onSelect(syntheticPricing, vehicleSizeClass, quantity);
+    onClose();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogClose onClose={onClose} />
+      <DialogHeader>
+        <DialogTitle>{service.name}</DialogTitle>
+      </DialogHeader>
+      <DialogContent>
+        {/* Unit price info */}
+        <div className="mb-4 rounded-lg bg-gray-50 p-4">
+          <p className="text-sm text-gray-600">
+            <span className="font-semibold text-gray-900">${perUnitPrice.toFixed(2)}</span>
+            {' '}per {perUnitLabel}
+          </p>
+          {perUnitMax && (
+            <p className="mt-1 text-xs text-gray-400">
+              Maximum: {perUnitMax} {perUnitLabel}{perUnitMax > 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+
+        {/* Quantity selector */}
+        <div className="mb-4">
+          <p className="mb-3 text-sm font-medium text-gray-700">
+            How many {perUnitLabel}{quantity !== 1 ? 's' : ''}?
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                quantity <= 1
+                  ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                  : 'border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 active:scale-95'
+              )}
+            >
+              <Minus className="h-5 w-5" />
+            </button>
+
+            <div className="flex h-14 w-20 items-center justify-center rounded-xl bg-white border-2 border-blue-200">
+              <span className="text-2xl font-bold tabular-nums text-gray-900">
+                {quantity}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setQuantity((q) => Math.min(perUnitMax, q + 1))}
+              disabled={quantity >= perUnitMax}
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                quantity >= perUnitMax
+                  ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                  : 'border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 active:scale-95'
+              )}
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Total display */}
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/50 px-4 py-3">
+          <span className="text-sm font-medium text-gray-700">
+            {quantity} {perUnitLabel}{quantity > 1 ? 's' : ''} &times; ${perUnitPrice.toFixed(2)}
+          </span>
+          <span className="text-lg font-bold text-gray-900">
+            ${total.toFixed(2)}
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <button
+            onClick={handleAdd}
+            className={cn(
+              'flex-1 rounded-lg py-3 text-sm font-semibold text-white transition-all',
+              'bg-blue-600 hover:bg-blue-700 active:scale-[0.99]',
+              'min-h-[48px]'
+            )}
+          >
+            Add to Ticket &mdash; ${total.toFixed(2)}
+          </button>
         </div>
       </DialogContent>
     </Dialog>

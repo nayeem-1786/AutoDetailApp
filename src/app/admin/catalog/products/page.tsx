@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
 import { formatCurrency } from '@/lib/utils/format';
@@ -11,6 +12,8 @@ import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Plus, Package } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -34,16 +37,31 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [vendorFilter, setVendorFilter] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const [showInactive, setShowInactive] = useState(false);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [productsRes, categoriesRes, vendorsRes] = await Promise.all([
-        supabase
-          .from('products')
-          .select('*, product_categories(id, name), vendors(id, name)')
-          .eq('is_active', true)
-          .order('name'),
+
+      // Fetch products, categories, and vendors in parallel
+      // If categories or vendors fail, still show products
+      const productsRes = await supabase
+        .from('products')
+        .select('*, product_categories(id, name), vendors(id, name)')
+        .order('name');
+
+      if (productsRes.error) {
+        console.error('Failed to load products:', productsRes.error);
+        toast.error('Failed to load products');
+        setLoading(false);
+        return;
+      }
+
+      setProducts((productsRes.data ?? []) as ProductWithRelations[]);
+
+      // Fetch filter options — partial failure OK
+      const [categoriesRes, vendorsRes] = await Promise.all([
         supabase
           .from('product_categories')
           .select('*')
@@ -56,16 +74,59 @@ export default function ProductsPage() {
           .order('name'),
       ]);
 
-      if (productsRes.data) setProducts(productsRes.data as ProductWithRelations[]);
-      if (categoriesRes.data) setCategories(categoriesRes.data);
-      if (vendorsRes.data) setVendors(vendorsRes.data);
+      let filterWarning = false;
+
+      if (categoriesRes.error) {
+        console.error('Failed to load categories:', categoriesRes.error);
+        filterWarning = true;
+      } else {
+        setCategories(categoriesRes.data ?? []);
+      }
+
+      if (vendorsRes.error) {
+        console.error('Failed to load vendors:', vendorsRes.error);
+        filterWarning = true;
+      } else {
+        setVendors(vendorsRes.data ?? []);
+      }
+
+      if (filterWarning) {
+        toast.error('Some filter options couldn\'t be loaded');
+      }
+
       setLoading(false);
     }
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function handleReactivate(product: ProductWithRelations) {
+    if (!window.confirm(`Reactivate "${product.name}"?`)) return;
+
+    setReactivatingId(product.id);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_active: true })
+        .eq('id', product.id);
+
+      if (error) throw error;
+
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, is_active: true } : p))
+      );
+      toast.success(`${product.name} reactivated`);
+    } catch (err) {
+      console.error('Reactivate product error:', err);
+      toast.error('Failed to reactivate product');
+    } finally {
+      setReactivatingId(null);
+    }
+  }
+
   const filtered = useMemo(() => {
     return products.filter((p) => {
+      // Active/inactive filter
+      if (!showInactive && !p.is_active) return false;
       // Search filter
       if (search) {
         const q = search.toLowerCase();
@@ -90,7 +151,7 @@ export default function ProductsPage() {
       }
       return true;
     });
-  }, [products, search, categoryFilter, vendorFilter, stockFilter]);
+  }, [products, search, categoryFilter, vendorFilter, stockFilter, showInactive]);
 
   function getStockBadge(product: ProductWithRelations) {
     if (product.quantity_on_hand === 0) {
@@ -167,7 +228,29 @@ export default function ProductsPage() {
     {
       id: 'status',
       header: 'Status',
-      cell: ({ row }) => getStockBadge(row.original),
+      cell: ({ row }) => {
+        const p = row.original;
+        if (!p.is_active) {
+          return (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">Inactive</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                disabled={reactivatingId === p.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReactivate(p);
+                }}
+              >
+                {reactivatingId === p.id ? 'Activating...' : 'Activate'}
+              </Button>
+            </div>
+          );
+        }
+        return getStockBadge(p);
+      },
       enableSorting: false,
     },
   ];
@@ -193,7 +276,7 @@ export default function ProductsPage() {
         }
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:flex-wrap">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -230,6 +313,14 @@ export default function ProductsPage() {
           <option value="low-stock">Low Stock</option>
           <option value="out-of-stock">Out of Stock</option>
         </Select>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <Switch
+            id="show-inactive-products"
+            checked={showInactive}
+            onCheckedChange={setShowInactive}
+          />
+          <Label htmlFor="show-inactive-products">Show Inactive</Label>
+        </div>
       </div>
 
       <DataTable

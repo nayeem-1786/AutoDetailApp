@@ -81,39 +81,62 @@ export default function CategoriesPage() {
   async function loadData() {
     setLoading(true);
 
-    const [prodCatRes, svcCatRes, prodCountRes, svcCountRes] = await Promise.all([
-      supabase.from('product_categories').select('*').order('display_order'),
-      supabase.from('service_categories').select('*').order('display_order'),
-      supabase.from('products').select('category_id').eq('is_active', true).not('category_id', 'is', null),
-      supabase.from('services').select('category_id').eq('is_active', true).not('category_id', 'is', null),
-    ]);
+    try {
+      const [prodCatRes, svcCatRes, prodCountRes, svcCountRes] = await Promise.all([
+        supabase.from('product_categories').select('*').order('display_order'),
+        supabase.from('service_categories').select('*').order('display_order'),
+        supabase.from('products').select('category_id').eq('is_active', true).not('category_id', 'is', null),
+        supabase.from('services').select('category_id').eq('is_active', true).not('category_id', 'is', null),
+      ]);
 
-    if (prodCatRes.data) setProductCategories(prodCatRes.data);
-    if (svcCatRes.data) setServiceCategories(svcCatRes.data);
+      if (prodCatRes.error && svcCatRes.error) {
+        console.error('Failed to load categories:', prodCatRes.error, svcCatRes.error);
+        toast.error('Failed to load categories');
+        setLoading(false);
+        return;
+      }
 
-    // Build product count map
-    const pMap: Record<string, number> = {};
-    if (prodCountRes.data) {
-      for (const row of prodCountRes.data) {
-        if (row.category_id) {
-          pMap[row.category_id] = (pMap[row.category_id] || 0) + 1;
+      if (prodCatRes.error) {
+        console.error('Failed to load product categories:', prodCatRes.error);
+        toast.error('Failed to load product categories');
+      } else {
+        setProductCategories(prodCatRes.data);
+      }
+
+      if (svcCatRes.error) {
+        console.error('Failed to load service categories:', svcCatRes.error);
+        toast.error('Failed to load service categories');
+      } else {
+        setServiceCategories(svcCatRes.data);
+      }
+
+      // Build product count map
+      const pMap: Record<string, number> = {};
+      if (prodCountRes.data) {
+        for (const row of prodCountRes.data) {
+          if (row.category_id) {
+            pMap[row.category_id] = (pMap[row.category_id] || 0) + 1;
+          }
         }
       }
-    }
-    setProductCounts(pMap);
+      setProductCounts(pMap);
 
-    // Build service count map
-    const sMap: Record<string, number> = {};
-    if (svcCountRes.data) {
-      for (const row of svcCountRes.data) {
-        if (row.category_id) {
-          sMap[row.category_id] = (sMap[row.category_id] || 0) + 1;
+      // Build service count map
+      const sMap: Record<string, number> = {};
+      if (svcCountRes.data) {
+        for (const row of svcCountRes.data) {
+          if (row.category_id) {
+            sMap[row.category_id] = (sMap[row.category_id] || 0) + 1;
+          }
         }
       }
+      setServiceCounts(sMap);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      toast.error('Failed to load categories');
+    } finally {
+      setLoading(false);
     }
-    setServiceCounts(sMap);
-
-    setLoading(false);
   }
 
   useEffect(() => {

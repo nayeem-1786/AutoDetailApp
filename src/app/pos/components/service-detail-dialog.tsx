@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
@@ -16,7 +16,7 @@ interface ServiceDetailDialogProps {
   open: boolean;
   onClose: () => void;
   /** When provided, use this callback instead of dispatching to ticket context */
-  onAdd?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null) => void;
+  onAdd?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
   /** Override vehicle size class */
   vehicleSizeOverride?: VehicleSizeClass | null;
 }
@@ -28,6 +28,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   const vehicleSizeClass = vehicleSizeOverride !== undefined
     ? vehicleSizeOverride
     : (ticket.vehicle?.size_class ?? null);
+
+  const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
 
   // If flat price and no tiers, create synthetic tier
   const tiers: ServicePricing[] = pricing.length > 0
@@ -57,6 +59,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     : -1;
 
   const [selectedTierIdx, setSelectedTierIdx] = useState(0);
+  const [perUnitQty, setPerUnitQty] = useState(1);
 
   // Auto-select matching tier when service or vehicle changes
   useEffect(() => {
@@ -67,6 +70,11 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     }
   }, [service.id, autoMatchIdx]);
 
+  // Reset per-unit quantity when service changes
+  useEffect(() => {
+    setPerUnitQty(1);
+  }, [service.id]);
+
   const selectedTier = tiers[selectedTierIdx] ?? null;
 
   function getDisplayPrice(tier: ServicePricing): number {
@@ -74,6 +82,38 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   }
 
   function handleAdd() {
+    if (isPerUnit) {
+      const perUnitPrice = service.per_unit_price!;
+      const total = perUnitQty * perUnitPrice;
+      const syntheticPricing: ServicePricing = {
+        id: 'per_unit',
+        service_id: service.id,
+        tier_name: 'default',
+        tier_label: null,
+        price: total,
+        display_order: 0,
+        is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        created_at: '',
+      };
+      if (onAdd) {
+        onAdd(service, syntheticPricing, vehicleSizeClass, perUnitQty);
+      } else if (dispatch) {
+        dispatch({
+          type: 'ADD_SERVICE',
+          service,
+          pricing: syntheticPricing,
+          vehicleSizeClass,
+          perUnitQty,
+        });
+      }
+      toast.success(`Added ${service.name}`);
+      onClose();
+      return;
+    }
+
     if (!selectedTier) {
       toast.error('No pricing available');
       return;
@@ -92,7 +132,16 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     onClose();
   }
 
-  const resolvedPrice = selectedTier ? getDisplayPrice(selectedTier) : null;
+  // Resolve display price for the Add button
+  let resolvedPrice: number | null;
+  if (isPerUnit) {
+    resolvedPrice = perUnitQty * service.per_unit_price!;
+  } else {
+    resolvedPrice = selectedTier ? getDisplayPrice(selectedTier) : null;
+  }
+
+  const perUnitMax = service.per_unit_max ?? 10;
+  const perUnitLabel = service.per_unit_label || 'unit';
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -115,8 +164,76 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
             </p>
           )}
 
-          {/* Tier selection */}
-          {tiers.length > 1 && (
+          {/* Per-unit quantity picker */}
+          {isPerUnit && (
+            <div className="mt-5">
+              {/* Unit price info */}
+              <div className="mb-4 rounded-lg bg-gray-50 p-4">
+                <p className="text-sm text-gray-600">
+                  <span className="font-semibold text-gray-900">
+                    ${service.per_unit_price!.toFixed(2)}
+                  </span>
+                  {' '}per {perUnitLabel}
+                </p>
+                {perUnitMax && (
+                  <p className="mt-1 text-xs text-gray-400">
+                    Maximum: {perUnitMax} {perUnitLabel}{perUnitMax > 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+
+              {/* Quantity selector */}
+              <p className="mb-3 text-sm font-medium text-gray-700">
+                How many {perUnitLabel}{perUnitQty !== 1 ? 's' : ''}?
+              </p>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => setPerUnitQty((q) => Math.max(1, q - 1))}
+                  disabled={perUnitQty <= 1}
+                  className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                    perUnitQty <= 1
+                      ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 active:scale-95'
+                  )}
+                >
+                  <Minus className="h-5 w-5" />
+                </button>
+
+                <div className="flex h-14 w-20 items-center justify-center rounded-xl bg-white border-2 border-blue-200">
+                  <span className="text-2xl font-bold tabular-nums text-gray-900">
+                    {perUnitQty}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setPerUnitQty((q) => Math.min(perUnitMax, q + 1))}
+                  disabled={perUnitQty >= perUnitMax}
+                  className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                    perUnitQty >= perUnitMax
+                      ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 active:scale-95'
+                  )}
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Total display */}
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/50 px-4 py-3">
+                <span className="text-sm font-medium text-gray-700">
+                  {perUnitQty} {perUnitLabel}{perUnitQty > 1 ? 's' : ''} &times; ${service.per_unit_price!.toFixed(2)}
+                </span>
+                <span className="text-lg font-bold text-gray-900">
+                  ${resolvedPrice!.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Tier selection (non-per-unit services only) */}
+          {!isPerUnit && tiers.length > 1 && (
             <div className="mt-5">
               <h3 className="mb-2 text-sm font-semibold text-gray-700">
                 {isVehicleSizeTiers ? 'Vehicle Size Pricing' : 'Select Tier'}
@@ -188,8 +305,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
             </div>
           )}
 
-          {/* Vehicle size pricing info */}
-          {tiers.length === 1 && tiers[0].is_vehicle_size_aware && (
+          {/* Vehicle size pricing info (non-per-unit only) */}
+          {!isPerUnit && tiers.length === 1 && tiers[0].is_vehicle_size_aware && (
             <div className="mt-5">
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Vehicle Size Pricing</h3>
               <div className="flex flex-wrap gap-2">
@@ -215,8 +332,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
             </div>
           )}
 
-          {/* Multi-tier vehicle size pricing hint */}
-          {tiers.length > 1 && tiers.some((t) => t.is_vehicle_size_aware) && !vehicleSizeClass && (
+          {/* Multi-tier vehicle size pricing hint (non-per-unit only) */}
+          {!isPerUnit && tiers.length > 1 && tiers.some((t) => t.is_vehicle_size_aware) && !vehicleSizeClass && (
             <p className="mt-3 text-xs text-gray-400">
               Select a vehicle on the ticket to see size-specific pricing.
             </p>
@@ -227,10 +344,10 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         <div className="shrink-0 border-t border-gray-100 p-5 pt-4">
           <button
             onClick={handleAdd}
-            disabled={!selectedTier}
+            disabled={!isPerUnit && !selectedTier}
             className={cn(
               'w-full rounded-xl py-3 text-base font-semibold text-white transition-all',
-              selectedTier
+              (isPerUnit || selectedTier)
                 ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.99]'
                 : 'cursor-not-allowed bg-gray-300'
             )}
