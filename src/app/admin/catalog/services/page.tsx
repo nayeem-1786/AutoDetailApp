@@ -15,7 +15,7 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Check, X as XIcon, Wrench } from 'lucide-react';
+import { Plus, Check, X as XIcon, Wrench, ImageOff } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ServiceWithCategory = Service & {
@@ -262,6 +262,32 @@ export default function ServicesPage() {
           </Button>
         }
       />
+
+      {(() => {
+        const missingCount = services.filter((s) => s.is_active && !s.image_url).length;
+        if (missingCount === 0) return null;
+        return (
+          <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="flex items-center gap-2">
+              <ImageOff className="h-4 w-4 flex-shrink-0" />
+              <span>{missingCount} active {missingCount === 1 ? 'service' : 'services'} missing images. Services without images won&apos;t display well to customers.</span>
+            </div>
+            <button
+              type="button"
+              className="ml-4 flex-shrink-0 font-medium text-amber-900 underline hover:text-amber-700"
+              onClick={() => {
+                setSearch('');
+                setCategoryFilter('');
+                setClassificationFilter('');
+                setPricingModelFilter('');
+                setShowInactive(false);
+              }}
+            >
+              Show all
+            </button>
+          </div>
+        );
+      })()}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:flex-wrap">
         <SearchInput
