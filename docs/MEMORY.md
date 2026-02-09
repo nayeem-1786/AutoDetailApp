@@ -36,6 +36,12 @@
 - Reference: Customer History tab Receipt # links in `src/app/admin/customers/[id]/page.tsx`
 - Applied to all admin list pages: Coupons, Campaigns, Automations, Quotes, Transactions, Customers, Products, Services, Staff
 
+### Verified Complete (previously listed as pending/gaps)
+- Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
+- Service edit/new pages — full forms (1,371 + 543 lines), most substantial catalog pages
+- All 11 settings sub-pages built and functional: Business Profile, Tax Config, Mobile Zones, POS Favorites, POS Idle Timeout, Receipt Printer, POS Security, Card Reader, Coupon Enforcement, Feature Toggles, Audit Log
+- Staff management (list, new, edit pages) with role-based auth (`roles.ts` + `permissions.ts` + `use-permission` hook)
+
 ### Key Files
 - `src/lib/supabase/admin.ts` - Service role client (bypasses RLS)
 - `src/lib/supabase/server.ts` - Cookie-based auth client
