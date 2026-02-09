@@ -119,6 +119,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | Admin appointment creation (currently only via booking/POS/voice agent) | Feature | Low |
 | Consolidate duplicate vendor pages (catalog vs inventory) | Cleanup | Low |
 | Configure Twilio webhook URL for inbound SMS (`/api/webhooks/twilio/inbound`) | Configuration | High |
+| Revert Twilio signature validation bypass in `src/app/api/webhooks/twilio/inbound/route.ts` line 72 (remove `false &&`) before production deploy | Bug Fix | Critical |
 
 ### Data Notes
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
