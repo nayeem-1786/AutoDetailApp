@@ -1676,13 +1676,12 @@ export default function CustomerProfilePage() {
             const totalQuotes = quotes.length;
             // Accepted = customer accepted the quote (includes both 'accepted' and 'converted' statuses)
             const acceptedQuotes = quotes.filter(q => q.status === 'accepted' || q.status === 'converted').length;
-            // Booked = quote was converted into an appointment
+            // Booked = quote was converted into an actual appointment
             const bookedQuotes = quotes.filter(q => q.status === 'converted').length;
-            const totalQuotedValue = quotes.reduce((sum, q) => sum + (q.total_amount || 0), 0);
-            // Accepted value includes both accepted and converted quotes
-            const acceptedValue = quotes.filter(q => q.status === 'accepted' || q.status === 'converted').reduce((sum, q) => sum + (q.total_amount || 0), 0);
-            // Conversion rate = how many quotes were accepted by customers
-            const conversionRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
+            // Booking rate = how many quotes actually became appointments
+            const bookingRate = totalQuotes > 0 ? Math.round((bookedQuotes / totalQuotes) * 100) : 0;
+            // Booked revenue = sum of only converted quotes (actual revenue)
+            const bookedRevenue = quotes.filter(q => q.status === 'converted').reduce((sum, q) => sum + (q.total_amount || 0), 0);
 
             return (
               <div className="space-y-6">
@@ -1734,8 +1733,8 @@ export default function CustomerProfilePage() {
                           <TrendingUp className="h-5 w-5 text-amber-600" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-gray-900">{conversionRate}%</p>
-                          <p className="text-xs text-gray-500">Conversion Rate</p>
+                          <p className="text-2xl font-bold text-gray-900">{bookingRate}%</p>
+                          <p className="text-xs text-gray-500">Booking Rate</p>
                         </div>
                       </div>
                     </CardContent>
@@ -1747,8 +1746,8 @@ export default function CustomerProfilePage() {
                           <DollarSign className="h-5 w-5 text-emerald-600" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(acceptedValue)}</p>
-                          <p className="text-xs text-gray-500">Accepted Value</p>
+                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(bookedRevenue)}</p>
+                          <p className="text-xs text-gray-500">Booked Revenue</p>
                         </div>
                       </div>
                     </CardContent>
@@ -1835,9 +1834,9 @@ export default function CustomerProfilePage() {
                 {totalQuotes > 0 && (
                   <div className="rounded-md bg-gray-50 p-4 text-sm text-gray-600">
                     <p>
-                      Total quoted value: <span className="font-semibold text-gray-900">{formatCurrency(totalQuotedValue)}</span>
-                      {acceptedValue > 0 && (
-                        <> · Accepted: <span className="font-semibold text-green-600">{formatCurrency(acceptedValue)}</span></>
+                      {acceptedQuotes} of {totalQuotes} quotes accepted
+                      {bookedRevenue > 0 && (
+                        <> · Booked revenue: <span className="font-semibold text-green-600">{formatCurrency(bookedRevenue)}</span></>
                       )}
                     </p>
                   </div>

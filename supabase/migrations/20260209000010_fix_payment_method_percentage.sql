@@ -1,6 +1,4 @@
--- Replace client-side transaction stats aggregation with a Postgres function
--- to avoid PostgREST's default 1,000-row limit causing incorrect totals.
-
+-- Fix payment method percentage: use revenue-based % instead of transaction-count-based %
 CREATE OR REPLACE FUNCTION get_transaction_stats(
   p_status text DEFAULT NULL,
   p_from timestamptz DEFAULT NULL,

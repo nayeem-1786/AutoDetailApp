@@ -1,6 +1,7 @@
 'use client';
 
 import { formatCurrency } from '@/lib/utils/format';
+import { Info } from 'lucide-react';
 
 interface RevenueStatsProps {
   revenue: number;
@@ -53,7 +54,17 @@ export function RevenueStats({
           key={card.key}
           className={`bg-white rounded-lg border border-gray-200 shadow-sm p-4 border-l-4 ${card.border}`}
         >
-          <p className="text-xs font-medium uppercase text-gray-500">{card.label}</p>
+          <p className="text-xs font-medium uppercase text-gray-500">
+            {card.label}
+            {card.key === 'revenue' && (
+              <span className="relative inline-block ml-1 align-middle group">
+                <Info className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
+                <span className="pointer-events-none absolute bottom-full left-0 mb-2 z-[60] hidden w-max max-w-[250px] rounded-lg bg-gray-900 px-3 py-2 text-xs font-normal normal-case text-white shadow-lg group-hover:block">
+                  Total revenue from all transactions in the selected period, including anonymous walk-ins without a customer profile.
+                </span>
+              </span>
+            )}
+          </p>
           {loading ? (
             <div className="h-8 w-24 rounded bg-gray-200 animate-pulse mt-1" />
           ) : (
