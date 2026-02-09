@@ -47,6 +47,10 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Session expiry protection (3-layer: periodic check, focus check, fetch interceptor)
 - Dynamic business info (zero hardcoded values)
 - Quote soft-delete (`deleted_at` timestamp), number reuse fix, email dark mode fix
+- Square → Supabase image migration: 408 product images + 27 service images imported. Stored in Supabase storage buckets (`product-images/`, `service-images/`)
+- Missing-image alert banners on Products and Services list pages (amber warning with count)
+- Info tooltips on Transactions revenue card and Customers lifetime revenue card explaining data source differences
+- Quote stats cards: "Conversion Rate" → "Booking Rate", "Accepted Value" → "Booked Revenue" (now uses converted quotes only)
 
 ### Phase 5 — What's Remaining
 - Lifecycle automation rules (service-based triggers, configurable timing, vehicle-aware reminders)
@@ -98,6 +102,11 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 ### Known Gaps (from Phase 1)
 - Product and service edit pages partially implemented (list views exist, individual edit forms need completion)
 - Some settings sections are placeholder/incomplete (integrations, notifications)
+
+### Data Notes
+- **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
+- **Transaction date gap:** Square's first payment: May 8, 2021. Supabase `transaction_date` starts Dec 31, 2021 — early transactions may not have been imported.
+- **Product/service images:** Stored in Supabase storage buckets `product-images/` and `service-images/`. 23 products have no images (never had them in Square). 2 services have no images (Excessive Cleaning Fee, Paint Decontamination & Protection — no Square counterparts). `service-images` bucket also allows `image/avif` MIME type (added accidentally, no impact).
 
 ---
 
