@@ -1,0 +1,203 @@
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessHours, formatBusinessHoursText } from '@/lib/data/business-hours';
+import type { Message } from '@/lib/supabase/types';
+
+/**
+ * Build the system prompt for the AI auto-responder.
+ * Fetches business info, hours, active services with pricing, and any extra prompt instructions.
+ */
+export async function buildSystemPrompt(): Promise<string> {
+  const businessInfo = await getBusinessInfo();
+  const businessHours = await getBusinessHours();
+
+  const supabase = createAdminClient();
+
+  // Fetch active services with their pricing tiers
+  const { data: services } = await supabase
+    .from('services')
+    .select(`
+      name, description, pricing_model, flat_price, custom_starting_price,
+      per_unit_price, per_unit_max, per_unit_label, mobile_eligible,
+      base_duration_minutes,
+      pricing:service_pricing(tier_name, tier_label, price, vehicle_size_sedan_price,
+        vehicle_size_truck_suv_price, vehicle_size_suv_van_price, is_vehicle_size_aware, display_order)
+    `)
+    .eq('is_active', true)
+    .order('name');
+
+  // Fetch extra AI prompt instructions from settings
+  const { data: extraPrompt } = await supabase
+    .from('business_settings')
+    .select('value')
+    .eq('key', 'messaging_ai_system_prompt_extra')
+    .single();
+
+  const hoursText = businessHours ? formatBusinessHoursText(businessHours) : 'Hours not available';
+  const bookingUrl = businessInfo.website ? `${businessInfo.website}/book` : 'our website';
+
+  const serviceCatalog = services?.map((s) => {
+    let pricingText = '';
+
+    switch (s.pricing_model) {
+      case 'vehicle_size': {
+        // Use the service_pricing rows for vehicle-size tiers
+        const tiers = (s.pricing as Array<{
+          tier_name: string; price: number;
+          vehicle_size_sedan_price: number | null;
+          vehicle_size_truck_suv_price: number | null;
+          vehicle_size_suv_van_price: number | null;
+          display_order: number;
+        }>) || [];
+        if (tiers.length > 0) {
+          // Vehicle-size pricing: sedan/truck/suv tiers
+          const tier = tiers[0];
+          if (tier.vehicle_size_sedan_price != null) {
+            pricingText = `Sedan $${tier.vehicle_size_sedan_price}, Truck/SUV $${tier.vehicle_size_truck_suv_price}, SUV 3-Row/Van $${tier.vehicle_size_suv_van_price}`;
+          } else {
+            pricingText = tiers
+              .sort((a, b) => a.display_order - b.display_order)
+              .map((t) => `${t.tier_name}: $${t.price}`)
+              .join(', ');
+          }
+        } else {
+          pricingText = s.flat_price != null ? `$${s.flat_price}` : 'Contact for pricing';
+        }
+        break;
+      }
+      case 'scope': {
+        const tiers = (s.pricing as Array<{
+          tier_name: string; tier_label: string | null; price: number;
+          is_vehicle_size_aware: boolean;
+          vehicle_size_sedan_price: number | null;
+          vehicle_size_truck_suv_price: number | null;
+          vehicle_size_suv_van_price: number | null;
+          display_order: number;
+        }>) || [];
+        pricingText = tiers
+          .sort((a, b) => a.display_order - b.display_order)
+          .map((t) => {
+            const label = t.tier_label || t.tier_name;
+            if (t.is_vehicle_size_aware && t.vehicle_size_sedan_price != null) {
+              return `${label}: Sedan $${t.vehicle_size_sedan_price}, Truck/SUV $${t.vehicle_size_truck_suv_price}, SUV 3-Row/Van $${t.vehicle_size_suv_van_price}`;
+            }
+            return `${label}: $${t.price}`;
+          })
+          .join(' | ');
+        break;
+      }
+      case 'specialty': {
+        const tiers = (s.pricing as Array<{
+          tier_name: string; tier_label: string | null; price: number; display_order: number;
+        }>) || [];
+        pricingText = tiers
+          .sort((a, b) => a.display_order - b.display_order)
+          .map((t) => `${t.tier_label || t.tier_name}: $${t.price}`)
+          .join(', ');
+        break;
+      }
+      case 'per_unit':
+        pricingText = `$${s.per_unit_price} per ${s.per_unit_label || 'unit'}${s.per_unit_max ? ` (max ${s.per_unit_max})` : ''}`;
+        break;
+      case 'flat':
+        pricingText = s.flat_price != null ? `$${s.flat_price}` : 'Contact for pricing';
+        break;
+      case 'custom':
+        pricingText = s.custom_starting_price != null
+          ? `Starting at $${s.custom_starting_price}+ (inspection required)`
+          : 'Contact for quote';
+        break;
+      default:
+        pricingText = 'Contact for pricing';
+    }
+
+    const duration = s.base_duration_minutes
+      ? s.base_duration_minutes >= 60
+        ? `${Math.floor(s.base_duration_minutes / 60)}-${Math.ceil(s.base_duration_minutes / 60) + 1} hours`
+        : `${s.base_duration_minutes} min`
+      : '';
+
+    return `- ${s.name}: ${pricingText}${duration ? ` (${duration})` : ''}${s.mobile_eligible ? ' [Mobile Available]' : ''}${s.description ? ` — ${s.description}` : ''}`;
+  }).join('\n') || 'No services available';
+
+  return `You are a helpful SMS assistant for ${businessInfo.name}, an auto detailing business located at ${businessInfo.address}.
+
+Business phone: ${businessInfo.phone}
+Business hours: ${hoursText}
+
+## Your Role
+- Answer questions about services, pricing, and availability
+- Be friendly, professional, and concise (SMS messages should be brief)
+- Provide accurate pricing from the service catalog below
+- When customers show interest, encourage them to book online at: ${bookingUrl}
+- If you're unsure about something, say so and offer to have a team member follow up
+- If the customer seems ready to book, provide this link: ${bookingUrl}
+- If you learn their name, mention it naturally in your response
+
+## Rules
+- NEVER make up pricing or services not in the catalog
+- NEVER access, discuss, or look up customer personal data
+- NEVER offer custom discounts or deals not listed below
+- NEVER provide information about staff or internal operations
+- Keep responses under 320 characters when possible (SMS-friendly)
+
+## Service Catalog
+${serviceCatalog}
+
+${extraPrompt?.value ? `\n## Additional Instructions\n${extraPrompt.value}` : ''}`;
+}
+
+/**
+ * Get an AI response using the Anthropic Messages API.
+ * Passes conversation history for context (up to 20 messages).
+ */
+export async function getAIResponse(
+  conversationHistory: Message[],
+  newMessage: string
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is not configured');
+  }
+
+  const systemPrompt = await buildSystemPrompt();
+
+  // Build message history for context (last 20 messages max)
+  const recentHistory = conversationHistory.slice(-20);
+  const messages = recentHistory.map((msg) => ({
+    role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+    content: msg.body,
+  }));
+
+  // Add the new inbound message
+  messages.push({ role: 'user', content: newMessage });
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 300,
+      system: systemPrompt,
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Anthropic API error:', error);
+    throw new Error(`AI response failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data.content?.[0]?.text;
+
+  if (!text) throw new Error('Empty AI response');
+
+  // Truncate to 320 chars for SMS-friendliness (2 segments max)
+  return text.length > 320 ? text.slice(0, 317) + '...' : text;
+}
