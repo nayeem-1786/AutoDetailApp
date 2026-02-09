@@ -52,6 +52,12 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Info tooltips on Transactions revenue card and Customers lifetime revenue card explaining data source differences
 - Quote stats cards: "Conversion Rate" → "Booking Rate", "Accepted Value" → "Booked Revenue" (now uses converted quotes only)
 
+### Verified Complete (previously listed as pending)
+- Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
+- Service edit/new pages — full forms (1,371 + 543 lines), most substantial catalog pages
+- All 11 settings sub-pages built and functional: Business Profile (419 lines), Tax Config (217), Mobile Zones (454), POS Favorites (594), POS Idle Timeout (155), Receipt Printer (574), POS Security (458), Card Reader (407), Coupon Enforcement (137), Feature Toggles (112), Audit Log (184)
+- Staff management (list, new, edit pages) with role-based auth (roles.ts + permissions.ts + use-permission hook)
+
 ### Phase 5 — What's Remaining
 - Lifecycle automation rules (service-based triggers, configurable timing, vehicle-aware reminders)
 - Two-way SMS (inbound routed to Telegram, reply via Telegram)
@@ -93,15 +99,10 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | Task | Type | Priority |
 |------|------|----------|
 | POS session caching bug (multi-tab stale state, expired session on hard refresh) | Bug fix | Medium |
-| Admin Settings: Role Permissions UI (`/admin/settings/roles-permissions`) | Feature | Medium |
 | Merge duplicate customers (detect and consolidate) | Feature | Medium |
 | URL shortening for customer links (shorter tokens or Bitly integration) | Enhancement | Low |
 | Setup receipt printer integration for POS | Hardware | Low |
 | Test dashboard sections marked as completed | Testing | Low |
-
-### Known Gaps (from Phase 1)
-- Product and service edit pages partially implemented (list views exist, individual edit forms need completion)
-- Some settings sections are placeholder/incomplete (integrations, notifications)
 
 ### Data Notes
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
