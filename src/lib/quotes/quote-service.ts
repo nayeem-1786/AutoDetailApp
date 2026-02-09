@@ -434,15 +434,14 @@ export async function getQuoteMetrics(
   const totalAmount = quotes.reduce((sum, q) => sum + (q.total_amount ?? 0), 0);
   const averageValue = Math.round((totalAmount / totalQuotes) * 100) / 100;
 
-  // Conversion rate: (accepted + converted) / (total - drafts) * 100
+  // Booking rate: converted / (total - drafts) * 100
+  // Only counts quotes that became actual bookings (converted), not just accepted
   const draftCount = quotes.filter((q) => q.status === 'draft').length;
-  const acceptedOrConverted = quotes.filter(
-    (q) => q.status === 'accepted' || q.status === 'converted'
-  ).length;
+  const convertedCount = quotes.filter((q) => q.status === 'converted').length;
   const denominator = totalQuotes - draftCount;
   const conversionRate =
     denominator > 0
-      ? Math.round((acceptedOrConverted / denominator) * 100 * 100) / 100
+      ? Math.round((convertedCount / denominator) * 100 * 100) / 100
       : 0;
 
   // Avg days to convert

@@ -41,9 +41,21 @@
 - Service edit/new pages — full forms (1,371 + 543 lines), most substantial catalog pages
 - All 11 settings sub-pages built and functional: Business Profile, Tax Config, Mobile Zones, POS Favorites, POS Idle Timeout, Receipt Printer, POS Security, Card Reader, Coupon Enforcement, Feature Toggles, Audit Log
 - Staff management (list, new, edit pages) with role-based auth (`roles.ts` + `permissions.ts` + `use-permission` hook)
+- POS session management — cross-tab sync (storage events), 60s token expiry check, mount validation
+- Merge duplicate customers — `/admin/customers/duplicates`, `find_duplicate_customers` + `merge_customers` RPCs, smart scoring, confidence levels, bulk merge
+- URL shortening — `short_links` table, `/s/[code]` redirect, 6-char alphanumeric codes, collision retry
+- Dashboard widgets — all functional with live data (stats cards, calendar, schedule, quick actions)
+
+### Phase 5 Known Gaps
+- **Lifecycle automation rules**: UI/API/DB scaffolding exists but execution triggers NOT wired
+- **Two-way SMS, Google reviews, campaign analytics, A/B testing, TCPA audit**: Not built
+- **Admin appointment creation**: No admin-side create button — appointments only via booking, POS, or voice agent
 
 ### Key Files
 - `src/lib/supabase/admin.ts` - Service role client (bypasses RLS)
 - `src/lib/supabase/server.ts` - Cookie-based auth client
 - `src/lib/utils/admin-fetch.ts` - Auth-aware fetch with 401 redirect
+- `src/lib/utils/short-link.ts` - URL shortener (6-char codes, `short_links` table)
 - `src/app/admin/marketing/coupons/new/page.tsx` - 6-step coupon wizard
+- `src/app/admin/customers/duplicates/page.tsx` - Duplicate detection & merge UI
+- `src/app/pos/context/pos-auth-context.tsx` - POS session management with cross-tab sync

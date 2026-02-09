@@ -14,7 +14,7 @@ interface QuoteMetricsProps {
 export function QuoteMetrics({ metrics }: QuoteMetricsProps) {
   const items = [
     { label: 'Avg Value', value: formatCurrency(metrics.averageValue) },
-    { label: 'Conversion', value: `${metrics.conversionRate.toFixed(1)}%` },
+    { label: 'Booking Rate', value: `${metrics.conversionRate.toFixed(1)}%` },
     { label: 'Avg Days', value: `${Math.round(metrics.avgDaysToConvert)}d` },
     { label: 'Total', value: metrics.totalQuotes.toLocaleString() },
   ];
