@@ -613,3 +613,14 @@ export type CustomerVehicleInput = z.infer<typeof customerVehicleSchema>;
 export type CampaignCreateInput = z.infer<typeof campaignCreateSchema>;
 export type CampaignUpdateInput = z.infer<typeof campaignUpdateSchema>;
 export type LifecycleRuleInput = z.infer<typeof lifecycleRuleSchema>;
+
+// ---------------------------------------------------------------------------
+// Messaging schemas
+// ---------------------------------------------------------------------------
+
+export const sendMessageSchema = z.object({
+  conversation_id: z.string().uuid(),
+  body: z.string().min(1, 'Message is required').max(1600, 'SMS max 1600 characters'),
+});
+
+export type SendMessageInput = z.infer<typeof sendMessageSchema>;

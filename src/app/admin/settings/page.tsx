@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -42,6 +42,18 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Manage service zones, distance ranges, and mobile surcharges.',
         href: '/admin/settings/mobile-zones',
         icon: MapPin,
+        roles: ['super_admin'],
+      },
+    ],
+  },
+  {
+    label: 'Communications',
+    items: [
+      {
+        title: 'Messaging',
+        description: 'Configure AI auto-replies, after-hours messages, and SMS settings.',
+        href: '/admin/settings/messaging',
+        icon: MessageSquare,
         roles: ['super_admin'],
       },
     ],

@@ -186,3 +186,27 @@ export const FEATURE_FLAGS = {
   REFERRAL_PROGRAM: 'referral_program',
   MOBILE_SERVICE: 'mobile_service',
 } as const;
+
+// Messaging
+export const MESSAGE_DIRECTION = { INBOUND: 'inbound', OUTBOUND: 'outbound' } as const;
+export const MESSAGE_SENDER_TYPE = { CUSTOMER: 'customer', STAFF: 'staff', AI: 'ai', SYSTEM: 'system' } as const;
+export const CONVERSATION_STATUS = { OPEN: 'open', CLOSED: 'closed', ARCHIVED: 'archived' } as const;
+
+export const CONVERSATION_STATUS_LABELS: Record<string, string> = {
+  open: 'Open',
+  closed: 'Closed',
+  archived: 'Archived',
+} as const;
+
+export const CONVERSATION_STATUS_BADGE_VARIANT: Record<string, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
+  open: 'success',
+  closed: 'default',
+  archived: 'secondary',
+} as const;
+
+export const MESSAGE_SENDER_TYPE_LABELS: Record<string, string> = {
+  customer: 'Customer',
+  staff: 'Staff',
+  ai: 'AI',
+  system: 'System',
+} as const;
