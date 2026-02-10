@@ -756,6 +756,17 @@ export interface EmailDeliveryLog {
   created_at: string;
 }
 
+export interface CampaignVariant {
+  id: string;
+  campaign_id: string;
+  variant_label: string;
+  message_body: string;
+  email_subject: string | null;
+  split_percentage: number;
+  is_winner: boolean;
+  created_at: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }
