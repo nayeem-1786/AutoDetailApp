@@ -127,6 +127,74 @@ export async function buildSystemPrompt(): Promise<string> {
     return `- ${s.name}: ${pricingText}${duration ? ` (${duration})` : ''}${s.mobile_eligible ? ' [Mobile]' : ''}`;
   }).join('\n') || 'No services available';
 
+  // Fetch active general-purpose coupons with their rewards (joined via coupon_rewards)
+  let couponSection = '';
+  try {
+    const { data: activeCoupons } = await supabase
+      .from('coupons')
+      .select(`
+        code,
+        name,
+        expires_at,
+        min_purchase,
+        customer_id,
+        coupon_rewards (
+          applies_to,
+          discount_type,
+          discount_value,
+          max_discount,
+          target_product_id,
+          target_service_id,
+          target_product_category_id,
+          target_service_category_id,
+          products:target_product_id ( name ),
+          services:target_service_id ( name ),
+          product_categories:target_product_category_id ( name ),
+          service_categories:target_service_category_id ( name )
+        )
+      `)
+      .eq('status', 'active')
+      .is('customer_id', null)
+      .or(`expires_at.is.null,expires_at.gte.${new Date().toISOString()}`);
+
+    if (activeCoupons && activeCoupons.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const promoLines = activeCoupons.map((c: any) => {
+        const rewards = c.coupon_rewards || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const discountParts = rewards.map((r: any) => {
+          const targetName =
+            r.products?.name ||
+            r.services?.name ||
+            r.product_categories?.name ||
+            r.service_categories?.name ||
+            (r.applies_to === 'order' ? 'entire order' :
+             r.applies_to === 'product' ? 'any product' : 'any service');
+
+          if (r.discount_type === 'free') return `Free ${targetName}`;
+          if (r.discount_type === 'percentage') {
+            const cap = r.max_discount ? ` (max $${r.max_discount})` : '';
+            return `${r.discount_value}% off ${targetName}${cap}`;
+          }
+          // flat
+          return `$${r.discount_value} off ${targetName}`;
+        });
+
+        const discountStr = discountParts.join(' + ') || 'Special offer';
+        const expiry = c.expires_at
+          ? `expires ${new Date(c.expires_at).toLocaleDateString()}`
+          : 'no expiration';
+        const minPurchase = c.min_purchase ? ` | min $${c.min_purchase} order` : '';
+        const label = c.name ? ` — ${c.name}` : '';
+        return `- Code "${c.code}"${label}: ${discountStr} (${expiry}${minPurchase})`;
+      });
+
+      couponSection = `\n\nACTIVE PROMOTIONS:\n${promoLines.join('\n')}`;
+    }
+  } catch (err) {
+    console.error('Coupon query failed:', err);
+  }
+
   return `${behavioralPrompt}
 
 PRICING DATA (for your reference only — NEVER send this list to the customer):
@@ -137,7 +205,7 @@ ${businessInfo.name}
 Phone: ${businessInfo.phone}
 Hours: ${hoursText}
 Status: ${isOpen ? 'CURRENTLY OPEN' : 'CURRENTLY CLOSED'}
-Booking: ${bookingUrl}`;
+Booking: ${bookingUrl}${couponSection}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +261,9 @@ async function searchRelevantProducts(
     return `- ${p.name} (${price}${cat ? `, ${cat}` : ''})${desc}`;
   }).join('\n');
 
-  return `\n\nPRODUCTS WE CARRY (relevant to this conversation):\n${productLines}\n\nWhen discussing products: share name, price, and a brief description. For purchases, direct customers to visit in-store or let them know a team member can help with ordering.`;
+  const catalogUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/products`;
+
+  return `\n\nPRODUCTS WE CARRY (relevant to this conversation):\n${productLines}\nBrowse our full product catalog: ${catalogUrl}\n\nWhen discussing products: share name, price, and a brief description. For purchases, share the catalog link so customers can browse online, or let them know they can visit in-store.`;
 }
 
 export interface CustomerContext {
