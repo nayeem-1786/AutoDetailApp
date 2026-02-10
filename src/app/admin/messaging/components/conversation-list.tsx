@@ -51,7 +51,7 @@ const STATUS_PILLS: {
   {
     value: 'archived',
     label: 'Archived',
-    activeClassName: 'bg-gray-200 text-gray-700',
+    activeClassName: 'bg-purple-100 text-purple-700',
   },
 ];
 
