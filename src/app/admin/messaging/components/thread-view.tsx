@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -16,12 +16,27 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, formatCurrency } from '@/lib/utils/format';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { Conversation, Message } from '@/lib/supabase/types';
 import { MessageBubble } from './message-bubble';
 import { ReplyInput } from './reply-input';
 import Link from 'next/link';
-import { useState } from 'react';
+
+interface ConversationSummary {
+  customer: { name: string; phone: string; type: string } | null;
+  vehicle: { year: string; make: string; model: string; color: string } | null;
+  latestQuote: {
+    quote_number: string;
+    status: string;
+    total_amount: number;
+    services: string[];
+    created_at: string;
+    sent_at: string | null;
+    viewed_at: string | null;
+    accepted_at: string | null;
+  } | null;
+}
 
 interface ThreadViewProps {
   conversation: Conversation | null;
@@ -44,6 +59,29 @@ export function ThreadView({
   const containerRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [summary, setSummary] = useState<ConversationSummary | null>(null);
+
+  // Fetch summary when conversation changes
+  useEffect(() => {
+    if (!conversation) {
+      setSummary(null);
+      return;
+    }
+    let cancelled = false;
+    async function fetchSummary() {
+      try {
+        const res = await adminFetch(`/api/admin/messaging/${conversation!.id}/summary`);
+        if (res.ok && !cancelled) {
+          setSummary(await res.json());
+        }
+      } catch {
+        // Summary is non-critical, fail silently
+      }
+    }
+    setSummary(null);
+    fetchSummary();
+    return () => { cancelled = true; };
+  }, [conversation?.id]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -210,6 +248,15 @@ export function ThreadView({
         </div>
       </div>
 
+      {/* Summary card */}
+      {summary && (
+        <div className="border-b border-gray-200 bg-gray-50 px-4 py-2">
+          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+            <SummaryCard summary={summary} phoneDisplay={phoneDisplay} />
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-4">
         {loading ? (
@@ -257,6 +304,54 @@ export function ThreadView({
         </div>
       ) : (
         <ReplyInput onSend={onSend} />
+      )}
+    </div>
+  );
+}
+
+function SummaryCard({ summary, phoneDisplay }: { summary: ConversationSummary; phoneDisplay: string }) {
+  const { customer, vehicle, latestQuote } = summary;
+  const hasCustomerName = customer?.name && customer.name.trim().length > 0;
+
+  // Build vehicle string
+  const vehicleParts = [vehicle?.year, vehicle?.make, vehicle?.model, vehicle?.color]
+    .filter(Boolean);
+  const vehicleStr = vehicleParts.length > 0 ? vehicleParts.join(' ') : '';
+
+  // Build quote status text
+  let quoteStatusText = '';
+  if (latestQuote) {
+    if (latestQuote.accepted_at) {
+      quoteStatusText = 'Accepted \u2713';
+    } else if (latestQuote.viewed_at) {
+      const viewedDate = new Date(latestQuote.viewed_at).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric',
+      });
+      quoteStatusText = `Viewed ${viewedDate}`;
+    } else if (latestQuote.sent_at) {
+      quoteStatusText = 'Sent \u00b7 Not yet viewed';
+    } else {
+      quoteStatusText = latestQuote.status.charAt(0).toUpperCase() + latestQuote.status.slice(1);
+    }
+  }
+
+  const serviceNames = latestQuote?.services?.join(', ') || '';
+
+  return (
+    <div className="space-y-0.5">
+      <div className="flex items-center gap-1.5">
+        <span>{hasCustomerName ? customer!.name : phoneDisplay}</span>
+        {hasCustomerName && vehicleStr && (
+          <>
+            <span className="text-gray-400">&middot;</span>
+            <span className="text-gray-500">{vehicleStr}</span>
+          </>
+        )}
+      </div>
+      {latestQuote && (
+        <div className="text-gray-500">
+          Quote #{latestQuote.quote_number}: {serviceNames} &mdash; {formatCurrency(latestQuote.total_amount)} ({quoteStatusText})
+        </div>
       )}
     </div>
   );
