@@ -8,6 +8,7 @@ import { MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { Conversation, ConversationStatus } from '@/lib/supabase/types';
 import { ConversationRow } from './conversation-row';
+import { TogglePill } from '@/components/ui/toggle-pill';
 
 type FilterTab = 'all' | 'unread' | 'unknown' | 'customers';
 
@@ -35,26 +36,22 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 const STATUS_PILLS: {
   value: ConversationStatus;
   label: string;
-  active: string;
-  inactive: string;
+  activeClassName: string;
 }[] = [
   {
     value: 'open',
     label: 'Open',
-    active: 'bg-green-500 text-white',
-    inactive: 'bg-green-100 text-green-800',
+    activeClassName: 'bg-green-100 text-green-700',
   },
   {
     value: 'closed',
     label: 'Closed',
-    active: 'bg-yellow-500 text-white',
-    inactive: 'bg-yellow-100 text-yellow-800',
+    activeClassName: 'bg-yellow-100 text-yellow-700',
   },
   {
     value: 'archived',
     label: 'Archived',
-    active: 'bg-gray-500 text-white',
-    inactive: 'bg-gray-100 text-gray-600',
+    activeClassName: 'bg-gray-200 text-gray-700',
   },
 ];
 
@@ -97,16 +94,14 @@ export function ConversationList({
       <div className="space-y-2 border-b border-gray-200 p-3">
         <div className="flex gap-2">
           {STATUS_PILLS.map((pill) => (
-            <button
+            <TogglePill
               key={pill.value}
+              label={pill.label}
+              active={statusFilter === pill.value}
               onClick={() => onStatusFilterChange(pill.value)}
-              className={cn(
-                'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
-                statusFilter === pill.value ? pill.active : pill.inactive
-              )}
-            >
-              {pill.label} ({statusCounts[pill.value]})
-            </button>
+              activeClassName={pill.activeClassName}
+              count={statusCounts[pill.value]}
+            />
           ))}
         </div>
         <SearchInput

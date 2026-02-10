@@ -10,8 +10,8 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
+import { TogglePill } from '@/components/ui/toggle-pill';
 
 interface MessagingSettings {
   messaging_ai_unknown_enabled: string;
@@ -172,66 +172,87 @@ export default function MessagingSettingsPage() {
           <CardTitle>AI Auto-Reply</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
-            <p className="text-sm font-medium text-gray-900">
-              Enable AI for audience
-            </p>
-            <p className="mt-0.5 text-sm text-gray-500">
-              Choose which message senders get AI-powered auto-replies. Both can be enabled independently.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    messaging_ai_unknown_enabled: isEnabled(prev.messaging_ai_unknown_enabled) ? 'false' : 'true',
-                  }))
-                }
-                className={cn(
-                  'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
-                  isEnabled(settings.messaging_ai_unknown_enabled)
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-purple-100 text-purple-800'
-                )}
-              >
-                Unknown
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    messaging_ai_customers_enabled: isEnabled(prev.messaging_ai_customers_enabled) ? 'false' : 'true',
-                  }))
-                }
-                className={cn(
-                  'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
-                  isEnabled(settings.messaging_ai_customers_enabled)
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-blue-100 text-blue-800'
-                )}
-              >
-                Customers
-              </button>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                Enable AI Auto-Reply
+              </p>
+              <p className="mt-0.5 text-sm text-gray-500">
+                Automatically reply to incoming messages using AI.
+              </p>
             </div>
+            <Switch
+              checked={isEnabled(settings.messaging_ai_unknown_enabled) || isEnabled(settings.messaging_ai_customers_enabled)}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setSettings((prev) => ({
+                    ...prev,
+                    messaging_ai_unknown_enabled: 'true',
+                    messaging_ai_customers_enabled: 'false',
+                  }));
+                } else {
+                  setSettings((prev) => ({
+                    ...prev,
+                    messaging_ai_unknown_enabled: 'false',
+                    messaging_ai_customers_enabled: 'false',
+                  }));
+                }
+              }}
+            />
           </div>
 
-          <FormField
-            label="Additional AI Instructions"
-            description="Custom instructions for the AI when composing replies. For example: tone, topics to avoid, or specific information to include."
-            htmlFor="ai_instructions"
-          >
-            <Textarea
-              id="ai_instructions"
-              rows={4}
-              placeholder="e.g., Always be friendly and professional. Mention our ceramic coating special when relevant."
-              value={settings.messaging_ai_instructions}
-              onChange={(e) =>
-                setSettings((prev) => ({ ...prev, messaging_ai_instructions: e.target.value }))
-              }
-            />
-          </FormField>
+          {(isEnabled(settings.messaging_ai_unknown_enabled) || isEnabled(settings.messaging_ai_customers_enabled)) && (
+            <>
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Audience
+                </p>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  Choose which message senders get AI-powered auto-replies. Both can be enabled independently.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <TogglePill
+                    label="Unknown"
+                    active={isEnabled(settings.messaging_ai_unknown_enabled)}
+                    onClick={() =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        messaging_ai_unknown_enabled: isEnabled(prev.messaging_ai_unknown_enabled) ? 'false' : 'true',
+                      }))
+                    }
+                    activeClassName="bg-purple-100 text-purple-700"
+                  />
+                  <TogglePill
+                    label="Customers"
+                    active={isEnabled(settings.messaging_ai_customers_enabled)}
+                    onClick={() =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        messaging_ai_customers_enabled: isEnabled(prev.messaging_ai_customers_enabled) ? 'false' : 'true',
+                      }))
+                    }
+                    activeClassName="bg-blue-100 text-blue-700"
+                  />
+                </div>
+              </div>
+
+              <FormField
+                label="Additional AI Instructions"
+                description="Custom instructions for the AI when composing replies. For example: tone, topics to avoid, or specific information to include."
+                htmlFor="ai_instructions"
+              >
+                <Textarea
+                  id="ai_instructions"
+                  rows={4}
+                  placeholder="e.g., Always be friendly and professional. Mention our ceramic coating special when relevant."
+                  value={settings.messaging_ai_instructions}
+                  onChange={(e) =>
+                    setSettings((prev) => ({ ...prev, messaging_ai_instructions: e.target.value }))
+                  }
+                />
+              </FormField>
+            </>
+          )}
         </CardContent>
       </Card>
 
