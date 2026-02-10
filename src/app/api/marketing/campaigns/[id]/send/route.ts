@@ -8,7 +8,8 @@ import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { SITE_URL } from '@/lib/utils/constants';
-import type { CampaignChannel } from '@/lib/supabase/types';
+import { splitRecipients } from '@/lib/campaigns/ab-testing';
+import type { CampaignChannel, CampaignVariant } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
 function generateCouponCode(): string {
@@ -84,6 +85,38 @@ export async function POST(
       filters,
       campaign.channel as CampaignChannel
     );
+
+    // --- A/B Testing: check for variants ---
+    const { data: variants } = await adminClient
+      .from('campaign_variants')
+      .select('*')
+      .eq('campaign_id', id)
+      .order('variant_label');
+
+    const isABTest = variants && variants.length > 0;
+
+    // Build customer → variant assignment map for A/B tests
+    let customerVariantMap: Map<string, CampaignVariant> | null = null;
+    if (isABTest) {
+      const recipientAssignments = splitRecipients(
+        customerIds.map(cid => ({ customerId: cid })),
+        variants.map(v => ({ id: v.id, splitPercentage: v.split_percentage }))
+      );
+
+      // Reverse the map: variantId → customerIds[] → customerId → variant
+      customerVariantMap = new Map();
+      for (const variant of variants) {
+        const assignedCustomerIds = recipientAssignments.get(variant.id) ?? [];
+        for (const cid of assignedCustomerIds) {
+          customerVariantMap.set(cid, variant as CampaignVariant);
+        }
+      }
+
+      console.log(
+        `[Campaign ${id}] A/B test with ${variants.length} variants:`,
+        variants.map(v => `${v.variant_label} (${v.split_percentage}%)`).join(', ')
+      );
+    }
 
     // Get coupon template (with rewards) if attached
     let couponTemplate: any = null;
@@ -166,6 +199,12 @@ export async function POST(
         book_now_url: bookNowUrl,
       };
 
+      // Resolve message templates: use variant overrides for A/B tests
+      const variant = customerVariantMap?.get(customer.id) ?? null;
+      const smsTemplate = variant?.message_body ?? campaign.sms_template;
+      const emailSubjectTemplate = variant?.email_subject ?? campaign.email_subject;
+      const emailBodyTemplate = variant?.message_body ?? campaign.email_template;
+
       let smsDelivered = false;
       let emailDelivered = false;
       let mailgunMessageId: string | null = null;
@@ -178,10 +217,13 @@ export async function POST(
         (campaign.channel === 'sms' || campaign.channel === 'both') &&
         customer.sms_consent &&
         customer.phone &&
-        campaign.sms_template
+        smsTemplate
       ) {
-        const smsBody = renderTemplate(campaign.sms_template, templateVars);
-        const result = await sendMarketingSms(customer.phone, smsBody, customer.id);
+        const smsBody = renderTemplate(smsTemplate, templateVars);
+        const result = await sendMarketingSms(customer.phone, smsBody, customer.id, {
+          campaignId: id,
+          source: 'campaign',
+        });
         smsDelivered = result.success;
       }
 
@@ -190,11 +232,11 @@ export async function POST(
         (campaign.channel === 'email' || campaign.channel === 'both') &&
         customer.email_consent &&
         customer.email &&
-        campaign.email_subject &&
-        campaign.email_template
+        emailSubjectTemplate &&
+        emailBodyTemplate
       ) {
-        const emailSubject = renderTemplate(campaign.email_subject, templateVars);
-        const emailBody = renderTemplate(campaign.email_template, templateVars);
+        const emailSubject = renderTemplate(emailSubjectTemplate, templateVars);
+        const emailBody = renderTemplate(emailBodyTemplate, templateVars);
         const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
         const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${bookNowUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Book Now</a></div>`;
         const emailHtml = `<html><body>${bodyParagraphs}${ctaButton}</body></html>`;
@@ -211,7 +253,7 @@ export async function POST(
       const delivered = smsDelivered || emailDelivered;
       if (delivered) deliveredCount++;
 
-      // Record recipient with pre-generated ID
+      // Record recipient with pre-generated ID + variant assignment
       await adminClient.from('campaign_recipients').insert({
         id: recipientId,
         campaign_id: id,
@@ -220,6 +262,7 @@ export async function POST(
         coupon_code: couponCode || null,
         delivered,
         mailgun_message_id: mailgunMessageId,
+        variant_id: variant?.id ?? null,
         sent_at: new Date().toISOString(),
       });
     }
@@ -235,6 +278,20 @@ export async function POST(
       })
       .eq('id', id);
 
+    // Log A/B auto-select-winner info for future cron processing
+    if (isABTest && campaign.auto_select_winner) {
+      console.log(
+        `[Campaign ${id}] A/B test sent — auto_select_winner enabled` +
+        (campaign.auto_select_after_hours
+          ? `, winner selection in ${campaign.auto_select_after_hours}h`
+          : '')
+      );
+      // TODO: Schedule winner determination via cron or delayed job.
+      // For now, winner can be determined manually via determineWinner(campaignId)
+      // or via a future cron that checks campaigns with auto_select_winner=true
+      // and sent_at + auto_select_after_hours < now().
+    }
+
     // Fire webhook
     fireWebhook('campaign_send', {
       campaign_id: id,
@@ -242,6 +299,7 @@ export async function POST(
       channel: campaign.channel,
       recipient_count: customers?.length ?? 0,
       delivered_count: deliveredCount,
+      is_ab_test: isABTest,
     });
 
     return NextResponse.json({
@@ -249,6 +307,8 @@ export async function POST(
         status: 'sent',
         recipient_count: customers?.length ?? 0,
         delivered_count: deliveredCount,
+        is_ab_test: isABTest,
+        variant_count: isABTest ? variants!.length : 0,
       },
     });
   } catch (err) {
