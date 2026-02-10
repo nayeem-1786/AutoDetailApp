@@ -66,6 +66,7 @@ export default function AutomationDetailPage() {
           trigger_condition: data.trigger_condition,
           trigger_service_id: data.trigger_service_id || null,
           delay_days: data.delay_days,
+          delay_minutes: data.delay_minutes ?? 0,
           action: data.action,
           sms_template: data.sms_template || '',
           email_subject: data.email_subject || '',
@@ -184,7 +185,8 @@ export default function AutomationDetailPage() {
               </FormField>
               <FormField label="Trigger Condition" error={errors.trigger_condition?.message} required htmlFor="trigger_condition">
                 <Select id="trigger_condition" {...register('trigger_condition')}>
-                  <option value="service_completed">Service Completed</option>
+                  <option value="service_completed">After Service (appointment completed)</option>
+                  <option value="after_transaction">After Transaction (POS checkout)</option>
                   <option value="no_visit_days">No Visit (Days)</option>
                   <option value="birthday">Birthday</option>
                 </Select>
@@ -197,9 +199,22 @@ export default function AutomationDetailPage() {
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Delay (days)" error={errors.delay_days?.message} required htmlFor="delay_days">
-                <Input id="delay_days" type="number" min="0" {...register('delay_days')} />
-              </FormField>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Delay</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Input id="delay_days" type="number" min="0" {...register('delay_days')} />
+                    <span className="mt-1 block text-xs text-gray-500">days</span>
+                  </div>
+                  <div className="flex-1">
+                    <Input id="delay_minutes" type="number" min="0" max="1439" {...register('delay_minutes')} />
+                    <span className="mt-1 block text-xs text-gray-500">minutes</span>
+                  </div>
+                </div>
+                {(errors.delay_days?.message || errors.delay_minutes?.message) && (
+                  <p className="mt-1 text-sm text-red-600">{errors.delay_days?.message || errors.delay_minutes?.message}</p>
+                )}
+              </div>
               <FormField label="Chain Order" error={errors.chain_order?.message} htmlFor="chain_order">
                 <Input id="chain_order" type="number" min="0" {...register('chain_order')} />
               </FormField>
@@ -224,6 +239,9 @@ export default function AutomationDetailPage() {
                     <Textarea id="sms_template" {...register('sms_template')} rows={4} />
                   </FormField>
                   {variableChips('sms_template')}
+                  <p className="mt-2 text-xs text-gray-500">
+                    Available variables: {'{firstName}'}, {'{serviceName}'}, {'{vehicleInfo}'}, {'{googleReviewLink}'}, {'{yelpReviewLink}'}
+                  </p>
                 </div>
               )}
               {(watchAction === 'email' || watchAction === 'both') && (

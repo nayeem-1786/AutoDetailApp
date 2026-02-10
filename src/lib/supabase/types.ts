@@ -455,6 +455,7 @@ export interface LifecycleRule {
   trigger_service_id: string | null;
   trigger_condition: string;
   delay_days: number;
+  delay_minutes: number;
   action: 'sms' | 'email' | 'both';
   sms_template: string | null;
   email_subject: string | null;
@@ -467,6 +468,23 @@ export interface LifecycleRule {
   is_vehicle_aware: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type LifecycleExecutionStatus = 'pending' | 'sent' | 'failed' | 'skipped';
+
+export interface LifecycleExecution {
+  id: string;
+  lifecycle_rule_id: string;
+  customer_id: string;
+  appointment_id: string | null;
+  transaction_id: string | null;
+  trigger_event: string;
+  triggered_at: string;
+  scheduled_for: string;
+  executed_at: string | null;
+  status: LifecycleExecutionStatus;
+  error_message: string | null;
+  created_at: string;
 }
 
 export interface Quote {

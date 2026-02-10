@@ -553,6 +553,7 @@ export const lifecycleRuleSchema = z.object({
   trigger_condition: requiredString,
   trigger_service_id: z.string().uuid().optional().nullable(),
   delay_days: positiveInt.default(7),
+  delay_minutes: positiveInt.default(0),
   action: z.enum(['sms', 'email', 'both']),
   sms_template: optionalString,
   email_subject: optionalString,

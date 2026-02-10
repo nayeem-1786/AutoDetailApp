@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -106,6 +106,13 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Control how customer type restrictions on coupons are enforced.',
         href: '/admin/settings/coupon-enforcement',
         icon: Megaphone,
+        roles: ['super_admin'],
+      },
+      {
+        title: 'Reviews',
+        description: 'Configure Google and Yelp review links and post-service automation.',
+        href: '/admin/settings/reviews',
+        icon: StarHalf,
         roles: ['super_admin'],
       },
     ],

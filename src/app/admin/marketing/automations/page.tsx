@@ -20,6 +20,7 @@ interface RuleWithService {
   description: string | null;
   trigger_condition: string;
   delay_days: number;
+  delay_minutes: number;
   action: string;
   is_active: boolean;
   chain_order: number;
@@ -102,7 +103,15 @@ export default function AutomationsListPage() {
     {
       accessorKey: 'delay_days',
       header: 'Delay',
-      cell: ({ row }) => `${row.original.delay_days} days`,
+      cell: ({ row }) => {
+        const days = row.original.delay_days;
+        const mins = row.original.delay_minutes || 0;
+        if (days === 0 && mins === 0) return 'Immediate';
+        const parts: string[] = [];
+        if (days > 0) parts.push(`${days}d`);
+        if (mins > 0) parts.push(`${mins}m`);
+        return parts.join(' ');
+      },
     },
     {
       id: 'action',
