@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import { SearchInput } from '@/components/ui/search-input';
-import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MessageSquare } from 'lucide-react';
@@ -11,6 +10,8 @@ import type { Conversation, ConversationStatus } from '@/lib/supabase/types';
 import { ConversationRow } from './conversation-row';
 
 type FilterTab = 'all' | 'unread' | 'unknown' | 'customers';
+
+export type StatusCounts = Record<ConversationStatus, number>;
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -21,6 +22,7 @@ interface ConversationListProps {
   onSearchChange: (value: string) => void;
   statusFilter: ConversationStatus;
   onStatusFilterChange: (status: ConversationStatus) => void;
+  statusCounts: StatusCounts;
 }
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
@@ -30,10 +32,30 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'customers', label: 'Customers' },
 ];
 
-const STATUS_OPTIONS: { value: ConversationStatus; label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'archived', label: 'Archived' },
+const STATUS_PILLS: {
+  value: ConversationStatus;
+  label: string;
+  active: string;
+  inactive: string;
+}[] = [
+  {
+    value: 'open',
+    label: 'Open',
+    active: 'bg-green-500 text-white',
+    inactive: 'bg-green-100 text-green-800',
+  },
+  {
+    value: 'closed',
+    label: 'Closed',
+    active: 'bg-yellow-500 text-white',
+    inactive: 'bg-yellow-100 text-yellow-800',
+  },
+  {
+    value: 'archived',
+    label: 'Archived',
+    active: 'bg-gray-500 text-white',
+    inactive: 'bg-gray-100 text-gray-600',
+  },
 ];
 
 export function ConversationList({
@@ -45,6 +67,7 @@ export function ConversationList({
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  statusCounts,
 }: ConversationListProps) {
   const [filter, setFilter] = useState<FilterTab>('all');
 
@@ -70,19 +93,22 @@ export function ConversationList({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Status filter + Search */}
+      {/* Status pills + Search */}
       <div className="space-y-2 border-b border-gray-200 p-3">
-        <Select
-          value={statusFilter}
-          onChange={(e) => onStatusFilterChange(e.target.value as ConversationStatus)}
-          className="w-full"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
+        <div className="flex gap-2">
+          {STATUS_PILLS.map((pill) => (
+            <button
+              key={pill.value}
+              onClick={() => onStatusFilterChange(pill.value)}
+              className={cn(
+                'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+                statusFilter === pill.value ? pill.active : pill.inactive
+              )}
+            >
+              {pill.label} ({statusCounts[pill.value]})
+            </button>
           ))}
-        </Select>
+        </div>
         <SearchInput
           value={search}
           onChange={onSearchChange}

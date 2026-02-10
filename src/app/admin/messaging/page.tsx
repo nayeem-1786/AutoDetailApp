@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import type { Conversation, ConversationStatus, Message } from '@/lib/supabase/types';
 import { ConversationList } from './components/conversation-list';
+import type { StatusCounts } from './components/conversation-list';
 import { ThreadView } from './components/thread-view';
 
 function deduplicateMessages(messages: Message[]): Message[] {
@@ -37,6 +38,7 @@ export default function MessagingPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ConversationStatus>('open');
+  const [statusCounts, setStatusCounts] = useState<StatusCounts>({ open: 0, closed: 0, archived: 0 });
   const [mobileView, setMobileView] = useState<'list' | 'thread'>('list');
   const searchDebounceRef = useRef<NodeJS.Timeout>(null);
   const activeConversationIdRef = useRef<string | null>(null);
@@ -46,6 +48,19 @@ export default function MessagingPage() {
   useEffect(() => {
     activeConversationIdRef.current = activeConversation?.id || null;
   }, [activeConversation?.id]);
+
+  // Fetch status counts for pills
+  const fetchStatusCounts = useCallback(async () => {
+    try {
+      const res = await adminFetch('/api/messaging/conversations/counts');
+      if (res.ok) {
+        const { data } = await res.json();
+        setStatusCounts(data);
+      }
+    } catch {
+      // Silent fail — counts are non-critical
+    }
+  }, []);
 
   // Fetch conversations
   const fetchConversations = useCallback(async (searchTerm?: string, status?: ConversationStatus) => {
@@ -70,7 +85,8 @@ export default function MessagingPage() {
   useEffect(() => {
     setLoadingConversations(true);
     fetchConversations(search, statusFilter);
-  }, [fetchConversations, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchStatusCounts();
+  }, [fetchConversations, fetchStatusCounts, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
   useEffect(() => {
@@ -242,6 +258,7 @@ export default function MessagingPage() {
           setConversations((prev) => prev.filter((c) => c.id !== data.id));
           setActiveConversation(null);
           setMessages([]);
+          fetchStatusCounts();
         } else {
           setActiveConversation(data);
           setConversations((prev) =>
@@ -254,7 +271,7 @@ export default function MessagingPage() {
         toast.error(json.error || 'Failed to update conversation');
       }
     },
-    [activeConversation, statusFilter]
+    [activeConversation, statusFilter, fetchStatusCounts]
   );
 
   // Realtime: new messages for active conversation
@@ -379,6 +396,7 @@ export default function MessagingPage() {
             onSearchChange={setSearch}
             statusFilter={statusFilter}
             onStatusFilterChange={handleStatusFilterChange}
+            statusCounts={statusCounts}
           />
         </div>
 
