@@ -172,20 +172,55 @@ Booking: ${bookingUrl}
 ${extraPrompt?.value ? `ADDITIONAL INSTRUCTIONS:\n${extraPrompt.value}` : ''}`;
 }
 
+export interface CustomerContext {
+  name: string;
+  email?: string;
+  transaction_history: Array<{
+    date: string;
+    services: string[];
+    total: number;
+  }>;
+}
+
 /**
  * Get an AI response using the Anthropic Messages API.
  * Passes conversation history for context (up to 20 messages).
+ * When customerContext is provided, appends customer info to the system prompt.
  */
 export async function getAIResponse(
   conversationHistory: Message[],
-  newMessage: string
+  newMessage: string,
+  customerContext?: CustomerContext
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY is not configured');
   }
 
-  const systemPrompt = await buildSystemPrompt();
+  let systemPrompt = await buildSystemPrompt();
+
+  // Append customer context for returning customers
+  if (customerContext) {
+    const historyLines = customerContext.transaction_history
+      .map((t) => `- ${t.date}: ${t.services.join(', ')} — $${t.total}`)
+      .join('\n');
+
+    systemPrompt += `
+
+CUSTOMER CONTEXT (this is a returning customer — greet them by name):
+Name: ${customerContext.name}
+${customerContext.email ? `Email: ${customerContext.email}` : ''}
+
+${historyLines ? `TRANSACTION HISTORY:\n${historyLines}` : 'No previous transactions on file.'}
+
+INSTRUCTIONS FOR RETURNING CUSTOMERS:
+- Greet them by first name
+- Reference their past services: "Last time you got a [service] — would you like to book that again?"
+- If they had a premium service, suggest the same tier
+- If it's been 2+ months since last visit, suggest a maintenance service
+- You already have their vehicle info from past transactions — don't ask for it again
+- Focus on booking, not collecting info you already have`;
+  }
 
   // Build message history for context (last 20 messages max)
   const recentHistory = conversationHistory.slice(-20);

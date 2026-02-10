@@ -14,7 +14,7 @@ import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
-import { getAIResponse } from '@/lib/services/messaging-ai';
+import { getAIResponse, type CustomerContext } from '@/lib/services/messaging-ai';
 import { getAfterHoursReply } from '@/lib/services/messaging-after-hours';
 import crypto from 'crypto';
 
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
         .insert({
           phone_number: normalizedPhone,
           customer_id: customerId,
-          is_ai_enabled: !customerId, // AI for unknown numbers by default
+          is_ai_enabled: true, // Per-conversation toggle — global settings control which audiences get AI
           status: 'open',
           last_message_at: new Date().toISOString(),
           last_message_preview: body.substring(0, 200),
@@ -211,20 +211,31 @@ export async function POST(request: NextRequest) {
     const { data: settingsRows } = await admin
       .from('business_settings')
       .select('key, value')
-      .in('key', ['messaging_ai_enabled', 'messaging_after_hours_enabled']);
+      .in('key', [
+        'messaging_ai_unknown_enabled',
+        'messaging_ai_customers_enabled',
+        'messaging_after_hours_enabled',
+      ]);
 
-    const settings: Record<string, unknown> = {};
+    const settings: Record<string, string> = {};
     for (const row of settingsRows || []) {
-      settings[row.key] = row.value;
+      settings[row.key] = String(row.value);
     }
-    console.log('[Messaging] Settings:', settings);
+
+    const isUnknown = !conversation.customer_id;
+    const isCustomer = !!conversation.customer_id;
+    const aiEnabledForUnknown = settings.messaging_ai_unknown_enabled === 'true';
+    const aiEnabledForCustomers = settings.messaging_ai_customers_enabled === 'true';
+    const afterHoursEnabled = settings.messaging_after_hours_enabled === 'true';
 
     let autoReply: string | null = null;
     let senderType: 'ai' | 'system' = 'ai';
 
-    // AI auto-reply: unknown number + AI globally enabled + conversation AI enabled
-    console.log('[Messaging] AI check:', { customerId: conversation.customer_id, globalAI: settings.messaging_ai_enabled, conversationAI: conversation.is_ai_enabled });
-    if (!conversation.customer_id && settings.messaging_ai_enabled === 'true' && conversation.is_ai_enabled) {
+    const shouldAiReply =
+      conversation.is_ai_enabled &&
+      ((isUnknown && aiEnabledForUnknown) || (isCustomer && aiEnabledForCustomers));
+
+    if (shouldAiReply) {
       // Rate limiting: count AI replies in the last hour
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { count: recentAiCount } = await admin
@@ -244,17 +255,46 @@ export async function POST(request: NextRequest) {
             .order('created_at', { ascending: true })
             .limit(20);
 
-          autoReply = await getAIResponse(history || [], body);
-          console.log('[Messaging] AI replied:', autoReply?.substring(0, 50));
+          // Build customer context for known customers
+          let customerCtx: CustomerContext | undefined;
+          if (isCustomer && conversation.customer_id) {
+            const { data: custData } = await admin
+              .from('customers')
+              .select('first_name, last_name, email')
+              .eq('id', conversation.customer_id)
+              .single();
+
+            const { data: txns } = await admin
+              .from('transactions')
+              .select('transaction_date, total_amount, transaction_items(item_name)')
+              .eq('customer_id', conversation.customer_id)
+              .order('transaction_date', { ascending: false })
+              .limit(10);
+
+            if (custData) {
+              customerCtx = {
+                name: `${custData.first_name} ${custData.last_name}`.trim(),
+                email: custData.email || undefined,
+                transaction_history: (txns || []).map((t) => ({
+                  date: new Date(t.transaction_date).toLocaleDateString(),
+                  services: ((t.transaction_items as Array<{ item_name: string }>) || []).map(
+                    (i) => i.item_name
+                  ),
+                  total: t.total_amount,
+                })),
+              };
+            }
+          }
+
+          autoReply = await getAIResponse(history || [], body, customerCtx);
         } catch (err) {
           console.error('AI auto-reply failed:', err);
-          // Don't send a reply if AI fails — staff will see the unread message
         }
       } else {
-        console.warn(`[Messaging] Rate limit hit: ${recentAiCount} AI replies in last hour for conversation ${conversation.id}`);
+        console.warn(`[Messaging] Rate limit hit for conversation ${conversation.id}`);
       }
-    } else if (conversation.customer_id && settings.messaging_after_hours_enabled === 'true') {
-      // Known customer + after-hours enabled → template reply
+    } else if (isCustomer && afterHoursEnabled) {
+      // Known customer + AI not enabled for customers + after-hours enabled → template reply
       autoReply = await getAfterHoursReply();
       senderType = 'system';
     }

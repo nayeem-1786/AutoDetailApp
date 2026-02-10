@@ -10,11 +10,13 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 
 interface MessagingSettings {
-  messaging_ai_auto_reply: boolean;
-  messaging_after_hours_enabled: boolean;
+  messaging_ai_unknown_enabled: string;
+  messaging_ai_customers_enabled: string;
+  messaging_after_hours_enabled: string;
   messaging_after_hours_message: string;
   messaging_ai_instructions: string;
   messaging_auto_close_hours: string;
@@ -25,7 +27,8 @@ const DEFAULT_AFTER_HOURS_MESSAGE =
   'Thanks for reaching out to {business_name}! We\'re currently closed. Our business hours are {business_hours}. We\'ll get back to you as soon as we reopen. For immediate booking, visit: {booking_url}';
 
 const SETTINGS_KEYS = [
-  'messaging_ai_auto_reply',
+  'messaging_ai_unknown_enabled',
+  'messaging_ai_customers_enabled',
   'messaging_after_hours_enabled',
   'messaging_after_hours_message',
   'messaging_ai_instructions',
@@ -34,8 +37,9 @@ const SETTINGS_KEYS = [
 ] as const;
 
 const DEFAULTS: MessagingSettings = {
-  messaging_ai_auto_reply: false,
-  messaging_after_hours_enabled: false,
+  messaging_ai_unknown_enabled: 'true',
+  messaging_ai_customers_enabled: 'false',
+  messaging_after_hours_enabled: 'false',
   messaging_after_hours_message: DEFAULT_AFTER_HOURS_MESSAGE,
   messaging_ai_instructions: '',
   messaging_auto_close_hours: '48',
@@ -59,6 +63,19 @@ const AUTO_ARCHIVE_OPTIONS = [
   { value: '90', label: '90 days' },
   { value: '0', label: 'Never' },
 ];
+
+/** Normalize DB value to string — handles booleans, strings, and JSON-encoded strings */
+function toStringValue(val: unknown): string {
+  if (typeof val === 'boolean') return val ? 'true' : 'false';
+  if (typeof val === 'string') return val;
+  return String(val ?? '');
+}
+
+/** Check if a setting string is "true" (handles boolean true and string "true") */
+function isEnabled(val: unknown): boolean {
+  if (typeof val === 'boolean') return val;
+  return String(val) === 'true';
+}
 
 export default function MessagingSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -88,7 +105,7 @@ export default function MessagingSettingsPage() {
       for (const row of data || []) {
         const key = row.key as keyof MessagingSettings;
         if (key in loaded) {
-          (loaded as Record<string, unknown>)[key] = row.value;
+          loaded[key] = toStringValue(row.value);
         }
       }
 
@@ -155,21 +172,49 @@ export default function MessagingSettingsPage() {
           <CardTitle>AI Auto-Reply</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Enable AI Auto-Reply
-              </p>
-              <p className="mt-0.5 text-sm text-gray-500">
-                When enabled, AI will automatically respond to new inbound messages from unknown numbers.
-              </p>
+          <div>
+            <p className="text-sm font-medium text-gray-900">
+              Enable AI for audience
+            </p>
+            <p className="mt-0.5 text-sm text-gray-500">
+              Choose which message senders get AI-powered auto-replies. Both can be enabled independently.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    messaging_ai_unknown_enabled: isEnabled(prev.messaging_ai_unknown_enabled) ? 'false' : 'true',
+                  }))
+                }
+                className={cn(
+                  'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+                  isEnabled(settings.messaging_ai_unknown_enabled)
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-purple-100 text-purple-800'
+                )}
+              >
+                Unknown
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    messaging_ai_customers_enabled: isEnabled(prev.messaging_ai_customers_enabled) ? 'false' : 'true',
+                  }))
+                }
+                className={cn(
+                  'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+                  isEnabled(settings.messaging_ai_customers_enabled)
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-blue-100 text-blue-800'
+                )}
+              >
+                Customers
+              </button>
             </div>
-            <Switch
-              checked={settings.messaging_ai_auto_reply}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, messaging_ai_auto_reply: checked }))
-              }
-            />
           </div>
 
           <FormField
@@ -210,9 +255,9 @@ export default function MessagingSettingsPage() {
               </p>
             </div>
             <Switch
-              checked={settings.messaging_after_hours_enabled}
+              checked={isEnabled(settings.messaging_after_hours_enabled)}
               onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, messaging_after_hours_enabled: checked }))
+                setSettings((prev) => ({ ...prev, messaging_after_hours_enabled: checked ? 'true' : 'false' }))
               }
             />
           </div>
