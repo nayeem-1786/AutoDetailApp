@@ -189,6 +189,58 @@ function resolvePrice(
   }
 }
 
+/** Split a long message into SMS-friendly chunks at natural break points */
+function splitSmsMessage(message: string, maxLength: number = 320): string[] {
+  if (message.length <= maxLength) return [message];
+
+  const chunks: string[] = [];
+  let remaining = message;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining.trim());
+      break;
+    }
+
+    let splitAt = -1;
+    const searchArea = remaining.substring(0, maxLength);
+
+    // Priority 1: Split at double newline (paragraph break)
+    const doubleNewline = searchArea.lastIndexOf('\n\n');
+    if (doubleNewline > maxLength * 0.3) {
+      splitAt = doubleNewline;
+    }
+    // Priority 2: Split at single newline (line/bullet break)
+    else {
+      const singleNewline = searchArea.lastIndexOf('\n');
+      if (singleNewline > maxLength * 0.3) {
+        splitAt = singleNewline;
+      }
+      // Priority 3: Split at last sentence end
+      else {
+        const sentenceEnd = Math.max(
+          searchArea.lastIndexOf('. '),
+          searchArea.lastIndexOf('! '),
+          searchArea.lastIndexOf('? ')
+        );
+        if (sentenceEnd > maxLength * 0.3) {
+          splitAt = sentenceEnd + 1; // Include the punctuation
+        }
+        // Priority 4: Split at last space
+        else {
+          splitAt = searchArea.lastIndexOf(' ');
+          if (splitAt <= 0) splitAt = maxLength; // No space found, hard break
+        }
+      }
+    }
+
+    chunks.push(remaining.substring(0, splitAt).trim());
+    remaining = remaining.substring(splitAt).trim();
+  }
+
+  return chunks;
+}
+
 /**
  * Validate Twilio request signature.
  * https://www.twilio.com/docs/usage/security#validating-requests
@@ -607,13 +659,8 @@ export async function POST(request: NextRequest) {
             });
             if (commErr) console.error('[Auto-Quote] Failed to log communication:', commErr.message);
 
-            // Truncate clean message and append quote link
-            const linkSuffix = `\n\nView your quote: ${linkUrl}`;
-            const maxMsgLen = 320 - linkSuffix.length;
-            autoReply =
-              (cleanMessage.length > maxMsgLen
-                ? cleanMessage.substring(0, maxMsgLen - 1) + '…'
-                : cleanMessage) + linkSuffix;
+            // Append quote link to clean message (splitting handled later)
+            autoReply = cleanMessage + `\n\nView your quote: ${linkUrl}`;
 
             // Link customer to conversation if not already linked
             if (quoteCustomerId && !conversation.customer_id) {
@@ -624,42 +671,41 @@ export async function POST(request: NextRequest) {
             }
           } else {
             // No services resolved — send clean message without link
-            autoReply = cleanMessage.length > 320
-              ? cleanMessage.substring(0, 319) + '…'
-              : cleanMessage;
+            autoReply = cleanMessage;
           }
         } catch (err) {
           console.error('[Auto-Quote] Failed to generate quote:', err);
-          autoReply = cleanMessage.length > 320
-            ? cleanMessage.substring(0, 319) + '…'
-            : cleanMessage;
+          autoReply = cleanMessage;
         }
       } else {
-        // No quote block — truncate for SMS
-        autoReply = cleanMessage.length > 320
-          ? cleanMessage.substring(0, 319) + '…'
-          : cleanMessage;
+        // No quote block — use clean message as-is (splitting handled below)
+        autoReply = cleanMessage;
       }
     }
 
-    // Send the auto-reply if we have one
+    // Send the auto-reply if we have one — split long messages into chunks
     if (autoReply) {
-      const smsResult = await sendSms(normalizedPhone, autoReply);
+      const smsChunks = splitSmsMessage(autoReply);
 
-      await admin.from('messages').insert({
-        conversation_id: conversation.id,
-        direction: 'outbound',
-        body: autoReply,
-        sender_type: 'ai',
-        twilio_sid: smsResult.success ? smsResult.sid : null,
-        status: smsResult.success ? 'sent' : 'failed',
-      });
+      for (const chunk of smsChunks) {
+        const smsResult = await sendSms(normalizedPhone, chunk);
 
+        await admin.from('messages').insert({
+          conversation_id: conversation.id,
+          direction: 'outbound',
+          body: chunk,
+          sender_type: 'ai',
+          twilio_sid: smsResult.success ? smsResult.sid : null,
+          status: smsResult.success ? 'sent' : 'failed',
+        });
+      }
+
+      const lastChunk = smsChunks[smsChunks.length - 1];
       await admin
         .from('conversations')
         .update({
           last_message_at: new Date().toISOString(),
-          last_message_preview: autoReply.substring(0, 100),
+          last_message_preview: lastChunk.substring(0, 100),
         })
         .eq('id', conversation.id);
     }

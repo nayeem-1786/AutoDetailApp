@@ -57,8 +57,17 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Two-way SMS messaging system: shared team inbox at `/admin/messaging` with split-pane UI (conversation list + thread view), real-time updates via Supabase Realtime, unread badges in sidebar
 - AI auto-responder for unknown numbers: Claude API integration using dynamic system prompt built from live service catalog, business info, and hours. STOP word detection, rate limiting (10/hr per conversation), auto-disable when staff takes over
 - After-hours auto-responder for known customers: uses business hours from settings, configurable message template with variables ({business_name}, {business_hours}, {booking_url})
-- Messaging settings page (`/admin/settings/messaging`): AI auto-reply toggle, after-hours toggle + message template, additional AI instructions textarea
+- Messaging settings page (`/admin/settings/messaging`): Unified "AI Assistant" card with master toggle, audience pills (Unknown/Customers), full editable prompt textarea, "Apply Standard Template" reset link. Conversation Lifecycle card with side-by-side auto-close/auto-archive dropdowns.
 - Business hours helper (`src/lib/data/business-hours.ts`): getBusinessHours(), isWithinBusinessHours(), formatBusinessHoursText()
+- AI system prompt architecture: `getDefaultSystemPrompt()` in `messaging-ai-prompt.ts` (pure function, no server deps, client-importable). `buildSystemPrompt()` in `messaging-ai.ts` uses saved DB prompt or falls back to default, then appends live service catalog + business info + hours + open/closed status at runtime.
+- Conversation lifecycle automation: pg_cron function auto-closes conversations after configurable hours (default 48h), auto-archives after configurable days (default 30d). System messages logged on each transition. Inbound messages auto-reopen closed/archived conversations.
+- Auto-quote via SMS: AI collects full name (first + last required), vehicle info, and service → generates real quote with `[GENERATE_QUOTE]` block → creates quote record, vehicle, and customer (if new) → sends short link via SMS
+- Auto-quote customer defaults: new customers created via SMS auto-quote get `sms_consent: true`, `email_consent: true`, `customer_type: 'enthusiast'`
+- Quote communications logging: auto-quote SMS sends are logged in `quote_communications` table (channel, sent_to, status)
+- Quote acceptance SMS: when customer accepts quote via public page, confirmation SMS is sent automatically and logged in `quote_communications`
+- Contextual product knowledge: AI searches `products` table on demand when product-related keywords detected (27 keywords: spray, wax, cleaner, towel, etc.). Zero overhead for service-only conversations. Matches product name/description, returns up to 10 results with price and category.
+- SMS multi-message splitting: long AI responses split at natural break points (paragraph, newline, sentence) instead of truncating at 320 chars. Each chunk sent as separate SMS and stored as separate message row.
+- Performance fix: renamed `middleware.ts` → `proxy.ts` (Next.js 16 convention), eliminated self-fetch cascade (proxy.ts 5-13s → 2-64ms), excluded API routes from proxy matcher, externalized pdfkit/sharp via `serverExternalPackages`.
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
@@ -70,7 +79,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - URL shortening — BUILT (/s/[code] redirect, short_links table, 6-char codes)
 
 ### Phase 5 — What's Remaining
-- Lifecycle automation rules: UI scaffolding exists (pages + API + DB table) but **execution/triggers not wired**
 - Google review request automation (post-service with direct link) — feature flag exists, no implementation
 - Campaign analytics (delivery, opens, redemptions, revenue attribution, ROI) — no analytics dashboard
 - A/B testing for campaigns — nothing built
@@ -118,8 +126,10 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | Setup receipt printer hardware integration for POS | Hardware | Low |
 | Admin appointment creation (currently only via booking/POS/voice agent) | Feature | Low |
 | Consolidate duplicate vendor pages (catalog vs inventory) | Cleanup | Low |
-| Configure Twilio webhook URL for inbound SMS (`/api/webhooks/twilio/inbound`) | Configuration | High |
-| Revert Twilio signature validation bypass in `src/app/api/webhooks/twilio/inbound/route.ts` line 72 (remove `false &&`) before production deploy | Bug Fix | Critical |
+| Configure Twilio webhook URL for production (`/api/webhooks/twilio/inbound`) | Configuration | High |
+| Revert Twilio signature validation bypass in `src/app/api/webhooks/twilio/inbound/route.ts` line 234 (remove `false &&`) before production deploy | Bug Fix | Critical |
+| Add `ANTHROPIC_API_KEY` to production environment variables | Configuration | High |
+| Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
 
 ### Data Notes
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
@@ -127,6 +137,8 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Product/service images:** Stored in Supabase storage buckets `product-images/` and `service-images/`. 23 products have no images (never had them in Square). 2 services have no images (Excessive Cleaning Fee, Paint Decontamination & Protection — no Square counterparts). `service-images` bucket also allows `image/avif` MIME type (added accidentally, no impact).
 - **Duplicate vendor pages:** `/admin/catalog/vendors` (372 lines) and `/admin/inventory/vendors` (400 lines) both exist. Inventory version is more complete (search, address, lead time fields). Should consolidate.
 - **Messaging tables:** `conversations` (unique per phone_number, linked to customer_id if known) and `messages` (CASCADE delete with conversation). Both have Supabase Realtime enabled. AI auto-replies stored with `sender_type: 'ai'`, staff replies with `sender_type: 'staff'`.
+- **Key messaging files:** `src/lib/services/messaging-ai.ts` (AI response generation, product search, system prompt builder), `src/lib/services/messaging-ai-prompt.ts` (default prompt template), `src/app/api/webhooks/twilio/inbound/route.ts` (Twilio webhook: AI routing, auto-quote, SMS splitting), `src/app/api/quotes/[id]/accept/route.ts` (acceptance + confirmation SMS), `src/app/admin/settings/messaging/page.tsx` (unified AI settings UI), `src/proxy.ts` (middleware, renamed from middleware.ts).
+- **Quote communications:** `quote_communications` table tracks all SMS/email sends for quotes (channel, sent_to, status, error_message, sent_by). Used by `send-service.ts` (manual sends), inbound webhook (auto-quote), and accept route (acceptance SMS). `sent_by` is nullable — null for AI/system-generated sends.
 
 ---
 
@@ -154,6 +166,10 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Quotes use soft-delete** (`deleted_at` column). All quote queries MUST include `.is('deleted_at', null)` — except `quote-number.ts` (needs all quotes to prevent number reuse) and public quote page (needs deleted quotes for friendly messaging)
 - **Messaging inbound webhook** (`/api/webhooks/twilio/inbound`) is unauthenticated (called by Twilio) but validates Twilio HMAC signature. Uses `createAdminClient()` for DB operations.
 - **Messaging AI auto-disable:** When staff sends a manual reply to an AI-enabled conversation, `is_ai_enabled` is automatically set to false (human takeover).
+- **Messaging AI prompt**: Behavioral rules in `src/lib/services/messaging-ai-prompt.ts` (client-importable, no server deps). Dynamic data (service catalog, products, business info, hours) appended at runtime by `buildSystemPrompt()` in `src/lib/services/messaging-ai.ts`.
+- **Auto-quote flow**: AI must collect first AND last name before generating `[GENERATE_QUOTE]` block. Block is parsed by `extractQuoteRequest()` in the inbound webhook. Creates customer (with consent + enthusiast tag), vehicle, quote record, and sends short link.
+- **Quote acceptance SMS**: Sent automatically from `src/app/api/quotes/[id]/accept/route.ts` via `sendSms()`. Logged in `quote_communications`.
+- **Product search in AI**: `searchRelevantProducts()` in `messaging-ai.ts` — keyword-triggered, searches `products` table with `.or()` on name/description, joins `product_categories` for category name. Only fires when product intent detected.
 - **ANTHROPIC_API_KEY** must be in `.env.local` (and production env vars). Used by `src/lib/services/messaging-ai.ts`.
 
 ---
