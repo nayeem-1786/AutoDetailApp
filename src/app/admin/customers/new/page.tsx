@@ -119,6 +119,18 @@ export default function NewCustomerPage() {
           action: 'opt_in',
           source: 'manual',
         });
+        // Also log to TCPA audit table
+        if (phone) {
+          await supabase.from('sms_consent_log').insert({
+            customer_id: customer.id,
+            phone,
+            action: 'opt_in',
+            keyword: 'opt_in',
+            source: 'admin_manual',
+            previous_value: null,
+            new_value: true,
+          });
+        }
       }
       if (data.email_consent) {
         await supabase.from('marketing_consent_log').insert({

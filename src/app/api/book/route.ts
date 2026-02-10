@@ -5,6 +5,7 @@ import { normalizePhone } from '@/lib/utils/format';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
+import { updateSmsConsent } from '@/lib/utils/sms-consent';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,16 +89,31 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single();
 
+    const smsConsent = data.customer.sms_consent ?? false;
+    const emailConsent = data.customer.email_consent ?? false;
+
     if (existingByPhone) {
       customerId = existingByPhone.id;
-      // Update any missing fields
+      // Update any missing fields + consent upgrades (never downgrade via booking)
       const updates: Record<string, unknown> = {};
       if (!existingByPhone.email && data.customer.email) {
         updates.email = data.customer.email;
       }
+      if (smsConsent) updates.sms_consent = true;
+      if (emailConsent) updates.email_consent = true;
       if (Object.keys(updates).length > 0) {
         updates.updated_at = new Date().toISOString();
         await supabase.from('customers').update(updates).eq('id', customerId);
+      }
+      // Log SMS consent opt-in if customer checked the box
+      if (smsConsent) {
+        await updateSmsConsent({
+          customerId,
+          phone: e164Phone,
+          action: 'opt_in',
+          keyword: 'booking_form',
+          source: 'booking_form',
+        });
       }
     } else {
       // Try matching by email
@@ -111,10 +127,22 @@ export async function POST(request: NextRequest) {
 
       if (existingByEmail) {
         customerId = existingByEmail.id;
-        await supabase
-          .from('customers')
-          .update({ phone: e164Phone, updated_at: new Date().toISOString() })
-          .eq('id', customerId);
+        const updates: Record<string, unknown> = {
+          phone: e164Phone,
+          updated_at: new Date().toISOString(),
+        };
+        if (smsConsent) updates.sms_consent = true;
+        if (emailConsent) updates.email_consent = true;
+        await supabase.from('customers').update(updates).eq('id', customerId);
+        if (smsConsent) {
+          await updateSmsConsent({
+            customerId,
+            phone: e164Phone,
+            action: 'opt_in',
+            keyword: 'booking_form',
+            source: 'booking_form',
+          });
+        }
       } else {
         // Create new customer - all online bookings are enthusiasts by default
         const { data: newCustomer, error: custErr } = await supabase
@@ -125,6 +153,8 @@ export async function POST(request: NextRequest) {
             phone: e164Phone,
             email: data.customer.email,
             customer_type: 'enthusiast',
+            sms_consent: smsConsent,
+            email_consent: emailConsent,
           })
           .select('id')
           .single();
@@ -138,6 +168,17 @@ export async function POST(request: NextRequest) {
         }
         customerId = newCustomer.id;
         isNewCustomer = true;
+
+        // Log SMS consent for new customer if opted in
+        if (smsConsent) {
+          await updateSmsConsent({
+            customerId,
+            phone: e164Phone,
+            action: 'opt_in',
+            keyword: 'booking_form',
+            source: 'booking_form',
+          });
+        }
       }
     }
 

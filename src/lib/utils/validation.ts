@@ -254,6 +254,8 @@ export const bookingCustomerSchema = z.object({
   last_name: requiredString,
   phone: z.string().regex(bookingPhoneRegex, 'Enter valid mobile number'),
   email: z.string().email('Invalid email address'),
+  sms_consent: z.boolean().default(false),
+  email_consent: z.boolean().default(false),
 });
 
 export const bookingVehicleSchema = z.object({

@@ -726,6 +726,19 @@ export interface Message {
   sender?: Employee;
 }
 
+export interface SmsConsentLog {
+  id: string;
+  customer_id: string;
+  phone: string;
+  action: 'opt_out' | 'opt_in';
+  keyword: string;
+  source: 'inbound_sms' | 'admin_manual' | 'unsubscribe_page' | 'booking_form' | 'customer_portal' | 'system';
+  previous_value: boolean | null;
+  new_value: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }

@@ -253,6 +253,18 @@ export default function CustomerProfilePage() {
           action: data.sms_consent ? 'opt_in' : 'opt_out',
           source: 'manual',
         });
+        // Also log to TCPA audit table
+        if (phone || customer.phone) {
+          await supabase.from('sms_consent_log').insert({
+            customer_id: id,
+            phone: phone || customer.phone,
+            action: data.sms_consent ? 'opt_in' : 'opt_out',
+            keyword: data.sms_consent ? 'opt_in' : 'opt_out',
+            source: 'admin_manual',
+            previous_value: customer.sms_consent,
+            new_value: data.sms_consent,
+          });
+        }
       }
       if (data.email_consent !== customer.email_consent) {
         await supabase.from('marketing_consent_log').insert({

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { z } from 'zod';
 
 const prefsSchema = z.object({
@@ -58,10 +59,10 @@ export async function PATCH(
 
     const supabase = createAdminClient();
 
-    // Verify customer exists
+    // Fetch current customer state
     const { data: existing } = await supabase
       .from('customers')
-      .select('id')
+      .select('id, phone, sms_consent')
       .eq('id', customerId)
       .single();
 
@@ -69,6 +70,18 @@ export async function PATCH(
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
+    // Log SMS consent change via audit trail if it changed
+    if (existing.sms_consent !== parsed.data.sms_consent && existing.phone) {
+      await updateSmsConsent({
+        customerId,
+        phone: existing.phone,
+        action: parsed.data.sms_consent ? 'opt_in' : 'opt_out',
+        keyword: parsed.data.sms_consent ? 'opt_in' : 'opt_out',
+        source: 'unsubscribe_page',
+      });
+    }
+
+    // Update remaining fields (sms_consent already updated by updateSmsConsent if changed)
     const { error: updateErr } = await supabase
       .from('customers')
       .update({

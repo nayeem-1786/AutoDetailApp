@@ -11,6 +11,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { Plus } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -152,21 +153,10 @@ export default function AutomationsListPage() {
       id: 'active',
       header: 'Active',
       cell: ({ row }) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleActive(row.original.id, row.original.is_active);
-          }}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-            row.original.is_active ? 'bg-green-500' : 'bg-gray-300'
-          }`}
-        >
-          <span
-            className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              row.original.is_active ? 'translate-x-4' : 'translate-x-1'
-            }`}
-          />
-        </button>
+        <Switch
+          checked={row.original.is_active}
+          onCheckedChange={() => toggleActive(row.original.id, row.original.is_active)}
+        />
       ),
       enableSorting: false,
     },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { updateSmsConsent } from '@/lib/utils/sms-consent';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,16 +34,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update customer consent
-    const consentField = channel === 'sms' ? 'sms_consent' : 'email_consent';
-    const { error: updateError } = await supabase
-      .from('customers')
-      .update({ [consentField]: false })
-      .eq('id', customer_id);
+    if (channel === 'sms') {
+      // Use shared SMS consent helper for audit trail
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('phone')
+        .eq('id', customer_id)
+        .single();
 
-    if (updateError) throw updateError;
+      if (cust?.phone) {
+        await updateSmsConsent({
+          customerId: customer_id,
+          phone: cust.phone,
+          action: 'opt_out',
+          keyword: 'opt_out',
+          source: 'admin_manual',
+          notes: `Opted out by admin ${user.id}`,
+        });
+      } else {
+        // No phone on record — still update the flag directly
+        await supabase
+          .from('customers')
+          .update({ sms_consent: false })
+          .eq('id', customer_id);
+      }
+    } else {
+      // Email consent — update directly
+      const { error: updateError } = await supabase
+        .from('customers')
+        .update({ email_consent: false })
+        .eq('id', customer_id);
 
-    // Log consent change
+      if (updateError) throw updateError;
+    }
+
+    // Log consent change to marketing_consent_log (legacy)
     const { error: logError } = await supabase
       .from('marketing_consent_log')
       .insert({

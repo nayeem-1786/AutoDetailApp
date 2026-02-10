@@ -15,6 +15,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
+import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { getAIResponse, type CustomerContext } from '@/lib/services/messaging-ai';
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import { createQuote } from '@/lib/quotes/quote-service';
@@ -25,7 +26,10 @@ const TWIML_EMPTY = '<Response/>';
 const TWIML_HEADERS = { 'Content-Type': 'text/xml' };
 
 /** TCPA opt-out keywords — exact match only */
-const STOP_WORDS = ['STOP', 'UNSUBSCRIBE', 'CANCEL', 'QUIT', 'END'];
+const STOP_WORDS = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
+
+/** TCPA opt-in keywords — exact match only */
+const START_WORDS = ['START', 'YES', 'UNSTOP'];
 
 /** Max AI auto-replies per conversation per hour */
 const MAX_AI_REPLIES_PER_HOUR = 10;
@@ -373,10 +377,14 @@ export async function POST(request: NextRequest) {
     }
 
     // -------------------------------------------------------------------
-    // STOP word detection — must run before storing the inbound message
-    // so we can exit early without triggering auto-replies
+    // STOP/START keyword detection — must run before storing the inbound
+    // message so we can exit early without triggering auto-replies
     // -------------------------------------------------------------------
-    if (STOP_WORDS.some((w) => body.toUpperCase().trim() === w)) {
+    const normalizedBody = body.trim().toUpperCase();
+    const isStopWord = STOP_WORDS.includes(normalizedBody);
+    const isStartWord = START_WORDS.includes(normalizedBody);
+
+    if (isStopWord) {
       // Store the original inbound message
       await admin.from('messages').insert({
         conversation_id: conversation.id,
@@ -392,7 +400,7 @@ export async function POST(request: NextRequest) {
       await admin.from('messages').insert({
         conversation_id: conversation.id,
         direction: 'inbound',
-        body: `Customer sent "${body}" — auto-replies disabled`,
+        body: `Customer sent "${body}" — opted out of SMS`,
         sender_type: 'system',
         status: 'received',
       });
@@ -402,6 +410,92 @@ export async function POST(request: NextRequest) {
         .from('conversations')
         .update({ is_ai_enabled: false })
         .eq('id', conversation.id);
+
+      // Update sms_consent on customer record (TCPA critical)
+      if (customerId) {
+        await updateSmsConsent({
+          customerId,
+          phone: normalizedPhone,
+          action: 'opt_out',
+          keyword: normalizedBody,
+          source: 'inbound_sms',
+        });
+      } else {
+        // No customer record linked — try to find by phone
+        const { data: phoneCust } = await admin
+          .from('customers')
+          .select('id')
+          .eq('phone', normalizedPhone)
+          .single();
+
+        if (phoneCust) {
+          await updateSmsConsent({
+            customerId: phoneCust.id,
+            phone: normalizedPhone,
+            action: 'opt_out',
+            keyword: normalizedBody,
+            source: 'inbound_sms',
+          });
+        }
+      }
+
+      // Do NOT send any reply — Twilio handles the STOP auto-response
+      return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
+    }
+
+    if (isStartWord) {
+      // Store the original inbound message
+      await admin.from('messages').insert({
+        conversation_id: conversation.id,
+        direction: 'inbound',
+        body,
+        media_url: mediaUrl,
+        sender_type: 'customer',
+        twilio_sid: messageSid,
+        status: 'received',
+      });
+
+      // Log system message noting the opt-in
+      await admin.from('messages').insert({
+        conversation_id: conversation.id,
+        direction: 'inbound',
+        body: `Customer sent "${body}" — opted back in to SMS`,
+        sender_type: 'system',
+        status: 'received',
+      });
+
+      // Re-enable AI on this conversation
+      await admin
+        .from('conversations')
+        .update({ is_ai_enabled: true })
+        .eq('id', conversation.id);
+
+      // Update sms_consent on customer record
+      if (customerId) {
+        await updateSmsConsent({
+          customerId,
+          phone: normalizedPhone,
+          action: 'opt_in',
+          keyword: normalizedBody,
+          source: 'inbound_sms',
+        });
+      } else {
+        const { data: phoneCust } = await admin
+          .from('customers')
+          .select('id')
+          .eq('phone', normalizedPhone)
+          .single();
+
+        if (phoneCust) {
+          await updateSmsConsent({
+            customerId: phoneCust.id,
+            phone: normalizedPhone,
+            action: 'opt_in',
+            keyword: normalizedBody,
+            source: 'inbound_sms',
+          });
+        }
+      }
 
       return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
     }
@@ -555,6 +649,16 @@ export async function POST(request: NextRequest) {
                 throw new Error(`Customer creation failed: ${custErr?.message}`);
               }
               quoteCustomerId = newCust.id;
+
+              // Log SMS consent for new customer (texting in = implied consent)
+              await updateSmsConsent({
+                customerId: newCust.id,
+                phone: normalizedPhone,
+                action: 'opt_in',
+                keyword: 'sms_initiated',
+                source: 'inbound_sms',
+                notes: 'Customer initiated SMS conversation (auto-quote)',
+              });
             }
           }
 

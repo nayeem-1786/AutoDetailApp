@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendSms } from '@/lib/utils/sms';
+import { sendMarketingSms } from '@/lib/utils/sms';
 import { createShortLink } from '@/lib/utils/short-link';
 
 /**
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       id,
       access_token,
       customer_id,
-      customer:customers!inner(first_name, phone)
+      customer:customers!inner(first_name, phone, sms_consent)
     `)
     .eq('status', 'sent')
     .lt('sent_at', twentyFourHoursAgo)
@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
     // Skip if reminder already sent
     if (alreadyReminded.has(quote.id)) continue;
 
-    const customer = quote.customer as unknown as { first_name: string; phone: string | null };
-    if (!customer?.phone || !quote.access_token) continue;
+    const customer = quote.customer as unknown as { first_name: string; phone: string | null; sms_consent: boolean };
+    if (!customer?.phone || !customer.sms_consent || !quote.access_token) continue;
 
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       const firstName = customer.first_name || 'there';
       const message = `Hey ${firstName}! Just checking if you had a chance to look at your quote: ${shortUrl}`;
 
-      const result = await sendSms(customer.phone, message);
+      const result = await sendMarketingSms(customer.phone, message, quote.customer_id);
 
       // Log in quote_communications (includes "reminder" in message for dedup)
       await admin.from('quote_communications').insert({

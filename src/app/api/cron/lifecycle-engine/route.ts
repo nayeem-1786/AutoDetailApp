@@ -480,7 +480,7 @@ async function executePending(
         .replace(/\n{3,}/g, '\n\n');
 
       // Send via marketing SMS (appends STOP footer)
-      const result = await sendMarketingSms(customer.phone, message);
+      const result = await sendMarketingSms(customer.phone, message, exec.customer_id);
 
       if (result.success) {
         await markExecution(admin, exec.id, 'sent');

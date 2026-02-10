@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { bookingCustomerSchema, bookingVehicleSchema, type BookingCustomerInput, type BookingVehicleInput } from '@/lib/utils/validation';
@@ -59,6 +59,17 @@ export function StepCustomerInfo({
     return formatPhoneInput(phone);
   };
 
+  // Fetch business name for consent disclosure text
+  const [businessName, setBusinessName] = useState('our business');
+  useEffect(() => {
+    fetch('/api/public/business-info')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.name) setBusinessName(data.name);
+      })
+      .catch(() => {});
+  }, []);
+
   const {
     register,
     handleSubmit,
@@ -74,6 +85,8 @@ export function StepCustomerInfo({
         last_name: initialCustomer.last_name ?? '',
         phone: formatInitialPhone(initialCustomer.phone),
         email: initialCustomer.email ?? '',
+        sms_consent: false,
+        email_consent: false,
       },
       vehicle: {
         vehicle_type: initialVehicle.vehicle_type ?? 'standard',
@@ -226,6 +239,31 @@ export function StepCustomerInfo({
               {...register('customer.email')}
             />
           </FormField>
+        </div>
+
+        {/* Consent Checkboxes */}
+        <div className="mt-5 space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              {...register('customer.sms_consent')}
+            />
+            <span className="text-xs text-gray-600">
+              I agree to receive text messages from {businessName} including appointment reminders and updates. Msg &amp; data rates may apply. Reply STOP to opt out.
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              {...register('customer.email_consent')}
+            />
+            <span className="text-xs text-gray-600">
+              I agree to receive emails from {businessName} including appointment confirmations and promotional offers.
+            </span>
+          </label>
         </div>
       </div>
 

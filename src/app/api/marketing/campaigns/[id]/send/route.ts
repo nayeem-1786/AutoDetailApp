@@ -181,7 +181,7 @@ export async function POST(
         campaign.sms_template
       ) {
         const smsBody = renderTemplate(campaign.sms_template, templateVars);
-        const result = await sendMarketingSms(customer.phone, smsBody);
+        const result = await sendMarketingSms(customer.phone, smsBody, customer.id);
         smsDelivered = result.success;
       }
 

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { customerProfileSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
+import { updateSmsConsent } from '@/lib/utils/sms-consent';
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -31,7 +32,7 @@ export async function PATCH(request: NextRequest) {
     // Find the customer record for this auth user
     const { data: customer } = await admin
       .from('customers')
-      .select('id')
+      .select('id, phone, sms_consent')
       .eq('auth_user_id', user.id)
       .single();
 
@@ -43,6 +44,20 @@ export async function PATCH(request: NextRequest) {
     }
 
     const e164Phone = normalizePhone(data.phone);
+
+    // Log SMS consent change if it changed
+    if (customer.sms_consent !== data.sms_consent) {
+      const consentPhone = e164Phone || customer.phone;
+      if (consentPhone) {
+        await updateSmsConsent({
+          customerId: customer.id,
+          phone: consentPhone,
+          action: data.sms_consent ? 'opt_in' : 'opt_out',
+          keyword: data.sms_consent ? 'opt_in' : 'opt_out',
+          source: 'customer_portal',
+        });
+      }
+    }
 
     const { error: updateErr } = await admin
       .from('customers')
