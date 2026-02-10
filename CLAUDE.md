@@ -200,6 +200,23 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 
 ---
 
+## Last Session: 2026-02-10
+
+- Lifecycle automation engine fully built, tested, and verified (review SMS delivered)
+- Internal cron scheduler wired (node-cron + instrumentation.ts) — no external schedulers
+- Trigger conditions standardized to `service_completed` / `after_transaction`
+- Template variables standardized to snake_case via `renderTemplate()`
+- Automations coupon refactor: inline fields replaced with `coupon_id` FK selector
+- All migrations applied, all docs updated
+
+### Next Session Priorities (Phase 5 Remaining)
+1. TCPA audit — review all SMS sending paths for compliance (consent checks, opt-out, required disclosures)
+2. Campaign analytics — tracking opens, clicks, conversions for marketing campaigns
+3. A/B testing — split testing for SMS/email templates
+4. Quote stats label fix — bug fix for stats display
+
+---
+
 ## Session Instructions
 - Update this file at end of session or when asked
 - Reference `docs/PROJECT.md` for full specs, `docs/DASHBOARD_RULES.md` for admin UI structure
