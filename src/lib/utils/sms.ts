@@ -1,6 +1,8 @@
 // Shared Twilio SMS helper — ALL SMS sends MUST go through this file.
 // Delivery tracking via sms_delivery_log table + Twilio status callback webhook.
 
+import { wrapUrlsInMessage } from '@/lib/utils/link-tracking';
+
 interface SmsResult {
   success: true;
   sid: string;
@@ -145,7 +147,23 @@ export async function sendMarketingSms(to: string, body: string, customerId?: st
     console.warn('[SMS] sendMarketingSms called without customerId — no consent/frequency check performed');
   }
 
-  const result = await sendSms(to, `${body}\nReply STOP to unsubscribe`, {
+  // Wrap URLs with click tracking when campaign or lifecycle context is present
+  let finalBody = body;
+  if (marketingOptions?.campaignId || marketingOptions?.lifecycleExecutionId) {
+    try {
+      finalBody = await wrapUrlsInMessage(body, {
+        customerId,
+        campaignId: marketingOptions.campaignId,
+        lifecycleExecutionId: marketingOptions.lifecycleExecutionId,
+        source: marketingOptions.source || 'campaign',
+      });
+    } catch (wrapErr) {
+      // Don't block SMS send if URL wrapping fails — use original body
+      console.error('[SMS] Failed to wrap URLs for tracking:', wrapErr);
+    }
+  }
+
+  const result = await sendSms(to, `${finalBody}\nReply STOP to unsubscribe`, {
     customerId: customerId || undefined,
     campaignId: marketingOptions?.campaignId,
     lifecycleExecutionId: marketingOptions?.lifecycleExecutionId,
