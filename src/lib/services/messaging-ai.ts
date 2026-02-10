@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { type SupabaseClient } from '@supabase/supabase-js';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, isWithinBusinessHours, formatBusinessHoursText } from '@/lib/data/business-hours';
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
@@ -139,6 +140,62 @@ Status: ${isOpen ? 'CURRENTLY OPEN' : 'CURRENTLY CLOSED'}
 Booking: ${bookingUrl}`;
 }
 
+// ---------------------------------------------------------------------------
+// Product search — inject relevant products into system prompt on demand
+// ---------------------------------------------------------------------------
+
+const PRODUCT_KEYWORDS = [
+  'product', 'buy', 'sell', 'purchase', 'spray', 'wax', 'cleaner', 'towel',
+  'polish', 'soap', 'shampoo', 'kit', 'brush', 'applicator', 'sealant',
+  'dressing', 'clay', 'compound', 'pad', 'microfiber', 'glove', 'mitt',
+  'tire', 'wheel', 'glass', 'leather', 'interior', 'exterior', 'protectant',
+];
+
+async function searchRelevantProducts(
+  admin: SupabaseClient,
+  customerMessage: string,
+  conversationHistory: Array<{ role: string; content: string }>
+): Promise<string> {
+  // Combine recent messages for keyword detection
+  const recentText = [
+    customerMessage,
+    ...conversationHistory.slice(-3).map((m) => m.content),
+  ].join(' ').toLowerCase();
+
+  // Only search if the conversation has product intent
+  const hasProductIntent = PRODUCT_KEYWORDS.some((kw) => recentText.includes(kw));
+  if (!hasProductIntent) return '';
+
+  // Find which keywords matched to build the search filter
+  const matchedTerms = PRODUCT_KEYWORDS.filter((kw) => recentText.includes(kw));
+
+  // Build OR filter for name/description matching
+  const orFilters = matchedTerms
+    .flatMap((term) => [`name.ilike.%${term}%`, `description.ilike.%${term}%`])
+    .join(',');
+
+  const { data: products, error } = await admin
+    .from('products')
+    .select('name, description, retail_price, category:product_categories(name)')
+    .eq('is_active', true)
+    .or(orFilters)
+    .limit(10);
+
+  if (error || !products || products.length === 0) return '';
+
+  const productLines = products.map((p) => {
+    const price = p.retail_price ? `$${Number(p.retail_price).toFixed(2)}` : 'Price varies';
+    const catData = p.category as unknown as { name: string } | null;
+    const cat = catData?.name;
+    const desc = p.description
+      ? ` — ${p.description.length > 80 ? p.description.slice(0, 80) + '…' : p.description}`
+      : '';
+    return `- ${p.name} (${price}${cat ? `, ${cat}` : ''})${desc}`;
+  }).join('\n');
+
+  return `\n\nPRODUCTS WE CARRY (relevant to this conversation):\n${productLines}\n\nWhen discussing products: share name, price, and a brief description. For purchases, direct customers to visit in-store or let them know a team member can help with ordering.`;
+}
+
 export interface CustomerContext {
   name: string;
   email?: string;
@@ -165,6 +222,21 @@ export async function getAIResponse(
   }
 
   let systemPrompt = await buildSystemPrompt();
+
+  // Search for relevant products based on conversation context
+  const admin = createAdminClient();
+  const historyForSearch = conversationHistory.slice(-20).map((msg) => ({
+    role: msg.direction === 'inbound' ? 'user' : 'assistant',
+    content: msg.body,
+  }));
+  try {
+    const productContext = await searchRelevantProducts(admin, newMessage, historyForSearch);
+    if (productContext) {
+      systemPrompt += productContext;
+    }
+  } catch (err) {
+    console.error('Product search failed:', err);
+  }
 
   // Append customer context for returning customers
   if (customerContext) {
