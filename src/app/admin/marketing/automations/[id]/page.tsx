@@ -20,6 +20,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+
+interface CouponOption {
+  id: string;
+  name: string | null;
+  code: string;
+  summary: string;
+}
 
 export default function AutomationDetailPage() {
   const router = useRouter();
@@ -28,6 +36,7 @@ export default function AutomationDetailPage() {
   const supabase = createClient();
 
   const [services, setServices] = useState<Service[]>([]);
+  const [coupons, setCoupons] = useState<CouponOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -51,12 +60,32 @@ export default function AutomationDetailPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [ruleRes, servicesRes] = await Promise.all([
+      const [ruleRes, servicesRes, couponsRes] = await Promise.all([
         fetch(`/api/marketing/automations/${id}`),
         supabase.from('services').select('id, name').eq('is_active', true).order('name'),
+        supabase
+          .from('coupons')
+          .select('id, name, code, coupon_rewards(discount_type, discount_value)')
+          .eq('status', 'active')
+          .order('name'),
       ]);
 
       if (servicesRes.data) setServices(servicesRes.data as Service[]);
+      if (couponsRes.data) {
+        setCoupons(
+          couponsRes.data.map((c: { id: string; name: string | null; code: string; coupon_rewards: Array<{ discount_type: string; discount_value: number }> | null }) => {
+            const rewards = (c.coupon_rewards || []) as Array<{ discount_type: string; discount_value: number }>;
+            const summary = rewards.length > 0
+              ? rewards.map((r) => {
+                  if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
+                  if (r.discount_type === 'flat') return `$${r.discount_value} off`;
+                  return 'Free';
+                }).join(', ')
+              : 'No rewards';
+            return { id: c.id, name: c.name, code: c.code, summary };
+          })
+        );
+      }
 
       if (ruleRes.ok) {
         const { data } = await ruleRes.json();
@@ -71,9 +100,7 @@ export default function AutomationDetailPage() {
           sms_template: data.sms_template || '',
           email_subject: data.email_subject || '',
           email_template: data.email_template || '',
-          coupon_type: data.coupon_type || null,
-          coupon_value: data.coupon_value ?? null,
-          coupon_expiry_days: data.coupon_expiry_days ?? null,
+          coupon_id: data.coupon_id || null,
           is_active: data.is_active,
           is_vehicle_aware: data.is_vehicle_aware,
           chain_order: data.chain_order,
@@ -258,25 +285,27 @@ export default function AutomationDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Coupon */}
         <Card>
           <CardHeader><CardTitle>Coupon (Optional)</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid gap-6 md:grid-cols-3">
-              <FormField label="Coupon Type" error={errors.coupon_type?.message} htmlFor="coupon_type">
-                <Select id="coupon_type" {...register('coupon_type')}>
-                  <option value="">No coupon</option>
-                  <option value="percentage">Percentage</option>
-                  <option value="flat">Flat Amount</option>
-                  <option value="free_addon">Free Add-On</option>
-                  <option value="free_product">Free Product</option>
+            <div className="space-y-3">
+              <FormField label="Attach Coupon" error={errors.coupon_id?.message} htmlFor="coupon_id">
+                <Select id="coupon_id" {...register('coupon_id')}>
+                  <option value="">None</option>
+                  {coupons.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name || 'Unnamed'} ({c.code}) — {c.summary}
+                    </option>
+                  ))}
                 </Select>
               </FormField>
-              <FormField label="Coupon Value" error={errors.coupon_value?.message} htmlFor="coupon_value">
-                <Input id="coupon_value" type="number" step="0.01" min="0" {...register('coupon_value')} />
-              </FormField>
-              <FormField label="Coupon Expiry (days)" error={errors.coupon_expiry_days?.message} htmlFor="coupon_expiry_days">
-                <Input id="coupon_expiry_days" type="number" min="1" {...register('coupon_expiry_days')} />
-              </FormField>
+              <Link
+                href="/admin/marketing/coupons"
+                className="inline-block text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                Manage coupons →
+              </Link>
             </div>
           </CardContent>
         </Card>

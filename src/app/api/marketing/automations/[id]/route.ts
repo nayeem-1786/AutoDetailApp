@@ -23,7 +23,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from('lifecycle_rules')
-      .select('*, services:trigger_service_id(id, name)')
+      .select('*, services:trigger_service_id(id, name), coupons:coupon_id(id, name, code)')
       .eq('id', id)
       .single();
 

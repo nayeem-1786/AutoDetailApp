@@ -26,6 +26,7 @@ interface RuleWithService {
   chain_order: number;
   created_at: string;
   services: { id: string; name: string } | null;
+  coupons: { id: string; name: string | null; code: string } | null;
 }
 
 export default function AutomationsListPage() {
@@ -44,7 +45,7 @@ export default function AutomationsListPage() {
     setLoading(true);
     const { data } = await supabase
       .from('lifecycle_rules')
-      .select('*, services:trigger_service_id(id, name)')
+      .select('*, services:trigger_service_id(id, name), coupons:coupon_id(id, name, code)')
       .order('chain_order')
       .order('created_at', { ascending: false });
 
@@ -131,6 +132,20 @@ export default function AutomationsListPage() {
           {row.original.services?.name || 'Any'}
         </span>
       ),
+      enableSorting: false,
+    },
+    {
+      id: 'coupon',
+      header: 'Coupon',
+      cell: ({ row }) => {
+        const coupon = row.original.coupons;
+        if (!coupon) return <span className="text-sm text-gray-400">—</span>;
+        return (
+          <span className="text-sm text-gray-600">
+            {coupon.name || coupon.code}
+          </span>
+        );
+      },
       enableSorting: false,
     },
     {

@@ -612,6 +612,7 @@ export type Database = {
           action: Database["public"]["Enums"]["lifecycle_action"]
           chain_order: number
           coupon_expiry_days: number | null
+          coupon_id: string | null
           coupon_type: Database["public"]["Enums"]["coupon_type"] | null
           coupon_value: number | null
           created_at: string
@@ -632,6 +633,7 @@ export type Database = {
           action?: Database["public"]["Enums"]["lifecycle_action"]
           chain_order?: number
           coupon_expiry_days?: number | null
+          coupon_id?: string | null
           coupon_type?: Database["public"]["Enums"]["coupon_type"] | null
           coupon_value?: number | null
           created_at?: string
@@ -652,6 +654,7 @@ export type Database = {
           action?: Database["public"]["Enums"]["lifecycle_action"]
           chain_order?: number
           coupon_expiry_days?: number | null
+          coupon_id?: string | null
           coupon_type?: Database["public"]["Enums"]["coupon_type"] | null
           coupon_value?: number | null
           created_at?: string
@@ -669,6 +672,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lifecycle_rules_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lifecycle_rules_trigger_service_id_fkey"
             columns: ["trigger_service_id"]

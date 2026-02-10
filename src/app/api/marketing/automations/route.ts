@@ -19,7 +19,7 @@ export async function GET(_request: NextRequest) {
 
     const { data, error } = await supabase
       .from('lifecycle_rules')
-      .select('*, services:trigger_service_id(id, name)')
+      .select('*, services:trigger_service_id(id, name), coupons:coupon_id(id, name, code)')
       .order('chain_order')
       .order('created_at', { ascending: false });
 
