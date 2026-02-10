@@ -38,7 +38,8 @@ export async function SiteHeader() {
             href="/"
             className="text-lg font-bold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           >
-            {biz.name}
+            <span className="hidden sm:inline">{biz.name}</span>
+            <span className="sm:hidden">SD Auto Spa & Supplies</span>
           </Link>
         </div>
 

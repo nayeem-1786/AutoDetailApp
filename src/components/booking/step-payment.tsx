@@ -28,7 +28,7 @@ function TrustBadges() {
         <img
           src="/images/powered-by-stripe.svg"
           alt="Powered by Stripe"
-          className="h-9 w-auto opacity-20"
+          className="h-9 w-auto opacity-60"
         />
       </div>
     </div>
