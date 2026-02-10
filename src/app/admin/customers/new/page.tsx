@@ -44,8 +44,8 @@ export default function NewCustomerPage() {
       zip: '',
       notes: '',
       tags: [],
-      sms_consent: false,
-      email_consent: false,
+      sms_consent: true,
+      email_consent: true,
     },
   });
 

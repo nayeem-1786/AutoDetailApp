@@ -85,8 +85,8 @@ export function StepCustomerInfo({
         last_name: initialCustomer.last_name ?? '',
         phone: formatInitialPhone(initialCustomer.phone),
         email: initialCustomer.email ?? '',
-        sms_consent: false,
-        email_consent: false,
+        sms_consent: true,
+        email_consent: true,
       },
       vehicle: {
         vehicle_type: initialVehicle.vehicle_type ?? 'standard',
