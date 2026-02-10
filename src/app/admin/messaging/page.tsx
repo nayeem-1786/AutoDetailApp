@@ -6,7 +6,7 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
-import type { Conversation, Message } from '@/lib/supabase/types';
+import type { Conversation, ConversationStatus, Message } from '@/lib/supabase/types';
 import { ConversationList } from './components/conversation-list';
 import { ThreadView } from './components/thread-view';
 
@@ -36,6 +36,7 @@ export default function MessagingPage() {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ConversationStatus>('open');
   const [mobileView, setMobileView] = useState<'list' | 'thread'>('list');
   const searchDebounceRef = useRef<NodeJS.Timeout>(null);
   const activeConversationIdRef = useRef<string | null>(null);
@@ -47,9 +48,9 @@ export default function MessagingPage() {
   }, [activeConversation?.id]);
 
   // Fetch conversations
-  const fetchConversations = useCallback(async (searchTerm?: string) => {
+  const fetchConversations = useCallback(async (searchTerm?: string, status?: ConversationStatus) => {
     try {
-      const params = new URLSearchParams({ status: 'open' });
+      const params = new URLSearchParams({ status: status || 'open' });
       if (searchTerm && searchTerm.length >= 2) {
         params.set('search', searchTerm);
       }
@@ -65,10 +66,11 @@ export default function MessagingPage() {
     }
   }, []);
 
-  // Initial load
+  // Initial load + refetch when status filter changes
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+    setLoadingConversations(true);
+    fetchConversations(search, statusFilter);
+  }, [fetchConversations, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
   useEffect(() => {
@@ -78,13 +80,13 @@ export default function MessagingPage() {
     if (search.length === 0 || search.length >= 2) {
       searchDebounceRef.current = setTimeout(() => {
         setLoadingConversations(true);
-        fetchConversations(search);
+        fetchConversations(search, statusFilter);
       }, 300);
     }
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
-  }, [search, fetchConversations]);
+  }, [search, fetchConversations, statusFilter]);
 
   // Fetch messages for active conversation (always fetches fresh)
   const fetchMessages = useCallback(async (conversationId: string) => {
@@ -235,17 +237,24 @@ export default function MessagingPage() {
 
       if (res.ok) {
         const { data } = await res.json();
-        setActiveConversation(data);
-        setConversations((prev) =>
-          prev.map((c) => (c.id === data.id ? data : c))
-        );
+        // If the conversation status changed, it may no longer belong in the current list
+        if (updates.status && updates.status !== statusFilter) {
+          setConversations((prev) => prev.filter((c) => c.id !== data.id));
+          setActiveConversation(null);
+          setMessages([]);
+        } else {
+          setActiveConversation(data);
+          setConversations((prev) =>
+            prev.map((c) => (c.id === data.id ? data : c))
+          );
+        }
         toast.success('Conversation updated');
       } else {
         const json = await res.json();
         toast.error(json.error || 'Failed to update conversation');
       }
     },
-    [activeConversation]
+    [activeConversation, statusFilter]
   );
 
   // Realtime: new messages for active conversation
@@ -273,7 +282,7 @@ export default function MessagingPage() {
           }));
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((status: string, err?: Error) => {
         if (status === 'CHANNEL_ERROR') {
           console.error('[Messaging] Messages channel error:', err);
         }
@@ -327,7 +336,7 @@ export default function MessagingPage() {
           }
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((status: string, err?: Error) => {
         if (status === 'CHANNEL_ERROR') {
           console.error('[Messaging] Conversations channel error:', err);
         }
@@ -337,6 +346,13 @@ export default function MessagingPage() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleStatusFilterChange = useCallback((status: ConversationStatus) => {
+    setStatusFilter(status);
+    setActiveConversation(null);
+    setMessages([]);
+    setMobileView('list');
   }, []);
 
   const handleBack = () => {
@@ -361,6 +377,8 @@ export default function MessagingPage() {
             loading={loadingConversations}
             search={search}
             onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
           />
         </div>
 
