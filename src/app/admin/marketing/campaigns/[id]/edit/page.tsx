@@ -34,6 +34,9 @@ export default function EditCampaignPage() {
           email_template: data.email_template,
           coupon_id: data.coupon_id,
           scheduled_at: data.scheduled_at,
+          variants: data.variants ?? null,
+          auto_select_winner: data.auto_select_winner ?? false,
+          auto_select_after_hours: data.auto_select_after_hours ?? null,
         });
       } else {
         toast.error('Campaign not found');

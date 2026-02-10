@@ -23,7 +23,8 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { ArrowLeft, ArrowRight, Users, Send, Plus, Eye, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { ArrowLeft, ArrowRight, Users, Send, Plus, Eye, ChevronLeft, ChevronRight, Clock, FlaskConical } from 'lucide-react';
 import { SITE_URL } from '@/lib/utils/constants';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 
@@ -37,6 +38,13 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'review', label: 'Review & Send' },
 ];
 
+export interface CampaignVariant {
+  label: string;
+  messageBody: string;
+  emailSubject: string;
+  splitPercentage: number;
+}
+
 export interface InitialCampaignData {
   id: string;
   name: string;
@@ -47,6 +55,10 @@ export interface InitialCampaignData {
   email_template: string | null;
   coupon_id: string | null;
   scheduled_at: string | null;
+  // A/B testing fields
+  variants?: CampaignVariant[] | null;
+  auto_select_winner?: boolean;
+  auto_select_after_hours?: number | null;
 }
 
 interface CampaignWizardProps {
@@ -97,6 +109,28 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   const [scheduledAt, setScheduledAt] = useState(
     initialData?.scheduled_at ? toLocalDatetime(initialData.scheduled_at) : ''
   );
+
+  // A/B testing state
+  const hasInitialAB = initialData?.variants && initialData.variants.length === 2;
+  const [abTestEnabled, setAbTestEnabled] = useState(!!hasInitialAB);
+  const [variantBSmsTemplate, setVariantBSmsTemplate] = useState(
+    hasInitialAB ? initialData!.variants![1].messageBody : ''
+  );
+  const [variantBEmailSubject, setVariantBEmailSubject] = useState(
+    hasInitialAB ? initialData!.variants![1].emailSubject : ''
+  );
+  const [variantBEmailTemplate, setVariantBEmailTemplate] = useState('');
+  const [splitPercentage, setSplitPercentage] = useState(
+    hasInitialAB ? initialData!.variants![0].splitPercentage : 50
+  );
+  const [autoSelectWinner, setAutoSelectWinner] = useState(
+    initialData?.auto_select_winner ?? false
+  );
+  const [autoSelectAfterHours, setAutoSelectAfterHours] = useState(
+    initialData?.auto_select_after_hours ?? 48
+  );
+
+  const SPLIT_OPTIONS = [50, 60, 70, 80] as const;
 
   // Audience filters
   const [customerType, setCustomerType] = useState(String(initFilters.customer_type ?? ''));
@@ -173,7 +207,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   }, [customerType, lastService, daysSinceVisitMin, daysSinceVisitMax, vehicleType, minSpend]);
 
   function buildPayload() {
-    return {
+    const base: Record<string, unknown> = {
       name,
       channel,
       audience_filters: buildFilters(),
@@ -183,6 +217,27 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       coupon_id: couponId || null,
       scheduled_at: scheduledAt || null,
     };
+
+    if (abTestEnabled) {
+      base.variants = [
+        {
+          label: 'A',
+          messageBody: (channel === 'sms' || channel === 'both') ? smsTemplate : emailTemplate,
+          emailSubject: (channel === 'email' || channel === 'both') ? emailSubject : '',
+          splitPercentage,
+        },
+        {
+          label: 'B',
+          messageBody: (channel === 'sms' || channel === 'both') ? variantBSmsTemplate : variantBEmailTemplate,
+          emailSubject: (channel === 'email' || channel === 'both') ? variantBEmailSubject : '',
+          splitPercentage: 100 - splitPercentage,
+        },
+      ];
+      base.auto_select_winner = autoSelectWinner;
+      base.auto_select_after_hours = autoSelectWinner ? autoSelectAfterHours : null;
+    }
+
+    return base;
   }
 
   // -- Silent auto-save (called on step navigation) --
@@ -226,6 +281,29 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
     if (!name.trim()) {
       toast.error('Campaign name is required');
       return null;
+    }
+
+    // A/B test validation
+    if (abTestEnabled) {
+      const needsSms = channel === 'sms' || channel === 'both';
+      const needsEmail = channel === 'email' || channel === 'both';
+
+      if (needsSms && !smsTemplate.trim()) {
+        toast.error('Variant A SMS message is required');
+        return null;
+      }
+      if (needsSms && !variantBSmsTemplate.trim()) {
+        toast.error('Variant B SMS message is required');
+        return null;
+      }
+      if (needsEmail && !emailTemplate.trim()) {
+        toast.error('Variant A email body is required');
+        return null;
+      }
+      if (needsEmail && !variantBEmailTemplate.trim()) {
+        toast.error('Variant B email body is required');
+        return null;
+      }
     }
 
     setSaving(true);
@@ -712,6 +790,14 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
+              {/* Variant A label when A/B testing */}
+              {abTestEnabled && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="info">Variant A</Badge>
+                  <span className="text-sm text-gray-500">({splitPercentage}% of recipients)</span>
+                </div>
+              )}
+
               {(channel === 'sms' || channel === 'both') && (
                 <div>
                   <FormField label="SMS Message" htmlFor="sms_template">
@@ -763,6 +849,162 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                   </div>
                 </>
               )}
+
+              {/* A/B Testing Toggle */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Enable A/B Testing
+                      </p>
+                      <p className="mt-0.5 text-sm text-gray-500">
+                        Test two message variants to find what performs best.
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={abTestEnabled}
+                    onCheckedChange={setAbTestEnabled}
+                  />
+                </div>
+
+                {/* A/B Test Fields */}
+                {abTestEnabled && (
+                  <div className="mt-6 space-y-6">
+                    {/* Variant B */}
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4">
+                      <div className="mb-4 flex items-center gap-2">
+                        <Badge variant="warning">Variant B</Badge>
+                        <span className="text-sm text-gray-500">({100 - splitPercentage}% of recipients)</span>
+                      </div>
+
+                      {(channel === 'sms' || channel === 'both') && (
+                        <div>
+                          <FormField label="SMS Message (Variant B)" htmlFor="variant_b_sms">
+                            <Textarea
+                              id="variant_b_sms"
+                              value={variantBSmsTemplate}
+                              onChange={(e) => setVariantBSmsTemplate(e.target.value)}
+                              rows={4}
+                              placeholder="Hi {first_name}, don't miss our exclusive deal..."
+                            />
+                          </FormField>
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-xs text-gray-400">
+                              {variantBSmsTemplate.length}/160 chars
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {variantBSmsTemplate.length > 160
+                                ? `${Math.ceil(variantBSmsTemplate.length / 153)} segments`
+                                : '1 segment'}
+                            </span>
+                          </div>
+                          {variableChips(setVariantBSmsTemplate, 'variant_b_sms')}
+                        </div>
+                      )}
+
+                      {(channel === 'email' || channel === 'both') && (
+                        <>
+                          <div className={channel === 'both' ? 'mt-4' : ''}>
+                            <FormField label="Email Subject (Variant B)" htmlFor="variant_b_email_subject">
+                              <Input
+                                id="variant_b_email_subject"
+                                value={variantBEmailSubject}
+                                onChange={(e) => setVariantBEmailSubject(e.target.value)}
+                                placeholder="A special surprise for you, {first_name}!"
+                              />
+                            </FormField>
+                            {variableChips(setVariantBEmailSubject, 'variant_b_email_subject')}
+                          </div>
+                          <div className="mt-4">
+                            <FormField label="Email Body (Variant B)" htmlFor="variant_b_email_template">
+                              <Textarea
+                                id="variant_b_email_template"
+                                value={variantBEmailTemplate}
+                                onChange={(e) => setVariantBEmailTemplate(e.target.value)}
+                                rows={8}
+                                placeholder="Hi {first_name},&#10;&#10;We have something exciting to share..."
+                              />
+                            </FormField>
+                            {variableChips(setVariantBEmailTemplate, 'variant_b_email_template')}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Split Percentage */}
+                    <div>
+                      <p className="mb-2 text-sm font-medium text-gray-700">
+                        Traffic Split
+                      </p>
+                      <div className="flex items-center gap-3">
+                        {SPLIT_OPTIONS.map((pct) => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => setSplitPercentage(pct)}
+                            className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                              splitPercentage === pct
+                                ? 'border-gray-900 bg-gray-900 text-white'
+                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pct}/{100 - pct}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex overflow-hidden rounded-full">
+                        <div
+                          className="flex h-2.5 items-center justify-center bg-blue-500 transition-all duration-300"
+                          style={{ width: `${splitPercentage}%` }}
+                        />
+                        <div
+                          className="flex h-2.5 items-center justify-center bg-yellow-500 transition-all duration-300"
+                          style={{ width: `${100 - splitPercentage}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 flex justify-between text-xs text-gray-500">
+                        <span>Variant A: {splitPercentage}%</span>
+                        <span>Variant B: {100 - splitPercentage}%</span>
+                      </div>
+                    </div>
+
+                    {/* Auto-select Winner */}
+                    <div className="rounded-md border border-gray-200 bg-white p-4">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id="auto_select_winner"
+                          checked={autoSelectWinner}
+                          onChange={() => setAutoSelectWinner(!autoSelectWinner)}
+                        />
+                        <label
+                          htmlFor="auto_select_winner"
+                          className="text-sm font-medium text-gray-700"
+                        >
+                          Auto-select winner after
+                        </label>
+                        {autoSelectWinner && (
+                          <Select
+                            value={String(autoSelectAfterHours)}
+                            onChange={(e) => setAutoSelectAfterHours(parseInt(e.target.value))}
+                            className="w-32"
+                          >
+                            <option value="24">24 hours</option>
+                            <option value="48">48 hours</option>
+                            <option value="72">72 hours</option>
+                            <option value="168">1 week</option>
+                          </Select>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        Recipients will be randomly split between variants. The variant with the higher click rate wins.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -855,25 +1097,98 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                 </div>
               </div>
 
-              {(channel === 'sms' || channel === 'both') && smsTemplate && (
-                <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                  <p className="mb-1 text-xs font-medium text-gray-500">
-                    SMS Template
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm">{smsTemplate}</p>
+              {/* A/B Test info */}
+              {abTestEnabled && (
+                <div>
+                  <p className="text-sm text-gray-500">A/B Testing</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Badge variant="info">Enabled</Badge>
+                    <span className="text-sm text-gray-600">
+                      {splitPercentage}/{100 - splitPercentage} split
+                    </span>
+                    {autoSelectWinner && (
+                      <Badge variant="default">
+                        Auto-select winner after {autoSelectAfterHours}h
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {(channel === 'email' || channel === 'both') && emailTemplate && (
-                <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                  <p className="mb-1 text-xs font-medium text-gray-500">
-                    Email Template
-                  </p>
-                  <p className="mb-1 text-sm font-medium">{emailSubject}</p>
-                  <p className="whitespace-pre-wrap text-sm">
-                    {emailTemplate}
-                  </p>
+              {/* Message templates — show variants when A/B enabled */}
+              {abTestEnabled ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Variant A */}
+                  <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Badge variant="info">Variant A</Badge>
+                      <span className="text-xs text-gray-500">{splitPercentage}%</span>
+                    </div>
+                    {(channel === 'sms' || channel === 'both') && smsTemplate && (
+                      <div className="mb-2">
+                        <p className="mb-0.5 text-xs font-medium text-gray-500">SMS</p>
+                        <p className="whitespace-pre-wrap text-sm">{smsTemplate}</p>
+                      </div>
+                    )}
+                    {(channel === 'email' || channel === 'both') && emailTemplate && (
+                      <div>
+                        <p className="mb-0.5 text-xs font-medium text-gray-500">Email</p>
+                        {emailSubject && (
+                          <p className="text-sm font-medium">{emailSubject}</p>
+                        )}
+                        <p className="whitespace-pre-wrap text-sm">{emailTemplate}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Variant B */}
+                  <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Badge variant="warning">Variant B</Badge>
+                      <span className="text-xs text-gray-500">{100 - splitPercentage}%</span>
+                    </div>
+                    {(channel === 'sms' || channel === 'both') && variantBSmsTemplate && (
+                      <div className="mb-2">
+                        <p className="mb-0.5 text-xs font-medium text-gray-500">SMS</p>
+                        <p className="whitespace-pre-wrap text-sm">{variantBSmsTemplate}</p>
+                      </div>
+                    )}
+                    {(channel === 'email' || channel === 'both') && (variantBEmailTemplate || variantBEmailSubject) && (
+                      <div>
+                        <p className="mb-0.5 text-xs font-medium text-gray-500">Email</p>
+                        {variantBEmailSubject && (
+                          <p className="text-sm font-medium">{variantBEmailSubject}</p>
+                        )}
+                        {variantBEmailTemplate && (
+                          <p className="whitespace-pre-wrap text-sm">{variantBEmailTemplate}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {(channel === 'sms' || channel === 'both') && smsTemplate && (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                      <p className="mb-1 text-xs font-medium text-gray-500">
+                        SMS Template
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm">{smsTemplate}</p>
+                    </div>
+                  )}
+
+                  {(channel === 'email' || channel === 'both') && emailTemplate && (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                      <p className="mb-1 text-xs font-medium text-gray-500">
+                        Email Template
+                      </p>
+                      <p className="mb-1 text-sm font-medium">{emailSubject}</p>
+                      <p className="whitespace-pre-wrap text-sm">
+                        {emailTemplate}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {(smsTemplate || emailTemplate) && (
