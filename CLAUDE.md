@@ -94,7 +94,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
   - Quote reminders switched from `sendSms()` to `sendMarketingSms()` with `sms_consent` check before sending.
   - `sendMarketingSms()` consent safety net: accepts optional `customerId` param, looks up `sms_consent` from DB, blocks if `false`. Defense-in-depth — all callers also pass `customerId`.
   - Consent logging wired into ALL paths: inbound webhook (STOP/START), unsubscribe page, compliance opt-out, admin customer edit/new, customer portal profile, booking form.
-  - Booking form consent capture: SMS + email opt-in checkboxes (unchecked by default) with TCPA disclosure text using dynamic business name from `/api/public/business-info`. Consent upgrade-only for existing customers (never downgrades via booking).
+  - Booking form consent capture: SMS + email opt-in checkboxes (checked by default) with TCPA disclosure text using dynamic business name from `/api/public/business-info`. Consent upgrade-only for existing customers (never downgrades via booking).
   - Source tracking: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`.
   - Twilio signature validation enabled: `false &&` bypass removed from inbound webhook. Validation active in production, skipped in `NODE_ENV=development`.
   - All SMS routed through shared utility: 3 direct Twilio API calls (admin appt notify, POS appt notify, quote send-service) replaced with `sendSms()`. Zero direct Twilio calls outside `sms.ts`.
@@ -234,7 +234,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **SMS frequency cap**: `sendMarketingSms()` automatically checks `business_settings.sms_daily_cap_per_customer` (default 5). Counts both `campaign_recipients` and `lifecycle_executions` for the current PST day. Marketing SMS blocked when cap reached.
 - **Phone validation**: `isValidMobileNumber()` from `src/lib/utils/phone-validation.ts` — OFF by default (`TWILIO_LOOKUP_ENABLED=true` to enable). Costs ~$0.005/lookup. Fails open. Wire into customer creation flows when enabled.
 - **Twilio inbound webhook signature validation**: Active in production, skipped when `NODE_ENV=development`. Uses `crypto.timingSafeEqual()` for constant-time comparison. NEVER re-add `false &&` bypass.
-- **Booking form consent**: SMS + email checkboxes are unchecked by default (affirmative opt-in). For existing customers, consent only upgrades (true → true), never downgrades (true → false) via booking form. New customers get consent set from checkbox values.
+- **Booking form consent**: SMS + email checkboxes are checked by default. For existing customers, consent only upgrades (true → true), never downgrades (true → false) via booking form. New customers get consent set from checkbox values. Admin "Add Customer" form also defaults both to checked.
 - **sms_delivery_log** tracks Twilio delivery callbacks — always pass `statusCallback` URL in sends
 - **tracked_links + link_clicks** for click tracking — `wrapUrlsInMessage()` auto-wraps URLs in marketing SMS
 - **Mailgun webhook signing key**: `MAILGUN_WEBHOOK_SIGNING_KEY` env var required for production
