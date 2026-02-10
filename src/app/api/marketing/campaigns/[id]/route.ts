@@ -39,8 +39,24 @@ export async function GET(
       .select('id', { count: 'exact', head: true })
       .eq('campaign_id', id);
 
+    // Load A/B test variants
+    const { data: dbVariants } = await admin
+      .from('campaign_variants')
+      .select('*')
+      .eq('campaign_id', id)
+      .order('variant_label');
+
+    const variants = dbVariants && dbVariants.length > 0
+      ? dbVariants.map((v: { variant_label: string; message_body: string; email_subject: string | null; split_percentage: number }) => ({
+          label: v.variant_label,
+          messageBody: v.message_body,
+          emailSubject: v.email_subject || '',
+          splitPercentage: v.split_percentage,
+        }))
+      : null;
+
     return NextResponse.json({
-      data: { ...data, total_recipients: recipientCount ?? 0 },
+      data: { ...data, total_recipients: recipientCount ?? 0, variants },
     });
   } catch (err) {
     console.error('Get campaign error:', err);
@@ -102,6 +118,24 @@ export async function PATCH(
       .single();
 
     if (error) throw error;
+
+    // Replace A/B test variants when the key is present in the body
+    if ('variants' in body) {
+      // Delete existing variants
+      await admin.from('campaign_variants').delete().eq('campaign_id', id);
+
+      // Insert new ones if provided
+      if (body.variants && Array.isArray(body.variants) && body.variants.length > 0) {
+        const variantRows = body.variants.map((v: { label: string; messageBody: string; emailSubject?: string; splitPercentage: number }) => ({
+          campaign_id: id,
+          variant_label: v.label,
+          message_body: v.messageBody,
+          email_subject: v.emailSubject || null,
+          split_percentage: v.splitPercentage,
+        }));
+        await admin.from('campaign_variants').insert(variantRows);
+      }
+    }
 
     return NextResponse.json({ data });
   } catch (err) {

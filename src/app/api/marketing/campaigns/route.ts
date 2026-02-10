@@ -85,6 +85,18 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Insert A/B test variants if provided
+    if (body.variants && Array.isArray(body.variants) && body.variants.length > 0) {
+      const variantRows = body.variants.map((v: { label: string; messageBody: string; emailSubject?: string; splitPercentage: number }) => ({
+        campaign_id: data.id,
+        variant_label: v.label,
+        message_body: v.messageBody,
+        email_subject: v.emailSubject || null,
+        split_percentage: v.splitPercentage,
+      }));
+      await admin.from('campaign_variants').insert(variantRows);
+    }
+
     return NextResponse.json({ data }, { status: 201 });
   } catch (err) {
     console.error('Create campaign error:', err);

@@ -545,6 +545,8 @@ export const campaignCreateSchema = z.object({
   email_template: optionalString,
   coupon_id: z.string().uuid().optional().nullable(),
   scheduled_at: z.string().optional().nullable(),
+  auto_select_winner: z.boolean().optional().nullable(),
+  auto_select_after_hours: z.number().optional().nullable(),
 });
 
 export const campaignUpdateSchema = campaignCreateSchema.partial();

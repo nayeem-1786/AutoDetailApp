@@ -321,6 +321,23 @@ async function executePending(
 
   const rulesMap = new Map((rulesData || []).map((r) => [r.id, r]));
 
+  // Pre-load coupon templates for rules that have coupon_id
+  const couponIds = [...new Set(
+    (rulesData || [])
+      .filter((r) => r.coupon_id)
+      .map((r) => r.coupon_id as string)
+  )];
+  const couponTemplatesMap = new Map<string, Record<string, unknown>>();
+  if (couponIds.length > 0) {
+    const { data: couponData } = await admin
+      .from('coupons')
+      .select('*, coupon_rewards(*)')
+      .in('id', couponIds);
+    for (const c of couponData || []) {
+      couponTemplatesMap.set(c.id, c);
+    }
+  }
+
   // Pre-load feature flag
   const { data: reviewFlag } = await admin
     .from('feature_flags')
@@ -458,6 +475,48 @@ async function executePending(
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+      // Generate unique coupon code if rule has a coupon attached
+      let couponCode = '';
+      const couponTemplate = rule.coupon_id
+        ? couponTemplatesMap.get(rule.coupon_id as string)
+        : null;
+
+      if (couponTemplate) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        for (let i = 0; i < 8; i++) {
+          couponCode += chars[Math.floor(Math.random() * chars.length)];
+        }
+
+        // Create unique single-use coupon for this customer
+        const { data: newCoupon } = await admin.from('coupons').insert({
+          code: couponCode,
+          name: (couponTemplate as any).name,
+          auto_apply: false,
+          min_purchase: (couponTemplate as any).min_purchase,
+          is_single_use: true,
+          max_uses: 1,
+          expires_at: (couponTemplate as any).expires_at,
+          customer_id: exec.customer_id,
+          status: 'active',
+        }).select().single();
+
+        // Clone rewards from template coupon
+        if (newCoupon && (couponTemplate as any).coupon_rewards) {
+          const rewards = ((couponTemplate as any).coupon_rewards as any[]).map((r) => ({
+            coupon_id: newCoupon.id,
+            applies_to: r.applies_to,
+            discount_type: r.discount_type,
+            discount_value: r.discount_value,
+            max_discount: r.max_discount,
+            target_product_id: r.target_product_id,
+            target_service_id: r.target_service_id,
+            target_product_category_id: r.target_product_category_id,
+            target_service_category_id: r.target_service_category_id,
+          }));
+          await admin.from('coupon_rewards').insert(rewards);
+        }
+      }
+
       // Render template with snake_case variables matching TEMPLATE_VARIABLES
       let message = renderTemplate(template, {
         first_name: customer.first_name || 'there',
@@ -468,8 +527,11 @@ async function executePending(
         business_name: businessName,
         google_review_link: shortGoogleUrl,
         yelp_review_link: shortYelpUrl,
+        coupon_code: couponCode,
         booking_url: `${appUrl}/book`,
-        book_now_url: `${appUrl}/book`,
+        book_now_url: couponCode
+          ? `${appUrl}/book?coupon=${couponCode}`
+          : `${appUrl}/book`,
       });
 
       // Clean up lines with empty review links (e.g., if URL not configured)
@@ -479,8 +541,11 @@ async function executePending(
         .join('\n')
         .replace(/\n{3,}/g, '\n\n');
 
-      // Send via marketing SMS (appends STOP footer)
-      const result = await sendMarketingSms(customer.phone, message, exec.customer_id);
+      // Send via marketing SMS (appends STOP footer, wraps URLs for click tracking)
+      const result = await sendMarketingSms(customer.phone, message, exec.customer_id, {
+        lifecycleExecutionId: exec.id,
+        source: 'lifecycle',
+      });
 
       if (result.success) {
         await markExecution(admin, exec.id, 'sent');

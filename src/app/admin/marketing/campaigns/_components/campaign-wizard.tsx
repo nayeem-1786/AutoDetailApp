@@ -235,6 +235,10 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       ];
       base.auto_select_winner = autoSelectWinner;
       base.auto_select_after_hours = autoSelectWinner ? autoSelectAfterHours : null;
+    } else {
+      base.variants = null;
+      base.auto_select_winner = false;
+      base.auto_select_after_hours = null;
     }
 
     return base;
@@ -457,11 +461,13 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   }
 
   function renderPreviewForCustomer(customer: PreviewCustomer) {
-    // Generate a realistic-looking random code for the preview
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    // Only generate a sample coupon code if a coupon is actually attached
     let sampleCode = '';
-    for (let i = 0; i < 8; i++) {
-      sampleCode += chars[Math.floor(Math.random() * chars.length)];
+    if (couponId) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      for (let i = 0; i < 8; i++) {
+        sampleCode += chars[Math.floor(Math.random() * chars.length)];
+      }
     }
 
     const vars: Record<string, string> = {
@@ -470,13 +476,24 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       coupon_code: sampleCode,
       business_name: businessInfo?.name || '',
       booking_url: `${SITE_URL}/book`,
-      book_now_url: `${SITE_URL}/book?service=example-service&coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`,
+      book_now_url: sampleCode
+        ? `${SITE_URL}/book?coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`
+        : `${SITE_URL}/book`,
     };
-    return {
+
+    const variantA = {
       sms: smsTemplate ? renderTemplate(smsTemplate, vars) : null,
       subject: emailSubject ? renderTemplate(emailSubject, vars) : null,
       email: emailTemplate ? renderTemplate(emailTemplate, vars) : null,
     };
+
+    const variantB = abTestEnabled ? {
+      sms: variantBSmsTemplate ? renderTemplate(variantBSmsTemplate, vars) : null,
+      subject: variantBEmailSubject ? renderTemplate(variantBEmailSubject, vars) : null,
+      email: variantBEmailTemplate ? renderTemplate(variantBEmailTemplate, vars) : null,
+    } : null;
+
+    return { variantA, variantB, couponCode: sampleCode };
   }
 
   // -- Template variable helpers --
@@ -1526,46 +1543,65 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
 
               {/* Rendered messages */}
               {(() => {
-                const rendered = renderPreviewForCustomer(
+                const { variantA, variantB } = renderPreviewForCustomer(
                   previewCustomers[previewIndex]
                 );
-                return (
-                  <>
+
+                const renderVariantPreview = (
+                  variant: typeof variantA,
+                  label?: string,
+                  borderColor?: string
+                ) => (
+                  <div className={label ? `rounded-lg border ${borderColor} p-3` : ''}>
+                    {label && (
+                      <p className="mb-2 text-xs font-semibold text-gray-600">{label}</p>
+                    )}
                     {(channel === 'sms' || channel === 'both') &&
-                      rendered.sms && (
-                        <div>
+                      variant.sms && (
+                        <div className="mb-2">
                           <p className="mb-1 text-xs font-medium text-gray-500">
                             SMS to{' '}
                             {previewCustomers[previewIndex].phone || 'N/A'}
                           </p>
                           <div className="rounded-lg border border-green-200 bg-green-50 p-3">
                             <p className="whitespace-pre-wrap text-sm">
-                              {rendered.sms}
+                              {variant.sms}
                             </p>
                           </div>
                         </div>
                       )}
                     {(channel === 'email' || channel === 'both') &&
-                      rendered.email && (
+                      variant.email && (
                         <div>
                           <p className="mb-1 text-xs font-medium text-gray-500">
                             Email to{' '}
                             {previewCustomers[previewIndex].email || 'N/A'}
                           </p>
                           <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                            {rendered.subject && (
+                            {variant.subject && (
                               <p className="mb-2 text-sm font-medium">
-                                Subject: {rendered.subject}
+                                Subject: {variant.subject}
                               </p>
                             )}
                             <p className="whitespace-pre-wrap text-sm">
-                              {rendered.email}
+                              {variant.email}
                             </p>
                           </div>
                         </div>
                       )}
-                  </>
+                  </div>
                 );
+
+                if (variantB) {
+                  return (
+                    <div className="space-y-4">
+                      {renderVariantPreview(variantA, `Variant A (${splitPercentage}%)`, 'border-blue-200 bg-blue-50/30')}
+                      {renderVariantPreview(variantB, `Variant B (${100 - splitPercentage}%)`, 'border-yellow-200 bg-yellow-50/30')}
+                    </div>
+                  );
+                }
+
+                return renderVariantPreview(variantA);
               })()}
             </div>
           )}

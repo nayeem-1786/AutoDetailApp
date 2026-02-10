@@ -443,6 +443,8 @@ export interface Campaign {
   clicked_count: number;
   redeemed_count: number;
   revenue_attributed: number;
+  auto_select_winner: boolean;
+  auto_select_after_hours: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
