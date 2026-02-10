@@ -237,6 +237,37 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Attribution window** configurable via `business_settings.attribution_window_days` (default: 7)
 - **A/B testing**: `campaign_variants` table, winner determined by CTR via `determineWinner()`
 - **Click redirect is public** (no auth): `/api/t/[code]`
+- **Dev testing requires ngrok running** — Twilio statusCallback and Mailgun webhooks need a public URL to receive callbacks during local development
+- **CRON_SECRET in .env.local** is a placeholder — verify if it's used or if `CRON_API_KEY` is the actual auth key for cron endpoints
+
+---
+
+## Production Deployment Checklist
+
+### Environment Variables
+| Variable | Dev Value | Production Value |
+|----------|-----------|------------------|
+| `NEXT_PUBLIC_APP_URL` | ngrok URL | `https://smartdetailsautospa.com` |
+| `TWILIO_WEBHOOK_URL` | ngrok URL | `https://smartdetailsautospa.com/api/webhooks/twilio/inbound` |
+| `MAILGUN_WEBHOOK_SIGNING_KEY` | Already set | Verify matches Mailgun dashboard |
+| `ANTHROPIC_API_KEY` | Set in .env.local | Must add to production env |
+| `CRON_API_KEY` | Set in .env.local | Must add to production env |
+
+### Twilio Configuration
+- **Inbound webhook URL**: Must be set in Twilio console → Phone Numbers → Active Numbers → +14244010094 → Messaging → "A Message Comes In" → `https://smartdetailsautospa.com/api/webhooks/twilio/inbound`
+- **Status callback**: Does NOT need manual config in Twilio dashboard — it's passed per-message via `statusCallback` parameter in `sendSms()`, which reads from `NEXT_PUBLIC_APP_URL` automatically
+
+### Mailgun Configuration
+- **Webhook URL**: Must be updated from ngrok dev URL to production URL in Mailgun dashboard
+- **Path**: Sending → Webhooks
+- **Production URL**: `https://smartdetailsautospa.com/api/webhooks/mailgun`
+- **Events to configure** (all pointing to the same endpoint):
+  - Delivered
+  - Permanent Failure
+  - Temporary Failure
+  - Clicked
+  - Complained
+  - Unsubscribed
 
 ---
 
