@@ -22,31 +22,31 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// --- Types ---
+// --- Types matching actual API response ---
 
 interface ABVariant {
+  variantId: string;
   label: string;
-  messageBody: string;
-  emailSubject: string;
   sent: number;
   delivered: number;
   clicked: number;
-  clickRate: number;
+  optedOut: number;
   conversions: number;
   revenue: number;
+  isWinner: boolean;
 }
 
 interface ABTest {
-  id: string;
+  campaignId: string;
   campaignName: string;
-  status: 'active' | 'completed';
+  channel: string;
+  sentAt: string;
+  status: string;
   variants: ABVariant[];
-  winnerId: string | null;
-  winnerMetric: string | null;
 }
 
-interface ABTestResultsData {
-  abTests: ABTest[];
+interface ABTestApiResponse {
+  tests: ABTest[];
 }
 
 interface ABTestResultsProps {
@@ -55,14 +55,20 @@ interface ABTestResultsProps {
 
 // --- Helpers ---
 
+function computeRate(numerator: number, denominator: number): number {
+  return denominator > 0 ? Math.round((numerator / denominator) * 1000) / 10 : 0;
+}
+
 const STATUS_BADGE_VARIANT: Record<string, 'info' | 'success'> = {
   active: 'info',
+  sent: 'info',
   completed: 'success',
 };
 
 const VARIANT_COLORS: Record<string, { bg: string; text: string; fill: string }> = {
   A: { bg: 'bg-blue-50', text: 'text-blue-700', fill: '#2563eb' },
   B: { bg: 'bg-purple-50', text: 'text-purple-700', fill: '#9333ea' },
+  C: { bg: 'bg-amber-50', text: 'text-amber-700', fill: '#d97706' },
 };
 
 function MetricItem({ label, value }: { label: string; value: string }) {
@@ -78,14 +84,13 @@ function MetricItem({ label, value }: { label: string; value: string }) {
 
 function VariantColumn({
   variant,
-  isWinner,
   showWinner,
 }: {
   variant: ABVariant;
-  isWinner: boolean;
   showWinner: boolean;
 }) {
   const colors = VARIANT_COLORS[variant.label] ?? VARIANT_COLORS.A;
+  const clickRate = computeRate(variant.clicked ?? 0, variant.delivered ?? 0);
 
   return (
     <div className="flex-1 min-w-0">
@@ -100,7 +105,7 @@ function VariantColumn({
         >
           Variant {variant.label}
         </span>
-        {showWinner && isWinner && (
+        {showWinner && variant.isWinner && (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
             <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
             Winner
@@ -108,24 +113,17 @@ function VariantColumn({
         )}
       </div>
 
-      {/* Message preview */}
-      {variant.emailSubject && (
-        <p className="text-xs text-gray-500 mb-0.5">
-          Subject: <span className="text-gray-700">{variant.emailSubject}</span>
-        </p>
-      )}
-      <p className="text-sm text-gray-700 line-clamp-2 mb-3">{variant.messageBody}</p>
-
       {/* Stats */}
       <div className="border-t border-gray-100">
-        <MetricItem label="Sent" value={variant.sent.toLocaleString()} />
-        <MetricItem label="Delivered" value={variant.delivered.toLocaleString()} />
+        <MetricItem label="Sent" value={(variant.sent ?? 0).toLocaleString()} />
+        <MetricItem label="Delivered" value={(variant.delivered ?? 0).toLocaleString()} />
         <MetricItem
           label="Clicked"
-          value={`${variant.clicked.toLocaleString()} (${variant.clickRate.toFixed(1)}%)`}
+          value={`${(variant.clicked ?? 0).toLocaleString()} (${clickRate.toFixed(1)}%)`}
         />
-        <MetricItem label="Conversions" value={variant.conversions.toLocaleString()} />
-        <MetricItem label="Revenue" value={formatCurrency(variant.revenue)} />
+        <MetricItem label="Opted Out" value={(variant.optedOut ?? 0).toLocaleString()} />
+        <MetricItem label="Conversions" value={(variant.conversions ?? 0).toLocaleString()} />
+        <MetricItem label="Revenue" value={formatCurrency(variant.revenue ?? 0)} />
       </div>
     </div>
   );
@@ -134,12 +132,12 @@ function VariantColumn({
 // --- Single Test Card ---
 
 function ABTestCard({ test }: { test: ABTest }) {
-  const showWinner = test.status === 'completed' && test.winnerId !== null;
+  const hasWinner = (test.variants ?? []).some(v => v.isWinner);
 
   // Build chart data for click rate comparison
-  const chartData = test.variants.map((v) => ({
+  const chartData = (test.variants ?? []).map((v) => ({
     name: `Variant ${v.label}`,
-    clickRate: v.clickRate,
+    clickRate: computeRate(v.clicked ?? 0, v.delivered ?? 0),
     fill: VARIANT_COLORS[v.label]?.fill ?? '#6b7280',
   }));
 
@@ -149,10 +147,10 @@ function ABTestCard({ test }: { test: ABTest }) {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-gray-500" />
-            {test.campaignName}
+            {test.campaignName ?? 'Untitled Campaign'}
           </CardTitle>
           <Badge variant={STATUS_BADGE_VARIANT[test.status] ?? 'default'}>
-            {test.status === 'active' ? 'Active' : 'Completed'}
+            {test.status === 'sent' ? 'Active' : test.status === 'completed' ? 'Completed' : test.status}
           </Badge>
         </div>
       </CardHeader>
@@ -160,18 +158,17 @@ function ABTestCard({ test }: { test: ABTest }) {
         <div className="space-y-4">
           {/* Variant columns */}
           <div className="grid gap-6 sm:grid-cols-2">
-            {test.variants.map((variant) => (
+            {(test.variants ?? []).map((variant) => (
               <VariantColumn
-                key={variant.label}
+                key={variant.variantId ?? variant.label}
                 variant={variant}
-                isWinner={variant.label === test.winnerId}
-                showWinner={showWinner}
+                showWinner={hasWinner}
               />
             ))}
           </div>
 
           {/* Click rate comparison bar chart */}
-          {test.variants.length >= 2 && (
+          {(test.variants ?? []).length >= 2 && (
             <div className="border-t border-gray-200 pt-4">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
                 Click Rate Comparison
@@ -225,9 +222,9 @@ function ABTestCard({ test }: { test: ABTest }) {
           )}
 
           {/* Winner metric note */}
-          {showWinner && test.winnerMetric && (
+          {hasWinner && (
             <p className="text-xs text-gray-500 text-center border-t border-gray-100 pt-3">
-              Winner determined by: <span className="font-medium text-gray-700">{test.winnerMetric}</span>
+              Winner determined by: <span className="font-medium text-gray-700">Click-through rate</span>
             </p>
           )}
         </div>
@@ -239,7 +236,7 @@ function ABTestCard({ test }: { test: ABTest }) {
 // --- Main Component ---
 
 export function ABTestResults({ period }: ABTestResultsProps) {
-  const [data, setData] = useState<ABTestResultsData | null>(null);
+  const [data, setData] = useState<ABTestApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -255,7 +252,7 @@ export function ABTestResults({ period }: ABTestResultsProps) {
         throw new Error(json.error || 'Failed to load A/B test data');
       }
       const json = await res.json();
-      setData(json.data ?? json);
+      setData(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load A/B test data');
     } finally {
@@ -320,7 +317,9 @@ export function ABTestResults({ period }: ABTestResultsProps) {
 
   // --- Empty State ---
 
-  if (!data || data.abTests.length === 0) {
+  const tests = data?.tests ?? [];
+
+  if (tests.length === 0) {
     return (
       <div className="space-y-6">
         <h2 className="text-lg font-semibold text-gray-900">A/B Test Results</h2>
@@ -341,8 +340,8 @@ export function ABTestResults({ period }: ABTestResultsProps) {
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-gray-900">A/B Test Results</h2>
       <div className="space-y-4">
-        {data.abTests.map((test) => (
-          <ABTestCard key={test.id} test={test} />
+        {tests.map((test) => (
+          <ABTestCard key={test.campaignId} test={test} />
         ))}
       </div>
     </div>

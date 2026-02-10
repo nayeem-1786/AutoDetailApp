@@ -40,18 +40,25 @@ const cards = [
 ] as const;
 
 export function OverviewKpis({ data, loading }: OverviewKpisProps) {
+  const smsSent = data?.totalSmsSent ?? 0;
+  const emailSent = data?.totalEmailSent ?? 0;
+  const overallDeliveryRate = data?.overallDeliveryRate ?? 0;
+  const clickThroughRate = data?.clickThroughRate ?? 0;
+  const optOutRate = data?.optOutRate ?? 0;
+  const revenueAttributed = data?.revenueAttributed ?? 0;
+
   function getValue(key: string): string {
     switch (key) {
       case 'totalSent':
-        return (data.totalSmsSent + data.totalEmailSent).toLocaleString();
+        return (smsSent + emailSent).toLocaleString();
       case 'deliveryRate':
-        return `${data.overallDeliveryRate.toFixed(1)}%`;
+        return `${overallDeliveryRate.toFixed(1)}%`;
       case 'clickThroughRate':
-        return `${data.clickThroughRate.toFixed(1)}%`;
+        return `${clickThroughRate.toFixed(1)}%`;
       case 'optOutRate':
-        return `${data.optOutRate.toFixed(1)}%`;
+        return `${optOutRate.toFixed(1)}%`;
       case 'revenueAttributed':
-        return formatCurrency(data.revenueAttributed);
+        return formatCurrency(revenueAttributed);
       default:
         return '0';
     }
@@ -60,9 +67,9 @@ export function OverviewKpis({ data, loading }: OverviewKpisProps) {
   function getValueColor(key: string): string {
     switch (key) {
       case 'deliveryRate':
-        return getDeliveryRateColor(data.overallDeliveryRate);
+        return getDeliveryRateColor(overallDeliveryRate);
       case 'optOutRate':
-        return getOptOutRateColor(data.optOutRate);
+        return getOptOutRateColor(optOutRate);
       default:
         return 'text-gray-900';
     }
@@ -92,7 +99,7 @@ export function OverviewKpis({ data, loading }: OverviewKpisProps) {
               </p>
               {card.key === 'totalSent' && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {data.totalSmsSent.toLocaleString()} SMS &middot; {data.totalEmailSent.toLocaleString()} Email
+                  {smsSent.toLocaleString()} SMS &middot; {emailSent.toLocaleString()} Email
                 </p>
               )}
             </>

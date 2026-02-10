@@ -50,19 +50,19 @@ function ChannelCard({ title, data, borderColor }: { title: string; data: Channe
     <div className={`bg-white rounded-lg border border-gray-200 shadow-sm p-4 border-l-4 ${borderColor}`}>
       <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">{title}</h3>
       <div>
-        <MetricRow label="Sent" value={data.sent.toLocaleString()} />
+        <MetricRow label="Sent" value={(data?.sent ?? 0).toLocaleString()} />
         <MetricRow
           label="Delivered"
-          value={data.delivered.toLocaleString()}
-          secondary={`${data.deliveryRate.toFixed(1)}%`}
+          value={(data?.delivered ?? 0).toLocaleString()}
+          secondary={`${(data?.deliveryRate ?? 0).toFixed(1)}%`}
         />
         <MetricRow
           label="Clicked"
-          value={data.clicked.toLocaleString()}
-          secondary={`${data.clickRate.toFixed(1)}%`}
+          value={(data?.clicked ?? 0).toLocaleString()}
+          secondary={`${(data?.clickRate ?? 0).toFixed(1)}%`}
         />
-        <MetricRow label="Opted Out" value={data.optedOut.toLocaleString()} />
-        <MetricRow label="Est. Cost" value={formatCurrency(data.estimatedCost)} />
+        <MetricRow label="Opted Out" value={(data?.optedOut ?? 0).toLocaleString()} />
+        <MetricRow label="Est. Cost" value={formatCurrency(data?.estimatedCost ?? 0)} />
       </div>
     </div>
   );
@@ -94,26 +94,29 @@ export function ChannelComparison({ channels, loading }: ChannelComparisonProps)
     );
   }
 
+  const sms = channels?.sms ?? { sent: 0, delivered: 0, clicked: 0, optedOut: 0 };
+  const email = channels?.email ?? { sent: 0, delivered: 0, clicked: 0, optedOut: 0 };
+
   const chartData = [
     {
       metric: 'Sent',
-      SMS: channels.sms.sent,
-      Email: channels.email.sent,
+      SMS: sms.sent ?? 0,
+      Email: email.sent ?? 0,
     },
     {
       metric: 'Delivered',
-      SMS: channels.sms.delivered,
-      Email: channels.email.delivered,
+      SMS: sms.delivered ?? 0,
+      Email: email.delivered ?? 0,
     },
     {
       metric: 'Clicked',
-      SMS: channels.sms.clicked,
-      Email: channels.email.clicked,
+      SMS: sms.clicked ?? 0,
+      Email: email.clicked ?? 0,
     },
     {
       metric: 'Opted Out',
-      SMS: channels.sms.optedOut,
-      Email: channels.email.optedOut,
+      SMS: sms.optedOut ?? 0,
+      Email: email.optedOut ?? 0,
     },
   ];
 

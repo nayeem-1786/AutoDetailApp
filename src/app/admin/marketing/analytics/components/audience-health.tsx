@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,24 +26,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// --- Types ---
-
-interface ChannelBreakdown {
-  smsOnly: number;
-  emailOnly: number;
-  both: number;
-}
-
-interface OptOutTrendPoint {
-  date: string;
-  optIns: number;
-  optOuts: number;
-}
-
-interface GrowthTrendPoint {
-  date: string;
-  subscribers: number;
-}
+// --- Types matching actual API response ---
 
 interface DeliveryHealth {
   smsBounceRate: number;
@@ -52,13 +34,18 @@ interface DeliveryHealth {
   landlineCount: number;
 }
 
-interface AudienceHealthData {
+interface TrendPoint {
+  date: string;
+  count: number;
+}
+
+interface AudienceApiResponse {
   totalContactable: number;
-  smsConsentPercent: number;
-  emailConsentPercent: number;
-  channelBreakdown: ChannelBreakdown;
-  optOutTrend: OptOutTrendPoint[];
-  growthTrend: GrowthTrendPoint[];
+  smsOnly: number;
+  emailOnly: number;
+  both: number;
+  optOutTrend: TrendPoint[];
+  growthTrend: TrendPoint[];
   deliveryHealth: DeliveryHealth;
 }
 
@@ -104,8 +91,8 @@ function formatShortDate(dateStr: unknown): string {
 
 const statCards = [
   { key: 'totalContactable', label: 'Total Contactable', border: 'border-l-blue-500', icon: Users },
-  { key: 'smsConsentPercent', label: 'SMS Consent', border: 'border-l-green-500', icon: MessageSquare },
-  { key: 'emailConsentPercent', label: 'Email Consent', border: 'border-l-purple-500', icon: Mail },
+  { key: 'smsReach', label: 'SMS Reach', border: 'border-l-green-500', icon: MessageSquare },
+  { key: 'emailReach', label: 'Email Reach', border: 'border-l-purple-500', icon: Mail },
 ] as const;
 
 // --- Custom Donut Center Label ---
@@ -132,7 +119,7 @@ function renderCenterLabel(totalContactable: number) {
 // --- Main Component ---
 
 export function AudienceHealth({ period }: AudienceHealthProps) {
-  const [data, setData] = useState<AudienceHealthData | null>(null);
+  const [data, setData] = useState<AudienceApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,7 +135,7 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
         throw new Error(json.error || 'Failed to load audience data');
       }
       const json = await res.json();
-      setData(json.data ?? json);
+      setData(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load audience data');
     } finally {
@@ -205,29 +192,41 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
     );
   }
 
+  // --- Derived values ---
+
+  const totalContactable = data.totalContactable ?? 0;
+  const smsOnly = data.smsOnly ?? 0;
+  const emailOnly = data.emailOnly ?? 0;
+  const both = data.both ?? 0;
+  const smsReach = smsOnly + both;
+  const emailReach = emailOnly + both;
+
   // --- Donut Chart Data ---
 
   const donutData = [
-    { name: 'smsOnly', value: data.channelBreakdown.smsOnly },
-    { name: 'emailOnly', value: data.channelBreakdown.emailOnly },
-    { name: 'both', value: data.channelBreakdown.both },
+    { name: 'smsOnly', value: smsOnly },
+    { name: 'emailOnly', value: emailOnly },
+    { name: 'both', value: both },
   ].filter((d) => d.value > 0);
 
   // --- Stat Value Renderer ---
 
   function getStatValue(key: string): string {
-    if (!data) return '0';
     switch (key) {
       case 'totalContactable':
-        return data.totalContactable.toLocaleString();
-      case 'smsConsentPercent':
-        return `${data.smsConsentPercent.toFixed(1)}%`;
-      case 'emailConsentPercent':
-        return `${data.emailConsentPercent.toFixed(1)}%`;
+        return totalContactable.toLocaleString();
+      case 'smsReach':
+        return smsReach.toLocaleString();
+      case 'emailReach':
+        return emailReach.toLocaleString();
       default:
         return '0';
     }
   }
+
+  const optOutTrend = data.optOutTrend ?? [];
+  const growthTrend = data.growthTrend ?? [];
+  const deliveryHealth = data.deliveryHealth ?? { smsBounceRate: 0, emailBounceRate: 0, landlineCount: 0 };
 
   return (
     <div className="space-y-6">
@@ -291,7 +290,7 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
                         />
                       ))}
                       <Label
-                        content={renderCenterLabel(data.totalContactable)}
+                        content={renderCenterLabel(totalContactable)}
                         position="center"
                       />
                     </Pie>
@@ -335,18 +334,18 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
         {/* Opt-Out Trend */}
         <Card>
           <CardHeader>
-            <CardTitle>Opt-in / Opt-out Trend</CardTitle>
+            <CardTitle>Opt-out Trend</CardTitle>
           </CardHeader>
           <CardContent>
-            {data.optOutTrend.length === 0 ? (
+            {optOutTrend.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8">
-                No opt-in/opt-out data available.
+                No opt-out data available.
               </p>
             ) : (
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={data.optOutTrend}
+                    data={optOutTrend}
                     margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -373,19 +372,9 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
                         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                       }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
                     <Line
                       type="monotone"
-                      dataKey="optIns"
-                      name="Opt-ins"
-                      stroke="#16a34a"
-                      strokeWidth={2}
-                      dot={{ r: 3, fill: '#16a34a' }}
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="optOuts"
+                      dataKey="count"
                       name="Opt-outs"
                       stroke="#dc2626"
                       strokeWidth={2}
@@ -402,10 +391,10 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
         {/* Subscriber Growth */}
         <Card>
           <CardHeader>
-            <CardTitle>Subscriber Growth</CardTitle>
+            <CardTitle>New Customers</CardTitle>
           </CardHeader>
           <CardContent>
-            {data.growthTrend.length === 0 ? (
+            {growthTrend.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8">
                 No growth data available.
               </p>
@@ -413,7 +402,7 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={data.growthTrend}
+                    data={growthTrend}
                     margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -442,8 +431,8 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
                     />
                     <Line
                       type="monotone"
-                      dataKey="subscribers"
-                      name="Subscribers"
+                      dataKey="count"
+                      name="New Customers"
                       stroke="#16a34a"
                       strokeWidth={2}
                       dot={{ r: 3, fill: '#16a34a' }}
@@ -468,10 +457,10 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
             <div
               className={cn(
                 'rounded-lg p-4 border',
-                getBounceRateBg(data.deliveryHealth.smsBounceRate),
-                data.deliveryHealth.smsBounceRate > 10
+                getBounceRateBg(deliveryHealth.smsBounceRate),
+                deliveryHealth.smsBounceRate > 10
                   ? 'border-red-200'
-                  : data.deliveryHealth.smsBounceRate > 5
+                  : deliveryHealth.smsBounceRate > 5
                     ? 'border-amber-200'
                     : 'border-green-200'
               )}
@@ -483,16 +472,16 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
               <p
                 className={cn(
                   'text-2xl font-bold tabular-nums mt-1',
-                  getBounceRateColor(data.deliveryHealth.smsBounceRate)
+                  getBounceRateColor(deliveryHealth.smsBounceRate)
                 )}
               >
-                {data.deliveryHealth.smsBounceRate.toFixed(1)}%
+                {deliveryHealth.smsBounceRate.toFixed(1)}%
               </p>
-              {data.deliveryHealth.smsBounceRate > 5 && (
+              {deliveryHealth.smsBounceRate > 5 && (
                 <div className="flex items-center gap-1 mt-1">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                   <span className="text-xs text-amber-600">
-                    {data.deliveryHealth.smsBounceRate > 10
+                    {deliveryHealth.smsBounceRate > 10
                       ? 'Critical - review phone list'
                       : 'Elevated - monitor closely'}
                   </span>
@@ -504,10 +493,10 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
             <div
               className={cn(
                 'rounded-lg p-4 border',
-                getBounceRateBg(data.deliveryHealth.emailBounceRate),
-                data.deliveryHealth.emailBounceRate > 10
+                getBounceRateBg(deliveryHealth.emailBounceRate),
+                deliveryHealth.emailBounceRate > 10
                   ? 'border-red-200'
-                  : data.deliveryHealth.emailBounceRate > 5
+                  : deliveryHealth.emailBounceRate > 5
                     ? 'border-amber-200'
                     : 'border-green-200'
               )}
@@ -519,16 +508,16 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
               <p
                 className={cn(
                   'text-2xl font-bold tabular-nums mt-1',
-                  getBounceRateColor(data.deliveryHealth.emailBounceRate)
+                  getBounceRateColor(deliveryHealth.emailBounceRate)
                 )}
               >
-                {data.deliveryHealth.emailBounceRate.toFixed(1)}%
+                {deliveryHealth.emailBounceRate.toFixed(1)}%
               </p>
-              {data.deliveryHealth.emailBounceRate > 5 && (
+              {deliveryHealth.emailBounceRate > 5 && (
                 <div className="flex items-center gap-1 mt-1">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                   <span className="text-xs text-amber-600">
-                    {data.deliveryHealth.emailBounceRate > 10
+                    {deliveryHealth.emailBounceRate > 10
                       ? 'Critical - verify email list'
                       : 'Elevated - monitor closely'}
                   </span>
@@ -543,9 +532,9 @@ export function AudienceHealth({ period }: AudienceHealthProps) {
                 <p className="text-sm text-gray-600">Landline Numbers</p>
               </div>
               <p className="text-2xl font-bold text-gray-900 tabular-nums mt-1">
-                {data.deliveryHealth.landlineCount.toLocaleString()}
+                {(deliveryHealth.landlineCount ?? 0).toLocaleString()}
               </p>
-              {data.deliveryHealth.landlineCount > 0 && (
+              {(deliveryHealth.landlineCount ?? 0) > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
                   Cannot receive SMS
                 </p>

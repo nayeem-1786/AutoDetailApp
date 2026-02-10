@@ -16,12 +16,16 @@ import { cn } from '@/lib/utils/cn';
 interface CouponPerformance {
   id: string;
   code: string;
+  name?: string;
   distributed: number;
   redeemed: number;
   redemptionRate: number;
   discountGiven: number;
   revenueFromOrders: number;
-  roi: number;
+}
+
+function computeRoi(revenue: number, discount: number): number {
+  return discount > 0 ? Math.round((revenue / discount) * 10) / 10 : 0;
 }
 
 interface CouponResponse {
@@ -36,24 +40,19 @@ interface CouponTableProps {
 // Sorting
 // ---------------------------------------------------------------------------
 
-type SortKey = keyof Pick<
-  CouponPerformance,
-  'code' | 'distributed' | 'redeemed' | 'redemptionRate' | 'discountGiven' | 'revenueFromOrders' | 'roi'
->;
+type SortKey = 'code' | 'distributed' | 'redeemed' | 'redemptionRate' | 'discountGiven' | 'revenueFromOrders' | 'roi';
 
 type SortDirection = 'asc' | 'desc';
 
-function compareCoupons(a: CouponPerformance, b: CouponPerformance, key: SortKey, dir: SortDirection): number {
-  let aVal: string | number;
-  let bVal: string | number;
+function getCouponSortValue(c: CouponPerformance, key: SortKey): string | number {
+  if (key === 'code') return (c.code ?? '').toLowerCase();
+  if (key === 'roi') return computeRoi(c.revenueFromOrders ?? 0, c.discountGiven ?? 0);
+  return (c[key as keyof CouponPerformance] as number) ?? 0;
+}
 
-  if (key === 'code') {
-    aVal = a.code.toLowerCase();
-    bVal = b.code.toLowerCase();
-  } else {
-    aVal = a[key];
-    bVal = b[key];
-  }
+function compareCoupons(a: CouponPerformance, b: CouponPerformance, key: SortKey, dir: SortDirection): number {
+  const aVal = getCouponSortValue(a, key);
+  const bVal = getCouponSortValue(b, key);
 
   if (aVal < bVal) return dir === 'asc' ? -1 : 1;
   if (aVal > bVal) return dir === 'asc' ? 1 : -1;
@@ -231,14 +230,19 @@ export function CouponTable({ period }: CouponTableProps) {
 
                       {/* ROI */}
                       <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold tabular-nums',
-                            getRoiClasses(coupon.roi)
-                          )}
-                        >
-                          {coupon.roi.toFixed(1)}x
-                        </span>
+                        {(() => {
+                          const roi = computeRoi(coupon.revenueFromOrders ?? 0, coupon.discountGiven ?? 0);
+                          return (
+                            <span
+                              className={cn(
+                                'inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold tabular-nums',
+                                getRoiClasses(roi)
+                              )}
+                            >
+                              {roi.toFixed(1)}x
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}

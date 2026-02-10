@@ -13,14 +13,13 @@ import { ArrowUpDown } from 'lucide-react';
 // ---------------------------------------------------------------------------
 
 interface Automation {
-  id: string;
+  ruleId: string;
   name: string;
   trigger: string;
+  isActive: boolean;
   totalExecutions: number;
   delivered: number;
-  deliveryRate: number;
   clicked: number;
-  clickRate: number;
   conversions: number;
   revenue: number;
 }
@@ -41,6 +40,10 @@ type SortKey = keyof Pick<
   Automation,
   'name' | 'trigger' | 'totalExecutions' | 'delivered' | 'clicked' | 'conversions' | 'revenue'
 >;
+
+function computeRate(numerator: number, denominator: number): number {
+  return denominator > 0 ? Math.round((numerator / denominator) * 1000) / 10 : 0;
+}
 
 type SortDirection = 'asc' | 'desc';
 
@@ -213,7 +216,7 @@ export function AutomationTable({ period }: AutomationTableProps) {
                 <tbody className="divide-y divide-gray-100">
                   {sorted.map((automation) => (
                     <tr
-                      key={automation.id}
+                      key={automation.ruleId}
                       onClick={() => router.push('/admin/marketing/automations')}
                       className="cursor-pointer transition-colors hover:bg-gray-50"
                     >
@@ -240,17 +243,17 @@ export function AutomationTable({ period }: AutomationTableProps) {
 
                       {/* Delivered */}
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-900">
-                        {automation.delivered.toLocaleString()}
+                        {(automation.delivered ?? 0).toLocaleString()}
                         <span className="ml-1 text-xs text-gray-500">
-                          ({automation.deliveryRate.toFixed(1)}%)
+                          ({computeRate(automation.delivered ?? 0, automation.totalExecutions ?? 0).toFixed(1)}%)
                         </span>
                       </td>
 
                       {/* Clicked */}
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-900">
-                        {automation.clicked.toLocaleString()}
+                        {(automation.clicked ?? 0).toLocaleString()}
                         <span className="ml-1 text-xs text-gray-500">
-                          ({automation.clickRate.toFixed(1)}%)
+                          ({computeRate(automation.clicked ?? 0, automation.delivered ?? 0).toFixed(1)}%)
                         </span>
                       </td>
 

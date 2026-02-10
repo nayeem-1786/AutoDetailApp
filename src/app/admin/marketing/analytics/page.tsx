@@ -15,7 +15,7 @@ import { AudienceHealth } from './components/audience-health';
 import { ABTestResults } from './components/ab-test-results';
 
 // -------------------------------------------------------------------------
-// Types
+// Types — match actual API response shape
 // -------------------------------------------------------------------------
 
 interface ChannelData {
@@ -28,20 +28,88 @@ interface ChannelData {
   estimatedCost: number;
 }
 
+interface OverviewData {
+  totalSmsSent: number;
+  totalEmailSent: number;
+  smsDeliveryRate: number;
+  emailDeliveryRate: number;
+  overallDeliveryRate: number;
+  clickThroughRate: number;
+  optOutRate: number;
+  revenueAttributed: number;
+}
+
 interface AnalyticsData {
-  overview: {
-    totalSmsSent: number;
-    totalEmailSent: number;
-    smsDeliveryRate: number;
-    emailDeliveryRate: number;
-    overallDeliveryRate: number;
-    clickThroughRate: number;
-    optOutRate: number;
-    revenueAttributed: number;
-  };
+  overview: OverviewData;
   channels: {
     sms: ChannelData;
     email: ChannelData;
+  };
+}
+
+// -------------------------------------------------------------------------
+// API response → component data transformer
+// -------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformApiResponse(json: any): AnalyticsData {
+  const smsSent = json?.totalSent?.sms ?? 0;
+  const emailSent = json?.totalSent?.email ?? 0;
+  const smsDelivRate = json?.deliveryRate?.sms ?? 0;
+  const emailDelivRate = json?.deliveryRate?.email ?? 0;
+  const smsClickRate = json?.clickRate?.sms ?? 0;
+  const emailClickRate = json?.clickRate?.email ?? 0;
+  const optOutRate = json?.optOutRate ?? 0;
+  const attributedRevenue = json?.attributedRevenue ?? 0;
+
+  // Derive absolute counts from rates
+  const smsDelivered = smsSent > 0 ? Math.round(smsSent * smsDelivRate / 100) : 0;
+  const emailDelivered = emailSent > 0 ? Math.round(emailSent * emailDelivRate / 100) : 0;
+  const smsClicked = smsDelivered > 0 ? Math.round(smsDelivered * smsClickRate / 100) : 0;
+  const emailClicked = emailDelivered > 0 ? Math.round(emailDelivered * emailClickRate / 100) : 0;
+
+  const totalSent = smsSent + emailSent;
+  const totalDelivered = smsDelivered + emailDelivered;
+  const totalClicked = smsClicked + emailClicked;
+
+  const overallDeliveryRate = totalSent > 0
+    ? Math.round((totalDelivered / totalSent) * 1000) / 10
+    : 0;
+  const clickThroughRate = totalDelivered > 0
+    ? Math.round((totalClicked / totalDelivered) * 1000) / 10
+    : 0;
+
+  return {
+    overview: {
+      totalSmsSent: smsSent,
+      totalEmailSent: emailSent,
+      smsDeliveryRate: smsDelivRate,
+      emailDeliveryRate: emailDelivRate,
+      overallDeliveryRate,
+      clickThroughRate,
+      optOutRate,
+      revenueAttributed: attributedRevenue,
+    },
+    channels: {
+      sms: {
+        sent: smsSent,
+        delivered: smsDelivered,
+        deliveryRate: smsDelivRate,
+        clicked: smsClicked,
+        clickRate: smsClickRate,
+        optedOut: 0,
+        estimatedCost: Math.round(smsSent * 0.0079 * 100) / 100,
+      },
+      email: {
+        sent: emailSent,
+        delivered: emailDelivered,
+        deliveryRate: emailDelivRate,
+        clicked: emailClicked,
+        clickRate: emailClickRate,
+        optedOut: 0,
+        estimatedCost: 0,
+      },
+    },
   };
 }
 
@@ -98,7 +166,7 @@ export default function MarketingAnalyticsPage() {
         throw new Error(json.error || `HTTP ${res.status}`);
       }
       const json = await res.json();
-      setData(json);
+      setData(transformApiResponse(json));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load analytics';
       setError(message);

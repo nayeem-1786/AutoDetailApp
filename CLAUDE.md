@@ -28,7 +28,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **2** | POS Application | Done |
 | **3** | Booking, Quotes & 11 Labs API | Done |
 | **4** | Customer Portal | Done |
-| **5** | Marketing, Coupons & Campaigns | Partial (see below) |
+| **5** | Marketing, Coupons & Campaigns | Done |
 | **6** | Inventory Management | Partial (see below) |
 | **7** | QuickBooks Integration & Reporting | Not started |
 | **8** | Photo Documentation | Not started |
@@ -102,6 +102,15 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
   - Per-customer daily SMS frequency cap: `checkFrequencyCap()` in `sendMarketingSms()` — checks `campaign_recipients` + `lifecycle_executions` against `business_settings.sms_daily_cap_per_customer` (default 5). PST timezone.
   - Phone type validation utility: `isValidMobileNumber()` in `src/lib/utils/phone-validation.ts` — Twilio Lookup API v2. Off by default (`TWILIO_LOOKUP_ENABLED=true`). ~$0.005/lookup. Fails open.
   - Auto-quote email consent: changed `email_consent: true` to `email_consent: false` for SMS-initiated customer creation (CAN-SPAM compliance).
+- Campaign analytics dashboard (`/admin/marketing/analytics`) — overview KPIs, channel comparison (SMS vs Email), campaign/automation/coupon performance tables, audience health charts
+- SMS delivery tracking — Twilio statusCallback on all sends, `sms_delivery_log` table, `/api/webhooks/twilio/status` webhook
+- Click tracking — `tracked_links` + `link_clicks` tables, `/api/t/[code]` redirect endpoint, auto-URL wrapping in `sendMarketingSms()`
+- Email delivery tracking — Mailgun webhook (`/api/webhooks/mailgun`), `email_delivery_log` table, signature verification
+- Email consent helper — `updateEmailConsent()` mirrors SMS consent pattern
+- Revenue attribution — `getAttributedRevenue()` links campaigns/automations to transactions within configurable window
+- A/B testing — `campaign_variants` table, split recipients, auto-winner by CTR, variant stats comparison
+- A/B testing UI — campaign wizard toggle, variant B fields, split slider, auto-winner config, results display
+- TCPA compliance — all 9 audit items resolved (consent log, STOP/START handling, frequency caps, signature validation, landline detection)
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
@@ -111,10 +120,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - POS session caching bug — FIXED (cross-tab sync, 60s token expiry check, mount validation)
 - Merge duplicate customers — BUILT (/admin/customers/duplicates with smart scoring, confidence levels, bulk merge)
 - URL shortening — BUILT (/s/[code] redirect, short_links table, 6-char codes)
-
-### Phase 5 — What's Remaining
-- Campaign analytics (delivery, opens, redemptions, revenue attribution, ROI) — no analytics dashboard
-- A/B testing for campaigns — nothing built
 
 ### Phase 6 — What's Done
 - Stock overview page (/admin/inventory — 315 lines): product list with stock levels, low/out-of-stock filters, manual stock adjustment dialog, vendor column, reorder threshold display
@@ -167,6 +172,12 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Transaction date gap:** Square's first payment: May 8, 2021. Supabase `transaction_date` starts Dec 31, 2021 — early transactions may not have been imported.
 - **Product/service images:** Stored in Supabase storage buckets `product-images/` and `service-images/`. 23 products have no images (never had them in Square). 2 services have no images (Excessive Cleaning Fee, Paint Decontamination & Protection — no Square counterparts). `service-images` bucket also allows `image/avif` MIME type (added accidentally, no impact).
 - **Duplicate vendor pages:** `/admin/catalog/vendors` (372 lines) and `/admin/inventory/vendors` (400 lines) both exist. Inventory version is more complete (search, address, lead time fields). Should consolidate.
+- **sms_delivery_log:** Twilio delivery status tracking. Indexes on `(message_sid)` UNIQUE, `(campaign_id, status)`, `(lifecycle_execution_id, status)`, `(customer_id, created_at)`, `(created_at)`.
+- **tracked_links:** URL shortener registry for click tracking. `(short_code)` UNIQUE index.
+- **link_clicks:** Click event log. Indexes on `(short_code, clicked_at)`, `(campaign_id, clicked_at)`, `(customer_id, clicked_at)`.
+- **email_delivery_log:** Mailgun event tracking. Indexes on `(campaign_id, event)`, `(customer_id, created_at)`, `(mailgun_message_id)`, `(created_at)`.
+- **campaign_variants:** A/B test variants per campaign. `variant_id` column added to `campaign_recipients`.
+- **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants).
 - **Messaging tables:** `conversations` (unique per phone_number, linked to customer_id if known) and `messages` (CASCADE delete with conversation). Both have Supabase Realtime enabled. AI auto-replies stored with `sender_type: 'ai'`, staff replies with `sender_type: 'staff'`.
 - **Key messaging files:** `src/lib/services/messaging-ai.ts` (AI response generation, product search, coupon injection, system prompt builder), `src/lib/services/messaging-ai-prompt.ts` (default prompt template), `src/app/api/webhooks/twilio/inbound/route.ts` (Twilio webhook: AI routing, auto-quote, SMS splitting), `src/app/api/quotes/[id]/accept/route.ts` (acceptance + confirmation SMS), `src/app/admin/settings/messaging/page.tsx` (unified AI settings UI), `src/app/api/cron/quote-reminders/route.ts` (24hr unviewed quote nudge), `src/app/api/admin/messaging/[conversationId]/summary/route.ts` (conversation summary for staff), `src/proxy.ts` (middleware, renamed from middleware.ts).
 - **Quote communications:** `quote_communications` table tracks all SMS/email sends for quotes (channel, sent_to, status, error_message, message, sent_by). Used by `send-service.ts` (manual sends), inbound webhook (auto-quote), accept route (acceptance SMS), and quote-reminders cron. `sent_by` is nullable — null for AI/system-generated sends. `message` column added for storing SMS body text (used by reminder cron for deduplication).
@@ -220,6 +231,12 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Phone validation**: `isValidMobileNumber()` from `src/lib/utils/phone-validation.ts` — OFF by default (`TWILIO_LOOKUP_ENABLED=true` to enable). Costs ~$0.005/lookup. Fails open. Wire into customer creation flows when enabled.
 - **Twilio inbound webhook signature validation**: Active in production, skipped when `NODE_ENV=development`. Uses `crypto.timingSafeEqual()` for constant-time comparison. NEVER re-add `false &&` bypass.
 - **Booking form consent**: SMS + email checkboxes are unchecked by default (affirmative opt-in). For existing customers, consent only upgrades (true → true), never downgrades (true → false) via booking form. New customers get consent set from checkbox values.
+- **sms_delivery_log** tracks Twilio delivery callbacks — always pass `statusCallback` URL in sends
+- **tracked_links + link_clicks** for click tracking — `wrapUrlsInMessage()` auto-wraps URLs in marketing SMS
+- **Mailgun webhook signing key**: `MAILGUN_WEBHOOK_SIGNING_KEY` env var required for production
+- **Attribution window** configurable via `business_settings.attribution_window_days` (default: 7)
+- **A/B testing**: `campaign_variants` table, winner determined by CTR via `determineWinner()`
+- **Click redirect is public** (no auth): `/api/t/[code]`
 
 ---
 
@@ -253,9 +270,20 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Updated `docs/TCPA_AUDIT.md` with comprehensive audit report
 - All migrations applied, type check clean, committed and pushed (21 files, 687 insertions)
 
-### Next Session Priorities (Phase 5 Remaining)
-1. Campaign analytics — tracking opens, clicks, conversions for marketing campaigns
-2. A/B testing — split testing for SMS/email templates
+### Session 3 — Phase 5 Completion (Campaign Analytics + A/B Testing)
+- SMS delivery tracking: `sms_delivery_log` table + `/api/webhooks/twilio/status` webhook + `statusCallback` wired into all SMS sends
+- Click tracking: `tracked_links` + `link_clicks` tables, `link-tracking.ts` utility (`createTrackedLink`, `wrapUrlsInMessage`), `/api/t/[code]` redirect endpoint, auto-wired into `sendMarketingSms()`
+- Mailgun email tracking: `email_delivery_log` table, `mailgun-signature.ts` verification, `/api/webhooks/mailgun` webhook handler, `email-consent.ts` helper
+- A/B testing backend: `campaign_variants` table + `variant_id` on `campaign_recipients`, `ab-testing.ts` (splitRecipients, determineWinner, getVariantStats)
+- Revenue attribution: `attribution.ts` (getAttributedRevenue, getAttributedRevenueForPeriod), configurable window via `business_settings`
+- Analytics APIs: 6 endpoints under `/api/admin/marketing/analytics/` — overview, campaigns, automations, coupons, audience, ab-tests
+- Shared analytics helpers: `analytics-helpers.ts` (getPeriodDates, authenticateAdmin)
+- 4 migrations: 20260210000005 through 20260210000008
+- 15 commits, TypeScript clean (only pre-existing recharts module warning)
+
+### Next Session Priorities
+1. Phase 6 — Inventory Management (purchase orders, receiving, COGS tracking)
+2. Install `recharts` dependency for analytics dashboard charts
 
 ---
 

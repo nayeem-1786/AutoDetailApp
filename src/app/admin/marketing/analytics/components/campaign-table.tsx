@@ -20,9 +20,7 @@ interface Campaign {
   sentAt: string;
   recipients: number;
   delivered: number;
-  deliveryRate: number;
   clicked: number;
-  clickRate: number;
   optedOut: number;
   conversions: number;
   revenue: number;
@@ -31,7 +29,6 @@ interface Campaign {
 
 interface CampaignResponse {
   campaigns: Campaign[];
-  total: number;
 }
 
 interface CampaignTableProps {
@@ -46,6 +43,10 @@ type SortKey = keyof Pick<
   Campaign,
   'name' | 'channel' | 'sentAt' | 'recipients' | 'delivered' | 'clicked' | 'optedOut' | 'conversions' | 'revenue'
 >;
+
+function computeRate(numerator: number, denominator: number): number {
+  return denominator > 0 ? Math.round((numerator / denominator) * 1000) / 10 : 0;
+}
 
 type SortDirection = 'asc' | 'desc';
 
@@ -107,8 +108,9 @@ export function CampaignTable({ period }: CampaignTableProps) {
       const res = await adminFetch(`/api/admin/marketing/analytics/campaigns?period=${encodeURIComponent(p)}`);
       if (res.ok) {
         const data: CampaignResponse = await res.json();
-        setCampaigns(data.campaigns ?? []);
-        setTotal(data.total ?? 0);
+        const list = data.campaigns ?? [];
+        setCampaigns(list);
+        setTotal(list.length);
       } else {
         console.error('Error fetching campaign analytics:', res.status);
         setCampaigns([]);
@@ -264,17 +266,17 @@ export function CampaignTable({ period }: CampaignTableProps) {
 
                       {/* Delivered */}
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-900">
-                        {campaign.delivered.toLocaleString()}
+                        {(campaign.delivered ?? 0).toLocaleString()}
                         <span className="ml-1 text-xs text-gray-500">
-                          ({campaign.deliveryRate.toFixed(1)}%)
+                          ({computeRate(campaign.delivered ?? 0, campaign.recipients ?? 0).toFixed(1)}%)
                         </span>
                       </td>
 
                       {/* Clicked */}
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-900">
-                        {campaign.clicked.toLocaleString()}
+                        {(campaign.clicked ?? 0).toLocaleString()}
                         <span className="ml-1 text-xs text-gray-500">
-                          ({campaign.clickRate.toFixed(1)}%)
+                          ({computeRate(campaign.clicked ?? 0, campaign.delivered ?? 0).toFixed(1)}%)
                         </span>
                       </td>
 
