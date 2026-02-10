@@ -15,7 +15,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
 import { getAIResponse, type CustomerContext } from '@/lib/services/messaging-ai';
-import { getAfterHoursReply } from '@/lib/services/messaging-after-hours';
+import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import crypto from 'crypto';
 
 const TWIML_EMPTY = '<Response/>';
@@ -214,7 +214,6 @@ export async function POST(request: NextRequest) {
       .in('key', [
         'messaging_ai_unknown_enabled',
         'messaging_ai_customers_enabled',
-        'messaging_after_hours_enabled',
       ]);
 
     const settings: Record<string, string> = {};
@@ -226,14 +225,20 @@ export async function POST(request: NextRequest) {
     const isCustomer = !!conversation.customer_id;
     const aiEnabledForUnknown = settings.messaging_ai_unknown_enabled === 'true';
     const aiEnabledForCustomers = settings.messaging_ai_customers_enabled === 'true';
-    const afterHoursEnabled = settings.messaging_after_hours_enabled === 'true';
+    const aiMasterEnabled = aiEnabledForUnknown || aiEnabledForCustomers;
+
+    // Check business hours — after hours, AI handles ALL messages regardless of audience pills
+    const hours = await getBusinessHours();
+    const duringBusinessHours = hours ? isWithinBusinessHours(hours) : true;
 
     let autoReply: string | null = null;
-    let senderType: 'ai' | 'system' = 'ai';
 
     const shouldAiReply =
       conversation.is_ai_enabled &&
-      ((isUnknown && aiEnabledForUnknown) || (isCustomer && aiEnabledForCustomers));
+      aiMasterEnabled &&
+      (!duringBusinessHours ||
+        (isUnknown && aiEnabledForUnknown) ||
+        (isCustomer && aiEnabledForCustomers));
 
     if (shouldAiReply) {
       // Rate limiting: count AI replies in the last hour
@@ -293,10 +298,6 @@ export async function POST(request: NextRequest) {
       } else {
         console.warn(`[Messaging] Rate limit hit for conversation ${conversation.id}`);
       }
-    } else if (isCustomer && afterHoursEnabled) {
-      // Known customer + AI not enabled for customers + after-hours enabled → template reply
-      autoReply = await getAfterHoursReply();
-      senderType = 'system';
     }
 
     // Send the auto-reply if we have one
@@ -307,7 +308,7 @@ export async function POST(request: NextRequest) {
         conversation_id: conversation.id,
         direction: 'outbound',
         body: autoReply,
-        sender_type: senderType,
+        sender_type: 'ai',
         twilio_sid: smsResult.success ? smsResult.sid : null,
         status: smsResult.success ? 'sent' : 'failed',
       });

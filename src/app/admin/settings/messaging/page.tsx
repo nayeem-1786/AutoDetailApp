@@ -10,27 +10,22 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { TogglePill } from '@/components/ui/toggle-pill';
+import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 
 interface MessagingSettings {
   messaging_ai_unknown_enabled: string;
   messaging_ai_customers_enabled: string;
-  messaging_after_hours_enabled: string;
-  messaging_after_hours_message: string;
   messaging_ai_instructions: string;
   messaging_auto_close_hours: string;
   messaging_auto_archive_days: string;
 }
 
-const DEFAULT_AFTER_HOURS_MESSAGE =
-  'Thanks for reaching out to {business_name}! We\'re currently closed. Our business hours are {business_hours}. We\'ll get back to you as soon as we reopen. For immediate booking, visit: {booking_url}';
-
 const SETTINGS_KEYS = [
   'messaging_ai_unknown_enabled',
   'messaging_ai_customers_enabled',
-  'messaging_after_hours_enabled',
-  'messaging_after_hours_message',
   'messaging_ai_instructions',
   'messaging_auto_close_hours',
   'messaging_auto_archive_days',
@@ -39,8 +34,6 @@ const SETTINGS_KEYS = [
 const DEFAULTS: MessagingSettings = {
   messaging_ai_unknown_enabled: 'true',
   messaging_ai_customers_enabled: 'false',
-  messaging_after_hours_enabled: 'false',
-  messaging_after_hours_message: DEFAULT_AFTER_HOURS_MESSAGE,
   messaging_ai_instructions: '',
   messaging_auto_close_hours: '48',
   messaging_auto_archive_days: '30',
@@ -82,8 +75,10 @@ export default function MessagingSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<MessagingSettings>(DEFAULTS);
   const [initial, setInitial] = useState<MessagingSettings>(DEFAULTS);
+  const [resetPromptOpen, setResetPromptOpen] = useState(false);
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(initial);
+  const aiEnabled = isEnabled(settings.messaging_ai_unknown_enabled) || isEnabled(settings.messaging_ai_customers_enabled);
 
   useEffect(() => {
     async function load() {
@@ -107,6 +102,11 @@ export default function MessagingSettingsPage() {
         if (key in loaded) {
           loaded[key] = toStringValue(row.value);
         }
+      }
+
+      // Populate with default prompt if no saved instructions
+      if (!loaded.messaging_ai_instructions.trim()) {
+        loaded.messaging_ai_instructions = getDefaultSystemPrompt();
       }
 
       setSettings(loaded);
@@ -150,7 +150,7 @@ export default function MessagingSettingsPage() {
       <div className="space-y-6">
         <PageHeader
           title="Messaging"
-          description="Configure AI auto-replies and after-hours messaging."
+          description="Configure AI assistant and conversation settings."
         />
         <div className="flex items-center justify-center py-12">
           <Spinner size="lg" />
@@ -163,26 +163,26 @@ export default function MessagingSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Messaging"
-        description="Configure AI auto-replies and after-hours messaging."
+        description="Configure AI assistant and conversation settings."
       />
 
-      {/* AI Auto-Reply */}
+      {/* AI Assistant */}
       <Card>
         <CardHeader>
-          <CardTitle>AI Auto-Reply</CardTitle>
+          <CardTitle>AI Assistant</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900">
-                Enable AI Auto-Reply
+                Enable AI Assistant
               </p>
               <p className="mt-0.5 text-sm text-gray-500">
-                Automatically reply to incoming messages using AI.
+                When enabled, AI responds to inbound messages automatically.
               </p>
             </div>
             <Switch
-              checked={isEnabled(settings.messaging_ai_unknown_enabled) || isEnabled(settings.messaging_ai_customers_enabled)}
+              checked={aiEnabled}
               onCheckedChange={(checked) => {
                 if (checked) {
                   setSettings((prev) => ({
@@ -201,14 +201,14 @@ export default function MessagingSettingsPage() {
             />
           </div>
 
-          {(isEnabled(settings.messaging_ai_unknown_enabled) || isEnabled(settings.messaging_ai_customers_enabled)) && (
+          {aiEnabled && (
             <>
               <div>
                 <p className="text-sm font-medium text-gray-900">
-                  Audience
+                  During Business Hours
                 </p>
                 <p className="mt-0.5 text-sm text-gray-500">
-                  Choose which message senders get AI-powered auto-replies. Both can be enabled independently.
+                  Choose which messages get AI replies during open hours.
                 </p>
                 <div className="mt-3 flex gap-2">
                   <TogglePill
@@ -236,68 +236,47 @@ export default function MessagingSettingsPage() {
                 </div>
               </div>
 
-              <FormField
-                label="Additional AI Instructions"
-                description="Custom instructions for the AI when composing replies. For example: tone, topics to avoid, or specific information to include."
-                htmlFor="ai_instructions"
-              >
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  After Hours
+                </p>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  AI automatically handles all inbound messages when the business is closed.
+                  Business hours are configured in{' '}
+                  <a href="/admin/settings/business-profile" className="text-blue-600 hover:text-blue-800 hover:underline">
+                    Business Profile
+                  </a>.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  AI Prompt
+                </p>
                 <Textarea
                   id="ai_instructions"
-                  rows={4}
-                  placeholder="e.g., Always be friendly and professional. Mention our ceramic coating special when relevant."
+                  rows={8}
+                  className="mt-2 font-mono text-xs"
                   value={settings.messaging_ai_instructions}
                   onChange={(e) =>
                     setSettings((prev) => ({ ...prev, messaging_ai_instructions: e.target.value }))
                   }
                 />
-              </FormField>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <p className="text-xs text-gray-500">
+                    Behavioral rules for the AI. Service catalog and business info are appended automatically.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setResetPromptOpen(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap ml-4"
+                  >
+                    Apply Standard Template
+                  </button>
+                </div>
+              </div>
             </>
           )}
-        </CardContent>
-      </Card>
-
-      {/* After-Hours Auto-Reply */}
-      <Card>
-        <CardHeader>
-          <CardTitle>After-Hours Auto-Reply</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Enable After-Hours Auto-Reply
-              </p>
-              <p className="mt-0.5 text-sm text-gray-500">
-                Send an automatic reply when messages arrive outside of business hours.
-                Business hours are configured in{' '}
-                <a href="/admin/settings/business-profile" className="text-blue-600 hover:text-blue-800 hover:underline">
-                  Business Profile
-                </a>.
-              </p>
-            </div>
-            <Switch
-              checked={isEnabled(settings.messaging_after_hours_enabled)}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, messaging_after_hours_enabled: checked ? 'true' : 'false' }))
-              }
-            />
-          </div>
-
-          <FormField
-            label="After-Hours Message"
-            description="Template sent when a message arrives outside business hours. Available variables: {business_name}, {business_hours}, {booking_url}"
-            htmlFor="after_hours_message"
-          >
-            <Textarea
-              id="after_hours_message"
-              rows={4}
-              placeholder={DEFAULT_AFTER_HOURS_MESSAGE}
-              value={settings.messaging_after_hours_message}
-              onChange={(e) =>
-                setSettings((prev) => ({ ...prev, messaging_after_hours_message: e.target.value }))
-              }
-            />
-          </FormField>
         </CardContent>
       </Card>
 
@@ -306,48 +285,48 @@ export default function MessagingSettingsPage() {
         <CardHeader>
           <CardTitle>Conversation Lifecycle</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <FormField
-            label="Auto-Close Timer"
-            description="Automatically close open conversations with no activity after this period."
-            htmlFor="auto_close_hours"
-          >
-            <Select
-              id="auto_close_hours"
-              value={settings.messaging_auto_close_hours}
-              onChange={(e) =>
-                setSettings((prev) => ({ ...prev, messaging_auto_close_hours: e.target.value }))
-              }
-              className="w-full sm:w-64"
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <FormField
+              label="Auto-close after"
+              description="Close open conversations with no activity after this period."
+              htmlFor="auto_close_hours"
             >
-              {AUTO_CLOSE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+              <Select
+                id="auto_close_hours"
+                value={settings.messaging_auto_close_hours}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, messaging_auto_close_hours: e.target.value }))
+                }
+              >
+                {AUTO_CLOSE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
-          <FormField
-            label="Auto-Archive Timer"
-            description="Automatically archive closed conversations after this period."
-            htmlFor="auto_archive_days"
-          >
-            <Select
-              id="auto_archive_days"
-              value={settings.messaging_auto_archive_days}
-              onChange={(e) =>
-                setSettings((prev) => ({ ...prev, messaging_auto_archive_days: e.target.value }))
-              }
-              className="w-full sm:w-64"
+            <FormField
+              label="Auto-archive after"
+              description="Archive closed conversations after this period."
+              htmlFor="auto_archive_days"
             >
-              {AUTO_ARCHIVE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+              <Select
+                id="auto_archive_days"
+                value={settings.messaging_auto_archive_days}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, messaging_auto_archive_days: e.target.value }))
+                }
+              >
+                {AUTO_ARCHIVE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
         </CardContent>
       </Card>
 
@@ -357,6 +336,22 @@ export default function MessagingSettingsPage() {
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={resetPromptOpen}
+        onOpenChange={setResetPromptOpen}
+        title="Reset to Standard Template"
+        description="Your custom instructions will be replaced with the default AI prompt template."
+        confirmLabel="Reset"
+        variant="destructive"
+        onConfirm={() => {
+          setSettings((prev) => ({
+            ...prev,
+            messaging_ai_instructions: getDefaultSystemPrompt(),
+          }));
+          setResetPromptOpen(false);
+        }}
+      />
     </div>
   );
 }

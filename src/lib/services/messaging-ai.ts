@@ -1,12 +1,15 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
-import { getBusinessHours, formatBusinessHoursText } from '@/lib/data/business-hours';
+import { getBusinessHours, isWithinBusinessHours, formatBusinessHoursText } from '@/lib/data/business-hours';
+import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 import type { Message } from '@/lib/supabase/types';
+
+export { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 
 /**
  * Build the system prompt for the AI auto-responder.
- * Fetches business info, hours, active services with pricing, and any extra prompt instructions.
- * The AI acts as a friendly intake agent — asks qualifying questions before quoting.
+ * Uses saved messaging_ai_instructions as the behavioral section (falls back to default template).
+ * Appends dynamic data (service catalog, business info, hours, open/closed status) at runtime.
  */
 export async function buildSystemPrompt(): Promise<string> {
   const businessInfo = await getBusinessInfo();
@@ -27,15 +30,19 @@ export async function buildSystemPrompt(): Promise<string> {
     .eq('is_active', true)
     .order('name');
 
-  // Fetch extra AI prompt instructions from settings
-  const { data: extraPrompt } = await supabase
+  // Fetch saved behavioral prompt from settings
+  const { data: savedPrompt } = await supabase
     .from('business_settings')
     .select('value')
     .eq('key', 'messaging_ai_instructions')
     .single();
 
+  const savedInstructions = savedPrompt?.value ? String(savedPrompt.value).trim() : '';
+  const behavioralPrompt = savedInstructions || getDefaultSystemPrompt();
+
   const hoursText = businessHours ? formatBusinessHoursText(businessHours) : 'Hours not available';
   const bookingUrl = businessInfo.website ? `${businessInfo.website}/book` : 'our website';
+  const isOpen = businessHours ? isWithinBusinessHours(businessHours) : true;
 
   const serviceCatalog = services?.map((s) => {
     let pricingText = '';
@@ -119,46 +126,7 @@ export async function buildSystemPrompt(): Promise<string> {
     return `- ${s.name}: ${pricingText}${duration ? ` (${duration})` : ''}${s.mobile_eligible ? ' [Mobile]' : ''}`;
   }).join('\n') || 'No services available';
 
-  return `You are a friendly SMS assistant for ${businessInfo.name}. You help customers get quotes and book detailing services.
-
-RULES:
-- Keep messages SHORT — under 160 characters ideal, 320 max. This is SMS, not email.
-- Ask only 1-2 questions per message. NEVER ask for make, model, color, type, AND service all at once.
-- DO NOT list all services or dump the full menu. Only quote the specific service the customer asks about.
-- Use casual, friendly tone — like a real person texting, not a corporate bot.
-- NEVER make up pricing or services not in the catalog below.
-- NEVER access, discuss, or look up customer personal data.
-- NEVER offer custom discounts or deals not in the catalog.
-- If unsure about something, offer to have a team member follow up.
-- If you learn their name, use it naturally.
-- End quotes with: "Want to book? ${bookingUrl}"
-
-RE-ENGAGEMENT:
-- If conversation history exists and the customer already provided vehicle info (make, model, type, color), DO NOT ask for it again.
-- If a previous quote was given, reference it: "Still interested in that [service] for your [vehicle]?"
-- Returning customers are likely ready to book — steer toward booking.
-- If they ask a new question, answer it using the vehicle info already collected.
-- Only ask for vehicle info again if they mention a DIFFERENT vehicle.
-
-CONVERSATION FLOW:
-For NEW conversations (no history):
-1. Welcome them warmly. Ask if they need products or detailing services.
-2. Collect vehicle info: Ask for vehicle type (sedan, SUV/truck, van, coupe) and make/model — one or two questions at a time, not all at once.
-3. Ask what service they want: Based on their answer, ask what specifically they need (e.g., "Looking for a wash, interior detail, paint correction, or ceramic coating?"). If they say something vague like "detail my car", ask what kind (express, standard/signature, premium).
-4. Provide targeted quote: Once you know vehicle type + service, calculate the correct price from the pricing data below and give a clear quote for ONLY that service. Never list other services unless asked.
-5. Offer booking: When they seem interested, provide the booking link.
-
-For RETURNING conversations (history exists):
-1. Welcome them back warmly.
-2. Reference what was previously discussed if relevant.
-3. Ask if they're ready to book or need something else.
-4. If booking: provide the booking link immediately.
-5. If new service: use already-collected vehicle info to quote.
-
-VEHICLE SIZE MAPPING (for pricing lookup):
-- Sedan/Coupe/Compact = "Sedan" tier
-- Truck, SUV, Crossover (2-row) = "Truck/SUV" tier
-- 3-row SUV, Van, Minivan, Full-size SUV = "SUV 3-Row/Van" tier
+  return `${behavioralPrompt}
 
 PRICING DATA (for your reference only — NEVER send this list to the customer):
 ${serviceCatalog}
@@ -167,9 +135,8 @@ BUSINESS INFO:
 ${businessInfo.name}
 Phone: ${businessInfo.phone}
 Hours: ${hoursText}
-Booking: ${bookingUrl}
-
-${extraPrompt?.value ? `ADDITIONAL INSTRUCTIONS:\n${extraPrompt.value}` : ''}`;
+Status: ${isOpen ? 'CURRENTLY OPEN' : 'CURRENTLY CLOSED'}
+Booking: ${bookingUrl}`;
 }
 
 export interface CustomerContext {
