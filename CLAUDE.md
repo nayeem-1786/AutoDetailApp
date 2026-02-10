@@ -283,7 +283,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 
 ### Next Session Priorities
 1. Phase 6 — Inventory Management (purchase orders, receiving, COGS tracking)
-2. Install `recharts` dependency for analytics dashboard charts
 
 ---
 
