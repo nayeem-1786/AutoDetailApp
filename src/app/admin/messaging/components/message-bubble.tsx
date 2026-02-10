@@ -31,7 +31,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     ? isAi
       ? 'AI'
       : message.sender
-        ? `${message.sender.first_name} ${message.sender.last_name}`
+        ? (message.sender.last_name ? `${message.sender.first_name} ${message.sender.last_name}` : message.sender.first_name)
         : 'Staff'
     : null;
 

@@ -492,6 +492,9 @@ export async function POST(request: NextRequest) {
                   first_name: firstName,
                   last_name: lastName,
                   phone: normalizedPhone,
+                  sms_consent: true,
+                  email_consent: true,
+                  customer_type: 'enthusiast',
                 })
                 .select('id')
                 .single();
@@ -594,6 +597,15 @@ export async function POST(request: NextRequest) {
             } catch {
               // Fall back to full URL
             }
+
+            // Log quote communication
+            const { error: commErr } = await admin.from('quote_communications').insert({
+              quote_id: quoteRecord.id,
+              channel: 'sms',
+              sent_to: normalizedPhone,
+              status: 'sent',
+            });
+            if (commErr) console.error('[Auto-Quote] Failed to log communication:', commErr.message);
 
             // Truncate clean message and append quote link
             const linkSuffix = `\n\nView your quote: ${linkUrl}`;

@@ -76,7 +76,7 @@ export function ThreadView({
 
   const customer = conversation.customer;
   const displayName = customer
-    ? `${customer.first_name} ${customer.last_name}`
+    ? (customer.last_name ? `${customer.first_name} ${customer.last_name}` : customer.first_name)
     : 'Unknown Number';
   const phoneDisplay = formatPhone(conversation.phone_number);
   const isClosed = conversation.status === 'closed' || conversation.status === 'archived';

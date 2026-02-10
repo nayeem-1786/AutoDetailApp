@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fireWebhook } from '@/lib/utils/webhook';
+import { sendSms } from '@/lib/utils/sms';
 
 export async function POST(
   request: NextRequest,
@@ -67,6 +68,28 @@ export async function POST(
 
     // Fire webhook
     fireWebhook('quote_accepted', { ...quote, status: 'accepted', accepted_at: updated.accepted_at }, supabase).catch(() => {});
+
+    // Send SMS confirmation to customer
+    const customer = quote.customer as { id: string; first_name: string; last_name: string; phone: string | null; email: string | null } | null;
+    if (customer?.phone) {
+      const items = (quote.items as Array<{ item_name: string }>) ?? [];
+      let smsBody: string;
+      if (items.length === 1) {
+        smsBody = `Thanks ${customer.first_name}! Your quote for ${items[0].item_name} has been accepted. Our team will reach out shortly to schedule your appointment.`;
+      } else {
+        smsBody = `Thanks ${customer.first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.`;
+      }
+
+      const smsResult = await sendSms(customer.phone, smsBody);
+
+      await supabase.from('quote_communications').insert({
+        quote_id: id,
+        channel: 'sms',
+        sent_to: customer.phone,
+        status: smsResult.success ? 'sent' : 'failed',
+        error_message: smsResult.success ? null : 'SMS delivery failed',
+      });
+    }
 
     return NextResponse.json({ success: true, quote: updated });
   } catch (err) {

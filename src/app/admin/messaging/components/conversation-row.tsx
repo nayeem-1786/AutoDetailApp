@@ -29,10 +29,10 @@ function formatRelativeTime(date: string): string {
 export function ConversationRow({ conversation, isSelected, onClick }: ConversationRowProps) {
   const customer = conversation.customer;
   const displayName = customer
-    ? `${customer.first_name} ${customer.last_name}`
+    ? (customer.last_name ? `${customer.first_name} ${customer.last_name}` : customer.first_name)
     : formatPhone(conversation.phone_number);
   const initials = customer
-    ? `${customer.first_name[0]}${customer.last_name[0]}`
+    ? (customer.last_name ? `${customer.first_name[0]}${customer.last_name[0]}` : customer.first_name[0])
     : null;
 
   return (
