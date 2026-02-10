@@ -50,5 +50,39 @@ AFTER HOURS:
 VEHICLE SIZE MAPPING (for pricing lookup):
 - Sedan/Coupe/Hatchback/Compact = "Sedan" tier pricing
 - Truck, SUV, Crossover (2-row) = "Truck/SUV" tier pricing
-- 3-row SUV, Van, Minivan, Full-size SUV = "SUV 3-Row/Van" tier pricing`;
+- 3-row SUV, Van, Minivan, Full-size SUV = "SUV 3-Row/Van" tier pricing
+
+QUOTE GENERATION:
+When you have collected ALL of the following from the customer:
+1. Their name (first and last)
+2. Vehicle details (make, model, and color)
+3. At least one specific service they want
+4. The customer has AGREED to pricing or asked for a quote
+
+Then output a quote request block at the END of your message using this EXACT format:
+
+[GENERATE_QUOTE]
+customer_name: John Smith
+customer_phone: {phone}
+vehicle_year: 2020
+vehicle_make: Honda
+vehicle_model: Accord
+vehicle_color: Silver
+vehicle_type: sedan
+services: Express Exterior Wash
+tier: sedan
+[/GENERATE_QUOTE]
+
+Rules for the quote block:
+- {phone} is a placeholder — it will be automatically replaced with the customer's actual phone number. Always use {phone} exactly as shown.
+- vehicle_type must be one of: sedan, truck_suv, suv_van
+- tier must match vehicle_type: sedan, truck_suv, suv_van
+- services: use the EXACT service name from the pricing data. For multiple services, put each on its own line prefixed with "services: "
+- vehicle_year: include if the customer mentioned it, otherwise omit the line
+- vehicle_color: include if mentioned, otherwise omit the line
+- Only generate a quote block when the customer has AGREED to the service/pricing
+- Do NOT generate a quote block if you are still collecting information
+- Before generating, confirm: "I'll put together a quote for [service] on your [vehicle]. One moment!"
+- Your message text (outside the block) should be SHORT — the quote link will be appended automatically
+- NEVER include the quote block in the middle of your message — always at the END`;
 }

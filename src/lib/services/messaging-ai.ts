@@ -208,7 +208,7 @@ INSTRUCTIONS FOR RETURNING CUSTOMERS:
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 300,
+      max_tokens: 1000,
       system: systemPrompt,
       messages,
     }),
@@ -225,6 +225,7 @@ INSTRUCTIONS FOR RETURNING CUSTOMERS:
 
   if (!text) throw new Error('Empty AI response');
 
-  // Truncate to 320 chars for SMS-friendliness (2 segments max)
-  return text.length > 320 ? text.slice(0, 317) + '...' : text;
+  // Return full text — truncation is handled by the webhook after
+  // extracting any [GENERATE_QUOTE] blocks from the response.
+  return text;
 }
