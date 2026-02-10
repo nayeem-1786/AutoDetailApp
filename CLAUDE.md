@@ -108,8 +108,12 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Email delivery tracking — Mailgun webhook (`/api/webhooks/mailgun`), `email_delivery_log` table, signature verification
 - Email consent helper — `updateEmailConsent()` mirrors SMS consent pattern
 - Revenue attribution — `getAttributedRevenue()` links campaigns/automations to transactions within configurable window
-- A/B testing — `campaign_variants` table, split recipients, auto-winner by CTR, variant stats comparison
-- A/B testing UI — campaign wizard toggle, variant B fields, split slider, auto-winner config, results display
+- A/B testing — `campaign_variants` table, split recipients, auto-winner by CTR, variant stats comparison, full round-trip persistence (save/load/edit)
+- A/B testing UI — campaign wizard toggle, variant B fields, split slider, auto-winner config, results display, preview shows both variants personalized
+- Campaign coupon injection — unique coupon code per recipient, cloned from template coupon with rewards
+- Lifecycle engine coupon injection — same pattern, generates per-customer coupon for rules with `coupon_id`
+- Lifecycle engine URL tracking — passes `lifecycleExecutionId` to `sendMarketingSms()` so `wrapUrlsInMessage()` creates tracked short links
+- Personalized booking links — `{book_url}` placeholder generates `/book?name=...&phone=...&email=...&coupon=...` per customer, auto-shortened by click tracker
 - TCPA compliance — all 9 audit items resolved (consent log, STOP/START handling, frequency caps, signature validation, landline detection)
 
 ### Verified Complete (previously listed as pending)
@@ -177,7 +181,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **link_clicks:** Click event log. Indexes on `(short_code, clicked_at)`, `(campaign_id, clicked_at)`, `(customer_id, clicked_at)`.
 - **email_delivery_log:** Mailgun event tracking. Indexes on `(campaign_id, event)`, `(customer_id, created_at)`, `(mailgun_message_id)`, `(created_at)`.
 - **campaign_variants:** A/B test variants per campaign. `variant_id` column added to `campaign_recipients`.
-- **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants).
+- **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants), `20260210000009` (campaigns: auto_select_winner BOOLEAN, auto_select_after_hours INTEGER).
 - **Messaging tables:** `conversations` (unique per phone_number, linked to customer_id if known) and `messages` (CASCADE delete with conversation). Both have Supabase Realtime enabled. AI auto-replies stored with `sender_type: 'ai'`, staff replies with `sender_type: 'staff'`.
 - **Key messaging files:** `src/lib/services/messaging-ai.ts` (AI response generation, product search, coupon injection, system prompt builder), `src/lib/services/messaging-ai-prompt.ts` (default prompt template), `src/app/api/webhooks/twilio/inbound/route.ts` (Twilio webhook: AI routing, auto-quote, SMS splitting), `src/app/api/quotes/[id]/accept/route.ts` (acceptance + confirmation SMS), `src/app/admin/settings/messaging/page.tsx` (unified AI settings UI), `src/app/api/cron/quote-reminders/route.ts` (24hr unviewed quote nudge), `src/app/api/admin/messaging/[conversationId]/summary/route.ts` (conversation summary for staff), `src/proxy.ts` (middleware, renamed from middleware.ts).
 - **Quote communications:** `quote_communications` table tracks all SMS/email sends for quotes (channel, sent_to, status, error_message, message, sent_by). Used by `send-service.ts` (manual sends), inbound webhook (auto-quote), accept route (acceptance SMS), and quote-reminders cron. `sent_by` is nullable — null for AI/system-generated sends. `message` column added for storing SMS body text (used by reminder cron for deduplication).
@@ -235,7 +239,9 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **tracked_links + link_clicks** for click tracking — `wrapUrlsInMessage()` auto-wraps URLs in marketing SMS
 - **Mailgun webhook signing key**: `MAILGUN_WEBHOOK_SIGNING_KEY` env var required for production
 - **Attribution window** configurable via `business_settings.attribution_window_days` (default: 7)
-- **A/B testing**: `campaign_variants` table, winner determined by CTR via `determineWinner()`
+- **A/B testing**: `campaign_variants` table + `auto_select_winner`/`auto_select_after_hours` columns on `campaigns`. Winner determined by CTR via `determineWinner()`. Variants saved/loaded via POST/PATCH/GET routes (not in Zod schema — handled separately as they go to `campaign_variants` table).
+- **Campaign wizard A/B round-trip**: `buildPayload()` always sends `variants` key (null when A/B off). PATCH checks `'variants' in body` to delete+reinsert. GET joins `campaign_variants` and maps to wizard format (`label`/`messageBody`/`emailSubject`/`splitPercentage`).
+- **`{book_url}` placeholder**: Generates personalized booking link with customer name, phone, email, and coupon as query params. Auto-shortened by `wrapUrlsInMessage()`. Booking page (`/book`) accepts `?name`, `?phone`, `?email` params — tries email DB lookup first, falls back to URL params for pre-fill.
 - **Click redirect is public** (no auth): `/api/t/[code]`
 - **Dev testing requires ngrok running** — Twilio statusCallback and Mailgun webhooks need a public URL to receive callbacks during local development
 - **CRON_SECRET in .env.local** is a placeholder — verify if it's used or if `CRON_API_KEY` is the actual auth key for cron endpoints
@@ -300,6 +306,17 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Fixed customer profile API source from `'system'` to `'customer_portal'`
 - Updated `docs/TCPA_AUDIT.md` with comprehensive audit report
 - All migrations applied, type check clean, committed and pushed (21 files, 687 insertions)
+
+### Session 4 — Campaign Bug Fixes + Personalized Booking Links
+- Applied 5 tracking migrations to live DB (sms_delivery_log, tracked_links, link_clicks, email_delivery_log, campaign_variants)
+- **BUG 1 — A/B testing persistence**: Added `auto_select_winner`/`auto_select_after_hours` columns to campaigns table (migration 20260210000009). Updated Zod schema, POST inserts campaign_variants, PATCH deletes+reinserts, GET joins and returns. `buildPayload()` always sends variants key (null when A/B off).
+- **BUG 2 — Coupon codes**: Campaign send route was already correct. Fixed lifecycle engine — now generates unique coupon per recipient for rules with `coupon_id`, clones rewards from template.
+- **BUG 3 — URL tracking**: Campaign sends already tracked. Fixed lifecycle engine — now passes `{ lifecycleExecutionId, source: 'lifecycle' }` to `sendMarketingSms()` so `wrapUrlsInMessage()` fires.
+- **BUG 4 — Preview personalization**: `renderPreviewForCustomer()` now returns `{ variantA, variantB }`. Preview dialog shows both variants stacked. Sample coupon code only when coupon attached.
+- **Personalized booking links**: New `{book_url}` template variable builds `/book?name=...&phone=...&email=...&coupon=...` per customer. Booking page accepts `?name`, `?phone` params with email DB lookup + URL fallback. URLs auto-shortened by click tracker.
+- CRON_SECRET vs CRON_API_KEY audit: `CRON_API_KEY` is the active auth key (scheduler.ts, lifecycle-engine, quote-reminders). `CRON_SECRET` is a placeholder only used by process-scheduled route (falls back to admin session auth).
+- Production deployment checklist added to CLAUDE.md
+- 7 files changed, TypeScript clean, all pushed
 
 ### Session 3 — Phase 5 Completion (Campaign Analytics + A/B Testing)
 - SMS delivery tracking: `sms_delivery_log` table + `/api/webhooks/twilio/status` webhook + `statusCallback` wired into all SMS sends
