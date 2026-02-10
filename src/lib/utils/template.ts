@@ -6,6 +6,7 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
   coupon_code: 'Unique coupon code',
   service_name: 'Service that was performed',
   vehicle_description: 'Vehicle year/make/model',
+  vehicle_info: 'Vehicle year/make/model',
   business_name: 'Business name',
   booking_url: 'Online booking URL',
   book_now_url: 'Booking URL with service, coupon & email pre-filled',

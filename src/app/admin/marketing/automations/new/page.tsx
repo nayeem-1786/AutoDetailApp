@@ -213,9 +213,6 @@ export default function NewAutomationPage() {
                     />
                   </FormField>
                   {variableChips('sms_template')}
-                  <p className="mt-2 text-xs text-gray-500">
-                    Available variables: {'{firstName}'}, {'{serviceName}'}, {'{vehicleInfo}'}, {'{googleReviewLink}'}, {'{yelpReviewLink}'}
-                  </p>
                 </div>
               )}
 

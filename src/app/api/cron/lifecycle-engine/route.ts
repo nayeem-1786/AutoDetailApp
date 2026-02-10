@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
+import { renderTemplate } from '@/lib/utils/template';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
@@ -8,15 +9,14 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
  * Lifecycle execution engine cron endpoint.
  *
  * Runs in two phases per invocation:
- * Phase 1 — Schedule: find recent completions and insert pending lifecycle_executions
- * Phase 2 — Execute: send SMS for any executions whose scheduled_for <= now
+ *   Phase 1 — Schedule: find recent completions, insert pending lifecycle_executions
+ *   Phase 2 — Execute: send SMS for executions whose scheduled_for <= now
  *
  * Designed to be called every 5–15 minutes by an external scheduler or Vercel Cron.
  *
  * Example: curl -H "x-api-key: YOUR_KEY" https://domain.com/api/cron/lifecycle-engine
  */
 export async function GET(request: NextRequest) {
-  // Authenticate via API key
   const apiKey = request.headers.get('x-api-key');
   if (!apiKey || apiKey !== process.env.CRON_API_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient();
   const now = new Date();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const lookbackWindow = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   let scheduled = 0;
@@ -33,10 +33,9 @@ export async function GET(request: NextRequest) {
   let skipped = 0;
 
   // =========================================================================
-  // Phase 1: Schedule new executions
+  // Phase 1: Schedule new executions from recent trigger events
   // =========================================================================
 
-  // Load all active lifecycle rules
   const { data: rules, error: rulesErr } = await admin
     .from('lifecycle_rules')
     .select('*')
@@ -48,17 +47,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (rules && rules.length > 0) {
-    const serviceRules = rules.filter((r) => r.trigger_condition === 'after_service');
-    const transactionRules = rules.filter((r) => r.trigger_condition === 'after_transaction');
+    const serviceRules = rules.filter(
+      (r) => r.trigger_condition === 'service_completed'
+    );
+    const transactionRules = rules.filter(
+      (r) => r.trigger_condition === 'after_transaction'
+    );
 
-    // ----- Phase 1A: Appointment completions -----
     if (serviceRules.length > 0) {
-      scheduled += await scheduleAppointmentRules(admin, serviceRules, twentyFourHoursAgo, thirtyDaysAgo);
+      scheduled += await scheduleFromAppointments(admin, serviceRules, lookbackWindow, thirtyDaysAgo);
     }
 
-    // ----- Phase 1B: Transaction completions -----
     if (transactionRules.length > 0) {
-      scheduled += await scheduleTransactionRules(admin, transactionRules, twentyFourHoursAgo, thirtyDaysAgo);
+      scheduled += await scheduleFromTransactions(admin, transactionRules, lookbackWindow, thirtyDaysAgo);
     }
   }
 
@@ -89,10 +90,10 @@ export async function GET(request: NextRequest) {
 }
 
 // ===========================================================================
-// Phase 1A — Schedule from appointment completions
+// Phase 1A — Schedule from completed appointments
 // ===========================================================================
 
-interface LifecycleRule {
+interface Rule {
   id: string;
   trigger_service_id: string | null;
   delay_days: number;
@@ -100,174 +101,135 @@ interface LifecycleRule {
   [key: string]: unknown;
 }
 
-async function scheduleAppointmentRules(
+async function scheduleFromAppointments(
   admin: ReturnType<typeof createAdminClient>,
-  rules: LifecycleRule[],
-  twentyFourHoursAgo: string,
+  rules: Rule[],
+  lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
-  let scheduled = 0;
-
-  // Find recently completed appointments with customer info
-  const { data: appointments, error: aptErr } = await admin
+  // Find recently completed appointments with a customer who has a phone
+  const { data: appointments, error } = await admin
     .from('appointments')
     .select(`
       id,
       customer_id,
-      vehicle_id,
       updated_at,
       customers!inner(id, phone, sms_consent),
       appointment_services(service_id)
     `)
     .eq('status', 'completed')
-    .gte('updated_at', twentyFourHoursAgo)
+    .gte('updated_at', lookbackWindow)
     .not('customer_id', 'is', null);
 
-  if (aptErr) {
-    console.error('Failed to query completed appointments:', aptErr);
+  if (error || !appointments?.length) {
+    if (error) console.error('Failed to query completed appointments:', error);
     return 0;
   }
 
-  if (!appointments || appointments.length === 0) return 0;
-
-  // Get existing executions for dedup
-  const appointmentIds = appointments.map((a) => a.id);
-  const ruleIds = rules.map((r) => r.id);
-
-  const { data: existingByAppointment } = await admin
-    .from('lifecycle_executions')
-    .select('lifecycle_rule_id, appointment_id')
-    .in('lifecycle_rule_id', ruleIds)
-    .in('appointment_id', appointmentIds);
-
-  const appointmentDedupSet = new Set(
-    (existingByAppointment || []).map((e) => `${e.lifecycle_rule_id}:${e.appointment_id}`)
+  return scheduleExecutions(
+    admin,
+    rules,
+    appointments.map((apt) => ({
+      sourceId: apt.id,
+      sourceField: 'appointment_id' as const,
+      customerId: apt.customer_id!,
+      triggeredAt: apt.updated_at,
+      customer: apt.customers as unknown as { phone: string | null; sms_consent: boolean },
+      serviceIds: ((apt.appointment_services || []) as Array<{ service_id: string }>).map(
+        (s) => s.service_id
+      ),
+    })),
+    'appointment_completed',
+    thirtyDaysAgo
   );
-
-  // Get recent executions for 30-day customer dedup
-  const customerIds = [...new Set(appointments.map((a) => a.customer_id).filter(Boolean))] as string[];
-  const { data: recentByCustomer } = await admin
-    .from('lifecycle_executions')
-    .select('lifecycle_rule_id, customer_id')
-    .in('lifecycle_rule_id', ruleIds)
-    .in('customer_id', customerIds)
-    .gte('created_at', thirtyDaysAgo);
-
-  const customerDedupSet = new Set(
-    (recentByCustomer || []).map((e) => `${e.lifecycle_rule_id}:${e.customer_id}`)
-  );
-
-  const toInsert: Array<Record<string, unknown>> = [];
-
-  for (const apt of appointments) {
-    const customer = apt.customers as unknown as { id: string; phone: string | null; sms_consent: boolean };
-    if (!customer?.phone || !customer.sms_consent) continue;
-
-    const aptServiceIds = ((apt.appointment_services || []) as Array<{ service_id: string }>).map(
-      (s) => s.service_id
-    );
-
-    for (const rule of rules) {
-      // Skip if already scheduled for this appointment
-      if (appointmentDedupSet.has(`${rule.id}:${apt.id}`)) continue;
-
-      // 30-day customer dedup
-      if (customerDedupSet.has(`${rule.id}:${apt.customer_id}`)) continue;
-
-      // Service filter: if rule targets a specific service, appointment must include it
-      if (rule.trigger_service_id && !aptServiceIds.includes(rule.trigger_service_id)) continue;
-
-      // Calculate scheduled_for
-      const delayMs = (rule.delay_days * 1440 + (rule.delay_minutes || 0)) * 60 * 1000;
-      const scheduledFor = new Date(new Date(apt.updated_at).getTime() + delayMs).toISOString();
-
-      toInsert.push({
-        lifecycle_rule_id: rule.id,
-        customer_id: apt.customer_id,
-        appointment_id: apt.id,
-        trigger_event: 'appointment_completed',
-        triggered_at: apt.updated_at,
-        scheduled_for: scheduledFor,
-        status: 'pending',
-      });
-
-      // Mark in dedup sets to avoid dups within same batch
-      appointmentDedupSet.add(`${rule.id}:${apt.id}`);
-      customerDedupSet.add(`${rule.id}:${apt.customer_id}`);
-    }
-  }
-
-  if (toInsert.length > 0) {
-    // Use upsert with onConflict to handle any race conditions with the unique index
-    const { data: inserted, error: insertErr } = await admin
-      .from('lifecycle_executions')
-      .insert(toInsert)
-      .select('id');
-
-    if (insertErr) {
-      // Unique constraint violations are expected for races — log but don't fail
-      if (insertErr.code === '23505') {
-        console.log('Some appointment executions already existed (race condition), skipping duplicates');
-      } else {
-        console.error('Failed to insert appointment executions:', insertErr);
-      }
-    }
-    scheduled += inserted?.length ?? 0;
-  }
-
-  return scheduled;
 }
 
 // ===========================================================================
-// Phase 1B — Schedule from transaction completions
+// Phase 1B — Schedule from completed transactions
 // ===========================================================================
 
-async function scheduleTransactionRules(
+async function scheduleFromTransactions(
   admin: ReturnType<typeof createAdminClient>,
-  rules: LifecycleRule[],
-  twentyFourHoursAgo: string,
+  rules: Rule[],
+  lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
-  let scheduled = 0;
-
-  // Find recently completed transactions with customer info
-  const { data: transactions, error: txErr } = await admin
+  const { data: transactions, error } = await admin
     .from('transactions')
     .select(`
       id,
       customer_id,
-      vehicle_id,
       transaction_date,
       customers!inner(id, phone, sms_consent),
       transaction_items(service_id)
     `)
     .eq('status', 'completed')
-    .gte('transaction_date', twentyFourHoursAgo)
+    .gte('transaction_date', lookbackWindow)
     .not('customer_id', 'is', null);
 
-  if (txErr) {
-    console.error('Failed to query completed transactions:', txErr);
+  if (error || !transactions?.length) {
+    if (error) console.error('Failed to query completed transactions:', error);
     return 0;
   }
 
-  if (!transactions || transactions.length === 0) return 0;
+  return scheduleExecutions(
+    admin,
+    rules,
+    transactions.map((tx) => ({
+      sourceId: tx.id,
+      sourceField: 'transaction_id' as const,
+      customerId: tx.customer_id!,
+      triggeredAt: tx.transaction_date,
+      customer: tx.customers as unknown as { phone: string | null; sms_consent: boolean },
+      serviceIds: ((tx.transaction_items || []) as Array<{ service_id: string | null }>)
+        .map((i) => i.service_id)
+        .filter(Boolean) as string[],
+    })),
+    'transaction_completed',
+    thirtyDaysAgo
+  );
+}
 
-  // Get existing executions for dedup
-  const transactionIds = transactions.map((t) => t.id);
+// ===========================================================================
+// Shared scheduling logic (dedup + insert)
+// ===========================================================================
+
+interface TriggerEvent {
+  sourceId: string;
+  sourceField: 'appointment_id' | 'transaction_id';
+  customerId: string;
+  triggeredAt: string;
+  customer: { phone: string | null; sms_consent: boolean };
+  serviceIds: string[];
+}
+
+async function scheduleExecutions(
+  admin: ReturnType<typeof createAdminClient>,
+  rules: Rule[],
+  events: TriggerEvent[],
+  triggerEvent: string,
+  thirtyDaysAgo: string
+): Promise<number> {
   const ruleIds = rules.map((r) => r.id);
+  const sourceIds = events.map((e) => e.sourceId);
+  const customerIds = [...new Set(events.map((e) => e.customerId))];
 
-  const { data: existingByTx } = await admin
+  // Dedup: already-scheduled executions for these source IDs
+  const sourceField = events[0]?.sourceField;
+  const { data: existingBySource } = await admin
     .from('lifecycle_executions')
-    .select('lifecycle_rule_id, transaction_id')
+    .select('lifecycle_rule_id, appointment_id, transaction_id')
     .in('lifecycle_rule_id', ruleIds)
-    .in('transaction_id', transactionIds);
+    .in(sourceField, sourceIds);
 
-  const txDedupSet = new Set(
-    (existingByTx || []).map((e) => `${e.lifecycle_rule_id}:${e.transaction_id}`)
+  const sourceDedupSet = new Set(
+    (existingBySource || []).map((e) => {
+      const sid = sourceField === 'appointment_id' ? e.appointment_id : e.transaction_id;
+      return `${e.lifecycle_rule_id}:${sid}`;
+    })
   );
 
-  // Get recent executions for 30-day customer dedup
-  const customerIds = [...new Set(transactions.map((t) => t.customer_id).filter(Boolean))] as string[];
+  // Dedup: 30-day per-customer-per-rule limit
   const { data: recentByCustomer } = await admin
     .from('lifecycle_executions')
     .select('lifecycle_rule_id, customer_id')
@@ -281,61 +243,51 @@ async function scheduleTransactionRules(
 
   const toInsert: Array<Record<string, unknown>> = [];
 
-  for (const tx of transactions) {
-    const customer = tx.customers as unknown as { id: string; phone: string | null; sms_consent: boolean };
-    if (!customer?.phone || !customer.sms_consent) continue;
-
-    const txServiceIds = ((tx.transaction_items || []) as Array<{ service_id: string | null }>)
-      .map((i) => i.service_id)
-      .filter(Boolean) as string[];
+  for (const event of events) {
+    if (!event.customer?.phone || !event.customer.sms_consent) continue;
 
     for (const rule of rules) {
-      // Skip if already scheduled for this transaction
-      if (txDedupSet.has(`${rule.id}:${tx.id}`)) continue;
+      if (sourceDedupSet.has(`${rule.id}:${event.sourceId}`)) continue;
+      if (customerDedupSet.has(`${rule.id}:${event.customerId}`)) continue;
 
-      // 30-day customer dedup
-      if (customerDedupSet.has(`${rule.id}:${tx.customer_id}`)) continue;
+      // Service filter: rule targeting a specific service must match
+      if (rule.trigger_service_id && !event.serviceIds.includes(rule.trigger_service_id)) continue;
 
-      // Service filter: if rule targets a specific service, transaction must include it
-      if (rule.trigger_service_id && !txServiceIds.includes(rule.trigger_service_id)) continue;
-
-      // Calculate scheduled_for
       const delayMs = (rule.delay_days * 1440 + (rule.delay_minutes || 0)) * 60 * 1000;
-      const scheduledFor = new Date(new Date(tx.transaction_date).getTime() + delayMs).toISOString();
+      const scheduledFor = new Date(new Date(event.triggeredAt).getTime() + delayMs).toISOString();
 
       toInsert.push({
         lifecycle_rule_id: rule.id,
-        customer_id: tx.customer_id,
-        transaction_id: tx.id,
-        trigger_event: 'transaction_completed',
-        triggered_at: tx.transaction_date,
+        customer_id: event.customerId,
+        [event.sourceField]: event.sourceId,
+        trigger_event: triggerEvent,
+        triggered_at: event.triggeredAt,
         scheduled_for: scheduledFor,
         status: 'pending',
       });
 
-      // Mark in dedup sets
-      txDedupSet.add(`${rule.id}:${tx.id}`);
-      customerDedupSet.add(`${rule.id}:${tx.customer_id}`);
+      // Mark in dedup sets to prevent dups within same batch
+      sourceDedupSet.add(`${rule.id}:${event.sourceId}`);
+      customerDedupSet.add(`${rule.id}:${event.customerId}`);
     }
   }
 
-  if (toInsert.length > 0) {
-    const { data: inserted, error: insertErr } = await admin
-      .from('lifecycle_executions')
-      .insert(toInsert)
-      .select('id');
+  if (toInsert.length === 0) return 0;
 
-    if (insertErr) {
-      if (insertErr.code === '23505') {
-        console.log('Some transaction executions already existed (race condition), skipping duplicates');
-      } else {
-        console.error('Failed to insert transaction executions:', insertErr);
-      }
+  const { data: inserted, error } = await admin
+    .from('lifecycle_executions')
+    .insert(toInsert)
+    .select('id');
+
+  if (error) {
+    if (error.code === '23505') {
+      console.log('Some executions already existed (unique constraint), skipping duplicates');
+    } else {
+      console.error('Failed to insert lifecycle executions:', error);
     }
-    scheduled += inserted?.length ?? 0;
   }
 
-  return scheduled;
+  return inserted?.length ?? 0;
 }
 
 // ===========================================================================
@@ -369,7 +321,7 @@ async function executePending(
 
   const rulesMap = new Map((rulesData || []).map((r) => [r.id, r]));
 
-  // Pre-load feature flag for review requests
+  // Pre-load feature flag
   const { data: reviewFlag } = await admin
     .from('feature_flags')
     .select('enabled')
@@ -378,40 +330,34 @@ async function executePending(
 
   const reviewFlagEnabled = reviewFlag?.enabled ?? false;
 
-  // Pre-load review URLs from business_settings
-  const { data: reviewSettings } = await admin
+  // Pre-load business name + review URLs from business_settings
+  const { data: bizSettings } = await admin
     .from('business_settings')
     .select('key, value')
-    .in('key', ['google_review_url', 'yelp_review_url']);
+    .in('key', ['google_review_url', 'yelp_review_url', 'business_name']);
 
-  let googleReviewUrl = '';
-  let yelpReviewUrl = '';
-  for (const s of reviewSettings || []) {
-    const val = typeof s.value === 'string' ? s.value : JSON.stringify(s.value);
-    // business_settings stores JSON values — strip wrapping quotes
-    const cleaned = val.replace(/^"|"$/g, '');
-    if (s.key === 'google_review_url') googleReviewUrl = cleaned;
-    if (s.key === 'yelp_review_url') yelpReviewUrl = cleaned;
+  const settingsMap: Record<string, string> = {};
+  for (const s of bizSettings || []) {
+    // business_settings stores JSONB — unwrap string values
+    const raw = typeof s.value === 'string' ? s.value : String(s.value ?? '');
+    settingsMap[s.key] = raw;
   }
+
+  const businessName = settingsMap.business_name || 'Smart Detail Auto Spa & Supplies';
 
   // Shorten review URLs once (reuse across all executions)
+  const googleUrl = settingsMap.google_review_url || '';
+  const yelpUrl = settingsMap.yelp_review_url || '';
   let shortGoogleUrl = '';
   let shortYelpUrl = '';
-  if (googleReviewUrl) {
-    try {
-      shortGoogleUrl = await createShortLink(googleReviewUrl);
-    } catch (err) {
-      console.error('Failed to shorten Google review URL:', err);
-      shortGoogleUrl = googleReviewUrl;
-    }
+
+  if (googleUrl) {
+    try { shortGoogleUrl = await createShortLink(googleUrl); }
+    catch { shortGoogleUrl = googleUrl; }
   }
-  if (yelpReviewUrl) {
-    try {
-      shortYelpUrl = await createShortLink(yelpReviewUrl);
-    } catch (err) {
-      console.error('Failed to shorten Yelp review URL:', err);
-      shortYelpUrl = yelpReviewUrl;
-    }
+  if (yelpUrl) {
+    try { shortYelpUrl = await createShortLink(yelpUrl); }
+    catch { shortYelpUrl = yelpUrl; }
   }
 
   for (const exec of executions) {
@@ -425,11 +371,12 @@ async function executePending(
         continue;
       }
 
-      // Check feature flag for review-related templates
+      // Check feature flag for review-link templates
       const template = rule.sms_template || '';
-      const usesReviewLink = template.includes('{googleReviewLink}') || template.includes('{yelpReviewLink}');
+      const usesReviewLink =
+        template.includes('{google_review_link}') || template.includes('{yelp_review_link}');
       if (usesReviewLink && !reviewFlagEnabled) {
-        await markExecution(admin, exec.id, 'skipped', 'Google review requests feature flag disabled');
+        await markExecution(admin, exec.id, 'skipped', 'Google review requests feature disabled');
         skipped++;
         continue;
       }
@@ -437,7 +384,7 @@ async function executePending(
       // Load customer
       const { data: customer } = await admin
         .from('customers')
-        .select('first_name, phone, sms_consent')
+        .select('first_name, last_name, phone, sms_consent')
         .eq('id', exec.customer_id)
         .single();
 
@@ -447,12 +394,11 @@ async function executePending(
         continue;
       }
 
-      // Load context: vehicle + service names
-      let vehicleInfo = '';
+      // Resolve context: vehicle + service/item names
+      let vehicleDescription = '';
       let serviceName = '';
 
       if (exec.appointment_id) {
-        // Load vehicle from appointment
         const { data: apt } = await admin
           .from('appointments')
           .select('vehicle_id')
@@ -465,26 +411,23 @@ async function executePending(
             .select('year, make, model')
             .eq('id', apt.vehicle_id)
             .single();
-
           if (vehicle) {
-            vehicleInfo = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+            vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
           }
         }
 
-        // Load service names from appointment_services
         const { data: aptServices } = await admin
           .from('appointment_services')
           .select('services(name)')
           .eq('appointment_id', exec.appointment_id);
 
-        if (aptServices && aptServices.length > 0) {
-          const names = aptServices
+        if (aptServices?.length) {
+          serviceName = aptServices
             .map((s) => (s.services as unknown as { name: string })?.name)
-            .filter(Boolean);
-          serviceName = names.join(', ');
+            .filter(Boolean)
+            .join(', ');
         }
       } else if (exec.transaction_id) {
-        // Load vehicle from transaction
         const { data: tx } = await admin
           .from('transactions')
           .select('vehicle_id')
@@ -497,34 +440,44 @@ async function executePending(
             .select('year, make, model')
             .eq('id', tx.vehicle_id)
             .single();
-
           if (vehicle) {
-            vehicleInfo = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+            vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
           }
         }
 
-        // Load item names from transaction_items
         const { data: txItems } = await admin
           .from('transaction_items')
           .select('item_name')
           .eq('transaction_id', exec.transaction_id)
           .limit(5);
 
-        if (txItems && txItems.length > 0) {
+        if (txItems?.length) {
           serviceName = txItems.map((i) => i.item_name).filter(Boolean).join(', ');
         }
       }
 
-      // Replace template variables
-      let message = template
-        .replace(/\{firstName\}/g, customer.first_name || 'there')
-        .replace(/\{serviceName\}/g, serviceName || 'your service')
-        .replace(/\{vehicleInfo\}/g, vehicleInfo)
-        .replace(/\{googleReviewLink\}/g, shortGoogleUrl)
-        .replace(/\{yelpReviewLink\}/g, shortYelpUrl);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-      // Clean up empty vehicle references (e.g. "your " if no vehicle)
-      message = message.replace(/your\s+(?=to |!|\.|\s*$)/g, '');
+      // Render template with snake_case variables matching TEMPLATE_VARIABLES
+      let message = renderTemplate(template, {
+        first_name: customer.first_name || 'there',
+        last_name: customer.last_name || '',
+        service_name: serviceName || 'your service',
+        vehicle_description: vehicleDescription,
+        vehicle_info: vehicleDescription,
+        business_name: businessName,
+        google_review_link: shortGoogleUrl,
+        yelp_review_link: shortYelpUrl,
+        booking_url: `${appUrl}/book`,
+        book_now_url: `${appUrl}/book`,
+      });
+
+      // Clean up lines with empty review links (e.g., if URL not configured)
+      message = message
+        .split('\n')
+        .filter((line) => !/^⭐\s*(Google|Yelp):\s*$/.test(line.trim()))
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n');
 
       // Send via marketing SMS (appends STOP footer)
       const result = await sendMarketingSms(customer.phone, message);
@@ -539,11 +492,7 @@ async function executePending(
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       console.error(`Lifecycle execution ${exec.id} failed:`, err);
-      try {
-        await markExecution(admin, exec.id, 'failed', errorMsg);
-      } catch {
-        // Don't let status update failure block processing
-      }
+      try { await markExecution(admin, exec.id, 'failed', errorMsg); } catch { /* noop */ }
       failed++;
     }
   }
@@ -569,8 +518,5 @@ async function markExecution(
     update.error_message = errorMessage;
   }
 
-  await admin
-    .from('lifecycle_executions')
-    .update(update)
-    .eq('id', id);
+  await admin.from('lifecycle_executions').update(update).eq('id', id);
 }

@@ -239,9 +239,6 @@ export default function AutomationDetailPage() {
                     <Textarea id="sms_template" {...register('sms_template')} rows={4} />
                   </FormField>
                   {variableChips('sms_template')}
-                  <p className="mt-2 text-xs text-gray-500">
-                    Available variables: {'{firstName}'}, {'{serviceName}'}, {'{vehicleInfo}'}, {'{googleReviewLink}'}, {'{yelpReviewLink}'}
-                  </p>
                 </div>
               )}
               {(watchAction === 'email' || watchAction === 'both') && (

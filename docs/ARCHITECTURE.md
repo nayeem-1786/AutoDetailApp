@@ -19,6 +19,7 @@
 9. [Quote Service Layer](#9-quote-service-layer-srclibquotes)
 10. [Known Duplication Debt](#10-known-duplication-debt)
 11. [Rules for Adding New Code](#11-rules-for-adding-new-code)
+12. [Scheduled Jobs & Cron Infrastructure](#12-scheduled-jobs--cron-infrastructure)
 
 ---
 
@@ -492,3 +493,72 @@ return NextResponse.json(result);
 - ❌ Use `useAuth()` in POS components — use `usePosAuth()`
 - ❌ Use inline styles — use Tailwind classes per `DESIGN_SYSTEM.md`
 - ❌ Skip the soft-delete filter on quote queries — always `.is('deleted_at', null)`
+
+---
+
+## 12. Scheduled Jobs & Cron Infrastructure
+
+ALL scheduling is handled internally — no external schedulers, no n8n, no Vercel Cron.
+
+### Mechanism A: pg_cron (In-Database SQL)
+
+Runs PL/pgSQL functions directly inside Postgres. Pure SQL only — no HTTP, no Node.js.
+
+| Job Name | Schedule | Function | Migration |
+|----------|----------|----------|-----------|
+| `conversation-lifecycle` | `0 * * * *` (hourly) | `auto_close_and_archive_conversations()` | `20260209000012` |
+
+**When to use:** Pure data manipulation (UPDATE/INSERT/DELETE) with no external API calls.
+
+**Pattern:**
+```sql
+CREATE OR REPLACE FUNCTION my_task() RETURNS void AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+SELECT cron.schedule('job-name', '0 * * * *', $$SELECT my_task()$$);
+```
+
+**Limitations:** Cannot call external APIs, cannot run Node.js, cannot use app utilities.
+
+### Mechanism B: Internal Cron via node-cron + instrumentation.ts
+
+App-internal scheduler using `node-cron`. Runs inside the Next.js server process, calls API cron endpoints via self-fetch with `CRON_API_KEY` auth.
+
+**Infrastructure files:**
+| File | Purpose |
+|------|---------|
+| `src/instrumentation.ts` | Next.js hook — calls `setupCronJobs()` once on server startup |
+| `src/lib/cron/scheduler.ts` | Defines all scheduled jobs, self-fetches API endpoints |
+
+**Registered jobs:**
+| Endpoint | Purpose | Schedule | Auth |
+|----------|---------|----------|------|
+| `/api/cron/lifecycle-engine` | Lifecycle automation (review requests, follow-ups) | Every 10 minutes | `CRON_API_KEY` |
+| `/api/cron/quote-reminders` | 24hr quote nudge SMS | Every hour at :30 | `CRON_API_KEY` |
+
+**API cron endpoint auth pattern:**
+```typescript
+export async function GET(request: NextRequest) {
+  const apiKey = request.headers.get('x-api-key');
+  if (apiKey !== process.env.CRON_API_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // ... job logic
+}
+```
+
+**Adding a new scheduled job:**
+1. Create API route at `src/app/api/cron/{job-name}/route.ts` with `CRON_API_KEY` auth
+2. Add `cron.schedule()` entry in `src/lib/cron/scheduler.ts`
+3. Document in this section's tables above
+
+**Guards:**
+- `NEXT_RUNTIME === 'nodejs'` check in instrumentation.ts (skips build/edge)
+- Module-level `initialized` flag prevents duplicate setup on hot reload
+
+### Decision Guide: pg_cron vs node-cron API Endpoint
+
+| Question | pg_cron | node-cron + API |
+|----------|---------|-----------------|
+| Needs external APIs (Twilio, Mailgun)? | No | Yes |
+| Needs Node.js utilities (sendSms, templates)? | No | Yes |
+| Pure SQL data cleanup/updates? | Yes | Overkill |
+| Failure visibility | Postgres logs only | Console logs + HTTP response |

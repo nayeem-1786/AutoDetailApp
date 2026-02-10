@@ -72,6 +72,18 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Product catalog link in AI prompt (Enhancement 4): AI directs product-interested customers to `${NEXT_PUBLIC_SITE_URL}/products` for online browsing.
 - Quote follow-up reminder cron (Enhancement 1): `GET /api/cron/quote-reminders` with `CRON_API_KEY` auth. Sends one-time SMS nudge for quotes with `status='sent'`, `sent_at` > 24hrs ago, `viewed_at IS NULL`. Deduplicates via `quote_communications` check for "reminder" in `message` column. Uses `createShortLink()` for quote URL. Migration added `message` TEXT column to `quote_communications`.
 - Conversation summary card (Enhancement 2): `GET /api/admin/messaging/[conversationId]/summary` returns customer, latest vehicle, and latest quote with services. `thread-view.tsx` fetches on conversation change and renders compact card above messages — customer name + vehicle on line 1, quote number + services + amount + status on line 2. Handles all display states (no customer, no vehicle, no quote, viewed/accepted).
+- Google review request automation (Enhancement): Full lifecycle automation engine built and wired.
+  - Settings page: `/admin/settings/reviews` — configurable Google/Yelp review URLs stored in `business_settings` (`google_review_url`, `yelp_review_url`). Shows feature flag status and links to automations.
+  - Lifecycle execution engine: `/api/cron/lifecycle-engine` — cron endpoint (every 10 min) with two phases: Phase 1 schedules executions from completed appointments (`service_completed`) and POS transactions (`after_transaction`) within 24h window. Phase 2 sends pending SMS with template variable replacement (`{first_name}`, `{service_name}`, `{vehicle_info}`, `{google_review_link}`, `{yelp_review_link}`).
+  - `lifecycle_executions` tracking table: prevents duplicates per trigger event, enforces 30-day per-customer-per-rule cooldown, tracks status (`pending`/`sent`/`failed`/`skipped`).
+  - `delay_minutes` column added to `lifecycle_rules` for sub-day granularity (total delay = delay_days * 1440 + delay_minutes).
+  - Automations form updated: `delay_minutes` input alongside `delay_days`, `after_transaction` trigger condition added, SMS template variable helper text.
+  - Two seed rules: "Google Review Request — After Service" (30 min) and "Google Review Request — After Purchase" (30 min). Editable from Admin > Marketing > Automations.
+  - Uses `sendMarketingSms()` (appends STOP footer), `createShortLink()` for review URLs, respects `google_review_requests` feature flag and `sms_consent`.
+  - Prepayment-safe: only triggers on status change to completed, not on payment.
+  - Trigger condition standardized to `service_completed` (single canonical value — `after_service` removed from DB, forms, and cron engine).
+  - Template variables standardized to snake_case via `renderTemplate()` (e.g., `{first_name}`, `{google_review_link}`).
+- Internal cron scheduler: `node-cron` + `src/instrumentation.ts` runs all scheduled jobs inside the Next.js process — no external schedulers needed. Jobs defined in `src/lib/cron/scheduler.ts`, self-fetch API endpoints with `CRON_API_KEY` auth. Lifecycle engine every 10 min, quote reminders hourly at :30.
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
@@ -83,7 +95,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - URL shortening — BUILT (/s/[code] redirect, short_links table, 6-char codes)
 
 ### Phase 5 — What's Remaining
-- Google review request automation (post-service with direct link) — feature flag exists, no implementation
 - Campaign analytics (delivery, opens, redemptions, revenue attribution, ROI) — no analytics dashboard
 - A/B testing for campaigns — nothing built
 - Full TCPA compliance audit (consent capture, opt-out handling, audit log) — consent tracking exists, no audit report
@@ -134,7 +145,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | Add `ANTHROPIC_API_KEY` to production environment variables | Configuration | High |
 | Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
 | Add `CRON_API_KEY` to production environment variables | Configuration | High |
-| Set up external scheduler (Vercel Cron or similar) to call `GET /api/cron/quote-reminders` hourly with `x-api-key` header | Configuration | Medium |
 
 ### Data Notes
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
@@ -144,6 +154,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Messaging tables:** `conversations` (unique per phone_number, linked to customer_id if known) and `messages` (CASCADE delete with conversation). Both have Supabase Realtime enabled. AI auto-replies stored with `sender_type: 'ai'`, staff replies with `sender_type: 'staff'`.
 - **Key messaging files:** `src/lib/services/messaging-ai.ts` (AI response generation, product search, coupon injection, system prompt builder), `src/lib/services/messaging-ai-prompt.ts` (default prompt template), `src/app/api/webhooks/twilio/inbound/route.ts` (Twilio webhook: AI routing, auto-quote, SMS splitting), `src/app/api/quotes/[id]/accept/route.ts` (acceptance + confirmation SMS), `src/app/admin/settings/messaging/page.tsx` (unified AI settings UI), `src/app/api/cron/quote-reminders/route.ts` (24hr unviewed quote nudge), `src/app/api/admin/messaging/[conversationId]/summary/route.ts` (conversation summary for staff), `src/proxy.ts` (middleware, renamed from middleware.ts).
 - **Quote communications:** `quote_communications` table tracks all SMS/email sends for quotes (channel, sent_to, status, error_message, message, sent_by). Used by `send-service.ts` (manual sends), inbound webhook (auto-quote), accept route (acceptance SMS), and quote-reminders cron. `sent_by` is nullable — null for AI/system-generated sends. `message` column added for storing SMS body text (used by reminder cron for deduplication).
+- **Lifecycle executions:** `lifecycle_executions` table tracks all automated SMS sends. Unique constraint on `(lifecycle_rule_id, appointment_id, transaction_id)` prevents duplicate scheduling. Index on `(lifecycle_rule_id, customer_id, created_at)` supports 30-day dedup queries. Review URL short links are created once per cron run and reused across all executions in that batch.
 
 ---
 
@@ -152,7 +163,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Supabase project:** `zwvahzymzardmxixyfim`
 - **Super-Admin:** nayeem@smartdetailautospa.com
 - **Staff:** Segundo Cadena (detailer), Joselyn Reyes (cashier), Joana Lira (cashier), Su Khan (admin)
-- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | Workflows: N8N | AI: Anthropic Claude API (messaging auto-responder)
+- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | AI: Anthropic Claude API (messaging auto-responder) | Cron: node-cron via instrumentation.ts (lifecycle-engine every 10 min, quote-reminders hourly)
 - **Public pages:** Server Components for SEO. Admin pages: `'use client'` behind auth.
 
 ### Auth Patterns
@@ -176,6 +187,11 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Quote acceptance SMS**: Sent automatically from `src/app/api/quotes/[id]/accept/route.ts` via `sendSms()`. Logged in `quote_communications`.
 - **Product search in AI**: `searchRelevantProducts()` in `messaging-ai.ts` — keyword-triggered, searches `products` table with `.or()` on name/description, joins `product_categories` for category name. Only fires when product intent detected.
 - **ANTHROPIC_API_KEY** must be in `.env.local` (and production env vars). Used by `src/lib/services/messaging-ai.ts`.
+- **Lifecycle engine cron** (`/api/cron/lifecycle-engine`): Runs every 10 min via internal node-cron scheduler. Schedules + executes lifecycle rules. `lifecycle_executions` table tracks all scheduled/sent lifecycle SMS — 30-day per-customer-per-rule dedup. Never send review requests without checking: `sms_consent = true`, `google_review_requests` feature flag enabled, 30-day cooldown per customer per rule.
+- **Review URLs**: Stored in `business_settings` as `google_review_url` and `yelp_review_url` (JSONB string values). Configurable from Admin > Settings > Reviews. Google Place ID: `ChIJf7qNDhW1woAROX-FX8CScGE`.
+- **Lifecycle rules delay**: Total delay = `scheduled_for = triggered_at + (delay_days * 1440 + delay_minutes)` minutes. `delay_minutes` column added for sub-day granularity (e.g., 30-min review request delay).
+- **Trigger condition canonical values**: `service_completed` (appointments) and `after_transaction` (transactions) — NEVER use `after_service`.
+- **ALL cron/scheduling is internal** via `src/lib/cron/scheduler.ts` — NEVER suggest n8n, Vercel Cron, or external schedulers.
 
 ---
 
