@@ -739,6 +739,23 @@ export interface SmsConsentLog {
   created_at: string;
 }
 
+export type EmailDeliveryEvent = 'delivered' | 'failed' | 'bounced' | 'clicked' | 'complained' | 'unsubscribed';
+
+export interface EmailDeliveryLog {
+  id: string;
+  mailgun_message_id: string | null;
+  to_email: string;
+  from_email: string;
+  subject: string | null;
+  event: EmailDeliveryEvent;
+  campaign_id: string | null;
+  customer_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  click_url: string | null;
+  created_at: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }
