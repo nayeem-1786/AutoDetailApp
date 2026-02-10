@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
@@ -16,6 +17,8 @@ interface MessagingSettings {
   messaging_after_hours_enabled: boolean;
   messaging_after_hours_message: string;
   messaging_ai_instructions: string;
+  messaging_auto_close_hours: string;
+  messaging_auto_archive_days: string;
 }
 
 const DEFAULT_AFTER_HOURS_MESSAGE =
@@ -26,6 +29,8 @@ const SETTINGS_KEYS = [
   'messaging_after_hours_enabled',
   'messaging_after_hours_message',
   'messaging_ai_instructions',
+  'messaging_auto_close_hours',
+  'messaging_auto_archive_days',
 ] as const;
 
 const DEFAULTS: MessagingSettings = {
@@ -33,7 +38,27 @@ const DEFAULTS: MessagingSettings = {
   messaging_after_hours_enabled: false,
   messaging_after_hours_message: DEFAULT_AFTER_HOURS_MESSAGE,
   messaging_ai_instructions: '',
+  messaging_auto_close_hours: '48',
+  messaging_auto_archive_days: '30',
 };
+
+const AUTO_CLOSE_OPTIONS = [
+  { value: '24', label: '24 hours' },
+  { value: '48', label: '48 hours' },
+  { value: '72', label: '72 hours' },
+  { value: '168', label: '1 week' },
+  { value: '336', label: '2 weeks' },
+  { value: '0', label: 'Never' },
+];
+
+const AUTO_ARCHIVE_OPTIONS = [
+  { value: '7', label: '7 days' },
+  { value: '14', label: '14 days' },
+  { value: '30', label: '30 days' },
+  { value: '60', label: '60 days' },
+  { value: '90', label: '90 days' },
+  { value: '0', label: 'Never' },
+];
 
 export default function MessagingSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -206,6 +231,56 @@ export default function MessagingSettingsPage() {
                 setSettings((prev) => ({ ...prev, messaging_after_hours_message: e.target.value }))
               }
             />
+          </FormField>
+        </CardContent>
+      </Card>
+
+      {/* Conversation Lifecycle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Conversation Lifecycle</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <FormField
+            label="Auto-Close Timer"
+            description="Automatically close open conversations with no activity after this period."
+            htmlFor="auto_close_hours"
+          >
+            <Select
+              id="auto_close_hours"
+              value={settings.messaging_auto_close_hours}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, messaging_auto_close_hours: e.target.value }))
+              }
+              className="w-full sm:w-64"
+            >
+              {AUTO_CLOSE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField
+            label="Auto-Archive Timer"
+            description="Automatically archive closed conversations after this period."
+            htmlFor="auto_archive_days"
+          >
+            <Select
+              id="auto_archive_days"
+              value={settings.messaging_auto_archive_days}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, messaging_auto_archive_days: e.target.value }))
+              }
+              className="w-full sm:w-64"
+            >
+              {AUTO_ARCHIVE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Select>
           </FormField>
         </CardContent>
       </Card>

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+const STATUS_ACTION_LABELS: Record<string, string> = {
+  closed: 'closed',
+  archived: 'archived',
+  open: 'reopened',
+};
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -16,7 +22,7 @@ export async function PATCH(
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('role')
+    .select('role, first_name, last_name')
     .eq('auth_user_id', user.id)
     .single();
 
@@ -44,6 +50,21 @@ export async function PATCH(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Insert system message for status changes
+  if (updates.status && typeof updates.status === 'string') {
+    const action = STATUS_ACTION_LABELS[updates.status];
+    if (action) {
+      const staffName = `${employee.first_name} ${employee.last_name}`.trim();
+      await admin.from('messages').insert({
+        conversation_id: id,
+        direction: 'outbound',
+        body: `Conversation ${action} by ${staffName}`,
+        sender_type: 'system',
+        status: 'delivered',
+      });
+    }
   }
 
   // Fetch updated conversation

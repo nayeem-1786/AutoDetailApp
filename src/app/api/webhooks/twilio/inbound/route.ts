@@ -129,6 +129,8 @@ export async function POST(request: NextRequest) {
 
       conversation = newConv;
     } else {
+      const wasClosedOrArchived = conversation.status === 'closed' || conversation.status === 'archived';
+
       const updates: Record<string, unknown> = {
         last_message_at: new Date().toISOString(),
         last_message_preview: body.substring(0, 200),
@@ -143,6 +145,17 @@ export async function POST(request: NextRequest) {
         .from('conversations')
         .update(updates)
         .eq('id', conversation.id);
+
+      // Insert system message when a closed/archived conversation is reopened
+      if (wasClosedOrArchived) {
+        await admin.from('messages').insert({
+          conversation_id: conversation.id,
+          direction: 'outbound',
+          body: 'Conversation reopened — customer re-engaged',
+          sender_type: 'system',
+          status: 'delivered',
+        });
+      }
     }
 
     // -------------------------------------------------------------------
