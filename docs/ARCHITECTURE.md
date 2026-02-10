@@ -88,6 +88,8 @@ src/
 │   ├── auth/                           # Auth providers, roles, permissions
 │   ├── data/
 │   │   └── business.ts                 # ⭐ getBusinessInfo() — NEVER hardcode biz info
+│   ├── cron/                          # Internal cron scheduler
+│   │   └── scheduler.ts              # node-cron job definitions
 │   ├── hooks/                          # ⭐ SHARED HOOKS (see Section 2)
 │   └── utils/                          # ⭐ SHARED UTILITIES (see Section 2)
 │
@@ -192,6 +194,7 @@ All Zod schemas for form and API validation.
 | `src/lib/utils/sms.ts` | Send SMS via Twilio |
 | `src/lib/utils/template.ts` | Variable replacement in message templates |
 | `src/lib/utils/webhook.ts` | Dispatch webhooks for lifecycle events |
+| `src/lib/cron/scheduler.ts` | Internal cron scheduler — node-cron jobs for lifecycle-engine + quote-reminders |
 
 ### Audience & Campaign
 
