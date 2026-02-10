@@ -87,7 +87,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Campaign analytics (delivery, opens, redemptions, revenue attribution, ROI) — no analytics dashboard
 - A/B testing for campaigns — nothing built
 - Full TCPA compliance audit (consent capture, opt-out handling, audit log) — consent tracking exists, no audit report
-- Fix quote stats labels on quotes page ("Conversion Rate" → "Booking Rate" — already fixed in appointments context but not quotes page)
 
 ### Phase 6 — What's Done
 - Stock overview page (/admin/inventory — 315 lines): product list with stock levels, low/out-of-stock filters, manual stock adjustment dialog, vendor column, reorder threshold display
