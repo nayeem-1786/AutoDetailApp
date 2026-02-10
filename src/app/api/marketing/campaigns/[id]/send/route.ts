@@ -7,7 +7,6 @@ import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
-import { SITE_URL } from '@/lib/utils/constants';
 import { splitRecipients } from '@/lib/campaigns/ab-testing';
 import type { CampaignChannel, CampaignVariant } from '@/lib/supabase/types';
 import crypto from 'crypto';
@@ -71,6 +70,7 @@ export async function POST(
     }
 
     const businessInfo = await getBusinessInfo();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     // Mark as sending
     await supabase
@@ -188,7 +188,7 @@ export async function POST(
       if (serviceSlug) bookNowParams.set('service', serviceSlug);
       if (couponCode) bookNowParams.set('coupon', couponCode);
       if (customer.email) bookNowParams.set('email', customer.email);
-      const bookNowUrl = `${SITE_URL}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
+      const bookNowUrl = `${appUrl}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
 
       // Build personalized booking link with customer info pre-filled
       const bookUrlParams = new URLSearchParams();
@@ -197,14 +197,14 @@ export async function POST(
       if (customer.phone) bookUrlParams.set('phone', customer.phone);
       if (customer.email) bookUrlParams.set('email', customer.email);
       if (couponCode) bookUrlParams.set('coupon', couponCode);
-      const bookUrl = `${SITE_URL}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
+      const bookUrl = `${appUrl}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
 
       const templateVars: Record<string, string> = {
         first_name: customer.first_name,
         last_name: customer.last_name,
         coupon_code: couponCode,
         business_name: businessInfo.name,
-        booking_url: `${SITE_URL}/book`,
+        booking_url: `${appUrl}/book`,
         book_url: bookUrl,
         book_now_url: bookNowUrl,
       };
