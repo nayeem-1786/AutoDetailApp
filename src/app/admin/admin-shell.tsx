@@ -317,27 +317,37 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Fetch messaging unread count
+  // Fetch messaging unread count — initial fetch + Realtime only (no polling)
   useEffect(() => {
     if (!role || !['super_admin', 'admin'].includes(role)) return;
 
+    let abortController = new AbortController();
+    let isFetching = false;
+
     async function fetchUnread() {
+      if (isFetching) return; // Skip if a request is already in flight
+      isFetching = true;
+      abortController.abort(); // Cancel any stale request
+      abortController = new AbortController();
       try {
-        const res = await fetch('/api/messaging/unread-count');
+        const res = await fetch('/api/messaging/unread-count', {
+          signal: abortController.signal,
+        });
         if (res.ok) {
           const json = await res.json();
           setMessagingUnread(json.data?.count || 0);
         }
       } catch {
-        // Silent fail
+        // Silent fail (includes AbortError)
+      } finally {
+        isFetching = false;
       }
     }
+
+    // Initial fetch on mount
     fetchUnread();
 
-    // Poll every 30 seconds for unread count
-    const interval = setInterval(fetchUnread, 30000);
-
-    // Also subscribe to realtime conversation updates
+    // Realtime subscription — updates unread count when conversations change
     const supabase = createClient();
     const channel = supabase
       .channel('sidebar-unread')
@@ -349,7 +359,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => {
-      clearInterval(interval);
+      abortController.abort();
       supabase.removeChannel(channel);
     };
   }, [role]);
