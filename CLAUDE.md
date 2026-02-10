@@ -63,7 +63,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - AI system prompt architecture: `getDefaultSystemPrompt()` in `messaging-ai-prompt.ts` (pure function, no server deps, client-importable). `buildSystemPrompt()` in `messaging-ai.ts` uses saved DB prompt or falls back to default, then appends live service catalog + business info + hours + open/closed status + active coupons (with resolved reward target names) at runtime.
 - Conversation lifecycle automation: pg_cron function auto-closes conversations after configurable hours (default 48h), auto-archives after configurable days (default 30d). System messages logged on each transition. Inbound messages auto-reopen closed/archived conversations.
 - Auto-quote via SMS: AI collects full name (first + last required), vehicle info, and service → generates real quote with `[GENERATE_QUOTE]` block → creates quote record, vehicle, and customer (if new) → sends short link via SMS
-- Auto-quote customer defaults: new customers created via SMS auto-quote get `sms_consent: true`, `email_consent: true`, `customer_type: 'enthusiast'`
+- Auto-quote customer defaults: new customers created via SMS auto-quote get `sms_consent: true`, `email_consent: false` (CAN-SPAM requires explicit email opt-in), `customer_type: 'enthusiast'`
 - Quote communications logging: auto-quote SMS sends are logged in `quote_communications` table (channel, sent_to, status)
 - Quote acceptance SMS: when customer accepts quote via public page, confirmation SMS is sent automatically and logged in `quote_communications`
 - Contextual product knowledge: AI searches `products` table on demand when product-related keywords detected (27 keywords: spray, wax, cleaner, towel, etc.). Zero overhead for service-only conversations. Matches product name/description, returns up to 10 results with price and category.
@@ -87,7 +87,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Internal cron scheduler: `node-cron` + `src/instrumentation.ts` runs all scheduled jobs inside the Next.js process — no external schedulers needed. Jobs defined in `src/lib/cron/scheduler.ts`, self-fetch API endpoints with `CRON_API_KEY` auth. Lifecycle engine every 10 min, quote reminders hourly at :30.
 - SMS verified end-to-end: appointment completed → `lifecycle_executions` scheduled → cron fires → review SMS delivered with Google + Yelp links via `sendMarketingSms()`.
 - Automations coupon refactor: replaced inline coupon fields (coupon_type/coupon_value/coupon_expiry_days) with `coupon_id` FK selector pulling from existing coupons. Forms show coupon name + code + discount summary. "Manage coupons →" link to `/admin/marketing/coupons`.
-- TCPA compliance — full audit and critical fixes:
+- TCPA compliance — full audit and all 9 issues fixed:
   - `sms_consent_log` audit table: records every SMS consent change with `customer_id`, `phone`, `action` (opt_in/opt_out), `keyword`, `source`, `previous_value`, `new_value`, `notes`. Indexes on `(customer_id, created_at DESC)` and `(phone, created_at DESC)`.
   - `updateSmsConsent()` shared helper (`src/lib/utils/sms-consent.ts`): centralized function for all consent changes — updates `customers.sms_consent` + inserts `sms_consent_log` row. Skips if value unchanged.
   - STOP/START keyword handling fixed: inbound webhook now handles STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT (opt-out) and START, YES, UNSTOP (opt-in). Updates `sms_consent` on customer record + logs via `updateSmsConsent()`.
@@ -96,6 +96,12 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
   - Consent logging wired into ALL paths: inbound webhook (STOP/START), unsubscribe page, compliance opt-out, admin customer edit/new, customer portal profile, booking form.
   - Booking form consent capture: SMS + email opt-in checkboxes (unchecked by default) with TCPA disclosure text using dynamic business name from `/api/public/business-info`. Consent upgrade-only for existing customers (never downgrades via booking).
   - Source tracking: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`.
+  - Twilio signature validation enabled: `false &&` bypass removed from inbound webhook. Validation active in production, skipped in `NODE_ENV=development`.
+  - All SMS routed through shared utility: 3 direct Twilio API calls (admin appt notify, POS appt notify, quote send-service) replaced with `sendSms()`. Zero direct Twilio calls outside `sms.ts`.
+  - `sendSms()` extended with MMS support (`mediaUrl` option) and structured console logging for all sends.
+  - Per-customer daily SMS frequency cap: `checkFrequencyCap()` in `sendMarketingSms()` — checks `campaign_recipients` + `lifecycle_executions` against `business_settings.sms_daily_cap_per_customer` (default 5). PST timezone.
+  - Phone type validation utility: `isValidMobileNumber()` in `src/lib/utils/phone-validation.ts` — Twilio Lookup API v2. Off by default (`TWILIO_LOOKUP_ENABLED=true`). ~$0.005/lookup. Fails open.
+  - Auto-quote email consent: changed `email_consent: true` to `email_consent: false` for SMS-initiated customer creation (CAN-SPAM compliance).
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
@@ -167,7 +173,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Lifecycle executions:** `lifecycle_executions` table tracks all automated SMS sends. Unique constraint on `(lifecycle_rule_id, appointment_id, transaction_id)` prevents duplicate scheduling. Indexes: `(status, scheduled_for) WHERE status='pending'` for cron pickup, `(lifecycle_rule_id, customer_id, created_at)` for 30-day dedup. Review URL short links are created once per cron batch and reused.
 - **lifecycle_rules.coupon_id:** nullable FK to `coupons` table with `ON DELETE SET NULL`. Partial index on non-null values. Legacy `coupon_type`/`coupon_value`/`coupon_expiry_days` columns remain but are unused — form uses `coupon_id` exclusively.
 - **sms_consent_log:** Audit table tracking all SMS consent changes. Source CHECK constraint: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`. RLS: authenticated users can read/write (admin pages insert directly via browser client).
-- **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling), `src/lib/utils/sms.ts` (`sendMarketingSms()` with consent check), `docs/TCPA_AUDIT.md` (full audit report).
+- **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling + signature validation), `src/lib/utils/sms.ts` (`sendSms()` with MMS + logging, `sendMarketingSms()` with consent + frequency cap), `src/lib/utils/phone-validation.ts` (Twilio Lookup landline detection), `docs/TCPA_AUDIT.md` (full audit report).
 
 ---
 
@@ -208,14 +214,33 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **App operates in PST timezone** (America/Los_Angeles). All time displays, logs, and scheduling logic should use PST, not UTC.
 - **Automations coupon**: uses `coupon_id` FK to existing coupons table. NEVER recreate inline coupon fields — always select from existing coupons via `/admin/marketing/coupons`.
 - **SMS consent helper** (`updateSmsConsent()`): ALWAYS use this for any code path that changes `sms_consent` on a customer. Never update `sms_consent` directly without also logging to `sms_consent_log`. Import from `@/lib/utils/sms-consent`.
-- **sendMarketingSms() consent check**: All callers MUST pass `customerId` param. Function does defense-in-depth DB lookup of `sms_consent` and blocks if `false`. Logs warning if called without `customerId`.
+- **sendMarketingSms() consent + frequency check**: All callers MUST pass `customerId` param. Function does defense-in-depth DB lookup of `sms_consent` (blocks if false) AND daily frequency cap check (blocks if exceeded). Logs warning if called without `customerId`.
+- **ALL SMS MUST go through `sendSms()`** in `src/lib/utils/sms.ts`. NEVER call the Twilio API directly. `sendSms()` supports MMS via optional `{ mediaUrl }` param. NEVER add new SMS sending code that bypasses this utility.
+- **SMS frequency cap**: `sendMarketingSms()` automatically checks `business_settings.sms_daily_cap_per_customer` (default 5). Counts both `campaign_recipients` and `lifecycle_executions` for the current PST day. Marketing SMS blocked when cap reached.
+- **Phone validation**: `isValidMobileNumber()` from `src/lib/utils/phone-validation.ts` — OFF by default (`TWILIO_LOOKUP_ENABLED=true` to enable). Costs ~$0.005/lookup. Fails open. Wire into customer creation flows when enabled.
+- **Twilio inbound webhook signature validation**: Active in production, skipped when `NODE_ENV=development`. Uses `crypto.timingSafeEqual()` for constant-time comparison. NEVER re-add `false &&` bypass.
 - **Booking form consent**: SMS + email checkboxes are unchecked by default (affirmative opt-in). For existing customers, consent only upgrades (true → true), never downgrades (true → false) via booking form. New customers get consent set from checkbox values.
 
 ---
 
 ## Last Session: 2026-02-10
 
-- TCPA compliance audit completed — all critical and high-priority issues fixed
+### Session 2 — TCPA High/Medium Issues (Issues 4-9)
+- Enabled Twilio signature validation — removed `false &&` bypass, conditional on `NODE_ENV`
+- Routed all SMS through shared utility — replaced 3 direct Twilio API calls:
+  - `src/app/api/appointments/[id]/notify/route.ts` → `sendSms()`
+  - `src/app/api/pos/appointments/[id]/notify/route.ts` → `sendSms()` (added import)
+  - `src/lib/quotes/send-service.ts` → `sendSms()` with `{ mediaUrl }` for MMS PDF
+- Extended `sendSms()` with optional `mediaUrl` param for MMS and structured console logging
+- Added per-customer daily SMS frequency cap to `sendMarketingSms()` — checks `campaign_recipients` + `lifecycle_executions` against `business_settings.sms_daily_cap_per_customer` (default 5, PST timezone)
+- Created `src/lib/utils/phone-validation.ts` — `isValidMobileNumber()` using Twilio Lookup API v2, off by default
+- Fixed auto-quote email consent: `email_consent: false` for SMS-initiated customer creation
+- Updated `docs/TCPA_AUDIT.md` — all 9 issues marked FIXED, scorecard updated to COMPLIANT
+- Removed Twilio signature validation from CLAUDE.md pending tasks (resolved)
+- TypeScript clean, committed and pushed (8 files, 129 insertions)
+
+### Session 1 — TCPA Audit + Critical Fixes (Issues 1-3)
+- TCPA compliance audit completed — all critical issues fixed
 - Created `sms_consent_log` audit table with migration, TypeScript types, RLS policies
 - Built `updateSmsConsent()` shared helper — centralized consent change logging
 - Fixed STOP/START keyword handling in Twilio inbound webhook (added STOPALL, START, YES, UNSTOP)
