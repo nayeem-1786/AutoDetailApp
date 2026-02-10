@@ -470,12 +470,21 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       }
     }
 
+    const previewBookParams = new URLSearchParams();
+    const previewFullName = `${customer.first_name} ${customer.last_name}`.trim();
+    if (previewFullName) previewBookParams.set('name', previewFullName);
+    if (customer.phone) previewBookParams.set('phone', customer.phone);
+    if (customer.email) previewBookParams.set('email', customer.email);
+    if (sampleCode) previewBookParams.set('coupon', sampleCode);
+    const previewBookUrl = `${SITE_URL}/book${previewBookParams.toString() ? '?' + previewBookParams.toString() : ''}`;
+
     const vars: Record<string, string> = {
       first_name: customer.first_name,
       last_name: customer.last_name,
       coupon_code: sampleCode,
       business_name: businessInfo?.name || '',
       booking_url: `${SITE_URL}/book`,
+      book_url: previewBookUrl,
       book_now_url: sampleCode
         ? `${SITE_URL}/book?coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`
         : `${SITE_URL}/book`,

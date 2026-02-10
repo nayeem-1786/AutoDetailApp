@@ -30,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 interface BookPageProps {
-  searchParams: Promise<{ service?: string; rebook?: string; coupon?: string; email?: string }>;
+  searchParams: Promise<{ service?: string; rebook?: string; coupon?: string; email?: string; name?: string; phone?: string }>;
 }
 
 export default async function BookPage({ searchParams }: BookPageProps) {
@@ -83,29 +83,40 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     // Not authenticated — ignore
   }
 
-  // Campaign deep-link: look up customer by email if not logged in
+  // Campaign deep-link: pre-fill customer info from URL params when not logged in
   let campaignCustomerData = null;
-  if (params.email && !customerData) {
-    const adminClient = createAdminClient();
-    const { data: cust } = await adminClient
-      .from('customers')
-      .select('id, first_name, last_name, phone, email')
-      .eq('email', decodeURIComponent(params.email))
-      .single();
-    if (cust) {
-      const { data: vehicles } = await adminClient
-        .from('vehicles')
-        .select('id, vehicle_type, size_class, year, make, model, color')
-        .eq('customer_id', cust.id)
-        .order('created_at', { ascending: false });
+  if (!customerData && (params.email || params.name || params.phone)) {
+    // Try to find existing customer by email for full data + vehicles
+    if (params.email) {
+      const adminClient = createAdminClient();
+      const { data: cust } = await adminClient
+        .from('customers')
+        .select('id, first_name, last_name, phone, email')
+        .eq('email', decodeURIComponent(params.email))
+        .single();
+      if (cust) {
+        const { data: vehicles } = await adminClient
+          .from('vehicles')
+          .select('id, vehicle_type, size_class, year, make, model, color')
+          .eq('customer_id', cust.id)
+          .order('created_at', { ascending: false });
+        campaignCustomerData = {
+          customer: { first_name: cust.first_name, last_name: cust.last_name, phone: cust.phone, email: cust.email },
+          vehicles: vehicles ?? [],
+        };
+      }
+    }
+
+    // Fallback: use URL params directly (customer not found or no email provided)
+    if (!campaignCustomerData) {
+      const nameParts = params.name ? decodeURIComponent(params.name).split(' ') : [];
       campaignCustomerData = {
-        customer: { first_name: cust.first_name, last_name: cust.last_name, phone: cust.phone, email: cust.email },
-        vehicles: vehicles ?? [],
-      };
-    } else {
-      // Customer not in DB — still pre-fill the email field
-      campaignCustomerData = {
-        customer: { first_name: '', last_name: '', phone: null, email: decodeURIComponent(params.email) },
+        customer: {
+          first_name: nameParts[0] || '',
+          last_name: nameParts.slice(1).join(' ') || '',
+          phone: params.phone ? decodeURIComponent(params.phone) : null,
+          email: params.email ? decodeURIComponent(params.email) : null,
+        },
         vehicles: [],
       };
     }

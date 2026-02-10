@@ -517,6 +517,14 @@ async function executePending(
         }
       }
 
+      // Build personalized booking link with customer info pre-filled
+      const bookUrlParams = new URLSearchParams();
+      const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+      if (fullName) bookUrlParams.set('name', fullName);
+      if (customer.phone) bookUrlParams.set('phone', customer.phone);
+      if (couponCode) bookUrlParams.set('coupon', couponCode);
+      const bookUrl = `${appUrl}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
+
       // Render template with snake_case variables matching TEMPLATE_VARIABLES
       let message = renderTemplate(template, {
         first_name: customer.first_name || 'there',
@@ -529,6 +537,7 @@ async function executePending(
         yelp_review_link: shortYelpUrl,
         coupon_code: couponCode,
         booking_url: `${appUrl}/book`,
+        book_url: bookUrl,
         book_now_url: couponCode
           ? `${appUrl}/book?coupon=${couponCode}`
           : `${appUrl}/book`,

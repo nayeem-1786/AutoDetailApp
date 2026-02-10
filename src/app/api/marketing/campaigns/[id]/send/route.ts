@@ -190,12 +190,22 @@ export async function POST(
       if (customer.email) bookNowParams.set('email', customer.email);
       const bookNowUrl = `${SITE_URL}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
 
+      // Build personalized booking link with customer info pre-filled
+      const bookUrlParams = new URLSearchParams();
+      const fullName = `${customer.first_name} ${customer.last_name}`.trim();
+      if (fullName) bookUrlParams.set('name', fullName);
+      if (customer.phone) bookUrlParams.set('phone', customer.phone);
+      if (customer.email) bookUrlParams.set('email', customer.email);
+      if (couponCode) bookUrlParams.set('coupon', couponCode);
+      const bookUrl = `${SITE_URL}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
+
       const templateVars: Record<string, string> = {
         first_name: customer.first_name,
         last_name: customer.last_name,
         coupon_code: couponCode,
         business_name: businessInfo.name,
         booking_url: `${SITE_URL}/book`,
+        book_url: bookUrl,
         book_now_url: bookNowUrl,
       };
 

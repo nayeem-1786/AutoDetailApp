@@ -9,6 +9,7 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
   vehicle_info: 'Vehicle year/make/model',
   business_name: 'Business name',
   booking_url: 'Online booking URL',
+  book_url: 'Personalized booking link (pre-fills customer name, phone & email)',
   book_now_url: 'Booking URL with service, coupon & email pre-filled',
   google_review_link: 'Google review short link',
   yelp_review_link: 'Yelp review short link',
