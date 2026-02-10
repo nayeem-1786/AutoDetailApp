@@ -1,5 +1,5 @@
 // Shared Twilio SMS helper — ALL SMS sends MUST go through this file.
-// TODO: add sms_log table for full audit trail of all SMS sends
+// Delivery tracking via sms_delivery_log table + Twilio status callback webhook.
 
 interface SmsResult {
   success: true;
@@ -16,6 +16,14 @@ export type SendSmsResult = SmsResult | SmsError;
 export interface SendSmsOptions {
   /** Twilio MediaUrl for MMS (e.g., PDF attachment) */
   mediaUrl?: string;
+  /** Customer ID for delivery tracking */
+  customerId?: string;
+  /** Campaign ID for delivery tracking */
+  campaignId?: string;
+  /** Lifecycle execution ID for delivery tracking */
+  lifecycleExecutionId?: string;
+  /** Source label for delivery tracking (defaults to 'transactional') */
+  source?: 'campaign' | 'lifecycle' | 'transactional' | 'manual';
 }
 
 /**
@@ -42,6 +50,12 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
       formData.append('MediaUrl', options.mediaUrl);
     }
 
+    // Register status callback for delivery tracking
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (appUrl) {
+      formData.append('StatusCallback', `${appUrl}/api/webhooks/twilio/status`);
+    }
+
     const res = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
       {
@@ -63,6 +77,26 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
 
     const data = await res.json();
     console.log(`[SMS] type=transactional to=${to} status=sent sid=${data.sid}${options?.mediaUrl ? ' mms=true' : ''}`);
+
+    // Insert initial delivery tracking row
+    try {
+      const { createAdminClient } = await import('@/lib/supabase/admin');
+      const adminClient = createAdminClient();
+      await adminClient.from('sms_delivery_log').insert({
+        message_sid: data.sid,
+        to_phone: to,
+        from_phone: twilioFrom,
+        status: 'queued',
+        customer_id: options?.customerId || null,
+        campaign_id: options?.campaignId || null,
+        lifecycle_execution_id: options?.lifecycleExecutionId || null,
+        source: options?.source || 'transactional',
+      });
+    } catch (logErr) {
+      // Don't fail the SMS send if delivery logging fails
+      console.error('[SMS] Failed to insert delivery log:', logErr);
+    }
+
     return { success: true, sid: data.sid };
   } catch (err) {
     console.error('[SMS] Send error:', err);
@@ -71,11 +105,20 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
   }
 }
 
+export interface MarketingSmsOptions {
+  /** Campaign ID for delivery tracking */
+  campaignId?: string;
+  /** Lifecycle execution ID for delivery tracking */
+  lifecycleExecutionId?: string;
+  /** Source label for delivery tracking (defaults to 'campaign') */
+  source?: 'campaign' | 'lifecycle' | 'transactional' | 'manual';
+}
+
 /**
  * Send a marketing SMS with TCPA opt-out footer.
  * If customerId is provided, verifies sms_consent and frequency cap before sending.
  */
-export async function sendMarketingSms(to: string, body: string, customerId?: string): Promise<SendSmsResult> {
+export async function sendMarketingSms(to: string, body: string, customerId?: string, marketingOptions?: MarketingSmsOptions): Promise<SendSmsResult> {
   // Lazy import to avoid circular deps — admin client is server-only
   const { createAdminClient } = await import('@/lib/supabase/admin');
   const admin = createAdminClient();
@@ -102,7 +145,12 @@ export async function sendMarketingSms(to: string, body: string, customerId?: st
     console.warn('[SMS] sendMarketingSms called without customerId — no consent/frequency check performed');
   }
 
-  const result = await sendSms(to, `${body}\nReply STOP to unsubscribe`);
+  const result = await sendSms(to, `${body}\nReply STOP to unsubscribe`, {
+    customerId: customerId || undefined,
+    campaignId: marketingOptions?.campaignId,
+    lifecycleExecutionId: marketingOptions?.lifecycleExecutionId,
+    source: marketingOptions?.source || 'campaign',
+  });
 
   if (result.success) {
     console.log(`[SMS] type=marketing to=${to} status=sent sid=${result.sid}${customerId ? ` customerId=${customerId}` : ''}`);
