@@ -152,7 +152,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | Admin appointment creation (currently only via booking/POS/voice agent) | Feature | Low |
 | Consolidate duplicate vendor pages (catalog vs inventory) | Cleanup | Low |
 | Configure Twilio webhook URL for production (`/api/webhooks/twilio/inbound`) | Configuration | High |
-| Revert Twilio signature validation bypass in `src/app/api/webhooks/twilio/inbound/route.ts` line 234 (remove `false &&`) before production deploy | Bug Fix | Critical |
 | Add `ANTHROPIC_API_KEY` to production environment variables | Configuration | High |
 | Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
 | Add `CRON_API_KEY` to production environment variables | Configuration | High |
