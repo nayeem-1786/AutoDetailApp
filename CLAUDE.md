@@ -14,6 +14,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | `docs/COUPONS.md` | Coupon engine rules, types, validation logic, lifecycle. Reference when touching coupon/discount code. |
 | `docs/POS_SECURITY.md` | POS IP whitelist, HMAC auth, idle timeout. Reference when touching POS auth or security. |
 | `docs/iPAD.md` | iPad POS optimization features — touch targets, PWA, offline support, gestures. Reference for Phase 12. |
+| `docs/TCPA_AUDIT.md` | TCPA compliance audit report — SMS consent capture, opt-out handling, audit log, all sending paths reviewed. |
 | `docs/CHANGELOG.md` | Archived session history — all bug fixes (44+), feature details, file lists. Reference for "what changed" questions. |
 | `docs/MEMORY.md` | Session memory and context carryover notes. |
 
@@ -86,6 +87,15 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Internal cron scheduler: `node-cron` + `src/instrumentation.ts` runs all scheduled jobs inside the Next.js process — no external schedulers needed. Jobs defined in `src/lib/cron/scheduler.ts`, self-fetch API endpoints with `CRON_API_KEY` auth. Lifecycle engine every 10 min, quote reminders hourly at :30.
 - SMS verified end-to-end: appointment completed → `lifecycle_executions` scheduled → cron fires → review SMS delivered with Google + Yelp links via `sendMarketingSms()`.
 - Automations coupon refactor: replaced inline coupon fields (coupon_type/coupon_value/coupon_expiry_days) with `coupon_id` FK selector pulling from existing coupons. Forms show coupon name + code + discount summary. "Manage coupons →" link to `/admin/marketing/coupons`.
+- TCPA compliance — full audit and critical fixes:
+  - `sms_consent_log` audit table: records every SMS consent change with `customer_id`, `phone`, `action` (opt_in/opt_out), `keyword`, `source`, `previous_value`, `new_value`, `notes`. Indexes on `(customer_id, created_at DESC)` and `(phone, created_at DESC)`.
+  - `updateSmsConsent()` shared helper (`src/lib/utils/sms-consent.ts`): centralized function for all consent changes — updates `customers.sms_consent` + inserts `sms_consent_log` row. Skips if value unchanged.
+  - STOP/START keyword handling fixed: inbound webhook now handles STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT (opt-out) and START, YES, UNSTOP (opt-in). Updates `sms_consent` on customer record + logs via `updateSmsConsent()`.
+  - Quote reminders switched from `sendSms()` to `sendMarketingSms()` with `sms_consent` check before sending.
+  - `sendMarketingSms()` consent safety net: accepts optional `customerId` param, looks up `sms_consent` from DB, blocks if `false`. Defense-in-depth — all callers also pass `customerId`.
+  - Consent logging wired into ALL paths: inbound webhook (STOP/START), unsubscribe page, compliance opt-out, admin customer edit/new, customer portal profile, booking form.
+  - Booking form consent capture: SMS + email opt-in checkboxes (unchecked by default) with TCPA disclosure text using dynamic business name from `/api/public/business-info`. Consent upgrade-only for existing customers (never downgrades via booking).
+  - Source tracking: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`.
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
@@ -99,7 +109,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 ### Phase 5 — What's Remaining
 - Campaign analytics (delivery, opens, redemptions, revenue attribution, ROI) — no analytics dashboard
 - A/B testing for campaigns — nothing built
-- Full TCPA compliance audit (consent capture, opt-out handling, audit log) — consent tracking exists, no audit report
 
 ### Phase 6 — What's Done
 - Stock overview page (/admin/inventory — 315 lines): product list with stock levels, low/out-of-stock filters, manual stock adjustment dialog, vendor column, reorder threshold display
@@ -158,6 +167,8 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Quote communications:** `quote_communications` table tracks all SMS/email sends for quotes (channel, sent_to, status, error_message, message, sent_by). Used by `send-service.ts` (manual sends), inbound webhook (auto-quote), accept route (acceptance SMS), and quote-reminders cron. `sent_by` is nullable — null for AI/system-generated sends. `message` column added for storing SMS body text (used by reminder cron for deduplication).
 - **Lifecycle executions:** `lifecycle_executions` table tracks all automated SMS sends. Unique constraint on `(lifecycle_rule_id, appointment_id, transaction_id)` prevents duplicate scheduling. Indexes: `(status, scheduled_for) WHERE status='pending'` for cron pickup, `(lifecycle_rule_id, customer_id, created_at)` for 30-day dedup. Review URL short links are created once per cron batch and reused.
 - **lifecycle_rules.coupon_id:** nullable FK to `coupons` table with `ON DELETE SET NULL`. Partial index on non-null values. Legacy `coupon_type`/`coupon_value`/`coupon_expiry_days` columns remain but are unused — form uses `coupon_id` exclusively.
+- **sms_consent_log:** Audit table tracking all SMS consent changes. Source CHECK constraint: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`. RLS: authenticated users can read/write (admin pages insert directly via browser client).
+- **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling), `src/lib/utils/sms.ts` (`sendMarketingSms()` with consent check), `docs/TCPA_AUDIT.md` (full audit report).
 
 ---
 
@@ -197,23 +208,30 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **ALL cron/scheduling is internal** via `src/lib/cron/scheduler.ts` + `src/instrumentation.ts` — NEVER suggest n8n, Vercel Cron, or external schedulers.
 - **App operates in PST timezone** (America/Los_Angeles). All time displays, logs, and scheduling logic should use PST, not UTC.
 - **Automations coupon**: uses `coupon_id` FK to existing coupons table. NEVER recreate inline coupon fields — always select from existing coupons via `/admin/marketing/coupons`.
+- **SMS consent helper** (`updateSmsConsent()`): ALWAYS use this for any code path that changes `sms_consent` on a customer. Never update `sms_consent` directly without also logging to `sms_consent_log`. Import from `@/lib/utils/sms-consent`.
+- **sendMarketingSms() consent check**: All callers MUST pass `customerId` param. Function does defense-in-depth DB lookup of `sms_consent` and blocks if `false`. Logs warning if called without `customerId`.
+- **Booking form consent**: SMS + email checkboxes are unchecked by default (affirmative opt-in). For existing customers, consent only upgrades (true → true), never downgrades (true → false) via booking form. New customers get consent set from checkbox values.
 
 ---
 
 ## Last Session: 2026-02-10
 
-- Lifecycle automation engine fully built, tested, and verified (review SMS delivered)
-- Internal cron scheduler wired (node-cron + instrumentation.ts) — no external schedulers
-- Trigger conditions standardized to `service_completed` / `after_transaction`
-- Template variables standardized to snake_case via `renderTemplate()`
-- Automations coupon refactor: inline fields replaced with `coupon_id` FK selector
-- All migrations applied, all docs updated
+- TCPA compliance audit completed — all critical and high-priority issues fixed
+- Created `sms_consent_log` audit table with migration, TypeScript types, RLS policies
+- Built `updateSmsConsent()` shared helper — centralized consent change logging
+- Fixed STOP/START keyword handling in Twilio inbound webhook (added STOPALL, START, YES, UNSTOP)
+- Switched quote reminders from `sendSms()` to `sendMarketingSms()` with consent check
+- Added consent safety net to `sendMarketingSms()` — optional `customerId` for DB lookup
+- Wired consent logging into all 6 paths: inbound SMS, unsubscribe page, compliance opt-out, admin customer pages, customer portal, booking form
+- Added SMS + email consent checkboxes to booking form with TCPA disclosure text (dynamic business name)
+- Added `customer_portal` to `sms_consent_log` source CHECK constraint
+- Fixed customer profile API source from `'system'` to `'customer_portal'`
+- Updated `docs/TCPA_AUDIT.md` with comprehensive audit report
+- All migrations applied, type check clean, committed and pushed (21 files, 687 insertions)
 
 ### Next Session Priorities (Phase 5 Remaining)
-1. TCPA audit — review all SMS sending paths for compliance (consent checks, opt-out, required disclosures)
-2. Campaign analytics — tracking opens, clicks, conversions for marketing campaigns
-3. A/B testing — split testing for SMS/email templates
-4. Quote stats label fix — bug fix for stats display
+1. Campaign analytics — tracking opens, clicks, conversions for marketing campaigns
+2. A/B testing — split testing for SMS/email templates
 
 ---
 

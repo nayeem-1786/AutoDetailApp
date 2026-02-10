@@ -3,6 +3,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 import { createShortLink } from '@/lib/utils/short-link';
+import { sendSms } from '@/lib/utils/sms';
 
 interface QuoteCustomer {
   id: string;
@@ -166,76 +167,50 @@ export async function sendQuote(
     }
   }
 
-  // --- Send via SMS (Twilio MMS) ---
+  // --- Send via SMS/MMS (via shared utility) ---
   if (shouldSms) {
     if (!customer?.phone) {
       errors.push('Customer has no phone number');
     } else if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
       errors.push('SMS with PDF requires a public URL. Set NEXT_PUBLIC_APP_URL to your production domain.');
     } else {
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
-      const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+      try {
+        const smsBody =
+          `Estimate ${quote.quote_number} from ${business.name}\n` +
+          `Total: ${formatCurrency(quote.total_amount)}\n\n` +
+          `View Your Estimate: ${shortLink}`;
 
-      if (!twilioSid || !twilioAuth || !twilioFrom) {
-        errors.push('SMS service (Twilio) not configured');
-      } else {
-        try {
-          const smsBody =
-            `Estimate ${quote.quote_number} from ${business.name}\n` +
-            `Total: ${formatCurrency(quote.total_amount)}\n\n` +
-            `View Your Estimate: ${shortLink}`;
+        // Only attach PDF for production domains (ngrok free tier blocks MMS fetches)
+        const isProductionUrl = !appUrl.includes('ngrok') && !appUrl.includes('localhost');
+        const mediaUrl = isProductionUrl
+          ? `${appUrl}/api/quotes/${quoteId}/pdf?token=${quote.access_token}`
+          : undefined;
 
-          const formData = new URLSearchParams();
-          formData.append('From', twilioFrom);
-          formData.append('To', customer.phone);
-          formData.append('Body', smsBody);
+        const smsResult = await sendSms(customer.phone, smsBody, { mediaUrl });
 
-          // Only attach PDF for production domains (ngrok free tier blocks MMS fetches)
-          const isProductionUrl = !appUrl.includes('ngrok') && !appUrl.includes('localhost');
-          if (isProductionUrl) {
-            const pdfUrl = `${appUrl}/api/quotes/${quoteId}/pdf?token=${quote.access_token}`;
-            formData.append('MediaUrl', pdfUrl);
-          }
-
-          const twRes = await fetch(
-            `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: formData,
-            }
-          );
-
-          if (!twRes.ok) {
-            const errText = await twRes.text();
-            console.error('Twilio error:', errText);
-            errors.push('Failed to send SMS');
-            const { error: commErr } = await supabase.from('quote_communications').insert({
-              quote_id: quoteId,
-              channel: 'sms',
-              sent_to: customer.phone,
-              status: 'failed',
-              error_message: 'Twilio delivery failed',
-            });
-            if (commErr) console.error('Failed to record communication:', commErr.message);
-          } else {
-            sentVia.push('sms');
-            const { error: commErr } = await supabase.from('quote_communications').insert({
-              quote_id: quoteId,
-              channel: 'sms',
-              sent_to: customer.phone,
-              status: 'sent',
-            });
-            if (commErr) console.error('Failed to record communication:', commErr.message);
-          }
-        } catch (smsErr) {
-          console.error('SMS send error:', smsErr);
-          errors.push('Failed to send SMS');
+        if (smsResult.success) {
+          sentVia.push('sms');
+          const { error: commErr } = await supabase.from('quote_communications').insert({
+            quote_id: quoteId,
+            channel: 'sms',
+            sent_to: customer.phone,
+            status: 'sent',
+          });
+          if (commErr) console.error('Failed to record communication:', commErr.message);
+        } else {
+          errors.push(smsResult.error);
+          const { error: commErr } = await supabase.from('quote_communications').insert({
+            quote_id: quoteId,
+            channel: 'sms',
+            sent_to: customer.phone,
+            status: 'failed',
+            error_message: smsResult.error,
+          });
+          if (commErr) console.error('Failed to record communication:', commErr.message);
         }
+      } catch (smsErr) {
+        console.error('SMS send error:', smsErr);
+        errors.push('Failed to send SMS');
       }
     }
   }

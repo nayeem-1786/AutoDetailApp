@@ -211,54 +211,23 @@ Thank you for choosing ${business.name}!`;
       }
     }
 
-    // --- Send via SMS (Twilio) ---
+    // --- Send via SMS (via shared utility) ---
     if (shouldSms) {
       if (!customer.phone) {
         errors.push('Customer has no phone number');
       } else {
-        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-        const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
-        const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+        const smsBody =
+          `${business.name} — Appointment Confirmed\n\n` +
+          `${dateStr}\n` +
+          `${displayTime}\n` +
+          `Total: ${formatCurrency(appointment.total_amount)}\n\n` +
+          `Questions? Call ${business.phone}`;
 
-        if (!twilioSid || !twilioAuth || !twilioFrom) {
-          errors.push('SMS service (Twilio) not configured');
+        const smsResult = await sendSms(customer.phone, smsBody);
+        if (smsResult.success) {
+          sentVia.push('sms');
         } else {
-          try {
-            const smsBody =
-              `${business.name} — Appointment Confirmed\n\n` +
-              `${dateStr}\n` +
-              `${displayTime}\n` +
-              `Total: ${formatCurrency(appointment.total_amount)}\n\n` +
-              `Questions? Call ${business.phone}`;
-
-            const formData = new URLSearchParams();
-            formData.append('From', twilioFrom);
-            formData.append('To', customer.phone);
-            formData.append('Body', smsBody);
-
-            const twRes = await fetch(
-              `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData,
-              }
-            );
-
-            if (!twRes.ok) {
-              const errText = await twRes.text();
-              console.error('Twilio error:', errText);
-              errors.push('Failed to send SMS');
-            } else {
-              sentVia.push('sms');
-            }
-          } catch (smsErr) {
-            console.error('SMS send error:', smsErr);
-            errors.push('Failed to send SMS');
-          }
+          errors.push(smsResult.error);
         }
       }
     }

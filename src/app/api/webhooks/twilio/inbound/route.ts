@@ -283,12 +283,13 @@ export async function POST(request: NextRequest) {
       params[key] = String(value);
     }
 
-    // Validate Twilio signature
+    // Validate Twilio signature (skip in development — ngrok/localhost URLs won't match)
     const twilioSignature = request.headers.get('x-twilio-signature') || '';
     const requestUrl = request.url;
+    const skipSignatureValidation = process.env.NODE_ENV === 'development';
 
-    if (false && !validateTwilioSignature(requestUrl, params, twilioSignature)) {
-      console.error('Invalid Twilio signature');
+    if (!skipSignatureValidation && !validateTwilioSignature(requestUrl, params, twilioSignature)) {
+      console.error('[Twilio] Invalid signature — rejecting webhook request');
       return new Response(TWIML_EMPTY, { status: 403, headers: TWIML_HEADERS });
     }
 
@@ -639,7 +640,7 @@ export async function POST(request: NextRequest) {
                   last_name: lastName,
                   phone: normalizedPhone,
                   sms_consent: true,
-                  email_consent: true,
+                  email_consent: false, // No explicit email opt-in — CAN-SPAM requires affirmative consent
                   customer_type: 'enthusiast',
                 })
                 .select('id')
