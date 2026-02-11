@@ -31,7 +31,7 @@ Stores the coupon identity, targeting, conditions, and constraints.
 | `auto_apply` | BOOLEAN | When true, POS applies automatically when conditions met — no code needed |
 | **Targeting (WHO)** | | |
 | `customer_id` | UUID FK | Lock to one specific customer (NULL = anyone) |
-| `customer_tags` | TEXT[] | Match customers by tags (e.g., `{Detailer,VIP}`) |
+| `customer_tags` | TEXT[] | Match customers by tags (e.g., `{Professional,VIP}`) |
 | `tag_match_mode` | TEXT | `any` (customer has at least one tag) or `all` (customer has every tag) |
 | **Conditions (IF)** | | |
 | `condition_logic` | TEXT | `and` (all conditions must be met) or `or` (any condition suffices) |
@@ -114,10 +114,14 @@ The coupon creation UI is a 6-step wizard at `/admin/marketing/coupons/new`. Pro
 **Eligible Customer Count:**
 An inline counter at the bottom of this step shows how many customers match the current targeting configuration (e.g., "12 eligible customers"). This updates automatically as you change targeting options, helping you gauge whether the audience is too narrow or too broad.
 
-**Note on customer types:** "Detailer" and "Enthusiast" are stored as tags in the customer's `tags[]` array, not as separate flags. The `getCustomerType()` helper extracts them for display purposes (e.g., `CustomerTypeBadge`). These tags appear in the searchable dropdown if any customers already have them assigned.
+**Note on customer types:** Customer types are stored in the `customer_type` column (not tags). Two types exist:
+- **Enthusiast** — Retail customers who get detailing services or walk in to purchase products for personal use.
+- **Professional** — Detailers, auto body repair shops, and auto dealers who buy chemicals (usually in bulk) or send staff to purchase in-store.
+
+The `CustomerTypeBadge` component cycles `null → enthusiast → professional → null` on click. The deprecated term "Detailer" has been replaced with "Professional" throughout.
 
 **Example:**
-> Use "Customer Group" with the "Detailer" tag to offer discounts to all your detailer customers. Use "Specific Customer" for one-off coupons like a birthday discount.
+> Use "Customer Group" with the "Professional" tag to offer discounts to all your professional customers (detailers, body shops, dealers). Use "Specific Customer" for one-off coupons like a birthday discount.
 
 ### Step 3 — Conditions (optional)
 
@@ -231,8 +235,8 @@ The `MultiSearchableSelect` component renders selected items as removable chips/
 | Scenario | Targeting | Conditions | Rewards |
 |----------|-----------|-----------|---------|
 | $25 off for Nayeem | customer_id=Nayeem | None | 1 reward: order, flat, 25 |
-| 10% off for Detailers (auto) | tags=[Detailer], auto_apply | None | 1 reward: order, percentage, 10 |
-| VIP + Detailer 15% off | tags=[VIP,Detailer], match=all | None | 1 reward: order, percentage, 15 |
+| 10% off for Professionals (auto) | tags=[Professional], auto_apply | None | 1 reward: order, percentage, 10 |
+| VIP + Professional 15% off | tags=[VIP,Professional], match=all | None | 1 reward: order, percentage, 15 |
 
 ### Conditional Coupons (IF/THEN)
 
@@ -397,7 +401,7 @@ When a coupon is applied (manually or auto):
 
 **Admin Customer Profile:**
 - `src/app/admin/customers/[id]/page.tsx` — Clickable `CustomerTypeBadge` in page header for editing customer type tags
-- `src/app/pos/components/customer-type-badge.tsx` — Shared badge component (cycles null → enthusiast → detailer → null)
+- `src/app/pos/components/customer-type-badge.tsx` — Shared badge component (cycles null → enthusiast → professional → null)
 
 ---
 

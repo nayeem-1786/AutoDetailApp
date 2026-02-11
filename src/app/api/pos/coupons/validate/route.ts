@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
       const customerType = typeCustomer?.customer_type || null;
 
       if (customerType !== coupon.target_customer_type) {
-        const typeLabel = coupon.target_customer_type === 'enthusiast' ? 'Enthusiast' : 'Detailer';
+        const typeLabel = coupon.target_customer_type === 'enthusiast' ? 'Enthusiast' : 'Professional';
 
         // Check enforcement mode
         const { data: enforcementSetting } = await supabase

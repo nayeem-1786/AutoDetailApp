@@ -585,12 +585,28 @@ export default function NewCouponPage() {
     setLoadingCount(true);
     try {
       if (targeting === 'everyone') {
-        const { count } = await supabase
+        let query = supabase
           .from('customers')
           .select('*', { count: 'exact', head: true });
+        if (targetCustomerType) {
+          query = query.eq('customer_type', targetCustomerType);
+        }
+        const { count } = await query;
         setEligibleCount(count ?? 0);
       } else if (targeting === 'customer') {
-        setEligibleCount(selectedCustomer ? 1 : 0);
+        if (!selectedCustomer) {
+          setEligibleCount(0);
+        } else if (targetCustomerType) {
+          // Check if selected customer matches the type filter
+          const { data: cust } = await supabase
+            .from('customers')
+            .select('customer_type')
+            .eq('id', customerId)
+            .single();
+          setEligibleCount(cust?.customer_type === targetCustomerType ? 1 : 0);
+        } else {
+          setEligibleCount(1);
+        }
       } else if (targeting === 'group') {
         if (customerTags.length === 0) {
           setEligibleCount(0);
@@ -598,9 +614,10 @@ export default function NewCouponPage() {
           // Fetch customers that have tags, then filter in JS for any/all logic
           const { data } = await supabase
             .from('customers')
-            .select('tags');
+            .select('tags, customer_type');
           if (data) {
-            const matched = data.filter((c: { tags: string[] | null }) => {
+            const matched = data.filter((c: { tags: string[] | null; customer_type: string | null }) => {
+              if (targetCustomerType && c.customer_type !== targetCustomerType) return false;
               const ct: string[] = Array.isArray(c.tags) ? c.tags : [];
               if (tagMatchMode === 'all') {
                 return customerTags.every((t) => ct.includes(t));
@@ -622,7 +639,7 @@ export default function NewCouponPage() {
   // Auto-refresh count when targeting config changes
   useEffect(() => {
     refreshEligibleCount();
-  }, [targeting, selectedCustomer, customerTags, tagMatchMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targeting, selectedCustomer, customerTags, tagMatchMode, targetCustomerType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -------------------------------------------------------------------------
   // Tag management (Step 2)
@@ -1004,7 +1021,7 @@ export default function NewCouponPage() {
       desc = 'Everyone';
     }
     if (targetCustomerType) {
-      desc += ` (${targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Detailer'} only)`;
+      desc += ` (${targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Professional'} only)`;
     }
     return desc;
   }
@@ -1283,7 +1300,7 @@ export default function NewCouponPage() {
 
                 <button
                   type="button"
-                  onClick={() => setTargeting('customer')}
+                  onClick={() => { setTargeting('customer'); setTargetCustomerType(''); }}
                   className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
                     targeting === 'customer'
                       ? 'border-gray-900 bg-gray-50 text-gray-900'
@@ -1313,8 +1330,11 @@ export default function NewCouponPage() {
               </div>
 
               {/* Customer Type restriction */}
-              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className={`mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4${targeting === 'customer' ? ' opacity-50 pointer-events-none' : ''}`}>
                 <p className="mb-2 text-sm font-medium text-gray-700">Customer Type</p>
+                {targeting === 'customer' && (
+                  <p className="mb-2 text-xs text-gray-500">(Not applicable for specific customer)</p>
+                )}
                 <div className="flex gap-2">
                   {[
                     { value: '', label: 'Any Type' },
@@ -1337,7 +1357,7 @@ export default function NewCouponPage() {
                 </div>
                 {targetCustomerType && (
                   <p className="mt-1.5 text-xs text-gray-500">
-                    Only customers marked as &ldquo;{targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Detailer'}&rdquo; can use this coupon
+                    Only customers marked as &ldquo;{targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Professional'}&rdquo; can use this coupon
                     (enforcement depends on the Coupon Enforcement setting in Settings).
                   </p>
                 )}

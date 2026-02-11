@@ -98,7 +98,7 @@ export function evaluateCouponTargeting(
     if (!customer) return { passed: false };
 
     if (customer.customer_type !== coupon.target_customer_type) {
-      const typeLabel = coupon.target_customer_type === 'enthusiast' ? 'Enthusiast' : 'Detailer';
+      const typeLabel = coupon.target_customer_type === 'enthusiast' ? 'Enthusiast' : 'Professional';
       if (enforcementMode === 'hard') {
         return { passed: false };
       }
