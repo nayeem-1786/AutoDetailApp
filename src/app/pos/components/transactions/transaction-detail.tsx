@@ -10,6 +10,7 @@ import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format'
 import { posFetch } from '../../lib/pos-fetch';
 import { RefundDialog } from '../refund/refund-dialog';
 import { ReceiptOptions } from '../receipt-options';
+import { QboSyncBadge } from '@/components/qbo-sync-badge';
 import type {
   Transaction,
   TransactionItem,
@@ -54,6 +55,7 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voiding, setVoiding] = useState(false);
+  const [retryingQbo, setRetryingQbo] = useState(false);
 
   const fetchTransaction = useCallback(async () => {
     setLoading(true);
@@ -107,6 +109,28 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
     transaction.status === 'refunded' ||
     transaction.status === 'partial_refund';
 
+  async function handleRetryQbo() {
+    setRetryingQbo(true);
+    try {
+      const res = await posFetch('/api/admin/integrations/qbo/sync/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId }),
+      });
+      const json = await res.json();
+      if (json.succeeded > 0) {
+        toast.success('QBO sync retried successfully');
+      } else {
+        toast.error(json.error || 'QBO sync retry failed');
+      }
+      fetchTransaction();
+    } catch {
+      toast.error('Failed to retry QBO sync');
+    } finally {
+      setRetryingQbo(false);
+    }
+  }
+
   async function handleVoid() {
     setVoiding(true);
     try {
@@ -152,13 +176,26 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
               {formatDateTime(transaction.transaction_date)}
             </p>
           </div>
-          <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-              STATUS_BADGE_CLASSES[transaction.status] ?? 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            {TRANSACTION_STATUS_LABELS[transaction.status] ?? transaction.status}
-          </span>
+          <div className="flex items-center gap-2">
+            <QboSyncBadge
+              status={transaction.qbo_sync_status}
+              qboId={transaction.qbo_id}
+              error={transaction.qbo_sync_error}
+              syncedAt={transaction.qbo_synced_at}
+              onRetry={
+                transaction.qbo_sync_status === 'failed'
+                  ? handleRetryQbo
+                  : undefined
+              }
+            />
+            <span
+              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                STATUS_BADGE_CLASSES[transaction.status] ?? 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {TRANSACTION_STATUS_LABELS[transaction.status] ?? transaction.status}
+            </span>
+          </div>
         </div>
 
         {/* Customer & Employee info */}

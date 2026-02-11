@@ -305,6 +305,10 @@ export interface Transaction {
   transaction_date: string;
   created_at: string;
   updated_at: string;
+  qbo_id: string | null;
+  qbo_sync_status: 'pending' | 'synced' | 'failed' | 'skipped' | null;
+  qbo_sync_error: string | null;
+  qbo_synced_at: string | null;
 }
 
 export interface TransactionItem {

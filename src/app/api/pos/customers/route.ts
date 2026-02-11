@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { normalizePhone } from '@/lib/utils/format';
+import { isQboSyncEnabled, getQboSettings } from '@/lib/qbo/settings';
+import { syncCustomerToQbo } from '@/lib/qbo/sync-customer';
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,6 +67,20 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // QBO Customer Sync — fire and forget
+    isQboSyncEnabled().then(async enabled => {
+      if (enabled) {
+        const settings = await getQboSettings();
+        if (settings.qbo_auto_sync_customers) {
+          syncCustomerToQbo(customer.id).catch(err => {
+            console.error('[QBO] Background customer sync failed:', customer.id, err);
+          });
+        }
+      }
+    }).catch(err => {
+      console.error('[QBO] Failed to check customer sync:', err);
+    });
 
     return NextResponse.json({ data: customer }, { status: 201 });
   } catch (err) {

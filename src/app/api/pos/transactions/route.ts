@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { transactionCreateSchema } from '@/lib/utils/validation';
 import { CC_FEE_RATE, LOYALTY, WATER_SKU } from '@/lib/utils/constants';
+import { isQboSyncEnabled } from '@/lib/qbo/settings';
+import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
 
 export async function POST(request: NextRequest) {
   try {
@@ -298,6 +300,21 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    }
+
+    // QBO Sync — fire and forget, never block POS
+    if (transaction.status === 'completed') {
+      isQboSyncEnabled().then(enabled => {
+        if (enabled) {
+          supabase.from('transactions').update({ qbo_sync_status: 'pending' }).eq('id', transaction.id).then(() => {
+            syncTransactionToQbo(transaction.id).catch(err => {
+              console.error('[QBO] Background sync failed for transaction:', transaction.id, err);
+            });
+          });
+        }
+      }).catch(err => {
+        console.error('[QBO] Failed to check sync status:', err);
+      });
     }
 
     return NextResponse.json({ data: transaction }, { status: 201 });

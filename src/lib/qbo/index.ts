@@ -8,4 +8,7 @@ export {
   clearQboTokens,
 } from './settings';
 export { logSync, getSyncLog, clearSyncLog } from './sync-log';
+export { syncCustomerToQbo, syncCustomerBatch } from './sync-customer';
+export { syncServiceToQbo, syncProductToQbo, syncAllCatalog } from './sync-catalog';
+export { syncTransactionToQbo, syncUnsynced } from './sync-transaction';
 export * from './types';

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf, Plug } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -113,6 +113,18 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Configure Google and Yelp review links and post-service automation.',
         href: '/admin/settings/reviews',
         icon: StarHalf,
+        roles: ['super_admin'],
+      },
+    ],
+  },
+  {
+    label: 'Integrations',
+    items: [
+      {
+        title: 'QuickBooks Online',
+        description: 'Connect to QuickBooks for accounting sync.',
+        href: '/admin/settings/integrations/quickbooks',
+        icon: Plug,
         roles: ['super_admin'],
       },
     ],
