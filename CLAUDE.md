@@ -159,6 +159,10 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Stock Adjustment History (`/admin/inventory/stock-history`): full audit log of all stock changes (manual, PO received, count correction, damage, return). Filterable by product, reason, date range. Color-coded +/- changes, reference links to POs
 - Quick Adjust dialog on Products page logs to `stock_adjustments` with reason selection (was silent direct update)
 - PO create: product search scoped to selected vendor (strict filter — no null vendor leak). Vendor change clears line items with confirmation dialog
+- PO display fix: nested product data reshaped (`products` → `product`) in both detail and list API routes. Was causing `--` display for product names/SKUs.
+- PO receive updates `cost_price` on product (was only updating `quantity_on_hand`)
+- Stock History: reason shows PO number (not UUID), clickable "View PO" reference link column added
+- New PO page: "Create & Submit" (status=ordered) + "Save as Draft" buttons replace single create button
 
 ### Phase 7 — What's Done
 - QBO client library with automatic OAuth token refresh (`src/lib/qbo/client.ts`)
@@ -350,7 +354,16 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 18 — Phase 6 Complete + Post-Session Fixes)
+## Last Session: 2026-02-11 (Session 19 — PO & Stock History Bug Fixes)
+- **BUG 1 (CRITICAL)**: Fixed PO detail API not reshaping nested `products` → `product` on items — caused product names/SKUs showing as `--` on PO detail page
+- **BUG 2**: Fixed same reshape issue in PO list API for consistency
+- **BUG 3**: Fixed PO receive route to update `cost_price` on product (was only updating `quantity_on_hand`)
+- **BUG 4**: Fixed PO receive stock adjustment reason — now shows `Received from PO-XXXX` instead of raw UUID. Added `po_number` to receive query select.
+- **BUG 5**: Added "Reference" column to Stock History page with clickable "View PO" links using `reference_id`/`reference_type`
+- **IMPROVEMENT**: New PO page now has "Save as Draft" + "Create & Submit" buttons. POST API accepts optional `status` param with `ordered_at` timestamp.
+- TypeScript clean, committed
+
+### Session 18 — Phase 6 Complete + Post-Session Fixes
 - Added permission-gated Cost & Margin card to product detail page (`inventory.view_cost_data` permission)
   - Shows cost price, retail price, margin % with color coding (green >40%, amber 20-40%, red <20%)
   - Cost history table from PO receiving with clickable PO links, unit cost, quantities, dates

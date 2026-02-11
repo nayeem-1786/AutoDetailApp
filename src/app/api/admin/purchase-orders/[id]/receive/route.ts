@@ -33,7 +33,7 @@ export async function POST(
     // Fetch PO with items
     const { data: po } = await admin
       .from('purchase_orders')
-      .select('id, status, purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost)')
+      .select('id, status, po_number, purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost)')
       .eq('id', id)
       .single();
 
@@ -100,10 +100,13 @@ export async function POST(
       const quantityBefore = product.quantity_on_hand;
       const quantityAfter = quantityBefore + receiveItem.quantity_received;
 
-      // Update product stock
+      // Update product stock AND cost price
       await admin
         .from('products')
-        .update({ quantity_on_hand: quantityAfter })
+        .update({
+          quantity_on_hand: quantityAfter,
+          cost_price: poItem.unit_cost,
+        })
         .eq('id', poItem.product_id);
 
       // Update PO item received count
@@ -122,7 +125,7 @@ export async function POST(
             quantity_change: receiveItem.quantity_received,
             quantity_before: quantityBefore,
             quantity_after: quantityAfter,
-            reason: `PO ${po.id} received`,
+            reason: `Received from ${po.po_number}`,
             reference_id: po.id,
             reference_type: 'purchase_order',
             created_by: employee.id,

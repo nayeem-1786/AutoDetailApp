@@ -113,9 +113,7 @@ export default function NewPurchaseOrderPage() {
 
   const total = items.reduce((sum, i) => sum + i.quantity_ordered * i.unit_cost, 0);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
+  async function submitForm(status: 'draft' | 'ordered') {
     if (!vendorId) {
       toast.error('Select a vendor');
       return;
@@ -133,6 +131,7 @@ export default function NewPurchaseOrderPage() {
         body: JSON.stringify({
           vendor_id: vendorId,
           notes: notes || null,
+          status,
           items: items.map((i) => ({
             product_id: i.product_id,
             quantity_ordered: i.quantity_ordered,
@@ -144,7 +143,7 @@ export default function NewPurchaseOrderPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
 
-      toast.success('Purchase order created');
+      toast.success(status === 'ordered' ? 'Purchase order created & submitted' : 'Draft saved');
       router.push(`/admin/inventory/purchase-orders/${json.data.id}`);
     } catch (err) {
       console.error('Create PO error:', err);
@@ -175,7 +174,7 @@ export default function NewPurchaseOrderPage() {
         }
       />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Vendor & Notes */}
         <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
           <FormField label="Vendor" required htmlFor="vendor-select">
@@ -325,11 +324,23 @@ export default function NewPurchaseOrderPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={saving || items.length === 0}>
-            {saving ? 'Creating...' : 'Create Purchase Order'}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving || items.length === 0}
+            onClick={() => submitForm('draft')}
+          >
+            Save as Draft
+          </Button>
+          <Button
+            type="button"
+            disabled={saving || items.length === 0}
+            onClick={() => submitForm('ordered')}
+          >
+            {saving ? 'Creating...' : 'Create & Submit'}
           </Button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

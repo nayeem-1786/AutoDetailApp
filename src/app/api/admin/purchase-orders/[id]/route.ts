@@ -44,7 +44,11 @@ export async function GET(
       ...data,
       vendor: data.vendors,
       created_by_employee: data.employees,
-      items: data.purchase_order_items,
+      items: (data.purchase_order_items ?? []).map((item: Record<string, unknown>) => ({
+        ...item,
+        product: item.products,
+        products: undefined,
+      })),
       vendors: undefined,
       employees: undefined,
       purchase_order_items: undefined,

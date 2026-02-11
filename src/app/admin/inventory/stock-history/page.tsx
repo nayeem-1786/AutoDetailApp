@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { StockAdjustment } from '@/lib/supabase/types';
@@ -18,6 +19,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 const PAGE_SIZE = 50;
 
 export default function StockHistoryPage() {
+  const router = useRouter();
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -126,6 +128,26 @@ export default function StockHistoryPage() {
           {row.original.reason || '--'}
         </span>
       ),
+      enableSorting: false,
+    },
+    {
+      id: 'reference',
+      header: 'Reference',
+      size: 100,
+      cell: ({ row }) => {
+        const adj = row.original;
+        if (adj.reference_type === 'purchase_order' && adj.reference_id) {
+          return (
+            <button
+              className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+              onClick={() => router.push(`/admin/inventory/purchase-orders/${adj.reference_id}`)}
+            >
+              View PO
+            </button>
+          );
+        }
+        return <span className="text-gray-400">--</span>;
+      },
       enableSorting: false,
     },
     {
