@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Coupon, Service } from '@/lib/supabase/types';
-import { CAMPAIGN_VARIABLES, renderTemplate } from '@/lib/utils/template';
+import { VARIABLE_GROUPS, CAMPAIGN_GROUPS, renderTemplate } from '@/lib/utils/template';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +80,15 @@ function couponRewardsSummary(coupon: Coupon): string {
     if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
     return `$${r.discount_value} off`;
   }).join(' + ');
+}
+
+function formatPhoneForPreview(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  if (local.length === 10) {
+    return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
+  }
+  return phone;
 }
 
 export function CampaignWizard({ initialData }: CampaignWizardProps) {
@@ -483,15 +492,21 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       last_name: customer.last_name,
       coupon_code: sampleCode,
       business_name: businessInfo?.name || '',
+      business_phone: businessInfo?.phone ? formatPhoneForPreview(businessInfo.phone) : '(310) 756-4789',
+      business_address: businessInfo?.address || '123 Main St, Lomita, CA',
       booking_url: `${SITE_URL}/book`,
       book_url: previewBookUrl,
       book_now_url: sampleCode
         ? `${SITE_URL}/book?coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`
         : `${SITE_URL}/book`,
-      vehicle_info: '2024 Tesla Model 3',
       service_name: '',
       google_review_link: 'https://g.page/r/review',
       yelp_review_link: 'https://yelp.com/review',
+      loyalty_points: '1,250',
+      loyalty_value: '$12.50',
+      visit_count: '8',
+      days_since_last_visit: '45',
+      lifetime_spend: '$1,850',
     };
 
     const variantA = {
@@ -533,17 +548,22 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   }
 
   const variableChips = (setter: (fn: (prev: string) => string) => void, inputId: string) => (
-    <div className="mt-2 flex flex-wrap gap-1">
-      {Object.entries(CAMPAIGN_VARIABLES).map(([key, desc]) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => insertVariable(setter, key, inputId)}
-          className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
-          title={desc}
-        >
-          {`{${key}}`}
-        </button>
+    <div className="mt-2 space-y-1.5">
+      {CAMPAIGN_GROUPS.map((groupName) => (
+        <div key={groupName} className="flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-gray-400">{groupName}</span>
+          {Object.entries(VARIABLE_GROUPS[groupName]).map(([key, desc]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => insertVariable(setter, key, inputId)}
+              className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
+              title={desc}
+            >
+              {`{${key}}`}
+            </button>
+          ))}
+        </div>
       ))}
     </div>
   );

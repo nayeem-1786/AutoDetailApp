@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildAudienceQuery } from '@/lib/utils/audience';
-import { renderTemplate, cleanEmptyReviewLines } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
@@ -143,16 +143,18 @@ export async function POST(
       }
     }
 
-    // Pre-load review URLs from business_settings and shorten once
+    // Pre-load review URLs and loyalty rate from business_settings
     const { data: reviewSettings } = await adminClient
       .from('business_settings')
       .select('key, value')
-      .in('key', ['google_review_url', 'yelp_review_url']);
+      .in('key', ['google_review_url', 'yelp_review_url', 'loyalty_redeem_rate']);
 
     const reviewMap: Record<string, string> = {};
     for (const s of reviewSettings || []) {
       reviewMap[s.key] = typeof s.value === 'string' ? s.value : String(s.value ?? '');
     }
+
+    const loyaltyRedeemRate = parseFloat(reviewMap.loyalty_redeem_rate || '0.01');
 
     let shortGoogleUrl = '';
     let shortYelpUrl = '';
@@ -167,27 +169,14 @@ export async function POST(
       catch { shortYelpUrl = yelpUrl; }
     }
 
-    // Get customer details
+    // Get customer details (includes loyalty/visit fields for template variables)
     const { data: customers } = await adminClient
       .from('customers')
-      .select('id, first_name, last_name, phone, email, sms_consent, email_consent')
+      .select('id, first_name, last_name, phone, email, sms_consent, email_consent, loyalty_points_balance, visit_count, last_visit_date, lifetime_spend')
       .in('id', customerIds.length > 0 ? customerIds : ['__none__']);
 
-    // Pre-load most recent vehicle per customer for {vehicle_info}
-    const { data: vehicles } = await adminClient
-      .from('vehicles')
-      .select('customer_id, year, make, model')
-      .in('customer_id', customerIds.length > 0 ? customerIds : ['__none__'])
-      .order('created_at', { ascending: false });
-
-    const vehicleMap = new Map<string, string>();
-    for (const v of vehicles ?? []) {
-      if (!vehicleMap.has(v.customer_id)) {
-        vehicleMap.set(v.customer_id, [v.year, v.make, v.model].filter(Boolean).join(' '));
-      }
-    }
-
     let deliveredCount = 0;
+    const now = Date.now();
 
     for (const customer of customers ?? []) {
       const couponCode = couponTemplate ? generateCouponCode() : '';
@@ -240,18 +229,34 @@ export async function POST(
       if (couponCode) bookUrlParams.set('coupon', couponCode);
       const bookUrl = `${appUrl}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
 
+      // Calculate days since last visit
+      const loyaltyPts = customer.loyalty_points_balance ?? 0;
+      const visitCt = customer.visit_count ?? 0;
+      const lifetimeAmt = Number(customer.lifetime_spend ?? 0);
+      let daysSinceLastVisit = 'a while';
+      if (customer.last_visit_date) {
+        const diff = Math.floor((now - new Date(customer.last_visit_date).getTime()) / (1000 * 60 * 60 * 24));
+        daysSinceLastVisit = String(diff);
+      }
+
       const templateVars: Record<string, string> = {
         first_name: customer.first_name,
         last_name: customer.last_name,
         coupon_code: couponCode,
         business_name: businessInfo.name,
+        business_phone: formatPhoneDisplay(businessInfo.phone),
+        business_address: businessInfo.address,
         booking_url: `${appUrl}/book`,
         book_url: bookUrl,
         book_now_url: bookNowUrl,
-        vehicle_info: vehicleMap.get(customer.id) || '',
         service_name: targetServiceName,
         google_review_link: shortGoogleUrl,
         yelp_review_link: shortYelpUrl,
+        loyalty_points: formatNumber(loyaltyPts),
+        loyalty_value: formatDollar(loyaltyPts * loyaltyRedeemRate),
+        visit_count: formatNumber(visitCt),
+        days_since_last_visit: daysSinceLastVisit,
+        lifetime_spend: formatDollar(lifetimeAmt),
       };
 
       // Resolve message templates: use variant overrides for A/B tests

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { lifecycleRuleSchema, type LifecycleRuleInput } from '@/lib/utils/validation';
 import type { Service } from '@/lib/supabase/types';
-import { TEMPLATE_VARIABLES } from '@/lib/utils/template';
+import { VARIABLE_GROUPS, ALL_GROUPS } from '@/lib/utils/template';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -133,17 +133,22 @@ export default function NewAutomationPage() {
   }
 
   const variableChips = (field: 'sms_template' | 'email_template') => (
-    <div className="mt-2 flex flex-wrap gap-1">
-      {Object.entries(TEMPLATE_VARIABLES).map(([key, desc]) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => insertVariable(field, key)}
-          className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
-          title={desc}
-        >
-          {`{${key}}`}
-        </button>
+    <div className="mt-2 space-y-1.5">
+      {ALL_GROUPS.map((groupName) => (
+        <div key={groupName} className="flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-gray-400">{groupName}</span>
+          {Object.entries(VARIABLE_GROUPS[groupName]).map(([key, desc]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => insertVariable(field, key)}
+              className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
+              title={desc}
+            >
+              {`{${key}}`}
+            </button>
+          ))}
+        </div>
       ))}
     </div>
   );

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
-import { renderTemplate, cleanEmptyReviewLines } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
+import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
@@ -347,11 +348,12 @@ async function executePending(
 
   const reviewFlagEnabled = reviewFlag?.enabled ?? false;
 
-  // Pre-load business name + review URLs from business_settings
+  // Pre-load business info + review URLs from business_settings
+  const businessInfo = await getBusinessInfo();
   const { data: bizSettings } = await admin
     .from('business_settings')
     .select('key, value')
-    .in('key', ['google_review_url', 'yelp_review_url', 'business_name']);
+    .in('key', ['google_review_url', 'yelp_review_url', 'business_name', 'loyalty_redeem_rate']);
 
   const settingsMap: Record<string, string> = {};
   for (const s of bizSettings || []) {
@@ -361,6 +363,7 @@ async function executePending(
   }
 
   const businessName = settingsMap.business_name || 'Smart Detail Auto Spa & Supplies';
+  const loyaltyRedeemRate = parseFloat(settingsMap.loyalty_redeem_rate || '0.01');
 
   // Shorten review URLs once (reuse across all executions)
   const googleUrl = settingsMap.google_review_url || '';
@@ -398,10 +401,10 @@ async function executePending(
         continue;
       }
 
-      // Load customer
+      // Load customer (includes loyalty/visit fields for template variables)
       const { data: customer } = await admin
         .from('customers')
-        .select('first_name, last_name, phone, email, sms_consent')
+        .select('first_name, last_name, phone, email, sms_consent, loyalty_points_balance, visit_count, last_visit_date, lifetime_spend')
         .eq('id', exec.customer_id)
         .single();
 
@@ -411,15 +414,18 @@ async function executePending(
         continue;
       }
 
-      // Resolve context: vehicle + service/item names
+      // Resolve context: vehicle + service/item names + appointment date/time + amount
       let vehicleDescription = '';
       let serviceName = '';
       let serviceSlug = '';
+      let appointmentDate = '';
+      let appointmentTime = '';
+      let amountPaid = '';
 
       if (exec.appointment_id) {
         const { data: apt } = await admin
           .from('appointments')
-          .select('vehicle_id')
+          .select('vehicle_id, scheduled_date, scheduled_start_time, payment_amount')
           .eq('id', exec.appointment_id)
           .single();
 
@@ -432,6 +438,31 @@ async function executePending(
           if (vehicle) {
             vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
           }
+        }
+
+        // Format appointment date/time in PST
+        if (apt?.scheduled_date) {
+          try {
+            const d = new Date(apt.scheduled_date + 'T00:00:00');
+            appointmentDate = d.toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              timeZone: 'America/Los_Angeles',
+            });
+          } catch { /* keep empty */ }
+        }
+        if (apt?.scheduled_start_time) {
+          try {
+            // scheduled_start_time is a time string like "14:30"
+            const [h, m] = apt.scheduled_start_time.split(':').map(Number);
+            const period = h >= 12 ? 'PM' : 'AM';
+            const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+            appointmentTime = `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+          } catch { /* keep empty */ }
+        }
+        if (apt?.payment_amount) {
+          amountPaid = formatDollar(Number(apt.payment_amount));
         }
 
         const { data: aptServices } = await admin
@@ -447,7 +478,7 @@ async function executePending(
       } else if (exec.transaction_id) {
         const { data: tx } = await admin
           .from('transactions')
-          .select('vehicle_id')
+          .select('vehicle_id, total_amount')
           .eq('id', exec.transaction_id)
           .single();
 
@@ -460,6 +491,10 @@ async function executePending(
           if (vehicle) {
             vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
           }
+        }
+
+        if (tx?.total_amount) {
+          amountPaid = formatDollar(Number(tx.total_amount));
         }
 
         const { data: txItems } = await admin
@@ -532,6 +567,16 @@ async function executePending(
       if (customer.email) bookNowParams.set('email', customer.email);
       const bookNowUrl = `${appUrl}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
 
+      // Calculate customer-specific template variables
+      const loyaltyPts = customer.loyalty_points_balance ?? 0;
+      const visitCt = customer.visit_count ?? 0;
+      const lifetimeAmt = Number(customer.lifetime_spend ?? 0);
+      let daysSinceLastVisit = 'a while';
+      if (customer.last_visit_date) {
+        const diff = Math.floor((Date.now() - new Date(customer.last_visit_date).getTime()) / (1000 * 60 * 60 * 24));
+        daysSinceLastVisit = String(diff);
+      }
+
       // Render template with snake_case variables matching TEMPLATE_VARIABLES
       let message = renderTemplate(template, {
         first_name: customer.first_name || 'there',
@@ -539,12 +584,22 @@ async function executePending(
         service_name: serviceName || 'your service',
         vehicle_info: vehicleDescription,
         business_name: businessName,
+        business_phone: formatPhoneDisplay(businessInfo.phone),
+        business_address: businessInfo.address,
         google_review_link: shortGoogleUrl,
         yelp_review_link: shortYelpUrl,
         coupon_code: couponCode,
         booking_url: `${appUrl}/book`,
         book_url: bookUrl,
         book_now_url: bookNowUrl,
+        loyalty_points: formatNumber(loyaltyPts),
+        loyalty_value: formatDollar(loyaltyPts * loyaltyRedeemRate),
+        visit_count: formatNumber(visitCt),
+        days_since_last_visit: daysSinceLastVisit,
+        lifetime_spend: formatDollar(lifetimeAmt),
+        appointment_date: appointmentDate,
+        appointment_time: appointmentTime,
+        amount_paid: amountPaid,
       });
 
       // Clean up lines with empty review links (e.g., if URL not configured)
