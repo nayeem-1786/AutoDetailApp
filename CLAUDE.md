@@ -33,7 +33,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **6** | Inventory Management | Done |
 | **7** | QuickBooks Integration & Reporting | Not started |
 | **8** | Photo Documentation | Not started |
-| **9** | Online Store (WooCommerce Sync) | Not started |
+| **9** | Native Online Store | Not started |
 | **10** | Recurring Services (Dormant) | Not started |
 | **11** | Intelligence & Growth | Not started |
 | **12** | iPad POS Optimization | Not started |
@@ -115,7 +115,6 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Lifecycle engine coupon injection — same pattern, generates per-customer coupon for rules with `coupon_id`
 - Lifecycle engine URL tracking — passes `lifecycleExecutionId` to `sendMarketingSms()` so `wrapUrlsInMessage()` creates tracked short links
 - Personalized booking links — `{book_url}` placeholder generates `/book?name=...&phone=...&email=...&coupon=...` per customer, auto-shortened by click tracker
-- TCPA compliance — all 9 audit items resolved (consent log, STOP/START handling, frequency caps, signature validation, landline detection)
 - Campaign detail analytics drill-down (`/admin/marketing/campaigns/[id]/analytics`) — summary KPIs, delivery funnel, recipient table (filterable/paginated), A/B variant comparison, click details with link performance, engagement timeline chart
 - Campaign duplicate action — copy icon on campaign list, creates draft copy with "(Copy)" suffix, copies A/B variants. Endpoint: `POST /api/marketing/campaigns/[id]/duplicate`
 - Campaign list column width balanced (Name column expanded to 35%)
@@ -126,6 +125,9 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - `{offer_url}` smart routing — renamed from `{book_now_url}`. Service-targeted coupon → `/book`, product-targeted coupon → `/products/<cat>/<prod>`. Email CTA button adapts ("Book Now" vs "Shop Now"). `{book_now_url}` kept as backward-compat alias.
 - Expanded template variable system: 21 total variables organized into 6 `VARIABLE_GROUPS` (Customer Info, Business, Links, Loyalty & History, Coupons, Event Context). New vars: `{business_phone}`, `{business_address}`, `{loyalty_points}`, `{loyalty_value}`, `{visit_count}`, `{days_since_last_visit}`, `{lifetime_spend}`, `{appointment_date}`, `{appointment_time}`, `{amount_paid}`. Helper formatters: `formatPhoneDisplay()`, `formatDollar()`, `formatNumber()`.
 - Data audit saved to `docs/AUDIT_VARIABLE_DATA.md` — 1,316 customers, 97% vehicles incomplete, 393 with loyalty points, email only 6.4% coverage.
+- Coupon auto-apply toggle styling fixed — both status and auto-apply toggles on coupon detail page now use system-wide Switch pattern (`bg-green-500` active, `bg-gray-200` inactive). Previously auto-apply used `bg-blue-500`/`bg-gray-300`.
+- Coupon category validation fixed — `categoryId` added to `TicketItem` interface, populated from `product.category_id`/`service.category_id` in both ticket-reducer and quote-reducer, passed to all 5 cart item mapping locations (coupon-input, quote-coupon-input, ticket-context, promotions-tab ×2). POS validation endpoints already checked `category_id` but cart items never sent it.
+- Powered by Stripe SVG logo on booking payment step (`step-payment.tsx`) — `h-9 w-auto opacity-20`
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
@@ -148,6 +150,9 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Cost/COGS tracking (margin reporting, COGS-per-transaction)
 - Low stock proactive notifications/dashboard alerts (currently filter-only on stock page)
 - Consolidate duplicate vendor pages (inventory version is more complete)
+
+### Phase 9 — Native Online Store (NOT WooCommerce)
+Build full e-commerce within the existing Next.js app. Product catalog pages already exist at `/products` with SEO, categories, and product detail pages. Needs: cart (React context), cart drawer/page, Stripe checkout flow, order management (`orders` table, status tracking), order confirmation + email, shipping/pickup selection, order history in customer dashboard, admin order management page. No WordPress/WooCommerce — everything stays in this app. Stripe is already integrated from booking payments.
 
 ---
 
@@ -263,6 +268,8 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **`{vehicle_description}` removed**: Consolidated into `{vehicle_info}` everywhere. No code references `vehicle_description` anymore.
 - **Campaign duplicate endpoint**: `POST /api/marketing/campaigns/[id]/duplicate` — creates draft copy with "(Copy)" suffix, copies A/B variants.
 - **Campaign detail analytics paths**: `/admin/marketing/campaigns/[id]/analytics` — drill-down with summary KPIs, funnel, variant comparison, recipient table, click details, engagement timeline. API: `GET /api/admin/marketing/analytics/campaigns/[id]`
+- **Coupon category validation**: `TicketItem.categoryId` holds `product.category_id` or `service.category_id`. Both ticket-reducer and quote-reducer populate this on `ADD_PRODUCT`/`ADD_SERVICE`. All cart item mappings pass `category_id` to validate/promotions endpoints. The validation logic in `coupon-helpers.ts` and `pos/coupons/validate` already matches on `item.category_id` — this field was just never sent before.
+- **Phase 9 is Native Online Store** — NO WordPress/WooCommerce. Build cart, checkout, orders within this Next.js app. Product catalog pages already exist at `/products`.
 
 ---
 
@@ -296,6 +303,12 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 ---
 
 ## Last Session: 2026-02-10
+
+### Session 8 — Coupon Toggle Styling + Category Validation Fix
+- **FIX 1 ({offer_url})**: Verified already complete from Session 7 — no code changes needed.
+- **FIX 2 (coupon toggle styling)**: Fixed 2 inline toggles on `coupons/[id]/page.tsx` — status toggle `bg-gray-300` → `bg-gray-200`, auto-apply toggle `bg-blue-500` → `bg-green-500` and `bg-gray-300` → `bg-gray-200`. Now matches system-wide `Switch` component pattern.
+- **FIX 3 (coupon category validation)**: Root cause — POS cart items never included `category_id`, so category-targeted coupons couldn't match. Fix: added `categoryId: string | null` to `TicketItem` interface, populated from `product.category_id`/`service.category_id` in both `ticket-reducer.ts` and `quote-reducer.ts` (`ADD_PRODUCT`, `ADD_SERVICE`, `ADD_CUSTOM_ITEM`), added `category_id` mapping in all 5 cart item serialization locations (`coupon-input.tsx`, `quote-coupon-input.tsx`, `ticket-context.tsx`, `promotions-tab.tsx` ×2).
+- 8 files changed, TypeScript clean, committed and pushed.
 
 ### Session 7 — {offer_url} Smart Routing
 - **Renamed `{book_now_url}` → `{offer_url}`** with smart routing: service-targeted coupon → `/book?service=slug&coupon=code&email=...`, product-targeted coupon → `/products/<categorySlug>/<productSlug>?coupon=code`, no coupon → `/book`.
