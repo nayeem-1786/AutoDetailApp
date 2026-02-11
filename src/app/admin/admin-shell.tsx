@@ -441,6 +441,12 @@ function AdminContent({ children }: { children: React.ReactNode }) {
             {item.children!.map((child) => {
               const ChildIcon = iconMap[child.icon] || LayoutDashboard;
               const childActive = pathname === child.href;
+              const badgeNumber: Record<string, number> = {
+                '/admin/marketing/coupons': 1,
+                '/admin/marketing/automations': 2,
+                '/admin/marketing/campaigns': 3,
+              };
+              const badge = badgeNumber[child.href];
               return (
                 <li key={child.href}>
                   <button
@@ -456,6 +462,11 @@ function AdminContent({ children }: { children: React.ReactNode }) {
                     )}
                   >
                     <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+                    {badge && (
+                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-900 text-white text-[10px] font-medium dark:bg-white dark:text-gray-900">
+                        {badge}
+                      </span>
+                    )}
                     {child.label}
                   </button>
                 </li>

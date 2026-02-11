@@ -88,21 +88,9 @@ export const SIDEBAR_NAV: NavItem[] = [
     roles: ['super_admin', 'admin'],
     children: [
       {
-        label: 'Analytics',
-        href: '/admin/marketing/analytics',
-        icon: 'BarChart3',
-        roles: ['super_admin', 'admin'],
-      },
-      {
         label: 'Coupons',
         href: '/admin/marketing/coupons',
         icon: 'Ticket',
-        roles: ['super_admin', 'admin'],
-      },
-      {
-        label: 'Campaigns',
-        href: '/admin/marketing/campaigns',
-        icon: 'Send',
         roles: ['super_admin', 'admin'],
       },
       {
@@ -112,9 +100,21 @@ export const SIDEBAR_NAV: NavItem[] = [
         roles: ['super_admin', 'admin'],
       },
       {
+        label: 'Campaigns',
+        href: '/admin/marketing/campaigns',
+        icon: 'Send',
+        roles: ['super_admin', 'admin'],
+      },
+      {
         label: 'Compliance',
         href: '/admin/marketing/compliance',
         icon: 'ShieldCheck',
+        roles: ['super_admin', 'admin'],
+      },
+      {
+        label: 'Analytics',
+        href: '/admin/marketing/analytics',
+        icon: 'BarChart3',
         roles: ['super_admin', 'admin'],
       },
     ],

@@ -65,8 +65,8 @@ export default function MarketingIndexPage() {
 
   const quickLinks = [
     { label: 'Coupons', description: 'Create and manage discount codes', href: '/admin/marketing/coupons', icon: Ticket },
-    { label: 'Campaigns', description: 'Send SMS and email campaigns', href: '/admin/marketing/campaigns', icon: Send },
     { label: 'Automations', description: 'Lifecycle marketing rules', href: '/admin/marketing/automations', icon: Zap },
+    { label: 'Campaigns', description: 'Send SMS and email campaigns', href: '/admin/marketing/campaigns', icon: Send },
     { label: 'Compliance', description: 'Consent audit log', href: '/admin/marketing/compliance', icon: ShieldCheck },
   ];
 
