@@ -111,10 +111,12 @@ export function useFeatureFlags(): {
   loading: boolean;
   refresh: () => Promise<void>;
 } {
+  // Only use cache for initial state if it has full FeatureFlag objects (not localStorage stubs)
+  const cacheHasFullData = Object.keys(flagCache).length > 0 && Object.values(flagCache).every((f) => f.name !== undefined);
   const [flags, setFlags] = useState<Record<string, FeatureFlag>>(
-    Object.keys(flagCache).length > 0 ? { ...flagCache } : {}
+    cacheHasFullData ? { ...flagCache } : {}
   );
-  const [loading, setLoading] = useState(Object.keys(flagCache).length === 0);
+  const [loading, setLoading] = useState(!cacheHasFullData);
 
   const refresh = useCallback(async () => {
     lastFetched = 0;

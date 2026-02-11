@@ -67,7 +67,7 @@ export default function FeatureTogglesPage() {
 
   // Sort flags within each category by name
   for (const cat of Object.keys(grouped)) {
-    grouped[cat].sort((a, b) => a.name.localeCompare(b.name));
+    grouped[cat].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
   }
 
   // Order categories
