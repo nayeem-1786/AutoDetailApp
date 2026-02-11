@@ -139,7 +139,7 @@ Full list: 1-Year/3-Year/5-Year Ceramic Shield, 3-Stage Paint Correction, Aircra
 - `{booking_url}` — 1 campaign
 - `{google_review_link}` — 2 campaigns (the "Copy" campaign)
 - `{yelp_review_link}` — 2 campaigns
-- `{book_now_url}` — 1 campaign
+- `{offer_url}` (was `{book_now_url}`) — 1 campaign
 
 **Lifecycle rule templates use these variables:**
 - `{first_name}` — all 3 rules
@@ -149,7 +149,9 @@ Full list: 1-Year/3-Year/5-Year Ceramic Shield, 3-Stage Paint Correction, Aircra
 - `{google_review_link}` — all 3 rules
 - `{yelp_review_link}` — all 3 rules
 - `{coupon_code}` — 1 rule
-- `{book_now_url}` — 1 rule
+- `{offer_url}` (was `{book_now_url}`) — 1 rule
+
+> **Note:** `{book_now_url}` still works as a backward-compat alias in all send routes. Existing saved templates using the old name will continue to function.
 
 **Notable: The 3rd lifecycle rule** ("Post-Service Thank You") uses review links WITHOUT the `⭐ Google:` / `⭐ Yelp:` format — uses inline format `please leave us a review: {google_review_link} or {yelp_review_link}`. The `cleanEmptyReviewLines()` regex won't catch this pattern if links are empty (it only matches lines starting with `⭐`). The link would just be blank in the output: "please leave us a review:  or ".
 
