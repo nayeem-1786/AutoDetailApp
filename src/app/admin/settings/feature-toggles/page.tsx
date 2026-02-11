@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useFeatureFlags, invalidateFeatureFlagCache } from '@/lib/hooks/use-feature-flag';
+import { useFeatureFlagContext } from '@/lib/hooks/feature-flag-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -24,6 +25,7 @@ const CATEGORY_ORDER = [
 
 export default function FeatureTogglesPage() {
   const { flags, loading, refresh } = useFeatureFlags();
+  const flagContext = useFeatureFlagContext();
   const [updating, setUpdating] = useState<string | null>(null);
 
   async function handleToggle(flag: FeatureFlag) {
@@ -47,6 +49,8 @@ export default function FeatureTogglesPage() {
 
     invalidateFeatureFlagCache();
     await refresh();
+    // Update the provider context so sidebar reacts immediately
+    await flagContext?.refreshFlags();
 
     toast.success(`"${flag.name}" ${newEnabled ? 'enabled' : 'disabled'}`);
     setUpdating(null);

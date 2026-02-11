@@ -44,6 +44,7 @@ import type { LucideIcon } from 'lucide-react';
 import { ROLE_LABELS, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
+import { FeatureFlagProvider } from '@/lib/hooks/feature-flag-provider';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -246,7 +247,7 @@ function CommandPalette({
 function AdminContent({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, signOut } = useAuth();
   const { info: businessInfo } = useBusinessInfo();
-  const { enabled: twoWaySmsEnabled, loading: flagsLoading } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
+  const { enabled: twoWaySmsEnabled } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
   const { enabled: inventoryEnabled } = useFeatureFlag(FEATURE_FLAGS.INVENTORY_MANAGEMENT);
   const router = useRouter();
   const pathname = usePathname();
@@ -396,9 +397,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   if (!employee || !role) return null;
 
   // Filter out nav items when their feature flag is disabled
-  // Show all items while flags are loading to prevent flash of missing content
   const navItems = getNavForRole(role).filter((item) => {
-    if (flagsLoading) return true;
     if (item.href === '/admin/messaging') return twoWaySmsEnabled;
     if (item.href === '/admin/inventory') return inventoryEnabled;
     return true;
@@ -700,7 +699,9 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <AdminContent>{children}</AdminContent>
+      <FeatureFlagProvider>
+        <AdminContent>{children}</AdminContent>
+      </FeatureFlagProvider>
     </AuthProvider>
   );
 }
