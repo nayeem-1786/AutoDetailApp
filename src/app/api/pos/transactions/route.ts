@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { transactionCreateSchema } from '@/lib/utils/validation';
-import { CC_FEE_RATE, LOYALTY, WATER_SKU } from '@/lib/utils/constants';
+import { CC_FEE_RATE, LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
 
@@ -193,7 +194,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Loyalty points earn (if customer, and items qualify)
-    if (data.customer_id) {
+    const loyaltyEnabled = await isFeatureEnabled(FEATURE_FLAGS.LOYALTY_REWARDS);
+    if (data.customer_id && loyaltyEnabled) {
       // Get current loyalty balance
       const { data: custForLoyalty } = await supabase
         .from('customers')

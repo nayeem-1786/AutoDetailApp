@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bookingSubmitSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
-import { APPOINTMENT } from '@/lib/utils/constants';
+import { APPOINTMENT, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
@@ -245,6 +246,15 @@ export async function POST(request: NextRequest) {
 
     // 6. Calculate totals
     const addonTotal = data.addons.reduce((sum, a) => sum + a.price, 0);
+
+    // Reject mobile bookings when mobile_service flag is off
+    if (data.is_mobile && !await isFeatureEnabled(FEATURE_FLAGS.MOBILE_SERVICE)) {
+      return NextResponse.json(
+        { error: 'Mobile service is not currently available' },
+        { status: 400 }
+      );
+    }
+
     const mobileSurcharge = data.is_mobile ? (data.mobile_surcharge || 0) : 0;
     const subtotal = data.price + addonTotal + mobileSurcharge;
     const scheduledEndTime = addMinutesToTime(

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 
 export async function GET(request: NextRequest) {
   try {
+    if (!await isFeatureEnabled(FEATURE_FLAGS.LOYALTY_REWARDS)) {
+      return NextResponse.json({ balance: 0, entries: [], total: 0 });
+    }
+
     const supabase = await createClient();
     const {
       data: { user },

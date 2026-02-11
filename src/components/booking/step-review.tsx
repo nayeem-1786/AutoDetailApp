@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils/format';
-import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
 
 interface AvailableCoupon {
@@ -101,6 +102,7 @@ export function StepReview({
   const [couponInput, setCouponInput] = useState(couponCode ?? '');
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
+  const { enabled: cancellationFeeEnabled } = useFeatureFlag(FEATURE_FLAGS.CANCELLATION_FEE);
 
   // Loyalty points constants
   const REDEEM_RATE = 0.05; // $0.05 per point
@@ -647,7 +649,9 @@ export function StepReview({
                 <div>
                   <p className="text-xs font-medium text-amber-800">Cancellation & No-Show Policy</p>
                   <p className="text-xs text-amber-700 mt-0.5">
-                    Cancellations must be made at least 24 hours before your appointment. Late cancellations or no-shows will be charged a <span className="font-semibold">$50 fee</span>.
+                    {cancellationFeeEnabled
+                      ? <>Cancellations must be made at least 24 hours before your appointment. Late cancellations or no-shows will be charged a <span className="font-semibold">$50 fee</span>.</>
+                      : 'Cancellations must be made at least 24 hours before your appointment.'}
                   </p>
                 </div>
               </div>

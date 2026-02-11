@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
-import { LOYALTY } from '@/lib/utils/constants';
+import { LOYALTY, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { formatPoints, formatCurrency, formatDate } from '@/lib/utils/format';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,7 @@ const ACTION_LABELS: Record<string, string> = {
 
 export default function AccountLoyaltyPage() {
   const { customer } = useCustomerAuth();
+  const { enabled: loyaltyEnabled, loading: flagLoading } = useFeatureFlag(FEATURE_FLAGS.LOYALTY_REWARDS);
   const [balance, setBalance] = useState(0);
   const [entries, setEntries] = useState<LoyaltyEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,25 @@ export default function AccountLoyaltyPage() {
   }, [customer, loadLoyalty]);
 
   if (!customer) return null;
+
+  if (flagLoading) {
+    return (
+      <div className="mt-8 flex justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!loyaltyEnabled) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Loyalty Rewards</h1>
+        <p className="mt-4 text-sm text-gray-500">
+          The loyalty rewards program is not currently available.
+        </p>
+      </div>
+    );
+  }
 
   const pointValue = balance * LOYALTY.REDEEM_RATE;
   const canRedeem = balance >= LOYALTY.REDEEM_MINIMUM;

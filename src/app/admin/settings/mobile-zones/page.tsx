@@ -32,9 +32,11 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Pencil, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils/format';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 
 export default function MobileZonesPage() {
   const [zones, setZones] = useState<MobileZone[]>([]);
@@ -43,6 +45,7 @@ export default function MobileZonesPage() {
   const [editingZone, setEditingZone] = useState<MobileZone | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MobileZone | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { enabled: mobileEnabled } = useFeatureFlag(FEATURE_FLAGS.MOBILE_SERVICE);
 
   const loadZones = useCallback(async () => {
     const supabase = createClient();
@@ -152,6 +155,19 @@ export default function MobileZonesPage() {
           </Button>
         }
       />
+
+      {!mobileEnabled && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600 mt-0.5" />
+          <p className="text-sm text-amber-800">
+            Mobile service is currently disabled. Enable it in{' '}
+            <a href="/admin/settings/feature-toggles" className="font-medium underline">
+              Feature Toggles
+            </a>{' '}
+            to offer on-location services to customers.
+          </p>
+        </div>
+      )}
 
       {zones.length === 0 ? (
         <Card>

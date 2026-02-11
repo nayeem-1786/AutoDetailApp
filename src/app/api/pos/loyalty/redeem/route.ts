@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
-import { LOYALTY } from '@/lib/utils/constants';
+import { LOYALTY, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +10,14 @@ export async function POST(request: NextRequest) {
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    if (!await isFeatureEnabled(FEATURE_FLAGS.LOYALTY_REWARDS)) {
+      return NextResponse.json(
+        { error: 'Loyalty rewards are currently disabled' },
+        { status: 403 }
+      );
+    }
+
     const supabase = createAdminClient();
 
     const body = await request.json();

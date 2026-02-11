@@ -48,12 +48,16 @@ export async function POST(
       );
     }
 
+    // Only persist fee if cancellation_fee flag is enabled
+    const feeEnabled = await isFeatureEnabled(FEATURE_FLAGS.CANCELLATION_FEE);
+    const fee = feeEnabled ? (data.cancellation_fee ?? null) : null;
+
     const { data: updated, error: updateErr } = await supabase
       .from('appointments')
       .update({
         status: 'cancelled',
         cancellation_reason: data.cancellation_reason,
-        cancellation_fee: data.cancellation_fee ?? null,
+        cancellation_fee: fee,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -75,7 +79,7 @@ export async function POST(
       appointment: {
         id,
         cancellation_reason: data.cancellation_reason,
-        cancellation_fee: data.cancellation_fee ?? null,
+        cancellation_fee: fee,
       },
     }, supabase).catch(err => console.error('Webhook fire failed:', err));
 

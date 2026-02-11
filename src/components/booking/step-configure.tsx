@@ -135,8 +135,8 @@ export function StepConfigure({
           onSetQty={setPerUnitQty}
         />
 
-        {/* Mobile toggle */}
-        {service.mobile_eligible && (
+        {/* Mobile toggle — hidden when no zones available (mobile_service flag off) */}
+        {service.mobile_eligible && mobileZones.length > 0 && (
           <div className="rounded-lg border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

@@ -1,5 +1,7 @@
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createAnonClient } from '@/lib/supabase/anon';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import type {
   Service,
   ServiceCategory,
@@ -174,6 +176,11 @@ export async function getBookableServiceBySlug(
 // ---------------------------------------------------------------------------
 
 export async function getMobileZones(): Promise<MobileZone[]> {
+  // If mobile service is disabled, return empty list — hides mobile option in booking
+  if (!await isFeatureEnabled(FEATURE_FLAGS.MOBILE_SERVICE)) {
+    return [];
+  }
+
   const supabase = await getClient();
 
   const { data, error } = await supabase

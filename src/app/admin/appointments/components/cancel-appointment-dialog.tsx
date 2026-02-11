@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { appointmentCancelSchema, type AppointmentCancelInput } from '@/lib/utils/validation';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import type { AppointmentWithRelations } from '../types';
 
 interface CancelAppointmentDialogProps {
@@ -32,6 +34,7 @@ export function CancelAppointmentDialog({
   onConfirm,
 }: CancelAppointmentDialogProps) {
   const [saving, setSaving] = useState(false);
+  const { enabled: feeEnabled } = useFeatureFlag(FEATURE_FLAGS.CANCELLATION_FEE);
 
   const {
     register,
@@ -91,21 +94,23 @@ export function CancelAppointmentDialog({
             />
           </FormField>
 
-          <FormField
-            label="Cancellation Fee"
-            error={errors.cancellation_fee?.message}
-            description="Optional fee to charge for late cancellation"
-            htmlFor="cancel-fee"
-          >
-            <Input
-              id="cancel-fee"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              {...register('cancellation_fee', { valueAsNumber: true })}
-            />
-          </FormField>
+          {feeEnabled && (
+            <FormField
+              label="Cancellation Fee"
+              error={errors.cancellation_fee?.message}
+              description="Optional fee to charge for late cancellation"
+              htmlFor="cancel-fee"
+            >
+              <Input
+                id="cancel-fee"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                {...register('cancellation_fee', { valueAsNumber: true })}
+              />
+            </FormField>
+          )}
         </form>
       </DialogContent>
       <DialogFooter>

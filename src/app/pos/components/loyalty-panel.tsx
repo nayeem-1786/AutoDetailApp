@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { LOYALTY } from '@/lib/utils/constants';
+import { LOYALTY, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { useTicket } from '../context/ticket-context';
 
 export function LoyaltyPanel() {
   const { ticket, dispatch } = useTicket();
   const [redeeming, setRedeeming] = useState(false);
+  const { enabled: loyaltyEnabled, loading: flagLoading } = useFeatureFlag(FEATURE_FLAGS.LOYALTY_REWARDS);
 
   const customer = ticket.customer;
   const balance = customer?.loyalty_points_balance ?? 0;
@@ -26,7 +28,7 @@ export function LoyaltyPanel() {
     }
   }, [customer, isRedeeming, dispatch]);
 
-  if (!customer) return null;
+  if (!customer || flagLoading || !loyaltyEnabled) return null;
 
   function handleToggleRedeem() {
     if (isRedeeming) {
