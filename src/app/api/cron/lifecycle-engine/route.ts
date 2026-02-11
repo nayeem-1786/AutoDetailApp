@@ -552,6 +552,20 @@ async function executePending(
         }
       }
 
+      // Look up product slug from coupon template for smart offer routing
+      let couponProductSlug: string | null = null;
+      let couponProductCategorySlug: string | null = null;
+      if (couponTemplate) {
+        const rewards = (couponTemplate as any).coupon_rewards as any[] | undefined;
+        const targetProductId = rewards?.[0]?.target_product_id;
+        if (targetProductId) {
+          const { data: prod } = await admin
+            .from('products').select('slug, product_categories(slug)').eq('id', targetProductId).single();
+          couponProductSlug = prod?.slug ?? null;
+          couponProductCategorySlug = (prod?.product_categories as any)?.slug ?? null;
+        }
+      }
+
       // Build personalized booking link with customer info pre-filled
       const bookUrlParams = new URLSearchParams();
       const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
@@ -560,12 +574,19 @@ async function executePending(
       if (couponCode) bookUrlParams.set('coupon', couponCode);
       const bookUrl = `${appUrl}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
 
-      // Build book-now deep link with service, coupon & email
-      const bookNowParams = new URLSearchParams();
-      if (serviceSlug) bookNowParams.set('service', serviceSlug);
-      if (couponCode) bookNowParams.set('coupon', couponCode);
-      if (customer.email) bookNowParams.set('email', customer.email);
-      const bookNowUrl = `${appUrl}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
+      // Build smart offer link: product-targeted coupon → /products, otherwise → /book
+      let offerUrl: string;
+      if (couponProductSlug && couponProductCategorySlug) {
+        const offerParams = new URLSearchParams();
+        if (couponCode) offerParams.set('coupon', couponCode);
+        offerUrl = `${appUrl}/products/${couponProductCategorySlug}/${couponProductSlug}${offerParams.toString() ? '?' + offerParams.toString() : ''}`;
+      } else {
+        const offerParams = new URLSearchParams();
+        if (serviceSlug) offerParams.set('service', serviceSlug);
+        if (couponCode) offerParams.set('coupon', couponCode);
+        if (customer.email) offerParams.set('email', customer.email);
+        offerUrl = `${appUrl}/book${offerParams.toString() ? '?' + offerParams.toString() : ''}`;
+      }
 
       // Calculate customer-specific template variables
       const loyaltyPts = customer.loyalty_points_balance ?? 0;
@@ -591,7 +612,8 @@ async function executePending(
         coupon_code: couponCode,
         booking_url: `${appUrl}/book`,
         book_url: bookUrl,
-        book_now_url: bookNowUrl,
+        offer_url: offerUrl,
+        book_now_url: offerUrl, // backward compat
         loyalty_points: formatNumber(loyaltyPts),
         loyalty_value: formatDollar(loyaltyPts * loyaltyRedeemRate),
         visit_count: formatNumber(visitCt),

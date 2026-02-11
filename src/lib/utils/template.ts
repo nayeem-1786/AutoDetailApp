@@ -15,7 +15,7 @@ export const VARIABLE_GROUPS = {
   'Links': {
     booking_url: 'Booking page link',
     book_url: 'Personalized booking link (pre-fills customer info)',
-    book_now_url: 'Service-specific booking link',
+    offer_url: 'Smart offer link (service → booking, product → shop)',
     google_review_link: 'Google review short link',
     yelp_review_link: 'Yelp review short link',
   },

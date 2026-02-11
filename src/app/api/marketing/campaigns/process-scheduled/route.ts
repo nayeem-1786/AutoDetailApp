@@ -119,16 +119,24 @@ export async function POST(request: NextRequest) {
         couponTemplate = coupon;
       }
 
-      // Look up target service slug + name for book-now deep link and {service_name}
+      // Look up target service/product slug for offer link and {service_name}
       let serviceSlug: string | null = null;
       let targetServiceName = '';
+      let productSlug: string | null = null;
+      let productCategorySlug: string | null = null;
       if (couponTemplate?.coupon_rewards?.length > 0) {
-        const targetServiceId = couponTemplate.coupon_rewards[0].target_service_id;
-        if (targetServiceId) {
+        const reward = couponTemplate.coupon_rewards[0];
+        if (reward.target_service_id) {
           const { data: svc } = await adminClient
-            .from('services').select('name, slug').eq('id', targetServiceId).single();
+            .from('services').select('name, slug').eq('id', reward.target_service_id).single();
           serviceSlug = svc?.slug ?? null;
           targetServiceName = svc?.name ?? '';
+        }
+        if (reward.target_product_id) {
+          const { data: prod } = await adminClient
+            .from('products').select('slug, product_categories(slug)').eq('id', reward.target_product_id).single();
+          productSlug = prod?.slug ?? null;
+          productCategorySlug = (prod?.product_categories as any)?.slug ?? null;
         }
       }
 
@@ -175,12 +183,19 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Build book-now deep link with service, coupon & email
-        const bookNowParams = new URLSearchParams();
-        if (serviceSlug) bookNowParams.set('service', serviceSlug);
-        if (couponCode) bookNowParams.set('coupon', couponCode);
-        if (customer.email) bookNowParams.set('email', customer.email);
-        const bookNowUrl = `${appUrl}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
+        // Build smart offer link: product-targeted → /products, otherwise → /book
+        let offerUrl: string;
+        if (productSlug && productCategorySlug) {
+          const offerParams = new URLSearchParams();
+          if (couponCode) offerParams.set('coupon', couponCode);
+          offerUrl = `${appUrl}/products/${productCategorySlug}/${productSlug}${offerParams.toString() ? '?' + offerParams.toString() : ''}`;
+        } else {
+          const offerParams = new URLSearchParams();
+          if (serviceSlug) offerParams.set('service', serviceSlug);
+          if (couponCode) offerParams.set('coupon', couponCode);
+          if (customer.email) offerParams.set('email', customer.email);
+          offerUrl = `${appUrl}/book${offerParams.toString() ? '?' + offerParams.toString() : ''}`;
+        }
 
         // Build personalized booking link with customer info pre-filled
         const bookUrlParams = new URLSearchParams();
@@ -210,7 +225,8 @@ export async function POST(request: NextRequest) {
           business_address: businessInfo.address,
           booking_url: `${appUrl}/book`,
           book_url: bookUrl,
-          book_now_url: bookNowUrl,
+          offer_url: offerUrl,
+          book_now_url: offerUrl, // backward compat
           service_name: targetServiceName,
           google_review_link: shortGoogleUrl,
           yelp_review_link: shortYelpUrl,
@@ -249,7 +265,8 @@ export async function POST(request: NextRequest) {
           const subj = renderTemplate(campaign.email_subject, templateVars);
           const emailBody = cleanEmptyReviewLines(renderTemplate(campaign.email_template, templateVars));
           const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
-          const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${bookNowUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Book Now</a></div>`;
+          const ctaLabel = (productSlug && productCategorySlug) ? 'Shop Now' : 'Book Now';
+          const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${offerUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">${ctaLabel}</a></div>`;
           const emailHtml = `<html><body>${bodyParagraphs}${ctaButton}</body></html>`;
           const result = await sendEmail(customer.email, subj, emailBody, emailHtml, {
             variables: { campaign_id: campaign.id, recipient_id: recipientId },

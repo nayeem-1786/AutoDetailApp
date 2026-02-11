@@ -17,6 +17,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | `docs/TCPA_AUDIT.md` | TCPA compliance audit report — SMS consent capture, opt-out handling, audit log, all sending paths reviewed. |
 | `docs/CHANGELOG.md` | Archived session history — all bug fixes (44+), feature details, file lists. Reference for "what changed" questions. |
 | `docs/MEMORY.md` | Session memory and context carryover notes. |
+| `docs/AUDIT_VARIABLE_DATA.md` | Template variable data audit — customer/transaction/vehicle data coverage, business settings keys, live template usage, loyalty data. Reference when adding or modifying template variables. |
 
 ---
 
@@ -120,8 +121,11 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Campaign list column width balanced (Name column expanded to 35%)
 - Click-to-variant attribution — `variant_id` column added to `tracked_links` and `link_clicks` tables (migration 20260210000010), threaded through full chain: `createTrackedLink()` → `wrapUrlsInMessage()` → `sendMarketingSms()` → campaign send route → click redirect handler → `getVariantStats()`
 - `campaign_recipients.clicked_at` updates on first click via `/api/t/[code]` redirect handler
-- Template variables audit — consolidated `vehicle_description` into `vehicle_info`, context-aware variable chips (COMMON_VARIABLES in campaigns, AUTOMATION_ONLY like `service_name` only in automation editors), `cleanEmptyReviewLines()` strips blank lines from unused review URL placeholders
-- Campaign send route enhanced — pre-loads `{vehicle_info}`, `{service_name}`, `{google_review_link}`, `{yelp_review_link}` template variables, uses `cleanEmptyReviewLines()` and `createShortLink()` for review URLs
+- Template variables audit — consolidated `{vehicle_description}` into `{vehicle_info}`, context-aware variable chips (`CAMPAIGN_VARIABLES` in campaigns, `AUTOMATION_ONLY_VARIABLES` for event context only in automation editors), `cleanEmptyReviewLines()` strips blank lines from unused review URL placeholders
+- All template variables now work in all 3 send routes (campaign immediate, campaign scheduled, lifecycle engine). Pre-loads `{vehicle_info}` (batch query per customer), `{service_name}` (from coupon target), `{google_review_link}` + `{yelp_review_link}` (from `business_settings`, shortened via `createShortLink()`). Fixed `{book_url}` missing from scheduled send. Fixed `SITE_URL` → `NEXT_PUBLIC_APP_URL` in scheduled send.
+- `{offer_url}` smart routing — renamed from `{book_now_url}`. Service-targeted coupon → `/book`, product-targeted coupon → `/products/<cat>/<prod>`. Email CTA button adapts ("Book Now" vs "Shop Now"). `{book_now_url}` kept as backward-compat alias.
+- Expanded template variable system: 21 total variables organized into 6 `VARIABLE_GROUPS` (Customer Info, Business, Links, Loyalty & History, Coupons, Event Context). New vars: `{business_phone}`, `{business_address}`, `{loyalty_points}`, `{loyalty_value}`, `{visit_count}`, `{days_since_last_visit}`, `{lifetime_spend}`, `{appointment_date}`, `{appointment_time}`, `{amount_paid}`. Helper formatters: `formatPhoneDisplay()`, `formatDollar()`, `formatNumber()`.
+- Data audit saved to `docs/AUDIT_VARIABLE_DATA.md` — 1,316 customers, 97% vehicles incomplete, 393 with loyalty points, email only 6.4% coverage.
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete
@@ -253,8 +257,9 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Click redirect is public** (no auth): `/api/t/[code]`
 - **Dev testing requires ngrok running** — Twilio statusCallback and Mailgun webhooks need a public URL to receive callbacks during local development
 - **CRON_SECRET in .env.local** is a placeholder — verify if it's used or if `CRON_API_KEY` is the actual auth key for cron endpoints
-- **`{book_url}` vs `{book_now_url}`**: Both use `NEXT_PUBLIC_APP_URL` as base. `{book_url}` = personalized (name, phone, email, coupon). `{book_now_url}` = service deep-link (service slug, coupon, email). Campaign send route generates both per customer.
-- **Template variable context**: `COMMON_VARIABLES` shown in campaign editor. `AUTOMATION_ONLY` variables (like `{service_name}`) shown only in automation/lifecycle editors. `cleanEmptyReviewLines()` strips blank lines when review URL placeholders are unused.
+- **`{book_url}` vs `{offer_url}`**: Both use `NEXT_PUBLIC_APP_URL` as base. `{book_url}` = personalized (name, phone, email, coupon). `{offer_url}` = smart offer link with routing: service-targeted coupon → `/book?service=slug&coupon=code&email=...`, product-targeted coupon → `/products/<cat>/<prod>?coupon=code`, no coupon → `/book`. Email CTA button text adapts: "Book Now" vs "Shop Now". `{book_now_url}` kept as backward-compat alias in all send routes.
+- **Template variable architecture**: `VARIABLE_GROUPS` object organizes vars into 6 groups (Customer Info, Business, Links, Loyalty & History, Coupons, Event Context). `CAMPAIGN_VARIABLES` = all groups except Event Context (16 vars). `AUTOMATION_ONLY_VARIABLES` = Event Context only (service_name, vehicle_info, appointment_date, appointment_time, amount_paid). `TEMPLATE_VARIABLES` = combined full set. `CAMPAIGN_GROUPS` / `ALL_GROUPS` arrays for UI rendering. `cleanEmptyReviewLines()` strips empty review link lines, orphaned connectors, and trailing colons.
+- **New template variables**: `{business_phone}`, `{business_address}`, `{loyalty_points}`, `{loyalty_value}`, `{visit_count}`, `{days_since_last_visit}`, `{lifetime_spend}`, `{appointment_date}`, `{appointment_time}`, `{amount_paid}`. Added alongside existing vars.
 - **`{vehicle_description}` removed**: Consolidated into `{vehicle_info}` everywhere. No code references `vehicle_description` anymore.
 - **Campaign duplicate endpoint**: `POST /api/marketing/campaigns/[id]/duplicate` — creates draft copy with "(Copy)" suffix, copies A/B variants.
 - **Campaign detail analytics paths**: `/admin/marketing/campaigns/[id]/analytics` — drill-down with summary KPIs, funnel, variant comparison, recipient table, click details, engagement timeline. API: `GET /api/admin/marketing/analytics/campaigns/[id]`
@@ -292,13 +297,33 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 
 ## Last Session: 2026-02-10
 
-### Session 5 — Campaign Analytics Drill-Down, A/B Variant Attribution, Template Variables
+### Session 7 — {offer_url} Smart Routing
+- **Renamed `{book_now_url}` → `{offer_url}`** with smart routing: service-targeted coupon → `/book?service=slug&coupon=code&email=...`, product-targeted coupon → `/products/<categorySlug>/<productSlug>?coupon=code`, no coupon → `/book`.
+- **Product slug lookup**: All 3 send routes now check `coupon_rewards[0].target_product_id`, look up product + category slug for direct product page deep links.
+- **Email CTA button**: Dynamically shows "Shop Now" (product target) or "Book Now" (service/no target).
+- **Backward compat**: `{book_now_url}` kept as alias in all templateVars — existing saved templates continue to work.
+- 5 files changed (template.ts, send/route.ts, process-scheduled/route.ts, lifecycle-engine/route.ts, campaign-wizard.tsx), TypeScript clean.
+
+### Session 6 — Template Variable Audit & Comprehensive Fix
+- **Full template variable audit**: Mapped all 12 variables across 4 replacement sites (campaign send, scheduled send, lifecycle engine, preview). Documented which vars were defined, replaced, and actually worked.
+- **Consolidated `{vehicle_description}`** → removed (identical to `{vehicle_info}`). Removed from `TEMPLATE_VARIABLES` and lifecycle engine.
+- **Split `TEMPLATE_VARIABLES` into context-aware groups**: `CAMPAIGN_VARIABLES` (10 vars shown in campaign wizard) + `AUTOMATION_ONLY_VARIABLES` (`{service_name}` — only automations have event context). `TEMPLATE_VARIABLES` still exported as combined set for automation editors.
+- **Fixed `{book_url}` missing** from `process-scheduled/route.ts` — was completely absent, now builds personalized URL with name/phone/email/coupon.
+- **Fixed `SITE_URL` → `NEXT_PUBLIC_APP_URL`** throughout `process-scheduled/route.ts` (was using hardcoded production domain).
+- **Fixed lifecycle engine `{book_now_url}`** — was missing service slug and email params. Now includes service slug from `appointment_services` and customer email. Added `email` to customer select query, updated `appointment_services` query to also fetch `slug`.
+- **Added all missing vars to both campaign send routes**: `{google_review_link}`, `{yelp_review_link}` (read from `business_settings`, shortened via `createShortLink()`), `{vehicle_info}` (batch-loads most recent vehicle per customer), `{service_name}` (derived from coupon target service).
+- **Added `cleanEmptyReviewLines()`** utility to `template.ts` — strips empty `⭐ Google:` / `⭐ Yelp:` lines after rendering. Used by all 3 send routes.
+- **Campaign preview** now shows sample values for `vehicle_info`, `google_review_link`, `yelp_review_link`.
+- **Campaign duplicate action** added to campaign list (POST `/api/marketing/campaigns/[id]/duplicate`). Copies all fields, generates "(Copy)" / "(Copy N)" name, copies A/B variants with `is_winner` reset. Redirects to edit page.
+- **Campaign list column widths** balanced: Name 320px (~35%), other columns proportional.
+- **Data audit** (`docs/AUDIT_VARIABLE_DATA.md`): 1,316 customers, 6,118 transactions, 134 vehicles (97% incomplete), 393 with loyalty points, 30 active services, 39 business settings keys. Key finding: vehicle data is very sparse (only 4 complete), email coverage only 6.4%.
+- 6 files changed, TypeScript clean, all pushed.
+
+### Session 5 — Campaign Analytics Drill-Down, A/B Variant Attribution
 - Reordered Marketing sidebar sub-pages: Coupons(1) → Automations(2) → Campaigns(3) → Compliance → Analytics. Numbered circle badges on first 3 items.
 - Built campaign detail analytics drill-down (`/admin/marketing/campaigns/[id]/analytics`): summary KPI cards, delivery funnel chart, A/B variant comparison, filterable/paginated recipient table, click details (by URL + recent activity), engagement timeline (72h hourly Recharts AreaChart). New API: `GET /api/admin/marketing/analytics/campaigns/[id]` with pagination, filtering (clicked/converted/failed/opted_out/delivered), sorting, revenue attribution.
 - Fixed `campaign_recipients.clicked_at` not updating — click redirect handler (`/api/t/[code]`) now updates on first click.
 - Fixed A/B variant click attribution — added `variant_id` column to `tracked_links` and `link_clicks` (migration 20260210000010). Threaded variant_id through full chain: `createTrackedLink()` → `wrapUrlsInMessage()` → `sendMarketingSms()` → campaign send route → click redirect → `getVariantStats()`.
-- Campaign send route enhanced with `{vehicle_info}`, `{service_name}`, `{google_review_link}`, `{yelp_review_link}` template variables, `cleanEmptyReviewLines()`, and `createShortLink()` for review URLs.
-- Campaign duplicate action added to campaign list (POST `/api/marketing/campaigns/[id]/duplicate`).
 - Analytics overview campaign table now links to drill-down (not campaign detail page).
 - Campaign detail page shows "View Analytics" button for sent/completed campaigns.
 - 7 new component files, 1 new API route, 1 migration, multiple file updates. TypeScript clean, all pushed.

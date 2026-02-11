@@ -496,9 +496,12 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       business_address: businessInfo?.address || '123 Main St, Lomita, CA',
       booking_url: `${SITE_URL}/book`,
       book_url: previewBookUrl,
-      book_now_url: sampleCode
+      offer_url: sampleCode
         ? `${SITE_URL}/book?coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`
         : `${SITE_URL}/book`,
+      book_now_url: sampleCode
+        ? `${SITE_URL}/book?coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`
+        : `${SITE_URL}/book`, // backward compat
       service_name: '',
       google_review_link: 'https://g.page/r/review',
       yelp_review_link: 'https://yelp.com/review',
