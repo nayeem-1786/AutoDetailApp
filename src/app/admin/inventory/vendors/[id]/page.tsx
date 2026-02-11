@@ -50,7 +50,7 @@ export default function VendorDetailPage() {
 
       if (vendorRes.error || !vendorRes.data) {
         toast.error('Vendor not found');
-        router.push('/admin/catalog/vendors');
+        router.push('/admin/inventory/vendors');
         return;
       }
 
@@ -246,7 +246,7 @@ export default function VendorDetailPage() {
         title={vendor.name}
         description="Vendor details and products"
         action={
-          <Button variant="outline" onClick={() => router.push('/admin/catalog/vendors')}>
+          <Button variant="outline" onClick={() => router.push('/admin/inventory/vendors')}>
             <ArrowLeft className="h-4 w-4" />
             Back to Vendors
           </Button>

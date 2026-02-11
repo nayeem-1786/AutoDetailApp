@@ -141,7 +141,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 
 ### Phase 6 — What's Done
 - Stock overview page (`/admin/inventory` — 315 lines): product list with stock levels, low/out-of-stock filters, manual stock adjustment dialog, vendor column, reorder threshold display
-- Vendor management: `/admin/catalog/vendors` (CRUD with search, address, lead time, min order amount fields). Duplicate at `/admin/inventory/vendors` — catalog version is canonical.
+- Vendor management: `/admin/inventory/vendors` (CRUD with search, address, lead time, min order amount fields).
 - Purchase order system: list page with status filters/badge counts, create/edit forms with multi-product line items, approve/send workflow with status tracking (draft → sent → partial → received → cancelled)
 - PO receiving workflow: receive-against-PO with quantity verification, variance flagging, auto-status update (partial/received), cost price updates on receive
 - Low stock email alerts: daily cron (8 AM PST) with anti-spam logic (7-day cooldown per product unless stock changes), HTML email template with dark mode support
@@ -155,7 +155,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Nav: Inventory section in admin sidebar (gated by `inventory_management` feature flag)
 - Cron: stock-alerts job registered in scheduler (daily 16:00 UTC / 8 AM PST)
 - `view_cost_data` permission: admin always sees cost/margin, grantable to other roles. Gates: Products page cost/margin columns, Vendor detail cost/margin columns, Product detail Cost & Margin card
-- Vendor detail page (`/admin/catalog/vendors/[id]`): header with vendor info, products table with stock data, permission-gated cost/margin columns, last order date/qty from POs (clickable to PO detail)
+- Vendor detail page (`/admin/inventory/vendors/[id]`): header with vendor info, products table with stock data, permission-gated cost/margin columns, last order date/qty from POs (clickable to PO detail)
 - Stock Adjustment History (`/admin/inventory/stock-history`): full audit log of all stock changes (manual, PO received, count correction, damage, return). Filterable by product, reason, date range. Color-coded +/- changes, reference links to POs
 - Quick Adjust dialog on Products page logs to `stock_adjustments` with reason selection (was silent direct update)
 - PO create: product search scoped to selected vendor (strict filter — no null vendor leak). Vendor change clears line items with confirmation dialog
@@ -208,7 +208,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 |------|------|----------|
 | Setup receipt printer hardware integration for POS | Hardware | Low |
 | Admin appointment creation (currently only via booking/POS/voice agent) | Feature | Low |
-| Consolidate duplicate vendor pages (catalog vs inventory) | Cleanup | Low |
+| ~~Consolidate duplicate vendor pages~~ | ~~Cleanup~~ | ~~Done~~ |
 | Configure Twilio webhook URL for production (`/api/webhooks/twilio/inbound`) | Configuration | High |
 | Add `ANTHROPIC_API_KEY` to production environment variables | Configuration | High |
 | Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
@@ -220,7 +220,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
 - **Transaction date gap:** Square's first payment: May 8, 2021. Supabase `transaction_date` starts Dec 31, 2021 — early transactions may not have been imported.
 - **Product/service images:** Stored in Supabase storage buckets `product-images/` and `service-images/`. 23 products have no images (never had them in Square). 2 services have no images (Excessive Cleaning Fee, Paint Decontamination & Protection — no Square counterparts). `service-images` bucket also allows `image/avif` MIME type (added accidentally, no impact).
-- **Duplicate vendor pages:** `/admin/catalog/vendors` (372 lines) and `/admin/inventory/vendors` (400 lines) both exist. Inventory version is more complete (search, address, lead time fields). Should consolidate.
+- **Vendor pages consolidated:** `/admin/inventory/vendors` (moved from catalog, single canonical location).
 - **sms_delivery_log:** Twilio delivery status tracking. Indexes on `(message_sid)` UNIQUE, `(campaign_id, status)`, `(lifecycle_execution_id, status)`, `(customer_id, created_at)`, `(created_at)`.
 - **tracked_links:** URL shortener registry for click tracking. `(short_code)` UNIQUE index.
 - **link_clicks:** Click event log. Indexes on `(short_code, clicked_at)`, `(campaign_id, clicked_at)`, `(customer_id, clicked_at)`.
@@ -236,7 +236,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **lifecycle_rules.coupon_id:** nullable FK to `coupons` table with `ON DELETE SET NULL`. Partial index on non-null values. Legacy `coupon_type`/`coupon_value`/`coupon_expiry_days` columns remain but are unused — form uses `coupon_id` exclusively.
 - **sms_consent_log:** Audit table tracking all SMS consent changes. Source CHECK constraint: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`. RLS: authenticated users can read/write (admin pages insert directly via browser client).
 - **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling + signature validation), `src/lib/utils/sms.ts` (`sendSms()` with MMS + logging, `sendMarketingSms()` with consent + frequency cap), `src/lib/utils/phone-validation.ts` (Twilio Lookup landline detection), `docs/TCPA_AUDIT.md` (full audit report).
-- **Key inventory files:** `src/app/admin/catalog/products/page.tsx` (products with stock management), `src/app/admin/catalog/vendors/page.tsx` (vendor list), `src/app/admin/catalog/vendors/[id]/page.tsx` (vendor detail with products), `src/app/admin/inventory/purchase-orders/` (PO list/create/detail+receive), `src/app/admin/inventory/stock-history/page.tsx` (stock adjustment log), `src/app/api/admin/purchase-orders/` (PO CRUD + receiving API), `src/app/api/admin/stock-adjustments/route.ts` (stock adjustment API), `src/app/api/cron/stock-alerts/route.ts` (daily stock alert cron), `src/app/api/admin/notification-recipients/route.ts` (recipients CRUD), `src/app/admin/settings/notifications/page.tsx` (notification settings UI).
+- **Key inventory files:** `src/app/admin/catalog/products/page.tsx` (products with stock management), `src/app/admin/inventory/vendors/page.tsx` (vendor list), `src/app/admin/inventory/vendors/[id]/page.tsx` (vendor detail with products), `src/app/admin/inventory/purchase-orders/` (PO list/create/detail+receive), `src/app/admin/inventory/stock-history/page.tsx` (stock adjustment log), `src/app/api/admin/purchase-orders/` (PO CRUD + receiving API), `src/app/api/admin/stock-adjustments/route.ts` (stock adjustment API), `src/app/api/cron/stock-alerts/route.ts` (daily stock alert cron), `src/app/api/admin/notification-recipients/route.ts` (recipients CRUD), `src/app/admin/settings/notifications/page.tsx` (notification settings UI).
 - **Key QBO files:** `src/lib/qbo/client.ts` (API client with token refresh, query, CRUD methods), `src/lib/qbo/settings.ts` (read/write QBO settings, `isQboSyncEnabled()`, `isQboConnected()`), `src/lib/qbo/types.ts` (all QBO TypeScript types), `src/lib/qbo/sync-customer.ts` (customer sync engine), `src/lib/qbo/sync-catalog.ts` (service/product sync engine), `src/lib/qbo/sync-transaction.ts` (transaction → Sales Receipt sync), `src/lib/qbo/sync-log.ts` (sync log helpers), `src/lib/qbo/index.ts` (barrel exports), `src/app/api/admin/integrations/qbo/` (OAuth + settings + sync + accounts routes), `src/app/admin/settings/integrations/quickbooks/page.tsx` (settings UI), `src/components/qbo-sync-badge.tsx` (reusable sync status badge), `docs/QBO-INTEGRATION.md` (integration documentation).
 
 ---

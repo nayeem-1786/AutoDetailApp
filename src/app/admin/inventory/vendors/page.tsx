@@ -215,7 +215,7 @@ export default function VendorsPage() {
       cell: ({ row }) => (
         <button
           className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
-          onClick={() => router.push(`/admin/catalog/vendors/${row.original.id}`)}
+          onClick={() => router.push(`/admin/inventory/vendors/${row.original.id}`)}
         >
           {row.original.name}
         </button>
