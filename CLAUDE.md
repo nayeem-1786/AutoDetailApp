@@ -30,7 +30,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **3** | Booking, Quotes & 11 Labs API | Done |
 | **4** | Customer Portal | Done |
 | **5** | Marketing, Coupons & Campaigns | Done |
-| **6** | Inventory Management | Done |
+| **6** | Inventory Management | In Progress |
 | **7** | QuickBooks Integration & Reporting | Not started |
 | **8** | Photo Documentation | Not started |
 | **9** | Native Online Store | Not started |
@@ -186,6 +186,8 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 | Add `ANTHROPIC_API_KEY` to production environment variables | Configuration | High |
 | Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
 | Add `CRON_API_KEY` to production environment variables | Configuration | High |
+| Design/UX audit — modern auto detailing aesthetic | Design | High |
+| Phase 7 — QuickBooks Integration & Reporting | Feature | Medium |
 
 ### Data Notes
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
@@ -261,7 +263,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **`{book_url}` placeholder**: Generates personalized booking link with customer name, phone, email, and coupon as query params. Auto-shortened by `wrapUrlsInMessage()`. Booking page (`/book`) accepts `?name`, `?phone`, `?email` params — tries email DB lookup first, falls back to URL params for pre-fill.
 - **Click redirect is public** (no auth): `/api/t/[code]`
 - **Dev testing requires ngrok running** — Twilio statusCallback and Mailgun webhooks need a public URL to receive callbacks during local development
-- **CRON_SECRET in .env.local** is a placeholder — verify if it's used or if `CRON_API_KEY` is the actual auth key for cron endpoints
+- **CRON_SECRET** is a placeholder only used by `process-scheduled/route.ts` (falls back to admin session auth). **`CRON_API_KEY`** is the real auth key used by `scheduler.ts`, `lifecycle-engine`, and `quote-reminders`. Resolved in Session 4.
 - **`{book_url}` vs `{offer_url}`**: Both use `NEXT_PUBLIC_APP_URL` as base. `{book_url}` = personalized (name, phone, email, coupon). `{offer_url}` = smart offer link with routing: service-targeted coupon → `/book?service=slug&coupon=code&email=...`, product-targeted coupon → `/products/<cat>/<prod>?coupon=code`, no coupon → `/book`. Email CTA button text adapts: "Book Now" vs "Shop Now". `{book_now_url}` kept as backward-compat alias in all send routes.
 - **Template variable architecture**: `VARIABLE_GROUPS` object organizes vars into 6 groups (Customer Info, Business, Links, Loyalty & History, Coupons, Event Context). `CAMPAIGN_VARIABLES` = all groups except Event Context (16 vars). `AUTOMATION_ONLY_VARIABLES` = Event Context only (service_name, vehicle_info, appointment_date, appointment_time, amount_paid). `TEMPLATE_VARIABLES` = combined full set. `CAMPAIGN_GROUPS` / `ALL_GROUPS` arrays for UI rendering. `cleanEmptyReviewLines()` strips empty review link lines, orphaned connectors, and trailing colons.
 - **New template variables**: `{business_phone}`, `{business_address}`, `{loyalty_points}`, `{loyalty_value}`, `{visit_count}`, `{days_since_last_visit}`, `{lifetime_spend}`, `{appointment_date}`, `{appointment_time}`, `{amount_paid}`. Added alongside existing vars.
@@ -341,6 +343,28 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Campaign detail page shows "View Analytics" button for sent/completed campaigns.
 - 7 new component files, 1 new API route, 1 migration, multiple file updates. TypeScript clean, all pushed.
 
+### Session 4 — Campaign Bug Fixes + Personalized Booking Links
+- Applied 5 tracking migrations to live DB (sms_delivery_log, tracked_links, link_clicks, email_delivery_log, campaign_variants)
+- **BUG 1 — A/B testing persistence**: Added `auto_select_winner`/`auto_select_after_hours` columns to campaigns table (migration 20260210000009). Updated Zod schema, POST inserts campaign_variants, PATCH deletes+reinserts, GET joins and returns. `buildPayload()` always sends variants key (null when A/B off).
+- **BUG 2 — Coupon codes**: Campaign send route was already correct. Fixed lifecycle engine — now generates unique coupon per recipient for rules with `coupon_id`, clones rewards from template.
+- **BUG 3 — URL tracking**: Campaign sends already tracked. Fixed lifecycle engine — now passes `{ lifecycleExecutionId, source: 'lifecycle' }` to `sendMarketingSms()` so `wrapUrlsInMessage()` fires.
+- **BUG 4 — Preview personalization**: `renderPreviewForCustomer()` now returns `{ variantA, variantB }`. Preview dialog shows both variants stacked. Sample coupon code only when coupon attached.
+- **Personalized booking links**: New `{book_url}` template variable builds `/book?name=...&phone=...&email=...&coupon=...` per customer. Booking page accepts `?name`, `?phone` params with email DB lookup + URL fallback. URLs auto-shortened by click tracker.
+- CRON_SECRET vs CRON_API_KEY audit: `CRON_API_KEY` is the active auth key (scheduler.ts, lifecycle-engine, quote-reminders). `CRON_SECRET` is a placeholder only used by process-scheduled route (falls back to admin session auth).
+- Production deployment checklist added to CLAUDE.md
+- 7 files changed, TypeScript clean, all pushed
+
+### Session 3 — Phase 5 Completion (Campaign Analytics + A/B Testing)
+- SMS delivery tracking: `sms_delivery_log` table + `/api/webhooks/twilio/status` webhook + `statusCallback` wired into all SMS sends
+- Click tracking: `tracked_links` + `link_clicks` tables, `link-tracking.ts` utility (`createTrackedLink`, `wrapUrlsInMessage`), `/api/t/[code]` redirect endpoint, auto-wired into `sendMarketingSms()`
+- Mailgun email tracking: `email_delivery_log` table, `mailgun-signature.ts` verification, `/api/webhooks/mailgun` webhook handler, `email-consent.ts` helper
+- A/B testing backend: `campaign_variants` table + `variant_id` on `campaign_recipients`, `ab-testing.ts` (splitRecipients, determineWinner, getVariantStats)
+- Revenue attribution: `attribution.ts` (getAttributedRevenue, getAttributedRevenueForPeriod), configurable window via `business_settings`
+- Analytics APIs: 6 endpoints under `/api/admin/marketing/analytics/` — overview, campaigns, automations, coupons, audience, ab-tests
+- Shared analytics helpers: `analytics-helpers.ts` (getPeriodDates, authenticateAdmin)
+- 4 migrations: 20260210000005 through 20260210000008
+- 15 commits, TypeScript clean (only pre-existing recharts module warning)
+
 ### Session 2 — TCPA High/Medium Issues (Issues 4-9)
 - Enabled Twilio signature validation — removed `false &&` bypass, conditional on `NODE_ENV`
 - Routed all SMS through shared utility — replaced 3 direct Twilio API calls:
@@ -369,30 +393,10 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Updated `docs/TCPA_AUDIT.md` with comprehensive audit report
 - All migrations applied, type check clean, committed and pushed (21 files, 687 insertions)
 
-### Session 4 — Campaign Bug Fixes + Personalized Booking Links
-- Applied 5 tracking migrations to live DB (sms_delivery_log, tracked_links, link_clicks, email_delivery_log, campaign_variants)
-- **BUG 1 — A/B testing persistence**: Added `auto_select_winner`/`auto_select_after_hours` columns to campaigns table (migration 20260210000009). Updated Zod schema, POST inserts campaign_variants, PATCH deletes+reinserts, GET joins and returns. `buildPayload()` always sends variants key (null when A/B off).
-- **BUG 2 — Coupon codes**: Campaign send route was already correct. Fixed lifecycle engine — now generates unique coupon per recipient for rules with `coupon_id`, clones rewards from template.
-- **BUG 3 — URL tracking**: Campaign sends already tracked. Fixed lifecycle engine — now passes `{ lifecycleExecutionId, source: 'lifecycle' }` to `sendMarketingSms()` so `wrapUrlsInMessage()` fires.
-- **BUG 4 — Preview personalization**: `renderPreviewForCustomer()` now returns `{ variantA, variantB }`. Preview dialog shows both variants stacked. Sample coupon code only when coupon attached.
-- **Personalized booking links**: New `{book_url}` template variable builds `/book?name=...&phone=...&email=...&coupon=...` per customer. Booking page accepts `?name`, `?phone` params with email DB lookup + URL fallback. URLs auto-shortened by click tracker.
-- CRON_SECRET vs CRON_API_KEY audit: `CRON_API_KEY` is the active auth key (scheduler.ts, lifecycle-engine, quote-reminders). `CRON_SECRET` is a placeholder only used by process-scheduled route (falls back to admin session auth).
-- Production deployment checklist added to CLAUDE.md
-- 7 files changed, TypeScript clean, all pushed
-
-### Session 3 — Phase 5 Completion (Campaign Analytics + A/B Testing)
-- SMS delivery tracking: `sms_delivery_log` table + `/api/webhooks/twilio/status` webhook + `statusCallback` wired into all SMS sends
-- Click tracking: `tracked_links` + `link_clicks` tables, `link-tracking.ts` utility (`createTrackedLink`, `wrapUrlsInMessage`), `/api/t/[code]` redirect endpoint, auto-wired into `sendMarketingSms()`
-- Mailgun email tracking: `email_delivery_log` table, `mailgun-signature.ts` verification, `/api/webhooks/mailgun` webhook handler, `email-consent.ts` helper
-- A/B testing backend: `campaign_variants` table + `variant_id` on `campaign_recipients`, `ab-testing.ts` (splitRecipients, determineWinner, getVariantStats)
-- Revenue attribution: `attribution.ts` (getAttributedRevenue, getAttributedRevenueForPeriod), configurable window via `business_settings`
-- Analytics APIs: 6 endpoints under `/api/admin/marketing/analytics/` — overview, campaigns, automations, coupons, audience, ab-tests
-- Shared analytics helpers: `analytics-helpers.ts` (getPeriodDates, authenticateAdmin)
-- 4 migrations: 20260210000005 through 20260210000008
-- 15 commits, TypeScript clean (only pre-existing recharts module warning)
-
 ### Next Session Priorities
-1. Phase 6 — Inventory Management (purchase orders, receiving, COGS tracking)
+1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
+2. Phase 6 — Review stock & vendor pages, consolidate duplicate vendor pages (catalog vs inventory), then build PO/receiving/COGS.
+3. Phase 7 — QuickBooks Integration & Reporting
 
 ---
 
