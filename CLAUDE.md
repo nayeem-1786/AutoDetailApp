@@ -160,10 +160,11 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Manual sync + retry + log API routes under `/api/admin/integrations/qbo/sync/`
 - POS transaction hook: fire-and-forget QBO sync after completion
 - POS customer creation hook: fire-and-forget sync when auto-sync enabled
-- Settings UI: `/admin/settings/integrations/quickbooks` — connection management, credentials, sync toggles, account mapping (income + bank from QBO API), sync stats cards, sync log viewer with filters and expandable payloads
+- Settings UI: `/admin/settings/integrations/quickbooks` — connection management, sync toggles, account mapping (income + bank from QBO API), sync stats cards, sync log viewer with filters and expandable payloads. Links to Feature Toggles for master enable/disable.
 - QBO sync badge component (`src/components/qbo-sync-badge.tsx`) on transaction detail page
 - DB migration: `qbo_id`, `qbo_sync_status`, `qbo_sync_error`, `qbo_synced_at` columns; `qbo_sync_log` table; `business_settings` seeds
-- Fixes: query URL double-`?` in client.ts, undeclared realmId, getAccounts() syntax, removed redundant feature_flags entry
+- Credential architecture: `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET` stored as env vars (not in DB). Master toggle via `feature_flags` table (shown on Feature Toggles page). Sync-specific settings (auto-sync toggles, account mapping) in `business_settings`.
+- `isQboSyncEnabled()` reads `qbo_enabled` from `feature_flags` table, then verifies connection via `isQboConnected()`
 
 ### Phase 9 — Native Online Store (NOT WooCommerce)
 Build full e-commerce within the existing Next.js app. Product catalog pages already exist at `/products` with SEO, categories, and product detail pages. Needs: cart (React context), cart drawer/page, Stripe checkout flow, order management (`orders` table, status tracking), order confirmation + email, shipping/pickup selection, order history in customer dashboard, admin order management page. No WordPress/WooCommerce — everything stays in this app. Stripe is already integrated from booking payments.
@@ -201,6 +202,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 | Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
 | Add `CRON_API_KEY` to production environment variables | Configuration | High |
 | Design/UX audit — modern auto detailing aesthetic | Design | High |
+| Add `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET` to production env vars | Configuration | High |
 
 ### Data Notes
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
@@ -229,7 +231,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Supabase project:** `zwvahzymzardmxixyfim`
 - **Super-Admin:** nayeem@smartdetailautospa.com
 - **Staff:** Segundo Cadena (detailer), Joselyn Reyes (cashier), Joana Lira (cashier), Su Khan (admin)
-- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | AI: Anthropic Claude API (messaging auto-responder) | Cron: node-cron via instrumentation.ts (lifecycle-engine every 10 min, quote-reminders hourly)
+- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | AI: Anthropic Claude API (messaging auto-responder) | Accounting: QuickBooks Online (OAuth, env vars `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET`) | Cron: node-cron via instrumentation.ts (lifecycle-engine every 10 min, quote-reminders hourly)
 - **Public pages:** Server Components for SEO. Admin pages: `'use client'` behind auth.
 
 ### Auth Patterns
@@ -267,6 +269,10 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **ALL SMS MUST go through `sendSms()`** in `src/lib/utils/sms.ts`. NEVER call the Twilio API directly. `sendSms()` supports MMS via optional `{ mediaUrl }` param. NEVER add new SMS sending code that bypasses this utility.
 - **SMS frequency cap**: `sendMarketingSms()` automatically checks `business_settings.sms_daily_cap_per_customer` (default 5). Counts both `campaign_recipients` and `lifecycle_executions` for the current PST day. Marketing SMS blocked when cap reached.
 - **Phone validation**: `isValidMobileNumber()` from `src/lib/utils/phone-validation.ts` — OFF by default (`TWILIO_LOOKUP_ENABLED=true` to enable). Costs ~$0.005/lookup. Fails open. Wire into customer creation flows when enabled.
+- **QBO credentials**: `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET` are env vars — NEVER store in DB. Settings UI shows "configured" status from env, not editable fields.
+- **QBO master toggle**: `feature_flags` table `qbo_enabled` row is the sole on/off switch (Feature Toggles page). `isQboSyncEnabled()` checks `feature_flags` + connection status. No `qbo_enabled` in `business_settings`.
+- **QBO sync engines**: All sync functions check `isQboSyncEnabled()` first. POS hooks are fire-and-forget (never block POS). Walk-in customer and miscellaneous item fallbacks for anonymous/deleted references. PST date formatting for QBO.
+- **QBO API**: All requests go through `QboClient.request()` which handles token refresh on 401. `QboApiError` for structured error handling. Query method uses QBO SQL-like syntax.
 - **Twilio inbound webhook signature validation**: Active in production, skipped when `NODE_ENV=development`. Uses `crypto.timingSafeEqual()` for constant-time comparison. NEVER re-add `false &&` bypass.
 - **Booking form consent**: SMS + email checkboxes are checked by default. For existing customers, consent only upgrades (true → true), never downgrades (true → false) via booking form. New customers get consent set from checkbox values. Admin "Add Customer" form also defaults both to checked.
 - **sms_delivery_log** tracks Twilio delivery callbacks — always pass `statusCallback` URL in sends
@@ -286,7 +292,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Campaign duplicate endpoint**: `POST /api/marketing/campaigns/[id]/duplicate` — creates draft copy with "(Copy)" suffix, copies A/B variants.
 - **Campaign detail analytics paths**: `/admin/marketing/campaigns/[id]/analytics` — drill-down with summary KPIs, funnel, variant comparison, recipient table, click details, engagement timeline. API: `GET /api/admin/marketing/analytics/campaigns/[id]`
 - **Coupon category validation**: `TicketItem.categoryId` holds `product.category_id` or `service.category_id`. Both ticket-reducer and quote-reducer populate this on `ADD_PRODUCT`/`ADD_SERVICE`. All cart item mappings pass `category_id` to validate/promotions endpoints. The validation logic in `coupon-helpers.ts` and `pos/coupons/validate` already matches on `item.category_id` — this field was just never sent before.
-- **QBO Integration**: Lives behind `qbo_enabled` in `business_settings` (NOT feature_flags). Source of truth is ALWAYS the Smart Details app (Supabase). QBO is a one-way accounting mirror. POS hooks are fire-and-forget — NEVER block POS for QBO. All TxnDate values in PST (America/Los_Angeles). Client library at `src/lib/qbo/`. OAuth tokens stored in `business_settings`, not env vars. `isQboSyncEnabled()` checks `business_settings` + connection status.
+- **QBO Integration**: Master toggle is `qbo_enabled` in `feature_flags` table (shown on Feature Toggles page). Credentials (`QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`) in env vars — NEVER in DB. OAuth tokens in `business_settings`. Source of truth is ALWAYS the Smart Details app (Supabase). QBO is a one-way accounting mirror. POS hooks are fire-and-forget — NEVER block POS for QBO. All TxnDate values in PST (America/Los_Angeles). Client library at `src/lib/qbo/`. `isQboSyncEnabled()` checks `feature_flags` + connection status.
 - **Phase 9 is Native Online Store** — NO WordPress/WooCommerce. Build cart, checkout, orders within this Next.js app. Product catalog pages already exist at `/products`.
 
 ---
@@ -301,6 +307,8 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 | `MAILGUN_WEBHOOK_SIGNING_KEY` | Already set | Verify matches Mailgun dashboard |
 | `ANTHROPIC_API_KEY` | Set in .env.local | Must add to production env |
 | `CRON_API_KEY` | Set in .env.local | Must add to production env |
+| `QBO_CLIENT_ID` | Set in .env.local | Must add to production env |
+| `QBO_CLIENT_SECRET` | Set in .env.local | Must add to production env |
 
 ### Twilio Configuration
 - **Inbound webhook URL**: Must be set in Twilio console → Phone Numbers → Active Numbers → +14244010094 → Messaging → "A Message Comes In" → `https://smartdetailsautospa.com/api/webhooks/twilio/inbound`
@@ -334,7 +342,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Fixed: query URL double-`?` bug in `client.ts` (minorversion param separator)
 - Fixed: undeclared `realmId` variable in `client.ts` `request()` method
 - Fixed: `getAccounts()` query syntax for fetching all accounts without WHERE filter
-- Fixed: removed redundant `qbo_enabled` from `feature_flags` table — `business_settings` is single source of truth
+- Changed: moved `qbo_enabled` toggle from `feature_flags` to `business_settings` (later reverted in Session 10b fix)
 - Docs: `docs/QBO-INTEGRATION.md`
 
 ### Session 9 — Coupon Wizard Customer Type Fixes
@@ -432,9 +440,32 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Updated `docs/TCPA_AUDIT.md` with comprehensive audit report
 - All migrations applied, type check clean, committed and pushed (21 files, 687 insertions)
 
+### Session 10 — Phase 7.2: QBO OAuth, Settings UI, Sync Engines
+- Built 6 OAuth/admin API routes: connect (initiates OAuth flow with CSRF state), callback (token exchange + connection test), disconnect (revokes + clears tokens), status (connection + company info), settings (GET/PATCH), accounts (income/bank from QBO)
+- Built 3 sync API routes: `/api/admin/integrations/qbo/sync` (bulk sync all/transactions/customers/catalog), `/sync/retry` (retry failed), `/sync/log` (paginated log with filters)
+- Built full admin settings page at `/admin/settings/integrations/quickbooks` with 6 sections: connection management, sync toggles, account mapping, manual sync actions, sync stats cards, sync log viewer with expandable payloads and auto-refresh
+- Built 3 sync engines: `sync-customer.ts` (create/update with duplicate detection + batch), `sync-catalog.ts` (services as QBO Service, products as NonInventory), `sync-transaction.ts` (POS → QBO Sales Receipt with line items, discounts, walk-in fallback, misc item fallback, PST dates)
+- Added POS hooks: auto-sync customers on create, transactions on complete (fire-and-forget)
+- Added QboSyncBadge component, updated Supabase Transaction types with QBO fields
+- Added QuickBooks card to Settings index under new "Integrations" group
+- Migration `20260210000012`: removed `qbo_enabled` from `feature_flags` (later restored by fix session)
+- 22+ files, TypeScript clean, all pushed
+
+### Session 10b — QBO Architecture Fix
+- **Restored `qbo_enabled` feature flag** as master toggle (was incorrectly deleted in Session 10). Migration `20260210000013`: restores flag + deletes `qbo_client_id`/`qbo_client_secret`/`qbo_enabled` from `business_settings`
+- **Moved credentials to env vars**: `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET` now read from `process.env` in `client.ts`, `connect/route.ts`, `callback/route.ts`, `disconnect/route.ts` — NEVER stored in DB
+- **Fixed `isQboSyncEnabled()`**: now reads from `feature_flags` table (not `business_settings`)
+- **Updated settings UI**: removed credential input fields, added env var status indicator, added link to Feature Toggles page for master toggle
+- **Updated `status/route.ts`**: reads `enabled` from `feature_flags`, added `credentials_configured` field
+- **Cleaned `settings/route.ts`**: removed `qbo_enabled`, `qbo_client_id`, `qbo_client_secret` from `ALLOWED_KEYS`
+- Restored `QBO_ENABLED` to `FEATURE_FLAGS` constant in `constants.ts`
+- Added `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET` to `.env.local`
+- TypeScript clean, committed and pushed
+
 ### Next Session Priorities
 1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
 2. Phase 6 — Review stock & vendor pages, consolidate duplicate vendor pages (catalog vs inventory), then build PO/receiving/COGS.
+3. Phase 7.3 — QBO cron auto-sync, reporting dashboard, CSV exports
 
 ---
 
