@@ -113,6 +113,7 @@ export interface Vendor {
   website: string | null;
   address: string | null;
   lead_time_days: number | null;
+  min_order_amount: number | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;
@@ -143,6 +144,7 @@ export interface Product {
   retail_price: number;
   quantity_on_hand: number;
   reorder_threshold: number | null;
+  min_order_qty: number | null;
   is_taxable: boolean;
   is_loyalty_eligible: boolean;
   image_url: string | null;

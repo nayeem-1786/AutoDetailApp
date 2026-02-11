@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type VendorWithCount = Vendor & {
@@ -36,6 +37,7 @@ type VendorWithCount = Vendor & {
 };
 
 export default function VendorsPage() {
+  const router = useRouter();
   const supabase = createClient();
 
   const [vendors, setVendors] = useState<VendorWithCount[]>([]);
@@ -125,6 +127,7 @@ export default function VendorsPage() {
       website: '',
       address: '',
       lead_time_days: null,
+      min_order_amount: null,
       notes: '',
     });
     setDialogOpen(true);
@@ -140,6 +143,7 @@ export default function VendorsPage() {
       website: vendor.website || '',
       address: vendor.address || '',
       lead_time_days: vendor.lead_time_days,
+      min_order_amount: vendor.min_order_amount,
       notes: vendor.notes || '',
     });
     setDialogOpen(true);
@@ -156,6 +160,7 @@ export default function VendorsPage() {
         website: data.website || null,
         address: data.address || null,
         lead_time_days: data.lead_time_days ?? null,
+        min_order_amount: data.min_order_amount ?? null,
         notes: data.notes || null,
       };
 
@@ -208,7 +213,12 @@ export default function VendorsPage() {
       accessorKey: 'name',
       header: 'Name',
       cell: ({ row }) => (
-        <span className="font-medium text-gray-900">{row.original.name}</span>
+        <button
+          className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
+          onClick={() => router.push(`/admin/catalog/vendors/${row.original.id}`)}
+        >
+          {row.original.name}
+        </button>
       ),
     },
     {
@@ -382,9 +392,15 @@ export default function VendorsPage() {
               <Input id="vendor-address" {...register('address')} placeholder="Shipping address" />
             </FormField>
 
-            <FormField label="Lead Time (days)" error={errors.lead_time_days?.message} htmlFor="vendor-lead-time">
-              <Input id="vendor-lead-time" type="number" min="0" {...register('lead_time_days')} placeholder="e.g. 7" />
-            </FormField>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Lead Time (days)" error={errors.lead_time_days?.message} htmlFor="vendor-lead-time">
+                <Input id="vendor-lead-time" type="number" min="0" {...register('lead_time_days')} placeholder="e.g. 7" />
+              </FormField>
+
+              <FormField label="Min Order Amount ($)" error={errors.min_order_amount?.message} htmlFor="vendor-min-order">
+                <Input id="vendor-min-order" type="number" min="0" step="0.01" {...register('min_order_amount')} placeholder="e.g. 100.00" />
+              </FormField>
+            </div>
 
             <FormField label="Notes" error={errors.notes?.message} htmlFor="vendor-notes">
               <Textarea id="vendor-notes" {...register('notes')} placeholder="Internal notes..." rows={2} />

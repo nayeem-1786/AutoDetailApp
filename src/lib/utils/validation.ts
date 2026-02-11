@@ -100,6 +100,7 @@ export const vendorSchema = z.object({
   website: optionalString,
   address: optionalString,
   lead_time_days: positiveInt.optional().nullable(),
+  min_order_amount: z.coerce.number().min(0).optional().nullable(),
   notes: optionalString,
 });
 

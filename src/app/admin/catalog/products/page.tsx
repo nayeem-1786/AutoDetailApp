@@ -29,6 +29,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Plus, Package, ImageOff } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ProductWithRelations = Product & {
@@ -48,6 +49,7 @@ type AdjustInput = z.infer<typeof adjustSchema>;
 export default function ProductsPage() {
   const router = useRouter();
   const supabase = createClient();
+  const canViewCost = usePermission('inventory.view_cost_data');
 
   const [products, setProducts] = useState<ProductWithRelations[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -234,7 +236,13 @@ export default function ProductsPage() {
     return <Badge variant="success">In Stock</Badge>;
   }
 
-  const columns: ColumnDef<ProductWithRelations, unknown>[] = [
+  function getMarginColor(margin: number): string {
+    if (margin > 40) return 'text-green-600';
+    if (margin >= 20) return 'text-yellow-600';
+    return 'text-red-600';
+  }
+
+  const baseColumns: ColumnDef<ProductWithRelations, unknown>[] = [
     {
       id: 'image',
       header: '',
@@ -295,27 +303,39 @@ export default function ProductsPage() {
       size: 80,
       cell: ({ row }) => formatCurrency(row.original.retail_price),
     },
-    {
-      id: 'cost_price',
-      header: 'Cost',
-      size: 80,
-      cell: ({ row }) =>
-        row.original.cost_price > 0
-          ? formatCurrency(row.original.cost_price)
-          : '--',
-    },
-    {
-      id: 'margin',
-      header: 'Margin',
-      size: 64,
-      cell: ({ row }) => {
-        const p = row.original;
-        if (!p.cost_price || p.cost_price === 0 || p.retail_price === 0) return '--';
-        const margin = ((p.retail_price - p.cost_price) / p.retail_price * 100);
-        return `${margin.toFixed(0)}%`;
-      },
-      enableSorting: false,
-    },
+  ];
+
+  const costColumns: ColumnDef<ProductWithRelations, unknown>[] = canViewCost
+    ? [
+        {
+          id: 'cost_price',
+          header: 'Cost',
+          size: 80,
+          cell: ({ row }) =>
+            row.original.cost_price > 0
+              ? formatCurrency(row.original.cost_price)
+              : '--',
+        },
+        {
+          id: 'margin',
+          header: 'Margin',
+          size: 64,
+          cell: ({ row }) => {
+            const p = row.original;
+            if (!p.cost_price || p.cost_price === 0 || p.retail_price === 0) return '--';
+            const margin = (p.retail_price - p.cost_price) / p.retail_price * 100;
+            return (
+              <span className={`font-medium ${getMarginColor(margin)}`}>
+                {margin.toFixed(0)}%
+              </span>
+            );
+          },
+          enableSorting: false,
+        },
+      ]
+    : [];
+
+  const stockColumns: ColumnDef<ProductWithRelations, unknown>[] = [
     {
       accessorKey: 'quantity_on_hand',
       header: 'Stock',
@@ -370,6 +390,12 @@ export default function ProductsPage() {
       },
       enableSorting: false,
     },
+  ];
+
+  const columns: ColumnDef<ProductWithRelations, unknown>[] = [
+    ...baseColumns,
+    ...costColumns,
+    ...stockColumns,
   ];
 
   if (loading) {

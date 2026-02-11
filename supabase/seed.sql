@@ -395,7 +395,12 @@ INSERT INTO permissions (permission_key, role, granted) VALUES
   ('settings.backup_export', 'super_admin', true),
   ('settings.backup_export', 'admin', false),
   ('settings.backup_export', 'cashier', false),
-  ('settings.backup_export', 'detailer', false);
+  ('settings.backup_export', 'detailer', false),
+  -- Inventory
+  ('inventory.view_cost_data', 'super_admin', true),
+  ('inventory.view_cost_data', 'admin', true),
+  ('inventory.view_cost_data', 'cashier', false),
+  ('inventory.view_cost_data', 'detailer', false);
 
 -- ============================================
 -- Business Settings

@@ -39,6 +39,8 @@ import {
   Search,
   MessageSquare,
   FileText,
+  ClipboardList,
+  History,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ROLE_LABELS, FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -67,6 +69,8 @@ const iconMap: Record<string, LucideIcon> = {
   ShieldCheck,
   MessageSquare,
   FileText,
+  ClipboardList,
+  History,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
