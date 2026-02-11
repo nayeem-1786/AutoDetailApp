@@ -68,20 +68,24 @@ export async function isQboConnected(): Promise<boolean> {
   });
 }
 
-/** Check if QBO sync is enabled (feature toggle ON + connected). */
+/** Check if QBO sync is enabled (business_settings toggle ON + connected). */
 export async function isQboSyncEnabled(): Promise<boolean> {
   const supabase = createAdminClient();
 
-  // Check feature flag
-  const { data: flag } = await supabase
-    .from('feature_flags')
-    .select('enabled')
+  // Check qbo_enabled in business_settings (single source of truth)
+  const { data } = await supabase
+    .from('business_settings')
+    .select('value')
     .eq('key', 'qbo_enabled')
     .single();
 
-  if (!flag?.enabled) return false;
+  if (!data) return false;
+  const val = data.value as string;
+  const enabled = (typeof val === 'string' ? val.replace(/^"|"$/g, '') : '') === 'true';
 
-  // Check connected
+  if (!enabled) return false;
+
+  // Also verify connection exists
   return isQboConnected();
 }
 
