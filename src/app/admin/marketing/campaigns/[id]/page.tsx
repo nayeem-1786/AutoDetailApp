@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Pencil, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
 
 interface CampaignDetail {
   id: string;
@@ -121,6 +121,12 @@ export default function CampaignDetailPage() {
         title={campaign.name}
         action={
           <div className="flex gap-2">
+            {['sent', 'completed'].includes(campaign.status) && (
+              <Button onClick={() => router.push(`/admin/marketing/campaigns/${id}/analytics`)}>
+                <BarChart3 className="h-4 w-4" />
+                View Analytics
+              </Button>
+            )}
             {['draft', 'scheduled'].includes(campaign.status) && (
               <Button onClick={() => router.push(`/admin/marketing/campaigns/${id}/edit`)}>
                 <Pencil className="h-4 w-4" />

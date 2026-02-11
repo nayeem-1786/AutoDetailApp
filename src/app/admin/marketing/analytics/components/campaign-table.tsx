@@ -235,7 +235,7 @@ export function CampaignTable({ period }: CampaignTableProps) {
                   {sorted.map((campaign) => (
                     <tr
                       key={campaign.id}
-                      onClick={() => router.push(`/admin/marketing/campaigns/${campaign.id}`)}
+                      onClick={() => router.push(`/admin/marketing/campaigns/${campaign.id}/analytics`)}
                       className="cursor-pointer transition-colors hover:bg-gray-50"
                     >
                       {/* Name */}

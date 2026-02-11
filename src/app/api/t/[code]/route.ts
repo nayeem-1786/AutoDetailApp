@@ -45,6 +45,16 @@ export async function GET(
       ip_address: ipAddress,
       user_agent: userAgent,
     });
+
+    // Update campaign_recipients.clicked_at on first click
+    if (trackedLink.campaign_id && trackedLink.customer_id) {
+      await supabase
+        .from('campaign_recipients')
+        .update({ clicked_at: new Date().toISOString() })
+        .eq('campaign_id', trackedLink.campaign_id)
+        .eq('customer_id', trackedLink.customer_id)
+        .is('clicked_at', null);
+    }
   } catch (clickErr) {
     // Don't block redirect if click logging fails
     console.error('[LinkTracking] Failed to record click:', clickErr);
