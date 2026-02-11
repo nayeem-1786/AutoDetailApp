@@ -307,6 +307,14 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ## Last Session: 2026-02-10
 
+### Session 9 — Coupon Wizard Customer Type Fixes
+- **Eligible count fix**: `refreshEligibleCount()` now filters by `targetCustomerType` in all 3 branches (everyone, customer, group). Added to useEffect dependency array.
+- **Unknown segment**: Added "Unknown Only" as 4th Customer Type button in coupon wizard. Targets customers with `customer_type = NULL` (349 of 1,316). POS validation handles unknown targeting with proper soft/hard enforcement.
+- **Specific Customer hides Customer Type**: When targeting = "Specific Customer", the entire Customer Type section is hidden (not just disabled). `targetCustomerType` resets to '' when switching to specific customer.
+- **Detailer → Professional**: Deprecated "Detailer" label replaced with "Professional" across coupon wizard, POS validate route, enforcement settings page, COUPONS.md, and CLAUDE.md.
+- **POS validation refactored**: Section 6c now uses `typeLabels` map and `typeMismatch` boolean logic to handle all 3 types. Fixed enforcement mode parsing to strip JSON quotes.
+- **Files modified**: `src/app/admin/marketing/coupons/new/page.tsx`, `src/app/api/pos/coupons/validate/route.ts`, `src/app/admin/settings/coupon-enforcement/page.tsx`, `docs/COUPONS.md`, `CLAUDE.md`
+
 ### Session 8 — Coupon Toggle Styling + Category Validation Fix
 - **FIX 1 ({offer_url})**: Verified already complete from Session 7 — no code changes needed.
 - **FIX 2 (coupon toggle styling)**: Fixed 2 inline toggles on `coupons/[id]/page.tsx` — status toggle `bg-gray-300` → `bg-gray-200`, auto-apply toggle `bg-blue-500` → `bg-green-500` and `bg-gray-300` → `bg-gray-200`. Now matches system-wide `Switch` component pattern.
