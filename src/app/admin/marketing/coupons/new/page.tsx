@@ -1341,8 +1341,9 @@ export default function NewCouponPage() {
                 </button>
               </div>
 
-              {/* Customer Type restriction */}
-              <div className={`mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4${targeting === 'customer' ? ' opacity-50 pointer-events-none' : ''}`}>
+              {/* Customer Type restriction (hidden for specific customer targeting) */}
+              {targeting !== 'customer' && (
+              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="mb-2 text-sm font-medium text-gray-700">Customer Type</p>
                 <div className="flex gap-2">
                   {[
@@ -1374,10 +1375,8 @@ export default function NewCouponPage() {
                         : 'Only unclassified customers (no type set) can use this coupon (enforcement depends on the Coupon Enforcement setting in Settings).'}
                   </p>
                 )}
-                {targeting === 'customer' && (
-                  <p className="text-xs text-gray-400 italic mt-1">(Not applicable for specific customer targeting)</p>
-                )}
               </div>
+              )}
 
               {/* Specific customer picker */}
               {targeting === 'customer' && (
