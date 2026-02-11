@@ -31,6 +31,7 @@ export function TicketProvider({ children }: { children: ReactNode }) {
       item_type: item.itemType,
       product_id: item.productId || undefined,
       service_id: item.serviceId || undefined,
+      category_id: item.categoryId || undefined,
       unit_price: item.unitPrice,
       quantity: item.quantity,
       item_name: item.itemName,

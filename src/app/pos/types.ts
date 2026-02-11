@@ -16,6 +16,7 @@ export interface TicketItem {
   itemType: 'product' | 'service' | 'custom';
   productId: string | null;
   serviceId: string | null;
+  categoryId: string | null; // product or service category_id — used for coupon category targeting
   itemName: string;
   quantity: number;
   unitPrice: number;

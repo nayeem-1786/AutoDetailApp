@@ -387,7 +387,7 @@ export default function CouponDetailPage() {
                 else if (coupon.status === 'disabled') openReEnableDialog();
               }}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                coupon.status === 'active' ? 'bg-green-500' : 'bg-gray-300'
+                coupon.status === 'active' ? 'bg-green-500' : 'bg-gray-200'
               }`}
               role="switch"
               aria-checked={coupon.status === 'active'}
@@ -414,7 +414,7 @@ export default function CouponDetailPage() {
               disabled={inlineSaving}
               onClick={toggleAutoApply}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                coupon.auto_apply ? 'bg-blue-500' : 'bg-gray-300'
+                coupon.auto_apply ? 'bg-green-500' : 'bg-gray-200'
               }`}
               role="switch"
               aria-checked={coupon.auto_apply}
