@@ -199,8 +199,8 @@ export class QboClient {
 
     const environment = await this.getEnvironment();
     const baseUrl = QBO_BASE_URL[environment];
-    const url = `${baseUrl}/${tokens.realm_id}/${path}?minorversion=${MINOR_VERSION}`;
-
+    const separator = path.includes('?') ? '&' : '?';
+    const url = `${baseUrl}/${tokens.realm_id}/${path}${separator}minorversion=${MINOR_VERSION}`;
     const doFetch = async (token: string) => {
       const options: RequestInit = {
         method,
@@ -323,10 +323,16 @@ export class QboClient {
 
   /** Get accounts, optionally filtered by AccountType. */
   async getAccounts(accountType?: string): Promise<QboAccount[]> {
-    const where = accountType
-      ? `AccountType = '${accountType}'`
-      : `Active = true`;
-    return this.query<QboAccount>('Account', where);
+    if (accountType) {
+      return this.query<QboAccount>('Account', `AccountType = '${accountType}'`);
+    }
+    // Fetch all accounts - use a broad query QBO supports
+    const queryStr = encodeURIComponent('SELECT * FROM Account MAXRESULTS 1000');
+    const res = await this.request<{ QueryResponse: { Account?: QboAccount[] } }>(
+      'GET',
+      `query?query=${queryStr}`
+    );
+    return res.QueryResponse.Account || [];
   }
 
   // ============================================

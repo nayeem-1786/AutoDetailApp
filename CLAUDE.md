@@ -160,9 +160,10 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Manual sync + retry + log API routes under `/api/admin/integrations/qbo/sync/`
 - POS transaction hook: fire-and-forget QBO sync after completion
 - POS customer creation hook: fire-and-forget sync when auto-sync enabled
-- Settings UI: `/admin/settings/integrations/quickbooks` with connection management, credentials, account mapping, sync controls, sync log viewer
+- Settings UI: `/admin/settings/integrations/quickbooks` — connection management, credentials, sync toggles, account mapping (income + bank from QBO API), sync stats cards, sync log viewer with filters and expandable payloads
 - QBO sync badge component (`src/components/qbo-sync-badge.tsx`) on transaction detail page
-- DB migration: `qbo_id`, `qbo_sync_status`, `qbo_sync_error`, `qbo_synced_at` columns; `qbo_sync_log` table; `feature_flags` + `business_settings` seeds
+- DB migration: `qbo_id`, `qbo_sync_status`, `qbo_sync_error`, `qbo_synced_at` columns; `qbo_sync_log` table; `business_settings` seeds
+- Fixes: query URL double-`?` in client.ts, undeclared realmId, getAccounts() syntax, removed redundant feature_flags entry
 
 ### Phase 9 — Native Online Store (NOT WooCommerce)
 Build full e-commerce within the existing Next.js app. Product catalog pages already exist at `/products` with SEO, categories, and product detail pages. Needs: cart (React context), cart drawer/page, Stripe checkout flow, order management (`orders` table, status tracking), order confirmation + email, shipping/pickup selection, order history in customer dashboard, admin order management page. No WordPress/WooCommerce — everything stays in this app. Stripe is already integrated from booking payments.
@@ -200,7 +201,6 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 | Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
 | Add `CRON_API_KEY` to production environment variables | Configuration | High |
 | Design/UX audit — modern auto detailing aesthetic | Design | High |
-| Phase 7 — QuickBooks Integration & Reporting | Feature | Medium |
 
 ### Data Notes
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
@@ -220,6 +220,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **lifecycle_rules.coupon_id:** nullable FK to `coupons` table with `ON DELETE SET NULL`. Partial index on non-null values. Legacy `coupon_type`/`coupon_value`/`coupon_expiry_days` columns remain but are unused — form uses `coupon_id` exclusively.
 - **sms_consent_log:** Audit table tracking all SMS consent changes. Source CHECK constraint: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`. RLS: authenticated users can read/write (admin pages insert directly via browser client).
 - **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling + signature validation), `src/lib/utils/sms.ts` (`sendSms()` with MMS + logging, `sendMarketingSms()` with consent + frequency cap), `src/lib/utils/phone-validation.ts` (Twilio Lookup landline detection), `docs/TCPA_AUDIT.md` (full audit report).
+- **Key QBO files:** `src/lib/qbo/client.ts` (API client with token refresh, query, CRUD methods), `src/lib/qbo/settings.ts` (read/write QBO settings, `isQboSyncEnabled()`, `isQboConnected()`), `src/lib/qbo/types.ts` (all QBO TypeScript types), `src/lib/qbo/sync-customer.ts` (customer sync engine), `src/lib/qbo/sync-catalog.ts` (service/product sync engine), `src/lib/qbo/sync-transaction.ts` (transaction → Sales Receipt sync), `src/lib/qbo/sync-log.ts` (sync log helpers), `src/lib/qbo/index.ts` (barrel exports), `src/app/api/admin/integrations/qbo/` (OAuth + settings + sync + accounts routes), `src/app/admin/settings/integrations/quickbooks/page.tsx` (settings UI), `src/components/qbo-sync-badge.tsx` (reusable sync status badge), `docs/QBO-INTEGRATION.md` (integration documentation).
 
 ---
 
@@ -285,7 +286,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Campaign duplicate endpoint**: `POST /api/marketing/campaigns/[id]/duplicate` — creates draft copy with "(Copy)" suffix, copies A/B variants.
 - **Campaign detail analytics paths**: `/admin/marketing/campaigns/[id]/analytics` — drill-down with summary KPIs, funnel, variant comparison, recipient table, click details, engagement timeline. API: `GET /api/admin/marketing/analytics/campaigns/[id]`
 - **Coupon category validation**: `TicketItem.categoryId` holds `product.category_id` or `service.category_id`. Both ticket-reducer and quote-reducer populate this on `ADD_PRODUCT`/`ADD_SERVICE`. All cart item mappings pass `category_id` to validate/promotions endpoints. The validation logic in `coupon-helpers.ts` and `pos/coupons/validate` already matches on `item.category_id` — this field was just never sent before.
-- **QBO Integration**: Lives behind `qbo_enabled` feature toggle. Source of truth is ALWAYS the Smart Details app (Supabase). QBO is a one-way accounting mirror. POS hooks are fire-and-forget — NEVER block POS for QBO. All TxnDate values in PST (America/Los_Angeles). Client library at `src/lib/qbo/`. OAuth tokens stored in `business_settings`, not env vars. Docs: `docs/QBO-INTEGRATION.md`.
+- **QBO Integration**: Lives behind `qbo_enabled` in `business_settings` (NOT feature_flags). Source of truth is ALWAYS the Smart Details app (Supabase). QBO is a one-way accounting mirror. POS hooks are fire-and-forget — NEVER block POS for QBO. All TxnDate values in PST (America/Los_Angeles). Client library at `src/lib/qbo/`. OAuth tokens stored in `business_settings`, not env vars. `isQboSyncEnabled()` checks `business_settings` + connection status.
 - **Phase 9 is Native Online Store** — NO WordPress/WooCommerce. Build cart, checkout, orders within this Next.js app. Product catalog pages already exist at `/products`.
 
 ---
@@ -322,16 +323,18 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 ## Last Session: 2026-02-10
 
 ### Phase 7: QuickBooks Online Integration (Feb 2026)
-- Built complete QBO integration behind feature toggle (`qbo_enabled`)
-- OAuth 2.0 connect/disconnect with auto token refresh (1hr access, 100-day refresh)
+- Built complete QBO integration behind business_settings toggle (`qbo_enabled`)
+- OAuth 2.0 connect/disconnect flow with auto token refresh (1hr access, 100-day refresh)
 - Sync engines: customers, services/products (catalog), transactions (as Sales Receipts)
-- POS hook fires non-blocking sync after transaction completion
-- Customer creation hook fires non-blocking sync (if auto-sync enabled)
-- Manual sync + retry for backfill and error recovery
-- Settings UI at `/admin/settings/integrations/quickbooks` with connection management, sync settings, account mapping, sync log
-- QBO sync badge component for transaction detail pages
-- DB schema: qbo_id/qbo_sync_status/qbo_sync_error/qbo_synced_at on transactions, qbo_id on customers/services/products, qbo_sync_log table
-- Files: `src/lib/qbo/*`, `src/app/api/admin/integrations/qbo/*`, `src/app/admin/settings/integrations/quickbooks/`, `src/components/qbo-sync-badge.tsx`
+- POS hook in `transactions/route.ts` fires non-blocking sync after transaction completion
+- Customer hook in `customers/route.ts` fires non-blocking sync on creation
+- Manual sync + retry routes at `/api/admin/integrations/qbo/sync/`
+- Settings UI at `/admin/settings/integrations/quickbooks` — connection management, sync toggles, account mapping dropdowns (income + bank from QBO API), sync stats, sync log viewer with filters
+- QBO sync badge component (`src/components/qbo-sync-badge.tsx`) integrated into transaction detail
+- Fixed: query URL double-`?` bug in `client.ts` (minorversion param separator)
+- Fixed: undeclared `realmId` variable in `client.ts` `request()` method
+- Fixed: `getAccounts()` query syntax for fetching all accounts without WHERE filter
+- Fixed: removed redundant `qbo_enabled` from `feature_flags` table — `business_settings` is single source of truth
 - Docs: `docs/QBO-INTEGRATION.md`
 
 ### Session 9 — Coupon Wizard Customer Type Fixes
@@ -432,7 +435,6 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 ### Next Session Priorities
 1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
 2. Phase 6 — Review stock & vendor pages, consolidate duplicate vendor pages (catalog vs inventory), then build PO/receiving/COGS.
-3. Phase 7 — QuickBooks Integration & Reporting
 
 ---
 
