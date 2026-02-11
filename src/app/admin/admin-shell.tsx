@@ -246,7 +246,7 @@ function CommandPalette({
 function AdminContent({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, signOut } = useAuth();
   const { info: businessInfo } = useBusinessInfo();
-  const { enabled: twoWaySmsEnabled } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
+  const { enabled: twoWaySmsEnabled, loading: flagsLoading } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
   const { enabled: inventoryEnabled } = useFeatureFlag(FEATURE_FLAGS.INVENTORY_MANAGEMENT);
   const router = useRouter();
   const pathname = usePathname();
@@ -396,7 +396,9 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   if (!employee || !role) return null;
 
   // Filter out nav items when their feature flag is disabled
+  // Show all items while flags are loading to prevent flash of missing content
   const navItems = getNavForRole(role).filter((item) => {
+    if (flagsLoading) return true;
     if (item.href === '/admin/messaging') return twoWaySmsEnabled;
     if (item.href === '/admin/inventory') return inventoryEnabled;
     return true;
