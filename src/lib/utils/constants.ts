@@ -183,9 +183,10 @@ export const FEATURE_FLAGS = {
   WAITLIST: 'waitlist',
   PHOTO_DOCUMENTATION: 'photo_documentation',
   CANCELLATION_FEE: 'cancellation_fee',
-  REFERRAL_PROGRAM: 'referral_program',
   MOBILE_SERVICE: 'mobile_service',
   QBO_ENABLED: 'qbo_enabled',
+  ONLINE_STORE: 'online_store',
+  INVENTORY_MANAGEMENT: 'inventory_management',
 } as const;
 
 // Messaging

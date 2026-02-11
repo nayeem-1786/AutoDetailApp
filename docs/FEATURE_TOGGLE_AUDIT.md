@@ -461,3 +461,50 @@ The Feature Toggles page currently shows a flat alphabetical list. Grouping woul
 | `two_way_sms` | `src/app/api/webhooks/twilio/inbound/route.ts`, `src/app/api/messaging/` |
 | `cancellation_fee` | `src/app/admin/appointments/components/cancel-appointment-dialog.tsx`, `src/app/api/appointments/[id]/cancel/route.ts` |
 | `mobile_service` | `src/components/booking/step-configure.tsx`, `src/lib/data/booking.ts`, `src/app/api/book/route.ts` |
+
+---
+
+## Remediation Complete — 2026-02-11
+
+### Session 1: Server-side utility + marketing orphans
+- Created `src/lib/utils/feature-flags.ts` with `isFeatureEnabled()`
+- Wired `sms_marketing` into campaign send routes + lifecycle engine
+- Wired `email_marketing` into campaign email send routes
+
+### Session 2: POS + booking orphans
+- Wired `loyalty_rewards` into points accumulation, redemption, POS panel, portal, booking
+- Wired `cancellation_fee` into cancel dialogs and fee processing
+- Wired `mobile_service` into booking flow and travel fee calculation
+
+### Session 3: Two-way SMS (nuanced)
+- Wired `two_way_sms` into inbound webhook (after STOP/START), sidebar nav, inbox UI
+- STOP/START keyword processing preserved regardless of toggle (TCPA compliance)
+
+### Session 4: Cleanup + organization
+- Removed `referral_program` (dead flag, no roadmap)
+- Added `online_store` placeholder (Phase 9)
+- Added `inventory_management` (Operations — gates sidebar nav)
+- Added `category` column to `feature_flags` table
+- Organized all flags into categories: Core POS, Marketing, Communication, Booking, Integrations, Operations, Future
+- Updated all labels and descriptions to be specific about what toggling off does
+- Feature Toggles page now groups by category with "Coming Soon" badge for Future flags
+- Inventory nav section hidden when `inventory_management` flag disabled
+
+### Final Flag Status
+| Flag | Category | Status | Wired |
+|------|----------|--------|-------|
+| loyalty_rewards | Core POS | Active | Session 2 |
+| cancellation_fee | Core POS | Active | Session 2 |
+| sms_marketing | Marketing | Active | Session 1 |
+| email_marketing | Marketing | Active | Session 1 |
+| google_review_requests | Marketing | Active | Already wired |
+| two_way_sms | Communication | Active | Session 3 |
+| online_booking_payment | Booking | Active | Already wired |
+| waitlist | Booking | Active | Already wired |
+| mobile_service | Booking | Active | Session 2 |
+| qbo_enabled | Integrations | Active | Separate session |
+| inventory_management | Operations | Active | Session 4 |
+| recurring_services | Future | Placeholder | N/A — Phase 10 |
+| photo_documentation | Future | Placeholder | N/A — Phase 8 |
+| online_store | Future | Placeholder | N/A — Phase 9 |
+| ~~referral_program~~ | — | Removed | — |

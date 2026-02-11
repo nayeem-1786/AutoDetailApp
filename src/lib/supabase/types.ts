@@ -636,6 +636,7 @@ export interface FeatureFlag {
   key: string;
   name: string;
   description: string | null;
+  category: string | null;
   enabled: boolean;
   config: Record<string, unknown>;
   updated_by: string | null;

@@ -297,6 +297,14 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Feature flag checks (server-side)**: Use `isFeatureEnabled(key)` from `src/lib/utils/feature-flags.ts` for all API route flag checks. Uses `createAdminClient()` (service role). Fails closed. Import `FEATURE_FLAGS` from constants for key names.
 - **sms_marketing flag**: Gates campaign SMS sends (immediate + scheduled) and lifecycle engine Phase 2. Does NOT gate transactional SMS (appointment reminders, quote notifications, STOP/START processing).
 - **email_marketing flag**: Gates campaign email sends (immediate + scheduled). Does NOT gate transactional emails (booking confirmations, password resets, quote PDFs).
+- **two_way_sms flag**: Gates conversation creation, AI auto-responder, after-hours replies, auto-quote, staff inbox UI, and sidebar badges. STOP/START keyword processing and `sms_consent_log` updates are ALWAYS active regardless of this flag (TCPA compliance). The AI Assistant sub-toggle in messaging settings only applies when `two_way_sms` is ON. Inbound webhook order: signature validation → parse → customer lookup → STOP/START consent → feature flag check → conversation/AI/auto-quote.
+- **Feature flag categories**: Core POS, Marketing, Communication, Booking, Integrations, Operations, Future. "Future" flags are placeholders for upcoming phases — visually distinct on the Feature Toggles page with "Coming Soon" badge.
+- **inventory_management flag**: Gates inventory section visibility in admin sidebar. When disabled, hides Stock Overview and Vendors nav items.
+- **online_store flag**: Phase 9 placeholder. Will gate shopping cart/checkout when built.
+- **referral_program removed**: Dead flag with no code or roadmap. Deleted in Session 4 cleanup.
+- **loyalty_rewards flag**: Gates points accumulation (POS earn route + transaction completion), redemption (POS redeem route), POS loyalty panel, quote loyalty panel, customer portal loyalty page, and portal loyalty API. Existing points preserved when disabled. Server-side: `isFeatureEnabled()` in earn/redeem/transaction routes + customer loyalty API. Client-side: `useFeatureFlag()` in loyalty-panel, quote-loyalty-panel, portal loyalty page.
+- **cancellation_fee flag**: Gates the fee input field in cancel-appointment-dialog and fee processing in cancel API route. The cancel action itself still works — just without a fee. Server-side: cancel route sets fee to null when disabled. Client-side: `useFeatureFlag()` hides fee input. Booking flow disclaimer conditionally shows "$50 fee" text only when enabled.
+- **mobile_service flag**: Gates mobile/on-location booking option. Server-side: `getMobileZones()` returns empty array when disabled; book API route rejects mobile bookings when disabled. Client-side: step-configure hides mobile toggle when no zones available. Mobile Zones settings page shows warning banner when disabled (page still accessible for configuration).
 
 ---
 
@@ -331,7 +339,46 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 11 — Feature Toggle Fix: Server Utility + Marketing Orphans)
+## Last Session: 2026-02-11 (Session 15 — Feature Toggle Cleanup: Categories + Organization)
+- Removed `referral_program` dead flag (no code exists, not on roadmap)
+- Added `online_store` placeholder flag (Phase 9, Future category)
+- Added `inventory_management` flag (Operations category, default ON) — gates inventory sidebar nav
+- Added `category` column to `feature_flags` table (migration `20260211000002`)
+- Organized all 14 flags into 7 categories: Core POS, Marketing, Communication, Booking, Integrations, Operations, Future
+- Updated all flag labels and descriptions to clearly describe what gets disabled
+- Rewrote Feature Toggles page to group by category with "Coming Soon" badge for Future flags (opacity-60)
+- Updated seed.sql with categories, new flags, removed referral_program
+- Updated FeatureFlag TypeScript interface with `category` field
+- Wired `inventory_management` into admin-shell.tsx sidebar nav filter
+- TypeScript clean, 6 files changed + 1 migration
+
+### Session 14 — Feature Toggle Fix: Two-Way SMS
+- Wired `two_way_sms` feature flag to gate all messaging inbox features
+- **Inbound webhook restructured**: STOP/START keyword processing + consent updates ALWAYS run (TCPA compliance). Moved before conversation creation. Feature flag check gates conversation creation, AI auto-responder, after-hours replies, auto-quote, and message storage.
+- When flag is ON + STOP/START keyword: consent updated AND logged to conversation (staff visibility preserved)
+- When flag is OFF + STOP/START keyword: consent updated only (no conversation created)
+- **Admin sidebar**: Messaging nav item + unread badge hidden when flag is off. Unread count fetch skipped.
+- **Messaging inbox** (`/admin/messaging`): Shows disabled state with `MessageSquareOff` icon and link to Feature Toggles
+- **Messaging settings** (`/admin/settings/messaging`): Amber info banner when flag is off, settings still editable for pre-configuration
+- **Staff reply API** (`POST /api/messaging/conversations/[id]/messages`): Returns 403 when flag is off
+- Updated flag description: "Receive and respond to customer SMS messages. Includes team inbox, AI auto-responder, and auto-quotes. Disabling hides the messaging inbox and stops AI responses. STOP/START opt-out processing always remains active for compliance."
+- Migration `20260211000003`, TypeScript clean, 7 files changed
+
+### Session 13 — Feature Toggle Fix: Loyalty, Cancellation Fee, Mobile Service
+- Wired `loyalty_rewards` flag into all loyalty code paths:
+  - Server-side: POS earn route (returns 0 points when off), POS redeem route (returns 403), transaction route section 6 (skips earn/redeem logic), customer portal loyalty API (returns empty data)
+  - Client-side: POS loyalty-panel + quote-loyalty-panel (hidden when off), portal loyalty page (shows "not available" message)
+- Wired `cancellation_fee` flag into cancellation flow:
+  - Server-side: cancel API route sets fee to null when disabled (ignores client-sent value)
+  - Client-side: cancel-appointment-dialog hides fee input field when off
+  - Booking step-review: cancellation disclaimer conditionally shows "$50 fee" text only when enabled
+- Wired `mobile_service` flag into booking flow:
+  - Server-side: `getMobileZones()` returns empty array when off (hides mobile option from booking wizard), book API route rejects `is_mobile: true` bookings with 400 when off
+  - Client-side: step-configure hides mobile toggle when `mobileZones.length === 0`
+  - Mobile Zones settings page shows amber warning banner with link to Feature Toggles when off (page still accessible for configuration)
+- TypeScript clean, 14 files changed
+
+### Session 12 — Feature Toggle Fix: Server Utility + Marketing Orphans
 - Created `src/lib/utils/feature-flags.ts` — `isFeatureEnabled(key)` server-side utility using `createAdminClient()`, fail-closed
 - Replaced ALL inline `feature_flags` queries in API routes with `isFeatureEnabled()`: `qbo/settings.ts`, `qbo/status/route.ts`, `lifecycle-engine/route.ts`, `waitlist/route.ts`, `appointments/[id]/cancel/route.ts`
 - Wired `sms_marketing` flag into: campaign immediate send (`[id]/send/route.ts`), campaign scheduled send (`process-scheduled/route.ts`), lifecycle engine Phase 2 (skips all pending executions when disabled — Phase 1 scheduling still runs so executions send when re-enabled)
@@ -340,6 +387,12 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Added warning banners to campaign wizard (basics step) when selected channel's marketing flag is disabled
 - Updated `sms_marketing` and `email_marketing` flag names/descriptions in seed.sql and live DB (migration `20260211000001`) to clearly communicate what gets disabled
 - TypeScript clean, 10 files changed
+
+### Session 11 — Feature Toggle Audit
+- Created `docs/FEATURE_TOGGLE_AUDIT.md` — audited all 13 feature flags
+- Found 5 orphan flags (feature built but flag not checked), 3 placeholders, 4 wired, 1 special (QBO)
+- Identified critical gap: no server-side `isFeatureEnabled()` utility
+- Documented recommended categories, missing infrastructure, and fix priorities
 
 ### Session 10b — QBO Architecture Fix
 - Restored `qbo_enabled` feature flag as master toggle (was incorrectly deleted)
