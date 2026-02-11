@@ -89,22 +89,16 @@ export class QboClient {
     const tokens = await this.getTokens();
     if (!tokens) throw new QboApiError('Not connected to QBO', 'NOT_CONNECTED', '', 0);
 
-    // Read client credentials from business_settings
-    const { data: credRows } = await this.supabase
-      .from('business_settings')
-      .select('key, value')
-      .in('key', ['qbo_client_id', 'qbo_client_secret']);
-
-    const creds: Record<string, string> = {};
-    for (const row of credRows ?? []) {
-      const val = row.value as string;
-      creds[row.key] = typeof val === 'string' ? val.replace(/^"|"$/g, '') : '';
-    }
-
-    const clientId = creds.qbo_client_id;
-    const clientSecret = creds.qbo_client_secret;
+    // Read client credentials from env vars
+    const clientId = process.env.QBO_CLIENT_ID;
+    const clientSecret = process.env.QBO_CLIENT_SECRET;
     if (!clientId || !clientSecret) {
-      throw new QboApiError('QBO client credentials not configured', 'NO_CREDENTIALS', '', 0);
+      throw new QboApiError(
+        'QBO credentials not configured — add QBO_CLIENT_ID and QBO_CLIENT_SECRET to .env.local',
+        'NO_CREDENTIALS',
+        '',
+        0
+      );
     }
 
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');

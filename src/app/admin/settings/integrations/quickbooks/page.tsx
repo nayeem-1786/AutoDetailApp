@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { PageHeader } from '@/components/ui/page-header';
@@ -18,13 +19,12 @@ import { toast } from 'sonner';
 import {
   Plug,
   RefreshCw,
-  Eye,
-  EyeOff,
   CheckCircle2,
   Clock,
   XCircle,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface QboStatus {
@@ -33,6 +33,7 @@ interface QboStatus {
   realm_id: string | null;
   environment: string;
   enabled: boolean;
+  credentials_configured: boolean;
   last_sync_at: string | null;
   auto_sync: {
     transactions: boolean;
@@ -73,11 +74,7 @@ export default function QuickBooksSettingsPage() {
   // State
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<QboStatus | null>(null);
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
-  const [showSecret, setShowSecret] = useState(false);
   const [environment, setEnvironment] = useState<'sandbox' | 'production'>('sandbox');
-  const [savingCredentials, setSavingCredentials] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -113,6 +110,7 @@ export default function QuickBooksSettingsPage() {
   const [syncing, setSyncing] = useState<string | null>(null);
 
   const isConnected = connectionStatus?.status === 'connected';
+  const credentialsConfigured = connectionStatus?.credentials_configured ?? false;
 
   // ── Load connection status ──
   const loadStatus = useCallback(async () => {
@@ -130,14 +128,12 @@ export default function QuickBooksSettingsPage() {
     }
   }, []);
 
-  // ── Load settings (credentials + account IDs) ──
+  // ── Load settings (account IDs + environment) ──
   const loadSettings = useCallback(async () => {
     try {
       const res = await adminFetch('/api/admin/integrations/qbo/settings');
       if (res.ok) {
         const data = await res.json();
-        setClientId(data.qbo_client_id || '');
-        setClientSecret(data.qbo_client_secret || '');
         setEnvironment(data.qbo_environment === 'production' ? 'production' : 'sandbox');
         setIncomeAccountId(data.qbo_income_account_id || '');
         setDepositAccountId(data.qbo_default_payment_method_id || '');
@@ -256,6 +252,9 @@ export default function QuickBooksSettingsPage() {
     if (searchParams.get('error') === 'invalid_state') {
       toast.error('Connection failed — please try again');
     }
+    if (searchParams.get('error') === 'no_credentials') {
+      toast.error('QBO credentials not configured — add QBO_CLIENT_ID and QBO_CLIENT_SECRET to .env.local');
+    }
     if (searchParams.get('error') === 'token_exchange_failed') {
       toast.error('Failed to complete authorization');
     }
@@ -275,28 +274,21 @@ export default function QuickBooksSettingsPage() {
 
   // ── Handlers ──
 
-  async function handleSaveCredentials() {
-    setSavingCredentials(true);
+  async function handleSaveEnvironment() {
     try {
       const res = await adminFetch('/api/admin/integrations/qbo/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          qbo_client_id: clientId,
-          qbo_client_secret: clientSecret,
-          qbo_environment: environment,
-        }),
+        body: JSON.stringify({ qbo_environment: environment }),
       });
       if (res.ok) {
-        toast.success('Credentials saved');
+        toast.success('Environment saved');
       } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to save');
+        toast.error('Failed to save environment');
       }
     } catch {
-      toast.error('Failed to save credentials');
+      toast.error('Failed to save environment');
     }
-    setSavingCredentials(false);
   }
 
   async function handleDisconnect() {
@@ -428,6 +420,14 @@ export default function QuickBooksSettingsPage() {
         description="Connect to QuickBooks for accounting sync."
       />
 
+      {/* Feature toggle note */}
+      <p className="text-sm text-gray-500">
+        Enable or disable this integration from{' '}
+        <Link href="/admin/settings/feature-toggles" className="text-blue-600 hover:text-blue-800 hover:underline">
+          Settings &rarr; Feature Toggles
+        </Link>.
+      </p>
+
       {/* ── Section 1: Connection Status ── */}
       <Card>
         <CardHeader>
@@ -441,6 +441,22 @@ export default function QuickBooksSettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Credentials status */}
+          <div className="text-sm">
+            {credentialsConfigured ? (
+              <p className="text-green-700">
+                <CheckCircle2 className="mr-1 inline h-4 w-4" />
+                API Credentials: Configured
+              </p>
+            ) : (
+              <p className="text-amber-700">
+                <AlertTriangle className="mr-1 inline h-4 w-4" />
+                API Credentials: Not configured — add <code className="rounded bg-gray-100 px-1 text-xs">QBO_CLIENT_ID</code> and{' '}
+                <code className="rounded bg-gray-100 px-1 text-xs">QBO_CLIENT_SECRET</code> to .env.local
+              </p>
+            )}
+          </div>
+
           {isConnected ? (
             <>
               {connectionStatus?.company_name && (
@@ -484,36 +500,6 @@ export default function QuickBooksSettingsPage() {
             </>
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField label="Client ID" htmlFor="qbo_client_id">
-                  <Input
-                    id="qbo_client_id"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    placeholder="Enter Intuit Client ID"
-                  />
-                </FormField>
-                <FormField label="Client Secret" htmlFor="qbo_client_secret">
-                  <div className="relative">
-                    <Input
-                      id="qbo_client_secret"
-                      type={showSecret ? 'text' : 'password'}
-                      value={clientSecret}
-                      onChange={(e) => setClientSecret(e.target.value)}
-                      placeholder="Enter Intuit Client Secret"
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSecret(!showSecret)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </FormField>
-              </div>
-
               <FormField label="Environment" htmlFor="qbo_environment">
                 <Select
                   id="qbo_environment"
@@ -527,14 +513,13 @@ export default function QuickBooksSettingsPage() {
 
               <div className="flex gap-3">
                 <Button
-                  onClick={handleSaveCredentials}
-                  disabled={savingCredentials || !clientId || !clientSecret}
+                  variant="outline"
+                  onClick={handleSaveEnvironment}
                 >
-                  {savingCredentials ? 'Saving...' : 'Save Credentials'}
+                  Save Environment
                 </Button>
                 <Button
-                  variant="outline"
-                  disabled={!clientId || !clientSecret}
+                  disabled={!credentialsConfigured}
                   onClick={() => {
                     window.location.href = '/api/admin/integrations/qbo/connect';
                   }}

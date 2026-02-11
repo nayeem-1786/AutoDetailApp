@@ -45,12 +45,20 @@ export async function GET() {
       }
     }
 
+    // Read feature flag for enabled status
+    const { data: flag } = await supabase
+      .from('feature_flags')
+      .select('enabled')
+      .eq('key', 'qbo_enabled')
+      .single();
+
     return NextResponse.json({
       status: connected ? 'connected' : 'disconnected',
       company_name: companyName,
       realm_id: realmId || null,
       environment: map.qbo_environment || 'sandbox',
-      enabled: map.qbo_enabled === 'true',
+      enabled: flag?.enabled ?? false,
+      credentials_configured: !!(process.env.QBO_CLIENT_ID && process.env.QBO_CLIENT_SECRET),
       last_sync_at: map.qbo_last_sync_at || null,
       auto_sync: {
         transactions: map.qbo_auto_sync_transactions !== 'false',

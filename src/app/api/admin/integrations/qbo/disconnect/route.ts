@@ -18,36 +18,37 @@ export async function POST() {
 
     const supabase = createAdminClient();
 
-    // Read current tokens and credentials for revocation
-    const { data: settings } = await supabase
+    // Read refresh token for revocation
+    const { data: tokenRow } = await supabase
       .from('business_settings')
-      .select('key, value')
-      .in('key', ['qbo_refresh_token', 'qbo_client_id', 'qbo_client_secret']);
+      .select('value')
+      .eq('key', 'qbo_refresh_token')
+      .single();
 
-    const map: Record<string, string> = {};
-    for (const row of settings || []) {
-      const val = row.value as string;
-      map[row.key] = typeof val === 'string' ? val.replace(/^"|"$/g, '') : '';
-    }
+    const refreshToken = tokenRow
+      ? (typeof tokenRow.value === 'string' ? (tokenRow.value as string).replace(/^"|"$/g, '') : '')
+      : '';
 
     // Attempt to revoke the refresh token with Intuit
-    if (map.qbo_refresh_token && map.qbo_client_id && map.qbo_client_secret) {
+    const clientId = process.env.QBO_CLIENT_ID;
+    const clientSecret = process.env.QBO_CLIENT_SECRET;
+    if (refreshToken && clientId && clientSecret) {
       try {
-        const basicAuth = Buffer.from(`${map.qbo_client_id}:${map.qbo_client_secret}`).toString('base64');
+        const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
         await fetch('https://developer.api.intuit.com/v2/oauth2/tokens/revoke', {
           method: 'POST',
           headers: {
             'Authorization': `Basic ${basicAuth}`,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({ token: map.qbo_refresh_token }),
+          body: new URLSearchParams({ token: refreshToken }),
         });
       } catch (revokeErr) {
         console.warn('Failed to revoke QBO token (continuing with disconnect):', revokeErr);
       }
     }
 
-    // Clear token fields (keep client_id, client_secret, and sync settings)
+    // Clear token fields (keep sync settings)
     const now = new Date().toISOString();
     const tokenKeys = [
       'qbo_access_token',

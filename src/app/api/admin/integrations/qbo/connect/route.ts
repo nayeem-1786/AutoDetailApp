@@ -18,19 +18,8 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Read client ID from business_settings
-    const { data: settings } = await supabase
-      .from('business_settings')
-      .select('key, value')
-      .in('key', ['qbo_client_id', 'qbo_environment']);
-
-    const map: Record<string, string> = {};
-    for (const row of settings || []) {
-      const val = row.value as string;
-      map[row.key] = typeof val === 'string' ? val.replace(/^"|"$/g, '') : '';
-    }
-
-    const clientId = map.qbo_client_id;
+    // Read client ID from env vars
+    const clientId = process.env.QBO_CLIENT_ID;
     if (!clientId) {
       return NextResponse.redirect(
         new URL('/admin/settings/integrations/quickbooks?error=no_credentials', request.url)

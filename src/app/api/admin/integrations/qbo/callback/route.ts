@@ -41,20 +41,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(redirectBase.toString());
     }
 
-    // Read client credentials
-    const { data: credRows } = await supabase
-      .from('business_settings')
-      .select('key, value')
-      .in('key', ['qbo_client_id', 'qbo_client_secret']);
-
-    const creds: Record<string, string> = {};
-    for (const row of credRows || []) {
-      const val = row.value as string;
-      creds[row.key] = typeof val === 'string' ? val.replace(/^"|"$/g, '') : '';
-    }
-
-    const clientId = creds.qbo_client_id;
-    const clientSecret = creds.qbo_client_secret;
+    // Read client credentials from env vars
+    const clientId = process.env.QBO_CLIENT_ID;
+    const clientSecret = process.env.QBO_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
       redirectBase.searchParams.set('error', 'no_credentials');

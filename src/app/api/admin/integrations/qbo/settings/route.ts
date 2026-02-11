@@ -3,13 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const ALLOWED_KEYS = [
-  'qbo_enabled',
   'qbo_environment',
   'qbo_auto_sync_transactions',
   'qbo_auto_sync_customers',
   'qbo_auto_sync_catalog',
-  'qbo_client_id',
-  'qbo_client_secret',
   'qbo_income_account_id',
   'qbo_default_payment_method_id',
 ] as const;
@@ -73,26 +70,6 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const supabase = createAdminClient();
     const now = new Date().toISOString();
-
-    // Validate: qbo_enabled can only be true if connected
-    if (body.qbo_enabled === 'true' || body.qbo_enabled === true) {
-      const { data: realmRow } = await supabase
-        .from('business_settings')
-        .select('value')
-        .eq('key', 'qbo_realm_id')
-        .single();
-
-      const realmId = realmRow
-        ? (typeof realmRow.value === 'string' ? (realmRow.value as string).replace(/^"|"$/g, '') : '')
-        : '';
-
-      if (!realmId) {
-        return NextResponse.json(
-          { error: 'Cannot enable QBO sync — not connected. Please connect first.' },
-          { status: 400 }
-        );
-      }
-    }
 
     // Update each allowed key that was provided
     for (const key of ALLOWED_KEYS) {

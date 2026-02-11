@@ -18,9 +18,8 @@ export interface QboTokens {
   token_expires_at: string;
 }
 
-/** QBO Settings from business_settings */
+/** QBO Settings from business_settings (excludes qbo_enabled — that's in feature_flags) */
 export interface QboSettings {
-  qbo_enabled: boolean;
   qbo_environment: 'sandbox' | 'production';
   qbo_auto_sync_transactions: boolean;
   qbo_auto_sync_customers: boolean;

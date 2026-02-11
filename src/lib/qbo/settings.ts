@@ -40,7 +40,6 @@ export async function getQboSettings(): Promise<QboSettings> {
   }
 
   return {
-    qbo_enabled: raw.qbo_enabled === 'true',
     qbo_environment: raw.qbo_environment === 'production' ? 'production' : 'sandbox',
     qbo_auto_sync_transactions: raw.qbo_auto_sync_transactions !== 'false',
     qbo_auto_sync_customers: raw.qbo_auto_sync_customers !== 'false',
@@ -68,24 +67,20 @@ export async function isQboConnected(): Promise<boolean> {
   });
 }
 
-/** Check if QBO sync is enabled (business_settings toggle ON + connected). */
+/** Check if QBO sync is enabled (feature flag ON + connected). */
 export async function isQboSyncEnabled(): Promise<boolean> {
   const supabase = createAdminClient();
 
-  // Check qbo_enabled in business_settings (single source of truth)
-  const { data } = await supabase
-    .from('business_settings')
-    .select('value')
+  // Check feature flag (master toggle from Feature Toggles page)
+  const { data: flag } = await supabase
+    .from('feature_flags')
+    .select('enabled')
     .eq('key', 'qbo_enabled')
     .single();
 
-  if (!data) return false;
-  const val = data.value as string;
-  const enabled = (typeof val === 'string' ? val.replace(/^"|"$/g, '') : '') === 'true';
+  if (!flag?.enabled) return false;
 
-  if (!enabled) return false;
-
-  // Also verify connection exists
+  // Also verify we're actually connected to QBO
   return isQboConnected();
 }
 
