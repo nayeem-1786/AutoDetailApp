@@ -81,7 +81,7 @@ export default function CouponEnforcementPage() {
           <div className="mb-4 flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              When a coupon has a customer type restriction (e.g. &ldquo;Enthusiast Only&rdquo;)
+              When a coupon has a customer type restriction (e.g. &ldquo;Enthusiast Only&rdquo;, &ldquo;Professional Only&rdquo;, or &ldquo;Unknown Only&rdquo;)
               and a non-matching customer tries to use it, this setting controls what happens.
             </span>
           </div>

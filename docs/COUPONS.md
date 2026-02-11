@@ -114,14 +114,15 @@ The coupon creation UI is a 6-step wizard at `/admin/marketing/coupons/new`. Pro
 **Eligible Customer Count:**
 An inline counter at the bottom of this step shows how many customers match the current targeting configuration (e.g., "12 eligible customers"). This updates automatically as you change targeting options, helping you gauge whether the audience is too narrow or too broad.
 
-**Note on customer types:** Customer types are stored in the `customer_type` column (not tags). Two types exist:
+**Note on customer types:** Customer types are stored in the `customer_type` column:
 - **Enthusiast** — Retail customers who get detailing services or walk in to purchase products for personal use.
-- **Professional** — Detailers, auto body repair shops, and auto dealers who buy chemicals (usually in bulk) or send staff to purchase in-store.
+- **Professional** — Detailers, auto body repair shops, and auto dealers who buy chemicals (usually in bulk) or send staff to purchase in-store. (Replaces the deprecated term "Detailer".)
+- **Unknown** — Customers with `customer_type = NULL`. Targetable as a marketing segment for outreach and classification campaigns.
 
-The `CustomerTypeBadge` component cycles `null → enthusiast → professional → null` on click. The deprecated term "Detailer" has been replaced with "Professional" throughout.
+The `CustomerTypeBadge` component cycles `null → enthusiast → professional → null` on click. The coupon wizard allows targeting any of these three segments plus "Any Type" (no filter).
 
 **Example:**
-> Use "Customer Group" with the "Professional" tag to offer discounts to all your professional customers (detailers, body shops, dealers). Use "Specific Customer" for one-off coupons like a birthday discount.
+> Use the "Professional Only" customer type filter to offer discounts to all your professional customers (detailers, body shops, dealers). Use "Specific Customer" for one-off coupons like a birthday discount.
 
 ### Step 3 — Conditions (optional)
 
@@ -304,7 +305,7 @@ When `auto_apply = true`:
 1. POS checks all auto-apply coupons after each item added to ticket
 2. For each auto-apply coupon: verify targeting (customer/tags) and conditions
 3. If conditions met and no coupon already applied, auto-apply with best discount
-4. Cashier sees a notification: "Coupon DETAILER10 auto-applied: 10% off"
+4. Cashier sees a notification: "Coupon PRO10 auto-applied: 10% off"
 5. Cashier can remove the auto-applied coupon if needed
 
 Auto-apply coupons still have a `code` (for reference/tracking) but the code is not entered manually.

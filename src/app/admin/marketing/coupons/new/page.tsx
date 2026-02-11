@@ -588,7 +588,9 @@ export default function NewCouponPage() {
         let query = supabase
           .from('customers')
           .select('*', { count: 'exact', head: true });
-        if (targetCustomerType) {
+        if (targetCustomerType === 'unknown') {
+          query = query.is('customer_type', null);
+        } else if (targetCustomerType) {
           query = query.eq('customer_type', targetCustomerType);
         }
         const { count } = await query;
@@ -603,7 +605,12 @@ export default function NewCouponPage() {
             .select('customer_type')
             .eq('id', customerId)
             .single();
-          setEligibleCount(cust?.customer_type === targetCustomerType ? 1 : 0);
+          const custType = cust?.customer_type || null;
+          if (targetCustomerType === 'unknown') {
+            setEligibleCount(custType === null ? 1 : 0);
+          } else {
+            setEligibleCount(custType === targetCustomerType ? 1 : 0);
+          }
         } else {
           setEligibleCount(1);
         }
@@ -617,7 +624,11 @@ export default function NewCouponPage() {
             .select('tags, customer_type');
           if (data) {
             const matched = data.filter((c: { tags: string[] | null; customer_type: string | null }) => {
-              if (targetCustomerType && c.customer_type !== targetCustomerType) return false;
+              if (targetCustomerType === 'unknown') {
+                if (c.customer_type !== null) return false;
+              } else if (targetCustomerType) {
+                if (c.customer_type !== targetCustomerType) return false;
+              }
               const ct: string[] = Array.isArray(c.tags) ? c.tags : [];
               if (tagMatchMode === 'all') {
                 return customerTags.every((t) => ct.includes(t));
@@ -1021,7 +1032,8 @@ export default function NewCouponPage() {
       desc = 'Everyone';
     }
     if (targetCustomerType) {
-      desc += ` (${targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Professional'} only)`;
+      const typeLabels: Record<string, string> = { enthusiast: 'Enthusiast', professional: 'Professional', unknown: 'Unclassified' };
+      desc += ` (${typeLabels[targetCustomerType] || targetCustomerType} only)`;
     }
     return desc;
   }
@@ -1332,14 +1344,12 @@ export default function NewCouponPage() {
               {/* Customer Type restriction */}
               <div className={`mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4${targeting === 'customer' ? ' opacity-50 pointer-events-none' : ''}`}>
                 <p className="mb-2 text-sm font-medium text-gray-700">Customer Type</p>
-                {targeting === 'customer' && (
-                  <p className="mb-2 text-xs text-gray-500">(Not applicable for specific customer)</p>
-                )}
                 <div className="flex gap-2">
                   {[
                     { value: '', label: 'Any Type' },
                     { value: 'enthusiast', label: 'Enthusiast Only' },
                     { value: 'professional', label: 'Professional Only' },
+                    { value: 'unknown', label: 'Unknown Only' },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -1357,9 +1367,15 @@ export default function NewCouponPage() {
                 </div>
                 {targetCustomerType && (
                   <p className="mt-1.5 text-xs text-gray-500">
-                    Only customers marked as &ldquo;{targetCustomerType === 'enthusiast' ? 'Enthusiast' : 'Professional'}&rdquo; can use this coupon
-                    (enforcement depends on the Coupon Enforcement setting in Settings).
+                    {targetCustomerType === 'enthusiast'
+                      ? 'Only customers marked as Enthusiast can use this coupon (enforcement depends on the Coupon Enforcement setting in Settings).'
+                      : targetCustomerType === 'professional'
+                        ? 'Only customers marked as Professional can use this coupon (enforcement depends on the Coupon Enforcement setting in Settings).'
+                        : 'Only unclassified customers (no type set) can use this coupon (enforcement depends on the Coupon Enforcement setting in Settings).'}
                   </p>
+                )}
+                {targeting === 'customer' && (
+                  <p className="text-xs text-gray-400 italic mt-1">(Not applicable for specific customer targeting)</p>
                 )}
               </div>
 

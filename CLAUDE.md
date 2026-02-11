@@ -226,7 +226,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Session expiry:** `adminFetch()` from `@/lib/utils/admin-fetch` auto-redirects on 401
 
 ### Critical Rules
-- **Customer types:** `enthusiast` (retail customers, personal use) and `professional` (detailers, body shops, dealers, bulk buyers). The term "Detailer" as a customer type label is deprecated — always use "Professional". DB column: `customers.customer_type`. Badge cycles: `null → enthusiast → professional → null`.
+- **Customer types:** `enthusiast` (retail, personal use), `professional` (detailers, body shops, dealers, bulk buyers), and `unknown` (NULL, unclassified — targetable segment). The term "Detailer" as a customer type label is deprecated — always use "Professional". DB column: `customers.customer_type`. Badge cycles: `null → enthusiast → professional → null`.
 - **NEVER hardcode** business name/phone/address/email. Use `getBusinessInfo()` from `@/lib/data/business.ts`
 - **Mobile business name:** Site header (`site-header.tsx`) shows "SD Auto Spa & Supplies" on mobile (<640px) and full `biz.name` on sm:+ to prevent header overflow. Uses `hidden sm:inline` / `sm:hidden` pattern.
 - **Supabase `.or()` on related tables** doesn't work. Query related table first, then `.in('foreign_key', ids)`

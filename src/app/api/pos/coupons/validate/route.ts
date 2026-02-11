@@ -222,7 +222,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Fetch customer's type (reuse existing customer data if already fetched above, otherwise fetch)
       const { data: typeCustomer } = await supabase
         .from('customers')
         .select('customer_type')
@@ -231,8 +230,24 @@ export async function POST(request: NextRequest) {
 
       const customerType = typeCustomer?.customer_type || null;
 
-      if (customerType !== coupon.target_customer_type) {
-        const typeLabel = coupon.target_customer_type === 'enthusiast' ? 'Enthusiast' : 'Professional';
+      const typeLabels: Record<string, string> = {
+        enthusiast: 'Enthusiast',
+        professional: 'Professional',
+        unknown: 'Unclassified',
+      };
+
+      let typeMismatch = false;
+
+      if (coupon.target_customer_type === 'unknown') {
+        // Coupon targets unclassified customers — mismatch if customer HAS a type
+        typeMismatch = customerType !== null;
+      } else {
+        // Coupon targets enthusiast or professional — mismatch if customer type differs
+        typeMismatch = customerType !== coupon.target_customer_type;
+      }
+
+      if (typeMismatch) {
+        const typeLabel = typeLabels[coupon.target_customer_type] || coupon.target_customer_type;
 
         // Check enforcement mode
         const { data: enforcementSetting } = await supabase
@@ -241,8 +256,9 @@ export async function POST(request: NextRequest) {
           .eq('key', 'coupon_type_enforcement')
           .single();
 
-        const enforcementMode = typeof enforcementSetting?.value === 'string'
-          ? enforcementSetting.value
+        const rawValue = enforcementSetting?.value;
+        const enforcementMode = typeof rawValue === 'string'
+          ? rawValue.replace(/"/g, '')
           : 'soft';
 
         if (enforcementMode === 'hard') {
@@ -252,7 +268,6 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Soft mode: allow but set warning
         customerTypeWarning = `This coupon is intended for ${typeLabel} customers`;
       }
     }
