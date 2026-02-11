@@ -185,6 +185,7 @@ export const FEATURE_FLAGS = {
   CANCELLATION_FEE: 'cancellation_fee',
   REFERRAL_PROGRAM: 'referral_program',
   MOBILE_SERVICE: 'mobile_service',
+  QBO_ENABLED: 'qbo_enabled',
 } as const;
 
 // Messaging

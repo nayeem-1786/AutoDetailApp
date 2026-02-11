@@ -2,7 +2,7 @@
 -- This file runs after all migrations via `supabase db reset`
 
 -- ============================================
--- Feature Flags (12 flags)
+-- Feature Flags (13 flags)
 -- ============================================
 INSERT INTO feature_flags (key, name, description, enabled) VALUES
   ('loyalty_rewards', 'Loyalty & Rewards', 'Customer points system (1pt per $1 eligible spend)', true),
@@ -16,7 +16,8 @@ INSERT INTO feature_flags (key, name, description, enabled) VALUES
   ('photo_documentation', 'Photo Documentation', 'Before/after/damage photo capture', false),
   ('cancellation_fee', 'Cancellation Fee Enforcement', 'Less than 24hr cancellation fee', true),
   ('referral_program', 'Referral Program', 'Unique codes, track referrals, reward referrer', false),
-  ('mobile_service', 'Mobile Service', 'Mobile detailing with zone-based surcharges', true);
+  ('mobile_service', 'Mobile Service', 'Mobile detailing with zone-based surcharges', true),
+  ('qbo_enabled', 'QuickBooks Online Integration', 'Sync transactions, customers, and catalog items to QuickBooks Online for accounting.', false);
 
 -- ============================================
 -- Mobile Zones (2 zones)
