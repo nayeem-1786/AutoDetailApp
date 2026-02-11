@@ -188,7 +188,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **link_clicks:** Click event log. Indexes on `(short_code, clicked_at)`, `(campaign_id, clicked_at)`, `(customer_id, clicked_at)`.
 - **email_delivery_log:** Mailgun event tracking. Indexes on `(campaign_id, event)`, `(customer_id, created_at)`, `(mailgun_message_id)`, `(created_at)`.
 - **campaign_variants:** A/B test variants per campaign. `variant_id` column added to `campaign_recipients`.
-- **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants), `20260210000009` (campaigns: auto_select_winner BOOLEAN, auto_select_after_hours INTEGER).
+- **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants), `20260210000009` (campaigns: auto_select_winner BOOLEAN, auto_select_after_hours INTEGER), `20260210000010` (variant_id UUID FK on tracked_links + link_clicks, with partial indexes).
 - **Messaging tables:** `conversations` (unique per phone_number, linked to customer_id if known) and `messages` (CASCADE delete with conversation). Both have Supabase Realtime enabled. AI auto-replies stored with `sender_type: 'ai'`, staff replies with `sender_type: 'staff'`.
 - **Key messaging files:** `src/lib/services/messaging-ai.ts` (AI response generation, product search, coupon injection, system prompt builder), `src/lib/services/messaging-ai-prompt.ts` (default prompt template), `src/app/api/webhooks/twilio/inbound/route.ts` (Twilio webhook: AI routing, auto-quote, SMS splitting), `src/app/api/quotes/[id]/accept/route.ts` (acceptance + confirmation SMS), `src/app/admin/settings/messaging/page.tsx` (unified AI settings UI), `src/app/api/cron/quote-reminders/route.ts` (24hr unviewed quote nudge), `src/app/api/admin/messaging/[conversationId]/summary/route.ts` (conversation summary for staff), `src/proxy.ts` (middleware, renamed from middleware.ts).
 - **Quote communications:** `quote_communications` table tracks all SMS/email sends for quotes (channel, sent_to, status, error_message, message, sent_by). Used by `send-service.ts` (manual sends), inbound webhook (auto-quote), accept route (acceptance SMS), and quote-reminders cron. `sent_by` is nullable — null for AI/system-generated sends. `message` column added for storing SMS body text (used by reminder cron for deduplication).
@@ -253,6 +253,11 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - **Click redirect is public** (no auth): `/api/t/[code]`
 - **Dev testing requires ngrok running** — Twilio statusCallback and Mailgun webhooks need a public URL to receive callbacks during local development
 - **CRON_SECRET in .env.local** is a placeholder — verify if it's used or if `CRON_API_KEY` is the actual auth key for cron endpoints
+- **`{book_url}` vs `{book_now_url}`**: Both use `NEXT_PUBLIC_APP_URL` as base. `{book_url}` = personalized (name, phone, email, coupon). `{book_now_url}` = service deep-link (service slug, coupon, email). Campaign send route generates both per customer.
+- **Template variable context**: `COMMON_VARIABLES` shown in campaign editor. `AUTOMATION_ONLY` variables (like `{service_name}`) shown only in automation/lifecycle editors. `cleanEmptyReviewLines()` strips blank lines when review URL placeholders are unused.
+- **`{vehicle_description}` removed**: Consolidated into `{vehicle_info}` everywhere. No code references `vehicle_description` anymore.
+- **Campaign duplicate endpoint**: `POST /api/marketing/campaigns/[id]/duplicate` — creates draft copy with "(Copy)" suffix, copies A/B variants.
+- **Campaign detail analytics paths**: `/admin/marketing/campaigns/[id]/analytics` — drill-down with summary KPIs, funnel, variant comparison, recipient table, click details, engagement timeline. API: `GET /api/admin/marketing/analytics/campaigns/[id]`
 
 ---
 
@@ -286,6 +291,17 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 ---
 
 ## Last Session: 2026-02-10
+
+### Session 5 — Campaign Analytics Drill-Down, A/B Variant Attribution, Template Variables
+- Reordered Marketing sidebar sub-pages: Coupons(1) → Automations(2) → Campaigns(3) → Compliance → Analytics. Numbered circle badges on first 3 items.
+- Built campaign detail analytics drill-down (`/admin/marketing/campaigns/[id]/analytics`): summary KPI cards, delivery funnel chart, A/B variant comparison, filterable/paginated recipient table, click details (by URL + recent activity), engagement timeline (72h hourly Recharts AreaChart). New API: `GET /api/admin/marketing/analytics/campaigns/[id]` with pagination, filtering (clicked/converted/failed/opted_out/delivered), sorting, revenue attribution.
+- Fixed `campaign_recipients.clicked_at` not updating — click redirect handler (`/api/t/[code]`) now updates on first click.
+- Fixed A/B variant click attribution — added `variant_id` column to `tracked_links` and `link_clicks` (migration 20260210000010). Threaded variant_id through full chain: `createTrackedLink()` → `wrapUrlsInMessage()` → `sendMarketingSms()` → campaign send route → click redirect → `getVariantStats()`.
+- Campaign send route enhanced with `{vehicle_info}`, `{service_name}`, `{google_review_link}`, `{yelp_review_link}` template variables, `cleanEmptyReviewLines()`, and `createShortLink()` for review URLs.
+- Campaign duplicate action added to campaign list (POST `/api/marketing/campaigns/[id]/duplicate`).
+- Analytics overview campaign table now links to drill-down (not campaign detail page).
+- Campaign detail page shows "View Analytics" button for sent/completed campaigns.
+- 7 new component files, 1 new API route, 1 migration, multiple file updates. TypeScript clean, all pushed.
 
 ### Session 2 — TCPA High/Medium Issues (Issues 4-9)
 - Enabled Twilio signature validation — removed `false &&` bypass, conditional on `NODE_ENV`
