@@ -5,7 +5,10 @@ import { useAuth } from '@/lib/auth/auth-provider';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { MessageSquareOff } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import type { Conversation, ConversationStatus, Message } from '@/lib/supabase/types';
 import { ConversationList } from './components/conversation-list';
 import type { StatusCounts } from './components/conversation-list';
@@ -29,6 +32,7 @@ function sortConversationsByRecent(convs: Conversation[]): Conversation[] {
 
 export default function MessagingPage() {
   const { employee } = useAuth();
+  const { enabled: twoWaySmsEnabled, loading: flagLoading } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -375,6 +379,31 @@ export default function MessagingPage() {
   const handleBack = () => {
     setMobileView('list');
   };
+
+  // Gate: show disabled state if two_way_sms feature flag is off
+  if (!flagLoading && !twoWaySmsEnabled) {
+    return (
+      <div className="flex h-[calc(100vh-7rem)] flex-col">
+        <PageHeader title="Messaging" />
+        <div className="mt-4 flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="text-center px-6">
+            <MessageSquareOff className="mx-auto h-12 w-12 text-gray-300" />
+            <h2 className="mt-4 text-lg font-semibold text-gray-900">Two-Way SMS Messaging is Disabled</h2>
+            <p className="mt-2 text-sm text-gray-500 max-w-md">
+              Enable the Two-Way SMS feature flag to receive and respond to customer SMS messages,
+              use the AI auto-responder, and generate auto-quotes.
+            </p>
+            <a
+              href="/admin/settings/feature-toggles"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+            >
+              Go to Feature Toggles
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col">

@@ -8,6 +8,11 @@
  * Local testing:
  *   twilio phone-numbers:update +14244010094 --sms-url http://localhost:3000/api/webhooks/twilio/inbound
  *   Or use ngrok: ngrok http 3000 → set webhook to ngrok URL
+ *
+ * Feature flag: two_way_sms
+ *   STOP/START keyword processing and consent updates ALWAYS run (TCPA compliance).
+ *   Conversation creation, AI auto-responder, after-hours replies, auto-quote,
+ *   and message storage are gated by the two_way_sms feature flag.
  */
 
 import { NextRequest } from 'next/server';
@@ -16,6 +21,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { getAIResponse, type CustomerContext } from '@/lib/services/messaging-ai';
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import { createQuote } from '@/lib/quotes/quote-service';
@@ -283,7 +290,9 @@ export async function POST(request: NextRequest) {
       params[key] = String(value);
     }
 
-    // Validate Twilio signature (skip in development — ngrok/localhost URLs won't match)
+    // -------------------------------------------------------------------
+    // 1. Validate Twilio signature (ALWAYS — security)
+    // -------------------------------------------------------------------
     const twilioSignature = request.headers.get('x-twilio-signature') || '';
     const requestUrl = request.url;
     const skipSignatureValidation = process.env.NODE_ENV === 'development';
@@ -293,6 +302,9 @@ export async function POST(request: NextRequest) {
       return new Response(TWIML_EMPTY, { status: 403, headers: TWIML_HEADERS });
     }
 
+    // -------------------------------------------------------------------
+    // 2. Parse body (ALWAYS)
+    // -------------------------------------------------------------------
     const from = params.From || '';
     const body = params.Body || '';
     const messageSid = params.MessageSid || '';
@@ -306,15 +318,8 @@ export async function POST(request: NextRequest) {
     const normalizedPhone = normalizePhone(from) || from;
 
     // -------------------------------------------------------------------
-    // Find or create conversation
+    // 3. Customer lookup (ALWAYS — needed for STOP/START consent)
     // -------------------------------------------------------------------
-    let { data: conversation } = await admin
-      .from('conversations')
-      .select('*')
-      .eq('phone_number', normalizedPhone)
-      .single();
-
-    // Try to match a customer by phone
     let customerId: string | null = null;
     const { data: customer } = await admin
       .from('customers')
@@ -325,6 +330,116 @@ export async function POST(request: NextRequest) {
     if (customer) {
       customerId = customer.id;
     }
+
+    // -------------------------------------------------------------------
+    // 4. STOP/START keyword handling (ALWAYS — TCPA compliance)
+    //    This block MUST run before the feature flag check. Legally required
+    //    regardless of whether two-way SMS messaging is enabled.
+    // -------------------------------------------------------------------
+    const normalizedBody = body.trim().toUpperCase();
+    const isStopWord = STOP_WORDS.includes(normalizedBody);
+    const isStartWord = START_WORDS.includes(normalizedBody);
+
+    if (isStopWord || isStartWord) {
+      // Update consent on customer record — TCPA critical
+      const consentCustomerId = customerId || await (async () => {
+        const { data: phoneCust } = await admin
+          .from('customers')
+          .select('id')
+          .eq('phone', normalizedPhone)
+          .single();
+        return phoneCust?.id || null;
+      })();
+
+      if (consentCustomerId) {
+        await updateSmsConsent({
+          customerId: consentCustomerId,
+          phone: normalizedPhone,
+          action: isStopWord ? 'opt_out' : 'opt_in',
+          keyword: normalizedBody,
+          source: 'inbound_sms',
+        });
+      }
+
+      // If two-way SMS is enabled, also log to conversation for staff visibility
+      const twoWaySmsEnabled = await isFeatureEnabled(FEATURE_FLAGS.TWO_WAY_SMS);
+      if (twoWaySmsEnabled) {
+        // Find or create conversation for logging
+        let { data: conversation } = await admin
+          .from('conversations')
+          .select('*')
+          .eq('phone_number', normalizedPhone)
+          .single();
+
+        if (!conversation) {
+          const { data: newConv } = await admin
+            .from('conversations')
+            .insert({
+              phone_number: normalizedPhone,
+              customer_id: customerId,
+              is_ai_enabled: isStartWord, // false for STOP, true for START
+              status: 'open',
+              last_message_at: new Date().toISOString(),
+              last_message_preview: body.substring(0, 200),
+              unread_count: 1,
+            })
+            .select()
+            .single();
+          conversation = newConv;
+        }
+
+        if (conversation) {
+          // Store the inbound message
+          await admin.from('messages').insert({
+            conversation_id: conversation.id,
+            direction: 'inbound',
+            body,
+            media_url: mediaUrl,
+            sender_type: 'customer',
+            twilio_sid: messageSid,
+            status: 'received',
+          });
+
+          // Log system message
+          const action = isStopWord ? 'opted out of' : 'opted back in to';
+          await admin.from('messages').insert({
+            conversation_id: conversation.id,
+            direction: 'inbound',
+            body: `Customer sent "${body}" — ${action} SMS`,
+            sender_type: 'system',
+            status: 'received',
+          });
+
+          // Update AI status on conversation
+          await admin
+            .from('conversations')
+            .update({ is_ai_enabled: isStartWord })
+            .eq('id', conversation.id);
+        }
+      }
+
+      return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
+    }
+
+    // -------------------------------------------------------------------
+    // 5. Feature flag check — gate all inbox/messaging features
+    //    Conversation creation, AI auto-responder, after-hours replies,
+    //    auto-quote, and message storage are all gated.
+    // -------------------------------------------------------------------
+    const twoWaySmsEnabled = await isFeatureEnabled(FEATURE_FLAGS.TWO_WAY_SMS);
+    if (!twoWaySmsEnabled) {
+      console.log(`[Messaging] Inbound SMS from ${from} — two_way_sms disabled, skipping conversation processing`);
+      return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
+    }
+
+    // -------------------------------------------------------------------
+    // 6. Find or create conversation
+    // -------------------------------------------------------------------
+    let { data: conversation } = await admin
+      .from('conversations')
+      .select('*')
+      .eq('phone_number', normalizedPhone)
+      .single();
 
     if (!conversation) {
       const { data: newConv, error: convError } = await admin
@@ -378,131 +493,7 @@ export async function POST(request: NextRequest) {
     }
 
     // -------------------------------------------------------------------
-    // STOP/START keyword detection — must run before storing the inbound
-    // message so we can exit early without triggering auto-replies
-    // -------------------------------------------------------------------
-    const normalizedBody = body.trim().toUpperCase();
-    const isStopWord = STOP_WORDS.includes(normalizedBody);
-    const isStartWord = START_WORDS.includes(normalizedBody);
-
-    if (isStopWord) {
-      // Store the original inbound message
-      await admin.from('messages').insert({
-        conversation_id: conversation.id,
-        direction: 'inbound',
-        body,
-        media_url: mediaUrl,
-        sender_type: 'customer',
-        twilio_sid: messageSid,
-        status: 'received',
-      });
-
-      // Log system message noting the opt-out
-      await admin.from('messages').insert({
-        conversation_id: conversation.id,
-        direction: 'inbound',
-        body: `Customer sent "${body}" — opted out of SMS`,
-        sender_type: 'system',
-        status: 'received',
-      });
-
-      // Disable AI on this conversation
-      await admin
-        .from('conversations')
-        .update({ is_ai_enabled: false })
-        .eq('id', conversation.id);
-
-      // Update sms_consent on customer record (TCPA critical)
-      if (customerId) {
-        await updateSmsConsent({
-          customerId,
-          phone: normalizedPhone,
-          action: 'opt_out',
-          keyword: normalizedBody,
-          source: 'inbound_sms',
-        });
-      } else {
-        // No customer record linked — try to find by phone
-        const { data: phoneCust } = await admin
-          .from('customers')
-          .select('id')
-          .eq('phone', normalizedPhone)
-          .single();
-
-        if (phoneCust) {
-          await updateSmsConsent({
-            customerId: phoneCust.id,
-            phone: normalizedPhone,
-            action: 'opt_out',
-            keyword: normalizedBody,
-            source: 'inbound_sms',
-          });
-        }
-      }
-
-      // Do NOT send any reply — Twilio handles the STOP auto-response
-      return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
-    }
-
-    if (isStartWord) {
-      // Store the original inbound message
-      await admin.from('messages').insert({
-        conversation_id: conversation.id,
-        direction: 'inbound',
-        body,
-        media_url: mediaUrl,
-        sender_type: 'customer',
-        twilio_sid: messageSid,
-        status: 'received',
-      });
-
-      // Log system message noting the opt-in
-      await admin.from('messages').insert({
-        conversation_id: conversation.id,
-        direction: 'inbound',
-        body: `Customer sent "${body}" — opted back in to SMS`,
-        sender_type: 'system',
-        status: 'received',
-      });
-
-      // Re-enable AI on this conversation
-      await admin
-        .from('conversations')
-        .update({ is_ai_enabled: true })
-        .eq('id', conversation.id);
-
-      // Update sms_consent on customer record
-      if (customerId) {
-        await updateSmsConsent({
-          customerId,
-          phone: normalizedPhone,
-          action: 'opt_in',
-          keyword: normalizedBody,
-          source: 'inbound_sms',
-        });
-      } else {
-        const { data: phoneCust } = await admin
-          .from('customers')
-          .select('id')
-          .eq('phone', normalizedPhone)
-          .single();
-
-        if (phoneCust) {
-          await updateSmsConsent({
-            customerId: phoneCust.id,
-            phone: normalizedPhone,
-            action: 'opt_in',
-            keyword: normalizedBody,
-            source: 'inbound_sms',
-          });
-        }
-      }
-
-      return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
-    }
-
-    // -------------------------------------------------------------------
-    // Store the inbound message
+    // 7. Store the inbound message
     // -------------------------------------------------------------------
     await admin.from('messages').insert({
       conversation_id: conversation.id,
@@ -515,7 +506,7 @@ export async function POST(request: NextRequest) {
     });
 
     // -------------------------------------------------------------------
-    // Auto-reply logic
+    // 8. Auto-reply logic
     // -------------------------------------------------------------------
     const { data: settingsRows } = await admin
       .from('business_settings')
@@ -610,7 +601,7 @@ export async function POST(request: NextRequest) {
     }
 
     // -------------------------------------------------------------------
-    // Auto-quote processing — extract quote block and generate real quote
+    // 9. Auto-quote processing — extract quote block and generate real quote
     // -------------------------------------------------------------------
     if (autoReply) {
       const { cleanMessage, quoteData } = extractQuoteRequest(autoReply, normalizedPhone);

@@ -2,22 +2,23 @@
 -- This file runs after all migrations via `supabase db reset`
 
 -- ============================================
--- Feature Flags (13 flags)
+-- Feature Flags (14 flags)
 -- ============================================
-INSERT INTO feature_flags (key, name, description, enabled) VALUES
-  ('loyalty_rewards', 'Loyalty & Rewards', 'Customer points system (1pt per $1 eligible spend)', true),
-  ('recurring_services', 'Recurring/Subscription Services', 'Monthly wash membership and maintenance plans', false),
-  ('online_booking_payment', 'Online Booking Requires Payment', 'Full prepayment via Stripe at booking', true),
-  ('sms_marketing', 'SMS Marketing Campaigns', 'Send SMS campaigns and lifecycle automations to customers. Disabling stops all outbound marketing SMS. Transactional messages (appointment reminders, quote notifications) are not affected.', true),
-  ('email_marketing', 'Email Marketing Campaigns', 'Send email campaigns to customers. Disabling stops all outbound marketing emails. Transactional emails (booking confirmations, password resets) are not affected.', true),
-  ('google_review_requests', 'Google Review Requests', 'Post-service automation with direct link', true),
-  ('two_way_sms', 'Two-Way SMS', 'Inbound routed to Telegram, reply back as SMS', true),
-  ('waitlist', 'Waitlist', 'Customers join when fully booked', true),
-  ('photo_documentation', 'Photo Documentation', 'Before/after/damage photo capture', false),
-  ('cancellation_fee', 'Cancellation Fee Enforcement', 'Less than 24hr cancellation fee', true),
-  ('referral_program', 'Referral Program', 'Unique codes, track referrals, reward referrer', false),
-  ('mobile_service', 'Mobile Service', 'Mobile detailing with zone-based surcharges', true),
-  ('qbo_enabled', 'QuickBooks Online Integration', 'Sync transactions, customers, and catalog items to QuickBooks Online for accounting.', false);
+INSERT INTO feature_flags (key, name, description, category, enabled) VALUES
+  ('loyalty_rewards', 'Loyalty Rewards Program', 'Award points on purchases and allow redemption for discounts. Disabling hides loyalty from POS and portal, stops accumulation, and blocks redemption. Existing points are preserved.', 'Core POS', true),
+  ('cancellation_fee', 'Cancellation Fees', 'Charge a fee when appointments are cancelled. Disabling removes the fee option from cancellation dialogs.', 'Core POS', true),
+  ('sms_marketing', 'SMS Marketing Campaigns', 'Send SMS campaigns and lifecycle automations. Disabling stops all outbound marketing SMS. Transactional messages (reminders, confirmations) are not affected.', 'Marketing', true),
+  ('email_marketing', 'Email Marketing Campaigns', 'Send email campaigns to customers. Disabling stops all outbound marketing emails. Transactional emails (confirmations, resets) are not affected.', 'Marketing', true),
+  ('google_review_requests', 'Google Review Requests', 'Automatically request Google/Yelp reviews after service completion via lifecycle automations.', 'Marketing', true),
+  ('two_way_sms', 'Two-Way SMS Messaging', 'Receive and respond to customer SMS messages. Includes team inbox, AI auto-responder, and auto-quotes. Disabling hides the messaging inbox and stops AI responses. STOP/START opt-out processing always remains active for compliance.', 'Communication', true),
+  ('online_booking_payment', 'Online Booking Payment', 'Collect payment via Stripe during the online booking flow. Disabling allows booking without upfront payment.', 'Booking', true),
+  ('waitlist', 'Waitlist', 'Allow customers to join a waitlist when slots are full. Sends notifications when spots open.', 'Booking', true),
+  ('mobile_service', 'Mobile/On-Location Service', 'Offer on-location detailing with travel zones and fees. Disabling hides the mobile option from booking. Configure zones in Settings > Mobile Zones.', 'Booking', true),
+  ('qbo_enabled', 'QuickBooks Online Integration', 'Sync transactions, customers, and catalog to QuickBooks Online for accounting. Configure connection in Settings > Integrations > QuickBooks.', 'Integrations', false),
+  ('inventory_management', 'Inventory Management', 'Stock tracking, vendor management, and purchase orders. Hides inventory section from admin navigation when disabled.', 'Operations', true),
+  ('recurring_services', 'Recurring Services', 'Subscription-based recurring service plans. Phase 10 — reserved for future use.', 'Future', false),
+  ('photo_documentation', 'Photo Documentation', 'Before/after photo capture for service documentation. Phase 8 — reserved for future use.', 'Future', false),
+  ('online_store', 'Online Store', 'Shopping cart, checkout, and order management. Phase 9 — reserved for future use.', 'Future', false);
 
 -- ============================================
 -- Mobile Zones (2 zones)

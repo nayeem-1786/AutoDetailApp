@@ -41,8 +41,9 @@ import {
   FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { ROLE_LABELS } from '@/lib/utils/constants';
+import { ROLE_LABELS, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -245,6 +246,8 @@ function CommandPalette({
 function AdminContent({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, signOut } = useAuth();
   const { info: businessInfo } = useBusinessInfo();
+  const { enabled: twoWaySmsEnabled } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
+  const { enabled: inventoryEnabled } = useFeatureFlag(FEATURE_FLAGS.INVENTORY_MANAGEMENT);
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -318,8 +321,13 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Fetch messaging unread count — initial fetch + Realtime only (no polling)
+  // Gated by two_way_sms feature flag — skip entirely when disabled
   useEffect(() => {
     if (!role || !['super_admin', 'admin'].includes(role)) return;
+    if (!twoWaySmsEnabled) {
+      setMessagingUnread(0);
+      return;
+    }
 
     let abortController = new AbortController();
     let isFetching = false;
@@ -362,7 +370,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       abortController.abort();
       supabase.removeChannel(channel);
     };
-  }, [role]);
+  }, [role, twoWaySmsEnabled]);
 
   // Auto-expand parent nav item when child is active
   useEffect(() => {
@@ -387,7 +395,12 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
   if (!employee || !role) return null;
 
-  const navItems = getNavForRole(role);
+  // Filter out nav items when their feature flag is disabled
+  const navItems = getNavForRole(role).filter((item) => {
+    if (item.href === '/admin/messaging') return twoWaySmsEnabled;
+    if (item.href === '/admin/inventory') return inventoryEnabled;
+    return true;
+  });
 
   const toggleExpand = (href: string) => {
     setExpandedItems((prev) =>

@@ -14,6 +14,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { TogglePill } from '@/components/ui/toggle-pill';
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
 interface MessagingSettings {
   messaging_ai_unknown_enabled: string;
@@ -71,6 +73,7 @@ function isEnabled(val: unknown): boolean {
 }
 
 export default function MessagingSettingsPage() {
+  const { enabled: twoWaySmsEnabled } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<MessagingSettings>(DEFAULTS);
@@ -165,6 +168,17 @@ export default function MessagingSettingsPage() {
         title="Messaging"
         description="Configure AI assistant and conversation settings."
       />
+
+      {!twoWaySmsEnabled && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-800">
+            Two-Way SMS is currently disabled. These settings will take effect when the feature is enabled in{' '}
+            <a href="/admin/settings/feature-toggles" className="font-medium text-amber-900 underline hover:text-amber-700">
+              Feature Toggles
+            </a>.
+          </p>
+        </div>
+      )}
 
       {/* AI Assistant */}
       <Card>
