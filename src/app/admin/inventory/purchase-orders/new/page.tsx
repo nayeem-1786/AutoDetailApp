@@ -63,8 +63,8 @@ export default function NewPurchaseOrderPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredProducts = products.filter((p) => {
-    // Filter by selected vendor if applicable
-    if (vendorId && p.vendor_id && p.vendor_id !== vendorId) return false;
+    // Only show products from the selected vendor
+    if (vendorId && p.vendor_id !== vendorId) return false;
     // Exclude already added products
     if (items.some((i) => i.product_id === p.id)) return false;
     // Search
@@ -77,6 +77,15 @@ export default function NewPurchaseOrderPage() {
     }
     return true;
   });
+
+  function handleVendorChange(newVendorId: string) {
+    if (items.length > 0 && newVendorId !== vendorId) {
+      if (!window.confirm('Changing vendor will clear current line items. Continue?')) return;
+      setItems([]);
+      setProductSearch('');
+    }
+    setVendorId(newVendorId);
+  }
 
   function addProduct(product: Product) {
     setItems((prev) => [
@@ -173,7 +182,7 @@ export default function NewPurchaseOrderPage() {
             <Select
               id="vendor-select"
               value={vendorId}
-              onChange={(e) => setVendorId(e.target.value)}
+              onChange={(e) => handleVendorChange(e.target.value)}
             >
               <option value="">Select vendor...</option>
               {vendors.map((v) => (

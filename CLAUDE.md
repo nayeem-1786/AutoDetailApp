@@ -151,9 +151,14 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - COGS margin visibility: permission-gated Cost & Margin card on product detail page with margin calculation, color coding (green >40%, amber 20-40%, red <20%), cost history from PO receiving with clickable PO links
 - Product forms: `min_order_qty` field added to both create and edit forms with Zod validation. `is_active` toggle added to create and edit forms (was missing — Services already had it).
 - Stock status indicators: Unicode circle icons (🟢/🟡/🔴) on Products page and Vendor detail page
-- DB tables: `purchase_orders`, `po_items`, `notification_recipients`, `stock_alert_log`
+- DB tables: `purchase_orders`, `purchase_order_items`, `stock_adjustments`, `notification_recipients`, `stock_alert_log`
 - Nav: Inventory section in admin sidebar (gated by `inventory_management` feature flag)
 - Cron: stock-alerts job registered in scheduler (daily 16:00 UTC / 8 AM PST)
+- `view_cost_data` permission: admin always sees cost/margin, grantable to other roles. Gates: Products page cost/margin columns, Vendor detail cost/margin columns, Product detail Cost & Margin card
+- Vendor detail page (`/admin/catalog/vendors/[id]`): header with vendor info, products table with stock data, permission-gated cost/margin columns, last order date/qty from POs (clickable to PO detail)
+- Stock Adjustment History (`/admin/inventory/stock-history`): full audit log of all stock changes (manual, PO received, count correction, damage, return). Filterable by product, reason, date range. Color-coded +/- changes, reference links to POs
+- Quick Adjust dialog on Products page logs to `stock_adjustments` with reason selection (was silent direct update)
+- PO create: product search scoped to selected vendor (strict filter — no null vendor leak). Vendor change clears line items with confirmation dialog
 
 ### Phase 7 — What's Done
 - QBO client library with automatic OAuth token refresh (`src/lib/qbo/client.ts`)
@@ -227,7 +232,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **lifecycle_rules.coupon_id:** nullable FK to `coupons` table with `ON DELETE SET NULL`. Partial index on non-null values. Legacy `coupon_type`/`coupon_value`/`coupon_expiry_days` columns remain but are unused — form uses `coupon_id` exclusively.
 - **sms_consent_log:** Audit table tracking all SMS consent changes. Source CHECK constraint: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`. RLS: authenticated users can read/write (admin pages insert directly via browser client).
 - **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling + signature validation), `src/lib/utils/sms.ts` (`sendSms()` with MMS + logging, `sendMarketingSms()` with consent + frequency cap), `src/lib/utils/phone-validation.ts` (Twilio Lookup landline detection), `docs/TCPA_AUDIT.md` (full audit report).
-- **Key inventory files:** `src/app/admin/inventory/page.tsx` (stock overview), `src/app/admin/catalog/vendors/page.tsx` (vendor list), `src/app/admin/catalog/vendors/[id]/page.tsx` (vendor edit), `src/app/api/cron/stock-alerts/route.ts` (daily stock alert cron), `src/app/api/admin/notification-recipients/route.ts` (recipients CRUD), `src/app/admin/settings/notifications/page.tsx` (notification settings UI).
+- **Key inventory files:** `src/app/admin/catalog/products/page.tsx` (products with stock management), `src/app/admin/catalog/vendors/page.tsx` (vendor list), `src/app/admin/catalog/vendors/[id]/page.tsx` (vendor detail with products), `src/app/admin/inventory/purchase-orders/` (PO list/create/detail+receive), `src/app/admin/inventory/stock-history/page.tsx` (stock adjustment log), `src/app/api/admin/purchase-orders/` (PO CRUD + receiving API), `src/app/api/admin/stock-adjustments/route.ts` (stock adjustment API), `src/app/api/cron/stock-alerts/route.ts` (daily stock alert cron), `src/app/api/admin/notification-recipients/route.ts` (recipients CRUD), `src/app/admin/settings/notifications/page.tsx` (notification settings UI).
 - **Key QBO files:** `src/lib/qbo/client.ts` (API client with token refresh, query, CRUD methods), `src/lib/qbo/settings.ts` (read/write QBO settings, `isQboSyncEnabled()`, `isQboConnected()`), `src/lib/qbo/types.ts` (all QBO TypeScript types), `src/lib/qbo/sync-customer.ts` (customer sync engine), `src/lib/qbo/sync-catalog.ts` (service/product sync engine), `src/lib/qbo/sync-transaction.ts` (transaction → Sales Receipt sync), `src/lib/qbo/sync-log.ts` (sync log helpers), `src/lib/qbo/index.ts` (barrel exports), `src/app/api/admin/integrations/qbo/` (OAuth + settings + sync + accounts routes), `src/app/admin/settings/integrations/quickbooks/page.tsx` (settings UI), `src/components/qbo-sync-badge.tsx` (reusable sync status badge), `docs/QBO-INTEGRATION.md` (integration documentation).
 
 ---
@@ -345,7 +350,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 18 — Phase 6 Session 4: COGS Margin Visibility + Final Polish)
+## Last Session: 2026-02-11 (Session 18 — Phase 6 Complete + Post-Session Fixes)
 - Added permission-gated Cost & Margin card to product detail page (`inventory.view_cost_data` permission)
   - Shows cost price, retail price, margin % with color coding (green >40%, amber 20-40%, red <20%)
   - Cost history table from PO receiving with clickable PO links, unit cost, quantities, dates
@@ -355,6 +360,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Updated CLAUDE.md: Phase 6 → Done, comprehensive completion notes, session history
 - Products: `is_active` toggle added to create and edit forms (was missing — Services already had it). Switch with contextual helper text matching service page pattern.
 - Stock status indicators: pill badges replaced with minimalistic Unicode circle icons (🟢 In Stock, 🟡 Low Stock, 🔴 Out of Stock) on Products page and Vendor detail page.
+- PO create: product search now scoped to selected vendor (strict filter, null vendor_id no longer leaks through). Vendor change clears line items with confirmation dialog.
 - TypeScript clean, committed
 
 ### Session 17 — Phase 6 Session 3: Low Stock Alerts + Notification Recipients
@@ -559,8 +565,8 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ### Next Session Priorities
 1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
-2. Phase 6 — Review stock & vendor pages, consolidate duplicate vendor pages (catalog vs inventory), then build PO/receiving/COGS.
-3. Phase 7.3 — QBO cron auto-sync, reporting dashboard, CSV exports
+2. Phase 7.3 — QBO cron auto-sync, reporting dashboard, CSV exports
+3. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
 
 ---
 
