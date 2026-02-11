@@ -25,8 +25,9 @@ import {
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, ArrowRight, Users, Send, Plus, Eye, ChevronLeft, ChevronRight, Clock, FlaskConical } from 'lucide-react';
-import { SITE_URL } from '@/lib/utils/constants';
+import { SITE_URL, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 
 type Step = 'basics' | 'audience' | 'message' | 'coupon' | 'review';
 
@@ -95,6 +96,8 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   const router = useRouter();
   const supabase = createClient();
   const { info: businessInfo } = useBusinessInfo();
+  const { enabled: smsMarketingEnabled } = useFeatureFlag(FEATURE_FLAGS.SMS_MARKETING);
+  const { enabled: emailMarketingEnabled } = useFeatureFlag(FEATURE_FLAGS.EMAIL_MARKETING);
 
   const [campaignId, setCampaignId] = useState<string | null>(initialData?.id ?? null);
   const [step, setStep] = useState<Step>('basics');
@@ -705,6 +708,18 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                 </Select>
               </FormField>
             </div>
+
+            {/* Warning when selected channel(s) are disabled */}
+            {((channel === 'sms' || channel === 'both') && !smsMarketingEnabled) && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                SMS Marketing is currently disabled. This campaign won&apos;t send SMS until it&apos;s enabled in Settings &rarr; Feature Toggles.
+              </div>
+            )}
+            {((channel === 'email' || channel === 'both') && !emailMarketingEnabled) && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Email Marketing is currently disabled. This campaign won&apos;t send emails until it&apos;s enabled in Settings &rarr; Feature Toggles.
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

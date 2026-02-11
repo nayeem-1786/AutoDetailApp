@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { waitlistEntrySchema } from '@/lib/utils/validation';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 
 /**
  * GET /api/waitlist — Admin: list waitlist entries with optional filters.
@@ -71,13 +72,9 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Check that waitlist feature flag is enabled
-    const { data: flag } = await supabase
-      .from('feature_flags')
-      .select('enabled')
-      .eq('key', FEATURE_FLAGS.WAITLIST)
-      .single();
+    const waitlistEnabled = await isFeatureEnabled(FEATURE_FLAGS.WAITLIST);
 
-    if (!flag?.enabled) {
+    if (!waitlistEnabled) {
       return NextResponse.json(
         { error: 'Waitlist is not currently available' },
         { status: 400 }

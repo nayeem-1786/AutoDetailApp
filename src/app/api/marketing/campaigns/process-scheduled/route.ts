@@ -7,6 +7,8 @@ import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import type { CampaignChannel } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
@@ -66,6 +68,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ data: { processed: 0 } });
     }
 
+    // Check feature flags for marketing channels
+    const [smsEnabled, emailEnabled] = await Promise.all([
+      isFeatureEnabled(FEATURE_FLAGS.SMS_MARKETING),
+      isFeatureEnabled(FEATURE_FLAGS.EMAIL_MARKETING),
+    ]);
+
     // Pre-load review URLs and loyalty rate from business_settings
     const { data: reviewSettings } = await adminClient
       .from('business_settings')
@@ -95,6 +103,18 @@ export async function POST(request: NextRequest) {
     const results = [];
 
     for (const campaign of campaigns) {
+      // Skip campaigns whose channels are entirely disabled
+      const campNeedsSms = campaign.channel === 'sms' || campaign.channel === 'both';
+      const campNeedsEmail = campaign.channel === 'email' || campaign.channel === 'both';
+      if (
+        (campaign.channel === 'sms' && !smsEnabled) ||
+        (campaign.channel === 'email' && !emailEnabled) ||
+        (campaign.channel === 'both' && !smsEnabled && !emailEnabled)
+      ) {
+        console.warn(`[Campaign] Skipping scheduled campaign ${campaign.id} (${campaign.name}) — required marketing channel(s) disabled`);
+        continue;
+      }
+
       // Mark as sending
       await adminClient
         .from('campaigns')
@@ -245,6 +265,7 @@ export async function POST(request: NextRequest) {
         const recipientId = crypto.randomUUID();
 
         if (
+          smsEnabled &&
           (campaign.channel === 'sms' || campaign.channel === 'both') &&
           customer.sms_consent &&
           customer.phone &&
@@ -256,6 +277,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (
+          emailEnabled &&
           (campaign.channel === 'email' || campaign.channel === 'both') &&
           customer.email_consent &&
           customer.email &&

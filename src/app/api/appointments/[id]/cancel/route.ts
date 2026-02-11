@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { appointmentCancelSchema } from '@/lib/utils/validation';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 
 const TERMINAL_STATUSES = ['completed', 'cancelled'];
 
@@ -80,13 +81,9 @@ export async function POST(
 
     // --- Waitlist notification on cancellation ---
     // Check if waitlist feature is enabled
-    const { data: flag } = await supabase
-      .from('feature_flags')
-      .select('enabled')
-      .eq('key', FEATURE_FLAGS.WAITLIST)
-      .single();
+    const waitlistEnabled = await isFeatureEnabled(FEATURE_FLAGS.WAITLIST);
 
-    if (flag?.enabled) {
+    if (waitlistEnabled) {
       // Get the cancelled appointment's services and date
       const { data: apptServices } = await supabase
         .from('appointment_services')

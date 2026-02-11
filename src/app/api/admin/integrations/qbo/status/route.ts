@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { QboClient } from '@/lib/qbo/client';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
 export async function GET() {
   try {
@@ -45,19 +47,14 @@ export async function GET() {
       }
     }
 
-    // Read feature flag for enabled status
-    const { data: flag } = await supabase
-      .from('feature_flags')
-      .select('enabled')
-      .eq('key', 'qbo_enabled')
-      .single();
+    const enabled = await isFeatureEnabled(FEATURE_FLAGS.QBO_ENABLED);
 
     return NextResponse.json({
       status: connected ? 'connected' : 'disconnected',
       company_name: companyName,
       realm_id: realmId || null,
       environment: map.qbo_environment || 'sandbox',
-      enabled: flag?.enabled ?? false,
+      enabled,
       credentials_configured: !!(process.env.QBO_CLIENT_ID && process.env.QBO_CLIENT_SECRET),
       last_sync_at: map.qbo_last_sync_at || null,
       auto_sync: {

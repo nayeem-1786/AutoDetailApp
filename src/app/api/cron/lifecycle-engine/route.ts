@@ -5,6 +5,7 @@ import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 
 /**
  * Lifecycle execution engine cron endpoint.
@@ -81,10 +82,18 @@ export async function GET(request: NextRequest) {
   }
 
   if (pendingExecs && pendingExecs.length > 0) {
-    const results = await executePending(admin, pendingExecs);
-    sent += results.sent;
-    failed += results.failed;
-    skipped += results.skipped;
+    // Check if SMS Marketing is enabled before sending any lifecycle SMS
+    const smsMarketingEnabled = await isFeatureEnabled(FEATURE_FLAGS.SMS_MARKETING);
+    if (!smsMarketingEnabled) {
+      console.log(`[Lifecycle] SMS Marketing disabled — skipping ${pendingExecs.length} pending executions`);
+      // Don't skip Phase 1 (scheduling) — just skip Phase 2 (sending)
+      // When SMS Marketing is re-enabled, pending executions will send
+    } else {
+      const results = await executePending(admin, pendingExecs);
+      sent += results.sent;
+      failed += results.failed;
+      skipped += results.skipped;
+    }
   }
 
   return NextResponse.json({ scheduled, sent, failed, skipped });
@@ -339,14 +348,8 @@ async function executePending(
     }
   }
 
-  // Pre-load feature flag
-  const { data: reviewFlag } = await admin
-    .from('feature_flags')
-    .select('enabled')
-    .eq('key', FEATURE_FLAGS.GOOGLE_REVIEW_REQUESTS)
-    .single();
-
-  const reviewFlagEnabled = reviewFlag?.enabled ?? false;
+  // Pre-load feature flag for review-link templates
+  const reviewFlagEnabled = await isFeatureEnabled(FEATURE_FLAGS.GOOGLE_REVIEW_REQUESTS);
 
   // Pre-load business info + review URLs from business_settings
   const businessInfo = await getBusinessInfo();

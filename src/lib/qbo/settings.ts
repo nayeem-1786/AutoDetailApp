@@ -1,4 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import type { QboSettings } from './types';
 
 /** Read a single QBO setting from business_settings. */
@@ -69,16 +71,8 @@ export async function isQboConnected(): Promise<boolean> {
 
 /** Check if QBO sync is enabled (feature flag ON + connected). */
 export async function isQboSyncEnabled(): Promise<boolean> {
-  const supabase = createAdminClient();
-
-  // Check feature flag (master toggle from Feature Toggles page)
-  const { data: flag } = await supabase
-    .from('feature_flags')
-    .select('enabled')
-    .eq('key', 'qbo_enabled')
-    .single();
-
-  if (!flag?.enabled) return false;
+  const enabled = await isFeatureEnabled(FEATURE_FLAGS.QBO_ENABLED);
+  if (!enabled) return false;
 
   // Also verify we're actually connected to QBO
   return isQboConnected();

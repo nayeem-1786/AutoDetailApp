@@ -294,6 +294,9 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Coupon category validation**: `TicketItem.categoryId` holds `product.category_id` or `service.category_id`. Both ticket-reducer and quote-reducer populate this on `ADD_PRODUCT`/`ADD_SERVICE`. All cart item mappings pass `category_id` to validate/promotions endpoints. The validation logic in `coupon-helpers.ts` and `pos/coupons/validate` already matches on `item.category_id` — this field was just never sent before.
 - **QBO Integration**: Master toggle is `qbo_enabled` in `feature_flags` table (shown on Feature Toggles page). Credentials (`QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`) in env vars — NEVER in DB. OAuth tokens in `business_settings`. Source of truth is ALWAYS the Smart Details app (Supabase). QBO is a one-way accounting mirror. POS hooks are fire-and-forget — NEVER block POS for QBO. All TxnDate values in PST (America/Los_Angeles). Client library at `src/lib/qbo/`. `isQboSyncEnabled()` checks `feature_flags` + connection status.
 - **Phase 9 is Native Online Store** — NO WordPress/WooCommerce. Build cart, checkout, orders within this Next.js app. Product catalog pages already exist at `/products`.
+- **Feature flag checks (server-side)**: Use `isFeatureEnabled(key)` from `src/lib/utils/feature-flags.ts` for all API route flag checks. Uses `createAdminClient()` (service role). Fails closed. Import `FEATURE_FLAGS` from constants for key names.
+- **sms_marketing flag**: Gates campaign SMS sends (immediate + scheduled) and lifecycle engine Phase 2. Does NOT gate transactional SMS (appointment reminders, quote notifications, STOP/START processing).
+- **email_marketing flag**: Gates campaign email sends (immediate + scheduled). Does NOT gate transactional emails (booking confirmations, password resets, quote PDFs).
 
 ---
 
@@ -328,7 +331,17 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-10 (Session 10b — QBO Architecture Fix)
+## Last Session: 2026-02-11 (Session 11 — Feature Toggle Fix: Server Utility + Marketing Orphans)
+- Created `src/lib/utils/feature-flags.ts` — `isFeatureEnabled(key)` server-side utility using `createAdminClient()`, fail-closed
+- Replaced ALL inline `feature_flags` queries in API routes with `isFeatureEnabled()`: `qbo/settings.ts`, `qbo/status/route.ts`, `lifecycle-engine/route.ts`, `waitlist/route.ts`, `appointments/[id]/cancel/route.ts`
+- Wired `sms_marketing` flag into: campaign immediate send (`[id]/send/route.ts`), campaign scheduled send (`process-scheduled/route.ts`), lifecycle engine Phase 2 (skips all pending executions when disabled — Phase 1 scheduling still runs so executions send when re-enabled)
+- Wired `email_marketing` flag into: campaign immediate send, campaign scheduled send
+- For `channel === 'both'`: sends through whichever channel is enabled, skips disabled one. Only blocks entirely if all required channels are disabled.
+- Added warning banners to campaign wizard (basics step) when selected channel's marketing flag is disabled
+- Updated `sms_marketing` and `email_marketing` flag names/descriptions in seed.sql and live DB (migration `20260211000001`) to clearly communicate what gets disabled
+- TypeScript clean, 10 files changed
+
+### Session 10b — QBO Architecture Fix
 - Restored `qbo_enabled` feature flag as master toggle (was incorrectly deleted)
 - Moved `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET` to env vars (out of DB)
 - Fixed `isQboSyncEnabled()` to check `feature_flags` (not `business_settings`)

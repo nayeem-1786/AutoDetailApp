@@ -9,6 +9,8 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { splitRecipients } from '@/lib/campaigns/ab-testing';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import type { CampaignChannel, CampaignVariant } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
@@ -57,6 +59,35 @@ export async function POST(
       return NextResponse.json(
         { error: 'Campaign has already been sent or cancelled' },
         { status: 400 }
+      );
+    }
+
+    // Check feature flags for the campaign's channel
+    const [smsEnabled, emailEnabled] = await Promise.all([
+      isFeatureEnabled(FEATURE_FLAGS.SMS_MARKETING),
+      isFeatureEnabled(FEATURE_FLAGS.EMAIL_MARKETING),
+    ]);
+
+    const needsSms = campaign.channel === 'sms' || campaign.channel === 'both';
+    const needsEmail = campaign.channel === 'email' || campaign.channel === 'both';
+
+    // Block if the only channel is disabled
+    if (campaign.channel === 'sms' && !smsEnabled) {
+      return NextResponse.json(
+        { error: 'SMS Marketing is disabled. Enable it in Settings \u2192 Feature Toggles.' },
+        { status: 403 }
+      );
+    }
+    if (campaign.channel === 'email' && !emailEnabled) {
+      return NextResponse.json(
+        { error: 'Email Marketing is disabled. Enable it in Settings \u2192 Feature Toggles.' },
+        { status: 403 }
+      );
+    }
+    if (campaign.channel === 'both' && !smsEnabled && !emailEnabled) {
+      return NextResponse.json(
+        { error: 'Both SMS and Email Marketing are disabled. Enable them in Settings \u2192 Feature Toggles.' },
+        { status: 403 }
       );
     }
 
@@ -288,8 +319,9 @@ export async function POST(
       // Pre-generate recipient ID so we can pass it to Mailgun as a custom variable
       const recipientId = crypto.randomUUID();
 
-      // Send SMS
+      // Send SMS (skip if SMS Marketing is disabled)
       if (
+        smsEnabled &&
         (campaign.channel === 'sms' || campaign.channel === 'both') &&
         customer.sms_consent &&
         customer.phone &&
@@ -304,8 +336,9 @@ export async function POST(
         smsDelivered = result.success;
       }
 
-      // Send email
+      // Send email (skip if Email Marketing is disabled)
       if (
+        emailEnabled &&
         (campaign.channel === 'email' || campaign.channel === 'both') &&
         customer.email_consent &&
         customer.email &&
