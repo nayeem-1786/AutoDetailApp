@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { z } from 'zod';
@@ -49,8 +49,15 @@ type AdjustInput = z.infer<typeof adjustSchema>;
 
 export default function ProductsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const canViewCost = usePermission('inventory.view_cost_data');
+
+  const initialStock = (['all', 'in-stock', 'low-stock', 'out-of-stock'] as const).includes(
+    searchParams.get('stock') as StockFilter
+  )
+    ? (searchParams.get('stock') as StockFilter)
+    : 'all';
 
   const [products, setProducts] = useState<ProductWithRelations[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -59,7 +66,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [vendorFilter, setVendorFilter] = useState('');
-  const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const [stockFilter, setStockFilter] = useState<StockFilter>(initialStock);
   const [showInactive, setShowInactive] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);

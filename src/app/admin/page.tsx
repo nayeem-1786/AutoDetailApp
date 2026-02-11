@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   FileText,
   UserPlus,
   TrendingUp,
@@ -55,6 +56,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [quoteStats, setQuoteStats] = useState({ draft: 0, sent: 0, viewed: 0, accepted: 0 });
   const [customerStats, setCustomerStats] = useState({ total: 0, newThisWeek: 0, newThisMonth: 0 });
+  const [stockAlerts, setStockAlerts] = useState({ lowStock: 0, outOfStock: 0 });
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const fetchData = useCallback(async () => {
@@ -64,7 +66,7 @@ export default function AdminDashboard() {
     const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const monthStart = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
 
-    const [todayRes, weekRes, quotesRes, custTotalRes, custWeekRes, custMonthRes] = await Promise.all([
+    const [todayRes, weekRes, quotesRes, custTotalRes, custWeekRes, custMonthRes, stockRes] = await Promise.all([
       // Today's appointments
       supabase
         .from('appointments')
@@ -117,6 +119,12 @@ export default function AdminDashboard() {
         .from('customers')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', `${monthStart}T00:00:00`),
+
+      // Products with stock issues (for stock alert banner)
+      supabase
+        .from('products')
+        .select('quantity_on_hand, reorder_threshold')
+        .eq('is_active', true),
     ]);
 
     if (todayRes.data) {
@@ -137,6 +145,23 @@ export default function AdminDashboard() {
       newThisWeek: custWeekRes.count ?? 0,
       newThisMonth: custMonthRes.count ?? 0,
     });
+
+    // Compute stock alert counts
+    if (stockRes.data) {
+      let lowStock = 0;
+      let outOfStock = 0;
+      for (const p of stockRes.data) {
+        if (p.quantity_on_hand === 0) {
+          outOfStock++;
+        } else if (
+          p.reorder_threshold !== null &&
+          p.quantity_on_hand <= p.reorder_threshold
+        ) {
+          lowStock++;
+        }
+      }
+      setStockAlerts({ lowStock, outOfStock });
+    }
 
     setLoading(false);
   }, [supabase, today]);
@@ -214,6 +239,32 @@ export default function AdminDashboard() {
             </Link>
           </div>
         </div>
+      )}
+
+      {/* Low Stock Alert banner */}
+      {!loading && (stockAlerts.lowStock > 0 || stockAlerts.outOfStock > 0) && (
+        <Link href="/admin/catalog/products?stock=low-stock">
+          <div className="cursor-pointer rounded-lg border border-amber-200 bg-amber-50 p-4 transition-shadow hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <h3 className="text-sm font-semibold text-amber-900">Stock Alert</h3>
+                <p className="text-xs text-amber-700">
+                  {stockAlerts.lowStock > 0 && (
+                    <span>{stockAlerts.lowStock} product{stockAlerts.lowStock !== 1 ? 's' : ''} low on stock</span>
+                  )}
+                  {stockAlerts.lowStock > 0 && stockAlerts.outOfStock > 0 && ' · '}
+                  {stockAlerts.outOfStock > 0 && (
+                    <span className="font-semibold text-red-700">{stockAlerts.outOfStock} out of stock</span>
+                  )}
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                View Products <ArrowRight className="h-3 w-3" />
+              </span>
+            </div>
+          </div>
+        </Link>
       )}
 
       {/* Stats row */}

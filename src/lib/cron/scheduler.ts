@@ -35,7 +35,13 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/quote-reminders', 'quote-reminders');
   });
 
+  // Stock alerts — daily at 8:00 AM PST (16:00 UTC)
+  cron.schedule('0 16 * * *', () => {
+    callCronEndpoint('/api/cron/stock-alerts', 'stock-alerts');
+  });
+
   console.log('[CRON] Scheduled jobs:');
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
+  console.log('  - stock-alerts: daily at 8:00 AM PST');
 }

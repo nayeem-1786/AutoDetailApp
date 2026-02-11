@@ -823,6 +823,22 @@ export interface CampaignVariant {
   created_at: string;
 }
 
+export interface NotificationRecipient {
+  id: string;
+  email: string;
+  notification_type: 'low_stock' | 'all';
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface StockAlertLog {
+  id: string;
+  product_id: string;
+  stock_level: number;
+  alert_type: 'low_stock' | 'out_of_stock';
+  created_at: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }
