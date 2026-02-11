@@ -328,22 +328,12 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-10
-
-### Phase 7: QuickBooks Online Integration (Feb 2026)
-- Built complete QBO integration behind business_settings toggle (`qbo_enabled`)
-- OAuth 2.0 connect/disconnect flow with auto token refresh (1hr access, 100-day refresh)
-- Sync engines: customers, services/products (catalog), transactions (as Sales Receipts)
-- POS hook in `transactions/route.ts` fires non-blocking sync after transaction completion
-- Customer hook in `customers/route.ts` fires non-blocking sync on creation
-- Manual sync + retry routes at `/api/admin/integrations/qbo/sync/`
-- Settings UI at `/admin/settings/integrations/quickbooks` — connection management, sync toggles, account mapping dropdowns (income + bank from QBO API), sync stats, sync log viewer with filters
-- QBO sync badge component (`src/components/qbo-sync-badge.tsx`) integrated into transaction detail
-- Fixed: query URL double-`?` bug in `client.ts` (minorversion param separator)
-- Fixed: undeclared `realmId` variable in `client.ts` `request()` method
-- Fixed: `getAccounts()` query syntax for fetching all accounts without WHERE filter
-- Changed: moved `qbo_enabled` toggle from `feature_flags` to `business_settings` (later reverted in Session 10b fix)
-- Docs: `docs/QBO-INTEGRATION.md`
+## Last Session: 2026-02-10 (Session 10b — QBO Architecture Fix)
+- Restored `qbo_enabled` feature flag as master toggle (was incorrectly deleted)
+- Moved `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET` to env vars (out of DB)
+- Fixed `isQboSyncEnabled()` to check `feature_flags` (not `business_settings`)
+- Removed credential inputs from settings UI, added env var status + Feature Toggles link
+- Migration `20260210000013`, TypeScript clean, committed and pushed
 
 ### Session 9 — Coupon Wizard Customer Type Fixes
 - **Eligible count fix**: `refreshEligibleCount()` now filters by `targetCustomerType` in all 3 branches (everyone, customer, group). Added to useEffect dependency array.
