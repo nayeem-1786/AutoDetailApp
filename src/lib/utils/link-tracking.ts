@@ -5,6 +5,7 @@ interface TrackedLinkOptions {
   customerId?: string;
   campaignId?: string;
   lifecycleExecutionId?: string;
+  variantId?: string;
   source: string;
 }
 
@@ -25,6 +26,7 @@ export async function createTrackedLink(
     customer_id: opts.customerId || null,
     campaign_id: opts.campaignId || null,
     lifecycle_execution_id: opts.lifecycleExecutionId || null,
+    variant_id: opts.variantId || null,
     source: opts.source,
   });
 

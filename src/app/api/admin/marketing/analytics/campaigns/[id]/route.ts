@@ -66,7 +66,7 @@ export async function GET(
     // ---- Click stats ----
     const { data: clickRows } = await adminClient
       .from('link_clicks')
-      .select('customer_id, clicked_at, short_code, original_url, ip_address, user_agent')
+      .select('customer_id, variant_id, clicked_at, short_code, original_url, ip_address, user_agent')
       .eq('campaign_id', id)
       .order('clicked_at', { ascending: false });
 

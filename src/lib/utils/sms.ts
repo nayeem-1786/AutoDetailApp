@@ -112,6 +112,8 @@ export interface MarketingSmsOptions {
   campaignId?: string;
   /** Lifecycle execution ID for delivery tracking */
   lifecycleExecutionId?: string;
+  /** A/B test variant ID for click attribution */
+  variantId?: string;
   /** Source label for delivery tracking (defaults to 'campaign') */
   source?: 'campaign' | 'lifecycle' | 'transactional' | 'manual';
 }
@@ -155,6 +157,7 @@ export async function sendMarketingSms(to: string, body: string, customerId?: st
         customerId,
         campaignId: marketingOptions.campaignId,
         lifecycleExecutionId: marketingOptions.lifecycleExecutionId,
+        variantId: marketingOptions.variantId,
         source: marketingOptions.source || 'campaign',
       });
     } catch (wrapErr) {

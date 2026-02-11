@@ -116,17 +116,18 @@ export async function getVariantStats(campaignId: string): Promise<VariantStats[
       delivered = (smsDelivered ?? 0) + (emailDelivered ?? 0);
     }
 
-    // Click stats from email delivery log
+    // Click stats from link_clicks (tracks both SMS and email clicks per variant)
     let clicked = 0;
     if (customerIds.length > 0) {
-      const { count: clickCount } = await supabase
-        .from('email_delivery_log')
-        .select('id', { count: 'exact', head: true })
+      // Count unique customers who clicked (not total click events)
+      const { data: clickData } = await supabase
+        .from('link_clicks')
+        .select('customer_id')
         .eq('campaign_id', campaignId)
-        .in('customer_id', customerIds)
-        .eq('event', 'clicked');
+        .eq('variant_id', variant.id);
 
-      clicked = clickCount ?? 0;
+      const uniqueClickers = new Set((clickData ?? []).map(c => c.customer_id).filter(Boolean));
+      clicked = uniqueClickers.size;
     }
 
     // Opt-out stats from sms_consent_log

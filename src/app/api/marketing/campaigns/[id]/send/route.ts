@@ -232,6 +232,7 @@ export async function POST(
         const smsBody = renderTemplate(smsTemplate, templateVars);
         const result = await sendMarketingSms(customer.phone, smsBody, customer.id, {
           campaignId: id,
+          variantId: variant?.id ?? undefined,
           source: 'campaign',
         });
         smsDelivered = result.success;

@@ -41,6 +41,7 @@ export async function GET(
       customer_id: trackedLink.customer_id || null,
       campaign_id: trackedLink.campaign_id || null,
       lifecycle_execution_id: trackedLink.lifecycle_execution_id || null,
+      variant_id: trackedLink.variant_id || null,
       source: trackedLink.source,
       ip_address: ipAddress,
       user_agent: userAgent,
