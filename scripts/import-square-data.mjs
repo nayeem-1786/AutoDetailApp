@@ -389,9 +389,46 @@ async function importProducts() {
   }
 
   log(`  Importing ${productRows.length} products...`);
-  const result = await batchInsert('products', productRows);
-  log(`  Products imported: ${result.inserted}, errors: ${result.errors}`);
-  return result.inserted;
+
+  // Use upsert on square_item_id so re-imports are safe.
+  // cost_price is only set on insert — existing manual edits are preserved.
+  let inserted = 0;
+  let updated = 0;
+  let errors = 0;
+  for (let i = 0; i < productRows.length; i += 50) {
+    const batch = productRows.slice(i, i + 50);
+    for (const row of batch) {
+      if (row.square_item_id) {
+        // Check if product already exists
+        const { data: existing } = await supabase
+          .from('products')
+          .select('id, cost_price')
+          .eq('square_item_id', row.square_item_id)
+          .maybeSingle();
+
+        if (existing) {
+          // Update but preserve cost_price if already set
+          const updatePayload = { ...row };
+          delete updatePayload.square_item_id;
+          delete updatePayload.slug; // Don't overwrite slug
+          if (existing.cost_price && existing.cost_price > 0) {
+            delete updatePayload.cost_price; // Don't overwrite manual edits
+          }
+          const { error } = await supabase
+            .from('products')
+            .update(updatePayload)
+            .eq('id', existing.id);
+          if (error) { errors++; } else { updated++; }
+          continue;
+        }
+      }
+      // New product — insert
+      const { error } = await supabase.from('products').insert(row);
+      if (error) { errors++; } else { inserted++; }
+    }
+  }
+  log(`  Products: ${inserted} inserted, ${updated} updated, ${errors} errors`);
+  return inserted + updated;
 }
 
 // ---------------------------------------------------------------------------

@@ -2,19 +2,32 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { formResolver } from '@/lib/utils/form';
+import { z } from 'zod';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogContent,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { Plus, Package, ImageOff } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -24,6 +37,13 @@ type ProductWithRelations = Product & {
 };
 
 type StockFilter = 'all' | 'in-stock' | 'low-stock' | 'out-of-stock';
+
+const adjustSchema = z.object({
+  adjustment: z.coerce.number().int('Must be a whole number'),
+  reason: z.string().optional(),
+});
+
+type AdjustInput = z.infer<typeof adjustSchema>;
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -39,64 +59,74 @@ export default function ProductsPage() {
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const [showInactive, setShowInactive] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset: resetAdjustForm,
+    formState: { errors: adjustErrors },
+  } = useForm<AdjustInput>({
+    resolver: formResolver(adjustSchema),
+  });
+
+  async function loadProducts() {
+    setLoading(true);
+
+    const productsRes = await supabase
+      .from('products')
+      .select('*, product_categories(id, name), vendors(id, name)')
+      .order('name');
+
+    if (productsRes.error) {
+      console.error('Failed to load products:', productsRes.error);
+      toast.error('Failed to load products');
+      setLoading(false);
+      return;
+    }
+
+    setProducts((productsRes.data ?? []) as ProductWithRelations[]);
+
+    // Fetch filter options — partial failure OK
+    const [categoriesRes, vendorsRes] = await Promise.all([
+      supabase
+        .from('product_categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order'),
+      supabase
+        .from('vendors')
+        .select('*')
+        .eq('is_active', true)
+        .order('name'),
+    ]);
+
+    let filterWarning = false;
+
+    if (categoriesRes.error) {
+      console.error('Failed to load categories:', categoriesRes.error);
+      filterWarning = true;
+    } else {
+      setCategories(categoriesRes.data ?? []);
+    }
+
+    if (vendorsRes.error) {
+      console.error('Failed to load vendors:', vendorsRes.error);
+      filterWarning = true;
+    } else {
+      setVendors(vendorsRes.data ?? []);
+    }
+
+    if (filterWarning) {
+      toast.error('Some filter options couldn\'t be loaded');
+    }
+
+    setLoading(false);
+  }
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-
-      // Fetch products, categories, and vendors in parallel
-      // If categories or vendors fail, still show products
-      const productsRes = await supabase
-        .from('products')
-        .select('*, product_categories(id, name), vendors(id, name)')
-        .order('name');
-
-      if (productsRes.error) {
-        console.error('Failed to load products:', productsRes.error);
-        toast.error('Failed to load products');
-        setLoading(false);
-        return;
-      }
-
-      setProducts((productsRes.data ?? []) as ProductWithRelations[]);
-
-      // Fetch filter options — partial failure OK
-      const [categoriesRes, vendorsRes] = await Promise.all([
-        supabase
-          .from('product_categories')
-          .select('*')
-          .eq('is_active', true)
-          .order('display_order'),
-        supabase
-          .from('vendors')
-          .select('*')
-          .eq('is_active', true)
-          .order('name'),
-      ]);
-
-      let filterWarning = false;
-
-      if (categoriesRes.error) {
-        console.error('Failed to load categories:', categoriesRes.error);
-        filterWarning = true;
-      } else {
-        setCategories(categoriesRes.data ?? []);
-      }
-
-      if (vendorsRes.error) {
-        console.error('Failed to load vendors:', vendorsRes.error);
-        filterWarning = true;
-      } else {
-        setVendors(vendorsRes.data ?? []);
-      }
-
-      if (filterWarning) {
-        toast.error('Some filter options couldn\'t be loaded');
-      }
-
-      setLoading(false);
-    }
-    load();
+    loadProducts();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleReactivate(product: ProductWithRelations) {
@@ -120,6 +150,47 @@ export default function ProductsPage() {
       toast.error('Failed to reactivate product');
     } finally {
       setReactivatingId(null);
+    }
+  }
+
+  function openAdjust(product: ProductWithRelations) {
+    setAdjustTarget(product);
+    resetAdjustForm({ adjustment: 0, reason: '' });
+  }
+
+  async function onAdjust(data: AdjustInput) {
+    if (!adjustTarget) return;
+    if (data.adjustment === 0) {
+      toast.error('Adjustment cannot be zero');
+      return;
+    }
+
+    const newQty = adjustTarget.quantity_on_hand + data.adjustment;
+    if (newQty < 0) {
+      toast.error('Stock cannot go below zero');
+      return;
+    }
+
+    setAdjusting(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ quantity_on_hand: newQty })
+        .eq('id', adjustTarget.id);
+
+      if (error) throw error;
+
+      const direction = data.adjustment > 0 ? 'increased' : 'decreased';
+      toast.success(
+        `${adjustTarget.name} stock ${direction} by ${Math.abs(data.adjustment)} (now ${newQty})`
+      );
+      setAdjustTarget(null);
+      await loadProducts();
+    } catch (err) {
+      console.error('Adjust stock error:', err);
+      toast.error('Failed to adjust stock');
+    } finally {
+      setAdjusting(false);
     }
   }
 
@@ -225,10 +296,50 @@ export default function ProductsPage() {
       cell: ({ row }) => formatCurrency(row.original.retail_price),
     },
     {
+      id: 'cost_price',
+      header: 'Cost',
+      size: 80,
+      cell: ({ row }) =>
+        row.original.cost_price > 0
+          ? formatCurrency(row.original.cost_price)
+          : '--',
+    },
+    {
+      id: 'margin',
+      header: 'Margin',
+      size: 64,
+      cell: ({ row }) => {
+        const p = row.original;
+        if (!p.cost_price || p.cost_price === 0 || p.retail_price === 0) return '--';
+        const margin = ((p.retail_price - p.cost_price) / p.retail_price * 100);
+        return `${margin.toFixed(0)}%`;
+      },
+      enableSorting: false,
+    },
+    {
       accessorKey: 'quantity_on_hand',
       header: 'Stock',
       size: 64,
-      cell: ({ row }) => row.original.quantity_on_hand,
+      cell: ({ row }) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            openAdjust(row.original);
+          }}
+          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+        >
+          {row.original.quantity_on_hand}
+        </button>
+      ),
+    },
+    {
+      id: 'reorder_threshold',
+      header: 'Reorder At',
+      size: 80,
+      cell: ({ row }) =>
+        row.original.reorder_threshold !== null
+          ? row.original.reorder_threshold
+          : '--',
     },
     {
       id: 'status',
@@ -367,6 +478,59 @@ export default function ProductsPage() {
           </Button>
         }
       />
+
+      {/* Quick Adjust Dialog */}
+      <Dialog open={!!adjustTarget} onOpenChange={(open) => !open && setAdjustTarget(null)}>
+        <DialogClose onClose={() => setAdjustTarget(null)} />
+        <DialogHeader>
+          <DialogTitle>Adjust Stock: {adjustTarget?.name}</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          <div className="mb-4 rounded-lg bg-gray-50 p-3">
+            <div className="text-sm text-gray-500">Current Stock</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {adjustTarget?.quantity_on_hand ?? 0}
+            </div>
+          </div>
+
+          <form id="adjust-form" onSubmit={handleSubmit(onAdjust)} className="space-y-4">
+            <FormField
+              label="Adjustment"
+              error={adjustErrors.adjustment?.message}
+              required
+              htmlFor="adjustment"
+              description="Enter positive number to add, negative to subtract (e.g. +10 or -3)"
+            >
+              <Input
+                id="adjustment"
+                type="number"
+                {...register('adjustment')}
+                placeholder="e.g. +10 or -3"
+              />
+            </FormField>
+
+            <FormField
+              label="Reason"
+              error={adjustErrors.reason?.message}
+              htmlFor="adjust-reason"
+            >
+              <Input
+                id="adjust-reason"
+                {...register('reason')}
+                placeholder="e.g. Recount, damaged, etc."
+              />
+            </FormField>
+          </form>
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setAdjustTarget(null)} disabled={adjusting}>
+            Cancel
+          </Button>
+          <Button type="submit" form="adjust-form" disabled={adjusting}>
+            {adjusting ? 'Updating...' : 'Update Stock'}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

@@ -12,8 +12,11 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -37,14 +40,12 @@ export default function VendorsPage() {
 
   const [vendors, setVendors] = useState<VendorWithCount[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Dialog state
+  const [search, setSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [saving, setSaving] = useState(false);
-
-  // Delete state
-  const [deleteTarget, setDeleteTarget] = useState<VendorWithCount | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const {
@@ -57,35 +58,38 @@ export default function VendorsPage() {
     resolver: formResolver(vendorSchema),
   });
 
-  async function loadData() {
+  async function loadVendors() {
     setLoading(true);
 
-    const [vendorRes, countRes] = await Promise.all([
-      supabase.from('vendors').select('*').order('name'),
-      supabase
-        .from('products')
-        .select('vendor_id')
-        .eq('is_active', true)
-        .not('vendor_id', 'is', null),
-    ]);
+    // Fetch all vendors (active + inactive)
+    const { data: vendorData, error: vendorError } = await supabase
+      .from('vendors')
+      .select('*')
+      .order('name');
 
-    if (vendorRes.error) {
+    if (vendorError) {
       toast.error('Failed to load vendors');
       setLoading(false);
       return;
     }
 
-    // Build product count map
+    // Count products per vendor
+    const { data: countData } = await supabase
+      .from('products')
+      .select('vendor_id')
+      .eq('is_active', true)
+      .not('vendor_id', 'is', null);
+
     const countMap: Record<string, number> = {};
-    if (countRes.data) {
-      for (const row of countRes.data) {
+    if (countData) {
+      for (const row of countData) {
         if (row.vendor_id) {
           countMap[row.vendor_id] = (countMap[row.vendor_id] || 0) + 1;
         }
       }
     }
 
-    const withCounts: VendorWithCount[] = (vendorRes.data || []).map((v: Vendor) => ({
+    const withCounts: VendorWithCount[] = (vendorData || []).map((v: Vendor) => ({
       ...v,
       product_count: countMap[v.id] || 0,
     }));
@@ -95,8 +99,21 @@ export default function VendorsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    loadVendors();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = vendors.filter((v) => {
+    // Active/inactive filter
+    if (!showInactive && !v.is_active) return false;
+    // Search filter
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      v.name.toLowerCase().includes(q) ||
+      v.contact_name?.toLowerCase().includes(q) ||
+      v.email?.toLowerCase().includes(q)
+    );
+  });
 
   function openCreate() {
     setEditingVendor(null);
@@ -106,6 +123,8 @@ export default function VendorsPage() {
       email: '',
       phone: '',
       website: '',
+      address: '',
+      lead_time_days: null,
       notes: '',
     });
     setDialogOpen(true);
@@ -119,19 +138,11 @@ export default function VendorsPage() {
       email: vendor.email || '',
       phone: vendor.phone || '',
       website: vendor.website || '',
+      address: vendor.address || '',
+      lead_time_days: vendor.lead_time_days,
       notes: vendor.notes || '',
     });
     setDialogOpen(true);
-  }
-
-  function attemptDelete(vendor: VendorWithCount) {
-    if (vendor.product_count > 0) {
-      toast.error(
-        `Cannot delete "${vendor.name}" — it has ${vendor.product_count} linked product${vendor.product_count === 1 ? '' : 's'}. Reassign them first.`
-      );
-      return;
-    }
-    setDeleteTarget(vendor);
   }
 
   async function onSubmit(data: VendorInput) {
@@ -143,6 +154,8 @@ export default function VendorsPage() {
         email: data.email || null,
         phone: data.phone || null,
         website: data.website || null,
+        address: data.address || null,
+        lead_time_days: data.lead_time_days ?? null,
         notes: data.notes || null,
       };
 
@@ -154,16 +167,14 @@ export default function VendorsPage() {
         if (error) throw error;
         toast.success('Vendor updated');
       } else {
-        const { error } = await supabase
-          .from('vendors')
-          .insert({ ...payload, is_active: true });
+        const { error } = await supabase.from('vendors').insert(payload);
         if (error) throw error;
         toast.success('Vendor created');
       }
 
       setDialogOpen(false);
       setEditingVendor(null);
-      await loadData();
+      await loadVendors();
     } catch (err) {
       console.error('Save vendor error:', err);
       toast.error('Failed to save vendor');
@@ -183,7 +194,7 @@ export default function VendorsPage() {
       if (error) throw error;
       toast.success('Vendor deleted');
       setDeleteTarget(null);
-      await loadData();
+      await loadVendors();
     } catch (err) {
       console.error('Delete vendor error:', err);
       toast.error('Failed to delete vendor');
@@ -203,28 +214,37 @@ export default function VendorsPage() {
     {
       accessorKey: 'contact_name',
       header: 'Contact',
-      size: 140,
       cell: ({ row }) => row.original.contact_name || '--',
     },
     {
       accessorKey: 'email',
       header: 'Email',
-      size: 180,
-      cell: ({ row }) => (
-        <span className="truncate">{row.original.email || '--'}</span>
-      ),
+      cell: ({ row }) =>
+        row.original.email ? (
+          <a href={`mailto:${row.original.email}`} className="text-blue-600 hover:text-blue-800 hover:underline">
+            {row.original.email}
+          </a>
+        ) : (
+          '--'
+        ),
     },
     {
       accessorKey: 'phone',
       header: 'Phone',
-      size: 120,
       cell: ({ row }) =>
         row.original.phone ? formatPhone(row.original.phone) : '--',
     },
     {
+      accessorKey: 'lead_time_days',
+      header: 'Lead Time',
+      cell: ({ row }) =>
+        row.original.lead_time_days !== null
+          ? `${row.original.lead_time_days} days`
+          : '--',
+    },
+    {
       id: 'products',
       header: 'Products',
-      size: 80,
       cell: ({ row }) => (
         <Badge variant="secondary">{row.original.product_count}</Badge>
       ),
@@ -233,7 +253,6 @@ export default function VendorsPage() {
     {
       id: 'status',
       header: 'Status',
-      size: 80,
       cell: ({ row }) =>
         row.original.is_active ? (
           <Badge variant="success">Active</Badge>
@@ -245,7 +264,6 @@ export default function VendorsPage() {
     {
       id: 'actions',
       header: '',
-      size: 80,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -255,13 +273,15 @@ export default function VendorsPage() {
           >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => attemptDelete(row.original)}
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
+          {row.original.is_active && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDeleteTarget(row.original)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+          )}
         </div>
       ),
       enableSorting: false,
@@ -280,7 +300,7 @@ export default function VendorsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Vendors"
-        description="Manage product vendors"
+        description="Manage product suppliers"
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
@@ -289,9 +309,26 @@ export default function VendorsPage() {
         }
       />
 
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search vendors..."
+          className="w-full sm:w-64"
+        />
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <Switch
+            id="show-inactive-vendors"
+            checked={showInactive}
+            onCheckedChange={setShowInactive}
+          />
+          <Label htmlFor="show-inactive-vendors">Show Inactive</Label>
+        </div>
+      </div>
+
       <DataTable
         columns={columns}
-        data={vendors}
+        data={filtered}
         emptyTitle="No vendors found"
         emptyDescription="Add your first vendor to get started."
         emptyAction={
@@ -310,7 +347,7 @@ export default function VendorsPage() {
         </DialogHeader>
         <DialogContent>
           <form id="vendor-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <FormField label="Name" error={errors.name?.message} required htmlFor="vendor-name">
+            <FormField label="Vendor Name" error={errors.name?.message} required htmlFor="vendor-name">
               <Input id="vendor-name" {...register('name')} placeholder="e.g. Chemical Guys" />
             </FormField>
 
@@ -339,6 +376,14 @@ export default function VendorsPage() {
 
             <FormField label="Website" error={errors.website?.message} htmlFor="vendor-website">
               <Input id="vendor-website" {...register('website')} placeholder="https://..." />
+            </FormField>
+
+            <FormField label="Address" error={errors.address?.message} htmlFor="vendor-address">
+              <Input id="vendor-address" {...register('address')} placeholder="Shipping address" />
+            </FormField>
+
+            <FormField label="Lead Time (days)" error={errors.lead_time_days?.message} htmlFor="vendor-lead-time">
+              <Input id="vendor-lead-time" type="number" min="0" {...register('lead_time_days')} placeholder="e.g. 7" />
             </FormField>
 
             <FormField label="Notes" error={errors.notes?.message} htmlFor="vendor-notes">
