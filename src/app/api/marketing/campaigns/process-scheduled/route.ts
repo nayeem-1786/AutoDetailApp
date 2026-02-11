@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildAudienceQuery } from '@/lib/utils/audience';
-import { renderTemplate } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines } from '@/lib/utils/template';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
-import { SITE_URL } from '@/lib/utils/constants';
+import { createShortLink } from '@/lib/utils/short-link';
 import type { CampaignChannel } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient();
     const businessInfo = await getBusinessInfo();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     // Find all scheduled campaigns that are due
     const { data: campaigns, error: queryError } = await adminClient
@@ -63,6 +64,30 @@ export async function POST(request: NextRequest) {
     if (queryError) throw queryError;
     if (!campaigns || campaigns.length === 0) {
       return NextResponse.json({ data: { processed: 0 } });
+    }
+
+    // Pre-load review URLs from business_settings and shorten once
+    const { data: reviewSettings } = await adminClient
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['google_review_url', 'yelp_review_url']);
+
+    const reviewMap: Record<string, string> = {};
+    for (const s of reviewSettings || []) {
+      reviewMap[s.key] = typeof s.value === 'string' ? s.value : String(s.value ?? '');
+    }
+
+    let shortGoogleUrl = '';
+    let shortYelpUrl = '';
+    const googleUrl = reviewMap.google_review_url || '';
+    const yelpUrl = reviewMap.yelp_review_url || '';
+    if (googleUrl) {
+      try { shortGoogleUrl = await createShortLink(googleUrl); }
+      catch { shortGoogleUrl = googleUrl; }
+    }
+    if (yelpUrl) {
+      try { shortYelpUrl = await createShortLink(yelpUrl); }
+      catch { shortYelpUrl = yelpUrl; }
     }
 
     const results = [];
@@ -92,14 +117,16 @@ export async function POST(request: NextRequest) {
         couponTemplate = coupon;
       }
 
-      // Look up target service slug for book-now deep link
+      // Look up target service slug + name for book-now deep link and {service_name}
       let serviceSlug: string | null = null;
+      let targetServiceName = '';
       if (couponTemplate?.coupon_rewards?.length > 0) {
         const targetServiceId = couponTemplate.coupon_rewards[0].target_service_id;
         if (targetServiceId) {
           const { data: svc } = await adminClient
-            .from('services').select('slug').eq('id', targetServiceId).single();
+            .from('services').select('name, slug').eq('id', targetServiceId).single();
           serviceSlug = svc?.slug ?? null;
+          targetServiceName = svc?.name ?? '';
         }
       }
 
@@ -108,6 +135,20 @@ export async function POST(request: NextRequest) {
         .from('customers')
         .select('id, first_name, last_name, phone, email, sms_consent, email_consent')
         .in('id', customerIds.length > 0 ? customerIds : ['__none__']);
+
+      // Pre-load most recent vehicle per customer for {vehicle_info}
+      const { data: vehicles } = await adminClient
+        .from('vehicles')
+        .select('customer_id, year, make, model')
+        .in('customer_id', customerIds.length > 0 ? customerIds : ['__none__'])
+        .order('created_at', { ascending: false });
+
+      const vehicleMap = new Map<string, string>();
+      for (const v of vehicles ?? []) {
+        if (!vehicleMap.has(v.customer_id)) {
+          vehicleMap.set(v.customer_id, [v.year, v.make, v.model].filter(Boolean).join(' '));
+        }
+      }
 
       let deliveredCount = 0;
 
@@ -150,15 +191,29 @@ export async function POST(request: NextRequest) {
         if (serviceSlug) bookNowParams.set('service', serviceSlug);
         if (couponCode) bookNowParams.set('coupon', couponCode);
         if (customer.email) bookNowParams.set('email', customer.email);
-        const bookNowUrl = `${SITE_URL}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
+        const bookNowUrl = `${appUrl}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
+
+        // Build personalized booking link with customer info pre-filled
+        const bookUrlParams = new URLSearchParams();
+        const fullName = `${customer.first_name} ${customer.last_name}`.trim();
+        if (fullName) bookUrlParams.set('name', fullName);
+        if (customer.phone) bookUrlParams.set('phone', customer.phone);
+        if (customer.email) bookUrlParams.set('email', customer.email);
+        if (couponCode) bookUrlParams.set('coupon', couponCode);
+        const bookUrl = `${appUrl}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
 
         const templateVars: Record<string, string> = {
           first_name: customer.first_name,
           last_name: customer.last_name,
           coupon_code: couponCode,
           business_name: businessInfo.name,
-          booking_url: `${SITE_URL}/book`,
+          booking_url: `${appUrl}/book`,
+          book_url: bookUrl,
           book_now_url: bookNowUrl,
+          vehicle_info: vehicleMap.get(customer.id) || '',
+          service_name: targetServiceName,
+          google_review_link: shortGoogleUrl,
+          yelp_review_link: shortYelpUrl,
         };
 
         let smsDelivered = false;
@@ -174,7 +229,7 @@ export async function POST(request: NextRequest) {
           customer.phone &&
           campaign.sms_template
         ) {
-          const smsBody = renderTemplate(campaign.sms_template, templateVars);
+          const smsBody = cleanEmptyReviewLines(renderTemplate(campaign.sms_template, templateVars));
           const result = await sendMarketingSms(customer.phone, smsBody, customer.id);
           smsDelivered = result.success;
         }
@@ -187,7 +242,7 @@ export async function POST(request: NextRequest) {
           campaign.email_template
         ) {
           const subj = renderTemplate(campaign.email_subject, templateVars);
-          const emailBody = renderTemplate(campaign.email_template, templateVars);
+          const emailBody = cleanEmptyReviewLines(renderTemplate(campaign.email_template, templateVars));
           const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
           const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${bookNowUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Book Now</a></div>`;
           const emailHtml = `<html><body>${bodyParagraphs}${ctaButton}</body></html>`;

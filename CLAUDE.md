@@ -29,7 +29,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **3** | Booking, Quotes & 11 Labs API | Done |
 | **4** | Customer Portal | Done |
 | **5** | Marketing, Coupons & Campaigns | Done |
-| **6** | Inventory Management | Partial (see below) |
+| **6** | Inventory Management | Done |
 | **7** | QuickBooks Integration & Reporting | Not started |
 | **8** | Photo Documentation | Not started |
 | **9** | Online Store (WooCommerce Sync) | Not started |
@@ -115,6 +115,13 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Lifecycle engine URL tracking — passes `lifecycleExecutionId` to `sendMarketingSms()` so `wrapUrlsInMessage()` creates tracked short links
 - Personalized booking links — `{book_url}` placeholder generates `/book?name=...&phone=...&email=...&coupon=...` per customer, auto-shortened by click tracker
 - TCPA compliance — all 9 audit items resolved (consent log, STOP/START handling, frequency caps, signature validation, landline detection)
+- Campaign detail analytics drill-down (`/admin/marketing/campaigns/[id]/analytics`) — summary KPIs, delivery funnel, recipient table (filterable/paginated), A/B variant comparison, click details with link performance, engagement timeline chart
+- Campaign duplicate action — copy icon on campaign list, creates draft copy with "(Copy)" suffix, copies A/B variants. Endpoint: `POST /api/marketing/campaigns/[id]/duplicate`
+- Campaign list column width balanced (Name column expanded to 35%)
+- Click-to-variant attribution — `variant_id` column added to `tracked_links` and `link_clicks` tables (migration 20260210000010), threaded through full chain: `createTrackedLink()` → `wrapUrlsInMessage()` → `sendMarketingSms()` → campaign send route → click redirect handler → `getVariantStats()`
+- `campaign_recipients.clicked_at` updates on first click via `/api/t/[code]` redirect handler
+- Template variables audit — consolidated `vehicle_description` into `vehicle_info`, context-aware variable chips (COMMON_VARIABLES in campaigns, AUTOMATION_ONLY like `service_name` only in automation editors), `cleanEmptyReviewLines()` strips blank lines from unused review URL placeholders
+- Campaign send route enhanced — pre-loads `{vehicle_info}`, `{service_name}`, `{google_review_link}`, `{yelp_review_link}` template variables, uses `cleanEmptyReviewLines()` and `createShortLink()` for review URLs
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete

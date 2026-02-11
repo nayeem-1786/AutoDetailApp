@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
-import { renderTemplate } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines } from '@/lib/utils/template';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
@@ -401,7 +401,7 @@ async function executePending(
       // Load customer
       const { data: customer } = await admin
         .from('customers')
-        .select('first_name, last_name, phone, sms_consent')
+        .select('first_name, last_name, phone, email, sms_consent')
         .eq('id', exec.customer_id)
         .single();
 
@@ -414,6 +414,7 @@ async function executePending(
       // Resolve context: vehicle + service/item names
       let vehicleDescription = '';
       let serviceName = '';
+      let serviceSlug = '';
 
       if (exec.appointment_id) {
         const { data: apt } = await admin
@@ -435,14 +436,13 @@ async function executePending(
 
         const { data: aptServices } = await admin
           .from('appointment_services')
-          .select('services(name)')
+          .select('services(name, slug)')
           .eq('appointment_id', exec.appointment_id);
 
         if (aptServices?.length) {
-          serviceName = aptServices
-            .map((s) => (s.services as unknown as { name: string })?.name)
-            .filter(Boolean)
-            .join(', ');
+          const svcData = aptServices.map((s) => s.services as unknown as { name: string; slug: string } | null).filter(Boolean);
+          serviceName = svcData.map((s) => s!.name).filter(Boolean).join(', ');
+          serviceSlug = svcData[0]?.slug ?? '';
         }
       } else if (exec.transaction_id) {
         const { data: tx } = await admin
@@ -525,12 +525,18 @@ async function executePending(
       if (couponCode) bookUrlParams.set('coupon', couponCode);
       const bookUrl = `${appUrl}/book${bookUrlParams.toString() ? '?' + bookUrlParams.toString() : ''}`;
 
+      // Build book-now deep link with service, coupon & email
+      const bookNowParams = new URLSearchParams();
+      if (serviceSlug) bookNowParams.set('service', serviceSlug);
+      if (couponCode) bookNowParams.set('coupon', couponCode);
+      if (customer.email) bookNowParams.set('email', customer.email);
+      const bookNowUrl = `${appUrl}/book${bookNowParams.toString() ? '?' + bookNowParams.toString() : ''}`;
+
       // Render template with snake_case variables matching TEMPLATE_VARIABLES
       let message = renderTemplate(template, {
         first_name: customer.first_name || 'there',
         last_name: customer.last_name || '',
         service_name: serviceName || 'your service',
-        vehicle_description: vehicleDescription,
         vehicle_info: vehicleDescription,
         business_name: businessName,
         google_review_link: shortGoogleUrl,
@@ -538,17 +544,11 @@ async function executePending(
         coupon_code: couponCode,
         booking_url: `${appUrl}/book`,
         book_url: bookUrl,
-        book_now_url: couponCode
-          ? `${appUrl}/book?coupon=${couponCode}`
-          : `${appUrl}/book`,
+        book_now_url: bookNowUrl,
       });
 
       // Clean up lines with empty review links (e.g., if URL not configured)
-      message = message
-        .split('\n')
-        .filter((line) => !/^⭐\s*(Google|Yelp):\s*$/.test(line.trim()))
-        .join('\n')
-        .replace(/\n{3,}/g, '\n\n');
+      message = cleanEmptyReviewLines(message);
 
       // Send via marketing SMS (appends STOP footer, wraps URLs for click tracking)
       const result = await sendMarketingSms(customer.phone, message, exec.customer_id, {

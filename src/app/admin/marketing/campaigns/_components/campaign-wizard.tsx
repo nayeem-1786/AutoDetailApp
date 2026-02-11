@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Coupon, Service } from '@/lib/supabase/types';
-import { TEMPLATE_VARIABLES, renderTemplate } from '@/lib/utils/template';
+import { CAMPAIGN_VARIABLES, renderTemplate } from '@/lib/utils/template';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -488,6 +488,10 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       book_now_url: sampleCode
         ? `${SITE_URL}/book?coupon=${sampleCode}&email=${encodeURIComponent(customer.email || '')}`
         : `${SITE_URL}/book`,
+      vehicle_info: '2024 Tesla Model 3',
+      service_name: '',
+      google_review_link: 'https://g.page/r/review',
+      yelp_review_link: 'https://yelp.com/review',
     };
 
     const variantA = {
@@ -530,7 +534,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
 
   const variableChips = (setter: (fn: (prev: string) => string) => void, inputId: string) => (
     <div className="mt-2 flex flex-wrap gap-1">
-      {Object.entries(TEMPLATE_VARIABLES).map(([key, desc]) => (
+      {Object.entries(CAMPAIGN_VARIABLES).map(([key, desc]) => (
         <button
           key={key}
           type="button"

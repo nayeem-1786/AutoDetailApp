@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildAudienceQuery } from '@/lib/utils/audience';
-import { renderTemplate } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines } from '@/lib/utils/template';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
+import { createShortLink } from '@/lib/utils/short-link';
 import { splitRecipients } from '@/lib/campaigns/ab-testing';
 import type { CampaignChannel, CampaignVariant } from '@/lib/supabase/types';
 import crypto from 'crypto';
@@ -129,15 +130,41 @@ export async function POST(
       couponTemplate = coupon;
     }
 
-    // Look up target service slug for book-now deep link
+    // Look up target service slug + name for book-now deep link and {service_name}
     let serviceSlug: string | null = null;
+    let targetServiceName = '';
     if (couponTemplate?.coupon_rewards?.length > 0) {
       const targetServiceId = couponTemplate.coupon_rewards[0].target_service_id;
       if (targetServiceId) {
         const { data: svc } = await adminClient
-          .from('services').select('slug').eq('id', targetServiceId).single();
+          .from('services').select('name, slug').eq('id', targetServiceId).single();
         serviceSlug = svc?.slug ?? null;
+        targetServiceName = svc?.name ?? '';
       }
+    }
+
+    // Pre-load review URLs from business_settings and shorten once
+    const { data: reviewSettings } = await adminClient
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['google_review_url', 'yelp_review_url']);
+
+    const reviewMap: Record<string, string> = {};
+    for (const s of reviewSettings || []) {
+      reviewMap[s.key] = typeof s.value === 'string' ? s.value : String(s.value ?? '');
+    }
+
+    let shortGoogleUrl = '';
+    let shortYelpUrl = '';
+    const googleUrl = reviewMap.google_review_url || '';
+    const yelpUrl = reviewMap.yelp_review_url || '';
+    if (googleUrl) {
+      try { shortGoogleUrl = await createShortLink(googleUrl); }
+      catch { shortGoogleUrl = googleUrl; }
+    }
+    if (yelpUrl) {
+      try { shortYelpUrl = await createShortLink(yelpUrl); }
+      catch { shortYelpUrl = yelpUrl; }
     }
 
     // Get customer details
@@ -145,6 +172,20 @@ export async function POST(
       .from('customers')
       .select('id, first_name, last_name, phone, email, sms_consent, email_consent')
       .in('id', customerIds.length > 0 ? customerIds : ['__none__']);
+
+    // Pre-load most recent vehicle per customer for {vehicle_info}
+    const { data: vehicles } = await adminClient
+      .from('vehicles')
+      .select('customer_id, year, make, model')
+      .in('customer_id', customerIds.length > 0 ? customerIds : ['__none__'])
+      .order('created_at', { ascending: false });
+
+    const vehicleMap = new Map<string, string>();
+    for (const v of vehicles ?? []) {
+      if (!vehicleMap.has(v.customer_id)) {
+        vehicleMap.set(v.customer_id, [v.year, v.make, v.model].filter(Boolean).join(' '));
+      }
+    }
 
     let deliveredCount = 0;
 
@@ -207,6 +248,10 @@ export async function POST(
         booking_url: `${appUrl}/book`,
         book_url: bookUrl,
         book_now_url: bookNowUrl,
+        vehicle_info: vehicleMap.get(customer.id) || '',
+        service_name: targetServiceName,
+        google_review_link: shortGoogleUrl,
+        yelp_review_link: shortYelpUrl,
       };
 
       // Resolve message templates: use variant overrides for A/B tests
@@ -229,7 +274,7 @@ export async function POST(
         customer.phone &&
         smsTemplate
       ) {
-        const smsBody = renderTemplate(smsTemplate, templateVars);
+        const smsBody = cleanEmptyReviewLines(renderTemplate(smsTemplate, templateVars));
         const result = await sendMarketingSms(customer.phone, smsBody, customer.id, {
           campaignId: id,
           variantId: variant?.id ?? undefined,
@@ -247,7 +292,7 @@ export async function POST(
         emailBodyTemplate
       ) {
         const emailSubject = renderTemplate(emailSubjectTemplate, templateVars);
-        const emailBody = renderTemplate(emailBodyTemplate, templateVars);
+        const emailBody = cleanEmptyReviewLines(renderTemplate(emailBodyTemplate, templateVars));
         const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
         const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${bookNowUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Book Now</a></div>`;
         const emailHtml = `<html><body>${bodyParagraphs}${ctaButton}</body></html>`;
