@@ -149,7 +149,8 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Dashboard low stock alert banner: links to filtered products view (`/admin/catalog/products?stock=low-stock`)
 - Products page URL param support: `?stock=` query param initializes stock filter from external links
 - COGS margin visibility: permission-gated Cost & Margin card on product detail page with margin calculation, color coding (green >40%, amber 20-40%, red <20%), cost history from PO receiving with clickable PO links
-- Product forms: `min_order_qty` field added to both create and edit forms with Zod validation
+- Product forms: `min_order_qty` field added to both create and edit forms with Zod validation. `is_active` toggle added to create and edit forms (was missing — Services already had it).
+- Stock status indicators: Unicode circle icons (🟢/🟡/🔴) on Products page and Vendor detail page
 - DB tables: `purchase_orders`, `po_items`, `notification_recipients`, `stock_alert_log`
 - Nav: Inventory section in admin sidebar (gated by `inventory_management` feature flag)
 - Cron: stock-alerts job registered in scheduler (daily 16:00 UTC / 8 AM PST)
@@ -352,6 +353,8 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Verified vendor edit form already has `min_order_amount`, address, `lead_time_days` fields — no changes needed
 - Dead code cleanup: no orphaned inventory/stock directories or broken path references found
 - Updated CLAUDE.md: Phase 6 → Done, comprehensive completion notes, session history
+- Products: `is_active` toggle added to create and edit forms (was missing — Services already had it). Switch with contextual helper text matching service page pattern.
+- Stock status indicators: pill badges replaced with minimalistic Unicode circle icons (🟢 In Stock, 🟡 Low Stock, 🔴 Out of Stock) on Products page and Vendor detail page.
 - TypeScript clean, committed
 
 ### Session 17 — Phase 6 Session 3: Low Stock Alerts + Notification Recipients
