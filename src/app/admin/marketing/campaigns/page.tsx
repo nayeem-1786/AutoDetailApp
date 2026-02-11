@@ -11,7 +11,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -25,6 +25,7 @@ export default function CampaignsListPage() {
   const [channelFilter, setChannelFilter] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -76,10 +77,30 @@ export default function CampaignsListPage() {
     }
   }
 
+  async function handleDuplicate(campaignId: string) {
+    setDuplicating(campaignId);
+    try {
+      const res = await fetch(`/api/marketing/campaigns/${campaignId}/duplicate`, { method: 'POST' });
+      if (res.ok) {
+        const { data } = await res.json();
+        toast.success('Campaign duplicated');
+        router.push(`/admin/marketing/campaigns/${data.id}/edit`);
+      } else {
+        const { error } = await res.json();
+        toast.error(error || 'Failed to duplicate campaign');
+      }
+    } catch {
+      toast.error('Failed to duplicate campaign');
+    } finally {
+      setDuplicating(null);
+    }
+  }
+
   const columns: ColumnDef<Campaign, unknown>[] = [
     {
       accessorKey: 'name',
       header: 'Name',
+      size: 320,
       cell: ({ row }) => (
         <button
           className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
@@ -92,6 +113,7 @@ export default function CampaignsListPage() {
     {
       id: 'channel',
       header: 'Channel',
+      size: 100,
       cell: ({ row }) => (
         <Badge variant="info">
           {CAMPAIGN_CHANNEL_LABELS[row.original.channel] || row.original.channel}
@@ -102,20 +124,24 @@ export default function CampaignsListPage() {
     {
       id: 'status',
       header: 'Status',
+      size: 100,
       cell: ({ row }) => statusBadge(row.original.status),
       enableSorting: false,
     },
     {
       accessorKey: 'recipient_count',
       header: 'Recipients',
+      size: 100,
     },
     {
       accessorKey: 'delivered_count',
       header: 'Delivered',
+      size: 100,
     },
     {
       id: 'sent_at',
       header: 'Sent',
+      size: 120,
       cell: ({ row }) => (
         <span className="text-sm text-gray-500">
           {row.original.sent_at ? formatDate(row.original.sent_at) : '--'}
@@ -125,6 +151,7 @@ export default function CampaignsListPage() {
     {
       id: 'actions',
       header: '',
+      size: 140,
       cell: ({ row }) => {
         const c = row.original;
         return (
@@ -142,6 +169,19 @@ export default function CampaignsListPage() {
                 {c.status === 'draft' ? 'Resume' : 'Edit'}
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDuplicate(c.id);
+              }}
+              className="text-gray-400 hover:text-blue-600"
+              title="Duplicate campaign"
+              disabled={duplicating === c.id}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"

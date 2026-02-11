@@ -209,6 +209,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 
 ### Critical Rules
 - **NEVER hardcode** business name/phone/address/email. Use `getBusinessInfo()` from `@/lib/data/business.ts`
+- **Mobile business name:** Site header (`site-header.tsx`) shows "SD Auto Spa & Supplies" on mobile (<640px) and full `biz.name` on sm:+ to prevent header overflow. Uses `hidden sm:inline` / `sm:hidden` pattern.
 - **Supabase `.or()` on related tables** doesn't work. Query related table first, then `.in('foreign_key', ids)`
 - **Admin quotes are READ-ONLY.** All creation/editing via POS builder deep-links
 - **POS deep-links:** `/pos/quotes?mode=builder` (new), `?mode=builder&quoteId=<id>` (edit), `?mode=detail&quoteId=<id>` (view)
