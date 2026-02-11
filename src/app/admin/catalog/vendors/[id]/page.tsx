@@ -212,10 +212,10 @@ export default function VendorDetailPage() {
     cell: ({ row }) => {
       const p = row.original;
       if (!p.is_active) return <Badge variant="secondary">Inactive</Badge>;
-      if (p.quantity_on_hand === 0) return <Badge variant="destructive">Out</Badge>;
+      if (p.quantity_on_hand === 0) return '🔴';
       if (p.reorder_threshold !== null && p.quantity_on_hand <= p.reorder_threshold)
-        return <Badge variant="warning">Low</Badge>;
-      return <Badge variant="success">OK</Badge>;
+        return '🟡';
+      return '🟢';
     },
     enableSorting: false,
   };

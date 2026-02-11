@@ -31,7 +31,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **3** | Booking, Quotes & 11 Labs API | Done |
 | **4** | Customer Portal | Done |
 | **5** | Marketing, Coupons & Campaigns | Done |
-| **6** | Inventory Management | In Progress |
+| **6** | Inventory Management | Done |
 | **7** | QuickBooks Integration & Reporting | In Progress |
 | **8** | Photo Documentation | Not started |
 | **9** | Native Online Store | Not started |
@@ -140,17 +140,19 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - URL shortening — BUILT (/s/[code] redirect, short_links table, 6-char codes)
 
 ### Phase 6 — What's Done
-- Stock overview page (/admin/inventory — 315 lines): product list with stock levels, low/out-of-stock filters, manual stock adjustment dialog, vendor column, reorder threshold display
-- Vendor management (2 pages): /admin/inventory/vendors (400 lines, more complete with search + address + lead time) AND /admin/catalog/vendors (372 lines, basic CRUD). Duplicate exists — inventory version is canonical.
-- Nav links wired (roles.ts has routes + sidebar entries)
-- DB tables exist for purchase orders (purchase_orders, po_items migrations)
-
-### Phase 6 — What's Remaining
-- Purchase order UI (list, create, edit, approve workflow) — DB tables exist but no pages or API routes
-- Receiving workflow (receive-against-PO, count verification, variance flagging)
-- Cost/COGS tracking (margin reporting, COGS-per-transaction)
-- Low stock proactive notifications/dashboard alerts (currently filter-only on stock page)
-- Consolidate duplicate vendor pages (inventory version is more complete)
+- Stock overview page (`/admin/inventory` — 315 lines): product list with stock levels, low/out-of-stock filters, manual stock adjustment dialog, vendor column, reorder threshold display
+- Vendor management: `/admin/catalog/vendors` (CRUD with search, address, lead time, min order amount fields). Duplicate at `/admin/inventory/vendors` — catalog version is canonical.
+- Purchase order system: list page with status filters/badge counts, create/edit forms with multi-product line items, approve/send workflow with status tracking (draft → sent → partial → received → cancelled)
+- PO receiving workflow: receive-against-PO with quantity verification, variance flagging, auto-status update (partial/received), cost price updates on receive
+- Low stock email alerts: daily cron (8 AM PST) with anti-spam logic (7-day cooldown per product unless stock changes), HTML email template with dark mode support
+- Notification recipients settings (`/admin/settings/notifications`): CRUD for stock alert recipients, toggle active/inactive, auto-populate business email
+- Dashboard low stock alert banner: links to filtered products view (`/admin/catalog/products?stock=low-stock`)
+- Products page URL param support: `?stock=` query param initializes stock filter from external links
+- COGS margin visibility: permission-gated Cost & Margin card on product detail page with margin calculation, color coding (green >40%, amber 20-40%, red <20%), cost history from PO receiving with clickable PO links
+- Product forms: `min_order_qty` field added to both create and edit forms with Zod validation
+- DB tables: `purchase_orders`, `po_items`, `notification_recipients`, `stock_alert_log`
+- Nav: Inventory section in admin sidebar (gated by `inventory_management` feature flag)
+- Cron: stock-alerts job registered in scheduler (daily 16:00 UTC / 8 AM PST)
 
 ### Phase 7 — What's Done
 - QBO client library with automatic OAuth token refresh (`src/lib/qbo/client.ts`)
@@ -215,6 +217,8 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **email_delivery_log:** Mailgun event tracking. Indexes on `(campaign_id, event)`, `(customer_id, created_at)`, `(mailgun_message_id)`, `(created_at)`.
 - **campaign_variants:** A/B test variants per campaign. `variant_id` column added to `campaign_recipients`.
 - **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants), `20260210000009` (campaigns: auto_select_winner BOOLEAN, auto_select_after_hours INTEGER), `20260210000010` (variant_id UUID FK on tracked_links + link_clicks, with partial indexes).
+- **notification_recipients:** Email recipients for stock alerts. Unique constraint on `(email, notification_type)`. Types: `low_stock`, `all`. Toggle `is_active` to pause without deleting.
+- **stock_alert_log:** Anti-spam tracker for stock alerts. Records `(product_id, stock_level, alert_type)`. Cron checks: skip if stock level unchanged AND last alert < 7 days ago.
 - **Messaging tables:** `conversations` (unique per phone_number, linked to customer_id if known) and `messages` (CASCADE delete with conversation). Both have Supabase Realtime enabled. AI auto-replies stored with `sender_type: 'ai'`, staff replies with `sender_type: 'staff'`.
 - **Key messaging files:** `src/lib/services/messaging-ai.ts` (AI response generation, product search, coupon injection, system prompt builder), `src/lib/services/messaging-ai-prompt.ts` (default prompt template), `src/app/api/webhooks/twilio/inbound/route.ts` (Twilio webhook: AI routing, auto-quote, SMS splitting), `src/app/api/quotes/[id]/accept/route.ts` (acceptance + confirmation SMS), `src/app/admin/settings/messaging/page.tsx` (unified AI settings UI), `src/app/api/cron/quote-reminders/route.ts` (24hr unviewed quote nudge), `src/app/api/admin/messaging/[conversationId]/summary/route.ts` (conversation summary for staff), `src/proxy.ts` (middleware, renamed from middleware.ts).
 - **Quote communications:** `quote_communications` table tracks all SMS/email sends for quotes (channel, sent_to, status, error_message, message, sent_by). Used by `send-service.ts` (manual sends), inbound webhook (auto-quote), accept route (acceptance SMS), and quote-reminders cron. `sent_by` is nullable — null for AI/system-generated sends. `message` column added for storing SMS body text (used by reminder cron for deduplication).
@@ -222,6 +226,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **lifecycle_rules.coupon_id:** nullable FK to `coupons` table with `ON DELETE SET NULL`. Partial index on non-null values. Legacy `coupon_type`/`coupon_value`/`coupon_expiry_days` columns remain but are unused — form uses `coupon_id` exclusively.
 - **sms_consent_log:** Audit table tracking all SMS consent changes. Source CHECK constraint: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`. RLS: authenticated users can read/write (admin pages insert directly via browser client).
 - **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling + signature validation), `src/lib/utils/sms.ts` (`sendSms()` with MMS + logging, `sendMarketingSms()` with consent + frequency cap), `src/lib/utils/phone-validation.ts` (Twilio Lookup landline detection), `docs/TCPA_AUDIT.md` (full audit report).
+- **Key inventory files:** `src/app/admin/inventory/page.tsx` (stock overview), `src/app/admin/catalog/vendors/page.tsx` (vendor list), `src/app/admin/catalog/vendors/[id]/page.tsx` (vendor edit), `src/app/api/cron/stock-alerts/route.ts` (daily stock alert cron), `src/app/api/admin/notification-recipients/route.ts` (recipients CRUD), `src/app/admin/settings/notifications/page.tsx` (notification settings UI).
 - **Key QBO files:** `src/lib/qbo/client.ts` (API client with token refresh, query, CRUD methods), `src/lib/qbo/settings.ts` (read/write QBO settings, `isQboSyncEnabled()`, `isQboConnected()`), `src/lib/qbo/types.ts` (all QBO TypeScript types), `src/lib/qbo/sync-customer.ts` (customer sync engine), `src/lib/qbo/sync-catalog.ts` (service/product sync engine), `src/lib/qbo/sync-transaction.ts` (transaction → Sales Receipt sync), `src/lib/qbo/sync-log.ts` (sync log helpers), `src/lib/qbo/index.ts` (barrel exports), `src/app/api/admin/integrations/qbo/` (OAuth + settings + sync + accounts routes), `src/app/admin/settings/integrations/quickbooks/page.tsx` (settings UI), `src/components/qbo-sync-badge.tsx` (reusable sync status badge), `docs/QBO-INTEGRATION.md` (integration documentation).
 
 ---
@@ -231,7 +236,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Supabase project:** `zwvahzymzardmxixyfim`
 - **Super-Admin:** nayeem@smartdetailautospa.com
 - **Staff:** Segundo Cadena (detailer), Joselyn Reyes (cashier), Joana Lira (cashier), Su Khan (admin)
-- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | AI: Anthropic Claude API (messaging auto-responder) | Accounting: QuickBooks Online (OAuth, env vars `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET`) | Cron: node-cron via instrumentation.ts (lifecycle-engine every 10 min, quote-reminders hourly)
+- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | AI: Anthropic Claude API (messaging auto-responder) | Accounting: QuickBooks Online (OAuth, env vars `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET`) | Cron: node-cron via instrumentation.ts (lifecycle-engine every 10 min, quote-reminders hourly, stock-alerts daily 8 AM PST)
 - **Public pages:** Server Components for SEO. Admin pages: `'use client'` behind auth.
 
 ### Auth Patterns
@@ -261,7 +266,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Review URLs**: Stored in `business_settings` as `google_review_url` and `yelp_review_url` (JSONB string values). Configurable from Admin > Settings > Reviews. Google Place ID: `ChIJf7qNDhW1woAROX-FX8CScGE`.
 - **Lifecycle rules delay**: Total delay = `scheduled_for = triggered_at + (delay_days * 1440 + delay_minutes)` minutes. `delay_minutes` column added for sub-day granularity (e.g., 30-min review request delay).
 - **Trigger condition canonical values**: `service_completed` (appointments) and `after_transaction` (transactions) — NEVER use `after_service`.
-- **ALL cron/scheduling is internal** via `src/lib/cron/scheduler.ts` + `src/instrumentation.ts` — NEVER suggest n8n, Vercel Cron, or external schedulers.
+- **ALL cron/scheduling is internal** via `src/lib/cron/scheduler.ts` + `src/instrumentation.ts` — NEVER suggest n8n, Vercel Cron, or external schedulers. Jobs: lifecycle-engine (every 10 min), quote-reminders (hourly), stock-alerts (daily 8 AM PST).
 - **App operates in PST timezone** (America/Los_Angeles). All time displays, logs, and scheduling logic should use PST, not UTC.
 - **Automations coupon**: uses `coupon_id` FK to existing coupons table. NEVER recreate inline coupon fields — always select from existing coupons via `/admin/marketing/coupons`.
 - **SMS consent helper** (`updateSmsConsent()`): ALWAYS use this for any code path that changes `sms_consent` on a customer. Never update `sms_consent` directly without also logging to `sms_consent_log`. Import from `@/lib/utils/sms-consent`.
@@ -339,7 +344,38 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 15 — Feature Toggle Cleanup: Categories + Organization)
+## Last Session: 2026-02-11 (Session 18 — Phase 6 Session 4: COGS Margin Visibility + Final Polish)
+- Added permission-gated Cost & Margin card to product detail page (`inventory.view_cost_data` permission)
+  - Shows cost price, retail price, margin % with color coding (green >40%, amber 20-40%, red <20%)
+  - Cost history table from PO receiving with clickable PO links, unit cost, quantities, dates
+- Added `min_order_qty` field to product create and edit forms with Zod validation (`positiveInt.optional().nullable()`)
+- Verified vendor edit form already has `min_order_amount`, address, `lead_time_days` fields — no changes needed
+- Dead code cleanup: no orphaned inventory/stock directories or broken path references found
+- Updated CLAUDE.md: Phase 6 → Done, comprehensive completion notes, session history
+- TypeScript clean, committed
+
+### Session 17 — Phase 6 Session 3: Low Stock Alerts + Notification Recipients
+- Created DB migration `20260211000006`: `notification_recipients` table (email, type, active toggle) + `stock_alert_log` table (anti-spam tracking)
+- Added `NotificationRecipient` and `StockAlertLog` TypeScript types
+- Built notification recipients CRUD API (`/api/admin/notification-recipients` GET/POST, `[id]` PATCH/DELETE)
+- Built stock-alerts cron endpoint (`/api/cron/stock-alerts`): queries low stock (qty > 0, qty <= threshold) + out of stock (qty = 0), anti-spam via `stock_alert_log` (7-day cooldown unless stock changes), HTML email with dark mode, business email fallback
+- Registered stock-alerts job in scheduler: `0 16 * * *` (daily 8 AM PST)
+- Built Notifications settings page (`/admin/settings/notifications`): recipient table, add form with email + type, toggle active/inactive, delete confirmation dialog, auto-populate business email when empty
+- Added Notifications to Settings nav under Communications group
+- Added dashboard low stock alert banner with link to `/admin/catalog/products?stock=low-stock`
+- Added `?stock=` URL param support to Products page for external deep-linking
+- Tested: 1 low stock + 72 out of stock detected, email sent, anti-spam confirmed (2nd run = 0 alerts)
+- TypeScript clean, committed
+
+### Session 16 — Phase 6 Sessions 1-2: PO System + Receiving Workflow
+- Built purchase order list page with status filter tabs (draft/sent/partial/received/cancelled) and badge counts
+- Built PO create/edit forms with multi-product line items, vendor selection, notes, expected delivery date
+- Built PO approve/send workflow with status transitions
+- Built receiving workflow: receive-against-PO, quantity verification, variance flagging, auto-status update, cost price updates
+- Built all supporting API routes for PO CRUD, status updates, and receiving
+- TypeScript clean, committed
+
+### Session 15 — Feature Toggle Cleanup: Categories + Organization
 - Removed `referral_program` dead flag (no code exists, not on roadmap)
 - Added `online_store` placeholder flag (Phase 9, Future category)
 - Added `inventory_management` flag (Operations category, default ON) — gates inventory sidebar nav

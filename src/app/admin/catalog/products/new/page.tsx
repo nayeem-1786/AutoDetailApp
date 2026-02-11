@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -17,6 +17,7 @@ import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
@@ -35,6 +36,7 @@ export default function NewProductPage() {
   const {
     register,
     handleSubmit,
+    control,
     watch,
     setValue,
     formState: { errors },
@@ -50,8 +52,10 @@ export default function NewProductPage() {
       retail_price: 0,
       quantity_on_hand: 0,
       reorder_threshold: null,
+      min_order_qty: null,
       is_taxable: true,
       is_loyalty_eligible: true,
+      is_active: true,
       barcode: '',
     },
   });
@@ -126,8 +130,10 @@ export default function NewProductPage() {
           retail_price: data.retail_price,
           quantity_on_hand: data.quantity_on_hand,
           reorder_threshold: data.reorder_threshold ?? null,
+          min_order_qty: data.min_order_qty ?? null,
           is_taxable: data.is_taxable,
           is_loyalty_eligible: data.is_loyalty_eligible,
+          is_active: data.is_active,
           barcode: data.barcode || null,
         })
         .select('id')
@@ -261,6 +267,16 @@ export default function NewProductPage() {
                 />
               </FormField>
 
+              <FormField label="Min Order Qty" error={errors.min_order_qty?.message} htmlFor="min_order_qty" description="Minimum quantity to order from vendor">
+                <Input
+                  id="min_order_qty"
+                  type="number"
+                  min="0"
+                  {...register('min_order_qty')}
+                  placeholder="e.g. 6"
+                />
+              </FormField>
+
               <FormField label="Barcode" error={errors.barcode?.message} htmlFor="barcode">
                 <Input id="barcode" {...register('barcode')} placeholder="UPC / EAN barcode" />
               </FormField>
@@ -286,6 +302,23 @@ export default function NewProductPage() {
                     )}
                   </label>
                 </div>
+                <Controller
+                  name="is_active"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Active</p>
+                        <p className="text-xs text-gray-500">
+                          {field.value
+                            ? 'Product is visible in POS and catalog'
+                            : 'Product is hidden from POS and catalog'}
+                        </p>
+                      </div>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </div>
+                  )}
+                />
               </div>
             </div>
           </CardContent>

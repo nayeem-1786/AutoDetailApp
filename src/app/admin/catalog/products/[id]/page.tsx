@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import Link from 'next/link';
+import { useForm, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { productCreateSchema, type ProductCreateInput } from '@/lib/utils/validation';
 import { WATER_SKU } from '@/lib/utils/constants';
 import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,10 +19,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
-import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Trash2 } from 'lucide-react';
 import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
 
 type ProductWithRelations = Product & {
@@ -27,15 +32,25 @@ type ProductWithRelations = Product & {
   vendors: Pick<Vendor, 'id' | 'name'> | null;
 };
 
+interface CostHistoryEntry {
+  date: string;
+  po_number: string;
+  po_id: string;
+  unit_cost: number;
+  quantity_received: number;
+}
+
 export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
   const productId = params.id as string;
   const supabase = createClient();
+  const canViewCost = usePermission('inventory.view_cost_data');
 
   const [product, setProduct] = useState<ProductWithRelations | null>(null);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [costHistory, setCostHistory] = useState<CostHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -46,6 +61,7 @@ export default function ProductDetailPage() {
   const {
     register,
     handleSubmit,
+    control,
     watch,
     setValue,
     reset,
@@ -96,6 +112,31 @@ export default function ProductDetailPage() {
       if (categoriesRes.data) setCategories(categoriesRes.data);
       if (vendorsRes.data) setVendors(vendorsRes.data);
 
+      // Load cost history from PO receiving
+      const { data: poItems } = await supabase
+        .from('po_items')
+        .select('unit_cost, quantity_received, purchase_order_id, purchase_orders(id, po_number, received_at)')
+        .eq('product_id', productId)
+        .gt('quantity_received', 0)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (poItems) {
+        const history: CostHistoryEntry[] = poItems
+          .filter((item: Record<string, unknown>) => item.purchase_orders)
+          .map((item: Record<string, unknown>) => {
+            const po = item.purchase_orders as { id: string; po_number: string; received_at: string | null };
+            return {
+              date: po.received_at || '',
+              po_number: po.po_number,
+              po_id: po.id,
+              unit_cost: item.unit_cost as number,
+              quantity_received: item.quantity_received as number,
+            };
+          });
+        setCostHistory(history);
+      }
+
       // Populate form
       reset({
         name: p.name,
@@ -107,8 +148,10 @@ export default function ProductDetailPage() {
         retail_price: p.retail_price,
         quantity_on_hand: p.quantity_on_hand,
         reorder_threshold: p.reorder_threshold ?? null,
+        min_order_qty: p.min_order_qty ?? null,
         is_taxable: p.is_taxable,
         is_loyalty_eligible: p.is_loyalty_eligible,
+        is_active: p.is_active,
         barcode: p.barcode || '',
       });
 
@@ -163,8 +206,10 @@ export default function ProductDetailPage() {
           retail_price: data.retail_price,
           quantity_on_hand: data.quantity_on_hand,
           reorder_threshold: data.reorder_threshold ?? null,
+          min_order_qty: data.min_order_qty ?? null,
           is_taxable: data.is_taxable,
           is_loyalty_eligible: data.is_loyalty_eligible,
+          is_active: data.is_active,
           barcode: data.barcode || null,
           image_url: imageUrl,
         })
@@ -305,6 +350,16 @@ export default function ProductDetailPage() {
                 />
               </FormField>
 
+              <FormField label="Min Order Qty" error={errors.min_order_qty?.message} htmlFor="min_order_qty" description="Minimum quantity to order from vendor">
+                <Input
+                  id="min_order_qty"
+                  type="number"
+                  min="0"
+                  {...register('min_order_qty')}
+                  placeholder="e.g. 6"
+                />
+              </FormField>
+
               <FormField label="Barcode" error={errors.barcode?.message} htmlFor="barcode">
                 <Input id="barcode" {...register('barcode')} placeholder="UPC / EAN barcode" />
               </FormField>
@@ -329,6 +384,23 @@ export default function ProductDetailPage() {
                     )}
                   </label>
                 </div>
+                <Controller
+                  name="is_active"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Active</p>
+                        <p className="text-xs text-gray-500">
+                          {field.value
+                            ? 'Product is visible in POS and catalog'
+                            : 'Product is hidden from POS and catalog'}
+                        </p>
+                      </div>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </div>
+                  )}
+                />
               </div>
             </div>
           </CardContent>
@@ -366,6 +438,11 @@ export default function ProductDetailPage() {
         </div>
       </form>
 
+      {/* Cost & Margin Card — permission-gated */}
+      {canViewCost && product && (
+        <CostMarginCard product={product} costHistory={costHistory} />
+      )}
+
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
@@ -377,5 +454,129 @@ export default function ProductDetailPage() {
         onConfirm={handleDelete}
       />
     </div>
+  );
+}
+
+// ─── Cost & Margin Card ──────────────────────────────────────────
+
+function CostMarginCard({
+  product,
+  costHistory,
+}: {
+  product: ProductWithRelations;
+  costHistory: CostHistoryEntry[];
+}) {
+  const margin =
+    product.retail_price > 0
+      ? ((product.retail_price - product.cost_price) / product.retail_price) * 100
+      : 0;
+
+  function getMarginColor(m: number) {
+    if (m > 40) return 'text-green-600';
+    if (m >= 20) return 'text-amber-600';
+    return 'text-red-600';
+  }
+
+  function getMarginVariant(m: number): 'success' | 'warning' | 'destructive' {
+    if (m > 40) return 'success';
+    if (m >= 20) return 'warning';
+    return 'destructive';
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <DollarSign className="h-5 w-5" />
+          Cost & Margin
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Cost Price */}
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Cost Price</p>
+            <p className="mt-1 text-lg font-semibold text-gray-900">
+              {formatCurrency(product.cost_price)}
+            </p>
+          </div>
+
+          {/* Retail Price */}
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Retail Price</p>
+            <p className="mt-1 text-lg font-semibold text-gray-900">
+              {formatCurrency(product.retail_price)}
+            </p>
+          </div>
+
+          {/* Margin */}
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Margin</p>
+            <div className="mt-1 flex items-center gap-2">
+              {product.cost_price > 0 ? (
+                <>
+                  <span className={`text-lg font-semibold ${getMarginColor(margin)}`}>
+                    {margin.toFixed(1)}%
+                  </span>
+                  <Badge variant={getMarginVariant(margin)}>
+                    {margin > 40 ? 'Healthy' : margin >= 20 ? 'Fair' : 'Low'}
+                  </Badge>
+                </>
+              ) : (
+                <span className="text-lg font-semibold text-gray-400">--</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Min Order Qty */}
+        {product.min_order_qty !== null && product.min_order_qty > 0 && (
+          <div className="mt-4 border-t pt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Min Order Qty</p>
+            <p className="mt-1 text-sm font-medium text-gray-900">{product.min_order_qty} units</p>
+          </div>
+        )}
+
+        {/* Cost History */}
+        <div className="mt-4 border-t pt-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Cost History (from POs)</p>
+          {costHistory.length > 0 ? (
+            <div className="overflow-hidden rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Date</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">PO #</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Cost</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costHistory.map((entry, idx) => (
+                    <tr key={idx} className="border-b last:border-0">
+                      <td className="px-3 py-2 text-gray-600">
+                        {entry.date ? formatDate(entry.date) : '--'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Link
+                          href={`/admin/inventory/purchase-orders/${entry.po_id}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {entry.po_number}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-900">{formatCurrency(entry.unit_cost)}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">{entry.quantity_received}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No purchase order history yet.</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

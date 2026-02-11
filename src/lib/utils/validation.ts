@@ -84,8 +84,10 @@ export const productCreateSchema = z.object({
   retail_price: positiveNumber,
   quantity_on_hand: positiveInt.default(0),
   reorder_threshold: positiveInt.optional().nullable(),
+  min_order_qty: positiveInt.optional().nullable(),
   is_taxable: z.boolean().default(true),
   is_loyalty_eligible: z.boolean().default(true),
+  is_active: z.boolean().default(true),
   barcode: optionalString,
 });
 

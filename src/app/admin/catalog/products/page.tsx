@@ -241,14 +241,10 @@ export default function ProductsPage() {
     });
   }, [products, search, categoryFilter, vendorFilter, stockFilter, showInactive]);
 
-  function getStockBadge(product: ProductWithRelations) {
-    if (product.quantity_on_hand === 0) {
-      return <Badge variant="destructive">Out of Stock</Badge>;
-    }
-    if (product.reorder_threshold !== null && product.quantity_on_hand <= product.reorder_threshold) {
-      return <Badge variant="warning">Low Stock</Badge>;
-    }
-    return <Badge variant="success">In Stock</Badge>;
+  function getStockIcon(product: ProductWithRelations) {
+    if (product.quantity_on_hand === 0) return '🔴';
+    if (product.reorder_threshold !== null && product.quantity_on_hand <= product.reorder_threshold) return '🟡';
+    return '🟢';
   }
 
   function getMarginColor(margin: number): string {
@@ -401,7 +397,7 @@ export default function ProductsPage() {
             </div>
           );
         }
-        return getStockBadge(p);
+        return getStockIcon(p);
       },
       enableSorting: false,
     },
