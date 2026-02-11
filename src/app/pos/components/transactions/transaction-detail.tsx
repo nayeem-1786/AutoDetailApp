@@ -55,7 +55,7 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voiding, setVoiding] = useState(false);
-  const [retryingQbo, setRetryingQbo] = useState(false);
+  const [, setRetryingQbo] = useState(false);
 
   const fetchTransaction = useCallback(async () => {
     setLoading(true);
