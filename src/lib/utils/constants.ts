@@ -92,11 +92,27 @@ export const TRANSACTION_STATUS_LABELS: Record<string, string> = {
 // PO status labels
 export const PO_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
-  submitted: 'Submitted',
-  shipped: 'Shipped',
-  partial: 'Partially Received',
+  ordered: 'Ordered',
   received: 'Received',
   cancelled: 'Cancelled',
+} as const;
+
+// PO status badge variants
+export const PO_STATUS_BADGE_VARIANT: Record<string, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
+  draft: 'default',
+  ordered: 'info',
+  received: 'success',
+  cancelled: 'destructive',
+} as const;
+
+// Stock adjustment type labels
+export const STOCK_ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
+  manual: 'Manual',
+  received: 'PO Received',
+  sold: 'Sold',
+  returned: 'Returned',
+  damaged: 'Damaged',
+  recount: 'Recount',
 } as const;
 
 // Quote status labels

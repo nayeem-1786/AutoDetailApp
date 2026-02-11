@@ -244,6 +244,27 @@ export const couponSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Purchase Order schemas
+// ---------------------------------------------------------------------------
+
+export const purchaseOrderItemSchema = z.object({
+  product_id: z.string().uuid(),
+  quantity_ordered: z.coerce.number().int().min(1, 'Must order at least 1'),
+  unit_cost: z.coerce.number().min(0, 'Must be 0 or greater'),
+});
+
+export const purchaseOrderCreateSchema = z.object({
+  vendor_id: z.string().uuid('Select a vendor'),
+  notes: optionalString,
+  items: z.array(purchaseOrderItemSchema).min(1, 'Add at least one item'),
+});
+
+export const purchaseOrderUpdateSchema = z.object({
+  notes: optionalString,
+  status: z.enum(['draft', 'ordered', 'received', 'cancelled']).optional(),
+});
+
+// ---------------------------------------------------------------------------
 // Booking schemas (online booking wizard)
 // ---------------------------------------------------------------------------
 
@@ -617,6 +638,9 @@ export type CustomerVehicleInput = z.infer<typeof customerVehicleSchema>;
 export type CampaignCreateInput = z.infer<typeof campaignCreateSchema>;
 export type CampaignUpdateInput = z.infer<typeof campaignUpdateSchema>;
 export type LifecycleRuleInput = z.infer<typeof lifecycleRuleSchema>;
+export type PurchaseOrderItemInput = z.infer<typeof purchaseOrderItemSchema>;
+export type PurchaseOrderCreateInput = z.infer<typeof purchaseOrderCreateSchema>;
+export type PurchaseOrderUpdateInput = z.infer<typeof purchaseOrderUpdateSchema>;
 
 // ---------------------------------------------------------------------------
 // Messaging schemas

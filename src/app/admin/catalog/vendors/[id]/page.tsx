@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Vendor, Product, ProductCategory } from '@/lib/supabase/types';
-import { formatCurrency, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatPhone } from '@/lib/utils/format';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ export default function VendorDetailPage() {
 
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [products, setProducts] = useState<VendorProduct[]>([]);
+  const [lastOrders, setLastOrders] = useState<Record<string, { date: string; qty: number }>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,6 +56,25 @@ export default function VendorDetailPage() {
 
       setVendor(vendorRes.data as Vendor);
       setProducts((productsRes.data ?? []) as VendorProduct[]);
+
+      // Fetch last PO data per product for this vendor
+      const { data: poItems } = await supabase
+        .from('purchase_order_items')
+        .select('product_id, quantity_ordered, created_at, purchase_orders!inner(vendor_id, status)')
+        .eq('purchase_orders.vendor_id', vendorId)
+        .in('purchase_orders.status', ['ordered', 'received'])
+        .order('created_at', { ascending: false });
+
+      if (poItems) {
+        const map: Record<string, { date: string; qty: number }> = {};
+        for (const item of poItems as Array<{ product_id: string; quantity_ordered: number; created_at: string }>) {
+          if (!map[item.product_id]) {
+            map[item.product_id] = { date: item.created_at, qty: item.quantity_ordered };
+          }
+        }
+        setLastOrders(map);
+      }
+
       setLoading(false);
     }
 
@@ -163,14 +183,24 @@ export default function VendorDetailPage() {
       id: 'last_order_date',
       header: 'Last Order',
       size: 90,
-      cell: () => <span className="text-gray-400">--</span>,
+      cell: ({ row }) => {
+        const last = lastOrders[row.original.id];
+        return last ? (
+          <span className="text-sm">{formatDate(last.date)}</span>
+        ) : (
+          <span className="text-gray-400">--</span>
+        );
+      },
       enableSorting: false,
     },
     {
       id: 'last_order_qty',
       header: 'Last Qty',
       size: 70,
-      cell: () => <span className="text-gray-400">--</span>,
+      cell: ({ row }) => {
+        const last = lastOrders[row.original.id];
+        return last ? last.qty : <span className="text-gray-400">--</span>;
+      },
       enableSorting: false,
     },
   ];

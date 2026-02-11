@@ -7,6 +7,7 @@ import { formResolver } from '@/lib/utils/form';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
@@ -175,22 +176,29 @@ export default function ProductsPage() {
 
     setAdjusting(true);
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({ quantity_on_hand: newQty })
-        .eq('id', adjustTarget.id);
+      const res = await adminFetch('/api/admin/stock-adjustments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: adjustTarget.id,
+          adjustment: data.adjustment,
+          reason: data.reason || null,
+          adjustment_type: 'manual',
+        }),
+      });
 
-      if (error) throw error;
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
 
       const direction = data.adjustment > 0 ? 'increased' : 'decreased';
       toast.success(
-        `${adjustTarget.name} stock ${direction} by ${Math.abs(data.adjustment)} (now ${newQty})`
+        `${adjustTarget.name} stock ${direction} by ${Math.abs(data.adjustment)} (now ${json.data.quantity_after})`
       );
       setAdjustTarget(null);
       await loadProducts();
     } catch (err) {
       console.error('Adjust stock error:', err);
-      toast.error('Failed to adjust stock');
+      toast.error(err instanceof Error ? err.message : 'Failed to adjust stock');
     } finally {
       setAdjusting(false);
     }

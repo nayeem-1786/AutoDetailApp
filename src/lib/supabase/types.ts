@@ -22,7 +22,8 @@ export type LoyaltyAction = 'earned' | 'redeemed' | 'adjusted' | 'expired' | 'we
 export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
 export type CampaignChannel = 'sms' | 'email' | 'both';
 export type QuoteStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'expired' | 'converted';
-export type POStatus = 'draft' | 'submitted' | 'shipped' | 'partial' | 'received' | 'cancelled';
+export type POStatus = 'draft' | 'ordered' | 'received' | 'cancelled';
+export type StockAdjustmentType = 'manual' | 'received' | 'sold' | 'returned' | 'damaged' | 'recount';
 export type PhotoType = 'before' | 'after' | 'damage';
 export type ConsentChannel = 'sms' | 'email';
 export type ConsentAction = 'opt_in' | 'opt_out';
@@ -366,6 +367,52 @@ export interface RefundItem {
   amount: number;
   restock: boolean;
   created_at: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  po_number: string;
+  vendor_id: string;
+  status: POStatus;
+  notes: string | null;
+  ordered_at: string | null;
+  received_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined relations
+  vendor?: Vendor;
+  items?: PurchaseOrderItem[];
+  created_by_employee?: Pick<Employee, 'id' | 'first_name' | 'last_name'>;
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  purchase_order_id: string;
+  product_id: string;
+  quantity_ordered: number;
+  quantity_received: number;
+  unit_cost: number;
+  created_at: string;
+  // Joined relations
+  product?: Pick<Product, 'id' | 'name' | 'sku' | 'quantity_on_hand'>;
+}
+
+export interface StockAdjustment {
+  id: string;
+  product_id: string;
+  adjustment_type: StockAdjustmentType;
+  quantity_change: number;
+  quantity_before: number;
+  quantity_after: number;
+  reason: string | null;
+  reference_id: string | null;
+  reference_type: 'purchase_order' | 'transaction' | 'refund' | null;
+  created_by: string | null;
+  created_at: string;
+  // Joined relations
+  product?: Pick<Product, 'id' | 'name' | 'sku'>;
+  created_by_employee?: Pick<Employee, 'id' | 'first_name' | 'last_name'>;
 }
 
 export interface CouponReward {
