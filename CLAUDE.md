@@ -374,6 +374,12 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Files modified**: `src/app/pos/pos-shell.tsx`, `src/app/pos/login/page.tsx`, `src/app/admin/staff/[id]/page.tsx`, `src/lib/data/business.ts`, `src/app/api/public/business-info/route.ts`
 - TypeScript clean (zero errors)
 
+### Session 26c — POS Favorites Vehicle Prequalification Fix
+- **Bug fix**: Favorites (and catalog search direct-add) now auto-add services at the correct vehicle-specific price when a vehicle is on the ticket — no dialog required. Previously, vehicle-size-aware services always opened the pricing picker dialog even when the vehicle was known.
+- **Prequalification logic**: If vehicle is set: (1) vehicle-size tiers (sedan/truck_suv_2row/suv_3row_van) → match tier by name, auto-add; (2) single vehicle-size-aware tier → resolve price by vehicle size, auto-add. Falls back to picker only when no vehicle set or no matching tier.
+- **Files modified**: `src/app/pos/components/register-tab.tsx`, `src/app/pos/components/catalog-browser.tsx`
+- TypeScript clean (zero errors)
+
 ### Session 26b — EOD Batch Sync + Realtime Toggle
 - **EOD batch sync**: `batchSyncDayTransactions()` catches all unsynced transactions when POS register closes. Syncs customers first (those without `qbo_id`), then transactions in batches of 25. PST/PDT-aware date handling. Fire-and-forget from `end-of-day/route.ts` — never blocks register close.
 - **Realtime sync toggle**: `qbo_realtime_sync` business setting. When OFF, POS transaction + customer hooks skip immediate QBO sync. Transactions sync at EOD close or via background cron instead. Toggle in Sync Settings section on QuickBooks settings page.
@@ -736,7 +742,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ### Next Session Priorities
 1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
-2. Phase 7.3 — QBO cron auto-sync, reporting dashboard, CSV exports
+2. ~~Phase 7.3 — QBO cron auto-sync, reporting dashboard, CSV exports~~ Done (Session 26)
 3. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
 
 ---

@@ -12,6 +12,9 @@ import { ProductGrid, ServiceGrid } from './catalog-grid';
 import { ProductDetail } from './product-detail';
 import { ServiceDetailDialog } from './service-detail-dialog';
 import { ServicePricingPicker } from './service-pricing-picker';
+import { resolveServicePrice } from '../utils/pricing';
+
+const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
 
 type BrowseState =
   | { view: 'categories' }
@@ -133,20 +136,24 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     }
 
     const pricing = service.pricing ?? [];
-    if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
+
+    // Quick-add helper
+    function quickAdd(svc: CatalogService, p: ServicePricing, vsc: VehicleSizeClass | null) {
       if (onAddService) {
-        onAddService(service, pricing[0], vehicleSizeClass);
+        onAddService(svc, p, vsc);
       } else if (dispatch) {
-        dispatch({
-          type: 'ADD_SERVICE',
-          service,
-          pricing: pricing[0],
-          vehicleSizeClass,
-        });
+        dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc });
       }
+    }
+
+    // Quick-add: single tier, not vehicle-size-aware
+    if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
+      quickAdd(service, pricing[0], vehicleSizeClass);
       toast.success(`Added ${service.name}`);
       return;
     }
+
+    // Quick-add: flat price (no pricing tiers)
     if (pricing.length === 0 && service.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat',
@@ -161,19 +168,33 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         vehicle_size_suv_van_price: null,
         created_at: '',
       };
-      if (onAddService) {
-        onAddService(service, syntheticPricing, vehicleSizeClass);
-      } else if (dispatch) {
-        dispatch({
-          type: 'ADD_SERVICE',
-          service,
-          pricing: syntheticPricing,
-          vehicleSizeClass,
-        });
-      }
+      quickAdd(service, syntheticPricing, vehicleSizeClass);
       toast.success(`Added ${service.name}`);
       return;
     }
+
+    // Vehicle prequalification: auto-add when vehicle is set
+    if (vehicleSizeClass) {
+      const isVehicleSizeTiers = pricing.length > 1
+        && pricing.every((t) => VEHICLE_SIZE_CLASSES.has(t.tier_name));
+      if (isVehicleSizeTiers) {
+        const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
+        if (matchingTier) {
+          quickAdd(service, matchingTier, vehicleSizeClass);
+          const price = resolveServicePrice(matchingTier, vehicleSizeClass);
+          toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+          return;
+        }
+      }
+      if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
+        quickAdd(service, pricing[0], vehicleSizeClass);
+        const price = resolveServicePrice(pricing[0], vehicleSizeClass);
+        toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+        return;
+      }
+    }
+
+    // Fallback: open picker
     setPickerService(service);
   }
 
