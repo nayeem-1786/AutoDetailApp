@@ -390,7 +390,34 @@ export default function ProductDetailPage() {
       <PageHeader
         title={`Edit: ${product.name}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Controller
+              name="is_active"
+              control={control}
+              render={({ field }) => (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    {field.value ? 'Active' : 'Inactive'}
+                  </span>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={async (checked) => {
+                      field.onChange(checked);
+                      const { error } = await supabase
+                        .from('products')
+                        .update({ is_active: checked })
+                        .eq('id', productId);
+                      if (error) {
+                        field.onChange(!checked);
+                        toast.error('Failed to update status');
+                      } else {
+                        toast.success(checked ? 'Product activated' : 'Product deactivated');
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            />
             <Button variant="outline" onClick={() => router.push('/admin/catalog/products')}>
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -513,23 +540,6 @@ export default function ProductDetailPage() {
                     )}
                   </label>
                 </div>
-                <Controller
-                  name="is_active"
-                  control={control}
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Active</p>
-                        <p className="text-xs text-gray-500">
-                          {field.value
-                            ? 'Product is visible in POS and catalog'
-                            : 'Product is hidden from POS and catalog'}
-                        </p>
-                      </div>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </div>
-                  )}
-                />
               </div>
             </div>
           </CardContent>

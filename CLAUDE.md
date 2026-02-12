@@ -220,13 +220,14 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Revenue discrepancy:** Transactions Revenue = all transactions including anonymous walk-ins ($328,259 / 6,118 txns). Customer Lifetime Revenue = sum of `lifetime_spend` on named customers only ($187,617.47). 4,537 of 6,118 transactions have no `customer_id` (anonymous walk-ins).
 - **Transaction date gap:** Square's first payment: May 8, 2021. Supabase `transaction_date` starts Dec 31, 2021 — early transactions may not have been imported.
 - **Product/service images:** Stored in Supabase storage buckets `product-images/` and `service-images/`. 23 products have no images (never had them in Square). 2 services have no images (Excessive Cleaning Fee, Paint Decontamination & Protection — no Square counterparts). `service-images` bucket also allows `image/avif` MIME type (added accidentally, no impact).
+- **product_images table:** Source of truth for multi-image support (up to 6 per product). Columns: `id`, `product_id` (FK CASCADE), `image_url`, `storage_path`, `sort_order`, `is_primary`, `created_at`. Partial unique index on `(product_id) WHERE is_primary = true`. DB trigger `sync_product_primary_image` auto-updates `products.image_url` on any change. 409 rows migrated from existing `products.image_url`. Storage path pattern: `products/{productId}/{uuid}.{ext}`.
 - **Vendor pages consolidated:** `/admin/inventory/vendors` (moved from catalog, single canonical location).
 - **sms_delivery_log:** Twilio delivery status tracking. Indexes on `(message_sid)` UNIQUE, `(campaign_id, status)`, `(lifecycle_execution_id, status)`, `(customer_id, created_at)`, `(created_at)`.
 - **tracked_links:** URL shortener registry for click tracking. `(short_code)` UNIQUE index.
 - **link_clicks:** Click event log. Indexes on `(short_code, clicked_at)`, `(campaign_id, clicked_at)`, `(customer_id, clicked_at)`.
 - **email_delivery_log:** Mailgun event tracking. Indexes on `(campaign_id, event)`, `(customer_id, created_at)`, `(mailgun_message_id)`, `(created_at)`.
 - **campaign_variants:** A/B test variants per campaign. `variant_id` column added to `campaign_recipients`.
-- **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants), `20260210000009` (campaigns: auto_select_winner BOOLEAN, auto_select_after_hours INTEGER), `20260210000010` (variant_id UUID FK on tracked_links + link_clicks, with partial indexes).
+- **Migrations added:** `20260210000005` (sms_delivery_log), `20260210000006` (tracked_links + link_clicks), `20260210000007` (email_delivery_log), `20260210000008` (campaign_variants), `20260210000009` (campaigns: auto_select_winner BOOLEAN, auto_select_after_hours INTEGER), `20260210000010` (variant_id UUID FK on tracked_links + link_clicks, with partial indexes), `20260211000010` (product_images table + trigger + data migration).
 - **notification_recipients:** Email recipients for stock alerts. Unique constraint on `(email, notification_type)`. Types: `low_stock`, `all`. Toggle `is_active` to pause without deleting.
 - **stock_alert_log:** Anti-spam tracker for stock alerts. Records `(product_id, stock_level, alert_type)`. Cron checks: skip if stock level unchanged AND last alert < 7 days ago.
 - **Messaging tables:** `conversations` (unique per phone_number, linked to customer_id if known) and `messages` (CASCADE delete with conversation). Both have Supabase Realtime enabled. AI auto-replies stored with `sender_type: 'ai'`, staff replies with `sender_type: 'staff'`.
@@ -354,7 +355,19 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 24 — Staff Nav, Permission Pills, Reset Defaults, Route Access Fix)
+## Last Session: 2026-02-11 (Session 25 — Multi-Image Product Support)
+- **Multi-image product support (up to 6 images per product)**: New `product_images` table as source of truth. DB trigger `sync_product_primary_image` auto-syncs primary image back to `products.image_url` — all 8 existing display locations (POS, public pages, admin list, SEO) continue working unchanged.
+- **New `MultiImageUpload` component** (`src/app/admin/catalog/components/multi-image-upload.tsx`): horizontal row of 176x176px image slots, drag-and-drop reorder, hover overlay with Set Primary (star badge) / Replace / Remove buttons, file validation (JPEG/PNG/WebP/GIF/AVIF, 5MB), loading spinners per slot.
+- **Product edit page**: Replaced single `ImageUpload` with `MultiImageUpload`. All image operations are immediate (not deferred to form submit): upload to `products/{productId}/{uuid}.{ext}`, remove (with primary promotion), replace, reorder (batch `sort_order` update), set primary. Removed `image_url` from form submit payload — trigger handles sync.
+- **Product create page**: After product creation with image, also inserts into `product_images` with `is_primary = true`.
+- **Data migration**: 409 existing product images migrated into `product_images` table with `is_primary = true`.
+- **DB**: `product_images` table, partial unique index (one primary per product), `idx_product_images_product_sort` index, RLS policies, trigger function.
+- **Types**: `ProductImage` interface added to `types.ts`, optional `images?: ProductImage[]` on `Product`.
+- **Files created**: `supabase/migrations/20260211000010_product_images.sql`, `src/app/admin/catalog/components/multi-image-upload.tsx`
+- **Files modified**: `src/app/admin/catalog/products/[id]/page.tsx`, `src/app/admin/catalog/products/new/page.tsx`, `src/lib/supabase/types.ts`
+- TypeScript clean (zero errors)
+
+### Session 24 — Staff Nav, Permission Pills, Reset Defaults, Route Access Fix
 - **Fix 1 (Staff Nav)**: Added "All Staff" child item to Staff dropdown in `SIDEBAR_NAV` (`roles.ts`). Staff now has 2 children: All Staff → `/admin/staff`, Role Management → `/admin/staff/roles`.
 - **Fix 2 (Permission Pills)**: Replaced all permission Switch toggles on Role Management page with click-to-cycle `PermissionPill` component. Green pill = `[✓ Granted]`, red pill = `[✗ Denied]`. Single click cycles between states. Super Admin: all green + disabled. Category headers now show "Grant All | Deny All" links instead of All/None buttons.
 - **Fix 3a (Reset to Defaults)**: Created `src/lib/utils/role-defaults.ts` — all 76 permission defaults for 4 system roles extracted from seed migration. Created `POST /api/admin/staff/roles/[id]/reset/route.ts` — resets system roles to seed defaults, custom roles to all-denied. "Reset to Defaults" / "Reset to All Denied" button added to Permissions card header.

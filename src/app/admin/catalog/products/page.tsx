@@ -29,6 +29,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Plus, Package, ImageOff } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -70,6 +71,7 @@ export default function ProductsPage() {
   const [stockFilter, setStockFilter] = useState<StockFilter>(initialStock);
   const [showInactive, setShowInactive] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+  const [reactivateTarget, setReactivateTarget] = useState<ProductWithRelations | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);
   const [adjusting, setAdjusting] = useState(false);
 
@@ -140,8 +142,9 @@ export default function ProductsPage() {
     loadProducts();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleReactivate(product: ProductWithRelations) {
-    if (!window.confirm(`Reactivate "${product.name}"?`)) return;
+  async function handleReactivate() {
+    if (!reactivateTarget) return;
+    const product = reactivateTarget;
 
     setReactivatingId(product.id);
     try {
@@ -161,6 +164,7 @@ export default function ProductsPage() {
       toast.error('Failed to reactivate product');
     } finally {
       setReactivatingId(null);
+      setReactivateTarget(null);
     }
   }
 
@@ -393,7 +397,7 @@ export default function ProductsPage() {
                 disabled={reactivatingId === p.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleReactivate(p);
+                  setReactivateTarget(p);
                 }}
               >
                 {reactivatingId === p.id ? 'Activating...' : 'Activate'}
@@ -518,6 +522,17 @@ export default function ProductsPage() {
             Add Product
           </Button>
         }
+      />
+
+      {/* Reactivate Confirm Dialog */}
+      <ConfirmDialog
+        open={!!reactivateTarget}
+        onOpenChange={(open) => !open && setReactivateTarget(null)}
+        title="Reactivate Product"
+        description={`Are you sure you want to reactivate "${reactivateTarget?.name}"? It will become visible in POS and catalog.`}
+        confirmLabel="Reactivate"
+        loading={!!reactivatingId}
+        onConfirm={handleReactivate}
       />
 
       {/* Quick Adjust Dialog */}
