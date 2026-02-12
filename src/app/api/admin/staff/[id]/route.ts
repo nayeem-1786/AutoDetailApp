@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate — admin session required
-    const supabaseSession = await createClient();
-    const { data: { user } } = await supabaseSession.auth.getUser();
-    if (!user) {
+    const caller = await getEmployeeFromSession();
+    if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const denied = await requirePermission(caller.id, 'settings.manage_users');
+    if (denied) return denied;
 
     const { id } = await params;
     const body = await request.json();
@@ -47,19 +49,37 @@ export async function PATCH(
       }
     }
 
+    // Look up role_id from roles table when role is provided
+    let role_id: string | undefined;
+    if (role) {
+      const { data: roleRow } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', role)
+        .single();
+      if (roleRow) {
+        role_id = roleRow.id;
+      }
+    }
+
     // Update employee record
+    const updateData: Record<string, unknown> = {
+      first_name,
+      last_name,
+      email,
+      phone: phone || null,
+      role,
+      pin_code: pin_code || null,
+      hourly_rate: hourly_rate ?? null,
+      bookable_for_appointments,
+    };
+    if (role_id) {
+      updateData.role_id = role_id;
+    }
+
     const { error: updateError } = await supabase
       .from('employees')
-      .update({
-        first_name,
-        last_name,
-        email,
-        phone: phone || null,
-        role,
-        pin_code: pin_code || null,
-        hourly_rate: hourly_rate ?? null,
-        bookable_for_appointments,
-      })
+      .update(updateData)
       .eq('id', id);
 
     if (updateError) {

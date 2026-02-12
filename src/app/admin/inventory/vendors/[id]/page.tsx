@@ -23,7 +23,7 @@ export default function VendorDetailPage() {
   const params = useParams();
   const router = useRouter();
   const supabase = createClient();
-  const canViewCost = usePermission('inventory.view_cost_data');
+  const { granted: canViewCost } = usePermission('inventory.view_costs');
   const vendorId = params.id as string;
 
   const [vendor, setVendor] = useState<Vendor | null>(null);

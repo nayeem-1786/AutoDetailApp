@@ -16,8 +16,14 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import { canAccessRoute } from '@/lib/auth/roles';
+import type { UserRole } from '@/lib/supabase/types';
+import { ROLE_LABELS } from '@/lib/utils/constants';
+
+// POS access: role-based check as backward-compatible fallback.
+// TODO: Replace with can_access_pos from roles table once POS auth is fully migrated to dynamic system.
+const POS_ALLOWED_ROLES: UserRole[] = ['super_admin', 'admin', 'cashier'];
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
+import { PosPermissionProvider } from './context/pos-permission-context';
 import { TicketProvider, useTicket } from './context/ticket-context';
 import { CheckoutProvider, useCheckout } from './context/checkout-context';
 import { HeldTicketsProvider, useHeldTickets } from './context/held-tickets-context';
@@ -174,7 +180,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   }
 
   // Check POS access
-  if (!canAccessRoute(role, '/pos')) {
+  if (!POS_ALLOWED_ROLES.includes(role)) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 bg-gray-50">
         <ShieldAlert className="h-12 w-12 text-red-400" />
@@ -434,7 +440,7 @@ function PosShellContent({
             {displayName}
           </span>
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-            {role === 'super_admin' ? 'Admin' : role === 'admin' ? 'Admin' : 'Cashier'}
+            {ROLE_LABELS[role] || role}
           </span>
           <span className="text-sm tabular-nums text-gray-400">{clock}</span>
 
@@ -521,7 +527,9 @@ function PosShellContent({
 export function PosShell({ children }: { children: React.ReactNode }) {
   return (
     <PosAuthProvider>
-      <PosShellInner>{children}</PosShellInner>
+      <PosPermissionProvider>
+        <PosShellInner>{children}</PosShellInner>
+      </PosPermissionProvider>
     </PosAuthProvider>
   );
 }

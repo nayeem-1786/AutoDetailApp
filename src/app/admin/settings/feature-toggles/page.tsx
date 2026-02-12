@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useFeatureFlags, invalidateFeatureFlagCache } from '@/lib/hooks/use-feature-flag';
 import { useFeatureFlagContext } from '@/lib/hooks/feature-flag-provider';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -26,6 +27,7 @@ const CATEGORY_ORDER = [
 export default function FeatureTogglesPage() {
   const { flags, loading, refresh } = useFeatureFlags();
   const flagContext = useFeatureFlagContext();
+  const { granted: canToggleFeatures } = usePermission('settings.feature_toggles');
   const [updating, setUpdating] = useState<string | null>(null);
 
   async function handleToggle(flag: FeatureFlag) {
@@ -153,7 +155,7 @@ export default function FeatureTogglesPage() {
                         <Switch
                           checked={flag.enabled}
                           onCheckedChange={() => handleToggle(flag)}
-                          disabled={updating === flag.id}
+                          disabled={updating === flag.id || !canToggleFeatures}
                         />
                       </CardContent>
                     </Card>

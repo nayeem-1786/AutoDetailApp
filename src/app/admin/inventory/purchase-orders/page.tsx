@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { PurchaseOrder } from '@/lib/supabase/types';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { PO_STATUS_LABELS, PO_STATUS_BADGE_VARIANT } from '@/lib/utils/constants';
@@ -18,6 +19,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 export default function PurchaseOrdersPage() {
   const router = useRouter();
+  const { granted: canManagePO } = usePermission('inventory.manage_po');
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -129,10 +131,12 @@ export default function PurchaseOrdersPage() {
         title="Purchase Orders"
         description="Create and manage purchase orders from vendors"
         action={
-          <Button onClick={() => router.push('/admin/inventory/purchase-orders/new')}>
-            <Plus className="h-4 w-4" />
-            New Purchase Order
-          </Button>
+          canManagePO ? (
+            <Button onClick={() => router.push('/admin/inventory/purchase-orders/new')}>
+              <Plus className="h-4 w-4" />
+              New Purchase Order
+            </Button>
+          ) : undefined
         }
       />
 
@@ -155,10 +159,12 @@ export default function PurchaseOrdersPage() {
         emptyTitle="No purchase orders"
         emptyDescription="Create your first purchase order to get started."
         emptyAction={
-          <Button onClick={() => router.push('/admin/inventory/purchase-orders/new')}>
-            <Plus className="h-4 w-4" />
-            New Purchase Order
-          </Button>
+          canManagePO ? (
+            <Button onClick={() => router.push('/admin/inventory/purchase-orders/new')}>
+              <Plus className="h-4 w-4" />
+              New Purchase Order
+            </Button>
+          ) : undefined
         }
       />
     </div>

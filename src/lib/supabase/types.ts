@@ -47,6 +47,7 @@ export interface Employee {
   email: string;
   phone: string | null;
   role: UserRole;
+  role_id: string;
   status: EmployeeStatus;
   pin_code: string | null;
   hourly_rate: number | null;
@@ -697,10 +698,33 @@ export interface Permission {
   id: string;
   permission_key: string;
   role: UserRole | null;
+  role_id: string | null;
   employee_id: string | null;
   granted: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  is_system: boolean;
+  is_super: boolean;
+  can_access_pos: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PermissionDefinition {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  category: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface AuditLogEntry {

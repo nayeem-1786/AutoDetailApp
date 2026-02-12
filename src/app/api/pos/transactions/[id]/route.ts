@@ -2,14 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 
-async function authenticate(request: NextRequest): Promise<boolean> {
+/**
+ * Authenticate request via POS HMAC token or admin session.
+ * Returns the employee_id if authenticated, null otherwise.
+ */
+async function authenticate(request: NextRequest): Promise<string | null> {
   const posEmployee = authenticatePosRequest(request);
-  if (posEmployee) return true;
+  if (posEmployee) return posEmployee.employee_id;
+
   const supabaseSession = await createClient();
   const { data: { user } } = await supabaseSession.auth.getUser();
-  return !!user;
+  if (!user) return null;
+
+  const admin = createAdminClient();
+  const { data: employee } = await admin
+    .from('employees')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .eq('status', 'active')
+    .single();
+
+  return employee?.id ?? null;
 }
 
 export async function GET(
@@ -18,7 +34,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    if (!await authenticate(request)) {
+    const employeeId = await authenticate(request);
+    if (!employeeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const supabase = createAdminClient();
@@ -62,7 +79,8 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    if (!await authenticate(request)) {
+    const employeeId = await authenticate(request);
+    if (!employeeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const supabase = createAdminClient();
@@ -71,6 +89,8 @@ export async function PATCH(
     const { action } = body;
 
     if (action === 'void') {
+      const denied = await requirePermission(employeeId, 'pos.void_transactions');
+      if (denied) return denied;
       const { data: transaction, error } = await supabase
         .from('transactions')
         .update({ status: 'voided' })

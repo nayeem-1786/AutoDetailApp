@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Ban, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { usePosAuth } from '../../context/pos-auth-context';
+import { usePosPermission } from '../../context/pos-permission-context';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
@@ -49,7 +49,6 @@ const REFUND_STATUS_CLASSES: Record<string, string> = {
 };
 
 export function TransactionDetail({ transactionId, onBack }: TransactionDetailProps) {
-  const { role } = usePosAuth();
   const [transaction, setTransaction] = useState<FullTransaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
@@ -95,13 +94,15 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
     );
   }
 
-  const canRefund =
-    (role === 'super_admin' || role === 'admin') &&
-    (transaction.status === 'completed' || transaction.status === 'partial_refund');
+  const { granted: hasRefundPerm } = usePosPermission('pos.issue_refunds');
+  const { granted: hasVoidPerm } = usePosPermission('pos.void_transactions');
 
-  const canVoid =
-    (role === 'super_admin' || role === 'admin') &&
-    transaction.status === 'completed';
+  const refundEligible =
+    transaction.status === 'completed' || transaction.status === 'partial_refund';
+  const canRefund = hasRefundPerm && refundEligible;
+
+  const voidEligible = transaction.status === 'completed';
+  const canVoid = hasVoidPerm && voidEligible;
 
   const showReceipt =
     transaction.status === 'completed' ||
@@ -471,21 +472,25 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
         )}
 
         {/* Action buttons */}
-        {(canRefund || canVoid) && (
+        {(refundEligible || voidEligible) && (
           <div className="flex gap-3 border-t border-gray-200 pt-4">
-            {canRefund && (
+            {refundEligible && (
               <Button
                 variant="destructive"
                 onClick={() => setShowRefundDialog(true)}
+                disabled={!hasRefundPerm}
+                title={!hasRefundPerm ? "You don't have permission to perform this action" : undefined}
               >
                 Issue Refund
               </Button>
             )}
-            {canVoid && (
+            {voidEligible && (
               <Button
                 variant="outline"
                 className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
                 onClick={() => setShowVoidConfirm(true)}
+                disabled={!hasVoidPerm}
+                title={!hasVoidPerm ? "You don't have permission to perform this action" : undefined}
               >
                 <Ban className="mr-1.5 h-4 w-4" />
                 Void Transaction

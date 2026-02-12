@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils/format';
 import { posFetch } from '../lib/pos-fetch';
 import { usePosAuth } from '../context/pos-auth-context';
+import { usePosPermission } from '../context/pos-permission-context';
 import { CashCountForm } from '../components/eod/cash-count-form';
 import { DaySummary } from '../components/eod/day-summary';
 import {
@@ -33,8 +34,8 @@ interface DaySummaryData {
 }
 
 export default function EndOfDayPage() {
-  const { employee, role } = usePosAuth();
-  const isManager = role === 'super_admin' || role === 'admin';
+  const { employee } = usePosAuth();
+  const { granted: canEndOfDay } = usePosPermission('pos.end_of_day');
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -364,8 +365,8 @@ export default function EndOfDayPage() {
           <DaySummary summary={summary} loading={loading} />
         </section>
 
-        {/* Access control: only managers can see close register controls */}
-        {!isManager ? (
+        {/* Access control: permission gated */}
+        {!canEndOfDay ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center">
             <Lock className="mx-auto h-8 w-8 text-amber-500" />
             <p className="mt-2 text-sm font-medium text-amber-800">

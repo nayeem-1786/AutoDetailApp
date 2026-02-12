@@ -1,41 +1,66 @@
 'use client';
 
-import { useAuth } from '@/lib/auth/auth-provider';
-import { hasPermission, hasAnyPermission, hasAllPermissions } from '@/lib/auth/permissions';
+import { usePermissionContext } from '@/lib/auth/permission-context';
 
-// Client-side permission hook for conditional rendering
-// Elements without permission are hidden (not grayed out)
+/**
+ * Hook to check if the current user has a specific permission.
+ * Reads from the PermissionProvider context (loaded once at session start).
+ *
+ * Resolution: super_admin bypass → user override → role default → deny
+ */
+export function usePermission(permissionKey: string): {
+  granted: boolean;
+  loading: boolean;
+} {
+  const { permissions, isSuper, loading } = usePermissionContext();
 
-export function usePermission(permissionKey: string): boolean {
-  const { role, employee, permissions } = useAuth();
+  if (loading) return { granted: false, loading: true };
+  if (isSuper) return { granted: true, loading: false };
 
-  if (!role || !employee) return false;
-
-  return hasPermission(permissionKey, role, employee.id, permissions);
+  return { granted: permissions[permissionKey] ?? false, loading: false };
 }
 
-export function useAnyPermission(permissionKeys: string[]): boolean {
-  const { role, employee, permissions } = useAuth();
+/**
+ * Check multiple permissions (OR logic — granted if ANY key is true)
+ */
+export function useAnyPermission(permissionKeys: string[]): {
+  granted: boolean;
+  loading: boolean;
+} {
+  const { permissions, isSuper, loading } = usePermissionContext();
 
-  if (!role || !employee) return false;
+  if (loading) return { granted: false, loading: true };
+  if (isSuper) return { granted: true, loading: false };
 
-  return hasAnyPermission(permissionKeys, role, employee.id, permissions);
+  const granted = permissionKeys.some((key) => permissions[key] ?? false);
+  return { granted, loading: false };
 }
 
-export function useAllPermissions(permissionKeys: string[]): boolean {
-  const { role, employee, permissions } = useAuth();
+/**
+ * Check multiple permissions (AND logic — granted only if ALL keys are true)
+ */
+export function useAllPermissions(permissionKeys: string[]): {
+  granted: boolean;
+  loading: boolean;
+} {
+  const { permissions, isSuper, loading } = usePermissionContext();
 
-  if (!role || !employee) return false;
+  if (loading) return { granted: false, loading: true };
+  if (isSuper) return { granted: true, loading: false };
 
-  return hasAllPermissions(permissionKeys, role, employee.id, permissions);
+  const granted = permissionKeys.every((key) => permissions[key] ?? false);
+  return { granted, loading: false };
 }
 
 export function useIsSuperAdmin(): boolean {
-  const { role } = useAuth();
-  return role === 'super_admin';
+  const { isSuper } = usePermissionContext();
+  return isSuper;
 }
 
 export function useIsAdminOrAbove(): boolean {
-  const { role } = useAuth();
-  return role === 'super_admin' || role === 'admin';
+  const { isSuper, permissions } = usePermissionContext();
+  if (isSuper) return true;
+  // Admin-or-above: check if they have broad admin permissions
+  // For simplicity, use settings.manage_users as a proxy for admin-level access
+  return permissions['settings.manage_users'] ?? false;
 }

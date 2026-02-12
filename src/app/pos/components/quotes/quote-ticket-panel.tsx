@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tag, X, CalendarDays, Loader2 } from 'lucide-react';
-import { usePosAuth } from '../../context/pos-auth-context';
+import { usePosPermission } from '../../context/pos-permission-context';
 import { useQuote } from '../../context/quote-context';
 import { useCatalog } from '../../hooks/use-catalog';
 import { QuoteItemRow } from './quote-item-row';
@@ -33,8 +33,7 @@ interface QuoteTicketPanelProps {
 }
 
 export function QuoteTicketPanel({ onSaved }: QuoteTicketPanelProps) {
-  const { role } = usePosAuth();
-  const isManager = role === 'super_admin' || role === 'admin';
+  const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
   const { quote, dispatch } = useQuote();
   const { services } = useCatalog();
 
@@ -341,8 +340,8 @@ export function QuoteTicketPanel({ onSaved }: QuoteTicketPanelProps) {
           <QuoteCouponInput />
           <QuoteLoyaltyPanel />
 
-          {/* Manual Discount — manager only */}
-          {isManager && (
+          {/* Manual Discount — permission gated */}
+          {canManualDiscount && (
             <>
               {quote.manualDiscount ? (
                 <div className="flex items-center justify-between rounded-md bg-red-50 px-3 py-1.5">

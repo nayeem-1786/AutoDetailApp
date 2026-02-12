@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { getNavForRole, canAccessRoute, type NavItem } from '@/lib/auth/roles';
+import { SIDEBAR_NAV, type NavItem } from '@/lib/auth/roles';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils/cn';
 import {
@@ -33,7 +33,6 @@ import {
   ChevronRight,
   Menu,
   X,
-  CircleUser,
   Shield,
   MonitorSmartphone,
   Search,
@@ -43,10 +42,11 @@ import {
   History,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { ROLE_LABELS, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FeatureFlagProvider } from '@/lib/hooks/feature-flag-provider';
+import { PermissionProvider } from '@/lib/auth/permission-context';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -71,6 +71,7 @@ const iconMap: Record<string, LucideIcon> = {
   FileText,
   ClipboardList,
   History,
+  Shield,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
@@ -249,7 +250,7 @@ function CommandPalette({
 }
 
 function AdminContent({ children }: { children: React.ReactNode }) {
-  const { employee, role, loading, signOut } = useAuth();
+  const { employee, role, isSuper, roleName, canAccessPos, loading, signOut } = useAuth();
   const { info: businessInfo } = useBusinessInfo();
   const { enabled: twoWaySmsEnabled } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
   const { enabled: inventoryEnabled } = useFeatureFlag(FEATURE_FLAGS.INVENTORY_MANAGEMENT);
@@ -294,12 +295,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     }
   }, [loading, employee, router, pathname]);
 
-  useEffect(() => {
-    if (role && !canAccessRoute(role, pathname)) {
-      router.push('/admin');
-    }
-  }, [role, pathname, router]);
-
   // Close account dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -328,7 +323,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   // Fetch messaging unread count — initial fetch + Realtime only (no polling)
   // Gated by two_way_sms feature flag — skip entirely when disabled
   useEffect(() => {
-    if (!role || !['super_admin', 'admin'].includes(role)) return;
+    if (!employee) return;
     if (!twoWaySmsEnabled) {
       setMessagingUnread(0);
       return;
@@ -375,20 +370,19 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       abortController.abort();
       supabase.removeChannel(channel);
     };
-  }, [role, twoWaySmsEnabled]);
+  }, [employee, twoWaySmsEnabled]);
 
   // Auto-expand parent nav item when child is active
   useEffect(() => {
-    if (!role) return;
-    const navItems = getNavForRole(role);
-    navItems.forEach((item) => {
+    if (!employee) return;
+    SIDEBAR_NAV.forEach((item) => {
       if (item.children?.some((child) => pathname.startsWith(child.href))) {
         setExpandedItems((prev) =>
           prev.includes(item.href) ? prev : [...prev, item.href]
         );
       }
     });
-  }, [pathname, role]);
+  }, [pathname, employee]);
 
   if (loading) {
     return (
@@ -400,8 +394,8 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
   if (!employee || !role) return null;
 
-  // Filter out nav items when their feature flag is disabled
-  const navItems = getNavForRole(role).filter((item) => {
+  // Filter nav items based on feature flags
+  const navItems = SIDEBAR_NAV.filter((item) => {
     if (item.href === '/admin/messaging') return twoWaySmsEnabled;
     if (item.href === '/admin/inventory') return inventoryEnabled;
     return true;
@@ -542,8 +536,8 @@ function AdminContent({ children }: { children: React.ReactNode }) {
               <p className="truncate text-sm font-medium text-gray-900">
                 {employee.first_name} {employee.last_name}
               </p>
-              <p className="truncate text-xs text-gray-500 capitalize">
-                {role.replace('_', ' ')}
+              <p className="truncate text-xs text-gray-500">
+                {roleName || role.replace('_', ' ')}
               </p>
             </div>
             <button
@@ -608,16 +602,18 @@ function AdminContent({ children }: { children: React.ReactNode }) {
             </kbd>
           </button>
 
-          {/* Open POS */}
-          <a
-            href="/pos"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 sm:ml-0 ml-auto"
-          >
-            <MonitorSmartphone className="h-4 w-4" />
-            <span className="hidden sm:inline">Open POS</span>
-          </a>
+          {/* Open POS — only show if role has POS access */}
+          {canAccessPos && (
+            <a
+              href="/pos"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 sm:ml-0 ml-auto"
+            >
+              <MonitorSmartphone className="h-4 w-4" />
+              <span className="hidden sm:inline">Open POS</span>
+            </a>
+          )}
 
           {/* Account dropdown */}
           <div className="relative" ref={accountRef}>
@@ -645,7 +641,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
                 <div className="px-4 py-2">
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <Shield className="h-3.5 w-3.5" />
-                    <span>{ROLE_LABELS[role] || role}</span>
+                    <span>{roleName || role}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
                     <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
@@ -703,9 +699,11 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <FeatureFlagProvider>
-        <AdminContent>{children}</AdminContent>
-      </FeatureFlagProvider>
+      <PermissionProvider>
+        <FeatureFlagProvider>
+          <AdminContent>{children}</AdminContent>
+        </FeatureFlagProvider>
+      </PermissionProvider>
     </AuthProvider>
   );
 }

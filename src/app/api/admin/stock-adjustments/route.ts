@@ -81,9 +81,13 @@ export async function POST(request: NextRequest) {
       .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
-    if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
+    if (!employee) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const { requirePermission } = await import('@/lib/auth/require-permission');
+    const denied = await requirePermission(employee.id, 'inventory.adjust_stock');
+    if (denied) return denied;
 
     const body = await request.json();
     const { product_id, adjustment, reason, adjustment_type } = body;

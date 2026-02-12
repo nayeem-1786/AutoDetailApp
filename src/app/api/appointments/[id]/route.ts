@@ -4,12 +4,19 @@ import { appointmentUpdateSchema } from '@/lib/utils/validation';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const employee = await getEmployeeFromSession();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const parsed = appointmentUpdateSchema.safeParse(body);
@@ -22,6 +29,22 @@ export async function PATCH(
     }
 
     const data = parsed.data;
+
+    // Permission check: reschedule requires appointments.reschedule
+    const isReschedule = data.scheduled_date !== undefined ||
+      data.scheduled_start_time !== undefined ||
+      data.scheduled_end_time !== undefined;
+    if (isReschedule) {
+      const denied = await requirePermission(employee.id, 'appointments.reschedule');
+      if (denied) return denied;
+    }
+
+    // Permission check: status changes require appointments.update_status
+    if (data.status !== undefined) {
+      const denied = await requirePermission(employee.id, 'appointments.update_status');
+      if (denied) return denied;
+    }
+
     const supabase = createAdminClient();
 
     // Fetch current appointment

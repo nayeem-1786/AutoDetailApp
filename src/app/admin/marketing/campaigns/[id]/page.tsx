@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Pencil, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface CampaignDetail {
   id: string;
@@ -54,6 +55,7 @@ export default function CampaignDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const { granted: canManageCampaigns } = usePermission('marketing.campaigns');
 
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,7 +129,7 @@ export default function CampaignDetailPage() {
                 View Analytics
               </Button>
             )}
-            {['draft', 'scheduled'].includes(campaign.status) && (
+            {canManageCampaigns && ['draft', 'scheduled'].includes(campaign.status) && (
               <Button onClick={() => router.push(`/admin/marketing/campaigns/${id}/edit`)}>
                 <Pencil className="h-4 w-4" />
                 {campaign.status === 'draft' ? 'Resume Editing' : 'Edit'}

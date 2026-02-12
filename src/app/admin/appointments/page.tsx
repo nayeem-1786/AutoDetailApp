@@ -5,6 +5,7 @@ import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { cn } from '@/lib/utils/cn';
 import { PageHeader } from '@/components/ui/page-header';
 import { Spinner } from '@/components/ui/spinner';
@@ -30,11 +31,9 @@ interface AppointmentStatsData {
 export default function AppointmentsPage() {
   const supabase = createClient();
   const { role } = useAuth();
-
-  // Permission flags based on PROJECT.md permission matrix
-  const canViewFullCalendar = role === 'super_admin' || role === 'admin' || role === 'cashier';
-  const canReschedule = role === 'super_admin' || role === 'admin' || role === 'cashier';
-  const canCancel = role === 'super_admin' || role === 'admin';
+  const { granted: canViewFullCalendar } = usePermission('appointments.view_calendar');
+  const { granted: canReschedule } = usePermission('appointments.reschedule');
+  const { granted: canCancel } = usePermission('appointments.cancel');
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());

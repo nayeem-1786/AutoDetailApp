@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -47,7 +48,8 @@ const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 
 };
 
 export default function AdminDashboard() {
-  const { employee, role } = useAuth();
+  const { employee, role, isSuper } = useAuth();
+  const { granted: canViewReports } = usePermission('reports.view');
   const supabase = createClient();
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([]);
   const [weekAppointments, setWeekAppointments] = useState<AppointmentWithRelations[]>([]);
@@ -195,23 +197,13 @@ export default function AdminDashboard() {
 
   const totalOpenQuotes = quoteStats.sent + quoteStats.viewed + quoteStats.accepted;
 
-  // Role-appropriate quick actions
-  const quickActions: { label: string; href: string; icon: typeof CalendarDays; description: string }[] = [];
-
-  if (role === 'detailer') {
-    quickActions.push({ label: 'My Schedule', href: '/admin/appointments', icon: CalendarDays, description: "View today's appointments" });
-  } else {
-    quickActions.push({ label: 'Appointments', href: '/admin/appointments', icon: CalendarDays, description: 'Manage the appointment calendar' });
-    quickActions.push({ label: 'Customers', href: '/admin/customers', icon: Users, description: 'View and manage customers' });
-  }
-
-  if (role === 'super_admin' || role === 'admin') {
-    quickActions.push({ label: 'Catalog', href: '/admin/catalog', icon: Package, description: 'Products and services' });
-  }
-
-  if (role === 'super_admin') {
-    quickActions.push({ label: 'Settings', href: '/admin/settings', icon: Settings, description: 'System configuration' });
-  }
+  // Quick actions — all admin users see the same set
+  const quickActions: { label: string; href: string; icon: typeof CalendarDays; description: string }[] = [
+    { label: 'Appointments', href: '/admin/appointments', icon: CalendarDays, description: 'Manage the appointment calendar' },
+    { label: 'Customers', href: '/admin/customers', icon: Users, description: 'View and manage customers' },
+    { label: 'Catalog', href: '/admin/catalog', icon: Package, description: 'Products and services' },
+    { label: 'Settings', href: '/admin/settings', icon: Settings, description: 'System configuration' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -335,7 +327,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quotes & Customers quick stats */}
-      {role !== 'detailer' && (
+      {canViewReports && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Link href="/admin/quotes" className="group">
             <Card className="transition-colors group-hover:border-gray-300">
@@ -473,7 +465,7 @@ export default function AdminDashboard() {
               href="/admin/appointments"
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
             >
-              {role === 'detailer' ? 'View All' : 'View Calendar'}
+              View Calendar
               <ArrowRight className="h-3 w-3" />
             </Link>
           </div>

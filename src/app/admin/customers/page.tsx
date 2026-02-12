@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
 import { Plus, Tag, X, Check, ChevronDown, Tags, Minus, Users } from 'lucide-react';
 import { CustomerStats } from './components/customer-stats';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BulkAction } from '@/components/ui/data-table';
 
@@ -273,6 +274,9 @@ function TagFilterDropdown({
 export default function CustomersPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canCreateCustomer } = usePermission('customers.create');
+  const { granted: canEditCustomer } = usePermission('customers.edit');
+  const { granted: canMergeCustomers } = usePermission('customers.merge');
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,24 +330,26 @@ export default function CustomersPage() {
     );
   }
 
-  const bulkActions: BulkAction<Customer>[] = [
-    {
-      label: 'Add Tag',
-      onClick: (selected) => {
-        setBulkTagTargets(selected);
-        setBulkTagMode('add');
-        setBulkTagOpen(true);
-      },
-    },
-    {
-      label: 'Remove Tag',
-      onClick: (selected) => {
-        setBulkTagTargets(selected);
-        setBulkTagMode('remove');
-        setBulkTagOpen(true);
-      },
-    },
-  ];
+  const bulkActions: BulkAction<Customer>[] = canEditCustomer
+    ? [
+        {
+          label: 'Add Tag',
+          onClick: (selected) => {
+            setBulkTagTargets(selected);
+            setBulkTagMode('add');
+            setBulkTagOpen(true);
+          },
+        },
+        {
+          label: 'Remove Tag',
+          onClick: (selected) => {
+            setBulkTagTargets(selected);
+            setBulkTagMode('remove');
+            setBulkTagOpen(true);
+          },
+        },
+      ]
+    : [];
 
   useEffect(() => {
     async function load() {
@@ -633,16 +639,20 @@ export default function CustomersPage() {
         description={`${customers.length} customers`}
         action={
           <div className="flex items-center gap-2">
-            <Link href="/admin/customers/duplicates">
-              <Button variant="outline" size="sm">
-                <Users className="h-4 w-4" />
-                Review Duplicates
+            {canMergeCustomers && (
+              <Link href="/admin/customers/duplicates">
+                <Button variant="outline" size="sm">
+                  <Users className="h-4 w-4" />
+                  Review Duplicates
+                </Button>
+              </Link>
+            )}
+            {canCreateCustomer && (
+              <Button onClick={() => router.push('/admin/customers/new')}>
+                <Plus className="h-4 w-4" />
+                Add Customer
               </Button>
-            </Link>
-            <Button onClick={() => router.push('/admin/customers/new')}>
-              <Plus className="h-4 w-4" />
-              Add Customer
-            </Button>
+            )}
           </div>
         }
       />

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { createClient } from '@/lib/supabase/client';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { serviceCreateSchema, type ServiceCreateInput } from '@/lib/utils/validation';
 import type {
   Service,
@@ -85,6 +86,7 @@ export default function ServiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canDeleteService } = usePermission('services.delete');
   const serviceId = params.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -813,10 +815,12 @@ export default function ServiceDetailPage() {
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </Button>
+            {canDeleteService && (
+              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            )}
           </div>
         }
       />

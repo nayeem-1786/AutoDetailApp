@@ -11,6 +11,7 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { splitRecipients } from '@/lib/campaigns/ab-testing';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { requirePermission } from '@/lib/auth/require-permission';
 import type { CampaignChannel, CampaignVariant } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
@@ -35,14 +36,17 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const { data: employee } = await adminClient
       .from('employees')
-      .select('role')
+      .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
-    if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
+    if (!employee) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     // Get campaign
     const { data: campaign, error: campError } = await supabase

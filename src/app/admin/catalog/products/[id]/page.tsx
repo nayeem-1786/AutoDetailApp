@@ -45,7 +45,8 @@ export default function ProductDetailPage() {
   const params = useParams();
   const productId = params.id as string;
   const supabase = createClient();
-  const canViewCost = usePermission('inventory.view_cost_data');
+  const { granted: canViewCost } = usePermission('inventory.view_costs');
+  const { granted: canDeleteProduct } = usePermission('products.delete');
 
   const [product, setProduct] = useState<ProductWithRelations | null>(null);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -268,10 +269,12 @@ export default function ProductDetailPage() {
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </Button>
+            {canDeleteProduct && (
+              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            )}
           </div>
         }
       />

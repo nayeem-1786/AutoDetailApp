@@ -354,7 +354,107 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 19 — PO & Stock History Bug Fixes)
+## Last Session: 2026-02-11 (Session 24 — Staff Nav, Permission Pills, Reset Defaults, Route Access Fix)
+- **Fix 1 (Staff Nav)**: Added "All Staff" child item to Staff dropdown in `SIDEBAR_NAV` (`roles.ts`). Staff now has 2 children: All Staff → `/admin/staff`, Role Management → `/admin/staff/roles`.
+- **Fix 2 (Permission Pills)**: Replaced all permission Switch toggles on Role Management page with click-to-cycle `PermissionPill` component. Green pill = `[✓ Granted]`, red pill = `[✗ Denied]`. Single click cycles between states. Super Admin: all green + disabled. Category headers now show "Grant All | Deny All" links instead of All/None buttons.
+- **Fix 3a (Reset to Defaults)**: Created `src/lib/utils/role-defaults.ts` — all 76 permission defaults for 4 system roles extracted from seed migration. Created `POST /api/admin/staff/roles/[id]/reset/route.ts` — resets system roles to seed defaults, custom roles to all-denied. "Reset to Defaults" / "Reset to All Denied" button added to Permissions card header.
+- **Fix 3b (Edit Role Name)**: Custom role names are editable inline (pencil icon → input → Enter/blur saves). System roles show lock icon with tooltip "System role names cannot be changed".
+- **Fix 3c (can_access_admin bug)**: Fixed PATCH route `api/admin/staff/roles/[id]/route.ts` — wasn't destructuring `can_access_admin` from request body. Toggle was silently not saving.
+- **Fix 4 (route_access table)**: Migration `20260211000008_route_access.sql` was never applied to live DB. Pushed both pending migrations (route_access + permissions_rls). Fixed permissions_rls migration to be idempotent with `DROP POLICY IF EXISTS` before `CREATE POLICY`. Both migrations now applied successfully. Verified `route_access` table accessible via REST API.
+- **Files created**: `src/lib/utils/role-defaults.ts`, `src/app/api/admin/staff/roles/[id]/reset/route.ts`
+- **Files modified**: `src/lib/auth/roles.ts` (staff nav children), `src/app/admin/staff/roles/page.tsx` (pills + reset + edit name), `src/app/api/admin/staff/roles/[id]/route.ts` (can_access_admin), `supabase/migrations/20260211000009_permissions_rls.sql` (idempotent DROP IF EXISTS)
+- TypeScript clean (zero errors)
+
+### Session 23 — Role Management Reconciliation
+- Reconciliation session fixing regressions from 5 parallel role management sessions
+- **Task 1 (Staff List Page)**: Verified intact — 181 lines, properly styled DataTable with search/filters. No work needed.
+- **Task 2 (Role Management Page Styling)**: Complete rewrite of `src/app/admin/staff/roles/page.tsx`:
+  - Changed from 2-column sidebar layout → horizontal Tabs for role selection
+  - Replaced ALL HTML checkboxes with Switch toggles in Route Access section
+  - Added "Grant all sub-routes" text link next to parent route Switch
+  - Added "X of 76 granted" badge to Permissions card header
+  - Moved Delete Role button to PageHeader action area
+  - Kept all existing logic: optimistic saves, debounced batch, create/delete dialogs
+- **Task 3 (Route Access Section)**: Done as part of Task 2 — Switch toggles with green/gray styling
+- **Task 4 (PermissionProvider Infrastructure)**: Verified complete — PermissionProvider exists in `permission-context.tsx`, wraps AdminShell, `/api/auth/my-permissions` endpoint exists
+- **Task 5 (Employee Permission Overrides)**: Rewrote in `src/app/admin/staff/[id]/page.tsx`:
+  - Replaced cycle-through button with three-state segmented control (Default/Granted/Denied)
+  - Default = gray bg, Granted = green-500 bg white text, Denied = red-500 bg white text
+  - Added debounced auto-save (300ms) using `overridesRef` for stale closure prevention
+  - Added Super Admin amber banner in permissions tab
+  - Added override count badge per category
+  - Added role default hint text with colored dot (green/red)
+  - Removed manual "Save Permission Overrides" button
+- **Task 6 (Role Assignment Syncing)**: Verified complete — PATCH route already syncs both `role` enum and `role_id` FK
+- **Task 7 (Hardcoded Role References)**:
+  - `src/app/admin/page.tsx`: Replaced `role === 'detailer'` checks with `canAccessRoute()` using dynamic route patterns from auth context
+  - `src/app/pos/pos-shell.tsx`: Replaced inline ternary role label (`role === 'super_admin' ? 'Admin' : ...`) with `ROLE_LABELS[role]` from constants
+  - Remaining hardcoded refs are acceptable: API route fallbacks (`is_super ?? role === 'super_admin'`), staff detail page display checks
+- **Task 8 (Cross-Session Conflicts)**: Zero TypeScript errors throughout. No duplicate migrations or import conflicts found.
+- **Files modified**: `src/app/admin/staff/roles/page.tsx` (rewritten), `src/app/admin/staff/[id]/page.tsx` (permissions tab), `src/app/admin/page.tsx` (dashboard), `src/app/pos/pos-shell.tsx` (role label)
+
+### Session 22 — Server-Side Permission Enforcement
+- Server-side permission enforcement — closes security gap where API routes only checked "is user logged in?"
+- **New utilities created**:
+  - `src/lib/auth/check-permission.ts` — `checkPermission()`, `checkAnyPermission()`, `checkAllPermissions()`. Resolution: super_admin bypass → user override → role default → deny. Single optimized DB query for both user and role permissions.
+  - `src/lib/auth/require-permission.ts` — `requirePermission()`, `requireAnyPermission()`. Returns null if granted, 403 NextResponse if denied. Drop-in for API routes.
+  - `src/lib/auth/get-employee.ts` — `getEmployeeFromSession()`. Standardizes session → employee lookup pattern for admin API routes. Returns `AuthenticatedEmployee` with id, role, role_id, is_super.
+- **Admin routes enforced**:
+  - Customer DELETE → `customers.delete` (was: auth only, no role check)
+  - Staff create POST → `settings.manage_users` (was: NO AUTH AT ALL)
+  - Staff update PATCH → `settings.manage_users` (was: auth only, no role check)
+  - Stock adjustments POST → `inventory.adjust_stock` (was: inline role array check)
+  - Campaign send POST → `marketing.campaigns` (was: inline role array check)
+- **POS routes enforced**:
+  - Refunds POST → `pos.issue_refunds` (was: HMAC auth only, no permission)
+  - End of day POST → `pos.end_of_day` (was: HMAC auth only, no permission)
+  - Void transaction PATCH → `pos.void_transactions` (was: basic auth only, no permission)
+- **Appointment routes enforced** (previously had NO authentication at all):
+  - Cancel POST → `appointments.cancel` + auth added
+  - Reschedule PATCH → `appointments.reschedule` (when date/time changes) + `appointments.update_status` (when status changes) + auth added
+- **RLS fixed on `permissions` table** — was completely unprotected (RLS not enabled). Now: all authenticated can read, only super_admin can write (insert/update/delete). Same fix applied to `permission_definitions` table.
+- Migration: `20260211000009_permissions_rls.sql`
+- TypeScript clean (zero errors)
+- **Key files modified**: `api/admin/customers/[id]/route.ts`, `api/staff/create/route.ts`, `api/admin/staff/[id]/route.ts`, `api/admin/stock-adjustments/route.ts`, `api/marketing/campaigns/[id]/send/route.ts`, `api/pos/refunds/route.ts`, `api/pos/end-of-day/route.ts`, `api/pos/transactions/[id]/route.ts`, `api/appointments/[id]/route.ts`, `api/appointments/[id]/cancel/route.ts`
+
+### Session 21 — Role Management Page
+- Built Role Management page at `/admin/staff/roles` — super_admin only
+- **Route access**: Added `/admin/staff/roles` to `ROUTE_ACCESS` in `roles.ts`
+- **Sidebar nav**: Added "Role Management" sub-item under Staff with Shield icon (Staff now has children array)
+- **API routes** (4 endpoints):
+  - `GET /api/admin/staff/roles` — lists all roles with permission grants, employee counts, and all 76 permission definitions grouped by 11 categories
+  - `POST /api/admin/staff/roles` — creates custom role with slugified name, optional copy-from-existing permissions
+  - `PATCH /api/admin/staff/roles/[id]` — updates role fields and/or upserts permissions. Blocks super_admin permission changes.
+  - `DELETE /api/admin/staff/roles/[id]` — deletes custom roles only, blocks if employees assigned
+- **Page features**:
+  - Horizontal Tabs for role selection (reconciled from sidebar layout in Session 23)
+  - Super Admin role: locked icon, amber notice, all toggles ON and disabled
+  - Permission editor: all 76 permissions grouped by 11 categories
+  - Category sections: collapsible with chevron toggle, All/None bulk buttons, granted count badge
+  - Individual permissions: Switch toggle with green/gray dot indicator, name + description
+  - Route Access: Switch toggles (reconciled from checkboxes in Session 23)
+  - Optimistic UI: toggles update immediately, API calls debounced 300ms, batched changes, revert on error
+  - Page Access section: can_access_pos and can_access_admin toggles per role
+  - Create Role dialog: display name, description, can_access_pos toggle, copy-from-existing role dropdown
+  - Delete Role confirmation dialog
+- **Files created**: `src/app/admin/staff/roles/page.tsx`, `src/app/api/admin/staff/roles/route.ts`, `src/app/api/admin/staff/roles/[id]/route.ts`
+- **Files modified**: `src/lib/auth/roles.ts` (route access + sidebar nav)
+- TypeScript clean (zero errors)
+
+### Session 20 — Roles & Permissions Database Foundation
+- Database foundation for role management system — no UI changes
+- **New table: `roles`** — defines system and custom roles. 4 system roles seeded: super_admin (is_super, can_access_pos), admin (can_access_pos), cashier (can_access_pos), detailer (no POS). RLS: all authenticated read, super_admin write.
+- **New table: `permission_definitions`** — canonical permission key registry with metadata (name, description, category, sort_order) for Role Management UI. 76 keys across 11 categories seeded. RLS: all authenticated read.
+- **Cleaned `permissions` table** — deleted ALL mismatched permission rows (both role defaults under wrong keys and dead employee overrides). Re-seeded 304 rows (76 keys × 4 system roles) matching exact PROJECT.md spec matrix.
+- **Added `role_id` to `employees`** — UUID FK to `roles.id`, backfilled from existing `role` enum, set NOT NULL. Old `role` enum column kept for backward compatibility.
+- **Added `role_id` to `permissions`** — UUID FK to `roles.id`, backfilled for role-level rows. Unique constraint on `(permission_key, role_id)`. Old `role` enum column kept.
+- **TypeScript types updated** — `Role`, `PermissionDefinition` interfaces added to `supabase/types.ts`. `Employee` and `Permission` interfaces updated with `role_id`. New `src/lib/types/roles.ts` with `RolePermission`, `RoleWithPermissions`, `PermissionMatrix`, `SystemRoleName`, `isSystemRole()`.
+- **Constants** — `PERMISSION_CATEGORIES` array (11 categories) and `PermissionCategory` type added to `constants.ts`.
+- Migration: `20260211000007_roles_permissions_foundation.sql`
+- TypeScript clean (zero errors), migration applied to live DB, all data verified
+- **Key note**: The "80 keys" mentioned in audit/spec is actually 76 distinct keys when counted from the detailed listing. 76 × 4 = 304 permission rows.
+
+### Session 19 — PO & Stock History Bug Fixes
 - **BUG 1 (CRITICAL)**: Fixed PO detail API not reshaping nested `products` → `product` on items — caused product names/SKUs showing as `--` on PO detail page
 - **BUG 2**: Fixed same reshape issue in PO list API for consistency
 - **BUG 3**: Fixed PO receive route to update `cost_price` on product (was only updating `quantity_on_hand`)

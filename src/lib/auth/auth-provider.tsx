@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Employee, Permission, UserRole } from '@/lib/supabase/types';
@@ -15,6 +14,9 @@ interface AuthContextType {
   employee: Employee | null;
   role: UserRole | null;
   permissions: Permission[];
+  isSuper: boolean;
+  canAccessPos: boolean;
+  roleName: string;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -25,6 +27,9 @@ const AuthContext = createContext<AuthContextType>({
   employee: null,
   role: null,
   permissions: [],
+  isSuper: false,
+  canAccessPos: false,
+  roleName: '',
   loading: true,
   signOut: async () => {},
 });
@@ -34,6 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [isSuper, setIsSuper] = useState(false);
+  const [canAccessPos, setCanAccessPos] = useState(false);
+  const [roleName, setRoleName] = useState('');
   const [loading, setLoading] = useState(true);
   const sessionCheckRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -51,13 +59,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (emp) {
         setEmployee(emp as Employee);
 
-        // Fetch permissions (role-level + user-level overrides)
-        const { data: perms } = await supabase
-          .from('permissions')
-          .select('*')
-          .or(`role.eq.${emp.role},employee_id.eq.${emp.id}`);
+        // Fetch permissions and role info in parallel
+        const [permsRes, roleRes] = await Promise.all([
+          // Permissions (role-level + user-level overrides)
+          supabase
+            .from('permissions')
+            .select('*')
+            .or(`role.eq.${emp.role},employee_id.eq.${emp.id}`),
+          // Role info from roles table
+          supabase
+            .from('roles')
+            .select('id, name, display_name, is_super, can_access_pos')
+            .eq('id', emp.role_id)
+            .single(),
+        ]);
 
-        setPermissions((perms as Permission[]) || []);
+        setPermissions((permsRes.data as Permission[]) || []);
+
+        if (roleRes.data) {
+          setIsSuper(roleRes.data.is_super);
+          setCanAccessPos(roleRes.data.can_access_pos);
+          setRoleName(roleRes.data.display_name);
+        } else {
+          // Fallback from enum
+          setIsSuper(emp.role === 'super_admin');
+          setCanAccessPos(emp.role !== 'detailer');
+          setRoleName(emp.role);
+        }
       }
     },
     [supabase]
@@ -86,6 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setEmployee(null);
         setPermissions([]);
+        setIsSuper(false);
+        setCanAccessPos(false);
+        setRoleName('');
       }
     });
 
@@ -108,6 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           setEmployee(null);
           setPermissions([]);
+          setIsSuper(false);
+          setCanAccessPos(false);
+          setRoleName('');
 
           // Redirect to login
           const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/admin';
@@ -139,6 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setEmployee(null);
     setPermissions([]);
+    setIsSuper(false);
+    setCanAccessPos(false);
+    setRoleName('');
   };
 
   return (
@@ -149,6 +186,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         employee,
         role: employee?.role ?? null,
         permissions,
+        isSuper,
+        canAccessPos,
+        roleName,
         loading,
         signOut,
       }}

@@ -4,6 +4,8 @@ import { appointmentCancelSchema } from '@/lib/utils/validation';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 const TERMINAL_STATUSES = ['completed', 'cancelled'];
 
@@ -12,6 +14,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const employee = await getEmployeeFromSession();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const denied = await requirePermission(employee.id, 'appointments.cancel');
+    if (denied) return denied;
+
     const { id } = await params;
     const body = await request.json();
     const parsed = appointmentCancelSchema.safeParse(body);

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { Employee } from '@/lib/supabase/types';
 import { ROLE_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
@@ -18,6 +19,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 export default function StaffPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canManageUsers } = usePermission('settings.manage_users');
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,10 +123,12 @@ export default function StaffPage() {
         title="Staff"
         description={`${employees.length} team members`}
         action={
-          <Button onClick={() => router.push('/admin/staff/new')}>
-            <Plus className="h-4 w-4" />
-            Add Staff Member
-          </Button>
+          canManageUsers ? (
+            <Button onClick={() => router.push('/admin/staff/new')}>
+              <Plus className="h-4 w-4" />
+              Add Staff Member
+            </Button>
+          ) : undefined
         }
       />
 
@@ -164,10 +168,12 @@ export default function StaffPage() {
         emptyTitle="No staff members found"
         emptyDescription="Get started by adding your first team member."
         emptyAction={
-          <Button onClick={() => router.push('/admin/staff/new')}>
-            <Plus className="h-4 w-4" />
-            Add Staff Member
-          </Button>
+          canManageUsers ? (
+            <Button onClick={() => router.push('/admin/staff/new')}>
+              <Plus className="h-4 w-4" />
+              Add Staff Member
+            </Button>
+          ) : undefined
         }
       />
     </div>

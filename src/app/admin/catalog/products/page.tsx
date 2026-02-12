@@ -51,7 +51,8 @@ export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const canViewCost = usePermission('inventory.view_cost_data');
+  const { granted: canViewCost } = usePermission('inventory.view_costs');
+  const { granted: canAdjustStock } = usePermission('inventory.adjust_stock');
 
   const initialStock = (['all', 'in-stock', 'low-stock', 'out-of-stock'] as const).includes(
     searchParams.get('stock') as StockFilter
@@ -351,17 +352,20 @@ export default function ProductsPage() {
       accessorKey: 'quantity_on_hand',
       header: 'Stock',
       size: 64,
-      cell: ({ row }) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            openAdjust(row.original);
-          }}
-          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-        >
-          {row.original.quantity_on_hand}
-        </button>
-      ),
+      cell: ({ row }) =>
+        canAdjustStock ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openAdjust(row.original);
+            }}
+            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+          >
+            {row.original.quantity_on_hand}
+          </button>
+        ) : (
+          <span>{row.original.quantity_on_hand}</span>
+        ),
     },
     {
       id: 'reorder_threshold',

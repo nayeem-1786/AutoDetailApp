@@ -28,6 +28,7 @@ import {
   X,
   Loader2,
 } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { toast } from 'sonner';
 import { RevenueStats } from './components/revenue-stats';
 import { PaymentBreakdown } from './components/payment-breakdown';
@@ -582,6 +583,7 @@ const DATE_PRESETS: DatePreset[] = ['today', 'yesterday', 'this_week', 'this_mon
 
 export default function AdminTransactionsPage() {
   const supabase = createClient();
+  const { granted: canExport } = usePermission('reports.export');
 
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -869,7 +871,7 @@ export default function AdminTransactionsPage() {
                   Showing {startIndex + 1}-
                   {Math.min(startIndex + PAGE_SIZE, totalCount)} of {totalCount}
                 </p>
-                <ExportButton transactions={transactions} />
+                {canExport && <ExportButton transactions={transactions} />}
               </div>
 
               {/* Table */}

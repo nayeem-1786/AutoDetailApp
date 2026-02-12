@@ -187,6 +187,23 @@ export const CONSENT_ACTION_LABELS: Record<string, string> = {
   opt_out: 'Opt Out',
 } as const;
 
+// Permission categories (ordered for Role Management UI)
+export const PERMISSION_CATEGORIES = [
+  'POS Operations',
+  'Customer Management',
+  'Appointments & Scheduling',
+  'Catalog',
+  'Inventory',
+  'Marketing',
+  'Quotes',
+  'Photos',
+  'Reports',
+  'Staff Management',
+  'Settings',
+] as const;
+
+export type PermissionCategory = typeof PERMISSION_CATEGORIES[number];
+
 // Feature flag keys
 export const FEATURE_FLAGS = {
   LOYALTY_REWARDS: 'loyalty_rewards',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { employeeUpdateSchema, type EmployeeUpdateInput } from '@/lib/utils/validation';
 import { ROLE_LABELS } from '@/lib/utils/constants';
 import { formatPhoneInput } from '@/lib/utils/format';
-import type { Employee, Permission, UserRole, EmployeeSchedule } from '@/lib/supabase/types';
+import type { Employee, UserRole, EmployeeSchedule } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Calendar, Trash2, CalendarOff, Plus } from 'lucide-react';
+import { ArrowLeft, Calendar, Trash2, CalendarOff, Plus, ExternalLink, Loader2, Shield, ChevronDown, ChevronRight } from 'lucide-react';
+import { adminFetch } from '@/lib/utils/admin-fetch';
+import { cn } from '@/lib/utils/cn';
+
+// Permission definition from API
+interface PermissionDefinition {
+  key: string;
+  name: string;
+  description: string | null;
+  category: string;
+  sort_order: number;
+}
 
 // Schedule constants
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -61,102 +72,6 @@ function mergeScheduleWithDefaults(existing: EmployeeSchedule[]): DaySchedule[] 
   });
 }
 
-// Permission categories and keys for the permission override UI
-const PERMISSION_CATEGORIES: Record<string, { label: string; keys: string[] }> = {
-  pos: {
-    label: 'POS Operations',
-    keys: [
-      'pos.open_register',
-      'pos.close_register',
-      'pos.apply_discount',
-      'pos.void_transaction',
-      'pos.process_refund',
-      'pos.apply_coupon',
-    ],
-  },
-  customer: {
-    label: 'Customer Management',
-    keys: [
-      'customer.view',
-      'customer.create',
-      'customer.edit',
-      'customer.delete',
-      'customer.view_financials',
-    ],
-  },
-  staff: {
-    label: 'Staff Management',
-    keys: [
-      'staff.view',
-      'staff.create',
-      'staff.edit',
-      'staff.deactivate',
-      'staff.permissions',
-    ],
-  },
-  catalog: {
-    label: 'Catalog Management',
-    keys: [
-      'catalog.products.manage',
-      'catalog.services.manage',
-      'catalog.categories.manage',
-    ],
-  },
-  inventory: {
-    label: 'Inventory',
-    keys: [
-      'inventory.view',
-      'inventory.adjust',
-      'inventory.purchase_orders',
-    ],
-  },
-  reports: {
-    label: 'Reports & Analytics',
-    keys: [
-      'reports.view',
-      'reports.export',
-    ],
-  },
-  settings: {
-    label: 'Settings',
-    keys: [
-      'settings.business',
-      'settings.features',
-      'settings.tax',
-    ],
-  },
-};
-
-const PERMISSION_LABELS: Record<string, string> = {
-  'pos.open_register': 'Open Register',
-  'pos.close_register': 'Close Register',
-  'pos.apply_discount': 'Apply Discounts',
-  'pos.void_transaction': 'Void Transactions',
-  'pos.process_refund': 'Process Refunds',
-  'pos.apply_coupon': 'Apply Coupons',
-  'customer.view': 'View Customers',
-  'customer.create': 'Create Customers',
-  'customer.edit': 'Edit Customers',
-  'customer.delete': 'Delete Customers',
-  'customer.view_financials': 'View Financial Data',
-  'staff.view': 'View Staff',
-  'staff.create': 'Create Staff',
-  'staff.edit': 'Edit Staff',
-  'staff.deactivate': 'Deactivate Staff',
-  'staff.permissions': 'Manage Permissions',
-  'catalog.products.manage': 'Manage Products',
-  'catalog.services.manage': 'Manage Services',
-  'catalog.categories.manage': 'Manage Categories',
-  'inventory.view': 'View Inventory',
-  'inventory.adjust': 'Adjust Stock',
-  'inventory.purchase_orders': 'Purchase Orders',
-  'reports.view': 'View Reports',
-  'reports.export': 'Export Reports',
-  'settings.business': 'Business Settings',
-  'settings.features': 'Feature Flags',
-  'settings.tax': 'Tax Settings',
-};
-
 type OverrideState = 'default' | 'grant' | 'deny';
 
 export default function StaffDetailPage() {
@@ -177,10 +92,13 @@ export default function StaffDetailPage() {
   const [deactivating, setDeactivating] = useState(false);
 
   // Permissions state
-  const [rolePermissions, setRolePermissions] = useState<Permission[]>([]);
-  const [employeePermissions, setEmployeePermissions] = useState<Permission[]>([]);
+  const [permissionDefinitions, setPermissionDefinitions] = useState<PermissionDefinition[]>([]);
+  const [roleDefaults, setRoleDefaults] = useState<Record<string, boolean>>({});
   const [overrides, setOverrides] = useState<Record<string, OverrideState>>({});
+  const [roleDisplayName, setRoleDisplayName] = useState('');
+  const [canAccessPos, setCanAccessPos] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   // Schedule state
   const [schedule, setSchedule] = useState<DaySchedule[]>(buildDefaultWeek());
@@ -238,17 +156,11 @@ export default function StaffDetailPage() {
       bookable_for_appointments: data.bookable_for_appointments,
     });
 
-    // Load permissions, schedule, and blocked dates
-    const [rolePermsRes, empPermsRes, scheduleRes, blockedRes] = await Promise.all([
-      supabase
-        .from('permissions')
-        .select('*')
-        .eq('role', data.role)
-        .is('employee_id', null),
-      supabase
-        .from('permissions')
-        .select('*')
-        .eq('employee_id', id),
+    // Load permissions via API, plus schedule and blocked dates
+    const [permsRes, scheduleRes, blockedRes] = await Promise.all([
+      adminFetch(`/api/admin/staff/${id}/permissions`).then((r) =>
+        r.ok ? r.json() : null
+      ),
       supabase
         .from('employee_schedules')
         .select('*')
@@ -261,14 +173,16 @@ export default function StaffDetailPage() {
         .order('date'),
     ]);
 
-    if (rolePermsRes.data) setRolePermissions(rolePermsRes.data);
-    if (empPermsRes.data) {
-      setEmployeePermissions(empPermsRes.data);
-      // Build overrides map from employee-specific permissions
+    if (permsRes) {
+      setPermissionDefinitions(permsRes.definitions || []);
+      setRoleDefaults(permsRes.role_defaults || {});
+      setRoleDisplayName(permsRes.role?.display_name || data.role);
+      setCanAccessPos(permsRes.role?.can_access_pos ?? false);
+      // Build overrides map from employee-specific overrides
       const ovMap: Record<string, OverrideState> = {};
-      empPermsRes.data.forEach((p: Permission) => {
-        ovMap[p.permission_key] = p.granted ? 'grant' : 'deny';
-      });
+      for (const [key, granted] of Object.entries(permsRes.overrides || {})) {
+        ovMap[key] = granted ? 'grant' : 'deny';
+      }
       setOverrides(ovMap);
     }
 
@@ -290,9 +204,26 @@ export default function StaffDetailPage() {
     loadEmployee();
   }, [loadEmployee]);
 
+  // Default all categories to collapsed when permission definitions load
+  useEffect(() => {
+    if (permissionDefinitions.length > 0) {
+      const cats = new Set<string>();
+      for (const d of permissionDefinitions) cats.add(d.category);
+      setCollapsedCategories(cats);
+    }
+  }, [permissionDefinitions]);
+
+  function toggleCollapseCategory(category: string) {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+  }
+
   function getRoleDefault(permKey: string): boolean {
-    const rolePerm = rolePermissions.find((p) => p.permission_key === permKey);
-    return rolePerm?.granted ?? false;
+    return roleDefaults[permKey] ?? false;
   }
 
   function getEffectiveValue(permKey: string): boolean {
@@ -302,21 +233,63 @@ export default function StaffDetailPage() {
     return getRoleDefault(permKey);
   }
 
-  function cycleOverride(permKey: string) {
+  // Ref to track latest overrides for debounced save
+  const overridesRef = useRef(overrides);
+  overridesRef.current = overrides;
+  const overrideSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function setOverrideValue(permKey: string, state: OverrideState) {
     setOverrides((prev) => {
-      const current = prev[permKey] || 'default';
-      let next: OverrideState;
-      if (current === 'default') next = 'grant';
-      else if (current === 'grant') next = 'deny';
-      else next = 'default';
       const updated = { ...prev };
-      if (next === 'default') {
+      if (state === 'default') {
         delete updated[permKey];
       } else {
-        updated[permKey] = next;
+        updated[permKey] = state;
       }
       return updated;
     });
+
+    // Debounced auto-save
+    if (overrideSaveTimerRef.current) clearTimeout(overrideSaveTimerRef.current);
+    overrideSaveTimerRef.current = setTimeout(() => {
+      debouncedSavePermissions();
+    }, 300);
+  }
+
+  // Auto-save version that reads from ref
+  async function debouncedSavePermissions() {
+    setSavingPermissions(true);
+    try {
+      const payload: Array<{ key: string; granted: boolean | null }> = [];
+      const current = overridesRef.current;
+
+      for (const def of permissionDefinitions) {
+        const state = current[def.key];
+        if (state === 'grant') {
+          payload.push({ key: def.key, granted: true });
+        } else if (state === 'deny') {
+          payload.push({ key: def.key, granted: false });
+        } else {
+          payload.push({ key: def.key, granted: null });
+        }
+      }
+
+      const res = await adminFetch(`/api/admin/staff/${id}/permissions`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overrides: payload }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to save permissions');
+      }
+    } catch (err) {
+      console.error('Auto-save permissions error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to save permissions');
+    } finally {
+      setSavingPermissions(false);
+    }
   }
 
   async function onSaveProfile(data: EmployeeUpdateInput) {
@@ -373,39 +346,58 @@ export default function StaffDetailPage() {
     }
   }
 
+  // Build grouped permissions from definitions
+  const permissionsByCategory = permissionDefinitions.reduce<
+    Record<string, PermissionDefinition[]>
+  >((acc, def) => {
+    if (!acc[def.category]) acc[def.category] = [];
+    acc[def.category].push(def);
+    return acc;
+  }, {});
+
+  // Sort categories by their first item's sort_order
+  const sortedCategories = Object.entries(permissionsByCategory).sort(
+    ([, a], [, b]) => (a[0]?.sort_order ?? 0) - (b[0]?.sort_order ?? 0)
+  );
+
+  // Check if overrides have changed from the loaded state
+  const hasOverrideChanges = permissionDefinitions.length > 0;
+
   async function handleSavePermissions() {
     setSavingPermissions(true);
     try {
-      // Delete all existing employee overrides
-      const { error: deleteError } = await supabase
-        .from('permissions')
-        .delete()
-        .eq('employee_id', id);
+      // Build the overrides payload — include all keys that have overrides
+      // and send null for keys that were previously overridden but reverted to default
+      const payload: Array<{ key: string; granted: boolean | null }> = [];
 
-      if (deleteError) throw deleteError;
-
-      // Insert new overrides
-      const overrideEntries = Object.entries(overrides);
-      if (overrideEntries.length > 0) {
-        const rows = overrideEntries.map(([key, state]) => ({
-          permission_key: key,
-          employee_id: id,
-          role: null,
-          granted: state === 'grant',
-        }));
-
-        const { error: insertError } = await supabase
-          .from('permissions')
-          .insert(rows);
-
-        if (insertError) throw insertError;
+      for (const def of permissionDefinitions) {
+        const state = overrides[def.key];
+        if (state === 'grant') {
+          payload.push({ key: def.key, granted: true });
+        } else if (state === 'deny') {
+          payload.push({ key: def.key, granted: false });
+        } else {
+          // Default — send null to clear any existing override
+          payload.push({ key: def.key, granted: null });
+        }
       }
 
-      toast.success('Permissions updated successfully');
+      const res = await adminFetch(`/api/admin/staff/${id}/permissions`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overrides: payload }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to save permissions');
+      }
+
+      toast.success('Permission overrides saved');
       await loadEmployee();
     } catch (err) {
       console.error('Save permissions error:', err);
-      toast.error('Failed to save permissions');
+      toast.error(err instanceof Error ? err.message : 'Failed to save permissions');
     } finally {
       setSavingPermissions(false);
     }
@@ -589,16 +581,41 @@ export default function StaffDetailPage() {
                     </Select>
                   </FormField>
 
-                  <FormField label="POS PIN Code" error={errors.pin_code?.message} htmlFor="pin_code" description="Optional 4-digit PIN for POS register login">
-                    <Input
-                      id="pin_code"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={4}
-                      {...register('pin_code')}
-                      placeholder="1234"
-                    />
+                  <FormField label="POS Access">
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        canAccessPos
+                          ? 'bg-green-50 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                      )}>
+                        <span className={cn(
+                          'inline-block h-1.5 w-1.5 rounded-full',
+                          canAccessPos ? 'bg-green-500' : 'bg-gray-400'
+                        )} />
+                        {canAccessPos ? 'Enabled' : 'Disabled'}
+                      </span>
+                      <a
+                        href="/admin/staff/roles"
+                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        Manage in Roles
+                      </a>
+                    </div>
                   </FormField>
+
+                  {canAccessPos && (
+                    <FormField label="POS PIN Code" error={errors.pin_code?.message} htmlFor="pin_code" description="Optional 4-digit PIN for POS register login">
+                      <Input
+                        id="pin_code"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={4}
+                        {...register('pin_code')}
+                        placeholder="1234"
+                      />
+                    </FormField>
+                  )}
 
                   <FormField label="Hourly Rate" error={errors.hourly_rate?.message} htmlFor="hourly_rate">
                     <Input
@@ -834,86 +851,158 @@ export default function StaffDetailPage() {
           </TabsContent>
         )}
 
-        {/* Permissions Tab */}
+        {/* Permission Overrides Tab */}
         <TabsContent value="permissions">
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Permission Overrides</CardTitle>
-                <p className="text-sm text-gray-500">
-                  Override the default permissions for the <Badge variant="info">{ROLE_LABELS[employee.role]}</Badge> role.
-                  Click a permission to cycle through: Default, Grant, Deny.
-                </p>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <CardTitle>Permission Overrides</CardTitle>
+                      {savingPermissions && (
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Override defaults from this employee&apos;s role.
+                      Leave as &quot;Default&quot; to inherit role settings.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <span>Role:</span>
+                    <Badge variant="info">{roleDisplayName}</Badge>
+                    <a
+                      href="/admin/staff/roles"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      View role defaults
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-8">
-                  {Object.entries(PERMISSION_CATEGORIES).map(([catKey, category]) => (
-                    <div key={catKey}>
-                      <h3 className="mb-3 text-sm font-semibold text-gray-900">{category.label}</h3>
-                      <div className="space-y-2">
-                        {category.keys.map((permKey) => {
-                          const overrideState = overrides[permKey] || 'default';
-                          const roleDefault = getRoleDefault(permKey);
-                          const effective = getEffectiveValue(permKey);
+                {/* Super Admin banner */}
+                {employee.role === 'super_admin' && (
+                  <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                    <Shield className="h-5 w-5 text-amber-600 shrink-0" />
+                    <p className="text-sm text-amber-800">
+                      Super Admin bypasses all permission checks. Overrides have no effect.
+                    </p>
+                  </div>
+                )}
 
-                          return (
-                            <div
-                              key={permKey}
-                              className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-2.5"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`h-2.5 w-2.5 rounded-full ${
-                                    effective ? 'bg-green-500' : 'bg-red-400'
-                                  }`}
-                                />
-                                <span className="text-sm text-gray-700">
-                                  {PERMISSION_LABELS[permKey] || permKey}
-                                </span>
-                                <span className="text-xs text-gray-400">
-                                  (role default: {roleDefault ? 'granted' : 'denied'})
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => cycleOverride(permKey)}
-                                className="rounded-md px-3 py-1 text-xs font-medium transition-colors"
-                                style={{
-                                  backgroundColor:
-                                    overrideState === 'default'
-                                      ? '#f3f4f6'
-                                      : overrideState === 'grant'
-                                      ? '#dcfce7'
-                                      : '#fee2e2',
-                                  color:
-                                    overrideState === 'default'
-                                      ? '#6b7280'
-                                      : overrideState === 'grant'
-                                      ? '#166534'
-                                      : '#991b1b',
-                                }}
-                              >
-                                {overrideState === 'default'
-                                  ? 'Default'
-                                  : overrideState === 'grant'
-                                  ? 'Granted'
-                                  : 'Denied'}
-                              </button>
+                {sortedCategories.length === 0 ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Spinner size="sm" />
+                    <span className="ml-2 text-sm text-gray-400">Loading permissions...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sortedCategories.map(([category, definitions]) => {
+                      const overrideCount = definitions.filter(
+                        (d) => overrides[d.key] === 'grant' || overrides[d.key] === 'deny'
+                      ).length;
+                      const isCollapsed = collapsedCategories.has(category);
+
+                      return (
+                        <div key={category} className="rounded-lg border border-gray-200">
+                          {/* Category Header — clickable to collapse */}
+                          <button
+                            type="button"
+                            onClick={() => toggleCollapseCategory(category)}
+                            className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              {isCollapsed ? (
+                                <ChevronRight className="h-4 w-4 text-gray-400" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-gray-400" />
+                              )}
+                              <span className="text-sm font-semibold text-gray-900">
+                                {category}
+                              </span>
+                              {overrideCount > 0 && (
+                                <Badge variant="info" className="text-[10px] px-1.5 py-0">
+                                  {overrideCount} override{overrideCount !== 1 ? 's' : ''}
+                                </Badge>
+                              )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {definitions.length}
+                            </Badge>
+                          </button>
+
+                          {/* Permission Rows */}
+                          {!isCollapsed && (
+                            <div className="border-t border-gray-100">
+                              {definitions.map((def, idx) => {
+                                const overrideState = overrides[def.key] || 'default';
+                                const roleDefault = getRoleDefault(def.key);
+                                const isSuperAdmin = employee.role === 'super_admin';
+
+                                return (
+                                  <div
+                                    key={def.key}
+                                    className={cn(
+                                      'flex items-center justify-between px-4 py-1.5 gap-3',
+                                      idx % 2 === 1 && 'bg-gray-50/60'
+                                    )}
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-700">
+                                          {def.name}
+                                        </span>
+                                        <span className={cn(
+                                          'inline-block h-1.5 w-1.5 rounded-full shrink-0',
+                                          getEffectiveValue(def.key) ? 'bg-green-500' : 'bg-red-400'
+                                        )} title={`Effective: ${getEffectiveValue(def.key) ? 'Granted' : 'Denied'}`} />
+                                      </div>
+                                      {def.description && (
+                                        <p className="text-xs text-gray-400 hidden sm:block">
+                                          {def.description}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {/* Click-to-cycle pill: Default → Granted → Denied → Default */}
+                                    <button
+                                      type="button"
+                                      disabled={isSuperAdmin}
+                                      onClick={() => {
+                                        const next: Record<OverrideState, OverrideState> = {
+                                          default: 'grant',
+                                          grant: 'deny',
+                                          deny: 'default',
+                                        };
+                                        setOverrideValue(def.key, next[overrideState]);
+                                      }}
+                                      className={cn(
+                                        'shrink-0 rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
+                                        overrideState === 'default' && 'bg-gray-100 text-gray-500',
+                                        overrideState === 'grant' && 'bg-green-100 text-green-700',
+                                        overrideState === 'deny' && 'bg-red-100 text-red-700',
+                                        isSuperAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'
+                                      )}
+                                    >
+                                      {overrideState === 'default' && 'Default'}
+                                      {overrideState === 'grant' && 'Granted'}
+                                      {overrideState === 'deny' && 'Denied'}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
-
-            <div className="flex justify-end">
-              <Button onClick={handleSavePermissions} disabled={savingPermissions}>
-                {savingPermissions ? 'Saving...' : 'Save Permissions'}
-              </Button>
-            </div>
           </div>
         </TabsContent>
       </Tabs>

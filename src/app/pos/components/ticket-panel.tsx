@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tag, X } from 'lucide-react';
-import { usePosAuth } from '../context/pos-auth-context';
+import { usePosPermission } from '../context/pos-permission-context';
 import { useTicket } from '../context/ticket-context';
 import { useCatalog } from '../hooks/use-catalog';
 import { TicketItemRow } from './ticket-item-row';
@@ -35,8 +35,7 @@ interface TicketPanelProps {
 }
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
-  const { role } = usePosAuth();
-  const isManager = role === 'super_admin' || role === 'admin';
+  const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
   const { ticket, dispatch } = useTicket();
   const { services } = useCatalog();
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
@@ -191,8 +190,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           <CouponInput />
           <LoyaltyPanel />
 
-          {/* Manual Discount — manager only */}
-          {isManager && (
+          {/* Manual Discount — permission gated */}
+          {canManualDiscount && (
             <>
               {ticket.manualDiscount ? (
                 <div className="flex items-center justify-between rounded-md bg-red-50 px-3 py-1.5">

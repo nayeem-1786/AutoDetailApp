@@ -18,6 +18,7 @@ import { FormField } from '@/components/ui/form-field';
 import { appointmentCancelSchema, type AppointmentCancelInput } from '@/lib/utils/validation';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { AppointmentWithRelations } from '../types';
 
 interface CancelAppointmentDialogProps {
@@ -35,6 +36,7 @@ export function CancelAppointmentDialog({
 }: CancelAppointmentDialogProps) {
   const [saving, setSaving] = useState(false);
   const { enabled: feeEnabled } = useFeatureFlag(FEATURE_FLAGS.CANCELLATION_FEE);
+  const { granted: canWaiveFee } = usePermission('appointments.waive_fee');
 
   const {
     register,
@@ -94,7 +96,7 @@ export function CancelAppointmentDialog({
             />
           </FormField>
 
-          {feeEnabled && (
+          {feeEnabled && canWaiveFee && (
             <FormField
               label="Cancellation Fee"
               error={errors.cancellation_fee?.message}

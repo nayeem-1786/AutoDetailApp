@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { employeeCreateSchema } from '@/lib/utils/validation';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function POST(request: NextRequest) {
   try {
+    const caller = await getEmployeeFromSession();
+    if (!caller) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const denied = await requirePermission(caller.id, 'settings.manage_users');
+    if (denied) return denied;
+
     const body = await request.json();
 
     // Validate input

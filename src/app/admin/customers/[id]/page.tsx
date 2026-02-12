@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { usePermission } from '@/lib/hooks/use-permission';
 import {
   customerUpdateSchema,
   vehicleSchema,
@@ -69,6 +70,10 @@ export default function CustomerProfilePage() {
   const id = params.id as string;
   const supabase = createClient();
   const { employee: adminEmployee } = useAuth();
+  const { granted: canDeleteCustomer } = usePermission('customers.delete');
+  const { granted: canEditCustomer } = usePermission('customers.edit');
+  const { granted: canAdjustLoyalty } = usePermission('customers.adjust_loyalty');
+  const { granted: canExportCustomers } = usePermission('customers.export');
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -1154,15 +1159,18 @@ export default function CustomerProfilePage() {
             </Card>
 
             <div className="flex justify-between">
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={() => setDeleteStep(1)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Customer
-              </Button>
+              {canDeleteCustomer && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => setDeleteStep(1)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Customer
+                </Button>
+              )}
+              {!canDeleteCustomer && <div />}
               <div className="flex gap-3">
                 <Button type="button" variant="outline" onClick={() => router.push('/admin/customers')}>
                   Cancel
@@ -1377,17 +1385,19 @@ export default function CustomerProfilePage() {
                     <Award className="h-10 w-10 text-amber-500" />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setLoyaltyAdjust({ points_change: 0, description: '', action: 'adjusted' });
-                      setLoyaltyDialogOpen(true);
-                    }}
-                  >
-                    Manual Adjust
-                  </Button>
-                </div>
+                {canAdjustLoyalty && (
+                  <div className="mt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setLoyaltyAdjust({ points_change: 0, description: '', action: 'adjusted' });
+                        setLoyaltyDialogOpen(true);
+                      }}
+                    >
+                      Manual Adjust
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { cashDrawerCloseSchema } from '@/lib/utils/validation';
 
 export async function POST(request: NextRequest) {
@@ -9,6 +10,10 @@ export async function POST(request: NextRequest) {
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const denied = await requirePermission(posEmployee.employee_id, 'pos.end_of_day');
+    if (denied) return denied;
+
     const supabase = createAdminClient();
 
     const body = await request.json();
