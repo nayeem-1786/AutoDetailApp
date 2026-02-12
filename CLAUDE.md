@@ -35,7 +35,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **5** | Marketing, Coupons & Campaigns | Done |
 | **6** | Inventory Management | Done |
 | **7** | QuickBooks Integration & Reporting | Done |
-| **8** | Job Management & Photo Documentation | In Progress |
+| **8** | Job Management & Photo Documentation | Done |
 | **9** | Native Online Store | Not started |
 | **10** | Recurring Services (Dormant) | Not started |
 | **11** | Intelligence & Growth | Done |
@@ -343,6 +343,11 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Job completion flow**: `POST /api/pos/jobs/[id]/complete` — generates `gallery_token`, auto-selects featured photos, fires-and-forgets SMS (MMS) + email notifications. Zone picker in completion mode shows intake photos for side-by-side reference.
 - **Gallery token**: UUID on `jobs.gallery_token` column. Generated at completion time. Public gallery at `/jobs/[token]/photos` — Server Component, no auth required.
 - **Job checkout auto-linking**: POS transactions route has fire-and-forget hook — after creating transaction for a customer, finds their most recent completed (unlinked) job, sets `transaction_id` and `status='closed'`. Never blocks POS.
+- **Job status workflow**: `scheduled → intake → in_progress → pending_approval → completed → closed` (also `cancelled`). Jobs bridge appointments → jobs → transactions.
+- **Job timer formula**: If paused → `timer_seconds` (static). If running → `timer_seconds + (now - work_started_at)`. All state in DB, client derives display.
+- **Photo minimums**: Configurable via `business_settings`: `min_intake_photos_exterior` (4), `min_intake_photos_interior` (2), same for completion. Counts unique zones with >=1 photo.
+- **Zone keys**: 8 exterior + 7 interior. Defined in `src/lib/utils/job-zones.ts`.
+- **Supabase Storage bucket**: `job-photos/` with path `{job_id}/{uuid}.jpg` + `{job_id}/{uuid}_thumb.jpg`. Public read, authenticated write.
 - **Phase 9 is Native Online Store** — NO WordPress/WooCommerce. Build cart, checkout, orders within this Next.js app. Product catalog pages already exist at `/products`.
 - **Feature flag checks (server-side)**: Use `isFeatureEnabled(key)` from `src/lib/utils/feature-flags.ts` for all API route flag checks. Uses `createAdminClient()` (service role). Fails closed. Import `FEATURE_FLAGS` from constants for key names.
 - **sms_marketing flag**: Gates campaign SMS sends (immediate + scheduled) and lifecycle engine Phase 2. Does NOT gate transactional SMS (appointment reminders, quote notifications, STOP/START processing).
