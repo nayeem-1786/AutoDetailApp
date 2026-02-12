@@ -24,6 +24,7 @@ import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { getAIResponse, type CustomerContext } from '@/lib/services/messaging-ai';
+import { extractAddonActions, approveAddon, declineAddon } from '@/lib/services/job-addons';
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
@@ -591,7 +592,7 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          autoReply = await getAIResponse(history || [], body, customerCtx);
+          autoReply = await getAIResponse(history || [], body, customerCtx, conversation.customer_id);
         } catch (err) {
           console.error('AI auto-reply failed:', err);
         }
@@ -776,6 +777,43 @@ export async function POST(request: NextRequest) {
       } else {
         // No quote block — use clean message as-is (splitting handled below)
         autoReply = cleanMessage;
+      }
+    }
+
+    // -------------------------------------------------------------------
+    // 10. Addon authorization processing — extract and handle AUTHORIZE/DECLINE blocks
+    // -------------------------------------------------------------------
+    if (autoReply) {
+      const { authorizeIds, declineIds, cleanedMessage } = extractAddonActions(autoReply);
+
+      // Process authorizations
+      for (const addonId of authorizeIds) {
+        try {
+          const result = await approveAddon(addonId);
+          if (!result.success && result.expired) {
+            // Addon expired during reply — notify customer
+            await sendSms(normalizedPhone, 'That authorization has expired. Would you like us to send a new one?');
+          }
+        } catch (err) {
+          console.error(`[AddonAuth] Failed to approve addon ${addonId}:`, err);
+        }
+      }
+
+      // Process declines
+      for (const addonId of declineIds) {
+        try {
+          const result = await declineAddon(addonId);
+          if (!result.success && result.expired) {
+            await sendSms(normalizedPhone, 'That authorization has expired. Would you like us to send a new one?');
+          }
+        } catch (err) {
+          console.error(`[AddonAuth] Failed to decline addon ${addonId}:`, err);
+        }
+      }
+
+      // Use cleaned message (blocks stripped) for the conversation
+      if (authorizeIds.length > 0 || declineIds.length > 0) {
+        autoReply = cleanedMessage;
       }
     }
 

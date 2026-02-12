@@ -54,9 +54,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp, Camera } from 'lucide-react';
 import Link from 'next/link';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
+import { BeforeAfterSlider } from '@/components/before-after-slider';
+import { getZoneLabel } from '@/lib/utils/job-zones';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 import { generateReceiptLines, generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import type { ReceiptTransaction } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
@@ -825,6 +828,7 @@ export default function CustomerProfilePage() {
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
           <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>
           <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
+          <TabsTrigger value="photos">Photos</TabsTrigger>
         </TabsList>
 
         {/* ===== INFO TAB ===== */}
@@ -1867,6 +1871,11 @@ export default function CustomerProfilePage() {
             );
           })()}
         </TabsContent>
+
+        {/* ===== PHOTOS TAB ===== */}
+        <TabsContent value="photos">
+          <CustomerPhotosTab customerId={id} vehicles={vehicles} />
+        </TabsContent>
       </Tabs>
 
       {/* Delete Customer - First Confirmation */}
@@ -1912,6 +1921,170 @@ export default function CustomerProfilePage() {
         requireConfirmText={customer?.first_name || ''}
         onConfirm={handleDeleteCustomer}
       />
+    </div>
+  );
+}
+
+// ─── Customer Photos Tab ────────────────────────────────────────────────────────
+
+interface JobPhotoGroup {
+  job_id: string;
+  status: string;
+  services: { id: string; name: string; price: number }[];
+  vehicle: { id: string; year: number; make: string; model: string; color: string | null } | null;
+  date: string;
+  photos: {
+    id: string;
+    job_id: string;
+    zone: string;
+    phase: string;
+    image_url: string;
+    thumbnail_url: string | null;
+    notes: string | null;
+    annotation_data: unknown;
+    is_featured: boolean;
+    is_internal: boolean;
+    created_at: string;
+  }[];
+}
+
+function CustomerPhotosTab({ customerId, vehicles }: { customerId: string; vehicles: Vehicle[] }) {
+  const [groups, setGroups] = useState<JobPhotoGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [vehicleFilter, setVehicleFilter] = useState('');
+
+  const loadPhotos = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (vehicleFilter) params.set('vehicle_id', vehicleFilter);
+      const res = await adminFetch(`/api/admin/customers/${customerId}/photos?${params}`);
+      if (res.ok) {
+        const json = await res.json();
+        setGroups(json.data);
+      }
+    } catch { /* ignore */ } finally {
+      setLoading(false);
+    }
+  }, [customerId, vehicleFilter]);
+
+  useEffect(() => {
+    loadPhotos();
+  }, [loadPhotos]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="md" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Vehicle filter */}
+      {vehicles.length > 1 && (
+        <div className="flex items-center gap-2">
+          <select
+            value={vehicleFilter}
+            onChange={(e) => setVehicleFilter(e.target.value)}
+            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm"
+          >
+            <option value="">All Vehicles</option>
+            {vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.year} {v.make} {v.model}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {groups.length === 0 ? (
+        <EmptyState
+          icon={Camera}
+          title="No job photos found for this customer"
+          description="Photos will appear here after jobs with photo documentation are completed."
+        />
+      ) : (
+        groups.map((group) => {
+          const vehicle = group.vehicle;
+          const vehicleStr = vehicle
+            ? `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.color ? ` (${vehicle.color})` : ''}`
+            : 'Unknown vehicle';
+          const serviceNames = group.services.map((s) => s.name).join(', ');
+          const dateStr = new Date(group.date).toLocaleDateString('en-US', {
+            timeZone: 'America/Los_Angeles',
+            dateStyle: 'medium',
+          });
+
+          // Group photos by zone for before/after display
+          const zoneMap = new Map<string, { intake: typeof group.photos; completion: typeof group.photos; other: typeof group.photos }>();
+          for (const photo of group.photos) {
+            if (!zoneMap.has(photo.zone)) {
+              zoneMap.set(photo.zone, { intake: [], completion: [], other: [] });
+            }
+            const entry = zoneMap.get(photo.zone)!;
+            if (photo.phase === 'intake') entry.intake.push(photo);
+            else if (photo.phase === 'completion') entry.completion.push(photo);
+            else entry.other.push(photo);
+          }
+
+          return (
+            <Card key={group.job_id}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">{dateStr}</CardTitle>
+                    <p className="text-sm text-gray-500">{vehicleStr} · {serviceNames}</p>
+                  </div>
+                  <Badge variant={group.status === 'completed' || group.status === 'closed' ? 'default' : 'secondary'}>
+                    {group.status.replace(/_/g, ' ')}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[...zoneMap.entries()].map(([zoneKey, zonePhotos]) => {
+                    const hasBeforeAfter = zonePhotos.intake.length > 0 && zonePhotos.completion.length > 0;
+
+                    return (
+                      <div key={zoneKey}>
+                        <h4 className="mb-2 text-sm font-medium text-gray-700">{getZoneLabel(zoneKey)}</h4>
+                        {hasBeforeAfter ? (
+                          <div className="max-w-lg">
+                            <BeforeAfterSlider
+                              beforeSrc={zonePhotos.intake[0].image_url}
+                              afterSrc={zonePhotos.completion[0].image_url}
+                            />
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                            {[...zonePhotos.intake, ...zonePhotos.completion, ...zonePhotos.other].map((photo) => (
+                              <div key={photo.id} className="relative aspect-square overflow-hidden rounded-lg bg-gray-200">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={photo.thumbnail_url || photo.image_url}
+                                  alt={`${zoneKey} ${photo.phase}`}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                />
+                                <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+                                  {photo.phase}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
     </div>
   );
 }

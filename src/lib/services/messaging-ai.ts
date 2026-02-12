@@ -3,6 +3,7 @@ import { type SupabaseClient } from '@supabase/supabase-js';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, isWithinBusinessHours, formatBusinessHoursText } from '@/lib/data/business-hours';
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
+import { getPendingAddonsForCustomer, buildAddonPromptSection } from '@/lib/services/job-addons';
 import type { Message } from '@/lib/supabase/types';
 
 export { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
@@ -11,8 +12,9 @@ export { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
  * Build the system prompt for the AI auto-responder.
  * Uses saved messaging_ai_instructions as the behavioral section (falls back to default template).
  * Appends dynamic data (service catalog, business info, hours, open/closed status) at runtime.
+ * When customerId is provided, injects pending addon authorization context.
  */
-export async function buildSystemPrompt(): Promise<string> {
+export async function buildSystemPrompt(customerId?: string | null): Promise<string> {
   const businessInfo = await getBusinessInfo();
   const businessHours = await getBusinessHours();
 
@@ -195,6 +197,17 @@ export async function buildSystemPrompt(): Promise<string> {
     console.error('Coupon query failed:', err);
   }
 
+  // Inject pending addon authorization context for this customer
+  let addonSection = '';
+  if (customerId) {
+    try {
+      const addons = await getPendingAddonsForCustomer(customerId);
+      addonSection = buildAddonPromptSection(addons);
+    } catch (err) {
+      console.error('Addon context injection failed:', err);
+    }
+  }
+
   return `${behavioralPrompt}
 
 PRICING DATA (for your reference only — NEVER send this list to the customer):
@@ -205,7 +218,7 @@ ${businessInfo.name}
 Phone: ${businessInfo.phone}
 Hours: ${hoursText}
 Status: ${isOpen ? 'CURRENTLY OPEN' : 'CURRENTLY CLOSED'}
-Booking: ${bookingUrl}${couponSection}`;
+Booking: ${bookingUrl}${couponSection}${addonSection}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,18 +293,20 @@ export interface CustomerContext {
  * Get an AI response using the Anthropic Messages API.
  * Passes conversation history for context (up to 20 messages).
  * When customerContext is provided, appends customer info to the system prompt.
+ * When customerId is provided, pending addon authorizations are injected into the prompt.
  */
 export async function getAIResponse(
   conversationHistory: Message[],
   newMessage: string,
-  customerContext?: CustomerContext
+  customerContext?: CustomerContext,
+  customerId?: string | null
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY is not configured');
   }
 
-  let systemPrompt = await buildSystemPrompt();
+  let systemPrompt = await buildSystemPrompt(customerId);
 
   // Search for relevant products based on conversation context
   const admin = createAdminClient();

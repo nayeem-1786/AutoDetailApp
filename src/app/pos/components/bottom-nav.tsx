@@ -8,6 +8,7 @@ import {
   Vault,
   Receipt,
   FileText,
+  ClipboardList,
   MoreHorizontal,
   ExternalLink,
   Settings,
@@ -128,6 +129,18 @@ export function BottomNav() {
       >
         <FileText className="h-5 w-5" />
         <span className="text-[10px] font-medium leading-tight">Quotes</span>
+      </Link>
+
+      {/* Jobs */}
+      <Link
+        href="/pos/jobs"
+        className={cn(
+          'flex flex-col items-center gap-0.5 px-3 py-1',
+          pathname.startsWith('/pos/jobs') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+        )}
+      >
+        <ClipboardList className="h-5 w-5" />
+        <span className="text-[10px] font-medium leading-tight">Jobs</span>
       </Link>
 
       {/* More */}

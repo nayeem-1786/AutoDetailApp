@@ -14,6 +14,7 @@ const ACCOUNT_TABS = [
   { label: 'Appointments', href: '/account/appointments' },
   { label: 'Vehicles', href: '/account/vehicles' },
   { label: 'Transactions', href: '/account/transactions' },
+  { label: 'Photos', href: '/account/photos' },
   { label: 'Loyalty', href: '/account/loyalty' },
   { label: 'Profile', href: '/account/profile' },
 ] as const;

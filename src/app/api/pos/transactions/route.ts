@@ -321,6 +321,36 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Job linking — fire and forget, never block POS
+    // If customer has completed jobs, link the most recent one to this transaction and close it
+    if (data.customer_id) {
+      Promise.resolve(
+        supabase
+          .from('jobs')
+          .select('id')
+          .eq('customer_id', data.customer_id)
+          .eq('status', 'completed')
+          .is('transaction_id', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ).then(async ({ data: completedJob }) => {
+        if (completedJob) {
+          await supabase
+            .from('jobs')
+            .update({
+              transaction_id: transaction.id,
+              status: 'closed',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', completedJob.id);
+          console.log(`[JobCheckout] Job ${completedJob.id} linked to transaction ${transaction.id}, status → closed`);
+        }
+      }).catch((err: unknown) => {
+        console.error('[JobCheckout] Failed to link job to transaction:', err);
+      });
+    }
+
     return NextResponse.json({ data: transaction }, { status: 201 });
   } catch (err) {
     console.error('Transaction create route error:', err);

@@ -874,6 +874,86 @@ export interface StockAlertLog {
   created_at: string;
 }
 
+// Phase 8: Job Management types
+
+export type JobStatus = 'scheduled' | 'intake' | 'in_progress' | 'pending_approval' | 'completed' | 'closed' | 'cancelled';
+export type JobPhotoPhase = 'intake' | 'progress' | 'completion';
+export type JobAddonStatus = 'pending' | 'approved' | 'declined' | 'expired';
+
+export interface JobServiceSnapshot {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface Job {
+  id: string;
+  appointment_id: string | null;
+  transaction_id: string | null;
+  customer_id: string;
+  vehicle_id: string | null;
+  assigned_staff_id: string | null;
+  status: JobStatus;
+  services: JobServiceSnapshot[];
+  work_started_at: string | null;
+  work_completed_at: string | null;
+  timer_seconds: number;
+  timer_paused_at: string | null;
+  intake_started_at: string | null;
+  intake_completed_at: string | null;
+  intake_notes: string | null;
+  estimated_pickup_at: string | null;
+  actual_pickup_at: string | null;
+  pickup_notes: string | null;
+  gallery_token: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  // Joined relations
+  customer?: Customer;
+  vehicle?: Vehicle;
+  assigned_staff?: Employee;
+  addons?: JobAddon[];
+}
+
+export interface JobPhoto {
+  id: string;
+  job_id: string;
+  zone: string;
+  phase: JobPhotoPhase;
+  image_url: string;
+  thumbnail_url: string | null;
+  storage_path: string;
+  notes: string | null;
+  annotation_data: unknown;
+  is_featured: boolean;
+  is_internal: boolean;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface JobAddon {
+  id: string;
+  job_id: string;
+  service_id: string | null;
+  product_id: string | null;
+  custom_description: string | null;
+  price: number;
+  discount_amount: number;
+  status: JobAddonStatus;
+  authorization_token: string;
+  message_to_customer: string | null;
+  sent_at: string | null;
+  responded_at: string | null;
+  expires_at: string | null;
+  pickup_delay_minutes: number;
+  photo_ids: string[];
+  customer_notified_via: string[];
+  created_by: string | null;
+  created_at: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }

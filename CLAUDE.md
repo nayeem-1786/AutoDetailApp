@@ -18,7 +18,9 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | `docs/CHANGELOG.md` | Archived session history — all bug fixes (44+), feature details, file lists. Reference for "what changed" questions. |
 | `docs/MEMORY.md` | Session memory and context carryover notes. |
 | `docs/AUDIT_VARIABLE_DATA.md` | Template variable data audit — customer/transaction/vehicle data coverage, business settings keys, live template usage, loyalty data. Reference when adding or modifying template variables. |
+| `docs/DESIGN_SYSTEM.md` | Visual consistency rules — color palette, typography, spacing, component patterns, page layouts, status indicators, dark mode, responsive breakpoints, anti-patterns. Reference when building any UI. |
 | `docs/QBO-INTEGRATION.md` | QuickBooks Online integration guide — architecture, entity mapping, OAuth setup, POS hooks, sync API, troubleshooting. Reference when touching QBO code. |
+| `docs/PHASE8_JOB_MANAGEMENT.md` | Phase 8 job management & photo documentation spec — schema, workflows, UI specs, zone system, authorization flow. Reference when touching job/photo code. |
 
 ---
 
@@ -33,10 +35,10 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **5** | Marketing, Coupons & Campaigns | Done |
 | **6** | Inventory Management | Done |
 | **7** | QuickBooks Integration & Reporting | Done |
-| **8** | Photo Documentation | Not started |
+| **8** | Job Management & Photo Documentation | In Progress |
 | **9** | Native Online Store | Not started |
 | **10** | Recurring Services (Dormant) | Not started |
-| **11** | Intelligence & Growth | Not started |
+| **11** | Intelligence & Growth | Done |
 | **12** | iPad POS Optimization | Not started |
 
 ### Phase 5 — What's Done
@@ -185,6 +187,17 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - EOD batch sync: `batchSyncDayTransactions()` in `src/lib/qbo/sync-batch.ts`, fire-and-forget from `src/app/api/pos/end-of-day/route.ts`. Syncs unsynced customers first, then transactions in batches of 25. Handles PST/PDT timezone correctly. Source: `eod_batch`. Never blocks register close.
 - Realtime sync toggle: `qbo_realtime_sync` business setting (default: `true`). When OFF, POS transaction + customer hooks skip immediate QBO sync — transactions only sync at EOD close or via background cron. Toggle in Sync Settings section of QuickBooks settings page.
 
+### Phase 11 — What's Done
+Intelligence & Growth features were built organically across Phases 3, 5, 6, and 7:
+- **Analytics dashboards**: Admin KPI overview, campaign analytics (delivery/clicks/A/B), customer analytics (lifetime value, repeat rate, at-risk), QBO reporting dashboard
+- **AI & Automation**: Claude-powered SMS auto-responder with dynamic context (service catalog, hours, coupons, product knowledge), auto-quote generation, conversation summaries, multi-message splitting
+- **Lifecycle automation engine**: 2-phase cron (schedule + execute), review request automation (Google/Yelp), template variables, 30-day dedup, coupon injection
+- **Growth tools**: SMS + email campaign system with A/B testing, coupon/promo codes with eligibility rules, click tracking with link shortening, delivery status tracking (Twilio + Mailgun webhooks)
+- **Customer intelligence**: Segmentation (enthusiast/professional), lifetime spend tracking, vehicle history, at-risk identification (90+ days inactive)
+- **Operational intelligence**: Low stock alerts (daily cron, anti-spam, email notifications), PO workflow with receiving, QBO sync monitoring with error tracking, feature flag system (14 flags)
+
+**Deferred to future phase**: Staff performance metrics (revenue/services per staff), predictive analytics (churn prediction, revenue forecasting, demand forecasting), service recommendation engine, automated re-engagement campaigns, sentiment analysis.
+
 ### Phase 9 — Native Online Store (NOT WooCommerce)
 Build full e-commerce within the existing Next.js app. Product catalog pages already exist at `/products` with SEO, categories, and product detail pages. Needs: cart (React context), cart drawer/page, Stripe checkout flow, order management (`orders` table, status tracking), order confirmation + email, shipping/pickup selection, order history in customer dashboard, admin order management page. No WordPress/WooCommerce — everything stays in this app. Stripe is already integrated from booking payments.
 
@@ -317,6 +330,19 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Campaign detail analytics paths**: `/admin/marketing/campaigns/[id]/analytics` — drill-down with summary KPIs, funnel, variant comparison, recipient table, click details, engagement timeline. API: `GET /api/admin/marketing/analytics/campaigns/[id]`
 - **Coupon category validation**: `TicketItem.categoryId` holds `product.category_id` or `service.category_id`. Both ticket-reducer and quote-reducer populate this on `ADD_PRODUCT`/`ADD_SERVICE`. All cart item mappings pass `category_id` to validate/promotions endpoints. The validation logic in `coupon-helpers.ts` and `pos/coupons/validate` already matches on `item.category_id` — this field was just never sent before.
 - **QBO Integration**: Master toggle is `qbo_enabled` in `feature_flags` table (shown on Feature Toggles page). Credentials (`QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`) in env vars — NEVER in DB. OAuth tokens in `business_settings`. Source of truth is ALWAYS the Smart Details app (Supabase). QBO is a one-way accounting mirror. POS hooks are fire-and-forget — NEVER block POS for QBO. All TxnDate values in PST (America/Los_Angeles). Client library at `src/lib/qbo/`. `isQboSyncEnabled()` checks `feature_flags` + connection status.
+- **Jobs store services as JSONB snapshots**: `services` column on `jobs` table holds `[{id, name, price}]` at creation time. Price changes in the catalog do NOT retroactively affect existing jobs.
+- **Job auto-population**: When the Jobs tab loads, it calls `POST /api/pos/jobs/populate` to create job records from today's confirmed/in_progress appointments that don't already have matching jobs (deduped by `appointment_id`). This is the bridge between the booking/appointment system and the POS jobs queue.
+- **POS Services API** (`GET /api/pos/services`): Dedicated endpoint for walk-in service selection. The existing `useCatalog()` hook uses direct Supabase (cookie auth) which doesn't work with HMAC-authenticated POS API context.
+- **photo_documentation flag** (default ON): Core POS feature. Gates photo capture during intake/progress/completion phases.
+- **photo_gallery flag** (default OFF): Gates the public gallery page at `/gallery`. When disabled, shows "Coming Soon" page. Does NOT affect admin photo gallery or customer portal photos (those use `photo_documentation` flag).
+- **Internal photos** (`is_internal = true`): MUST NEVER appear in customer-facing views (portal, public gallery, customer detail Photos tab). Only visible in admin photo gallery and POS job detail. All customer-facing queries filter `is_internal = false`.
+- **Admin photo gallery** (`/admin/photos`): Browse all job photos with filters. Permission-gated: `admin.photos.view` for viewing, `admin.photos.manage` for featured/internal toggles and bulk actions. Feature flag: `photo_documentation`.
+- **Customer portal photos** (`/account/photos`): Shows only completed/closed/pending_approval jobs. Excludes internal photos. No admin auth — uses cookie session + customer lookup.
+- **Public gallery** (`/gallery`): Server Component for SEO. Only shows `is_featured = true` AND `is_internal = false` photos with both intake + completion (before/after pairs). NO customer data exposed — only vehicle make/model and service names.
+- **AI addon authorization**: `buildSystemPrompt()` injects pending addon context when `customerId` provided. AI outputs `[AUTHORIZE_ADDON:uuid]` / `[DECLINE_ADDON:uuid]` blocks, parsed by `extractAddonActions()` in Twilio webhook. Blocks stripped before sending customer-facing message. Pattern mirrors `extractQuoteRequest()`.
+- **Job completion flow**: `POST /api/pos/jobs/[id]/complete` — generates `gallery_token`, auto-selects featured photos, fires-and-forgets SMS (MMS) + email notifications. Zone picker in completion mode shows intake photos for side-by-side reference.
+- **Gallery token**: UUID on `jobs.gallery_token` column. Generated at completion time. Public gallery at `/jobs/[token]/photos` — Server Component, no auth required.
+- **Job checkout auto-linking**: POS transactions route has fire-and-forget hook — after creating transaction for a customer, finds their most recent completed (unlinked) job, sets `transaction_id` and `status='closed'`. Never blocks POS.
 - **Phase 9 is Native Online Store** — NO WordPress/WooCommerce. Build cart, checkout, orders within this Next.js app. Product catalog pages already exist at `/products`.
 - **Feature flag checks (server-side)**: Use `isFeatureEnabled(key)` from `src/lib/utils/feature-flags.ts` for all API route flag checks. Uses `createAdminClient()` (service role). Fails closed. Import `FEATURE_FLAGS` from constants for key names.
 - **sms_marketing flag**: Gates campaign SMS sends (immediate + scheduled) and lifecycle engine Phase 2. Does NOT gate transactional SMS (appointment reminders, quote notifications, STOP/START processing).
@@ -363,7 +389,88 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 27 — Simplify POS Access, Unify PIN Screens)
+## Last Session: 2026-02-12 (Session 32 — Phase 8 Session 4: AI Authorization + Completion + Notifications + Checkout)
+- **Job-addons service** (`src/lib/services/job-addons.ts`): Central service for addon authorization handling via AI. `extractAddonActions(aiResponse)` regex-parses `[AUTHORIZE_ADDON:uuid]` and `[DECLINE_ADDON:uuid]` blocks. `approveAddon(addonId)` / `declineAddon(addonId)` validate status + expiration, update DB, send confirmation SMS. `getPendingAddonsForCustomer(customerId)` queries job_addons for active jobs. `buildAddonPromptSection(addons)` formats pending addons as AI prompt rules.
+- **AI context injection**: `buildSystemPrompt()` in `messaging-ai.ts` now accepts optional `customerId` param. When provided, injects pending addon context into AI system prompt so AI can authorize/decline addons conversationally. `getAIResponse()` passes `customerId` through.
+- **Webhook addon processing**: Twilio inbound webhook (`/api/webhooks/twilio/inbound`) — after AI generates response, `extractAddonActions()` parses authorize/decline blocks, processes each addon (with expiration handling), strips blocks from customer-facing message. Follows same block-extraction pattern as `extractQuoteRequest()`.
+- **Completion photo flow**: Zone picker (`zone-picker.tsx`) gains `isCompletionFlow` prop. In completion mode: fetches intake photos for side-by-side reference, shows intake thumbnails in zone list, calls `POST /api/pos/jobs/[id]/complete` on finish. Job detail refactored from boolean `showZonePicker` to typed `zonePickerMode` ('intake' | 'completion' | 'progress' | null) to support all three modes.
+- **Job completion API** (`POST /api/pos/jobs/[id]/complete`): Validates in_progress status, calculates final timer_seconds, generates `gallery_token` (UUID), auto-selects featured photos (first exterior + interior before/after pairs), updates job to 'completed', fires-and-forgets completion notifications.
+- **Completion notifications**: SMS with MMS (featured completion photo) + gallery short link via `createShortLink()`. Rich HTML email with before/after photo pairs, service summary, timer display, approved addons list, "View All Photos" CTA button. All fire-and-forget — never blocks POS.
+- **Customer-facing photo gallery** (`/jobs/[token]/photos`): Server Component with `generateMetadata()` for SEO. Looks up job by `gallery_token`. Groups photos by zone, renders `<BeforeAfterSlider>` for zones with both intake+completion photos. Shows services performed, completion date, business footer. Mobile-optimized (max-w-2xl). Public API at `GET /api/jobs/[token]/photos`.
+- **Pickup sign-off** (`POST /api/pos/jobs/[id]/pickup`): Sets `actual_pickup_at` + `pickup_notes`. Job detail has pickup dialog modal with notes field, Cancel/Confirm buttons.
+- **Checkout integration**: `GET /api/pos/jobs/[id]/checkout-items` returns job services (JSONB snapshot) + approved addons as POS line items. `POST /api/pos/jobs/[id]/link-transaction` links transaction_id and sets status to 'closed'. Fire-and-forget hook in POS transactions route auto-links most recent completed job for customer to newly created transaction.
+- **Gallery token migration** (`20260212000005_add_gallery_token.sql`): Adds `gallery_token TEXT UNIQUE` column + index to jobs table.
+- **Files created**: `src/lib/services/job-addons.ts`, `src/app/api/pos/jobs/[id]/complete/route.ts`, `src/app/api/pos/jobs/[id]/pickup/route.ts`, `src/app/api/pos/jobs/[id]/checkout-items/route.ts`, `src/app/api/pos/jobs/[id]/link-transaction/route.ts`, `src/app/api/jobs/[token]/photos/route.ts`, `src/app/jobs/[token]/photos/page.tsx`, `src/app/jobs/[token]/photos/gallery-client.tsx`, `supabase/migrations/20260212000005_add_gallery_token.sql`
+- **Files modified**: `src/lib/services/messaging-ai.ts` (AI context injection), `src/app/api/webhooks/twilio/inbound/route.ts` (addon block processing), `src/app/pos/jobs/components/zone-picker.tsx` (completion flow), `src/app/pos/jobs/components/job-detail.tsx` (zone picker modes, pickup dialog, completion button), `src/lib/supabase/types.ts` (gallery_token field), `src/app/api/pos/transactions/route.ts` (fire-and-forget job linking)
+- TypeScript clean (zero errors)
+
+### Session 31 — Phase 8 Session 5: Admin Gallery + Customer Photos + Portal + Public Showcase
+- **Admin photo gallery** (`/admin/photos`): Browse all job photos with filters (date range, customer search, vehicle search, zone, phase). Photo grid with zone/phase badges, featured star, internal lock icons. Detail modal with metadata sidebar (customer link, vehicle, zone, phase, notes, staff, timestamp). Bulk actions (feature, unfeature, mark internal, mark public) with multi-select checkboxes. Gated by `photo_documentation` feature flag + `admin.photos.view`/`admin.photos.manage` permissions. Pagination.
+- **Admin photo API routes**: `GET /api/admin/photos` (list with all filters, joined to jobs+customers+vehicles+employees), `PATCH /api/admin/photos/[id]` (single photo is_featured/is_internal update), `PATCH /api/admin/photos/bulk` (bulk update up to 100 photos). All require admin auth + permission enforcement.
+- **Customer detail "Photos" tab** (6th tab): Photos grouped by job/visit (most recent first). Each group shows date, vehicle, services, status badge. Zone-by-zone layout with `<BeforeAfterSlider>` for zones with both intake+completion photos. Vehicle filter dropdown when customer has multiple vehicles. Excludes `is_internal = true` photos. API: `GET /api/admin/customers/[id]/photos`.
+- **Customer portal photo history** (`/account/photos`): Customer's own service photos grouped by visit. `<BeforeAfterSlider>` for before/after pairs. Download button on each photo. Excludes internal photos (CRITICAL). Empty state for new customers. Added to portal tab navigation (between Transactions and Loyalty). API: `GET /api/account/photos` (authenticates via cookie session, looks up customer, filters completed/closed/pending_approval jobs only).
+- **Public gallery** (`/gallery`): Server Component for SEO. `generateMetadata()` with business name. JSON-LD `ImageGallery` structured data. Hero section. Service type filter pills. Before/after cards with `<BeforeAfterSlider>`, service name, vehicle make/model (NO customer data). "Load More" pagination (12 per page). Gated by `photo_gallery` feature flag — shows "Coming Soon" when disabled. API: `GET /api/gallery` (public, no auth, returns only featured+non-internal before/after pairs).
+- **Admin sidebar updated**: "Photos" nav item with ImageIcon, between Inventory and Staff. Gated by `photo_documentation` feature flag (hidden when disabled).
+- **Files created**: `src/app/admin/photos/page.tsx`, `src/app/api/admin/photos/route.ts`, `src/app/api/admin/photos/[id]/route.ts`, `src/app/api/admin/photos/bulk/route.ts`, `src/app/api/admin/customers/[id]/photos/route.ts`, `src/app/api/account/photos/route.ts`, `src/app/api/gallery/route.ts`, `src/app/(account)/account/photos/page.tsx`, `src/app/(public)/gallery/page.tsx`, `src/app/(public)/gallery/gallery-client.tsx`
+- **Files modified**: `src/lib/auth/roles.ts` (Photos nav item), `src/app/admin/admin-shell.tsx` (ImageIcon import + icon map + feature flag filter), `src/app/admin/customers/[id]/page.tsx` (Photos tab + CustomerPhotosTab component), `src/components/account/account-shell.tsx` (Photos tab in portal nav)
+- TypeScript clean (zero errors)
+
+### Session 30 — Phase 8 Session 3: Timer + In-Progress + Mid-Service Upsell + Authorization
+- **Job timer**: Persistent HH:MM:SS clock on job detail header. Derived from DB fields (`timer_seconds`, `work_started_at`, `timer_paused_at`). Client-side `setInterval` for ticking, but all state lives in DB. Pause: calculates elapsed, accumulates `timer_seconds`, sets `timer_paused_at`. Resume: sets `work_started_at`, clears `timer_paused_at`. Visual states: running (green bg) and paused (yellow pulsing with "PAUSED" label).
+- **Start Work button**: Visible when `status=intake` + `intake_completed_at` set. Calls `POST /api/pos/jobs/[id]/start-work` → sets `status=in_progress`, `work_started_at=now()`. Timer begins immediately.
+- **Timer API** (`PATCH /api/pos/jobs/[id]/timer`): `action: 'pause'` or `'resume'`. Validates job is `in_progress`. Pause accumulates elapsed into `timer_seconds`. Resume restarts `work_started_at`.
+- **Flag Issue flow** (`flag-issue-flow.tsx`): 7-step wizard — zone select → photo capture (reuses `PhotoCapture` with `phase='progress'`) → catalog search (services + products) or custom line item → discount (flat $ off) → pickup delay (auto-fills from service duration) → message template (3 prebuilt + custom) → preview (mock authorization page) → send.
+- **Message templates**: 3 prebuilt with `{issue}`, `{service}`, `{price}` variable substitution. Plus "Custom message" textarea.
+- **Addon creation** (`POST /api/pos/jobs/[id]/addons`): Creates `job_addons` record with `authorization_token` (UUID), expiration from `addon_auth_expiration_minutes` business setting (default 30). Sends SMS via `sendSms()` with MMS photo + email via `sendEmail()` with rich HTML template. Updates `estimated_pickup_at` if delay specified.
+- **Addon list** (`GET /api/pos/jobs/[id]/addons`): Auto-expires stale pending addons where `expires_at < now()`. Returns all addons for job, newest first.
+- **Addon re-send** (`POST /api/pos/jobs/[id]/addons/[addonId]/resend`): Clones expired/declined addon as new record with fresh token + expiration. Re-sends SMS + email.
+- **Authorization page** (`/authorize/[token]`): Public Server Component page. Shows business branding, issue photo, message, price (with strikethrough discount), pickup delay, vehicle info, current services. Interactive Approve (green) / Decline (red outline) buttons via client component. Auto-submits if `?action=approve` or `?action=decline` query param (from email CTA links).
+- **Authorization API**: `GET /api/authorize/[token]` (public, fetches addon + job + photos + catalog name), `POST .../approve` and `POST .../decline` (one-time status change, checks expiration). Returns 409 if already responded, 410 if expired.
+- **Authorization states**: Active (buttons shown), already responded (approval/decline confirmation), expired (message with business phone contact link), not found (404 page).
+- **Expiration logic**: On job detail load, client calls addons GET which auto-expires stale pending addons. Authorization page also checks expiration on approve/decline.
+- **Job detail updated**: Timer in header (when in_progress), "Start Work" button now functional, "Flag Issue" (orange button) when in_progress, full addons section showing all addons with status pills (Pending=orange pulsing, Approved=green, Declined=red, Expired=gray), price, discount, delay, re-send button on expired/declined.
+- **Job queue badge**: Bell icon on job card when any addon is `pending` (already existed from Session 1).
+- **Email template**: Rich HTML authorization email with business logo, photo, price box (with discount), approve/decline CTA buttons linking to `/authorize/[token]?action=approve|decline`, expiration notice.
+- **PATCH route update**: Job PATCH now returns full addon data (`addons:job_addons(*)`) instead of just `id, status`.
+- **Files created**: `src/app/api/pos/jobs/[id]/start-work/route.ts`, `src/app/api/pos/jobs/[id]/timer/route.ts`, `src/app/api/pos/jobs/[id]/addons/route.ts`, `src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts`, `src/app/api/authorize/[token]/route.ts`, `src/app/api/authorize/[token]/approve/route.ts`, `src/app/api/authorize/[token]/decline/route.ts`, `src/app/authorize/[token]/page.tsx`, `src/app/authorize/[token]/authorization-client.tsx`, `src/app/pos/jobs/components/job-timer.tsx`, `src/app/pos/jobs/components/flag-issue-flow.tsx`
+- **Files modified**: `src/app/pos/jobs/components/job-detail.tsx` (complete rewrite — timer, start work, flag issue, addons section), `src/app/api/pos/jobs/[id]/route.ts` (PATCH select expanded to full addon data + email field)
+- TypeScript clean (zero errors in Session 3 files; pre-existing errors only in concurrent Session 5 gallery files)
+- **Phase 8 Session 4 next: AI authorization handling + completion flow + notifications + checkout**
+
+### Session 29 — Phase 8 Session 2: Intake Flow + Camera + Zone Picker + BeforeAfterSlider
+- **Zone system** (`src/lib/utils/job-zones.ts`): 8 exterior + 7 interior zone definitions with keys, labels, descriptions. Helper functions: `getZoneLabel()`, `getZoneGroup()`, `countCoveredZones()`. Annotation types: `CircleAnnotation`, `ArrowAnnotation`, `TextAnnotation`.
+- **Photo upload API** (`POST /api/pos/jobs/[id]/photos`): Multipart form upload → `sharp` processing (resize 1920px max + 400px thumbnail, JPEG 80%) → Supabase Storage (`job-photos/` bucket) → `job_photos` DB record. Auto-increments `sort_order` per zone+phase.
+- **Photo CRUD API**: `GET /api/pos/jobs/[id]/photos` (filterable by phase/zone), `PATCH .../photos/[photoId]` (annotation_data, notes, is_internal, is_featured), `DELETE .../photos/[photoId]` (removes storage files + DB record).
+- **Job settings API** (`GET /api/pos/jobs/settings`): Returns configurable minimums from `business_settings` (min_intake_photos_exterior, min_intake_photos_interior, etc.).
+- **Zone picker** (`zone-picker.tsx`): Full-screen with Exterior/Interior tabs. SVG vehicle diagrams (top-down exterior, layout interior) with tappable zone hotspots. Green/red coloring based on photo coverage. Photo count badges on SVG. Progress bar ("4/4 Exterior | 1/2 Interior"). Zone list below SVG with capture buttons. "Complete Intake" button disabled until minimums met.
+- **Camera capture** (`photo-capture.tsx`): HTML5 `<input capture="environment">` for iPad rear camera. Preview screen with retake/annotate/save. Notes field, "Internal Only" toggle. Uploads via FormData to photo API.
+- **Photo annotations** (`photo-annotation.tsx`): SVG overlay with circle, arrow, text tools. Pointer events for touch-friendly interaction. Undo/clear all. Normalized percentage coordinates. Separate `AnnotationOverlay` component for read-only rendering.
+- **Zone photos view** (`zone-photos-view.tsx`): Grid of photos for a single zone. Tap to full-size with annotation overlay. Delete button. Add more photos.
+- **Intake flow wired into JobDetail**: "Start Intake" sets `status='intake'` + `intake_started_at`, opens zone picker. "Continue Intake" resumes. "Complete Intake" sets `intake_completed_at`. After intake completion, shows "Start Work" placeholder for Session 3.
+- **Reusable PhotoGallery** (`src/components/photo-gallery.tsx`): Grid thumbnails with `groupBy` (zone/phase), full-size modal with annotation overlay, navigation arrows, editable mode (toggle featured/internal). Used in 5+ contexts.
+- **BeforeAfterSlider** (`src/components/before-after-slider.tsx`): Draggable vertical divider with before/after labels. Touch-friendly (pointer events). ResizeObserver for proper image sizing. Used in: public gallery, customer detail, portal, job completion (Session 4), authorization page (Session 3).
+- **Storage bucket migration** (`20260212000004_job_photos_storage.sql`): Creates `job-photos` bucket with public read, authenticated write/update/delete policies. 10MB file limit, JPEG/PNG/WebP allowed.
+- **Files created**: `src/lib/utils/job-zones.ts`, `src/app/api/pos/jobs/[id]/photos/route.ts`, `src/app/api/pos/jobs/[id]/photos/[photoId]/route.ts`, `src/app/api/pos/jobs/settings/route.ts`, `src/app/pos/jobs/components/zone-picker.tsx`, `src/app/pos/jobs/components/photo-capture.tsx`, `src/app/pos/jobs/components/photo-annotation.tsx`, `src/app/pos/jobs/components/zone-photos-view.tsx`, `src/components/photo-gallery.tsx`, `src/components/before-after-slider.tsx`, `supabase/migrations/20260212000004_job_photos_storage.sql`
+- **Files modified**: `src/app/pos/jobs/components/job-detail.tsx` (wired intake flow, removed placeholder buttons)
+- TypeScript clean (zero errors)
+- **Phase 8 Sessions 3+5 next (can run concurrently)**: S3=Timer+Upsell, S5=Gallery pages
+
+### Session 28 — Phase 8 Session 1: Job Management Foundation
+- **Database migration** (`20260212000003_phase8_jobs_schema.sql`): Created `jobs`, `job_photos`, `job_addons` tables with full columns, CHECK constraints, indexes, RLS policies. Seeded 5 `business_settings` keys (job defaults). Added 2 feature flags (`photo_documentation` default ON, `photo_gallery` default OFF). Added 6 permission definitions + 24 role defaults (4 roles × 6 keys).
+- **Job status workflow**: `scheduled → intake → in_progress → pending_approval → completed → closed → cancelled`
+- **Services snapshot**: Jobs store services as JSONB `[{id, name, price}]` array captured at creation time — survives catalog edits.
+- **POS Jobs tab** (`/pos/jobs`): Queue view with filter pills (My Jobs / All Jobs / Unassigned), status-priority sorting (in_progress first → cancelled last). Auto-populates from today's confirmed appointments on tab load.
+- **Walk-in creation flow**: 3-step wizard (Customer → Vehicle → Services). Customer search with quick-add. Vehicle select from customer's list with quick-add. Service multi-select with search, running total, and create button.
+- **Job detail shell**: Header with customer name, vehicle, status pill. Info cards for assigned staff, services with price total, timing section, pending/approved addons, customer contact.
+- **Auto-population**: POST `/api/pos/jobs/populate` finds today's confirmed/in_progress appointments without matching jobs, creates them with service snapshots and estimated pickup times. Deduplicates by `appointment_id`.
+- **PST date filtering**: Jobs list API uses America/Los_Angeles timezone for "today" boundaries — all job queries are PST-aware.
+- **Bottom nav updated**: Added Jobs tab (ClipboardList icon) between Quotes and More in POS bottom navigation.
+- **Permission defaults**: super_admin/admin get all 6 job+photo keys ON (except admin.photos.manage for admin). Cashier gets pos.jobs.view only. Detailer gets pos.jobs.view/manage/flag_issue.
+- **Files created**: `supabase/migrations/20260212000003_phase8_jobs_schema.sql`, `src/app/api/pos/jobs/route.ts`, `src/app/api/pos/jobs/[id]/route.ts`, `src/app/api/pos/jobs/populate/route.ts`, `src/app/api/pos/services/route.ts`, `src/app/pos/jobs/page.tsx`, `src/app/pos/jobs/components/job-queue.tsx`, `src/app/pos/jobs/components/walk-in-flow.tsx`, `src/app/pos/jobs/components/job-detail.tsx`
+- **Files modified**: `src/lib/supabase/types.ts`, `src/lib/utils/constants.ts`, `src/lib/utils/role-defaults.ts`, `src/app/pos/components/bottom-nav.tsx`
+- TypeScript clean (zero errors)
+
+### Session 27 — Simplify POS Access, Unify PIN Screens
 - **POS access simplified**: Removed `POS_ALLOWED_ROLES` hardcoded gate from `pos-shell.tsx`. Any employee with a PIN can now use the POS — no role-based gating. PIN login API already had no role filter, so this was the only blocker.
 - **Staff detail page**: Combined "POS Access" and "POS PIN Code" into a single form field — narrow PIN input (`w-24`) with live Enabled/Disabled pill next to it. Moved to same grid row as "Bookable for Appointments". Removed dead `canAccessPos` state (was reading unused `can_access_pos` from roles table) and "Manage in Roles" link.
 - **Unified PinScreen component** (`src/app/pos/components/pin-screen.tsx`): Shared by both login page and lock screen overlay. Business logo from receipt printer settings (centered, `h-32`), Lock icons flanking "Enter PIN" title, last session subtitle, dot indicators, shake animation, "Verifying..." label — all in one place. `overlay` prop toggles full-page vs fixed overlay rendering.
@@ -379,6 +486,10 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Prequalification logic**: If vehicle is set: (1) vehicle-size tiers (sedan/truck_suv_2row/suv_3row_van) → match tier by name, auto-add; (2) single vehicle-size-aware tier → resolve price by vehicle size, auto-add. Falls back to picker only when no vehicle set or no matching tier.
 - **Files modified**: `src/app/pos/components/register-tab.tsx`, `src/app/pos/components/catalog-browser.tsx`
 - TypeScript clean (zero errors)
+
+### Session 26c — Phase 11 Audit
+- **Phase 11 (Intelligence & Growth) marked DONE** — audit confirmed 27/29 core features built across Phases 3, 5, 6, 7. Only gaps: staff performance metrics and advanced ML/predictive features (deferred).
+- Updated CLAUDE.md: Phase 11 → Done, added "What's Done" section, updated Next Session Priorities.
 
 ### Session 26b — EOD Batch Sync + Realtime Toggle
 - **EOD batch sync**: `batchSyncDayTransactions()` catches all unsynced transactions when POS register closes. Syncs customers first (those without `qbo_id`), then transactions in batches of 25. PST/PDT-aware date handling. Fire-and-forget from `end-of-day/route.ts` — never blocks register close.
@@ -742,7 +853,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ### Next Session Priorities
 1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
-2. ~~Phase 7.3 — QBO cron auto-sync, reporting dashboard, CSV exports~~ Done (Session 26)
+2. Phase 8 — Remaining: pending_approval workflow (if needed), POS checkout-items UI integration (pre-populating register ticket from job)
 3. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
 
 ---

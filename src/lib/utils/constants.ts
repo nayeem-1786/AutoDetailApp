@@ -215,6 +215,7 @@ export const FEATURE_FLAGS = {
   TWO_WAY_SMS: 'two_way_sms',
   WAITLIST: 'waitlist',
   PHOTO_DOCUMENTATION: 'photo_documentation',
+  PHOTO_GALLERY: 'photo_gallery',
   CANCELLATION_FEE: 'cancellation_fee',
   MOBILE_SERVICE: 'mobile_service',
   QBO_ENABLED: 'qbo_enabled',

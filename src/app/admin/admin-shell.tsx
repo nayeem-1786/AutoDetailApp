@@ -41,6 +41,7 @@ import {
   FileText,
   ClipboardList,
   History,
+  ImageIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -73,6 +74,7 @@ const iconMap: Record<string, LucideIcon> = {
   ClipboardList,
   History,
   Shield,
+  ImageIcon,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
@@ -261,6 +263,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   const { info: businessInfo } = useBusinessInfo();
   const { enabled: twoWaySmsEnabled } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
   const { enabled: inventoryEnabled } = useFeatureFlag(FEATURE_FLAGS.INVENTORY_MANAGEMENT);
+  const { enabled: photoDocEnabled } = useFeatureFlag(FEATURE_FLAGS.PHOTO_DOCUMENTATION);
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -405,6 +408,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   const navItems = SIDEBAR_NAV.filter((item) => {
     if (item.href === '/admin/messaging') return twoWaySmsEnabled;
     if (item.href === '/admin/inventory') return inventoryEnabled;
+    if (item.href === '/admin/photos') return photoDocEnabled;
     return true;
   });
 
