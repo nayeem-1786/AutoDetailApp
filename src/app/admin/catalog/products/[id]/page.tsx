@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { productCreateSchema, type ProductCreateInput } from '@/lib/utils/validation';
 import { WATER_SKU } from '@/lib/utils/constants';
-import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
+import type { Product, ProductCategory, ProductImage, Vendor } from '@/lib/supabase/types';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
@@ -25,7 +25,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, DollarSign, Trash2 } from 'lucide-react';
-import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
+import { MultiImageUpload } from '@/app/admin/catalog/components/multi-image-upload';
 
 type ProductWithRelations = Product & {
   product_categories: Pick<ProductCategory, 'id' | 'name'> | null;
@@ -56,8 +56,7 @@ export default function ProductDetailPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [productImages, setProductImages] = useState<ProductImage[]>([]);
 
   const {
     register,
@@ -109,9 +108,16 @@ export default function ProductDetailPage() {
 
       const p = productRes.data as ProductWithRelations;
       setProduct(p);
-      if (p.image_url) setImagePreview(p.image_url);
       if (categoriesRes.data) setCategories(categoriesRes.data);
       if (vendorsRes.data) setVendors(vendorsRes.data);
+
+      // Load product images
+      const { data: imgData } = await supabase
+        .from('product_images')
+        .select('*')
+        .eq('product_id', productId)
+        .order('sort_order');
+      if (imgData) setProductImages(imgData);
 
       // Load cost history from PO receiving
       const { data: poItems } = await supabase
@@ -161,40 +167,161 @@ export default function ProductDetailPage() {
     loadData();
   }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function uploadImage(): Promise<string | null> {
-    if (!imageFile) return null;
+  // --- Multi-image handlers (immediate operations) ---
 
-    const ext = imageFile.name.split('.').pop();
-    const path = `products/${productId}.${ext}`;
+  async function handleImageUpload(file: File) {
+    const ext = file.name.split('.').pop();
+    const fileId = crypto.randomUUID();
+    const path = `products/${productId}/${fileId}.${ext}`;
 
     const { error } = await supabase.storage
       .from('product-images')
-      .upload(path, imageFile, { upsert: true });
+      .upload(path, file, { upsert: true });
 
     if (error) {
       console.error('Image upload error:', error);
       toast.error('Failed to upload image');
-      return null;
+      return;
     }
 
     const { data: urlData } = supabase.storage
       .from('product-images')
       .getPublicUrl(path);
 
-    return urlData.publicUrl;
+    const isFirst = productImages.length === 0;
+    const nextSort = isFirst ? 0 : Math.max(...productImages.map(i => i.sort_order)) + 1;
+
+    const { data: row, error: insertErr } = await supabase
+      .from('product_images')
+      .insert({
+        product_id: productId,
+        image_url: urlData.publicUrl,
+        storage_path: path,
+        sort_order: nextSort,
+        is_primary: isFirst,
+      })
+      .select()
+      .single();
+
+    if (insertErr || !row) {
+      console.error('Insert product_images error:', insertErr);
+      toast.error('Failed to save image record');
+      return;
+    }
+
+    setProductImages(prev => [...prev, row]);
+    toast.success('Image uploaded');
+  }
+
+  async function handleImageRemove(image: ProductImage) {
+    // Delete from storage
+    await supabase.storage.from('product-images').remove([image.storage_path]);
+
+    // Delete from DB
+    const { error } = await supabase
+      .from('product_images')
+      .delete()
+      .eq('id', image.id);
+
+    if (error) {
+      toast.error('Failed to remove image');
+      return;
+    }
+
+    const remaining = productImages.filter(i => i.id !== image.id);
+
+    // If we removed the primary, promote the next image
+    if (image.is_primary && remaining.length > 0) {
+      const nextPrimary = remaining.sort((a, b) => a.sort_order - b.sort_order)[0];
+      await supabase
+        .from('product_images')
+        .update({ is_primary: true })
+        .eq('id', nextPrimary.id);
+      remaining.forEach(i => {
+        if (i.id === nextPrimary.id) i.is_primary = true;
+      });
+    }
+
+    setProductImages(remaining);
+    toast.success('Image removed');
+  }
+
+  async function handleImageReplace(image: ProductImage, file: File) {
+    const ext = file.name.split('.').pop();
+    const fileId = crypto.randomUUID();
+    const newPath = `products/${productId}/${fileId}.${ext}`;
+
+    // Upload new file
+    const { error: uploadErr } = await supabase.storage
+      .from('product-images')
+      .upload(newPath, file, { upsert: true });
+
+    if (uploadErr) {
+      toast.error('Failed to upload replacement image');
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(newPath);
+
+    // Update DB row
+    const { error: updateErr } = await supabase
+      .from('product_images')
+      .update({ image_url: urlData.publicUrl, storage_path: newPath })
+      .eq('id', image.id);
+
+    if (updateErr) {
+      toast.error('Failed to update image record');
+      return;
+    }
+
+    // Delete old file from storage
+    await supabase.storage.from('product-images').remove([image.storage_path]);
+
+    setProductImages(prev =>
+      prev.map(i => i.id === image.id ? { ...i, image_url: urlData.publicUrl, storage_path: newPath } : i)
+    );
+    toast.success('Image replaced');
+  }
+
+  async function handleSetPrimary(image: ProductImage) {
+    // Unset old primary, set new primary
+    const oldPrimary = productImages.find(i => i.is_primary);
+    if (oldPrimary) {
+      await supabase
+        .from('product_images')
+        .update({ is_primary: false })
+        .eq('id', oldPrimary.id);
+    }
+
+    await supabase
+      .from('product_images')
+      .update({ is_primary: true })
+      .eq('id', image.id);
+
+    setProductImages(prev =>
+      prev.map(i => ({ ...i, is_primary: i.id === image.id }))
+    );
+    toast.success('Primary image updated');
+  }
+
+  async function handleReorder(reorderedImages: ProductImage[]) {
+    setProductImages(reorderedImages);
+
+    // Batch-update sort_order
+    const updates = reorderedImages.map(img =>
+      supabase
+        .from('product_images')
+        .update({ sort_order: img.sort_order })
+        .eq('id', img.id)
+    );
+    await Promise.all(updates);
   }
 
   async function onSubmit(data: ProductCreateInput) {
     setSaving(true);
     try {
-      let imageUrl = product?.image_url || null;
-
-      // Upload new image if selected
-      if (imageFile) {
-        const newUrl = await uploadImage();
-        if (newUrl) imageUrl = newUrl;
-      }
-
       const { error } = await supabase
         .from('products')
         .update({
@@ -212,7 +339,6 @@ export default function ProductDetailPage() {
           is_loyalty_eligible: data.is_loyalty_eligible,
           is_active: data.is_active,
           barcode: data.barcode || null,
-          image_url: imageUrl,
         })
         .eq('id', productId);
 
@@ -411,18 +537,15 @@ export default function ProductDetailPage() {
 
         <Card>
           <CardContent className="pt-6">
-            <p className="mb-3 text-sm font-medium text-gray-700">Product Image</p>
-            <ImageUpload
-              imageUrl={imagePreview}
-              onUpload={async (file) => {
-                setImageFile(file);
-                setImagePreview(URL.createObjectURL(file));
-              }}
-              onRemove={async () => {
-                setImageFile(null);
-                setImagePreview(null);
-              }}
-              uploading={saving}
+            <p className="mb-3 text-sm font-medium text-gray-700">Product Images</p>
+            <MultiImageUpload
+              images={productImages}
+              onUpload={handleImageUpload}
+              onRemove={handleImageRemove}
+              onReplace={handleImageReplace}
+              onSetPrimary={handleSetPrimary}
+              onReorder={handleReorder}
+              disabled={saving}
             />
           </CardContent>
         </Card>

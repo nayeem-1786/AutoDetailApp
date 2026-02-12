@@ -145,10 +145,25 @@ export default function NewProductPage() {
       if (imageFile && product) {
         const imageUrl = await uploadImage(product.id);
         if (imageUrl) {
+          const ext = imageFile.name.split('.').pop();
+          const storagePath = `products/${product.id}.${ext}`;
+
+          // Update products.image_url
           await supabase
             .from('products')
             .update({ image_url: imageUrl })
             .eq('id', product.id);
+
+          // Also insert into product_images for multi-image support
+          await supabase
+            .from('product_images')
+            .insert({
+              product_id: product.id,
+              image_url: imageUrl,
+              storage_path: storagePath,
+              sort_order: 0,
+              is_primary: true,
+            });
         }
       }
 

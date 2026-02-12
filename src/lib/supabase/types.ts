@@ -133,6 +133,16 @@ export interface ProductCategory {
   updated_at: string;
 }
 
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  storage_path: string;
+  sort_order: number;
+  is_primary: boolean;
+  created_at: string;
+}
+
 export interface Product {
   id: string;
   square_item_id: string | null;
@@ -157,6 +167,7 @@ export interface Product {
   // Joined relations
   category?: ProductCategory;
   vendor?: Vendor;
+  images?: ProductImage[];
 }
 
 export interface ServiceCategory {
