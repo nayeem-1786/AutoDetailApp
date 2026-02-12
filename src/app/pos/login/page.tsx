@@ -119,6 +119,7 @@ function PosLoginInner() {
           onDigit={handleDigit}
           onBackspace={handleBackspace}
           size="lg"
+          variant="dark"
         />
       </div>
 

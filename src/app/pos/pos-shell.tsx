@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   Loader2,
@@ -36,7 +37,7 @@ import { PinPad } from './components/pin-pad';
 import { cn } from '@/lib/utils/cn';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
-  const { employee, role, loading, locked, lock, replaceSession, signOut } = usePosAuth();
+  const { employee, role, loading, locked, lock, replaceSession } = usePosAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [clock, setClock] = useState('');
@@ -123,6 +124,12 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
           throw new Error(data.error || 'Invalid PIN');
         }
 
+        // Show welcome toast when a different employee unlocks
+        const newName = data.employee.first_name || data.employee.email.split('@')[0];
+        if (employee && data.employee.id !== employee.id) {
+          toast.success(`Welcome, ${newName}`);
+        }
+
         // Replace session with new employee (handles both same and different employee)
         replaceSession({
           token: data.token,
@@ -140,7 +147,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
         setLockSubmitting(false);
       }
     },
-    [replaceSession]
+    [replaceSession, employee]
   );
 
   function handleLockDigit(d: string) {
@@ -160,11 +167,6 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     if (lockSubmitting) return;
     setLockDigits(lockDigits.slice(0, -1));
     setLockError(null);
-  }
-
-  function handleLockLogout() {
-    signOut();
-    router.replace('/pos/login');
   }
 
   if (loading) {
@@ -210,18 +212,18 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
           {locked && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/95">
               <div className="w-full max-w-sm px-4">
-                <div className="mb-6 flex flex-col items-center gap-2">
-                  <Lock className="h-10 w-10 text-gray-400" />
-                  <h2 className="text-xl font-bold text-white">Screen Locked</h2>
-                  <p className="text-sm text-gray-400">
-                    Enter PIN to continue as {employee.first_name} or switch user
+                <div className="mb-8 flex flex-col items-center gap-3">
+                  <Lock className="h-12 w-12 text-gray-500" />
+                  <h2 className="text-2xl font-bold text-white">Enter PIN</h2>
+                  <p className="text-sm text-gray-500">
+                    Last session: {employee.first_name} {employee.last_name ? employee.last_name.charAt(0) + '.' : ''}
                   </p>
                 </div>
 
                 {/* Dot indicators */}
                 <div
                   className={cn(
-                    'mb-6 flex items-center justify-center gap-4',
+                    'mb-8 flex items-center justify-center gap-4',
                     lockShake && 'animate-shake'
                   )}
                 >
@@ -232,7 +234,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
                         'h-4 w-4 rounded-full border-2 transition-all duration-150',
                         i < lockDigits.length
                           ? 'border-white bg-white'
-                          : 'border-gray-500 bg-transparent'
+                          : 'border-gray-600 bg-transparent'
                       )}
                     />
                   ))}
@@ -250,14 +252,8 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
                   onDigit={handleLockDigit}
                   onBackspace={handleLockBackspace}
                   size="lg"
+                  variant="dark"
                 />
-
-                <button
-                  onClick={handleLockLogout}
-                  className="mt-6 w-full text-center text-sm text-gray-500 hover:text-gray-300"
-                >
-                  Sign out instead
-                </button>
               </div>
 
               <style jsx>{`
