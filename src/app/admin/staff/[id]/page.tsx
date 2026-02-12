@@ -96,7 +96,6 @@ export default function StaffDetailPage() {
   const [roleDefaults, setRoleDefaults] = useState<Record<string, boolean>>({});
   const [overrides, setOverrides] = useState<Record<string, OverrideState>>({});
   const [roleDisplayName, setRoleDisplayName] = useState('');
-  const [canAccessPos, setCanAccessPos] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
@@ -129,6 +128,7 @@ export default function StaffDetailPage() {
   });
 
   const bookable = watch('bookable_for_appointments');
+  const pinCode = watch('pin_code');
 
   const loadEmployee = useCallback(async () => {
     setLoading(true);
@@ -177,7 +177,6 @@ export default function StaffDetailPage() {
       setPermissionDefinitions(permsRes.definitions || []);
       setRoleDefaults(permsRes.role_defaults || {});
       setRoleDisplayName(permsRes.role?.display_name || data.role);
-      setCanAccessPos(permsRes.role?.can_access_pos ?? false);
       // Build overrides map from employee-specific overrides
       const ovMap: Record<string, OverrideState> = {};
       for (const [key, granted] of Object.entries(permsRes.overrides || {})) {
@@ -581,42 +580,6 @@ export default function StaffDetailPage() {
                     </Select>
                   </FormField>
 
-                  <FormField label="POS Access">
-                    <div className="flex items-center gap-3 pt-1">
-                      <span className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
-                        canAccessPos
-                          ? 'bg-green-50 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
-                      )}>
-                        <span className={cn(
-                          'inline-block h-1.5 w-1.5 rounded-full',
-                          canAccessPos ? 'bg-green-500' : 'bg-gray-400'
-                        )} />
-                        {canAccessPos ? 'Enabled' : 'Disabled'}
-                      </span>
-                      <a
-                        href="/admin/staff/roles"
-                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        Manage in Roles
-                      </a>
-                    </div>
-                  </FormField>
-
-                  {canAccessPos && (
-                    <FormField label="POS PIN Code" error={errors.pin_code?.message} htmlFor="pin_code" description="Optional 4-digit PIN for POS register login">
-                      <Input
-                        id="pin_code"
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={4}
-                        {...register('pin_code')}
-                        placeholder="1234"
-                      />
-                    </FormField>
-                  )}
-
                   <FormField label="Hourly Rate" error={errors.hourly_rate?.message} htmlFor="hourly_rate">
                     <Input
                       id="hourly_rate"
@@ -625,6 +588,32 @@ export default function StaffDetailPage() {
                       min="0"
                       {...register('hourly_rate')}
                     />
+                  </FormField>
+
+                  <FormField label="POS Access" error={errors.pin_code?.message} htmlFor="pin_code" description="4-digit PIN to enable POS register login">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        id="pin_code"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={4}
+                        {...register('pin_code')}
+                        placeholder="1234"
+                        className="w-24"
+                      />
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium shrink-0',
+                        pinCode
+                          ? 'bg-green-50 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                      )}>
+                        <span className={cn(
+                          'inline-block h-1.5 w-1.5 rounded-full',
+                          pinCode ? 'bg-green-500' : 'bg-gray-400'
+                        )} />
+                        {pinCode ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
                   </FormField>
 
                   <FormField label="Bookable for Appointments">

@@ -18,6 +18,8 @@ export interface BusinessInfo {
   zip: string;
   email: string | null;
   website: string | null;
+  /** Business logo URL from receipt printer settings */
+  logo_url: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +40,7 @@ async function fetchBusinessInfo(): Promise<BusinessInfo> {
   const { data } = await supabase
     .from('business_settings')
     .select('key, value')
-    .in('key', ['business_name', 'business_phone', 'business_address', 'business_email', 'business_website']);
+    .in('key', ['business_name', 'business_phone', 'business_address', 'business_email', 'business_website', 'receipt_config']);
 
   const settings: Record<string, unknown> = {};
   for (const row of data ?? []) {
@@ -62,6 +64,9 @@ async function fetchBusinessInfo(): Promise<BusinessInfo> {
     zip: addr.zip,
     email: (settings.business_email as string) || null,
     website: (settings.business_website as string) || null,
+    logo_url: (typeof settings.receipt_config === 'object' && settings.receipt_config !== null
+      ? ((settings.receipt_config as Record<string, unknown>).logo_url as string) || null
+      : null),
   };
 }
 

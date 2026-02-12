@@ -13,6 +13,7 @@ export async function GET() {
       'business_address',
       'business_email',
       'business_website',
+      'receipt_config',
     ]);
 
   const settings: Record<string, unknown> = {};
@@ -37,6 +38,9 @@ export async function GET() {
     zip: addr.zip,
     email: (settings.business_email as string) || null,
     website: (settings.business_website as string) || null,
+    logo_url: (typeof settings.receipt_config === 'object' && settings.receipt_config !== null
+      ? ((settings.receipt_config as Record<string, unknown>).logo_url as string) || null
+      : null),
   };
 
   return NextResponse.json(info, {

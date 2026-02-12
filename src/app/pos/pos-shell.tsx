@@ -7,23 +7,16 @@ import { toast } from 'sonner';
 import {
   ArrowLeft,
   Loader2,
-  ShieldAlert,
   ScanLine,
   PauseCircle,
   Keyboard,
   X,
-  Lock,
-  CreditCard,
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import type { UserRole } from '@/lib/supabase/types';
 import { ROLE_LABELS } from '@/lib/utils/constants';
-
-// POS access: role-based check as backward-compatible fallback.
-// TODO: Replace with can_access_pos from roles table once POS auth is fully migrated to dynamic system.
-const POS_ALLOWED_ROLES: UserRole[] = ['super_admin', 'admin', 'cashier'];
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
+import type { PosSessionEmployee } from './context/pos-auth-context';
 import { PosPermissionProvider } from './context/pos-permission-context';
 import { TicketProvider, useTicket } from './context/ticket-context';
 import { CheckoutProvider, useCheckout } from './context/checkout-context';
@@ -33,7 +26,7 @@ import { QuoteProvider } from './context/quote-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
 import { HeldTicketsPanel } from './components/held-tickets-panel';
-import { PinPad } from './components/pin-pad';
+import { PinScreen } from './components/pin-screen';
 import { cn } from '@/lib/utils/cn';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
@@ -43,12 +36,6 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   const [clock, setClock] = useState('');
   const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { idleTimeoutMinutes } = usePosAuth();
-
-  // Lock screen state
-  const [lockDigits, setLockDigits] = useState('');
-  const [lockError, setLockError] = useState<string | null>(null);
-  const [lockSubmitting, setLockSubmitting] = useState(false);
-  const [lockShake, setLockShake] = useState(false);
 
   // Redirect if not authenticated — preserve intended destination
   useEffect(() => {
@@ -105,69 +92,22 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Lock screen PIN submit
-  const handleLockPinSubmit = useCallback(
-    async (pin: string) => {
-      setLockSubmitting(true);
-      setLockError(null);
-
-      try {
-        const res = await fetch('/api/pos/auth/pin-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Invalid PIN');
-        }
-
-        // Show welcome toast when a different employee unlocks
-        const newName = data.employee.first_name || data.employee.email.split('@')[0];
-        if (employee && data.employee.id !== employee.id) {
-          toast.success(`Welcome, ${newName}`);
-        }
-
-        // Replace session with new employee (handles both same and different employee)
-        replaceSession({
-          token: data.token,
-          employee: data.employee,
-          idleTimeoutMinutes: data.idle_timeout_minutes,
-        });
-
-        setLockDigits('');
-      } catch (err) {
-        setLockError(err instanceof Error ? err.message : 'Invalid PIN');
-        setLockDigits('');
-        setLockShake(true);
-        setTimeout(() => setLockShake(false), 500);
-      } finally {
-        setLockSubmitting(false);
+  // Lock screen success handler
+  const handleLockSuccess = useCallback(
+    (data: { token: string; employee: PosSessionEmployee; idle_timeout_minutes: number }) => {
+      const newName = data.employee.first_name || data.employee.email.split('@')[0];
+      if (employee && data.employee.id !== employee.id) {
+        toast.success(`Welcome, ${newName}`);
       }
+
+      replaceSession({
+        token: data.token,
+        employee: data.employee,
+        idleTimeoutMinutes: data.idle_timeout_minutes,
+      });
     },
     [replaceSession, employee]
   );
-
-  function handleLockDigit(d: string) {
-    if (d === '.' || lockSubmitting) return;
-    const next = lockDigits + d;
-    if (next.length > 4) return;
-
-    setLockDigits(next);
-    setLockError(null);
-
-    if (next.length === 4) {
-      handleLockPinSubmit(next);
-    }
-  }
-
-  function handleLockBackspace() {
-    if (lockSubmitting) return;
-    setLockDigits(lockDigits.slice(0, -1));
-    setLockError(null);
-  }
 
   if (loading) {
     return (
@@ -179,21 +119,6 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
 
   if (!employee || !role) {
     return null;
-  }
-
-  // Check POS access
-  if (!POS_ALLOWED_ROLES.includes(role)) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-gray-50">
-        <ShieldAlert className="h-12 w-12 text-red-400" />
-        <p className="text-lg font-medium text-gray-700">
-          You don&apos;t have access to the POS
-        </p>
-        <Link href="/admin" className="text-sm text-blue-600 hover:underline">
-          Back to Admin
-        </Link>
-      </div>
-    );
   }
 
   const displayName = employee.first_name || employee.email.split('@')[0];
@@ -210,63 +135,11 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
 
           {/* Lock screen overlay */}
           {locked && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/95">
-              <div className="w-full max-w-sm px-4">
-                <div className="mb-8 flex flex-col items-center gap-3">
-                  <Lock className="h-12 w-12 text-gray-500" />
-                  <h2 className="text-2xl font-bold text-white">Enter PIN</h2>
-                  <p className="text-sm text-gray-500">
-                    Last session: {employee.first_name} {employee.last_name ? employee.last_name.charAt(0) + '.' : ''}
-                  </p>
-                </div>
-
-                {/* Dot indicators */}
-                <div
-                  className={cn(
-                    'mb-8 flex items-center justify-center gap-4',
-                    lockShake && 'animate-shake'
-                  )}
-                >
-                  {[0, 1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        'h-4 w-4 rounded-full border-2 transition-all duration-150',
-                        i < lockDigits.length
-                          ? 'border-white bg-white'
-                          : 'border-gray-600 bg-transparent'
-                      )}
-                    />
-                  ))}
-                </div>
-
-                {lockError && (
-                  <p className="mb-4 text-center text-sm text-red-400">{lockError}</p>
-                )}
-
-                {lockSubmitting && (
-                  <p className="mb-4 text-center text-sm text-gray-400">Verifying...</p>
-                )}
-
-                <PinPad
-                  onDigit={handleLockDigit}
-                  onBackspace={handleLockBackspace}
-                  size="lg"
-                  variant="dark"
-                />
-              </div>
-
-              <style jsx>{`
-                @keyframes shake {
-                  0%, 100% { transform: translateX(0); }
-                  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
-                  20%, 40%, 60%, 80% { transform: translateX(8px); }
-                }
-                .animate-shake {
-                  animation: shake 0.5s ease-in-out;
-                }
-              `}</style>
-            </div>
+            <PinScreen
+              overlay
+              onSuccess={handleLockSuccess}
+              lastSessionName={`${employee.first_name}${employee.last_name ? ' ' + employee.last_name.charAt(0) + '.' : ''}`}
+            />
           )}
           </QuoteProvider>
           </HeldTicketsProvider>
