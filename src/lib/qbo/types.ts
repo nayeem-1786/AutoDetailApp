@@ -42,6 +42,7 @@ export interface QboSyncLogEntry {
   response_payload: Record<string, unknown> | null;
   created_at: string;
   duration_ms: number | null;
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch';
 }
 
 // ============================================

@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { cashDrawerCloseSchema } from '@/lib/utils/validation';
+import { isQboSyncEnabled } from '@/lib/qbo/settings';
+import { batchSyncDayTransactions } from '@/lib/qbo/sync-batch';
 
 export async function POST(request: NextRequest) {
   try {
@@ -170,6 +172,17 @@ export async function POST(request: NextRequest) {
 
       drawer = inserted;
     }
+
+    // QBO EOD Batch Sync — fire-and-forget, never blocks register close
+    isQboSyncEnabled().then((enabled) => {
+      if (enabled) {
+        batchSyncDayTransactions().catch((err) =>
+          console.error('[QBO] EOD batch sync failed:', err)
+        );
+      }
+    }).catch((err) => {
+      console.error('[QBO] Failed to check QBO status for EOD sync:', err);
+    });
 
     return NextResponse.json({ data: drawer }, { status: 200 });
   } catch (err) {

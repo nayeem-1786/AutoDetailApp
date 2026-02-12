@@ -160,7 +160,8 @@ async function getQboItemId(
  * Sync a single transaction to QuickBooks Online as a Sales Receipt.
  */
 export async function syncTransactionToQbo(
-  transactionId: string
+  transactionId: string,
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch' = 'manual'
 ): Promise<{ success: boolean; qbo_id?: string; error?: string }> {
   const startTime = Date.now();
   const supabase = createAdminClient();
@@ -342,6 +343,7 @@ export async function syncTransactionToQbo(
       request_payload: receiptPayload as Record<string, unknown>,
       response_payload: { qbo_id: qboId, total: qboReceipt.TotalAmt },
       duration_ms: Date.now() - startTime,
+      source,
     });
 
     return { success: true, qbo_id: qboId };
@@ -367,6 +369,7 @@ export async function syncTransactionToQbo(
       request_payload: null,
       response_payload: null,
       duration_ms: Date.now() - startTime,
+      source,
     });
 
     return { success: false, error: errorMsg };
@@ -377,7 +380,9 @@ export async function syncTransactionToQbo(
  * Sync all unsynced transactions to QBO.
  * Finds completed transactions that are not yet synced or previously failed.
  */
-export async function syncUnsynced(): Promise<{
+export async function syncUnsynced(
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch' = 'manual'
+): Promise<{
   synced: number;
   failed: number;
   skipped: number;
@@ -413,7 +418,7 @@ export async function syncUnsynced(): Promise<{
       continue;
     }
 
-    const result = await syncTransactionToQbo(txn.id);
+    const result = await syncTransactionToQbo(txn.id, source);
     if (result.success) {
       synced++;
     } else {

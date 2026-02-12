@@ -4,7 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { transactionCreateSchema } from '@/lib/utils/validation';
 import { CC_FEE_RATE, LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
-import { isQboSyncEnabled } from '@/lib/qbo/settings';
+import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
 
 export async function POST(request: NextRequest) {
@@ -305,13 +305,15 @@ export async function POST(request: NextRequest) {
     }
 
     // QBO Sync — fire and forget, never block POS
+    // Checks realtime toggle: when OFF, skips immediate sync (EOD batch or cron will catch it)
     if (transaction.status === 'completed') {
-      isQboSyncEnabled().then(enabled => {
+      isQboSyncEnabled().then(async (enabled) => {
         if (enabled) {
-          supabase.from('transactions').update({ qbo_sync_status: 'pending' }).eq('id', transaction.id).then(() => {
-            syncTransactionToQbo(transaction.id).catch(err => {
-              console.error('[QBO] Background sync failed for transaction:', transaction.id, err);
-            });
+          const realtimeSync = await getQboSetting('qbo_realtime_sync');
+          if (realtimeSync === 'false') return;
+          await supabase.from('transactions').update({ qbo_sync_status: 'pending' }).eq('id', transaction.id);
+          syncTransactionToQbo(transaction.id, 'pos_hook').catch(err => {
+            console.error('[QBO] Background sync failed for transaction:', transaction.id, err);
           });
         }
       }).catch(err => {

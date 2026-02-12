@@ -9,6 +9,8 @@ const ALLOWED_KEYS = [
   'qbo_auto_sync_catalog',
   'qbo_income_account_id',
   'qbo_default_payment_method_id',
+  'qbo_auto_sync_interval',
+  'qbo_realtime_sync',
 ] as const;
 
 const ALL_QBO_KEYS = [

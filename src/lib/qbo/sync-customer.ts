@@ -8,7 +8,8 @@ import { logSync } from './sync-log';
  * Creates or updates the QBO customer record.
  */
 export async function syncCustomerToQbo(
-  customerId: string
+  customerId: string,
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch' = 'manual'
 ): Promise<{ success: boolean; qbo_id?: string; error?: string }> {
   const startTime = Date.now();
 
@@ -120,6 +121,7 @@ export async function syncCustomerToQbo(
       request_payload: qboData as Record<string, unknown>,
       response_payload: { qbo_id: qboId },
       duration_ms: Date.now() - startTime,
+      source,
     });
 
     return { success: true, qbo_id: qboId };
@@ -136,6 +138,7 @@ export async function syncCustomerToQbo(
       request_payload: null,
       response_payload: null,
       duration_ms: Date.now() - startTime,
+      source,
     });
 
     return { success: false, error: errorMsg };
@@ -146,14 +149,15 @@ export async function syncCustomerToQbo(
  * Sync a batch of customers to QBO sequentially with a delay between each.
  */
 export async function syncCustomerBatch(
-  customerIds: string[]
+  customerIds: string[],
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch' = 'manual'
 ): Promise<{ synced: number; failed: number; errors: string[] }> {
   let synced = 0;
   let failed = 0;
   const errors: string[] = [];
 
   for (const id of customerIds) {
-    const result = await syncCustomerToQbo(id);
+    const result = await syncCustomerToQbo(id, source);
     if (result.success) {
       synced++;
     } else {

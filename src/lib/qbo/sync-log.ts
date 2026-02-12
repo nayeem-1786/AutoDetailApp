@@ -1,12 +1,15 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { QboSyncLogEntry } from './types';
 
-/** Insert a sync log entry. */
+/** Insert a sync log entry. Source defaults to 'manual' if not provided. */
 export async function logSync(
   entry: Omit<QboSyncLogEntry, 'id' | 'created_at'>
 ): Promise<void> {
   const supabase = createAdminClient();
-  await supabase.from('qbo_sync_log').insert(entry);
+  await supabase.from('qbo_sync_log').insert({
+    ...entry,
+    source: entry.source || 'manual',
+  });
 }
 
 /** Read sync log with pagination (newest first). */

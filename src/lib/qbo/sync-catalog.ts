@@ -7,7 +7,8 @@ import { logSync } from './sync-log';
  * Sync a single service to QuickBooks Online as an Item of type 'Service'.
  */
 export async function syncServiceToQbo(
-  serviceId: string
+  serviceId: string,
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch' = 'manual'
 ): Promise<{ success: boolean; qbo_id?: string; error?: string }> {
   const startTime = Date.now();
 
@@ -89,6 +90,7 @@ export async function syncServiceToQbo(
       request_payload: itemData as Record<string, unknown>,
       response_payload: { qbo_id: qboId },
       duration_ms: Date.now() - startTime,
+      source,
     });
 
     return { success: true, qbo_id: qboId };
@@ -104,6 +106,7 @@ export async function syncServiceToQbo(
       request_payload: null,
       response_payload: null,
       duration_ms: Date.now() - startTime,
+      source,
     });
     return { success: false, error: errorMsg };
   }
@@ -113,7 +116,8 @@ export async function syncServiceToQbo(
  * Sync a single product to QuickBooks Online as an Item of type 'NonInventory'.
  */
 export async function syncProductToQbo(
-  productId: string
+  productId: string,
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch' = 'manual'
 ): Promise<{ success: boolean; qbo_id?: string; error?: string }> {
   const startTime = Date.now();
 
@@ -191,6 +195,7 @@ export async function syncProductToQbo(
       request_payload: itemData as Record<string, unknown>,
       response_payload: { qbo_id: qboId },
       duration_ms: Date.now() - startTime,
+      source,
     });
 
     return { success: true, qbo_id: qboId };
@@ -206,6 +211,7 @@ export async function syncProductToQbo(
       request_payload: null,
       response_payload: null,
       duration_ms: Date.now() - startTime,
+      source,
     });
     return { success: false, error: errorMsg };
   }
@@ -215,7 +221,9 @@ export async function syncProductToQbo(
  * Sync all services and products to QBO.
  * Skips items synced within the last 24 hours.
  */
-export async function syncAllCatalog(): Promise<{
+export async function syncAllCatalog(
+  source: 'manual' | 'auto' | 'pos_hook' | 'eod_batch' = 'manual'
+): Promise<{
   services: { synced: number; failed: number };
   products: { synced: number; failed: number };
 }> {
@@ -243,7 +251,7 @@ export async function syncAllCatalog(): Promise<{
 
   const serviceResult = { synced: 0, failed: 0 };
   for (const id of serviceIds) {
-    const result = await syncServiceToQbo(id);
+    const result = await syncServiceToQbo(id, source);
     if (result.success) serviceResult.synced++;
     else serviceResult.failed++;
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -268,7 +276,7 @@ export async function syncAllCatalog(): Promise<{
 
   const productResult = { synced: 0, failed: 0 };
   for (const id of productIds) {
-    const result = await syncProductToQbo(id);
+    const result = await syncProductToQbo(id, source);
     if (result.success) productResult.synced++;
     else productResult.failed++;
     await new Promise((resolve) => setTimeout(resolve, 100));

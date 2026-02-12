@@ -40,8 +40,14 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/stock-alerts', 'stock-alerts');
   });
 
+  // QBO auto-sync — every 30 minutes
+  cron.schedule('*/30 * * * *', () => {
+    callCronEndpoint('/api/cron/qbo-sync', 'qbo-sync');
+  });
+
   console.log('[CRON] Scheduled jobs:');
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
   console.log('  - stock-alerts: daily at 8:00 AM PST');
+  console.log('  - qbo-sync: every 30 minutes');
 }

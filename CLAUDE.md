@@ -32,7 +32,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **4** | Customer Portal | Done |
 | **5** | Marketing, Coupons & Campaigns | Done |
 | **6** | Inventory Management | Done |
-| **7** | QuickBooks Integration & Reporting | In Progress |
+| **7** | QuickBooks Integration & Reporting | Done |
 | **8** | Photo Documentation | Not started |
 | **9** | Native Online Store | Not started |
 | **10** | Recurring Services (Dormant) | Not started |
@@ -177,6 +177,13 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - DB migration: `qbo_id`, `qbo_sync_status`, `qbo_sync_error`, `qbo_synced_at` columns; `qbo_sync_log` table; `business_settings` seeds
 - Credential architecture: `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET` stored as env vars (not in DB). Master toggle via `feature_flags` table (shown on Feature Toggles page). Sync-specific settings (auto-sync toggles, account mapping) in `business_settings`.
 - `isQboSyncEnabled()` reads `qbo_enabled` from `feature_flags` table, then verifies connection via `isQboConnected()`
+- QBO Auto-Sync cron job (`/api/cron/qbo-sync`): Runs every 30 min via internal scheduler. Catches unsynced transactions (limit 50), unsynced customers (limit 50), catalog changes, and retries failed transactions (1hr backoff, limit 10). Configurable interval via `qbo_auto_sync_interval` business setting (disabled/15/30/60 min).
+- QBO Reporting dashboard: Reports tab on QuickBooks settings page with sync health cards, entity coverage progress bars, revenue chart (recharts area chart), recent sync activity table, and error summary. Period selector (7d/30d/90d/all). API: `GET /api/admin/integrations/qbo/reports?period=30d`
+- CSV exports: Sync log export (`GET /api/admin/integrations/qbo/sync/log/export`) and revenue report export (`GET /api/admin/integrations/qbo/reports/export`). Both respect current filters, 5k row limit, entity name resolution.
+- `source` column on `qbo_sync_log` table: tracks `auto` (cron), `manual` (admin UI), `pos_hook` (POS fire-and-forget), `eod_batch` (EOD close). Displayed in sync log table.
+- Settings UI: Tab bar (Settings | Reports) on connected state. Auto-sync interval selector in Sync Settings section. Export CSV buttons on sync log and reports tab.
+- EOD batch sync: `batchSyncDayTransactions()` in `src/lib/qbo/sync-batch.ts`, fire-and-forget from `src/app/api/pos/end-of-day/route.ts`. Syncs unsynced customers first, then transactions in batches of 25. Handles PST/PDT timezone correctly. Source: `eod_batch`. Never blocks register close.
+- Realtime sync toggle: `qbo_realtime_sync` business setting (default: `true`). When OFF, POS transaction + customer hooks skip immediate QBO sync — transactions only sync at EOD close or via background cron. Toggle in Sync Settings section of QuickBooks settings page.
 
 ### Phase 9 — Native Online Store (NOT WooCommerce)
 Build full e-commerce within the existing Next.js app. Product catalog pages already exist at `/products` with SEO, categories, and product detail pages. Needs: cart (React context), cart drawer/page, Stripe checkout flow, order management (`orders` table, status tracking), order confirmation + email, shipping/pickup selection, order history in customer dashboard, admin order management page. No WordPress/WooCommerce — everything stays in this app. Stripe is already integrated from booking payments.
@@ -238,7 +245,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **sms_consent_log:** Audit table tracking all SMS consent changes. Source CHECK constraint: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`. RLS: authenticated users can read/write (admin pages insert directly via browser client).
 - **Key TCPA files:** `src/lib/utils/sms-consent.ts` (shared consent helper), `src/app/api/webhooks/twilio/inbound/route.ts` (STOP/START handling + signature validation), `src/lib/utils/sms.ts` (`sendSms()` with MMS + logging, `sendMarketingSms()` with consent + frequency cap), `src/lib/utils/phone-validation.ts` (Twilio Lookup landline detection), `docs/TCPA_AUDIT.md` (full audit report).
 - **Key inventory files:** `src/app/admin/catalog/products/page.tsx` (products with stock management), `src/app/admin/inventory/vendors/page.tsx` (vendor list), `src/app/admin/inventory/vendors/[id]/page.tsx` (vendor detail with products), `src/app/admin/inventory/purchase-orders/` (PO list/create/detail+receive), `src/app/admin/inventory/stock-history/page.tsx` (stock adjustment log), `src/app/api/admin/purchase-orders/` (PO CRUD + receiving API), `src/app/api/admin/stock-adjustments/route.ts` (stock adjustment API), `src/app/api/cron/stock-alerts/route.ts` (daily stock alert cron), `src/app/api/admin/notification-recipients/route.ts` (recipients CRUD), `src/app/admin/settings/notifications/page.tsx` (notification settings UI).
-- **Key QBO files:** `src/lib/qbo/client.ts` (API client with token refresh, query, CRUD methods), `src/lib/qbo/settings.ts` (read/write QBO settings, `isQboSyncEnabled()`, `isQboConnected()`), `src/lib/qbo/types.ts` (all QBO TypeScript types), `src/lib/qbo/sync-customer.ts` (customer sync engine), `src/lib/qbo/sync-catalog.ts` (service/product sync engine), `src/lib/qbo/sync-transaction.ts` (transaction → Sales Receipt sync), `src/lib/qbo/sync-log.ts` (sync log helpers), `src/lib/qbo/index.ts` (barrel exports), `src/app/api/admin/integrations/qbo/` (OAuth + settings + sync + accounts routes), `src/app/admin/settings/integrations/quickbooks/page.tsx` (settings UI), `src/components/qbo-sync-badge.tsx` (reusable sync status badge), `docs/QBO-INTEGRATION.md` (integration documentation).
+- **Key QBO files:** `src/lib/qbo/client.ts` (API client with token refresh, query, CRUD methods), `src/lib/qbo/settings.ts` (read/write QBO settings, `isQboSyncEnabled()`, `isQboConnected()`), `src/lib/qbo/types.ts` (all QBO TypeScript types), `src/lib/qbo/sync-customer.ts` (customer sync engine), `src/lib/qbo/sync-catalog.ts` (service/product sync engine), `src/lib/qbo/sync-transaction.ts` (transaction → Sales Receipt sync), `src/lib/qbo/sync-log.ts` (sync log helpers with `source` param), `src/lib/qbo/index.ts` (barrel exports), `src/app/api/admin/integrations/qbo/` (OAuth + settings + sync + accounts + reports routes), `src/app/api/admin/integrations/qbo/reports/route.ts` (reporting dashboard API), `src/app/api/admin/integrations/qbo/reports/export/route.ts` (revenue CSV export), `src/app/api/admin/integrations/qbo/sync/log/export/route.ts` (sync log CSV export), `src/app/api/cron/qbo-sync/route.ts` (auto-sync cron endpoint), `src/app/admin/settings/integrations/quickbooks/page.tsx` (settings + reports UI with tabs), `src/components/qbo-sync-badge.tsx` (reusable sync status badge), `docs/QBO-INTEGRATION.md` (integration documentation).
 
 ---
 
@@ -247,7 +254,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Supabase project:** `zwvahzymzardmxixyfim`
 - **Super-Admin:** nayeem@smartdetailautospa.com
 - **Staff:** Segundo Cadena (detailer), Joselyn Reyes (cashier), Joana Lira (cashier), Su Khan (admin)
-- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | AI: Anthropic Claude API (messaging auto-responder) | Accounting: QuickBooks Online (OAuth, env vars `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET`) | Cron: node-cron via instrumentation.ts (lifecycle-engine every 10 min, quote-reminders hourly, stock-alerts daily 8 AM PST)
+- **Integrations:** Email: Mailgun | SMS: Twilio (+14244010094) | Payments: Stripe | AI: Anthropic Claude API (messaging auto-responder) | Accounting: QuickBooks Online (OAuth, env vars `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET`) | Cron: node-cron via instrumentation.ts (lifecycle-engine every 10 min, quote-reminders hourly, stock-alerts daily 8 AM PST, qbo-sync every 30 min)
 - **Public pages:** Server Components for SEO. Admin pages: `'use client'` behind auth.
 
 ### Auth Patterns
@@ -258,6 +265,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Session expiry:** `adminFetch()` from `@/lib/utils/admin-fetch` auto-redirects on 401
 
 ### Critical Rules
+- **POS access = PIN presence.** No role-based gating. Set a PIN on an employee → they can log into POS. Clear the PIN → they can't. `roles.can_access_pos` is unused. Staff detail page shows a single combined field (PIN input + Enabled/Disabled pill). Login and lock screens share `PinScreen` component (`src/app/pos/components/pin-screen.tsx`).
 - **Customer types:** `enthusiast` (retail, personal use), `professional` (detailers, body shops, dealers, bulk buyers), and `unknown` (NULL, unclassified — targetable segment). The term "Detailer" as a customer type label is deprecated — always use "Professional". DB column: `customers.customer_type`. Badge cycles: `null → enthusiast → professional → null`.
 - **NEVER hardcode** business name/phone/address/email. Use `getBusinessInfo()` from `@/lib/data/business.ts`
 - **Mobile business name:** Site header (`site-header.tsx`) shows "SD Auto Spa & Supplies" on mobile (<640px) and full `biz.name` on sm:+ to prevent header overflow. Uses `hidden sm:inline` / `sm:hidden` pattern.
@@ -277,7 +285,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Review URLs**: Stored in `business_settings` as `google_review_url` and `yelp_review_url` (JSONB string values). Configurable from Admin > Settings > Reviews. Google Place ID: `ChIJf7qNDhW1woAROX-FX8CScGE`.
 - **Lifecycle rules delay**: Total delay = `scheduled_for = triggered_at + (delay_days * 1440 + delay_minutes)` minutes. `delay_minutes` column added for sub-day granularity (e.g., 30-min review request delay).
 - **Trigger condition canonical values**: `service_completed` (appointments) and `after_transaction` (transactions) — NEVER use `after_service`.
-- **ALL cron/scheduling is internal** via `src/lib/cron/scheduler.ts` + `src/instrumentation.ts` — NEVER suggest n8n, Vercel Cron, or external schedulers. Jobs: lifecycle-engine (every 10 min), quote-reminders (hourly), stock-alerts (daily 8 AM PST).
+- **ALL cron/scheduling is internal** via `src/lib/cron/scheduler.ts` + `src/instrumentation.ts` — NEVER suggest n8n, Vercel Cron, or external schedulers. Jobs: lifecycle-engine (every 10 min), quote-reminders (hourly), stock-alerts (daily 8 AM PST), qbo-sync (every 30 min).
 - **App operates in PST timezone** (America/Los_Angeles). All time displays, logs, and scheduling logic should use PST, not UTC.
 - **Automations coupon**: uses `coupon_id` FK to existing coupons table. NEVER recreate inline coupon fields — always select from existing coupons via `/admin/marketing/coupons`.
 - **SMS consent helper** (`updateSmsConsent()`): ALWAYS use this for any code path that changes `sms_consent` on a customer. Never update `sms_consent` directly without also logging to `sms_consent_log`. Import from `@/lib/utils/sms-consent`.
@@ -355,7 +363,37 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 25 — Multi-Image, UX Fixes, Breadcrumb Audit)
+## Last Session: 2026-02-12 (Session 27 — Simplify POS Access, Unify PIN Screens)
+- **POS access simplified**: Removed `POS_ALLOWED_ROLES` hardcoded gate from `pos-shell.tsx`. Any employee with a PIN can now use the POS — no role-based gating. PIN login API already had no role filter, so this was the only blocker.
+- **Staff detail page**: Combined "POS Access" and "POS PIN Code" into a single form field — narrow PIN input (`w-24`) with live Enabled/Disabled pill next to it. Moved to same grid row as "Bookable for Appointments". Removed dead `canAccessPos` state (was reading unused `can_access_pos` from roles table) and "Manage in Roles" link.
+- **Unified PinScreen component** (`src/app/pos/components/pin-screen.tsx`): Shared by both login page and lock screen overlay. Business logo from receipt printer settings (centered, `h-32`), Lock icons flanking "Enter PIN" title, last session subtitle, dot indicators, shake animation, "Verifying..." label — all in one place. `overlay` prop toggles full-page vs fixed overlay rendering.
+- **Login page** (`src/app/pos/login/page.tsx`): Reduced from ~140 lines to ~35 — just wraps `<PinScreen>` with `storePosSession()` callback.
+- **Lock screen** in `pos-shell.tsx`: Replaced ~60 lines of inline state/handlers/UI with `<PinScreen overlay>` + `replaceSession()` callback with welcome toast on employee switch.
+- **BusinessInfo.logo_url**: Added `logo_url` field to `BusinessInfo` interface, server-side `fetchBusinessInfo()`, and public API `/api/public/business-info` — reads from `receipt_config` in `business_settings`.
+- **Files created**: `src/app/pos/components/pin-screen.tsx`
+- **Files modified**: `src/app/pos/pos-shell.tsx`, `src/app/pos/login/page.tsx`, `src/app/admin/staff/[id]/page.tsx`, `src/lib/data/business.ts`, `src/app/api/public/business-info/route.ts`
+- TypeScript clean (zero errors)
+
+### Session 26b — EOD Batch Sync + Realtime Toggle
+- **EOD batch sync**: `batchSyncDayTransactions()` catches all unsynced transactions when POS register closes. Syncs customers first (those without `qbo_id`), then transactions in batches of 25. PST/PDT-aware date handling. Fire-and-forget from `end-of-day/route.ts` — never blocks register close.
+- **Realtime sync toggle**: `qbo_realtime_sync` business setting. When OFF, POS transaction + customer hooks skip immediate QBO sync. Transactions sync at EOD close or via background cron instead. Toggle in Sync Settings section on QuickBooks settings page.
+- **Source type expanded**: `eod_batch` added to sync source union type across all QBO sync engines and types.
+- **Files created**: `src/lib/qbo/sync-batch.ts`, `supabase/migrations/20260212000002_qbo_realtime_sync.sql`
+- **Files modified**: `src/app/api/pos/end-of-day/route.ts`, `src/app/api/pos/transactions/route.ts`, `src/app/api/pos/customers/route.ts`, `src/app/admin/settings/integrations/quickbooks/page.tsx`, `src/app/api/admin/integrations/qbo/settings/route.ts`, `src/lib/qbo/types.ts`, `src/lib/qbo/sync-transaction.ts`, `src/lib/qbo/sync-customer.ts`, `src/lib/qbo/sync-catalog.ts`
+- TypeScript clean (zero errors)
+
+### Session 26 — Phase 7.3: QBO Auto-Sync, Reporting Dashboard, CSV Exports
+- **Phase 7 (QuickBooks Integration) COMPLETE**
+- **QBO Auto-Sync cron job** (`/api/cron/qbo-sync`): Registered in scheduler at `*/30 * * * *`. Checks `isQboSyncEnabled()` + `qbo_auto_sync_interval` setting. Syncs unsynced transactions (50), unsynced customers (50), all catalog, retries failed txns (1hr backoff, 10). Each step wrapped in try/catch — one failure doesn't stop the batch. Configurable interval: disabled/15/30/60 min via Settings UI.
+- **QBO Reporting dashboard** (Reports tab): Sync health cards (sync rate with color coding, synced/failed/pending counts, last sync times). Entity coverage progress bars (customers/services/products). Revenue chart (recharts AreaChart with daily breakdown). Recent sync activity (20 entries with source badges). Error summary (grouped by pattern with count + last occurred). Period selector: 7d/30d/90d/All.
+- **CSV exports**: Sync log export with entity name resolution (joins customers/services/products/transactions tables). Revenue report export with customer names. Both respect filters, 5k row limit, proper CSV escaping. Download via `Content-Disposition` attachment headers.
+- **`source` tracking on sync log**: New column on `qbo_sync_log` (default: `'manual'`). Values: `auto` (cron), `manual` (admin UI), `pos_hook` (POS fire-and-forget). Threaded through all sync engines: `logSync()`, `syncTransactionToQbo()`, `syncUnsynced()`, `syncCustomerToQbo()`, `syncCustomerBatch()`, `syncServiceToQbo()`, `syncProductToQbo()`, `syncAllCatalog()`. POS hooks updated to pass `'pos_hook'`.
+- **Settings UI updates**: Tab bar (Settings | Reports) when connected. Auto-sync interval dropdown in Sync Settings section. Source column in sync log table. Export CSV buttons on sync log and reports tab.
+- **Files created**: `src/app/api/cron/qbo-sync/route.ts`, `src/app/api/admin/integrations/qbo/reports/route.ts`, `src/app/api/admin/integrations/qbo/reports/export/route.ts`, `src/app/api/admin/integrations/qbo/sync/log/export/route.ts`, `supabase/migrations/20260212000001_qbo_sync_source.sql`
+- **Files modified**: `src/lib/cron/scheduler.ts`, `src/lib/qbo/sync-log.ts`, `src/lib/qbo/types.ts`, `src/lib/qbo/sync-transaction.ts`, `src/lib/qbo/sync-customer.ts`, `src/lib/qbo/sync-catalog.ts`, `src/app/api/pos/transactions/route.ts`, `src/app/api/pos/customers/route.ts`, `src/app/api/admin/integrations/qbo/settings/route.ts`, `src/app/admin/settings/integrations/quickbooks/page.tsx`
+- TypeScript clean (zero errors)
+
+### Session 25 — Multi-Image, UX Fixes, Breadcrumb Audit
 - **Multi-image product support (up to 6 images per product)**: New `product_images` table as source of truth. DB trigger `sync_product_primary_image` auto-syncs primary image back to `products.image_url` — all 8 existing display locations (POS, public pages, admin list, SEO) continue working unchanged.
 - **New `MultiImageUpload` component** (`src/app/admin/catalog/components/multi-image-upload.tsx`): horizontal row of 176x176px image slots, drag-and-drop reorder, hover overlay with Set Primary (star badge) / Replace / Remove buttons, file validation (JPEG/PNG/WebP/GIF/AVIF, 5MB), loading spinners per slot.
 - **Product edit page**: Replaced single `ImageUpload` with `MultiImageUpload`. All image operations are immediate (not deferred to form submit): upload to `products/{productId}/{uuid}.{ext}`, remove (with primary promotion), replace, reorder (batch `sort_order` update), set primary. Removed `image_url` from form submit payload — trigger handles sync.
