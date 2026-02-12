@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-provider';
 import { createClient } from '@/lib/supabase/client';
@@ -84,6 +85,12 @@ const BREADCRUMB_ACRONYMS: Record<string, string> = {
   faq: 'FAQ',
   csv: 'CSV',
 };
+
+// Paths that are just folder groupings with no page — skip in breadcrumbs
+const NON_PAGE_PATHS = new Set([
+  '/admin/catalog',
+  '/admin/settings/integrations',
+]);
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -562,30 +569,43 @@ function AdminContent({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5 text-gray-500" />
           </button>
           {/* Breadcrumb from pathname */}
-          <nav className="flex items-center gap-1 text-sm text-gray-500">
-            {pathname
-              .split('/')
-              .filter(Boolean)
-              .reduce<{ segment: string; label: string | null }[]>((acc, segment) => {
-                const label = formatBreadcrumbSegment(segment);
-                acc.push({ segment, label });
-                return acc;
-              }, [])
-              .filter((item) => item.label !== null)
-              .map((item, i, arr) => (
-                <span key={i} className="flex items-center gap-1">
-                  {i > 0 && <span>/</span>}
-                  <span
-                    className={cn(
-                      i === arr.length - 1
-                        ? 'font-medium text-gray-900'
-                        : 'text-gray-500'
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-gray-500">
+            {(() => {
+              const segments = pathname.split('/').filter(Boolean);
+              const visible: { label: string; href: string }[] = [];
+              let pathSoFar = '';
+              for (const seg of segments) {
+                pathSoFar += `/${seg}`;
+                const label = formatBreadcrumbSegment(seg);
+                if (!label) continue;
+                // Skip folder groupings that have no actual page
+                if (NON_PAGE_PATHS.has(pathSoFar)) continue;
+                visible.push({ label, href: pathSoFar });
+              }
+              return visible.map((item, i, arr) => {
+                const isLast = i === arr.length - 1;
+                // Only treat as current page if the href matches the actual pathname
+                const isCurrent = isLast && item.href === pathname;
+                return (
+                  <span key={i} className="flex items-center gap-1.5">
+                    {i > 0 && <span className="text-gray-300" aria-hidden="true">/</span>}
+                    {isCurrent ? (
+                      <span className="font-medium text-gray-900" aria-current="page">{item.label}</span>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          'underline decoration-gray-300 underline-offset-2 hover:text-gray-900 hover:decoration-gray-500 transition-colors',
+                          isLast && 'font-medium text-gray-700'
+                        )}
+                      >
+                        {item.label}
+                      </Link>
                     )}
-                  >
-                    {item.label}
                   </span>
-                </span>
-              ))}
+                );
+              });
+            })()}
           </nav>
 
           {/* Global Search Trigger */}

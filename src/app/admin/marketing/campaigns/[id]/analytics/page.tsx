@@ -117,14 +117,12 @@ export default function CampaignAnalyticsPage() {
       />
 
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-gray-500">
-        <button onClick={() => router.push('/admin/marketing')} className="hover:text-gray-700">Marketing</button>
-        <span>/</span>
-        <button onClick={() => router.push('/admin/marketing/campaigns')} className="hover:text-gray-700">Campaigns</button>
-        <span>/</span>
-        <button onClick={() => router.push(`/admin/marketing/campaigns/${id}`)} className="hover:text-gray-700">{campaign?.name ?? 'Campaign'}</button>
-        <span>/</span>
-        <span className="font-medium text-gray-900">Analytics</span>
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-gray-500">
+        <button onClick={() => router.push('/admin/marketing/campaigns')} className="underline decoration-gray-300 underline-offset-2 hover:text-gray-900 hover:decoration-gray-500 transition-colors">Campaigns</button>
+        <span className="text-gray-300" aria-hidden="true">/</span>
+        <button onClick={() => router.push(`/admin/marketing/campaigns/${id}`)} className="underline decoration-gray-300 underline-offset-2 hover:text-gray-900 hover:decoration-gray-500 transition-colors">{campaign?.name ?? 'Campaign'}</button>
+        <span className="text-gray-300" aria-hidden="true">/</span>
+        <span className="font-medium text-gray-900" aria-current="page">Analytics</span>
       </nav>
 
       {/* Campaign meta */}

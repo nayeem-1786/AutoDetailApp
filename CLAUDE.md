@@ -355,7 +355,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-11 (Session 25 — Multi-Image Product Support)
+## Last Session: 2026-02-11 (Session 25 — Multi-Image, UX Fixes, Breadcrumb Audit)
 - **Multi-image product support (up to 6 images per product)**: New `product_images` table as source of truth. DB trigger `sync_product_primary_image` auto-syncs primary image back to `products.image_url` — all 8 existing display locations (POS, public pages, admin list, SEO) continue working unchanged.
 - **New `MultiImageUpload` component** (`src/app/admin/catalog/components/multi-image-upload.tsx`): horizontal row of 176x176px image slots, drag-and-drop reorder, hover overlay with Set Primary (star badge) / Replace / Remove buttons, file validation (JPEG/PNG/WebP/GIF/AVIF, 5MB), loading spinners per slot.
 - **Product edit page**: Replaced single `ImageUpload` with `MultiImageUpload`. All image operations are immediate (not deferred to form submit): upload to `products/{productId}/{uuid}.{ext}`, remove (with primary promotion), replace, reorder (batch `sort_order` update), set primary. Removed `image_url` from form submit payload — trigger handles sync.
@@ -363,8 +363,15 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Data migration**: 409 existing product images migrated into `product_images` table with `is_primary = true`.
 - **DB**: `product_images` table, partial unique index (one primary per product), `idx_product_images_product_sort` index, RLS policies, trigger function.
 - **Types**: `ProductImage` interface added to `types.ts`, optional `images?: ProductImage[]` on `Product`.
+- **Toast close buttons**: Added `closeButton` prop to global `<Toaster>` in `layout.tsx` — all toasts site-wide now have an "x" dismiss button.
+- **Products list Activate button**: Replaced `window.confirm()` with `ConfirmDialog` component (no more browser native popups).
+- **Active toggle moved to page header**: Product edit page Active/Inactive toggle now in PageHeader action area, saves immediately to DB without form submit.
+- **Breadcrumb audit and fix (3 implementations unified)**:
+  - `admin-shell.tsx` (every admin page): URL-based breadcrumb was entirely non-clickable `<span>` elements. Now parent segments are clickable `<Link>` with underline styling. Skips folder groupings with no page (`NON_PAGE_PATHS`: `/admin/catalog`, `/admin/settings/integrations`). Smart current-page detection: only marks last item as non-clickable if its href matches the actual pathname (fixes UUID detail pages where parent was incorrectly treated as current page).
+  - `components/public/breadcrumbs.tsx` (6 public pages): Added visible underline to clickable items for clear affordance.
+  - `campaigns/[id]/analytics/page.tsx` (inline): Updated to match consistent `text-sm`, underline, and `aria` patterns.
 - **Files created**: `supabase/migrations/20260211000010_product_images.sql`, `src/app/admin/catalog/components/multi-image-upload.tsx`
-- **Files modified**: `src/app/admin/catalog/products/[id]/page.tsx`, `src/app/admin/catalog/products/new/page.tsx`, `src/lib/supabase/types.ts`
+- **Files modified**: `src/app/admin/catalog/products/[id]/page.tsx`, `src/app/admin/catalog/products/new/page.tsx`, `src/lib/supabase/types.ts`, `src/app/layout.tsx`, `src/app/admin/catalog/products/page.tsx`, `src/app/admin/admin-shell.tsx`, `src/components/public/breadcrumbs.tsx`, `src/app/admin/marketing/campaigns/[id]/analytics/page.tsx`
 - TypeScript clean (zero errors)
 
 ### Session 24 — Staff Nav, Permission Pills, Reset Defaults, Route Access Fix

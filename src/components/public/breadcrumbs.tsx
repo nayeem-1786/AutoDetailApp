@@ -44,13 +44,13 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
                 </span>
               )}
               {isLast || !item.href ? (
-                <span className="text-gray-900 dark:text-gray-100 font-medium" aria-current="page">
+                <span className="font-medium text-gray-900 dark:text-gray-100" aria-current={isLast ? 'page' : undefined}>
                   {item.label}
                 </span>
               ) : (
                 <Link
                   href={item.href}
-                  className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                  className="underline decoration-gray-300 underline-offset-2 hover:text-gray-900 hover:decoration-gray-500 dark:decoration-gray-600 dark:hover:text-gray-100 dark:hover:decoration-gray-400 transition-colors"
                 >
                   {item.label}
                 </Link>
