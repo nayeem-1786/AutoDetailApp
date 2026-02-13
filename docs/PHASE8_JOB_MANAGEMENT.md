@@ -321,6 +321,18 @@ The complete detailer flow from start to finish:
    Status: [Completed] → [Closed]
 ```
 
+### Job Queue Visibility
+
+| Status | In Queue | Accessible Via |
+|--------|----------|----------------|
+| `scheduled` | Yes | Jobs tab |
+| `intake` | Yes | Jobs tab |
+| `in_progress` | Yes | Jobs tab |
+| `pending_approval` | Yes | Jobs tab |
+| `completed` | Yes (with Checkout button) | Jobs tab |
+| `closed` | **No** — hidden from queue | POS Transactions, Customer History |
+| `cancelled` | **No** — hidden from queue | — |
+
 ---
 
 ## Jobs Tab (POS)
@@ -331,14 +343,15 @@ New tab in POS navigation: **Jobs** (alongside existing POS tabs)
 ### Queue View (Default)
 - Shows today's jobs for the logged-in staff member
 - Filter pills: **My Jobs** (default) | **All Jobs** | **Unassigned**
+- **Excluded from queue**: `cancelled` and `closed` (paid) jobs are filtered out at the API level (`.neq('status', 'cancelled').neq('status', 'closed')`)
 - Each job card shows:
   - Customer name + vehicle (year/make/model/color)
   - Services booked (comma-separated)
-  - Status pill (color-coded): Scheduled (gray), Intake (blue), In Progress (yellow), Pending Approval (orange), Completed (green), Closed (slate)
+  - Status pill (color-coded): Scheduled (gray), Intake (blue), In Progress (yellow), Pending Approval (orange), Completed (green)
   - Assigned detailer name
   - Estimated pickup time
   - Time in progress (if timer is running)
-  - Badge: 🔔 if addon pending authorization
+  - Badge: if addon pending authorization
 - Sort: by status priority (In Progress first, then Intake, Scheduled, etc.)
 - Tap a job → opens job detail view
 

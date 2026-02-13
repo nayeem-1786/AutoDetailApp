@@ -28,7 +28,7 @@ export async function GET(
       .from('jobs')
       .select(`
         id, status, services, customer_id, vehicle_id, quote_id,
-        customer:customers!jobs_customer_id_fkey(id, first_name, last_name),
+        customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone, email, customer_type, tags),
         vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color, size_class),
         addons:job_addons(
           id, service_id, product_id, custom_description, price,

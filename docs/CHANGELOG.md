@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 44 — 2026-02-12 (Customer Data Persistence Through Checkout + Hide Paid Jobs)
+
+### Fix: Customer data persistence through job checkout flow
+- Root cause: `checkout-items` API only selected `(id, first_name, last_name)` for the customer — missing `phone`, `email`, `customer_type`, `tags`
+- This caused 3 downstream bugs:
+  1. **Customer type prompt always shown**: `customer_type` was undefined → prompt appeared even for customers with type already set
+  2. **Receipt modal couldn't send SMS/email**: `phone` and `email` were undefined → receipt options had no pre-filled contact data
+  3. **Customer data gap through checkout**: The ticket customer object was missing critical fields for the entire checkout flow
+- Fix: Added `phone, email, customer_type, tags` to the customer select in `checkout-items/route.ts`
+- Fix: Updated `jobs/page.tsx` type definition and customer construction to explicitly include all fields
+- Files: `src/app/api/pos/jobs/[id]/checkout-items/route.ts`, `src/app/pos/jobs/page.tsx`
+
+### Fix: Hide paid/closed jobs from POS jobs queue
+- Paid jobs (status `closed`) remained visible in the Jobs queue with a "Paid" badge
+- Fix: Added `.neq('status', 'closed')` filter to the jobs list API query, matching existing `.neq('status', 'cancelled')` pattern
+- Closed jobs are still accessible via POS Transactions list and Customer History tab
+- File: `src/app/api/pos/jobs/route.ts`
+
+---
+
 ## Session 43 — 2026-02-12 (Checkout Items Response Parsing Fix)
 
 ### Fix: Checkout items response parsing for job-to-register flow

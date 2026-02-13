@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
       `)
       .gte('created_at', startUtc)
       .lt('created_at', endUtc)
-      .neq('status', 'cancelled');
+      .neq('status', 'cancelled')
+      .neq('status', 'closed');
 
     if (filter === 'mine') {
       query = query.eq('assigned_staff_id', posEmployee.employee_id);

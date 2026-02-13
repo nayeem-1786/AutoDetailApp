@@ -56,7 +56,7 @@ export default function JobsPage() {
       job_id: string;
       customer_id: string | null;
       vehicle_id: string | null;
-      customer: { id: string; first_name: string; last_name: string } | null;
+      customer: { id: string; first_name: string; last_name: string; phone: string | null; email: string | null; customer_type: string | null; tags: string[] | null } | null;
       vehicle: { id: string; year: number | null; make: string | null; model: string | null; color: string | null; size_class: string | null } | null;
       items: Array<{
         item_type: 'service' | 'product' | 'custom';
@@ -107,7 +107,14 @@ export default function JobsPage() {
       });
 
       const ticketCustomer = data.customer
-        ? { ...data.customer, id: data.customer_id ?? data.customer.id } as Customer
+        ? {
+            ...data.customer,
+            id: data.customer_id ?? data.customer.id,
+            phone: data.customer.phone ?? null,
+            email: data.customer.email ?? null,
+            customer_type: data.customer.customer_type ?? null,
+            tags: data.customer.tags ?? null,
+          } as Customer
         : null;
 
       const subtotal = ticketItems.reduce((sum, i) => sum + i.totalPrice, 0);
