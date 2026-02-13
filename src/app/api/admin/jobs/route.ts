@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
   const staffId = searchParams.get('staff_id');
   const customerId = searchParams.get('customer_id');
+  const vehicleId = searchParams.get('vehicle_id');
   const dateFrom = searchParams.get('date_from');
   const dateTo = searchParams.get('date_to');
   const search = searchParams.get('search');
@@ -87,6 +88,9 @@ export async function GET(req: NextRequest) {
   }
   if (customerId) {
     query = query.eq('customer_id', customerId);
+  }
+  if (vehicleId) {
+    query = query.eq('vehicle_id', vehicleId);
   }
   if (dateFrom) {
     query = query.gte('created_at', `${dateFrom}T00:00:00`);

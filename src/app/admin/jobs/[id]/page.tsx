@@ -27,7 +27,9 @@ import {
   Footprints,
   CalendarDays,
   ExternalLink,
+  Star,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -203,6 +205,7 @@ export default function AdminJobDetailPage({
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
   const [lightboxPhoto, setLightboxPhoto] = useState<JobPhoto | null>(null);
+  const [togglingFeatured, setTogglingFeatured] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -221,6 +224,53 @@ export default function AdminJobDetailPage({
     }
     load();
   }, [id]);
+
+  const handleToggleFeatured = async (photo: JobPhoto) => {
+    if (togglingFeatured.has(photo.id)) return;
+    const newValue = !photo.is_featured;
+
+    // Optimistic update
+    setJob((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, photos_by_phase: { ...prev.photos_by_phase } };
+      for (const phase of Object.keys(updated.photos_by_phase)) {
+        updated.photos_by_phase[phase] = updated.photos_by_phase[phase].map((p) =>
+          p.id === photo.id ? { ...p, is_featured: newValue } : p
+        );
+      }
+      return updated;
+    });
+
+    setTogglingFeatured((prev) => new Set(prev).add(photo.id));
+    try {
+      const res = await adminFetch(`/api/admin/photos/${photo.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_featured: newValue }),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      toast.success(newValue ? 'Photo featured' : 'Photo unfeatured');
+    } catch {
+      // Revert on error
+      setJob((prev) => {
+        if (!prev) return prev;
+        const reverted = { ...prev, photos_by_phase: { ...prev.photos_by_phase } };
+        for (const phase of Object.keys(reverted.photos_by_phase)) {
+          reverted.photos_by_phase[phase] = reverted.photos_by_phase[phase].map((p) =>
+            p.id === photo.id ? { ...p, is_featured: !newValue } : p
+          );
+        }
+        return reverted;
+      });
+      toast.error('Failed to update photo');
+    } finally {
+      setTogglingFeatured((prev) => {
+        const next = new Set(prev);
+        next.delete(photo.id);
+        return next;
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -689,6 +739,7 @@ export default function AdminJobDetailPage({
                   photos={intakePhotos}
                   creators={job.photo_creators}
                   onPhotoClick={setLightboxPhoto}
+                  onToggleFeatured={handleToggleFeatured}
                 />
               )}
 
@@ -700,6 +751,7 @@ export default function AdminJobDetailPage({
                   photos={progressPhotos}
                   creators={job.photo_creators}
                   onPhotoClick={setLightboxPhoto}
+                  onToggleFeatured={handleToggleFeatured}
                 />
               )}
 
@@ -710,6 +762,7 @@ export default function AdminJobDetailPage({
                   photos={completionPhotos}
                   creators={job.photo_creators}
                   onPhotoClick={setLightboxPhoto}
+                  onToggleFeatured={handleToggleFeatured}
                 />
               )}
             </div>
@@ -813,12 +866,14 @@ function PhotoSection({
   photos,
   creators,
   onPhotoClick,
+  onToggleFeatured,
 }: {
   title: string;
   subtitle?: string;
   photos: JobPhoto[];
   creators: Record<string, string>;
   onPhotoClick: (photo: JobPhoto) => void;
+  onToggleFeatured: (photo: JobPhoto) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -842,11 +897,18 @@ function PhotoSection({
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
               <p className="text-xs font-medium text-white">{getZoneLabel(photo.zone)}</p>
             </div>
-            {photo.is_featured && (
-              <div className="absolute right-1 top-1 rounded-full bg-yellow-400 p-0.5">
-                <CheckCircle2 className="h-3 w-3 text-white" />
-              </div>
-            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFeatured(photo);
+              }}
+              className="absolute right-1.5 top-1.5 rounded-full p-1 transition-colors hover:bg-black/30"
+              title={photo.is_featured ? 'Remove from featured' : 'Feature for marketing'}
+            >
+              <Star
+                className={`h-4 w-4 ${photo.is_featured ? 'fill-yellow-400 text-yellow-400' : 'text-white/70 hover:text-white'}`}
+              />
+            </button>
             {photo.is_internal && (
               <div className="absolute left-1 top-1 rounded-full bg-gray-700 p-0.5">
                 <AlertCircle className="h-3 w-3 text-white" />

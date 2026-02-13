@@ -411,6 +411,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     if (item.href === '/admin/messaging') return twoWaySmsEnabled;
     if (item.href === '/admin/inventory') return inventoryEnabled;
     if (item.href === '/admin/jobs') return photoDocEnabled;
+    if (item.href === '/admin/photos') return photoDocEnabled;
     return true;
   });
 

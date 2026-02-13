@@ -54,12 +54,11 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp, Camera } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
-import { BeforeAfterSlider } from '@/components/before-after-slider';
-import { getZoneLabel } from '@/lib/utils/job-zones';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { Pagination } from '@/components/ui/pagination';
 import { generateReceiptLines, generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import type { ReceiptTransaction } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
@@ -828,7 +827,7 @@ export default function CustomerProfilePage() {
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
           <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>
           <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
-          <TabsTrigger value="photos">Photos</TabsTrigger>
+          <TabsTrigger value="service-history">Service History</TabsTrigger>
         </TabsList>
 
         {/* ===== INFO TAB ===== */}
@@ -1872,9 +1871,9 @@ export default function CustomerProfilePage() {
           })()}
         </TabsContent>
 
-        {/* ===== PHOTOS TAB ===== */}
-        <TabsContent value="photos">
-          <CustomerPhotosTab customerId={id} vehicles={vehicles} />
+        {/* ===== SERVICE HISTORY TAB ===== */}
+        <TabsContent value="service-history">
+          <CustomerServiceHistoryTab customerId={id} vehicles={vehicles} />
         </TabsContent>
       </Tabs>
 
@@ -1925,70 +1924,148 @@ export default function CustomerProfilePage() {
   );
 }
 
-// ─── Customer Photos Tab ────────────────────────────────────────────────────────
+// ─── Customer Service History Tab ─────────────────────────────────────────────
 
-interface JobPhotoGroup {
-  job_id: string;
+interface ServiceHistoryJob {
+  id: string;
   status: string;
   services: { id: string; name: string; price: number }[];
-  vehicle: { id: string; year: number; make: string; model: string; color: string | null } | null;
-  date: string;
-  photos: {
-    id: string;
-    job_id: string;
-    zone: string;
-    phase: string;
-    image_url: string;
-    thumbnail_url: string | null;
-    notes: string | null;
-    annotation_data: unknown;
-    is_featured: boolean;
-    is_internal: boolean;
-    created_at: string;
-  }[];
+  timer_seconds: number;
+  created_at: string;
+  vehicle: { id: string; year: number | null; make: string | null; model: string | null; color: string | null } | null;
+  assigned_staff: { id: string; first_name: string; last_name: string } | null;
+  photo_count: number;
+  addon_count: number;
 }
 
-function CustomerPhotosTab({ customerId, vehicles }: { customerId: string; vehicles: Vehicle[] }) {
-  const [groups, setGroups] = useState<JobPhotoGroup[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [vehicleFilter, setVehicleFilter] = useState('');
+const SERVICE_HISTORY_STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
-  const loadPhotos = useCallback(async () => {
+const SH_STATUS_CLASSES: Record<string, string> = {
+  scheduled: 'bg-gray-100 text-gray-700',
+  intake: 'bg-blue-50 text-blue-700',
+  in_progress: 'bg-yellow-50 text-yellow-700',
+  pending_approval: 'bg-orange-50 text-orange-700',
+  completed: 'bg-green-50 text-green-700',
+  closed: 'bg-slate-100 text-slate-600',
+  cancelled: 'bg-red-50 text-red-600',
+};
+
+const SH_STATUS_LABELS: Record<string, string> = {
+  scheduled: 'Scheduled',
+  intake: 'Intake',
+  in_progress: 'In Progress',
+  pending_approval: 'Pending',
+  completed: 'Completed',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+};
+
+function formatSHDuration(seconds: number): string {
+  if (!seconds) return '-';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function formatSHDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
+}
+
+function formatSHServiceNames(services: { name: string }[]): string {
+  if (!services || services.length === 0) return '-';
+  if (services.length <= 2) return services.map((s) => s.name).join(', ');
+  return `${services[0].name}, ${services[1].name} +${services.length - 2}`;
+}
+
+function formatSHVehicle(
+  v: { year: number | null; make: string | null; model: string | null; color: string | null } | null
+): string {
+  if (!v) return '-';
+  const parts = [v.year, v.make, v.model].filter(Boolean);
+  return parts.join(' ') || '-';
+}
+
+function CustomerServiceHistoryTab({ customerId, vehicles }: { customerId: string; vehicles: Vehicle[] }) {
+  const router = useRouter();
+  const [jobs, setJobs] = useState<ServiceHistoryJob[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
+  const limit = 20;
+
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      params.set('customer_id', customerId);
+      params.set('sort_by', 'created_at');
+      params.set('sort_dir', 'desc');
+      if (statusFilter) params.set('status', statusFilter);
       if (vehicleFilter) params.set('vehicle_id', vehicleFilter);
-      const res = await adminFetch(`/api/admin/customers/${customerId}/photos?${params}`);
+
+      const res = await adminFetch(`/api/admin/jobs?${params}`);
       if (res.ok) {
-        const json = await res.json();
-        setGroups(json.data);
+        const data = await res.json();
+        setJobs(data.jobs || []);
+        setTotal(data.total || 0);
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setLoading(false);
     }
-  }, [customerId, vehicleFilter]);
+  }, [customerId, page, statusFilter, vehicleFilter]);
 
   useEffect(() => {
-    loadPhotos();
-  }, [loadPhotos]);
+    fetchJobs();
+  }, [fetchJobs]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
-    );
-  }
+  const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="space-y-6">
-      {/* Vehicle filter */}
-      {vehicles.length > 1 && (
-        <div className="flex items-center gap-2">
-          <select
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          className="w-40"
+        >
+          {SERVICE_HISTORY_STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </Select>
+
+        {vehicles.length >= 2 && (
+          <Select
             value={vehicleFilter}
-            onChange={(e) => setVehicleFilter(e.target.value)}
-            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm"
+            onChange={(e) => {
+              setVehicleFilter(e.target.value);
+              setPage(1);
+            }}
+            className="w-52"
           >
             <option value="">All Vehicles</option>
             {vehicles.map((v) => (
@@ -1996,94 +2073,104 @@ function CustomerPhotosTab({ customerId, vehicles }: { customerId: string; vehic
                 {v.year} {v.make} {v.model}
               </option>
             ))}
-          </select>
+          </Select>
+        )}
+
+        <span className="text-sm text-gray-500">
+          {loading ? 'Loading...' : `${total} job${total !== 1 ? 's' : ''}`}
+        </span>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b bg-gray-50 text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Vehicle</th>
+              <th className="px-4 py-3">Services</th>
+              <th className="px-4 py-3 text-center">Add-ons</th>
+              <th className="px-4 py-3 text-center">Photos</th>
+              <th className="px-4 py-3">Duration</th>
+              <th className="px-4 py-3">Staff</th>
+              <th className="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-12 text-center">
+                  <Spinner className="mx-auto" />
+                </td>
+              </tr>
+            ) : jobs.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                  No service records found
+                </td>
+              </tr>
+            ) : (
+              jobs.map((job) => (
+                <tr
+                  key={job.id}
+                  className="cursor-pointer transition-colors hover:bg-gray-50"
+                  onClick={() => router.push(`/admin/jobs/${job.id}`)}
+                >
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                    {formatSHDate(job.created_at)}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {formatSHVehicle(job.vehicle)}
+                    {job.vehicle?.color && (
+                      <span className="ml-1 text-xs text-gray-400">({job.vehicle.color})</span>
+                    )}
+                  </td>
+                  <td className="max-w-[200px] truncate px-4 py-3 text-gray-600">
+                    {formatSHServiceNames(job.services)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {job.addon_count > 0 ? (
+                      <span className="text-sm text-gray-600">+{job.addon_count} add-on{job.addon_count !== 1 ? 's' : ''}</span>
+                    ) : (
+                      <span className="text-gray-300">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {job.photo_count > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-gray-600">
+                        {job.photo_count} photo{job.photo_count !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">-</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                    {formatSHDuration(job.timer_seconds)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                    {job.assigned_staff
+                      ? job.assigned_staff.first_name
+                      : <span className="text-gray-300">-</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SH_STATUS_CLASSES[job.status] || 'bg-gray-100 text-gray-700'}`}
+                    >
+                      {SH_STATUS_LABELS[job.status] || job.status}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-end">
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
         </div>
-      )}
-
-      {groups.length === 0 ? (
-        <EmptyState
-          icon={Camera}
-          title="No job photos found for this customer"
-          description="Photos will appear here after jobs with photo documentation are completed."
-        />
-      ) : (
-        groups.map((group) => {
-          const vehicle = group.vehicle;
-          const vehicleStr = vehicle
-            ? `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.color ? ` (${vehicle.color})` : ''}`
-            : 'Unknown vehicle';
-          const serviceNames = group.services.map((s) => s.name).join(', ');
-          const dateStr = new Date(group.date).toLocaleDateString('en-US', {
-            timeZone: 'America/Los_Angeles',
-            dateStyle: 'medium',
-          });
-
-          // Group photos by zone for before/after display
-          const zoneMap = new Map<string, { intake: typeof group.photos; completion: typeof group.photos; other: typeof group.photos }>();
-          for (const photo of group.photos) {
-            if (!zoneMap.has(photo.zone)) {
-              zoneMap.set(photo.zone, { intake: [], completion: [], other: [] });
-            }
-            const entry = zoneMap.get(photo.zone)!;
-            if (photo.phase === 'intake') entry.intake.push(photo);
-            else if (photo.phase === 'completion') entry.completion.push(photo);
-            else entry.other.push(photo);
-          }
-
-          return (
-            <Card key={group.job_id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base">{dateStr}</CardTitle>
-                    <p className="text-sm text-gray-500">{vehicleStr} · {serviceNames}</p>
-                  </div>
-                  <Badge variant={group.status === 'completed' || group.status === 'closed' ? 'default' : 'secondary'}>
-                    {group.status.replace(/_/g, ' ')}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[...zoneMap.entries()].map(([zoneKey, zonePhotos]) => {
-                    const hasBeforeAfter = zonePhotos.intake.length > 0 && zonePhotos.completion.length > 0;
-
-                    return (
-                      <div key={zoneKey}>
-                        <h4 className="mb-2 text-sm font-medium text-gray-700">{getZoneLabel(zoneKey)}</h4>
-                        {hasBeforeAfter ? (
-                          <div className="max-w-lg">
-                            <BeforeAfterSlider
-                              beforeSrc={zonePhotos.intake[0].image_url}
-                              afterSrc={zonePhotos.completion[0].image_url}
-                            />
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                            {[...zonePhotos.intake, ...zonePhotos.completion, ...zonePhotos.other].map((photo) => (
-                              <div key={photo.id} className="relative aspect-square overflow-hidden rounded-lg bg-gray-200">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={photo.thumbnail_url || photo.image_url}
-                                  alt={`${zoneKey} ${photo.phase}`}
-                                  className="h-full w-full object-cover"
-                                  loading="lazy"
-                                />
-                                <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                                  {photo.phase}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })
       )}
     </div>
   );
