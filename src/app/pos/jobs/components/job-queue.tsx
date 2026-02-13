@@ -213,10 +213,13 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
               const pickupTime = formatPickupTime(job.estimated_pickup_at);
 
               return (
-                <button
+                <div
                   key={job.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onSelectJob(job.id)}
-                  className="w-full rounded-lg border border-gray-200 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md active:bg-gray-50"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectJob(job.id); } }}
+                  className="w-full cursor-pointer rounded-lg border border-gray-200 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md active:bg-gray-50"
                 >
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
@@ -306,7 +309,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                       </span>
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
