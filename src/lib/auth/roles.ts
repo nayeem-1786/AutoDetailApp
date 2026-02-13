@@ -116,7 +116,7 @@ export const SIDEBAR_NAV: NavItem[] = [
   {
     label: 'Photos',
     href: '/admin/photos',
-    icon: 'ImageIcon',
+    icon: 'Camera',
   },
   {
     label: 'Staff',

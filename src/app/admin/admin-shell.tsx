@@ -41,7 +41,7 @@ import {
   FileText,
   ClipboardList,
   History,
-  ImageIcon,
+  Camera,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -74,7 +74,7 @@ const iconMap: Record<string, LucideIcon> = {
   ClipboardList,
   History,
   Shield,
-  ImageIcon,
+  Camera,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
