@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 48 — 2026-02-13 (Fix POS IP Restriction — Dev Blocking + RLS)
+
+### Fix: Middleware always blocked in dev due to IP mismatch
+- `getClientIp()` returned `::1` or `127.0.0.1` in local dev — never matches whitelisted public IPs
+- Now treats loopback addresses as `null` (same as "no IP detected")
+- IP check logic flipped: `!clientIp || !ips.includes(clientIp)` → `clientIp && !ips.includes(clientIp)`
+- Old: null IP = blocked (dev always blocked). New: null IP = allowed (local dev works), real IP checked in production
+- Error message now includes the blocked IP for easier debugging
+- Cache TTL reduced from 60s to 10s so settings changes take effect faster
+- Files: `src/middleware.ts`
+
+### Fix: RLS policy blocked non-super_admin from saving settings
+- `settings_write` policy on `business_settings` required `is_super_admin()` — only 1 user (Nayeem)
+- Admin users (Su Khan) got 42501 RLS violation on upsert, writes silently failed
+- Affected ALL 12 settings pages (Tax Config, Business Profile, Messaging, etc.)
+- Changed policy to use `is_admin_or_above()` — allows both `super_admin` and `admin` roles
+- Migration: `20260213000001_fix_settings_rls.sql`
+
+---
+
 ## Session 47 — 2026-02-12 (Fix POS IP Restriction — Dead Middleware)
 
 ### Fix: POS IP restriction was completely non-functional

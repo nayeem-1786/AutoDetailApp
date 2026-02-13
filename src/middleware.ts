@@ -9,7 +9,7 @@ const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/unsu
 let cachedIps: string[] | null = null;
 let cachedEnabled: boolean | null = null;
 let cacheExpiry = 0;
-const CACHE_TTL_MS = 60_000; // 60 seconds
+const CACHE_TTL_MS = 10_000; // 10 seconds
 
 async function getIpWhitelistConfig(): Promise<{ ips: string[]; enabled: boolean }> {
   const now = Date.now();
@@ -75,9 +75,14 @@ async function getIpWhitelistConfig(): Promise<{ ips: string[]; enabled: boolean
 function getClientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    const ip = forwarded.split(',')[0].trim();
+    // In dev, x-forwarded-for may be ::1 or 127.0.0.1 — treat as null
+    if (ip === '::1' || ip === '127.0.0.1') return null;
+    return ip;
   }
-  return request.headers.get('x-real-ip');
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp === '::1' || realIp === '127.0.0.1') return null;
+  return realIp;
 }
 
 export async function middleware(request: NextRequest) {
@@ -88,8 +93,13 @@ export async function middleware(request: NextRequest) {
     const { ips, enabled } = await getIpWhitelistConfig();
     if (enabled && ips.length > 0) {
       const clientIp = getClientIp(request);
-      if (!clientIp || !ips.includes(clientIp)) {
-        return new NextResponse('Access denied: Your IP address is not authorized to access the POS system.', { status: 403 });
+      // null means local/dev connection (::1, 127.0.0.1, or no proxy headers)
+      // Only enforce IP restriction when we have a real public IP to check
+      if (clientIp && !ips.includes(clientIp)) {
+        return new NextResponse(
+          'Access denied: Your IP address (' + clientIp + ') is not authorized to access the POS system.',
+          { status: 403 }
+        );
       }
     }
   }
