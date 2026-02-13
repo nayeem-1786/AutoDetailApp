@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 41 — 2026-02-12 (Toast Stacking Fix)
+
+### Fix: Toast notifications stack vertically instead of overlapping
+- Added `expand` prop to `<Toaster>` — toasts now always display in a fully expanded vertical stack instead of collapsing on top of each other
+- Added `visibleToasts={5}` to allow up to 5 simultaneous toasts (sonner default was 3)
+- File: `src/app/layout.tsx`
+
+---
+
 ## Session 40 — 2026-02-12 (Completion SMS, Job-to-Checkout, Gallery Addons + Timestamp)
 
 ### Fix: Completion SMS — Business Info + Vehicle Name
