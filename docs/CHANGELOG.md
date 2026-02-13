@@ -4,6 +4,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 50 — 2026-02-13 (Customer Portal Photo History Enhancements)
+
+### Enhanced: /api/account/photos API
+- Added pagination support (`page`, `limit` query params) with total count for load-more
+- Added vehicle filter (`vehicle_id` query param) to filter photos by vehicle
+- Restructured response: photos grouped by phase (`intake`/`completion`) instead of flat list
+- Added `zone_label` to each photo for display convenience
+- Added `vehicles` array in response for filter dropdown population
+- Excluded `progress` phase photos from customer view (internal documentation only)
+- Added `gallery_token` to each visit for potential future linking
+- Added `photo_count` per visit with intake/completion breakdown
+
+### Enhanced: /account/photos page
+- **Vehicle filter dropdown** — only shown when customer has multiple vehicles with photos
+- **"Load more" pagination** — shows count (e.g., "5 of 12"), appends next batch without full reload
+- **Photo lightbox** — fullscreen overlay with close (X), left/right navigation arrows, photo counter, zone label, phase label, download button. Click any photo or slider to open.
+- **Improved zone matching** — first matching intake+completion pair per zone shown as `BeforeAfterSlider`, extras in grid
+- **Photo count** — shown on each visit card header
+
+### New: "Your Last Service" card on /account dashboard
+- Shows date, vehicle (year make model — color), services performed
+- Features 1 before/after `BeforeAfterSlider` pair (prefers exterior zones)
+- "View all photos" link to `/account/photos`
+- Only visible when customer has at least 1 completed job with photos
+
+### Enhanced: Admin photos API
+- Added search support (customer name/phone lookup using related-table-first pattern)
+- Added pagination via `page`/`limit` params
+- Added `featured` filter param
+
+### Files Modified
+- `src/app/api/account/photos/route.ts` — rewritten with pagination, vehicle filter, phase grouping
+- `src/app/(account)/account/photos/page.tsx` — rewritten with vehicle filter, load more, lightbox
+- `src/app/(account)/account/page.tsx` — added Last Service card with before/after slider
+- `src/app/api/admin/photos/route.ts` — enhanced with search, pagination, featured filter
+
+---
+
 ## Session 49 — 2026-02-13 (Revert Vehicle SVG, Fix IP Restriction)
 
 ### Revert: Vehicle silhouette changes

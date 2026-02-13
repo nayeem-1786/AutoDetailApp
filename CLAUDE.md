@@ -343,7 +343,8 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **photo_gallery flag** (default OFF): Gates the public gallery page at `/gallery`. When disabled, shows "Coming Soon" page. Does NOT affect admin photo gallery or customer portal photos (those use `photo_documentation` flag).
 - **Internal photos** (`is_internal = true`): MUST NEVER appear in customer-facing views (portal, public gallery, customer detail Photos tab). Only visible in admin photo gallery and POS job detail. All customer-facing queries filter `is_internal = false`.
 - **Admin photo gallery** (`/admin/photos`): Browse all job photos with filters. Permission-gated: `admin.photos.view` for viewing, `admin.photos.manage` for featured/internal toggles and bulk actions. Feature flag: `photo_documentation`.
-- **Customer portal photos** (`/account/photos`): Shows only completed/closed/pending_approval jobs. Excludes internal photos. No admin auth — uses cookie session + customer lookup.
+- **Customer portal photos** (`/account/photos`): Shows only completed/closed/pending_approval jobs. Excludes internal AND progress-phase photos. No admin auth — uses cookie session + customer lookup. API supports pagination (`page`/`limit`), vehicle filter (`vehicle_id`), returns photos grouped by phase (intake/completion) with zone_labels and photo_counts. Page features: vehicle filter dropdown (multiple vehicles), "Load more" pagination, fullscreen photo lightbox with navigation.
+- **Last Service card** on `/account` dashboard: Shows most recent completed job with date, vehicle, services, and 1 featured before/after `BeforeAfterSlider` (prefers exterior zones). "View all photos" link to `/account/photos`. Only visible when customer has completed jobs with photos.
 - **Public gallery** (`/gallery`): Server Component for SEO. Only shows `is_featured = true` AND `is_internal = false` photos with both intake + completion (before/after pairs). NO customer data exposed — only vehicle make/model and service names.
 - **AI addon authorization**: `buildSystemPrompt()` injects pending addon context when `customerId` provided. AI outputs `[AUTHORIZE_ADDON:uuid]` / `[DECLINE_ADDON:uuid]` blocks, parsed by `extractAddonActions()` in Twilio webhook. Blocks stripped before sending customer-facing message. Pattern mirrors `extractQuoteRequest()`.
 - **Flag flow issue types**: Detailers select from 10 predefined issue types (scratches, water_spots, paint_damage, pet_hair_stains, interior_stains, odor, headlight_haze, wheel_damage, tar_sap_overspray, other) instead of picking from the service catalog. Stored as `issue_type` + `issue_description` on `job_addons` table. DB CHECK constraint enforces valid values. Utility: `src/lib/utils/issue-types.ts` — `getIssueHumanReadable()`, `getIssueLabel()`, `friendlyServiceName()`.
@@ -407,7 +408,15 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 45 — Flag Flow Fixes)
+## Last Session: 2026-02-13 (Session 50 — Customer Portal Photo History Enhancements)
+- **Enhanced /api/account/photos API**: Added pagination (`page`/`limit`), vehicle filter (`vehicle_id`), restructured response with photos grouped by phase (intake/completion), added `zone_label`, `photo_count`, `vehicles` array for filter dropdown, excluded progress-phase photos
+- **Enhanced /account/photos page**: Vehicle filter dropdown (shown when multiple vehicles), "Load more" pagination with count display, fullscreen photo lightbox (close, left/right navigation, counter, download), improved zone-by-zone before/after matching
+- **Last Service card on /account dashboard**: Shows most recent completed job date, vehicle, services. Features 1 `BeforeAfterSlider` pair (prefers exterior zones). "View all photos" link. Only visible with completed jobs with photos.
+- **Enhanced admin photos API**: Added search (customer name/phone), page/limit pagination, featured filter
+- Files: `src/app/api/account/photos/route.ts`, `src/app/(account)/account/photos/page.tsx`, `src/app/(account)/account/page.tsx`, `src/app/api/admin/photos/route.ts`
+- TypeScript clean (zero errors)
+
+### Session 45 — 2026-02-12 (Flag Flow Fixes)
 - **Flag flow annotated images**: Annotations (circles, arrows, text) now rendered on customer-facing authorization page via `AnnotationOverlay`, and burned into MMS/email images server-side via `sharp` compositing (`src/lib/utils/render-annotations.ts`). Preview step also shows annotations.
 - **Flag flow vehicle-size pricing**: Replaced flat $0.00 catalog list with `CatalogBrowser` + `ServicePricingPicker`. Tabs for Services/Products/Custom. Vehicle `size_class` passed through for correct pricing.
 - **Flag flow quantity rules**: `addedServiceIds` built from `job.services` + approved `job.addons`. Duplicate services blocked with warning toast. Per-unit max enforced via `PerUnitPicker`.
