@@ -410,13 +410,24 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-13 (Session 52 — Customer Portal: Service Records Restructure)
+## Last Session: 2026-02-13 (Session D — Admin Jobs / Service Records Page)
+- **New `/admin/jobs/[id]` detail page**: Full job detail with Overview + Photos tabs.
+  - **Overview tab**: Job summary card (customer link, vehicle, staff, duration), timeline (created → intake → work → completed → pickup → cancelled), services list with pricing, add-ons section with status badges (approved/declined/pending/expired) + discount display, totals sidebar card, quick stats card, intake notes, pickup notes, cancellation info.
+  - **Photos tab**: Before/after `BeforeAfterSlider` per zone, photo grids grouped by phase (intake/progress/completion) with thumbnails, lightbox with metadata (zone, phase, creator, timestamp, featured/internal badges).
+  - Source badge: Appointment (purple) vs Walk-In (amber).
+- File created: `src/app/admin/jobs/[id]/page.tsx`
+- TypeScript clean (zero errors)
+
+### Session 52 — 2026-02-13 (Customer Portal: Service Records Restructure + Admin Jobs Page)
 - **New `/account/services` page**: Clean row-style visit list — date, vehicle, services, addon count, photo count, status pill (green/slate). Vehicle filter dropdown. Load more pagination (10/page). Click → detail page.
 - **New `/account/services/[jobId]` detail page**: Service summary with prices, approved addons ("Additional services added during your visit"), duration (formatted from timer_seconds), staff attribution. Expandable before/after photos section with zone-by-zone BeforeAfterSliders. Link to public gallery.
 - **New APIs**: `GET /api/account/services` (paginated visit list with counts), `GET /api/account/services/[jobId]` (full detail with photos/addons/staff). Both use cookie auth + customer ownership verification.
 - **Nav updated**: "Photos" → "Service History" in portal tabs. Dashboard link → "View service history". Old `/account/photos` redirects to `/account/services`.
-- **Admin sidebar**: "Photos" → "Service Records" with children (All Jobs + Photo Gallery)
-- Files created: `src/app/(account)/account/services/page.tsx`, `src/app/(account)/account/services/[jobId]/page.tsx`, `src/app/api/account/services/route.ts`, `src/app/api/account/services/[jobId]/route.ts`
+- **Admin sidebar**: "Photos" → "Service Records" with children (All Jobs + Photo Gallery). Icon: Briefcase. Feature flag: `photo_documentation`.
+- **New `/admin/jobs` table page**: Filterable table of all jobs — columns: date, customer (clickable link), vehicle + color, services (truncated), add-ons count badge, photo count, duration, staff, status pill. Filters: customer search (debounced), status dropdown, staff dropdown, date range. Sortable columns (date, duration, status). Pagination. Row click → `/admin/jobs/[id]`.
+- **New `GET /api/admin/jobs` API**: Paginated job list with customer/vehicle/staff joins, batch photo + approved addon counts. Filters: status, staff_id, customer_id, date_from, date_to, search (name/phone). Auth: `admin.photos.view` permission.
+- **New `GET /api/admin/jobs/[id]` API**: Full job detail with customer, vehicle, staff, enriched addons (resolved service/product names), photos grouped by phase, photo creators, linked transaction. Auth: `admin.photos.view` permission.
+- Files created: `src/app/admin/jobs/page.tsx`, `src/app/api/admin/jobs/route.ts`, `src/app/api/admin/jobs/[id]/route.ts`, `src/app/(account)/account/services/page.tsx`, `src/app/(account)/account/services/[jobId]/page.tsx`, `src/app/api/account/services/route.ts`, `src/app/api/account/services/[jobId]/route.ts`
 - Files modified: `account-shell.tsx`, `account/page.tsx`, `account/photos/page.tsx` (redirect), `admin-shell.tsx`, `roles.ts`
 - TypeScript clean (zero errors)
 

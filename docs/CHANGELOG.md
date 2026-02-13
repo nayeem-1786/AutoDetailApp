@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session D — 2026-02-13 (Admin Jobs / Service Records Detail Page)
+
+### New: /admin/jobs/[id] — Job Detail Page
+- **Overview tab**: Job summary card (customer link, vehicle, staff, duration), timeline with all status transitions (created → intake → work → completed → pickup → cancelled), original services list with pricing, add-ons section with status badges (approved/declined/pending/expired) + discount display + issue type, totals sidebar card with grand total + transaction link, quick stats card (photos/duration/services/addons), intake notes, pickup notes, cancellation info
+- **Photos tab**: Before/after `BeforeAfterSlider` per zone (only zones with both intake + completion), photo grids grouped by phase (intake/progress/completion) with thumbnail grid, fullscreen lightbox with zone label, phase, creator name, timestamp, featured/internal badges, notes
+- Source badge: Appointment (purple, CalendarDays icon) vs Walk-In (amber, Footprints icon)
+- 3-column layout: main content (2 cols) + sidebar (1 col)
+- Auth: `admin.photos.view` permission via API route
+
+### Files
+- Created: `src/app/admin/jobs/[id]/page.tsx` (860 lines)
+
+---
+
 ## Session 52 — 2026-02-13 (Customer Portal: Service Records Restructure)
 
 ### New: /account/services — Service History page
