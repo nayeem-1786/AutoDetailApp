@@ -6,6 +6,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ## Session 37 — 2026-02-12 (Job Source Badge + Editable Job Detail + Phone Format Fix)
 
+### Notes Card Tap-to-Edit
+- Notes card now follows same full-tap pattern as Customer, Detailer, Services cards — tap anywhere to open edit modal
+- Removed standalone pencil icon — card itself is the button with hover/active feedback
+- Empty notes show "Tap to add notes" placeholder; read-only when no `pos.jobs.manage` permission
+
+### Duplicate Job Population Fix
+- **Root cause**: React strict mode double-fired mount `useEffect`, calling `POST /api/pos/jobs/populate` twice concurrently. Both calls read DB before either inserted, creating duplicates.
+- **DB fix**: Added partial unique index `idx_jobs_unique_appointment_id` on `jobs(appointment_id) WHERE appointment_id IS NOT NULL`
+- **API fix**: Changed `.insert()` to `.upsert()` with `ignoreDuplicates: true` — safe for concurrent calls
+- **Client fix**: Added `useRef` guard to prevent mount effect double-fire
+- Migration: `20260212000008_jobs_unique_appointment_id.sql` (includes commented cleanup SQL for existing dupes)
+
 ### Notes Editing Modal (iPad UX)
 - Replaced inline textarea editing with bottom sheet modal matching other edit modals (customer, vehicle, services)
 - Full-width textarea (5 rows), auto-focus for immediate keyboard, Save/Cancel buttons

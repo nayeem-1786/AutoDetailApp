@@ -124,9 +124,11 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Use upsert with ignoreDuplicates to safely handle concurrent calls.
+    // The partial unique index on appointment_id prevents duplicates at the DB level.
     const { data: createdJobs, error: insertError } = await supabase
       .from('jobs')
-      .insert(jobInserts)
+      .upsert(jobInserts, { onConflict: 'appointment_id', ignoreDuplicates: true })
       .select(`
         *,
         customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone),

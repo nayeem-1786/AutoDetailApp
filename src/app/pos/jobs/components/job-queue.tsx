@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, RefreshCw, User, Clock, Bell, Calendar, Footprints } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
@@ -78,6 +78,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [populating, setPopulating] = useState(false);
+  const populatedRef = useRef(false);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -112,8 +113,10 @@ export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
     }
   }, [fetchJobs]);
 
-  // Auto-populate on mount, then fetch jobs
+  // Auto-populate on mount (ref guard prevents React strict mode double-fire)
   useEffect(() => {
+    if (populatedRef.current) return;
+    populatedRef.current = true;
     async function init() {
       await populateFromAppointments();
       await fetchJobs();

@@ -861,27 +861,33 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
           </div>
 
           {/* Notes */}
-          {(isEditable || job.intake_notes) && (
-            <div className="rounded-lg bg-white p-3 shadow-sm">
+          {isEditable ? (
+            <button
+              onClick={handleStartEditNotes}
+              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <FileText className="h-4 w-4" />
                   <span>Notes</span>
                 </div>
-                {isEditable && (
-                  <button
-                    onClick={handleStartEditNotes}
-                    className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-gray-100"
-                  >
-                    <Pencil className="h-4 w-4 text-gray-400" />
-                  </button>
-                )}
+                <Pencil className="h-4 w-4 text-gray-400" />
               </div>
               <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
-                {job.intake_notes || <span className="italic text-gray-400">No notes</span>}
+                {job.intake_notes || <span className="italic text-gray-400">Tap to add notes</span>}
+              </p>
+            </button>
+          ) : job.intake_notes ? (
+            <div className="rounded-lg bg-white p-3 shadow-sm">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <FileText className="h-4 w-4" />
+                <span>Notes</span>
+              </div>
+              <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+                {job.intake_notes}
               </p>
             </div>
-          )}
+          ) : null}
 
           {/* Addons Section */}
           {allAddons.length > 0 && (
