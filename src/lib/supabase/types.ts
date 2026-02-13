@@ -906,6 +906,9 @@ export interface Job {
   actual_pickup_at: string | null;
   pickup_notes: string | null;
   gallery_token: string | null;
+  cancellation_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, RefreshCw, User, Clock, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
+import { usePosPermission } from '../../context/pos-permission-context';
 import { posFetch } from '../../lib/pos-fetch';
 import type { JobStatus } from '@/lib/supabase/types';
 
@@ -70,7 +71,9 @@ interface JobQueueProps {
 
 export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
   const { employee } = usePosAuth();
-  const [filter, setFilter] = useState<FilterType>('mine');
+  const { granted: canCreateWalkIn } = usePosPermission('pos.jobs.create_walkin');
+  const isBookable = employee?.bookable_for_appointments ?? false;
+  const [filter, setFilter] = useState<FilterType>(isBookable ? 'mine' : 'all');
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [populating, setPopulating] = useState(false);
@@ -145,32 +148,36 @@ export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
             <RefreshCw className={cn('h-4 w-4', populating && 'animate-spin')} />
             Refresh
           </button>
-          <button
-            onClick={onNewWalkIn}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" />
-            New Walk-in
-          </button>
+          {canCreateWalkIn && (
+            <button
+              onClick={onNewWalkIn}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />
+              New Walk-in
+            </button>
+          )}
         </div>
       </div>
 
       {/* Filter pills */}
       <div className="flex gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2">
-        {(['mine', 'all', 'unassigned'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              'rounded-full px-3 py-1 text-sm font-medium transition-colors',
-              filter === f
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
-            )}
-          >
-            {f === 'mine' ? 'My Jobs' : f === 'all' ? 'All Jobs' : 'Unassigned'}
-          </button>
-        ))}
+        {(['mine', 'all', 'unassigned'] as const)
+          .filter((f) => f !== 'mine' || isBookable)
+          .map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                'rounded-full px-3 py-1 text-sm font-medium transition-colors',
+                filter === f
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              )}
+            >
+              {f === 'mine' ? 'My Jobs' : f === 'all' ? 'All Jobs' : 'Unassigned'}
+            </button>
+          ))}
       </div>
 
       {/* Job list */}

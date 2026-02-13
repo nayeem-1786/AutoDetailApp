@@ -10,7 +10,7 @@ import type { Customer } from '@/lib/supabase/types';
 
 interface CustomerLookupProps {
   onSelect: (customer: Customer) => void;
-  onGuest: () => void;
+  onGuest?: () => void;
   onCreateNew: () => void;
 }
 
@@ -156,15 +156,17 @@ export function CustomerLookup({
 
       {/* Action buttons */}
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1"
-          onClick={onGuest}
-        >
-          <UserX className="mr-1.5 h-3.5 w-3.5" />
-          Guest
-        </Button>
+        {onGuest && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={onGuest}
+          >
+            <UserX className="mr-1.5 h-3.5 w-3.5" />
+            Guest
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"

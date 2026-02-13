@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Search,
@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { posFetch } from '../../lib/pos-fetch';
-import type { JobServiceSnapshot } from '@/lib/supabase/types';
+import { CustomerLookup } from '../../components/customer-lookup';
+import type { Customer, JobServiceSnapshot } from '@/lib/supabase/types';
 
 type Step = 'customer' | 'vehicle' | 'services';
 
@@ -181,38 +182,7 @@ export function WalkInFlow({ onBack, onCreated }: WalkInFlowProps) {
 // ─── Customer Step ───────────────────────────────────────────────────────────
 
 function CustomerStep({ onSelect }: { onSelect: (c: CustomerResult) => void }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<CustomerResult[]>([]);
-  const [searching, setSearching] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const search = useCallback(async (term: string) => {
-    if (term.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setSearching(true);
-    try {
-      const res = await posFetch(`/api/pos/customers/search?q=${encodeURIComponent(term)}`);
-      if (res.ok) {
-        const { data } = await res.json();
-        setResults(data ?? []);
-      }
-    } catch {
-      /* ignore */
-    } finally {
-      setSearching(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(query), 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, search]);
 
   if (showQuickAdd) {
     return (
@@ -225,58 +195,18 @@ function CustomerStep({ onSelect }: { onSelect: (c: CustomerResult) => void }) {
 
   return (
     <div className="p-4">
-      {/* Search input */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or phone..."
-          className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          autoFocus
-        />
-      </div>
-
-      {/* Quick Add button */}
-      <button
-        onClick={() => setShowQuickAdd(true)}
-        className="mt-3 flex w-full items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-      >
-        <Plus className="h-4 w-4" />
-        Quick Add New Customer
-      </button>
-
-      {/* Results */}
-      {searching && (
-        <div className="mt-4 flex justify-center">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-        </div>
-      )}
-
-      {!searching && results.length > 0 && (
-        <div className="mt-3 space-y-1">
-          {results.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => onSelect(c)}
-              className="flex w-full items-center justify-between rounded-lg bg-white p-3 text-left shadow-sm hover:bg-gray-50"
-            >
-              <div>
-                <p className="font-medium text-gray-900">
-                  {c.first_name} {c.last_name}
-                </p>
-                <p className="text-sm text-gray-500">{c.phone || c.email || 'No contact'}</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!searching && query.trim().length >= 2 && results.length === 0 && (
-        <p className="mt-4 text-center text-sm text-gray-400">No customers found</p>
-      )}
+      <CustomerLookup
+        onSelect={(customer: Customer) =>
+          onSelect({
+            id: customer.id,
+            first_name: customer.first_name,
+            last_name: customer.last_name,
+            phone: customer.phone,
+            email: customer.email,
+          })
+        }
+        onCreateNew={() => setShowQuickAdd(true)}
+      />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
+import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-detailer';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 
 /**
@@ -75,11 +77,26 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
+
+    // Permission check: pos.jobs.create_walkin
+    const canCreate = await checkPosPermission(
+      supabase,
+      posEmployee.role,
+      posEmployee.employee_id,
+      'pos.jobs.create_walkin'
+    );
+    if (!canCreate) {
+      return NextResponse.json(
+        { error: 'You don\'t have permission to create walk-in jobs' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const {
       customer_id,
       vehicle_id,
-      assigned_staff_id,
+      assigned_staff_id: providedStaffId,
       services,
       estimated_pickup_at,
     } = body as {
@@ -98,12 +115,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'At least one service is required' }, { status: 400 });
     }
 
+    // Auto-assign detailer if none provided (walk-in)
+    let assignedStaffId = providedStaffId || null;
+    if (!assignedStaffId) {
+      const now = new Date();
+      const pstDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(now);
+      const pstTime = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(now);
+      const estimatedEnd = addMinutesToTime(pstTime, 60);
+
+      assignedStaffId = await findAvailableDetailer(supabase, pstDate, pstTime, estimatedEnd);
+    }
+
     const { data: job, error } = await supabase
       .from('jobs')
       .insert({
         customer_id,
         vehicle_id: vehicle_id || null,
-        assigned_staff_id: assigned_staff_id || null,
+        assigned_staff_id: assignedStaffId,
         appointment_id: null, // walk-in
         services,
         status: 'scheduled',

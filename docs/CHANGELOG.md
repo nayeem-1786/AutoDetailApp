@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Sessions 34-35 — 2026-02-12 (POS Job Permission Enforcement + Detailer Reassignment)
+
+### Detailer Reassignment on Job Detail
+- Assigned staff card is tappable (permission-gated by `pos.jobs.manage`)
+- Bottom sheet modal with all bookable staff: busy indicators, today's job count, checkmark on current assignee
+- "Unassigned" option removes assignment
+- New endpoint: `GET /api/pos/staff/available`
+
+### Job Cancellation Flow
+- Cancel button with reason dropdown (5 reasons + custom), permission-gated by `pos.jobs.cancel`
+- Walk-in cancellation: silent cancel with toast
+- Appointment-based cancellation: SendMethodDialog for Email/SMS/Both notification, cancels job + frees appointment slot
+- Professional cancellation email (dark mode, red header, rebook CTA) + SMS notification
+- DB columns: `cancellation_reason`, `cancelled_at`, `cancelled_by`
+- New endpoint: `POST /api/pos/jobs/[id]/cancel`
+
+### POS Permission Enforcement (All 5 Job Permissions)
+- Shared `checkPosPermission()` utility at `src/lib/pos/check-permission.ts`
+- All POS job buttons now gated client-side (`usePosPermission()`) AND server-side (`checkPosPermission()`)
+- Permission matrix:
+  | Permission | Client Gate | Server Gate |
+  |---|---|---|
+  | `pos.jobs.view` | Jobs tab visibility | — |
+  | `pos.jobs.manage` | Reassign detailer | — |
+  | `pos.jobs.flag_issue` | Flag Issue button | — |
+  | `pos.jobs.create_walkin` | New Walk-in button | POST /api/pos/jobs |
+  | `pos.jobs.cancel` | Cancel button | POST /api/pos/jobs/[id]/cancel |
+- Defaults: cashier denied for cancel, flag_issue, manage, create_walkin
+
 ## Session 7 — 2026-02-07 (POS UX Polish)
 
 - **Service detail dialog:** Replaced full-page service detail with dialog popup (matching product flow)

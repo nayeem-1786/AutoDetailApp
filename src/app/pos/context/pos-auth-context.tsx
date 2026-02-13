@@ -20,6 +20,7 @@ export interface PosSessionEmployee {
   last_name: string;
   email: string;
   role: UserRole;
+  bookable_for_appointments: boolean;
 }
 
 interface PosSessionData {
@@ -54,14 +55,25 @@ const PosAuthContext = createContext<PosAuthContextType>({
   replaceSession: () => {},
 });
 
-/** Decode JWT payload without verification (client-side expiry check only). */
+/** Decode token payload without verification (client-side expiry check only). */
 function decodeTokenExp(token: string): number | null {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return null;
+    let payloadPart: string;
+
+    if (parts.length === 2) {
+      // POS custom token: payload.signature — payload is parts[0]
+      payloadPart = parts[0];
+    } else if (parts.length === 3) {
+      // Standard JWT: header.payload.signature — payload is parts[1]
+      payloadPart = parts[1];
+    } else {
+      return null;
+    }
+
     // base64url → base64
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const json = atob(payload);
+    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(base64);
     const parsed = JSON.parse(json);
     return typeof parsed.exp === 'number' ? parsed.exp : null;
   } catch {

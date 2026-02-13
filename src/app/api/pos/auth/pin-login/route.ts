@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   // Find active employee with this PIN (include role)
   const { data: employee, error: empError } = await admin
     .from('employees')
-    .select('id, auth_user_id, first_name, last_name, email, role')
+    .select('id, auth_user_id, first_name, last_name, email, role, bookable_for_appointments')
     .eq('pin_code', pin)
     .eq('status', 'active')
     .single();
@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
       last_name: employee.last_name,
       email: employee.email,
       role: employee.role,
+      bookable_for_appointments: employee.bookable_for_appointments,
     },
     idle_timeout_minutes: idleTimeoutMinutes,
   });

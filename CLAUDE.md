@@ -394,7 +394,50 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 32 — Phase 8 Session 4: AI Authorization + Completion + Notifications + Checkout)
+## Last Session: 2026-02-12 (Session 35 — POS Job Permission Enforcement)
+- **POS job permission enforcement**: All 5 POS job permissions now enforced client-side (via `usePosPermission()`) and server-side (via `checkPosPermission()`). Buttons hidden entirely when permission denied — no error dialogs.
+- **Shared permission helper** (`src/lib/pos/check-permission.ts`): Extracted `checkPosPermission()` to shared utility. Resolution: super_admin bypass → employee override → role default → deny. Used by cancel route and walk-in create route.
+- **`pos.jobs.cancel` defaults fixed**: Changed cashier default from `true` to `false`. Only super_admin, admin, detailer get cancel by default. Cashier must be explicitly granted. Updated both `role-defaults.ts` and migration file.
+- **`pos.jobs.create_walkin` now enforced**:
+  - **Client-side**: "New Walk-in" button in `job-queue.tsx` hidden when `pos.jobs.create_walkin` is denied.
+  - **Server-side**: `POST /api/pos/jobs` now checks `pos.jobs.create_walkin` via `checkPosPermission()`. Returns 403 if denied.
+- **`pos.jobs.flag_issue` now enforced**: Flag Issue button in `job-detail.tsx` hidden when `pos.jobs.flag_issue` is denied.
+- **`pos.jobs.cancel` enforcement** (from Session 34): Cancel button uses `usePosPermission('pos.jobs.cancel')`. Server-side cancel route uses shared `checkPosPermission()`.
+- **POS permission enforcement matrix**:
+  | Permission | Client Gate | Server Gate | Default: super_admin | admin | detailer | cashier |
+  |---|---|---|---|---|---|---|
+  | `pos.jobs.view` | Jobs tab visibility | — | true | true | true | true |
+  | `pos.jobs.manage` | Reassign detailer card | — | true | true | true | false |
+  | `pos.jobs.flag_issue` | Flag Issue button | — | true | true | true | false |
+  | `pos.jobs.create_walkin` | New Walk-in button | POST /api/pos/jobs | true | true | false | false |
+  | `pos.jobs.cancel` | Cancel Job button | POST /api/pos/jobs/[id]/cancel | true | true | true | false |
+- **Files created**: `src/lib/pos/check-permission.ts`
+- **Files modified**: `src/app/pos/jobs/components/job-detail.tsx` (flag_issue gating), `src/app/pos/jobs/components/job-queue.tsx` (walk-in button gating), `src/app/api/pos/jobs/route.ts` (server-side walk-in permission check), `src/app/api/pos/jobs/[id]/cancel/route.ts` (use shared checkPosPermission), `src/lib/utils/role-defaults.ts` (cashier cancel → false), `supabase/migrations/20260212000006_jobs_cancellation_columns.sql` (cashier cancel → false)
+- TypeScript clean (zero errors)
+
+### Session 34 — Detailer Reassignment + Cancel Permission Gating
+- **Detailer reassignment on job detail**: Assigned staff card is now tappable (for users with `pos.jobs.manage`). Opens bottom sheet with all bookable staff — shows name, "(busy)" indicator for in_progress/intake, today's job count, checkmark on current assignee. "Unassigned" option at top removes assignment. PATCHes `assigned_staff_id` via existing PATCH route.
+- **Cancel button permission-gated**: Uses `usePosPermission('pos.jobs.cancel')` and server-side `checkPosPermission()`.
+  - **Permission matrix**: scheduled/intake = `pos.jobs.cancel` permission. in_progress/pending_approval = admin only. completed/closed = cannot cancel.
+  - **Walk-in cancellation** (no `appointment_id`): Silent cancel. Sets `status='cancelled'`, `cancellation_reason`, `cancelled_at`, `cancelled_by`. Toast: "Job cancelled".
+  - **Appointment-based cancellation** (has `appointment_id`): After selecting reason, shows `SendMethodDialog` (reused from quotes) to choose Email/SMS/Both. Cancels job + linked appointment (frees time slot). Sends cancellation notification. Toast: "Job cancelled -- customer notified".
+  - **Cancel API**: `POST /api/pos/jobs/[id]/cancel` with HMAC auth. Body: `{ reason, notify_method? }`. Validates job is cancellable, role-based permission, cancels job + appointment, sends SMS/email notification.
+  - **Cancellation email**: Professional HTML email with dark mode support, red header, appointment details box, "Rebook Appointment" CTA button, business contact info. Uses `getBusinessInfo()` for all business details.
+  - **Cancellation SMS**: "Hi {first_name}, your {service_name} appointment on {date} at {time} has been cancelled. Please contact us to reschedule. - {business_name} {business_phone}"
+  - **Reason dropdown**: "Customer no-show", "Created by mistake", "Customer changed mind", "Schedule conflict", "Other" (with custom text input).
+  - **DB columns**: `cancellation_reason TEXT`, `cancelled_at TIMESTAMPTZ`, `cancelled_by UUID` added to `jobs` table. Migration: `20260212000006_jobs_cancellation_columns.sql`.
+  - **Permission**: `pos.jobs.cancel` added to `permission_definitions` + `permissions` (all POS roles). API enforces admin-only for in_progress+.
+  - **Queue filtering**: Cancelled jobs already excluded from job queue (`.neq('status', 'cancelled')` in GET handler).
+  - **Cancel button**: Red outline, positioned below action buttons. Hidden for completed/closed/cancelled jobs and non-admins for in_progress+ jobs.
+- **Files created**: `supabase/migrations/20260212000006_jobs_cancellation_columns.sql`, `src/app/api/pos/jobs/[id]/cancel/route.ts`
+- **Files modified**: `src/lib/utils/assign-detailer.ts` (schedule + jobs checks), `src/app/api/pos/jobs/route.ts` (auto-assign on walk-in), `src/lib/supabase/types.ts` (Job cancellation fields), `src/app/pos/jobs/components/job-detail.tsx` (cancel UI + SendMethodDialog)
+- TypeScript clean (zero errors)
+
+### Session 33 — Job Cancellation Flow + Auto-Assign Detailer to Walk-Ins
+- **Auto-assign detailer to walk-ins**: Enhanced `findAvailableDetailer()` in `src/lib/utils/assign-detailer.ts` to also check `employee_schedules` (day/time coverage) and active `jobs` table (in_progress/intake) for conflicts. Wired into `POST /api/pos/jobs` — walk-in jobs auto-assign a detailer using current PST time + 60min estimated window.
+- **Job cancellation flow**: Full cancel-with-notification system for POS jobs.
+
+### Session 32 — Phase 8 Session 4: AI Authorization + Completion + Notifications + Checkout
 - **Job-addons service** (`src/lib/services/job-addons.ts`): Central service for addon authorization handling via AI. `extractAddonActions(aiResponse)` regex-parses `[AUTHORIZE_ADDON:uuid]` and `[DECLINE_ADDON:uuid]` blocks. `approveAddon(addonId)` / `declineAddon(addonId)` validate status + expiration, update DB, send confirmation SMS. `getPendingAddonsForCustomer(customerId)` queries job_addons for active jobs. `buildAddonPromptSection(addons)` formats pending addons as AI prompt rules.
 - **AI context injection**: `buildSystemPrompt()` in `messaging-ai.ts` now accepts optional `customerId` param. When provided, injects pending addon context into AI system prompt so AI can authorize/decline addons conversationally. `getAIResponse()` passes `customerId` through.
 - **Webhook addon processing**: Twilio inbound webhook (`/api/webhooks/twilio/inbound`) — after AI generates response, `extractAddonActions()` parses authorize/decline blocks, processes each addon (with expiration handling), strips blocks from customer-facing message. Follows same block-extraction pattern as `extractQuoteRequest()`.
