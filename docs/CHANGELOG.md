@@ -4,6 +4,36 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 45 — 2026-02-12 (Flag Flow — Annotated Images, Vehicle-Size Pricing, Quantity Rules)
+
+### Fix: Annotated images not sent to customer in flag flow
+- Detailer markup (circles, arrows, text labels) was NOT visible to the customer — original unmarked photo was sent via MMS, shown in email, and displayed on the authorization page
+- Root cause: `annotation_data` JSONB was stored in DB and `AnnotationOverlay` component existed, but was never used in customer-facing contexts
+- **Authorization page** (`/authorize/[token]`): Added `AnnotationOverlay` SVG overlay on top of photos — annotations now visible when customer views the page
+- **MMS/Email**: Created `src/lib/utils/render-annotations.ts` — server-side utility using `sharp` that composites SVG annotations onto the actual image pixels, uploads to Supabase Storage, and returns a public URL. Both addon create and resend routes now send the annotated version
+- **Preview step**: Flag flow preview now shows `AnnotationOverlay` on the photo so detailer sees exactly what the customer will see
+- Files: `src/lib/utils/render-annotations.ts` (new), `src/app/authorize/[token]/page.tsx`, `src/app/api/pos/jobs/[id]/addons/route.ts`, `src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts`, `src/app/pos/jobs/components/flag-issue-flow.tsx`
+
+### Fix: Flag flow service picker shows $0.00 prices and wrong UX
+- Service prices showed as $0.00 because the flag flow used raw `base_price || price || 0` from `/api/pos/services` — most services use `service_pricing` table for vehicle-size-aware pricing, not `base_price`
+- Replaced the flat catalog list with the existing `CatalogBrowser` component used by the quote builder
+- Now has tabs (Services / Products / Custom) instead of a mixed flat list
+- Services tab: full category browsing, search, `ServicePricingPicker` for multi-tier services, vehicle-size-aware pricing via `resolveServicePrice()`
+- Products tab: full category browsing with proper `retail_price`
+- Custom tab: retained custom line item form
+- Vehicle `size_class` now flows from job detail → flag flow props → CatalogBrowser's `vehicleSizeOverride`
+- Files: `src/app/pos/jobs/components/flag-issue-flow.tsx`
+
+### Fix: Flag flow must follow service quantity rules
+- Flag flow had zero duplicate prevention — could add services already on the job, no per-unit max enforcement
+- Built `addedServiceIds` set from `job.services[]` + approved `job.addons[]` service IDs
+- Passed to `CatalogBrowser`'s `addedServiceIds` prop — shows green checkmark badge on already-added services
+- Added explicit duplicate guard in `handleAddService()` — shows warning toast and blocks selection
+- Per-unit max enforcement handled by `ServicePricingPicker`'s built-in `PerUnitPicker`
+- Files: `src/app/pos/jobs/components/flag-issue-flow.tsx`
+
+---
+
 ## Session 44 — 2026-02-12 (Customer Data Persistence Through Checkout + Hide Paid Jobs)
 
 ### Fix: Customer data persistence through job checkout flow

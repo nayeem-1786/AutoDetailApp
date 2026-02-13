@@ -2,6 +2,8 @@ import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { AuthorizationClient } from './authorization-client';
+import { AnnotationOverlay } from '@/app/pos/jobs/components/photo-annotation';
+import type { Annotation } from '@/lib/utils/job-zones';
 
 interface PageProps {
   params: Promise<{ token: string }>;
@@ -186,18 +188,24 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
             )}
           </div>
 
-          {/* Photos */}
+          {/* Photos (with annotation overlays) */}
           {photos.length > 0 && (
             <div className="px-5 pb-4">
-              {photos.map((photo) => (
-                <div key={photo.id} className="overflow-hidden rounded-lg">
-                  <img
-                    src={photo.image_url}
-                    alt="Issue found"
-                    className="w-full object-cover"
-                  />
-                </div>
-              ))}
+              {photos.map((photo) => {
+                const photoAnnotations = photo.annotation_data as Annotation[] | null;
+                return (
+                  <div key={photo.id} className="relative overflow-hidden rounded-lg">
+                    <img
+                      src={photo.image_url}
+                      alt="Issue found"
+                      className="w-full object-cover"
+                    />
+                    {photoAnnotations && photoAnnotations.length > 0 && (
+                      <AnnotationOverlay annotations={photoAnnotations} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 

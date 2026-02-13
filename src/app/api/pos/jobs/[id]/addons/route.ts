@@ -4,6 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
+import { getAnnotatedPhotoUrl } from '@/lib/utils/render-annotations';
 
 /**
  * GET /api/pos/jobs/[id]/addons — List addons for a job
@@ -163,16 +164,16 @@ export async function POST(
     const authorizeUrl = `${appUrl}/authorize/${authToken}`;
     const biz = await getBusinessInfo();
 
-    // Get the first photo URL for MMS
+    // Get the first photo URL for MMS (with annotations rendered onto image)
     let photoUrl: string | null = null;
     if (photo_ids.length > 0) {
       const { data: photo } = await supabase
         .from('job_photos')
-        .select('image_url')
+        .select('id, image_url, annotation_data')
         .eq('id', photo_ids[0])
         .single();
       if (photo?.image_url) {
-        photoUrl = photo.image_url;
+        photoUrl = await getAnnotatedPhotoUrl(supabase, photo, id);
       }
     }
 

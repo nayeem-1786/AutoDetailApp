@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ArrowLeft,
-  Camera,
-  Search,
   Check,
   ChevronRight,
   DollarSign,
@@ -12,28 +10,32 @@ import {
   MessageSquare,
   Eye,
   Send,
-  X,
-  Package,
-  Wrench,
   Edit3,
+  Wrench,
+  Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
 import { PhotoCapture } from './photo-capture';
+import { AnnotationOverlay } from './photo-annotation';
+import { CatalogBrowser } from '../../components/catalog-browser';
 import { EXTERIOR_ZONES, INTERIOR_ZONES, getZoneLabel } from '@/lib/utils/job-zones';
-import type { JobPhoto, JobPhotoPhase } from '@/lib/supabase/types';
+import { resolveServicePrice } from '../../utils/pricing';
+import type { Annotation } from '@/lib/utils/job-zones';
+import type { JobPhoto, JobPhotoPhase, ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+import type { CatalogService, CatalogProduct } from '../../types';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface CatalogItem {
-  id: string;
+interface SelectedItem {
+  type: 'service' | 'product' | 'custom';
+  id: string | null;
   name: string;
-  description: string | null;
   price: number;
-  type: 'service' | 'product';
-  estimated_duration_minutes?: number;
+  base_duration_minutes?: number;
 }
 
 interface FlagIssueFlowProps {
@@ -55,13 +57,17 @@ interface FlagIssueFlowProps {
       make: string | null;
       model: string | null;
       color: string | null;
+      size_class: string | null;
     } | null;
+    addons?: { id: string; status: string; service_id: string | null }[] | null;
   };
   onComplete: () => void;
   onBack: () => void;
 }
 
 type Step = 'photo' | 'zone-select' | 'catalog' | 'discount' | 'delay' | 'message' | 'preview';
+
+type CatalogTab = 'services' | 'products' | 'custom';
 
 const MESSAGE_TEMPLATES = [
   {
@@ -94,11 +100,9 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   const [capturedPhotos, setCapturedPhotos] = useState<JobPhoto[]>([]);
 
   // Step 2: Catalog selection
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [catalogSearch, setCatalogSearch] = useState('');
-  const [catalogLoading, setCatalogLoading] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
-  const [isCustom, setIsCustom] = useState(false);
+  const [catalogTab, setCatalogTab] = useState<CatalogTab>('services');
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [customDescription, setCustomDescription] = useState('');
   const [customPrice, setCustomPrice] = useState('');
 
@@ -113,12 +117,27 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   const [isCustomMessage, setIsCustomMessage] = useState(false);
   const [customMessageText, setCustomMessageText] = useState('');
 
+  // Vehicle size class for pricing
+  const vehicleSizeClass = (job.vehicle?.size_class ?? null) as VehicleSizeClass | null;
+
+  // Build set of service IDs already on this job (Bug 3: quantity rules)
+  const addedServiceIds = useMemo(() => {
+    const ids = new Set<string>();
+    // Services already on the job
+    job.services.forEach((s) => ids.add(s.id));
+    // Approved addon services
+    (job.addons ?? [])
+      .filter((a) => a.status === 'approved' && a.service_id)
+      .forEach((a) => ids.add(a.service_id!));
+    return ids;
+  }, [job.services, job.addons]);
+
   // Derived values
-  const price = isCustom ? parseFloat(customPrice) || 0 : selectedItem?.price || 0;
+  const price = selectedItem?.price || 0;
   const discount = parseFloat(discountAmount) || 0;
   const finalPrice = Math.max(0, price - discount);
   const delayMinutes = parseInt(pickupDelay) || 0;
-  const itemName = isCustom ? customDescription : selectedItem?.name || '';
+  const itemName = selectedItem?.name || '';
 
   const currentServiceNames = job.services.map((s) => s.name).join(', ');
   const vehicleDesc = job.vehicle
@@ -140,85 +159,76 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
       .replace('{price}', `$${finalPrice.toFixed(2)}`);
   })();
 
-  // Fetch catalog items
-  const fetchCatalog = useCallback(async (query: string) => {
-    setCatalogLoading(true);
-    try {
-      // Fetch services
-      const servicesRes = await posFetch(`/api/pos/services?search=${encodeURIComponent(query)}`);
-      let services: CatalogItem[] = [];
-      if (servicesRes.ok) {
-        const { data } = await servicesRes.json();
-        services = (data ?? []).map((s: Record<string, unknown>) => ({
-          id: s.id,
-          name: s.name,
-          description: s.description || null,
-          price: s.base_price || s.price || 0,
-          type: 'service' as const,
-          estimated_duration_minutes: s.estimated_duration_minutes || undefined,
-        }));
-      }
+  // ---------------------------------------------------------------------------
+  // Catalog callbacks (Bug 2: proper pricing via CatalogBrowser)
+  // ---------------------------------------------------------------------------
 
-      // Fetch products
-      const productsRes = await posFetch(`/api/pos/catalog?type=products&search=${encodeURIComponent(query)}`);
-      let products: CatalogItem[] = [];
-      if (productsRes.ok) {
-        const { data } = await productsRes.json();
-        products = (data ?? []).map((p: Record<string, unknown>) => ({
-          id: p.id,
-          name: p.name,
-          description: p.description || null,
-          price: p.price || 0,
-          type: 'product' as const,
-        }));
-      }
-
-      setCatalogItems([...services, ...products]);
-    } catch (err) {
-      console.error('Failed to fetch catalog:', err);
-    } finally {
-      setCatalogLoading(false);
+  function handleAddService(
+    service: CatalogService,
+    pricing: ServicePricing,
+    vsc: VehicleSizeClass | null,
+    perUnitQty?: number
+  ) {
+    // Duplicate guard (Bug 3)
+    if (addedServiceIds.has(service.id)) {
+      toast.warning(`${service.name} is already on this job`);
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    if (step === 'catalog') {
-      fetchCatalog(catalogSearch);
-    }
-  }, [step, catalogSearch, fetchCatalog]);
+    const resolved = perUnitQty != null && service.per_unit_price != null
+      ? perUnitQty * service.per_unit_price
+      : resolveServicePrice(pricing, vsc);
 
-  // Auto-set delay from service duration
-  useEffect(() => {
-    if (selectedItem?.estimated_duration_minutes && !pickupDelay) {
-      setPickupDelay(String(selectedItem.estimated_duration_minutes));
+    setSelectedItem({
+      type: 'service',
+      id: service.id,
+      name: service.name,
+      price: resolved,
+      base_duration_minutes: service.base_duration_minutes ?? undefined,
+    });
+
+    // Auto-fill pickup delay from service duration
+    if (service.base_duration_minutes) {
+      setPickupDelay(String(service.base_duration_minutes));
     }
-  }, [selectedItem]);
+
+    setStep('discount');
+  }
+
+  function handleAddProduct(product: CatalogProduct) {
+    setSelectedItem({
+      type: 'product',
+      id: product.id,
+      name: product.name,
+      price: product.retail_price,
+    });
+    setStep('discount');
+  }
+
+  function handleCustomSubmit() {
+    if (!customDescription.trim() || !customPrice) return;
+    setSelectedItem({
+      type: 'custom',
+      id: null,
+      name: customDescription.trim(),
+      price: parseFloat(customPrice) || 0,
+    });
+    setStep('discount');
+  }
 
   function handlePhotoSaved(photo: JobPhoto) {
     setCapturedPhotos((prev) => [...prev, photo]);
     setStep('catalog');
   }
 
-  function handleSelectItem(item: CatalogItem) {
-    setSelectedItem(item);
-    setIsCustom(false);
-    setStep('discount');
-  }
-
-  function handleCustomSubmit() {
-    if (!customDescription.trim() || !customPrice) return;
-    setIsCustom(true);
-    setSelectedItem(null);
-    setStep('discount');
-  }
-
   async function handleSend() {
+    if (!selectedItem) return;
     setSending(true);
     try {
       const payload = {
-        service_id: !isCustom && selectedItem?.type === 'service' ? selectedItem.id : null,
-        product_id: !isCustom && selectedItem?.type === 'product' ? selectedItem.id : null,
-        custom_description: isCustom ? customDescription : (selectedItem?.name || null),
+        service_id: selectedItem.type === 'service' ? selectedItem.id : null,
+        product_id: selectedItem.type === 'product' ? selectedItem.id : null,
+        custom_description: selectedItem.type === 'custom' ? selectedItem.name : (selectedItem.name || null),
         price,
         discount_amount: discount,
         pickup_delay_minutes: delayMinutes,
@@ -237,9 +247,11 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
       } else {
         const { error } = await res.json();
         console.error('Send addon error:', error);
+        toast.error(error || 'Failed to send authorization');
       }
     } catch (err) {
       console.error('Send addon error:', err);
+      toast.error('Failed to send authorization');
     } finally {
       setSending(false);
     }
@@ -302,7 +314,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   }
 
   // ---------------------------------------------------------------------------
-  // Step: Catalog Selection
+  // Step: Catalog Selection (Bug 2: CatalogBrowser + vehicle-size pricing)
   // ---------------------------------------------------------------------------
   if (step === 'catalog') {
     return (
@@ -317,109 +329,100 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
           </div>
         </div>
 
+        {/* Search + Tabs */}
         <div className="border-b border-gray-200 bg-white px-4 py-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search services or products..."
-              value={catalogSearch}
-              onChange={(e) => setCatalogSearch(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+          {/* Tab bar */}
+          <div className="mb-2 flex gap-1 rounded-lg bg-gray-100 p-0.5">
+            {([
+              { key: 'services' as CatalogTab, label: 'Services', icon: Wrench },
+              { key: 'products' as CatalogTab, label: 'Products', icon: Package },
+              { key: 'custom' as CatalogTab, label: 'Custom', icon: Edit3 },
+            ]).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setCatalogTab(key);
+                  setCatalogSearch('');
+                }}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium transition-colors',
+                  catalogTab === key
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
           </div>
 
-          {/* Custom toggle */}
-          <button
-            onClick={() => setIsCustom(!isCustom)}
-            className={cn(
-              'mt-2 flex w-full items-center gap-2 rounded-lg border p-2.5 text-sm',
-              isCustom
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-            )}
-          >
-            <Edit3 className="h-4 w-4" />
-            Custom line item
-          </button>
+          {/* Search bar (hidden for custom tab) */}
+          {catalogTab !== 'custom' && (
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Search ${catalogTab}...`}
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-          {isCustom ? (
-            <div className="space-y-3 rounded-lg bg-white p-4 shadow-sm">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Paint touch-up on rear bumper"
-                  value={customDescription}
-                  onChange={(e) => setCustomDescription(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Price ($)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={customPrice}
-                  onChange={(e) => setCustomPrice(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <button
-                onClick={handleCustomSubmit}
-                disabled={!customDescription.trim() || !customPrice || parseFloat(customPrice) <= 0}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                <Check className="h-4 w-4" />
-                Use Custom Item
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {catalogLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          {catalogTab === 'services' && (
+            <CatalogBrowser
+              type="services"
+              search={catalogSearch}
+              onAddService={handleAddService}
+              vehicleSizeOverride={vehicleSizeClass}
+              addedServiceIds={addedServiceIds}
+            />
+          )}
+          {catalogTab === 'products' && (
+            <CatalogBrowser
+              type="products"
+              search={catalogSearch}
+              onAddProduct={handleAddProduct}
+            />
+          )}
+          {catalogTab === 'custom' && (
+            <div className="p-4">
+              <div className="space-y-3 rounded-lg bg-white p-4 shadow-sm">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Paint touch-up on rear bumper"
+                    value={customDescription}
+                    onChange={(e) => setCustomDescription(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
                 </div>
-              ) : catalogItems.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">
-                  {catalogSearch ? 'No results found' : 'Search for a service or product'}
-                </p>
-              ) : (
-                catalogItems.map((item) => (
-                  <button
-                    key={`${item.type}-${item.id}`}
-                    onClick={() => handleSelectItem(item)}
-                    className="flex w-full items-start gap-3 rounded-lg bg-white p-3 shadow-sm hover:bg-gray-50"
-                  >
-                    <div className={cn(
-                      'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
-                      item.type === 'service' ? 'bg-blue-100' : 'bg-purple-100'
-                    )}>
-                      {item.type === 'service' ? (
-                        <Wrench className="h-3.5 w-3.5 text-blue-600" />
-                      ) : (
-                        <Package className="h-3.5 w-3.5 text-purple-600" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1 text-left">
-                      <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                      {item.description && (
-                        <p className="line-clamp-1 text-xs text-gray-500">{item.description}</p>
-                      )}
-                      {item.estimated_duration_minutes && (
-                        <p className="text-xs text-gray-400">~{item.estimated_duration_minutes} min</p>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-sm font-medium text-gray-900">
-                      ${item.price.toFixed(2)}
-                    </span>
-                  </button>
-                ))
-              )}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={customPrice}
+                    onChange={(e) => setCustomPrice(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  onClick={handleCustomSubmit}
+                  disabled={!customDescription.trim() || !customPrice || parseFloat(customPrice) <= 0}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" />
+                  Use Custom Item
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -527,8 +530,8 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <p className="mt-1 text-xs text-gray-500">
-              {selectedItem?.estimated_duration_minutes
-                ? `Auto-filled from service duration (${selectedItem.estimated_duration_minutes} min). You can adjust.`
+              {selectedItem?.base_duration_minutes
+                ? `Auto-filled from service duration (${selectedItem.base_duration_minutes} min). You can adjust.`
                 : 'Enter 0 if no additional time needed.'}
             </p>
 
@@ -656,9 +659,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   }
 
   // ---------------------------------------------------------------------------
-  // Step: Preview
+  // Step: Preview (Bug 1: show annotations on photo)
   // ---------------------------------------------------------------------------
   if (step === 'preview') {
+    const previewPhoto = capturedPhotos.length > 0 ? capturedPhotos[0] : null;
+    const previewAnnotations = previewPhoto?.annotation_data as Annotation[] | null;
+
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
@@ -677,14 +683,17 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               <p className="text-lg font-semibold text-white">Service Authorization Request</p>
             </div>
             <div className="space-y-4 p-4">
-              {/* Photo preview */}
-              {capturedPhotos.length > 0 && capturedPhotos[0].thumbnail_url && (
-                <div className="overflow-hidden rounded-lg">
+              {/* Photo preview with annotation overlay */}
+              {previewPhoto && previewPhoto.image_url && (
+                <div className="relative overflow-hidden rounded-lg">
                   <img
-                    src={capturedPhotos[0].thumbnail_url}
+                    src={previewPhoto.image_url}
                     alt="Issue photo"
                     className="w-full object-cover"
                   />
+                  {previewAnnotations && previewAnnotations.length > 0 && (
+                    <AnnotationOverlay annotations={previewAnnotations} />
+                  )}
                 </div>
               )}
 

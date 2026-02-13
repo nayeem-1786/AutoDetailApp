@@ -549,9 +549,10 @@ Future enhancement when multiple detailers are common: `job_staff_time` table tr
 
 1. During `in_progress` status, detailer taps **"Flag Issue"** button
 2. Camera opens → snap photo of the issue → optional annotation
-3. **Select what to propose:**
-   - **From catalog**: Search/browse existing services or products. Price auto-fills from catalog.
-   - **Custom line item**: Free-text description + manual price entry.
+3. **Select what to propose** (uses `CatalogBrowser` + `ServicePricingPicker`):
+   - **Services tab**: Full category-browsing CatalogBrowser with vehicle-size-aware pricing. Shows checkmark badges on services already on the job (quantity rules enforced — duplicate services blocked, per-unit max respected).
+   - **Products tab**: Full category-browsing CatalogBrowser for products.
+   - **Custom tab**: Free-text description + manual price entry.
 4. **Optional discount**: Flat dollar amount off. Detailer has full authority — no manager approval needed.
 5. **Pickup delay**: Auto-calculated from catalog service duration. Editable by detailer. Shows new estimated pickup time.
 6. **Message to customer**: 
@@ -561,12 +562,12 @@ Future enhancement when multiple detailers are common: `job_staff_time` table tr
      - "During our inspection we found [issue]. We recommend [service] for [price] — shall we go ahead?"
    - Or write a custom message
    - Template variables auto-fill: `{issue}`, `{service}`, `{price}`, `{delay}`, `{new_eta}`
-7. **Preview screen**: Shows exactly what the customer will see (photo, message, price, buttons)
+7. **Preview screen**: Shows exactly what the customer will see (photo with annotation overlay, message, price, buttons)
 8. Tap **"Send to Customer"** → creates `job_addons` record with `status = 'pending'`
 
 ### Customer Experience
 
-**SMS** (via `sendSms()` with MMS):
+**SMS** (via `sendSms()` with MMS — annotated image rendered server-side via `getAnnotatedPhotoUrl()`):
 ```
 Hi {first_name}, our team found something during your detail today.
 

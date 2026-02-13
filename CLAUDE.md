@@ -398,7 +398,14 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 40 — Completion SMS, Job-to-Checkout, Gallery Addons + Timestamp)
+## Last Session: 2026-02-12 (Session 45 — Flag Flow Fixes)
+- **Flag flow annotated images**: Annotations (circles, arrows, text) now rendered on customer-facing authorization page via `AnnotationOverlay`, and burned into MMS/email images server-side via `sharp` compositing (`src/lib/utils/render-annotations.ts`). Preview step also shows annotations.
+- **Flag flow vehicle-size pricing**: Replaced flat $0.00 catalog list with `CatalogBrowser` + `ServicePricingPicker`. Tabs for Services/Products/Custom. Vehicle `size_class` passed through for correct pricing.
+- **Flag flow quantity rules**: `addedServiceIds` built from `job.services` + approved `job.addons`. Duplicate services blocked with warning toast. Per-unit max enforced via `PerUnitPicker`.
+- Files: `src/lib/utils/render-annotations.ts` (new), `src/app/authorize/[token]/page.tsx`, `src/app/api/pos/jobs/[id]/addons/route.ts`, `src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts`, `src/app/pos/jobs/components/flag-issue-flow.tsx`, `docs/CHANGELOG.md`, `docs/PHASE8_JOB_MANAGEMENT.md`
+- TypeScript clean (zero errors)
+
+## Session 40 — 2026-02-12 (Completion SMS, Job-to-Checkout, Gallery Addons + Timestamp)
 - **Completion SMS rewrite**: Removed MMS `mediaUrl` (no raw image link). Vehicle = make + model only. Added business name, address, phone, today's closing time (from `business_hours` setting, PST). Email updated with same business info footer.
 - **Job → POS Checkout flow**: "Checkout" button on completed job detail (primary action). "Checkout" pill on completed job cards in queue. Loads checkout-items into POS register via `RESTORE_TICKET`. "Paid" badge on closed jobs. Double-checkout prevention (API returns 400 for closed jobs). Checkout-items response enriched with `is_taxable` + `category_id`.
 - **Gallery addons**: Gallery page (`/jobs/[token]/photos`) and API now include approved addons in "Services Performed" section with resolved service names and final prices.
