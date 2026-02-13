@@ -4,7 +4,11 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Session 37 — 2026-02-12 (Job Source Badge + Editable Job Detail)
+## Session 37 — 2026-02-12 (Job Source Badge + Editable Job Detail + Phone Format Fix)
+
+### Phone Number Display Fix
+- Fixed raw E.164 format (+14243637450) displaying on job detail — now shows (424) 363-7450
+- Applied existing `formatPhone()` from `@/lib/utils/format` to both editable and read-only customer sections
 
 ### Job Source Badge (Walk-In vs Appointment)
 - Source determined from `appointment_id` (NULL = Walk-In, NOT NULL = Appointment)

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { formatPhone } from '@/lib/utils/format';
 import {
   ArrowLeft,
   User,
@@ -1015,7 +1016,7 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
                       : 'No customer'}
                   </p>
                   {job.customer?.phone && (
-                    <p className="text-sm text-gray-500">{job.customer.phone}</p>
+                    <p className="text-sm text-gray-500">{formatPhone(job.customer.phone)}</p>
                   )}
                   {job.customer?.email && (
                     <p className="text-sm text-gray-400">{job.customer.email}</p>
@@ -1034,7 +1035,7 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
                 {job.customer.first_name} {job.customer.last_name}
               </p>
               {job.customer.phone && (
-                <p className="text-sm text-gray-500">{job.customer.phone}</p>
+                <p className="text-sm text-gray-500">{formatPhone(job.customer.phone)}</p>
               )}
               {job.customer.email && (
                 <p className="text-sm text-gray-400">{job.customer.email}</p>
