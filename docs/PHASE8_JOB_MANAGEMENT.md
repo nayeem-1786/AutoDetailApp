@@ -664,20 +664,26 @@ Same pattern as `extractQuoteRequest()` — the AI output contains a structured 
 
 ### Customer Notification (auto-triggered on completion)
 
-**SMS** (via `sendSms()` with MMS for the photos):
+**SMS** (via `sendSms()` — no MMS, text only):
 ```
-Hi {first_name}! Your {vehicle_info} is all done and looking amazing! 🚗✨
-
-Here's a preview of the results:
-{before_after_link}
-
-Ready for pickup at {business_name}.
+Hi {first_name}, your {make} {model} is looking great and ready for pickup! 🎉
+View your before & after photos: {gallery_link}
+{business_name}
+{business_address}
+{business_phone}
+Open today until {closing_time}
 ```
+- Vehicle: make + model only (no year, no color). Fallback: "your vehicle"
+- Closing time: from `business_hours` in `business_settings`, today's day (PST). If closed: "See our hours online"
+- Gallery link auto-shortened via `createShortLink()`
+- No MMS `mediaUrl` — avoids confusing raw image links
 
 **Email** (via Mailgun):
-- Before/after photo pair embedded (one exterior, one interior)
-- "View All Photos" button linking to the full gallery
+- Before/after photo pairs embedded inline (featured photos only)
+- "View All Photos" CTA button linking to full gallery
 - Job summary: services performed, total time, any approved add-ons
+- Business info footer: name, address, phone, today's hours
+- Vehicle display: make + model only in subject and body
 
 ### Photo Selection for Notifications
 - **Auto-selection** (default): System picks the first intake + first completion photo from the exterior group, and same from interior group — 2 before/after pairs
@@ -685,10 +691,12 @@ Ready for pickup at {business_name}.
 - **Featured flag**: Selected photos get `is_featured = true`
 
 ### Customer-Facing Photo Gallery Page
-- Public page at `/jobs/[token]/photos` (unique per job, token in jobs table or derived)
+- Public page at `/jobs/[token]/photos` (unique per job, token in jobs table)
 - Shows all non-internal photos grouped by zone
 - Before/after slider (draggable divider) per zone
-- Job summary: services, date, vehicle
+- **Services Performed**: original services + approved addons (with resolved service names and final prices after discount)
+- Completion date with time: "Thursday, February 12, 2026 at 5:23 PM" (PST)
+- Job summary: services, date/time, vehicle
 - No login required — link shared via SMS/email
 - Read-only — customer can view but not modify
 
@@ -718,17 +726,19 @@ If a customer claims damage after pickup, the full photo timeline exists as evid
 
 ### How Jobs Connect to POS Register
 
-1. Job reaches `completed` status → shows in POS register as ready for checkout
-2. Cashier opens the job (or it auto-loads when customer is looked up)
-3. **Pre-populated ticket** with:
+1. Job reaches `completed` status → **"Checkout" button** appears on job detail (primary action) + **"Checkout" pill** on job queue card
+2. Cashier taps Checkout → `GET /api/pos/jobs/[id]/checkout-items` fetches line items
+3. Items loaded into POS register via `RESTORE_TICKET` dispatch → navigates to `/pos`
+4. **Pre-populated ticket** with:
    - Original booked services (from `jobs.services` JSONB)
    - Approved add-ons (from `job_addons` where `status = 'approved'`)
    - Discounts applied to add-ons
    - Products from linked quote (via `quote_id` → `quote_items` where `product_id IS NOT NULL`)
    - Coupon code from linked quote (via `quote_id` → `quotes.coupon_code`)
-4. Cashier can still modify the ticket (add/remove items, apply coupons) — standard POS flow
-5. Payment processed via existing POS transaction flow
-6. Transaction created → `jobs.transaction_id` set → job status → `closed`
+5. Cashier can still modify the ticket (add/remove items, apply coupons) — standard POS flow
+6. Payment processed via existing POS transaction flow
+7. Transaction created → `jobs.transaction_id` set → job status → `closed`
+8. **Double-checkout prevention**: API returns 400 if job is already `closed`. UI shows "Paid" badge instead of Checkout button.
 
 ### Product & Coupon Bridge (Quote → Job → Checkout)
 
@@ -748,6 +758,7 @@ Ticket (services from job + products from quote_items + coupon from quotes.coupo
 - If `job.quote_id` exists:
   - Queries `quotes.coupon_code` for auto-apply at register
   - Queries `quote_items` where `product_id IS NOT NULL` for product line items
+- Each item includes `is_taxable` and `category_id` (resolved from services/products tables) for proper tax calculation and coupon eligibility
 - Returns unified `items[]` array + `coupon_code` field
 
 **Coupon persistence**: The `quotes.coupon_code` column (TEXT, nullable) stores the coupon code applied during quote creation. All quote save paths (Save Draft, Send Quote, Create Job) persist this value. The register's coupon validation system re-validates and applies the discount at checkout time.

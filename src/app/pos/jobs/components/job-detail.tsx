@@ -26,6 +26,7 @@ import {
   FileText,
   Search,
   Plus,
+  ShoppingCart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
@@ -186,9 +187,10 @@ function timeAgo(dt: string | null): string {
 interface JobDetailProps {
   jobId: string;
   onBack: () => void;
+  onCheckout?: (jobId: string) => void;
 }
 
-export function JobDetail({ jobId, onBack }: JobDetailProps) {
+export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const { employee } = usePosAuth();
   const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
   const { granted: canCancelJobs } = usePosPermission('pos.jobs.cancel');
@@ -236,6 +238,17 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
+
+  async function handleCheckout() {
+    if (!job || checkingOut || !onCheckout) return;
+    setCheckingOut(true);
+    try {
+      await onCheckout(jobId);
+    } finally {
+      setCheckingOut(false);
+    }
+  }
 
   const fetchJob = useCallback(async () => {
     try {
@@ -1160,17 +1173,33 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
           </div>
         )}
         {job.status === 'completed' && (
-          <button
-            onClick={() => setShowPickupDialog(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            Customer Pickup
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleCheckout}
+              disabled={checkingOut}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              {checkingOut ? 'Loading...' : 'Checkout'}
+            </button>
+            <button
+              onClick={() => setShowPickupDialog(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Customer Pickup
+            </button>
+          </div>
         )}
-        {(job.status === 'closed' || job.status === 'cancelled') && (
+        {job.status === 'closed' && (
+          <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 px-4 py-2.5 text-sm font-medium text-green-700">
+            <Check className="h-4 w-4" />
+            Paid
+          </div>
+        )}
+        {job.status === 'cancelled' && (
           <p className="text-center text-sm text-gray-400">
-            This job is {job.status}
+            This job is cancelled
           </p>
         )}
         {/* Cancel Job button */}

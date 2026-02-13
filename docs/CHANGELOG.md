@@ -4,6 +4,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 40 — 2026-02-12 (Completion SMS, Job-to-Checkout, Gallery Addons + Timestamp)
+
+### Fix: Completion SMS — Business Info + Vehicle Name
+- Removed MMS `mediaUrl` from `sendSms()` call — no more raw image link in SMS
+- Vehicle display now uses make + model only (no year), fallback to "your vehicle"
+- SMS template includes: gallery link, business name, address, phone, today's closing time
+- Closing time derived from `business_hours` in `business_settings` (PST timezone)
+- If business is closed today, shows "See our hours online"
+- Email updated with same vehicle display and enhanced business info footer with hours
+- Imported `getBusinessHours()` from `@/lib/data/business-hours`
+
+### Fix: Job → POS Checkout Flow
+- **Checkout button on job detail**: Prominent blue "Checkout" button for completed jobs, replaces "Customer Pickup" as primary action
+- **Checkout pill on job queue**: Completed jobs show a "Checkout" pill button, tapping loads items directly into POS register
+- **"Paid" indicator**: Closed jobs show green "Paid" badge instead of checkout button (both detail and queue)
+- **Double-checkout prevention**: `GET /api/pos/jobs/[id]/checkout-items` returns 400 if job is already closed
+- **Checkout-items enrichment**: Response now includes `is_taxable` and `category_id` per item (services, addons, products) for proper tax calculation and coupon eligibility
+- **RESTORE_TICKET flow**: Checkout handler builds a full TicketState from checkout-items and dispatches RESTORE_TICKET, then navigates to `/pos` register
+- **Auto-linking preserved**: Transaction creation route already auto-links most recent completed job → closed. No changes needed.
+- Shared checkout handler in `src/app/pos/jobs/page.tsx` — used by both queue and detail views
+
+### Fix: Gallery Page — Approved Addons in Services Performed
+- Gallery page (`/jobs/[token]/photos`) now queries `job_addons` where `status = 'approved'`
+- Addon service names resolved from `services` table (not just `custom_description`)
+- Listed below original services with price (after discount)
+- Gallery API route (`/api/jobs/[token]/photos`) also returns `addons` array
+
+### Fix: Gallery Page — Completion Time
+- Completion date now includes time: "Thursday, February 12, 2026 at 5:23 PM"
+- Uses `Intl.DateTimeFormat` with `hour`, `minute`, `hour12` options in PST timezone
+
+---
+
 ## Session 39 — 2026-02-12 (Walk-In Job Fix + Product & Coupon Checkout Bridge)
 
 ### Walk-In Job Creation Fix

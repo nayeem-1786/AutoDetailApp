@@ -44,6 +44,28 @@ export async function GET(
       .order('phase')
       .order('sort_order', { ascending: true });
 
+    // Get approved addons
+    const { data: approvedAddons } = await supabase
+      .from('job_addons')
+      .select('id, custom_description, price, discount_amount, service_id')
+      .eq('job_id', job.id)
+      .eq('status', 'approved');
+
+    // Resolve service names for addons
+    const addonServiceIds = (approvedAddons || []).filter((a) => a.service_id).map((a) => a.service_id!);
+    const addonServiceNames = new Map<string, string>();
+    if (addonServiceIds.length > 0) {
+      const { data: svcData } = await supabase.from('services').select('id, name').in('id', addonServiceIds);
+      if (svcData) for (const s of svcData) addonServiceNames.set(s.id, s.name);
+    }
+
+    const addons = (approvedAddons || []).map((addon) => ({
+      name: addon.service_id
+        ? (addonServiceNames.get(addon.service_id) || addon.custom_description || 'Add-on Service')
+        : (addon.custom_description || 'Add-on Service'),
+      price: Number(addon.price) - Number(addon.discount_amount),
+    }));
+
     return NextResponse.json({
       data: {
         job: {
@@ -56,6 +78,7 @@ export async function GET(
         customer_first_name: (job.customer as unknown as { first_name: string } | null)?.first_name || null,
         vehicle: job.vehicle,
         photos: photos || [],
+        addons,
       },
     });
   } catch (err) {

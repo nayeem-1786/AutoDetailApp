@@ -396,7 +396,13 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 39 — Walk-In Job Fix + Product & Coupon Checkout Bridge)
+## Last Session: 2026-02-12 (Session 40 — Completion SMS, Job-to-Checkout, Gallery Addons + Timestamp)
+- **Completion SMS rewrite**: Removed MMS `mediaUrl` (no raw image link). Vehicle = make + model only. Added business name, address, phone, today's closing time (from `business_hours` setting, PST). Email updated with same business info footer.
+- **Job → POS Checkout flow**: "Checkout" button on completed job detail (primary action). "Checkout" pill on completed job cards in queue. Loads checkout-items into POS register via `RESTORE_TICKET`. "Paid" badge on closed jobs. Double-checkout prevention (API returns 400 for closed jobs). Checkout-items response enriched with `is_taxable` + `category_id`.
+- **Gallery addons**: Gallery page (`/jobs/[token]/photos`) and API now include approved addons in "Services Performed" section with resolved service names and final prices.
+- **Gallery timestamp**: Completion date includes time — "Thursday, February 12, 2026 at 5:23 PM" (PST).
+
+## Session 39 — 2026-02-12 (Walk-In Job Fix + Product & Coupon Checkout Bridge)
 - **Walk-in job creation fix**: Added defensive `serviceId` null check in service item filter. Only items with `itemType === 'service' && serviceId` are mapped to job services. Prevents null service IDs from reaching the job creation API.
 - **Product checkout bridge**: `GET /api/pos/jobs/[id]/checkout-items` now checks `job.quote_id`. If a linked quote exists, queries `quote_items` for product items (`product_id IS NOT NULL`) and includes them in the response with `item_type: 'product'`.
 - **Coupon checkout bridge**: New `coupon_code TEXT` column on `quotes` table (migration `20260212000010`). All quote save paths (Save Draft, Send Quote, Create Job) now persist `coupon_code`. Checkout-items route reads `coupon_code` from linked quote and returns it so the register can auto-apply.
@@ -902,8 +908,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ### Next Session Priorities
 1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
-2. Phase 8 — Remaining: pending_approval workflow (if needed), POS checkout-items UI integration (pre-populating register ticket from job)
-3. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
+2. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
 
 ---
 

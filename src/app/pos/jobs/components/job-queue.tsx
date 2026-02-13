@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, User, Clock, Bell, Calendar, Footprints } from 'lucide-react';
+import { Plus, RefreshCw, User, Clock, Bell, Calendar, Footprints, ShoppingCart, Check } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
 import { usePosPermission } from '../../context/pos-permission-context';
@@ -14,6 +14,7 @@ interface JobListItem {
   id: string;
   status: JobStatus;
   appointment_id: string | null;
+  transaction_id: string | null;
   services: { id: string; name: string; price: number }[];
   estimated_pickup_at: string | null;
   created_at: string;
@@ -68,9 +69,10 @@ function formatPickupTime(dt: string | null): string {
 interface JobQueueProps {
   onNewWalkIn: () => void;
   onSelectJob: (jobId: string) => void;
+  onCheckout?: (jobId: string) => void;
 }
 
-export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
+export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps) {
   const { employee } = usePosAuth();
   const { granted: canCreateWalkIn } = usePosPermission('pos.jobs.manage');
   const isBookable = employee?.bookable_for_appointments ?? false;
@@ -279,6 +281,30 @@ export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
                     <p className="mt-1.5 text-xs text-gray-400">
                       Assigned: {job.assigned_staff.first_name} {job.assigned_staff.last_name}
                     </p>
+                  )}
+
+                  {/* Checkout action for completed jobs / Paid indicator for closed */}
+                  {job.status === 'completed' && !job.transaction_id && onCheckout && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCheckout(job.id);
+                        }}
+                        className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 active:bg-blue-800"
+                      >
+                        <ShoppingCart className="h-3.5 w-3.5" />
+                        Checkout
+                      </button>
+                    </div>
+                  )}
+                  {job.status === 'closed' && (
+                    <div className="mt-2 flex justify-end">
+                      <span className="flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                        <Check className="h-3 w-3" />
+                        Paid
+                      </span>
+                    </div>
                   )}
                 </button>
               );

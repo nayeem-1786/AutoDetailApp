@@ -92,6 +92,26 @@ export default async function JobPhotosGalleryPage({ params }: Props) {
     .order('phase')
     .order('sort_order', { ascending: true });
 
+  // Get approved addons for this job
+  const { data: approvedAddons } = await supabase
+    .from('job_addons')
+    .select('id, custom_description, price, discount_amount, service_id')
+    .eq('job_id', job.id)
+    .eq('status', 'approved');
+
+  // If addons reference a service, look up the service name
+  const addonServiceIds = (approvedAddons || []).filter((a) => a.service_id).map((a) => a.service_id!);
+  const addonServiceNames = new Map<string, string>();
+  if (addonServiceIds.length > 0) {
+    const { data: svcData } = await supabase.from('services').select('id, name').in('id', addonServiceIds);
+    if (svcData) for (const s of svcData) addonServiceNames.set(s.id, s.name);
+  }
+
+  const addonItems = (approvedAddons || []).map((addon) => ({
+    name: addon.service_id ? (addonServiceNames.get(addon.service_id) || addon.custom_description || 'Add-on Service') : (addon.custom_description || 'Add-on Service'),
+    price: Number(addon.price) - Number(addon.discount_amount),
+  }));
+
   const vehicle = job.vehicle as unknown as { year: number | null; make: string | null; model: string | null; color: string | null } | null;
   const vehicleParts = [vehicle?.year, vehicle?.make, vehicle?.model].filter(Boolean);
   const vehicleInfo = vehicleParts.length > 0 ? vehicleParts.join(' ') : 'Vehicle';
@@ -100,13 +120,16 @@ export default async function JobPhotosGalleryPage({ params }: Props) {
 
   const services = (job.services as Array<{ name: string; price: number }>) || [];
   const completedDate = job.work_completed_at
-    ? new Date(job.work_completed_at).toLocaleDateString('en-US', {
+    ? new Intl.DateTimeFormat('en-US', {
         weekday: 'long',
+        year: 'numeric',
         month: 'long',
         day: 'numeric',
-        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
         timeZone: 'America/Los_Angeles',
-      })
+      }).format(new Date(job.work_completed_at))
     : null;
 
   // Group photos by zone
@@ -140,13 +163,19 @@ export default async function JobPhotosGalleryPage({ params }: Props) {
         )}
       </div>
 
-      {/* Services performed */}
-      {services.length > 0 && (
+      {/* Services performed (original + approved addons) */}
+      {(services.length > 0 || addonItems.length > 0) && (
         <div className="mb-8 rounded-xl bg-gray-50 p-4">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-gray-500">Services Performed</h2>
           <ul className="space-y-1">
             {services.map((svc, i) => (
-              <li key={i} className="text-sm text-gray-700">{svc.name}</li>
+              <li key={`svc-${i}`} className="text-sm text-gray-700">{svc.name}</li>
+            ))}
+            {addonItems.map((addon, i) => (
+              <li key={`addon-${i}`} className="flex items-center justify-between text-sm text-gray-700">
+                <span>{addon.name}</span>
+                <span className="text-gray-500">${addon.price.toFixed(2)}</span>
+              </li>
             ))}
           </ul>
         </div>

@@ -4,6 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessHours, type BusinessHours } from '@/lib/data/business-hours';
 import { createShortLink } from '@/lib/utils/short-link';
 import crypto from 'crypto';
 
@@ -167,31 +168,22 @@ async function autoSelectFeaturedPhotos(
 // Send completion notifications (SMS + Email)
 // ---------------------------------------------------------------------------
 
-interface JobWithRelations {
-  id: string;
-  services: Array<{ id: string; name: string; price: number }>;
-  timer_seconds: number;
-  gallery_token: string | null;
-  customer: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    phone: string | null;
-    email: string | null;
-  } | null;
-  vehicle: {
-    id: string;
-    year: number | null;
-    make: string | null;
-    model: string | null;
-    color: string | null;
-  } | null;
-  addons?: Array<{
-    status: string;
-    custom_description: string | null;
-    price: number;
-    discount_amount: number;
-  }>[];
+/**
+ * Get today's closing time in PST, formatted as human-readable (e.g., "6:00 PM").
+ */
+function getTodayClosingTime(hours: BusinessHours | null): string | null {
+  if (!hours) return null;
+  const now = new Date();
+  const pst = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayKey = days[pst.getDay()];
+  const dayHours = hours[dayKey];
+  if (!dayHours) return null;
+
+  const [h, m] = dayHours.close.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? `${hour12}:00 ${ampm}` : `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 async function sendCompletionNotifications(
@@ -204,6 +196,10 @@ async function sendCompletionNotifications(
   if (!customer) return;
 
   const businessInfo = await getBusinessInfo();
+  const businessHours = await getBusinessHours();
+  const closingTime = getTodayClosingTime(businessHours);
+  const hoursLine = closingTime ? `Open today until ${closingTime}` : 'See our hours online';
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   const galleryUrl = `${appUrl}/jobs/${galleryToken}/photos`;
 
@@ -214,26 +210,19 @@ async function sendCompletionNotifications(
     // Fall back to full URL
   }
 
-  const vehicleParts = [job.vehicle?.year, job.vehicle?.make, job.vehicle?.model].filter(Boolean);
-  const vehicleInfo = vehicleParts.length > 0 ? vehicleParts.join(' ') : 'vehicle';
+  // Vehicle: make + model only (no year), fallback to "your vehicle"
+  const vehicleMakeModel = [job.vehicle?.make, job.vehicle?.model].filter(Boolean).join(' ');
+  const vehicleDisplay = vehicleMakeModel || 'your vehicle';
 
-  // Get a featured exterior photo for MMS
-  const { data: featuredPhotos } = await supabase
-    .from('job_photos')
-    .select('image_url, zone, phase')
-    .eq('job_id', job.id)
-    .eq('is_featured', true)
-    .eq('is_internal', false)
-    .eq('phase', 'completion')
-    .limit(1);
+  // Full vehicle info for email subject (with year)
+  const vehicleFullParts = [job.vehicle?.year, job.vehicle?.make, job.vehicle?.model].filter(Boolean);
+  const vehicleInfoFull = vehicleFullParts.length > 0 ? vehicleFullParts.join(' ') : 'Vehicle';
 
-  const mmsPhotoUrl = featuredPhotos?.[0]?.image_url || null;
-
-  // SMS notification
+  // SMS notification — no MMS image
   if (customer.phone) {
-    const smsBody = `Hi ${customer.first_name}! Your ${vehicleInfo} is all done and looking amazing!\n\nSee your results: ${galleryLink}\n\nReady for pickup at ${businessInfo.name}.`;
+    const smsBody = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup! \u{1F389}\nView your before & after photos: ${galleryLink}\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
 
-    await sendSms(customer.phone, smsBody, mmsPhotoUrl ? { mediaUrl: mmsPhotoUrl } : undefined);
+    await sendSms(customer.phone, smsBody);
   }
 
   // Email notification
@@ -302,14 +291,14 @@ async function sendCompletionNotifications(
       </p>
     ` : '';
 
-    const subject = `Your ${vehicleInfo} is Ready!`;
-    const plainText = `Hi ${customer.first_name}! Your ${vehicleInfo} is all done!\n\nServices: ${servicesList}\nTime: ${timerDisplay}\n\nView your photos: ${galleryUrl}\n\nReady for pickup at ${businessInfo.name}.`;
+    const subject = `Your ${vehicleDisplay} is Ready!`;
+    const plainText = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup!\n\nServices: ${servicesList}\nTime: ${timerDisplay}\n\nView your photos: ${galleryUrl}\n\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
-        <h1 style="font-size: 24px; color: #111827; margin-bottom: 8px;">Your ${vehicleInfo} is Ready!</h1>
+        <h1 style="font-size: 24px; color: #111827; margin-bottom: 8px;">Your ${vehicleDisplay} is Ready!</h1>
         <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">
-          Hi ${customer.first_name}! Great news — your vehicle is all done and looking amazing.
+          Hi ${customer.first_name}! Great news — your ${vehicleDisplay} is looking great and ready for pickup.
         </p>
 
         ${photoHtml}
@@ -333,7 +322,9 @@ async function sendCompletionNotifications(
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
         <p style="font-size: 13px; color: #9ca3af; text-align: center;">
           ${businessInfo.name}<br/>
-          ${businessInfo.phone || ''}${businessInfo.address ? `<br/>${businessInfo.address}` : ''}
+          ${businessInfo.address ? `${businessInfo.address}<br/>` : ''}
+          ${businessInfo.phone || ''}<br/>
+          ${hoursLine}
         </p>
       </div>
     `;
