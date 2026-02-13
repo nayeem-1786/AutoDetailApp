@@ -1,9 +1,11 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
+import { getIssueHumanReadable, friendlyServiceName } from '@/lib/utils/issue-types';
 import { AuthorizationClient } from './authorization-client';
 import { AnnotationOverlay } from '@/app/pos/jobs/components/photo-annotation';
 import type { Annotation } from '@/lib/utils/job-zones';
+import type { IssueType } from '@/lib/supabase/types';
 
 interface PageProps {
   params: Promise<{ token: string }>;
@@ -13,7 +15,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const biz = await getBusinessInfo();
   return {
-    title: `Service Authorization — ${biz.name}`,
+    title: `Additional Service Authorization — ${biz.name}`,
     robots: 'noindex, nofollow',
   };
 }
@@ -32,8 +34,10 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
       job:jobs!job_addons_job_id_fkey(
         id, services, estimated_pickup_at,
         customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone),
-        vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color)
-      )
+        vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
+        addons:job_addons(id, price, discount_amount, status)
+      ),
+      creator:employees!job_addons_created_by_fkey(first_name, last_name)
     `)
     .eq('authorization_token', token)
     .single();
@@ -133,14 +137,17 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
     photos = photoData ?? [];
   }
 
-  // Get catalog item name
+  // Get catalog item name + description
   let catalogItemName: string | null = null;
+  let catalogItemDescription: string | null = null;
   if (addon.service_id) {
-    const { data: svc } = await supabase.from('services').select('name').eq('id', addon.service_id).single();
+    const { data: svc } = await supabase.from('services').select('name, description').eq('id', addon.service_id).single();
     catalogItemName = svc?.name ?? null;
+    catalogItemDescription = svc?.description ?? null;
   } else if (addon.product_id) {
-    const { data: prod } = await supabase.from('products').select('name').eq('id', addon.product_id).single();
+    const { data: prod } = await supabase.from('products').select('name, description').eq('id', addon.product_id).single();
     catalogItemName = prod?.name ?? null;
+    catalogItemDescription = prod?.description ?? null;
   }
 
   const job = addon.job as {
@@ -149,95 +156,106 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
     estimated_pickup_at: string | null;
     customer: { id: string; first_name: string; last_name: string; phone: string | null } | null;
     vehicle: { id: string; year: number | null; make: string | null; model: string | null; color: string | null } | null;
+    addons: { id: string; price: number; discount_amount: number; status: string }[];
   };
+
+  const creator = addon.creator as { first_name: string; last_name: string } | null;
+  const detailerName = creator?.first_name || 'Your detailer';
 
   const customer = job?.customer;
   const vehicle = job?.vehicle;
-  const vehicleDesc = vehicle ? [vehicle.color, vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') : null;
-  const currentServices = (job?.services ?? []).map((s) => s.name).join(', ');
-  const finalPrice = addon.price - addon.discount_amount;
+  const vehicleDesc = vehicle && (vehicle.make || vehicle.model)
+    ? [vehicle.make, vehicle.model].filter(Boolean).join(' ')
+    : null;
+
+  const addonPrice = Number(addon.price) - Number(addon.discount_amount);
   const itemName = catalogItemName || addon.custom_description || 'Service Add-on';
+
+  // Calculate new ticket total
+  const originalServicesTotal = (job?.services ?? []).reduce((sum, s) => sum + s.price, 0);
+  const approvedAddonsTotal = (job?.addons ?? [])
+    .filter((a) => a.status === 'approved' && a.id !== addon.id)
+    .reduce((sum, a) => sum + (Number(a.price) - Number(a.discount_amount)), 0);
+  const newTicketTotal = originalServicesTotal + approvedAddonsTotal + addonPrice;
+
+  // Issue type human readable
+  const issueText = getIssueHumanReadable(
+    addon.issue_type as IssueType | null,
+    addon.issue_description
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-lg px-4 py-6">
-        {/* Header */}
+        {/* Header — most prominent element */}
         <div className="mb-6 rounded-xl bg-blue-800 p-6 text-center shadow-lg">
           {biz.logo_url && (
             <img src={biz.logo_url} alt={biz.name} className="mx-auto mb-3 h-12" />
           )}
-          <h1 className="text-xl font-semibold text-white">{biz.name}</h1>
-          <p className="mt-1 text-sm text-blue-200">Service Authorization Request</p>
+          <h1 className="text-2xl font-bold text-white">
+            Additional Service Authorization Request
+          </h1>
         </div>
 
         {/* Content card */}
         <div className="rounded-xl bg-white shadow-md">
-          {/* Greeting */}
+          {/* Conversational message */}
           <div className="p-5">
-            {customer && (
-              <p className="mb-3 text-sm text-gray-700">
-                Hi {customer.first_name},
-              </p>
-            )}
-
-            {/* Message */}
-            {addon.message_to_customer && (
-              <p className="text-sm leading-relaxed text-gray-800">
-                {addon.message_to_customer}
-              </p>
-            )}
+            <p className="text-base leading-relaxed text-gray-800">
+              Hi {customer?.first_name || 'there'},
+            </p>
+            <p className="mt-2 text-base leading-relaxed text-gray-800">
+              While working on your {vehicleDesc || 'vehicle'}, {detailerName} noticed{' '}
+              <span className="font-medium">{issueText}</span>.
+            </p>
+            <p className="mt-2 text-base leading-relaxed text-gray-800">
+              We&apos;d like to take care of it while your vehicle is already here.
+            </p>
           </div>
 
-          {/* Photos (with annotation overlays) */}
+          {/* Photos from inspection */}
           {photos.length > 0 && (
             <div className="px-5 pb-4">
-              {photos.map((photo) => {
-                const photoAnnotations = photo.annotation_data as Annotation[] | null;
-                return (
-                  <div key={photo.id} className="relative overflow-hidden rounded-lg">
-                    <img
-                      src={photo.image_url}
-                      alt="Issue found"
-                      className="w-full object-cover"
-                    />
-                    {photoAnnotations && photoAnnotations.length > 0 && (
-                      <AnnotationOverlay annotations={photoAnnotations} />
-                    )}
-                  </div>
-                );
-              })}
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                Photos from our inspection
+              </p>
+              <div className="space-y-3">
+                {photos.map((photo) => {
+                  const photoAnnotations = photo.annotation_data as Annotation[] | null;
+                  return (
+                    <div key={photo.id} className="relative overflow-hidden rounded-lg">
+                      <img
+                        src={photo.image_url}
+                        alt="Inspection photo"
+                        className="w-full object-cover"
+                      />
+                      {photoAnnotations && photoAnnotations.length > 0 && (
+                        <AnnotationOverlay annotations={photoAnnotations} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* Details */}
-          <div className="space-y-3 border-t border-gray-100 px-5 py-4">
-            {/* Item name */}
-            <div>
-              <p className="text-xs font-medium uppercase text-gray-500">Proposed Service</p>
-              <p className="mt-0.5 text-sm font-medium text-gray-900">{itemName}</p>
+          {/* Proposed Add-On Service */}
+          <div className="border-t border-gray-100 px-5 py-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Proposed Add-On Service
+            </p>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-lg font-semibold text-gray-900">{itemName}</p>
+              {catalogItemDescription && (
+                <p className="mt-1 text-sm text-gray-600">{catalogItemDescription}</p>
+              )}
             </div>
-
-            {/* Vehicle */}
-            {vehicleDesc && (
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-500">Vehicle</p>
-                <p className="mt-0.5 text-sm text-gray-900">{vehicleDesc}</p>
-              </div>
-            )}
-
-            {/* Current services */}
-            {currentServices && (
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-500">Currently Performing</p>
-                <p className="mt-0.5 text-sm text-gray-700">{currentServices}</p>
-              </div>
-            )}
           </div>
 
-          {/* Price */}
-          <div className="border-t border-gray-100 px-5 py-4">
+          {/* Pricing */}
+          <div className="border-t border-gray-100 px-5 py-5">
             {addon.discount_amount > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Original price</span>
                   <span className="text-gray-500 line-through">${Number(addon.price).toFixed(2)}</span>
@@ -246,19 +264,26 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
                   <span className="text-green-600">Discount</span>
                   <span className="text-green-600">-${Number(addon.discount_amount).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between border-t border-gray-100 pt-1">
-                  <span className="font-semibold text-gray-900">Total</span>
-                  <span className="text-2xl font-bold text-gray-900">${finalPrice.toFixed(2)}</span>
+                <div className="flex justify-between border-t border-gray-100 pt-2">
+                  <span className="text-lg font-semibold text-gray-900">Additional Cost</span>
+                  <span className="text-2xl font-bold text-gray-900">${addonPrice.toFixed(2)}</span>
                 </div>
               </div>
             ) : (
               <div className="flex justify-between">
-                <span className="font-semibold text-gray-900">Total</span>
-                <span className="text-2xl font-bold text-gray-900">${finalPrice.toFixed(2)}</span>
+                <span className="text-lg font-semibold text-gray-900">Additional Cost</span>
+                <span className="text-2xl font-bold text-gray-900">${addonPrice.toFixed(2)}</span>
               </div>
             )}
+
+            {/* New ticket total */}
+            <div className="mt-3 flex justify-between rounded-lg bg-blue-50 px-3 py-2">
+              <span className="text-sm text-blue-700">New Ticket Total</span>
+              <span className="text-sm font-semibold text-blue-900">${newTicketTotal.toFixed(2)}</span>
+            </div>
+
             {addon.pickup_delay_minutes > 0 && (
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-3 text-sm text-gray-500">
                 Estimated additional time: +{addon.pickup_delay_minutes} minutes
               </p>
             )}
@@ -268,22 +293,20 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
           <div className="border-t border-gray-100 p-5">
             <AuthorizationClient token={token} initialAction={action} />
           </div>
-
-          {/* Contact link */}
-          <div className="border-t border-gray-100 p-4 text-center">
-            <a
-              href={`sms:${biz.phone}`}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Have a question? Text us
-            </a>
-          </div>
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-xs text-gray-400">
-          {biz.name} &middot; {biz.address}
-        </p>
+        <div className="mt-6 text-center">
+          <p className="text-sm font-medium text-gray-600">{biz.name}</p>
+          {biz.address && <p className="mt-1 text-xs text-gray-400">{biz.address}</p>}
+          {biz.phone && (
+            <p className="mt-1">
+              <a href={`tel:${biz.phone}`} className="text-xs text-blue-600 hover:underline">
+                {biz.phone}
+              </a>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

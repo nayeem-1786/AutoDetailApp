@@ -278,19 +278,42 @@ The complete detailer flow from start to finish:
 
 4. FLAG ISSUE (optional, repeatable)
    At any point during work, detailer spots something
-   - Taps "Flag Issue" → snaps photo → annotates
-   - Selects service/product from catalog OR enters custom line item + price
-   - Optional discount
-   - Selects/writes message template
-   - System calculates pickup delay from catalog duration (editable)
-   - Taps "Send to Customer"
-   Status: stays [In Progress], job card shows "Pending Authorization" badge
-   
-   Customer receives: SMS + email with photo, description, price, new ETA
+   Step 1: What did you find? — Selects from predefined issue types:
+     - Scratches, Water Spots, Paint Damage, Pet Hair/Stains, Interior Stains,
+       Odor, Headlight Haze, Wheel Damage, Tar/Sap/Overspray, Other (free text)
+     - Stored as `issue_type` + `issue_description` on `job_addons` record
+   Step 2: Zone select → photo capture → annotate
+   Step 3: Select service/product from catalog OR enter custom line item + price
+   Step 4: Optional discount
+   Step 5: Pickup delay (auto-filled from service duration)
+   Step 6: Message template (uses issue + friendly service name + vehicle)
+   Step 7: Preview + Send
+   Status: stays [In Progress], job card shows "⚑ Addon Pending" badge (amber pill)
+
+   Customer receives: SMS (conversational, no MMS) + email with annotated photo
+   SMS format: "Hi {name}, while working on your {make model} we noticed {issue}.
+     We recommend {friendly_service} for ${price} — shall we go ahead?
+     View pictures and approve or decline here: {url}
+     {detailer_name}
+     {business_name}"
    Customer responds via:
    a) Web link (approve/decline buttons) — preferred path
    b) SMS reply — AI handles (see AI section below)
-   
+
+   Authorization page (`/authorize/[token]`):
+   - Header: "Additional Service Authorization Request" (large, bold)
+   - Conversational message with detailer name and issue description
+   - Annotated photos gallery ("Photos from our inspection")
+   - Proposed Add-On Service card (name + catalog description)
+   - "Additional Cost" (large font) + "New Ticket Total" (computed)
+   - Full-width Approve (green) + Decline (outline) buttons (48px height)
+   - Business footer (name, address, phone from DB)
+
+   Queue badges:
+   - Pending: "⚑ Addon Pending" (amber) — most visible
+   - Approved: "✓ Addon Approved" (green) — briefly shown
+   - Declined: "✗ Addon Declined" (gray) — informational
+
    Addon expires after configurable timeout (default 30 min):
    - Auto-declined
    - Flagged as "Recommended for next visit" on customer record
@@ -351,7 +374,7 @@ New tab in POS navigation: **Jobs** (alongside existing POS tabs)
   - Assigned detailer name
   - Estimated pickup time
   - Time in progress (if timer is running)
-  - Badge: if addon pending authorization
+  - Addon badge: "⚑ Addon Pending" (amber), "✓ Addon Approved" (green), "✗ Addon Declined" (gray)
 - Sort: by status priority (In Progress first, then Intake, Scheduled, etc.)
 - Tap a job → opens job detail view
 

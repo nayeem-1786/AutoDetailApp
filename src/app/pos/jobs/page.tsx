@@ -35,7 +35,13 @@ export default function JobsPage() {
     if (!res.ok) {
       try {
         const err = await res.json();
-        toast.error(err.error || 'Failed to load checkout items');
+        if (res.status === 403) {
+          toast.error(err.error || "You don't have permission to checkout jobs. Ask your admin to update your permissions.");
+        } else if (res.status === 404) {
+          toast.error('Job not found');
+        } else {
+          toast.error(err.error || 'Failed to load checkout items');
+        }
       } catch {
         toast.error('Failed to load checkout items');
       }

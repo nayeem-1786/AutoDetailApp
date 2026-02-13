@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, User, Clock, Bell, Calendar, Footprints, ShoppingCart, Check } from 'lucide-react';
+import { Plus, RefreshCw, User, Clock, Calendar, Footprints, ShoppingCart, Check } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
 import { usePosPermission } from '../../context/pos-permission-context';
@@ -64,6 +64,32 @@ function formatPickupTime(dt: string | null): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * Determine the most relevant addon status for the badge.
+ * Priority: pending > approved > declined > null
+ */
+function getAddonBadge(addons: { id: string; status: string }[] | null): {
+  label: string;
+  color: string;
+} | null {
+  if (!addons || addons.length === 0) return null;
+
+  const hasPending = addons.some((a) => a.status === 'pending');
+  const hasApproved = addons.some((a) => a.status === 'approved');
+  const hasDeclined = addons.some((a) => a.status === 'declined');
+
+  if (hasPending) {
+    return { label: 'Addon Pending', color: 'bg-amber-100 text-amber-800' };
+  }
+  if (hasApproved) {
+    return { label: 'Addon Approved', color: 'bg-green-100 text-green-700' };
+  }
+  if (hasDeclined) {
+    return { label: 'Addon Declined', color: 'bg-gray-100 text-gray-600' };
+  }
+  return null;
 }
 
 interface JobQueueProps {
@@ -207,7 +233,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         ) : (
           <div className="space-y-2">
             {sortedJobs.map((job) => {
-              const hasPendingAddon = job.addons?.some((a) => a.status === 'pending');
+              const addonBadge = getAddonBadge(job.addons);
               const statusConfig = STATUS_CONFIG[job.status];
               const serviceNames = job.services.map((s) => s.name).join(', ');
               const pickupTime = formatPickupTime(job.estimated_pickup_at);
@@ -223,17 +249,12 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                 >
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
-                      {/* Customer + Vehicle */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">
-                          {job.customer
-                            ? `${job.customer.first_name} ${job.customer.last_name}`
-                            : 'Unknown Customer'}
-                        </span>
-                        {hasPendingAddon && (
-                          <Bell className="h-4 w-4 shrink-0 text-orange-500" />
-                        )}
-                      </div>
+                      {/* Customer */}
+                      <span className="font-medium text-gray-900">
+                        {job.customer
+                          ? `${job.customer.first_name} ${job.customer.last_name}`
+                          : 'Unknown Customer'}
+                      </span>
                       <p className="mt-0.5 text-sm text-gray-500">
                         {formatVehicle(job.vehicle)}
                       </p>
@@ -246,7 +267,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
                     {/* Right side: source + status + pickup */}
                     <div className="ml-3 flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
                         <span
                           className={cn(
                             'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
@@ -278,6 +299,21 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                       )}
                     </div>
                   </div>
+
+                  {/* Addon badge */}
+                  {addonBadge && (
+                    <div className="mt-1.5">
+                      <span className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                        addonBadge.color
+                      )}>
+                        {addonBadge.label === 'Addon Pending' && '⚑ '}
+                        {addonBadge.label === 'Addon Approved' && '✓ '}
+                        {addonBadge.label === 'Addon Declined' && '✗ '}
+                        {addonBadge.label}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Assigned staff */}
                   {job.assigned_staff && (

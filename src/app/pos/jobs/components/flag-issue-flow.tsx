@@ -13,6 +13,7 @@ import {
   Edit3,
   Wrench,
   Package,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
@@ -21,9 +22,10 @@ import { PhotoCapture } from './photo-capture';
 import { AnnotationOverlay } from './photo-annotation';
 import { CatalogBrowser } from '../../components/catalog-browser';
 import { EXTERIOR_ZONES, INTERIOR_ZONES, getZoneLabel } from '@/lib/utils/job-zones';
+import { ISSUE_TYPES, getIssueHumanReadable, friendlyServiceName } from '@/lib/utils/issue-types';
 import { resolveServicePrice } from '../../utils/pricing';
 import type { Annotation } from '@/lib/utils/job-zones';
-import type { JobPhoto, JobPhotoPhase, ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+import type { IssueType, JobPhoto, JobPhotoPhase, ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import type { CatalogService, CatalogProduct } from '../../types';
 
 // ---------------------------------------------------------------------------
@@ -65,7 +67,7 @@ interface FlagIssueFlowProps {
   onBack: () => void;
 }
 
-type Step = 'photo' | 'zone-select' | 'catalog' | 'discount' | 'delay' | 'message' | 'preview';
+type Step = 'issue-type' | 'photo' | 'zone-select' | 'catalog' | 'discount' | 'delay' | 'message' | 'preview';
 
 type CatalogTab = 'services' | 'products' | 'custom';
 
@@ -73,17 +75,17 @@ const MESSAGE_TEMPLATES = [
   {
     id: 'noticed',
     label: 'Issue Found',
-    template: 'We noticed {issue} during your {service}. We can take care of it today for {price}.',
+    template: 'We noticed {issue} on your {vehicle}. We can take care of it today with {friendly_service} for {price}.',
   },
   {
     id: 'benefit',
     label: 'Recommendation',
-    template: 'Your vehicle could really benefit from {service}. Here\'s what we found:',
+    template: 'While working on your {vehicle}, we noticed {issue}. We recommend {friendly_service} — shall we go ahead?',
   },
   {
     id: 'inspection',
     label: 'Inspection Finding',
-    template: 'During our inspection we found {issue}. We recommend {service} for {price} — shall we go ahead?',
+    template: 'During our inspection we found {issue} on your {vehicle}. We recommend {friendly_service} for {price} — shall we go ahead?',
   },
 ];
 
@@ -92,8 +94,12 @@ const MESSAGE_TEMPLATES = [
 // ---------------------------------------------------------------------------
 
 export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowProps) {
-  const [step, setStep] = useState<Step>('zone-select');
+  const [step, setStep] = useState<Step>('issue-type');
   const [sending, setSending] = useState(false);
+
+  // Step 0: Issue type
+  const [selectedIssueType, setSelectedIssueType] = useState<IssueType | null>(null);
+  const [issueDescription, setIssueDescription] = useState('');
 
   // Step 1: Photo
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
@@ -120,12 +126,10 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   // Vehicle size class for pricing
   const vehicleSizeClass = (job.vehicle?.size_class ?? null) as VehicleSizeClass | null;
 
-  // Build set of service IDs already on this job (Bug 3: quantity rules)
+  // Build set of service IDs already on this job
   const addedServiceIds = useMemo(() => {
     const ids = new Set<string>();
-    // Services already on the job
     job.services.forEach((s) => ids.add(s.id));
-    // Approved addon services
     (job.addons ?? [])
       .filter((a) => a.status === 'approved' && a.service_id)
       .forEach((a) => ids.add(a.service_id!));
@@ -139,9 +143,11 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   const delayMinutes = parseInt(pickupDelay) || 0;
   const itemName = selectedItem?.name || '';
 
-  const currentServiceNames = job.services.map((s) => s.name).join(', ');
+  const issueHumanReadable = getIssueHumanReadable(selectedIssueType, issueDescription);
+  const friendlyItemName = selectedItem ? friendlyServiceName(selectedItem.name) : '';
+
   const vehicleDesc = job.vehicle
-    ? [job.vehicle.color, job.vehicle.year, job.vehicle.make, job.vehicle.model].filter(Boolean).join(' ')
+    ? [job.vehicle.make, job.vehicle.model].filter(Boolean).join(' ')
     : 'your vehicle';
 
   const newEta = job.estimated_pickup_at && delayMinutes > 0
@@ -154,13 +160,14 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     const tmpl = MESSAGE_TEMPLATES.find((t) => t.id === selectedTemplate);
     if (!tmpl) return '';
     return tmpl.template
-      .replace('{issue}', itemName || 'an issue')
-      .replace('{service}', currentServiceNames || 'your service')
+      .replace('{issue}', issueHumanReadable)
+      .replace('{vehicle}', vehicleDesc)
+      .replace('{friendly_service}', friendlyItemName || 'an additional service')
       .replace('{price}', `$${finalPrice.toFixed(2)}`);
   })();
 
   // ---------------------------------------------------------------------------
-  // Catalog callbacks (Bug 2: proper pricing via CatalogBrowser)
+  // Catalog callbacks
   // ---------------------------------------------------------------------------
 
   function handleAddService(
@@ -169,7 +176,6 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     vsc: VehicleSizeClass | null,
     perUnitQty?: number
   ) {
-    // Duplicate guard (Bug 3)
     if (addedServiceIds.has(service.id)) {
       toast.warning(`${service.name} is already on this job`);
       return;
@@ -187,7 +193,6 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
       base_duration_minutes: service.base_duration_minutes ?? undefined,
     });
 
-    // Auto-fill pickup delay from service duration
     if (service.base_duration_minutes) {
       setPickupDelay(String(service.base_duration_minutes));
     }
@@ -234,6 +239,8 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
         pickup_delay_minutes: delayMinutes,
         message_to_customer: messageText,
         photo_ids: capturedPhotos.map((p) => p.id),
+        issue_type: selectedIssueType,
+        issue_description: issueDescription || null,
       };
 
       const res = await posFetch(`/api/pos/jobs/${jobId}/addons`, {
@@ -258,6 +265,80 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   }
 
   // ---------------------------------------------------------------------------
+  // Step: Issue Type (NEW — first step)
+  // ---------------------------------------------------------------------------
+  if (step === 'issue-type') {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
+          <button onClick={onBack} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          </button>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Flag Issue</h2>
+            <p className="text-sm text-gray-500">Step 1: What did you find?</p>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+          <p className="mb-3 text-sm font-medium text-gray-700">What did you notice?</p>
+          <div className="grid grid-cols-2 gap-2">
+            {ISSUE_TYPES.map((issue) => (
+              <button
+                key={issue.key}
+                onClick={() => {
+                  setSelectedIssueType(issue.key);
+                  if (issue.key !== 'other') {
+                    setIssueDescription('');
+                    setStep('zone-select');
+                  }
+                }}
+                className={cn(
+                  'flex flex-col items-start rounded-xl border p-4 text-left transition-colors min-h-[72px]',
+                  selectedIssueType === issue.key
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100'
+                )}
+              >
+                <p className="text-sm font-semibold text-gray-900">{issue.label}</p>
+                <p className="mt-0.5 text-xs text-gray-500 leading-tight">{issue.description}</p>
+              </button>
+            ))}
+          </div>
+
+          {/* Free text input when "Other" is selected */}
+          {selectedIssueType === 'other' && (
+            <div className="mt-3 space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Describe the issue</label>
+              <textarea
+                value={issueDescription}
+                onChange={(e) => setIssueDescription(e.target.value)}
+                placeholder="e.g., Deep scratches on the rear bumper from a parking incident"
+                rows={3}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  if (!issueDescription.trim()) {
+                    toast.warning('Please describe the issue');
+                    return;
+                  }
+                  setStep('zone-select');
+                }}
+                disabled={!issueDescription.trim()}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 min-h-11"
+              >
+                Next: Take Photo
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Step: Zone Select
   // ---------------------------------------------------------------------------
   if (step === 'zone-select') {
@@ -265,12 +346,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100">
+          <button onClick={() => setStep('issue-type')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Flag Issue</h2>
-            <p className="text-sm text-gray-500">Step 1: Select zone and capture photo</p>
+            <p className="text-sm text-gray-500">Step 2: Select zone and capture photo</p>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
@@ -283,7 +364,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                   setSelectedZone(zone.key);
                   setStep('photo');
                 }}
-                className="flex w-full items-center justify-between rounded-lg bg-white p-3 shadow-sm hover:bg-gray-50"
+                className="flex w-full items-center justify-between rounded-lg bg-white p-3 shadow-sm hover:bg-gray-50 min-h-11"
               >
                 <div>
                   <p className="text-sm font-medium text-gray-900">{zone.label}</p>
@@ -314,18 +395,18 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   }
 
   // ---------------------------------------------------------------------------
-  // Step: Catalog Selection (Bug 2: CatalogBrowser + vehicle-size pricing)
+  // Step: Catalog Selection
   // ---------------------------------------------------------------------------
   if (step === 'catalog') {
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('zone-select')} className="rounded-lg p-1 hover:bg-gray-100">
+          <button onClick={() => setStep('zone-select')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Select Service/Product</h2>
-            <p className="text-sm text-gray-500">Step 2: What do you recommend?</p>
+            <p className="text-sm text-gray-500">Step 3: What do you recommend?</p>
           </div>
         </div>
 
@@ -345,7 +426,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                   setCatalogSearch('');
                 }}
                 className={cn(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium transition-colors',
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-md py-2.5 text-xs font-medium transition-colors min-h-11',
                   catalogTab === key
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
@@ -365,7 +446,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 placeholder={`Search ${catalogTab}...`}
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 py-2.5 pl-3 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           )}
@@ -399,25 +480,26 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                     placeholder="e.g., Paint touch-up on rear bumper"
                     value={customDescription}
                     onChange={(e) => setCustomDescription(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Price ($)</label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="0"
                     step="0.01"
                     placeholder="0.00"
                     value={customPrice}
                     onChange={(e) => setCustomPrice(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 <button
                   onClick={handleCustomSubmit}
                   disabled={!customDescription.trim() || !customPrice || parseFloat(customPrice) <= 0}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 min-h-11"
                 >
                   <Check className="h-4 w-4" />
                   Use Custom Item
@@ -437,12 +519,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('catalog')} className="rounded-lg p-1 hover:bg-gray-100">
+          <button onClick={() => setStep('catalog')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Discount</h2>
-            <p className="text-sm text-gray-500">Step 3: Optional discount</p>
+            <p className="text-sm text-gray-500">Step 4: Optional discount</p>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
@@ -458,13 +540,14 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               </label>
               <input
                 type="number"
+                inputMode="numeric"
                 min="0"
                 max={price}
                 step="0.01"
                 placeholder="0.00"
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <p className="mt-1 text-xs text-gray-500">Leave empty for no discount</p>
             </div>
@@ -489,7 +572,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
         <div className="border-t border-gray-200 bg-white px-4 py-3">
           <button
             onClick={() => setStep('delay')}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 min-h-11"
           >
             Next: Pickup Delay
             <ChevronRight className="h-4 w-4" />
@@ -506,12 +589,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('discount')} className="rounded-lg p-1 hover:bg-gray-100">
+          <button onClick={() => setStep('discount')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Pickup Delay</h2>
-            <p className="text-sm text-gray-500">Step 4: Additional time needed</p>
+            <p className="text-sm text-gray-500">Step 5: Additional time needed</p>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
@@ -522,12 +605,13 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
             </label>
             <input
               type="number"
+              inputMode="numeric"
               min="0"
               step="5"
               placeholder="0"
               value={pickupDelay}
               onChange={(e) => setPickupDelay(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <p className="mt-1 text-xs text-gray-500">
               {selectedItem?.base_duration_minutes
@@ -564,7 +648,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
         <div className="border-t border-gray-200 bg-white px-4 py-3">
           <button
             onClick={() => setStep('message')}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 min-h-11"
           >
             Next: Message
             <ChevronRight className="h-4 w-4" />
@@ -581,20 +665,21 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('delay')} className="rounded-lg p-1 hover:bg-gray-100">
+          <button onClick={() => setStep('delay')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Message to Customer</h2>
-            <p className="text-sm text-gray-500">Step 5: Choose a template or write custom</p>
+            <p className="text-sm text-gray-500">Step 6: Choose a template or write custom</p>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
           <div className="space-y-2">
             {MESSAGE_TEMPLATES.map((tmpl) => {
               const preview = tmpl.template
-                .replace('{issue}', itemName || 'an issue')
-                .replace('{service}', currentServiceNames || 'your service')
+                .replace('{issue}', issueHumanReadable)
+                .replace('{vehicle}', vehicleDesc)
+                .replace('{friendly_service}', friendlyItemName || 'an additional service')
                 .replace('{price}', `$${finalPrice.toFixed(2)}`);
               return (
                 <button
@@ -604,7 +689,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                     setIsCustomMessage(false);
                   }}
                   className={cn(
-                    'w-full rounded-lg border p-3 text-left transition-colors',
+                    'w-full rounded-lg border p-3 text-left transition-colors min-h-11',
                     selectedTemplate === tmpl.id && !isCustomMessage
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 bg-white hover:bg-gray-50'
@@ -623,7 +708,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 setSelectedTemplate(null);
               }}
               className={cn(
-                'flex w-full items-center gap-2 rounded-lg border p-3 text-left',
+                'flex w-full items-center gap-2 rounded-lg border p-3 text-left min-h-11',
                 isCustomMessage
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 bg-white hover:bg-gray-50'
@@ -639,7 +724,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 onChange={(e) => setCustomMessageText(e.target.value)}
                 placeholder="Type your message to the customer..."
                 rows={4}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             )}
           </div>
@@ -648,7 +733,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
           <button
             onClick={() => setStep('preview')}
             disabled={!messageText}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 min-h-11"
           >
             <Eye className="h-4 w-4" />
             Preview
@@ -659,7 +744,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   }
 
   // ---------------------------------------------------------------------------
-  // Step: Preview (Bug 1: show annotations on photo)
+  // Step: Preview
   // ---------------------------------------------------------------------------
   if (step === 'preview') {
     const previewPhoto = capturedPhotos.length > 0 ? capturedPhotos[0] : null;
@@ -668,21 +753,31 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('message')} className="rounded-lg p-1 hover:bg-gray-100">
+          <button onClick={() => setStep('message')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Preview</h2>
-            <p className="text-sm text-gray-500">Step 6: Review before sending</p>
+            <p className="text-sm text-gray-500">Step 7: Review before sending</p>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
           {/* Mock authorization page preview */}
           <div className="rounded-xl bg-white shadow-md">
             <div className="rounded-t-xl bg-blue-800 p-4 text-center">
-              <p className="text-lg font-semibold text-white">Service Authorization Request</p>
+              <p className="text-lg font-semibold text-white">Additional Service Authorization</p>
             </div>
             <div className="space-y-4 p-4">
+              {/* Issue type badge */}
+              {selectedIssueType && (
+                <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-800">
+                    Found: {getIssueHumanReadable(selectedIssueType, issueDescription)}
+                  </span>
+                </div>
+              )}
+
               {/* Photo preview with annotation overlay */}
               {previewPhoto && previewPhoto.image_url && (
                 <div className="relative overflow-hidden rounded-lg">
@@ -716,13 +811,13 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                       <span className="text-green-600">-${discount.toFixed(2)}</span>
                     </div>
                     <div className="mt-1 flex justify-between border-t border-gray-200 pt-1">
-                      <span className="font-semibold text-gray-900">Total</span>
+                      <span className="font-semibold text-gray-900">Additional Cost</span>
                       <span className="text-lg font-bold text-gray-900">${finalPrice.toFixed(2)}</span>
                     </div>
                   </>
                 ) : (
                   <div className="flex justify-between">
-                    <span className="font-semibold text-gray-900">Total</span>
+                    <span className="font-semibold text-gray-900">Additional Cost</span>
                     <span className="text-lg font-bold text-gray-900">${finalPrice.toFixed(2)}</span>
                   </div>
                 )}
@@ -742,17 +837,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 )}
               </div>
 
-              {/* Current services context */}
-              <p className="text-xs text-gray-400">
-                Currently performing: {currentServiceNames}
-              </p>
-
               {/* Mock buttons */}
-              <div className="flex gap-2">
-                <div className="flex flex-1 items-center justify-center rounded-lg bg-green-600 py-3 text-sm font-semibold text-white opacity-60">
+              <div className="space-y-2">
+                <div className="flex items-center justify-center rounded-lg bg-green-600 py-3.5 text-sm font-semibold text-white opacity-60">
                   Approve
                 </div>
-                <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-red-600 py-3 text-sm font-semibold text-red-600 opacity-60">
+                <div className="flex items-center justify-center rounded-lg border-2 border-gray-300 py-3.5 text-sm font-semibold text-gray-600 opacity-60">
                   Decline
                 </div>
               </div>
@@ -763,7 +853,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
           <div className="mt-4 rounded-lg bg-blue-50 p-3">
             <p className="text-sm text-blue-700">
               Will be sent via:
-              {job.customer?.phone && ' SMS (with photo)'}
+              {job.customer?.phone && ' SMS'}
               {job.customer?.phone && job.customer?.email && ' + '}
               {job.customer?.email && ' Email'}
               {!job.customer?.phone && !job.customer?.email && ' No contact info available'}
@@ -774,14 +864,14 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
           <div className="flex gap-2">
             <button
               onClick={() => setStep('message')}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-11"
             >
               Edit
             </button>
             <button
               onClick={handleSend}
               disabled={sending}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50 min-h-11"
             >
               <Send className="h-4 w-4" />
               {sending ? 'Sending...' : 'Send to Customer'}

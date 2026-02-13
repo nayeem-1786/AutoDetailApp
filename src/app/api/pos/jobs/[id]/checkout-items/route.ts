@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 
 /**
  * GET /api/pos/jobs/[id]/checkout-items
@@ -9,6 +10,8 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
  *   2. Approved job addons
  *   3. Products from linked quote (via quote_id bridge)
  *   4. Coupon code from linked quote
+ *
+ * Permission: pos.jobs.view (all POS roles)
  */
 export async function GET(
   request: NextRequest,
@@ -22,6 +25,20 @@ export async function GET(
     }
 
     const supabase = createAdminClient();
+
+    // Permission check: pos.jobs.view — any POS user who can see jobs can load checkout items
+    const canView = await checkPosPermission(
+      supabase,
+      posEmployee.role,
+      posEmployee.employee_id,
+      'pos.jobs.view'
+    );
+    if (!canView) {
+      return NextResponse.json(
+        { error: "You don't have permission to checkout jobs. Ask your admin to update your permissions." },
+        { status: 403 }
+      );
+    }
 
     // Fetch job with addons
     const { data: job, error: jobError } = await supabase
@@ -39,6 +56,7 @@ export async function GET(
       .single();
 
     if (jobError || !job) {
+      console.error('Checkout items - job fetch error:', jobError);
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 

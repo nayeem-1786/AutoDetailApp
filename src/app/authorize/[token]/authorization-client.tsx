@@ -49,23 +49,23 @@ export function AuthorizationClient({ token, initialAction }: AuthorizationClien
 
   if (status === 'approved') {
     return (
-      <div className="rounded-lg bg-green-50 p-4 text-center">
-        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-          <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="rounded-lg bg-green-50 p-5 text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+          <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <p className="text-sm font-medium text-green-800">Approved!</p>
-        <p className="mt-1 text-xs text-green-600">Your detailer will get right on it.</p>
+        <p className="text-base font-semibold text-green-800">Approved!</p>
+        <p className="mt-1 text-sm text-green-600">Your detailer will get right on it. Thank you!</p>
       </div>
     );
   }
 
   if (status === 'declined') {
     return (
-      <div className="rounded-lg bg-gray-50 p-4 text-center">
-        <p className="text-sm font-medium text-gray-700">Declined</p>
-        <p className="mt-1 text-xs text-gray-500">
+      <div className="rounded-lg bg-gray-50 p-5 text-center">
+        <p className="text-base font-semibold text-gray-700">Declined</p>
+        <p className="mt-1 text-sm text-gray-500">
           No problem! We&apos;ll note this as a recommendation for your next visit.
         </p>
       </div>
@@ -81,18 +81,20 @@ export function AuthorizationClient({ token, initialAction }: AuthorizationClien
   }
 
   return (
-    <div className="flex gap-3">
+    <div className="space-y-3">
       <button
         onClick={() => handleAction('approve')}
         disabled={status === 'loading'}
-        className="flex flex-1 items-center justify-center rounded-lg bg-green-600 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+        className="flex w-full items-center justify-center rounded-lg bg-green-600 py-4 text-base font-semibold text-white shadow-sm hover:bg-green-700 active:bg-green-800 disabled:opacity-50"
+        style={{ minHeight: '48px' }}
       >
         {status === 'loading' ? 'Processing...' : 'Approve'}
       </button>
       <button
         onClick={() => handleAction('decline')}
         disabled={status === 'loading'}
-        className="flex flex-1 items-center justify-center rounded-lg border-2 border-red-600 bg-white py-3.5 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
+        className="flex w-full items-center justify-center rounded-lg border-2 border-gray-300 bg-white py-4 text-base font-semibold text-gray-600 shadow-sm hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50"
+        style={{ minHeight: '48px' }}
       >
         {status === 'loading' ? '...' : 'Decline'}
       </button>

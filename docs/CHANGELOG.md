@@ -4,6 +4,55 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 46 — 2026-02-12 (Flag Flow UX Overhaul — Issue Dropdown, SMS Rewrite, Auth Page, Badge, Checkout Permission)
+
+### Fix: Flag flow — issue type dropdown replaces service-name picker
+- Step 1 of flag flow now asks "What did you find?" with 10 predefined issue types (Scratches, Water Spots, Paint Damage, Pet Hair/Stains, Interior Stains, Odor, Headlight Haze, Wheel Damage, Tar/Sap/Overspray, Other)
+- Issue types are large tappable grid buttons (2x5 grid) designed for iPad with gloves — 72px min height
+- "Other" shows free-text textarea for custom issue description
+- New flow: Issue Type → Zone Select → Photo → Catalog → Discount → Delay → Message → Preview (was: Zone → Photo → Catalog → ...)
+- DB migration adds `issue_type` and `issue_description` columns to `job_addons` table with CHECK constraint
+- New utility: `src/lib/utils/issue-types.ts` — `ISSUE_TYPES` array, `getIssueHumanReadable()`, `getIssueLabel()`, `friendlyServiceName()`
+- `friendlyServiceName()` converts catalog names to conversational descriptions ("Paint Correction Stage 1" → "a paint correction service")
+- Files: `src/app/pos/jobs/components/flag-issue-flow.tsx`, `src/lib/utils/issue-types.ts` (new), `src/lib/supabase/types.ts`, `supabase/migrations/20260212000011_addon_issue_type.sql`
+
+### Fix: SMS rewrite — conversational tone, no MMS attachment
+- Old SMS: `${message}\n\nApprove or decline here: ${url}\n\n— ${biz.name}` (with raw service name as "issue found" + confusing MMS attachment)
+- New SMS: `Hi {first_name}, while working on your {make model} we noticed {issue_human_readable}.\nWe recommend {friendly_service} for an additional ${price} — shall we go ahead?\nView pictures and approve or decline here: {url}\n{detailer_first_name}\n{biz.name}`
+- Removed `mediaUrl` from `sendSms()` call — no more extra Twilio media link at bottom of SMS
+- Photos now only viewable on the authorization web page (much better UX)
+- Detailer's first name added for personal touch
+- Vehicle description uses make/model only (no year/color for SMS brevity)
+- Email template also rewritten with conversational messaging and detailer name
+- Files: `src/app/api/pos/jobs/[id]/addons/route.ts`
+
+### Fix: Authorization page redesign — mobile-first, conversational
+- Header: "Additional Service Authorization Request" (most prominent, large bold text)
+- Conversational message: "Hi {name}, While working on your {make model}, {detailer} noticed {issue}. We'd like to take care of it while your vehicle is already here."
+- Photos section: labeled "Photos from our inspection" with scrollable gallery
+- Proposed Add-On Service section: service name + description in card, clear "Additional Cost" in large font
+- New Ticket Total: shows original services + approved addons + this addon in blue info box
+- Approve button: full-width green, 48px height for mobile touch
+- Decline button: full-width secondary outline below (stacked, not side-by-side)
+- Business footer: name, address, phone (from `getBusinessInfo()`)
+- Files: `src/app/authorize/[token]/page.tsx`, `src/app/authorize/[token]/authorization-client.tsx`
+
+### Fix: Addon status badge on job queue cards
+- Replaced simple bell icon with proper badge pill showing addon status
+- Badge states: "⚑ Addon Pending" (amber), "✓ Addon Approved" (green), "✗ Addon Declined" (gray)
+- Priority: pending > approved > declined (shows most actionable status)
+- Badge positioned below customer info, above assigned staff line
+- Uses existing `addons:job_addons(id, status)` from jobs list API (no additional queries)
+- Files: `src/app/pos/jobs/components/job-queue.tsx`
+
+### Fix: Cashier checkout permission — explicit check + descriptive errors
+- `checkout-items` route had NO permission check — only HMAC auth. Added `pos.jobs.view` check (all POS roles have this by default)
+- Frontend now distinguishes error types: 403 → "You don't have permission..." / 404 → "Job not found" / other → generic
+- Audit: all job-related API routes reviewed. Routes with explicit checks: `POST /jobs` (pos.jobs.manage), `PATCH /jobs/[id]` (pos.jobs.manage for editable fields), `POST /cancel` (pos.jobs.cancel), `GET /checkout-items` (pos.jobs.view, NEW)
+- Files: `src/app/api/pos/jobs/[id]/checkout-items/route.ts`, `src/app/pos/jobs/page.tsx`
+
+---
+
 ## Session 45 — 2026-02-12 (Flag Flow — Annotated Images, Vehicle-Size Pricing, Quantity Rules)
 
 ### Fix: Annotated images not sent to customer in flag flow

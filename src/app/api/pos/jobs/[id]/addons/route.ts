@@ -5,6 +5,8 @@ import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getAnnotatedPhotoUrl } from '@/lib/utils/render-annotations';
+import { getIssueHumanReadable, friendlyServiceName } from '@/lib/utils/issue-types';
+import type { IssueType } from '@/lib/supabase/types';
 
 /**
  * GET /api/pos/jobs/[id]/addons — List addons for a job
@@ -114,6 +116,8 @@ export async function POST(
       pickup_delay_minutes = 0,
       message_to_customer,
       photo_ids = [],
+      issue_type = null,
+      issue_description = null,
     } = body;
 
     // Create the addon record
@@ -129,6 +133,8 @@ export async function POST(
         status: 'pending',
         authorization_token: authToken,
         message_to_customer,
+        issue_type: issue_type || null,
+        issue_description: issue_description || null,
         sent_at: now.toISOString(),
         expires_at: expiresAt.toISOString(),
         pickup_delay_minutes,
@@ -163,8 +169,39 @@ export async function POST(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
     const authorizeUrl = `${appUrl}/authorize/${authToken}`;
     const biz = await getBusinessInfo();
+    const finalPrice = price - discount_amount;
 
-    // Get the first photo URL for MMS (with annotations rendered onto image)
+    // Get the detailer's first name
+    const { data: detailerEmployee } = await supabase
+      .from('employees')
+      .select('first_name')
+      .eq('id', posEmployee.employee_id)
+      .single();
+    const detailerName = detailerEmployee?.first_name || 'Your detailer';
+
+    // Build vehicle description (make model only, no year/color for SMS)
+    const vehicle = job.vehicle as unknown as { year: number | null; make: string | null; model: string | null; color: string | null } | null;
+    const vehicleDesc = vehicle && (vehicle.make || vehicle.model)
+      ? [vehicle.make, vehicle.model].filter(Boolean).join(' ')
+      : 'your vehicle';
+
+    // Build issue description for SMS
+    const issueText = getIssueHumanReadable(issue_type as IssueType | null, issue_description);
+
+    // Get service/product name for friendly description
+    let catalogItemName: string | null = null;
+    if (service_id) {
+      const { data: svc } = await supabase.from('services').select('name').eq('id', service_id).single();
+      catalogItemName = svc?.name ?? null;
+    } else if (product_id) {
+      const { data: prod } = await supabase.from('products').select('name').eq('id', product_id).single();
+      catalogItemName = prod?.name ?? null;
+    }
+    const friendlyName = catalogItemName
+      ? friendlyServiceName(catalogItemName)
+      : (custom_description || 'an additional service');
+
+    // Get annotated photo URL for email only (NOT for MMS — removed per spec)
     let photoUrl: string | null = null;
     if (photo_ids.length > 0) {
       const { data: photo } = await supabase
@@ -177,13 +214,19 @@ export async function POST(
       }
     }
 
-    // Send SMS
+    // Send SMS — conversational tone, NO mediaUrl
     if (customer?.phone) {
-      const smsBody = `${message_to_customer}\n\nApprove or decline here: ${authorizeUrl}\n\n— ${biz.name}`;
+      const smsBody = [
+        `Hi ${customer.first_name}, while working on your ${vehicleDesc} we noticed ${issueText}.`,
+        `We recommend ${friendlyName} for an additional $${finalPrice.toFixed(2)} — shall we go ahead?`,
+        `View pictures and approve or decline here: ${authorizeUrl}`,
+        detailerName,
+        biz.name,
+      ].join('\n');
+
       const smsResult = await sendSms(customer.phone, smsBody, {
         customerId: customer.id,
         source: 'transactional',
-        mediaUrl: photoUrl || undefined,
       });
       if (smsResult.success) {
         notifiedVia.push('sms');
@@ -192,29 +235,33 @@ export async function POST(
 
     // Send email
     if (customer?.email) {
-      const finalPrice = price - discount_amount;
-      const vehicle = job.vehicle as unknown as { year: number | null; make: string | null; model: string | null; color: string | null } | null;
-      const vehicleDesc = vehicle ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') : 'your vehicle';
-
       const htmlBody = buildAuthorizationEmail({
         businessName: biz.name,
         businessLogo: biz.logo_url,
         customerName: customer.first_name,
-        message: message_to_customer || '',
+        issueText,
+        friendlyServiceName: friendlyName,
+        detailerName,
+        vehicleDesc,
         price,
         discountAmount: discount_amount,
         finalPrice,
         pickupDelay: pickup_delay_minutes,
         expirationMinutes,
-        vehicleDesc,
         photoUrl,
         authorizeUrl,
       });
 
       const emailResult = await sendEmail(
         customer.email,
-        `Authorization Request — ${biz.name}`,
-        `${message_to_customer}\n\nApprove: ${authorizeUrl}\n\nPrice: $${finalPrice.toFixed(2)}${pickup_delay_minutes > 0 ? `\nAdditional time: +${pickup_delay_minutes} minutes` : ''}`,
+        `Additional Service Authorization — ${biz.name}`,
+        [
+          `Hi ${customer.first_name},`,
+          `While working on your ${vehicleDesc}, we noticed ${issueText}.`,
+          `We recommend ${friendlyName} for an additional $${finalPrice.toFixed(2)}.`,
+          `Approve: ${authorizeUrl}`,
+          `— ${detailerName}, ${biz.name}`,
+        ].join('\n\n'),
         htmlBody
       );
       if (emailResult.success) {
@@ -245,13 +292,15 @@ function buildAuthorizationEmail(params: {
   businessName: string;
   businessLogo: string | null;
   customerName: string;
-  message: string;
+  issueText: string;
+  friendlyServiceName: string;
+  detailerName: string;
+  vehicleDesc: string;
   price: number;
   discountAmount: number;
   finalPrice: number;
   pickupDelay: number;
   expirationMinutes: number;
-  vehicleDesc: string;
   photoUrl: string | null;
   authorizeUrl: string;
 }): string {
@@ -259,13 +308,15 @@ function buildAuthorizationEmail(params: {
     businessName,
     businessLogo,
     customerName,
-    message,
+    issueText,
+    friendlyServiceName: friendly,
+    detailerName,
+    vehicleDesc,
     price,
     discountAmount,
     finalPrice,
     pickupDelay,
     expirationMinutes,
-    vehicleDesc,
     photoUrl,
     authorizeUrl,
   } = params;
@@ -276,7 +327,7 @@ function buildAuthorizationEmail(params: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Authorization Request</title>
+<title>Additional Service Authorization</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;">
@@ -287,30 +338,35 @@ function buildAuthorizationEmail(params: {
 <tr><td style="background-color:#1e40af;padding:24px;text-align:center;">
 ${businessLogo ? `<img src="${businessLogo}" alt="${businessName}" style="height:48px;margin-bottom:12px;">` : ''}
 <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">${businessName}</h1>
-<p style="margin:4px 0 0;color:#93c5fd;font-size:14px;">Service Authorization Request</p>
+<p style="margin:4px 0 0;color:#93c5fd;font-size:14px;">Additional Service Authorization</p>
 </td></tr>
 
 <!-- Body -->
 <tr><td style="padding:24px;">
 <p style="margin:0 0 16px;color:#374151;font-size:15px;">Hi ${customerName},</p>
-<p style="margin:0 0 20px;color:#374151;font-size:15px;">${message}</p>
+<p style="margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;">
+While working on your ${vehicleDesc}, ${detailerName} noticed ${issueText}.<br>
+We'd like to take care of it while your vehicle is already here.
+</p>
 
 ${photoUrl ? `
 <div style="margin:0 0 20px;text-align:center;">
-<img src="${photoUrl}" alt="Issue photo" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb;">
+<p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:500;">Photos from our inspection</p>
+<img src="${photoUrl}" alt="Inspection photo" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb;">
 </div>
 ` : ''}
 
-<!-- Price box -->
+<!-- Proposed service -->
 <table role="presentation" width="100%" style="background-color:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:20px;">
 <tr><td style="padding:16px;">
-<p style="margin:0 0 4px;color:#6b7280;font-size:13px;font-weight:500;">Vehicle: ${vehicleDesc}</p>
+<p style="margin:0 0 4px;color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Proposed Add-On Service</p>
+<p style="margin:0 0 8px;color:#111827;font-size:15px;font-weight:600;">${friendly}</p>
 ${discountAmount > 0 ? `
-<p style="margin:8px 0 0;color:#6b7280;font-size:14px;">Original price: <span style="text-decoration:line-through;">$${price.toFixed(2)}</span></p>
+<p style="margin:0;color:#6b7280;font-size:14px;">Original price: <span style="text-decoration:line-through;">$${price.toFixed(2)}</span></p>
 <p style="margin:4px 0 0;color:#059669;font-size:14px;">Discount: -$${discountAmount.toFixed(2)}</p>
-<p style="margin:8px 0 0;color:#111827;font-size:20px;font-weight:700;">$${finalPrice.toFixed(2)}</p>
+<p style="margin:8px 0 0;color:#111827;font-size:22px;font-weight:700;">Additional Cost: $${finalPrice.toFixed(2)}</p>
 ` : `
-<p style="margin:8px 0 0;color:#111827;font-size:20px;font-weight:700;">$${finalPrice.toFixed(2)}</p>
+<p style="margin:0;color:#111827;font-size:22px;font-weight:700;">Additional Cost: $${finalPrice.toFixed(2)}</p>
 `}
 ${pickupDelay > 0 ? `<p style="margin:8px 0 0;color:#6b7280;font-size:13px;">Estimated additional time: +${pickupDelay} minutes</p>` : ''}
 </td></tr>
@@ -330,8 +386,13 @@ ${pickupDelay > 0 ? `<p style="margin:8px 0 0;color:#6b7280;font-size:13px;">Est
 
 <p style="margin:20px 0 0;color:#9ca3af;font-size:12px;text-align:center;">
 This authorization expires in ${expirationMinutes} minutes.
-If you have questions, contact us at ${businessName}.
 </p>
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="border-top:1px solid #e5e7eb;padding:16px;text-align:center;">
+<p style="margin:0;color:#6b7280;font-size:12px;">— ${detailerName}</p>
+<p style="margin:4px 0 0;color:#9ca3af;font-size:12px;">${businessName}</p>
 </td></tr>
 
 </table>

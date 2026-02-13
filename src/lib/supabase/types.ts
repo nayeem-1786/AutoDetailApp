@@ -937,6 +937,18 @@ export interface JobPhoto {
   created_at: string;
 }
 
+export type IssueType =
+  | 'scratches'
+  | 'water_spots'
+  | 'paint_damage'
+  | 'pet_hair_stains'
+  | 'interior_stains'
+  | 'odor'
+  | 'headlight_haze'
+  | 'wheel_damage'
+  | 'tar_sap_overspray'
+  | 'other';
+
 export interface JobAddon {
   id: string;
   job_id: string;
@@ -948,6 +960,8 @@ export interface JobAddon {
   status: JobAddonStatus;
   authorization_token: string;
   message_to_customer: string | null;
+  issue_type: IssueType | null;
+  issue_description: string | null;
   sent_at: string | null;
   responded_at: string | null;
   expires_at: string | null;
