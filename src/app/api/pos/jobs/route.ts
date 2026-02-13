@@ -78,12 +78,12 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Permission check: pos.jobs.create_walkin
+    // Permission check: pos.jobs.manage (covers walk-in creation)
     const canCreate = await checkPosPermission(
       supabase,
       posEmployee.role,
       posEmployee.employee_id,
-      'pos.jobs.create_walkin'
+      'pos.jobs.manage'
     );
     if (!canCreate) {
       return NextResponse.json(

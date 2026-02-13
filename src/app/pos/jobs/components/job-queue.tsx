@@ -71,7 +71,7 @@ interface JobQueueProps {
 
 export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
   const { employee } = usePosAuth();
-  const { granted: canCreateWalkIn } = usePosPermission('pos.jobs.create_walkin');
+  const { granted: canCreateWalkIn } = usePosPermission('pos.jobs.manage');
   const isBookable = employee?.bookable_for_appointments ?? false;
   const [filter, setFilter] = useState<FilterType>(isBookable ? 'mine' : 'all');
   const [jobs, setJobs] = useState<JobListItem[]>([]);

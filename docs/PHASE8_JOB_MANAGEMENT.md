@@ -833,9 +833,9 @@ Supabase Storage IS S3 under the hood. Using the Supabase SDK keeps auth, upload
 | Permission Key | Description | Default |
 |----------------|-------------|---------|
 | `pos.jobs.view` | View the Jobs tab and job queue | Allowed for all POS roles |
-| `pos.jobs.manage` | Start intake, begin work, complete jobs | Allowed for Detailer, Manager, Owner |
+| `pos.jobs.manage` | Create walk-in jobs, start intake, begin work, complete jobs, reassign detailer | Allowed for Detailer, Manager, Owner |
 | `pos.jobs.flag_issue` | Create mid-service upsell requests | Allowed for Detailer, Manager, Owner |
-| `pos.jobs.create_walkin` | Create walk-in jobs from Jobs tab | Allowed for Manager, Owner |
+| `pos.jobs.cancel` | Cancel jobs (destructive action, separately grantable) | Allowed for Manager, Owner |
 
 ### New Admin Permissions
 | Permission Key | Description | Default |

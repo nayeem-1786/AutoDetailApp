@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 36 — 2026-02-12 (Consolidate Job Permissions)
+
+- Consolidated `pos.jobs.create_walkin` into `pos.jobs.manage` — walk-in creation now gated by manage permission
+- Updated `pos.jobs.manage` description: "Create walk-in jobs, start intake, begin work, complete jobs, reassign detailer"
+- Fixed `pos.jobs.cancel` detailer default to `false` (only super_admin and admin get cancel by default)
+- Removed all orphaned `create_walkin` references from code, role-defaults, and docs
+- POS Jobs now has 4 permissions: view, manage, flag_issue, cancel
+
 ## Sessions 34-35 — 2026-02-12 (POS Job Permission Enforcement + Detailer Reassignment)
 
 ### Detailer Reassignment on Job Detail
@@ -20,18 +28,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - DB columns: `cancellation_reason`, `cancelled_at`, `cancelled_by`
 - New endpoint: `POST /api/pos/jobs/[id]/cancel`
 
-### POS Permission Enforcement (All 5 Job Permissions)
+### POS Permission Enforcement (4 Job Permissions)
 - Shared `checkPosPermission()` utility at `src/lib/pos/check-permission.ts`
 - All POS job buttons now gated client-side (`usePosPermission()`) AND server-side (`checkPosPermission()`)
 - Permission matrix:
   | Permission | Client Gate | Server Gate |
   |---|---|---|
   | `pos.jobs.view` | Jobs tab visibility | — |
-  | `pos.jobs.manage` | Reassign detailer | — |
+  | `pos.jobs.manage` | Walk-in + reassign | POST /api/pos/jobs |
   | `pos.jobs.flag_issue` | Flag Issue button | — |
-  | `pos.jobs.create_walkin` | New Walk-in button | POST /api/pos/jobs |
   | `pos.jobs.cancel` | Cancel button | POST /api/pos/jobs/[id]/cancel |
-- Defaults: cashier denied for cancel, flag_issue, manage, create_walkin
+- Defaults: cashier denied for cancel, flag_issue, manage
 
 ## Session 7 — 2026-02-07 (POS UX Polish)
 

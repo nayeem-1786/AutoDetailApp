@@ -394,25 +394,18 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 35 — POS Job Permission Enforcement)
-- **POS job permission enforcement**: All 5 POS job permissions now enforced client-side (via `usePosPermission()`) and server-side (via `checkPosPermission()`). Buttons hidden entirely when permission denied — no error dialogs.
-- **Shared permission helper** (`src/lib/pos/check-permission.ts`): Extracted `checkPosPermission()` to shared utility. Resolution: super_admin bypass → employee override → role default → deny. Used by cancel route and walk-in create route.
-- **`pos.jobs.cancel` defaults fixed**: Changed cashier default from `true` to `false`. Only super_admin, admin, detailer get cancel by default. Cashier must be explicitly granted. Updated both `role-defaults.ts` and migration file.
-- **`pos.jobs.create_walkin` now enforced**:
-  - **Client-side**: "New Walk-in" button in `job-queue.tsx` hidden when `pos.jobs.create_walkin` is denied.
-  - **Server-side**: `POST /api/pos/jobs` now checks `pos.jobs.create_walkin` via `checkPosPermission()`. Returns 403 if denied.
-- **`pos.jobs.flag_issue` now enforced**: Flag Issue button in `job-detail.tsx` hidden when `pos.jobs.flag_issue` is denied.
-- **`pos.jobs.cancel` enforcement** (from Session 34): Cancel button uses `usePosPermission('pos.jobs.cancel')`. Server-side cancel route uses shared `checkPosPermission()`.
-- **POS permission enforcement matrix**:
+## Last Session: 2026-02-12 (Session 36 — Consolidate Job Permissions)
+- **Consolidated `pos.jobs.create_walkin` into `pos.jobs.manage`**: Walk-in creation is now gated by `pos.jobs.manage` instead of a separate permission. Removed `create_walkin` from `permission_definitions`, `permissions`, `role-defaults.ts`, and all code references.
+- **Updated `pos.jobs.manage` description**: "Create walk-in jobs, start intake, begin work, complete jobs, reassign detailer"
+- **Fixed `pos.jobs.cancel` detailer default**: Changed from `true` to `false`. Only super_admin and admin get cancel by default.
+- **POS permission enforcement matrix (4 permissions)**:
   | Permission | Client Gate | Server Gate | Default: super_admin | admin | detailer | cashier |
   |---|---|---|---|---|---|---|
   | `pos.jobs.view` | Jobs tab visibility | — | true | true | true | true |
-  | `pos.jobs.manage` | Reassign detailer card | — | true | true | true | false |
+  | `pos.jobs.manage` | Walk-in + reassign | POST /api/pos/jobs | true | true | true | false |
   | `pos.jobs.flag_issue` | Flag Issue button | — | true | true | true | false |
-  | `pos.jobs.create_walkin` | New Walk-in button | POST /api/pos/jobs | true | true | false | false |
-  | `pos.jobs.cancel` | Cancel Job button | POST /api/pos/jobs/[id]/cancel | true | true | true | false |
-- **Files created**: `src/lib/pos/check-permission.ts`
-- **Files modified**: `src/app/pos/jobs/components/job-detail.tsx` (flag_issue gating), `src/app/pos/jobs/components/job-queue.tsx` (walk-in button gating), `src/app/api/pos/jobs/route.ts` (server-side walk-in permission check), `src/app/api/pos/jobs/[id]/cancel/route.ts` (use shared checkPosPermission), `src/lib/utils/role-defaults.ts` (cashier cancel → false), `supabase/migrations/20260212000006_jobs_cancellation_columns.sql` (cashier cancel → false)
+  | `pos.jobs.cancel` | Cancel Job button | POST /api/pos/jobs/[id]/cancel | true | true | false | false |
+- **Migration**: `20260212000007_consolidate_job_permissions.sql`
 - TypeScript clean (zero errors)
 
 ### Session 34 — Detailer Reassignment + Cancel Permission Gating
