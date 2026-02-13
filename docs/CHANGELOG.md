@@ -4,6 +4,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 49 — 2026-02-13 (Vehicle Silhouettes for Zone Picker)
+
+### Upgrade: Vehicle-type-specific silhouettes for exterior and interior zone picker
+- Replaced generic rectangular SVG shapes with proper vehicle silhouettes in the zone picker
+- Three exterior silhouettes based on `vehicle.size_class`:
+  - **Sedan** (default): compact body, defined trunk, lower roofline, wheel arches, side mirrors
+  - **SUV/Truck** (`truck_suv_2row`): wider/boxier body, roof rails, larger wheel arches
+  - **Van/3-Row** (`suv_3row_van`): tallest/widest body, extended rear, sliding door seam lines
+- Three interior silhouettes:
+  - **Sedan** (default): 2-row cabin with steering wheel, front seats with headrests, console with cup holders/shifter, door panels with handles, rear bench, carpet, trunk
+  - **SUV** (`truck_suv_2row`): wider 2-row cabin, larger seats and console, armrest storage
+  - **Van/3-Row** (`suv_3row_van`): 3-row cabin with 2nd + 3rd row seats (both map to `interior_seats_rear`), row divider labels, wider cargo area
+- All silhouettes use the same existing 15 zone IDs — fully backward compatible with existing photos
+- Falls back to sedan silhouette when `size_class` is null or unknown
+- Zone picker receives `sizeClass` prop from job detail component
+- All existing zone picker functionality preserved: tap to capture, multi-photo, photo count badges, progress bar, completion flow
+- Files created: `src/app/pos/jobs/components/vehicle-silhouettes/` (7 files: types.ts, index.tsx, sedan-exterior.tsx, suv-exterior.tsx, van-exterior.tsx, sedan-interior.tsx, suv-interior.tsx, van-interior.tsx)
+- Files modified: `zone-picker.tsx` (replaced inline SVG diagrams with silhouette components), `job-detail.tsx` (passes `sizeClass` to ZonePicker)
+- Zero TypeScript errors, build passes
+
+---
+
 ## Session 48 — 2026-02-13 (Fix POS IP Restriction — Dev Blocking + RLS)
 
 ### Fix: Middleware always blocked in dev due to IP mismatch

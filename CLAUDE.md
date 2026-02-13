@@ -360,6 +360,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Job timer formula**: If paused → `timer_seconds` (static). If running → `timer_seconds + (now - work_started_at)`. All state in DB, client derives display.
 - **Photo minimums**: Configurable via `business_settings`: `min_intake_photos_exterior` (4), `min_intake_photos_interior` (2), same for completion. Counts unique zones with >=1 photo.
 - **Zone keys**: 8 exterior + 7 interior. Defined in `src/lib/utils/job-zones.ts`.
+- **Vehicle silhouettes**: Zone picker renders vehicle-type-specific SVG silhouettes based on `vehicle.size_class`. Three variants: sedan (default), SUV/truck (`truck_suv_2row`), van/3-row SUV (`suv_3row_van`). Components in `src/app/pos/jobs/components/vehicle-silhouettes/`. Mapping functions: `getExteriorSilhouette()`, `getInteriorSilhouette()`. Falls back to sedan if size_class is null/unknown. Van interior shows 2nd + 3rd row seats (both map to `interior_seats_rear` zone).
 - **Supabase Storage bucket**: `job-photos/` with path `{job_id}/{uuid}.jpg` + `{job_id}/{uuid}_thumb.jpg`. Public read, authenticated write.
 - **Phase 9 is Native Online Store** — NO WordPress/WooCommerce. Build cart, checkout, orders within this Next.js app. Product catalog pages already exist at `/products`.
 - **Feature flag checks (server-side)**: Use `isFeatureEnabled(key)` from `src/lib/utils/feature-flags.ts` for all API route flag checks. Uses `createAdminClient()` (service role). Fails closed. Import `FEATURE_FLAGS` from constants for key names.

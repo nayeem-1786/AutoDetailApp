@@ -1,18 +1,18 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Check, Camera, ChevronRight, X, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Check, Camera, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { posFetch } from '../../lib/pos-fetch';
 import {
   EXTERIOR_ZONES,
   INTERIOR_ZONES,
   countCoveredZones,
-  getZoneLabel,
 } from '@/lib/utils/job-zones';
 import { PhotoCapture } from './photo-capture';
 import { ZonePhotosView } from './zone-photos-view';
-import type { JobPhoto, JobPhotoPhase } from '@/lib/supabase/types';
+import { getExteriorSilhouette, getInteriorSilhouette } from './vehicle-silhouettes';
+import type { JobPhoto, JobPhotoPhase, VehicleSizeClass } from '@/lib/supabase/types';
 
 type Tab = 'exterior' | 'interior';
 
@@ -25,6 +25,8 @@ interface ZonePickerProps {
   onBack: () => void;
   /** When true, calls the /complete API instead of PATCH */
   isCompletionFlow?: boolean;
+  /** Vehicle size class determines which silhouette SVG to render. Falls back to sedan. */
+  sizeClass?: VehicleSizeClass | string | null;
 }
 
 export function ZonePicker({
@@ -35,6 +37,7 @@ export function ZonePicker({
   onComplete,
   onBack,
   isCompletionFlow = false,
+  sizeClass,
 }: ZonePickerProps) {
   const [tab, setTab] = useState<Tab>('exterior');
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
@@ -152,6 +155,10 @@ export function ZonePicker({
 
   const zones = tab === 'exterior' ? EXTERIOR_ZONES : INTERIOR_ZONES;
 
+  // Get the correct silhouette component for this vehicle type
+  const ExteriorSilhouette = getExteriorSilhouette(sizeClass);
+  const InteriorSilhouette = getInteriorSilhouette(sizeClass);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -220,12 +227,12 @@ export function ZonePicker({
           </div>
         ) : (
           <>
-            {/* Vehicle SVG Diagram */}
+            {/* Vehicle SVG Diagram — vehicle-type-specific silhouette */}
             <div className="px-4 pt-4">
               {tab === 'exterior' ? (
-                <ExteriorDiagram photoCounts={photoCounts} onZoneTap={setCaptureZone} />
+                <ExteriorSilhouette photoCounts={photoCounts} onZoneTap={setCaptureZone} />
               ) : (
-                <InteriorDiagram photoCounts={photoCounts} onZoneTap={setCaptureZone} />
+                <InteriorSilhouette photoCounts={photoCounts} onZoneTap={setCaptureZone} />
               )}
             </div>
 
@@ -321,275 +328,5 @@ export function ZonePicker({
         </button>
       </div>
     </div>
-  );
-}
-
-// ─── Exterior SVG Diagram (Top-Down View) ────────────────────────────────────
-
-function ExteriorDiagram({
-  photoCounts,
-  onZoneTap,
-}: {
-  photoCounts: Record<string, number>;
-  onZoneTap: (zone: string) => void;
-}) {
-  function zoneColor(key: string) {
-    return (photoCounts[key] ?? 0) > 0 ? '#dcfce7' : '#fee2e2';
-  }
-  function zoneBorder(key: string) {
-    return (photoCounts[key] ?? 0) > 0 ? '#16a34a' : '#dc2626';
-  }
-
-  return (
-    <svg viewBox="0 0 300 480" className="mx-auto w-full max-w-[260px]">
-      {/* Vehicle body outline — top-down view */}
-      <path
-        d="M 90 60 Q 90 30 150 20 Q 210 30 210 60 L 220 120 L 225 180 L 225 300 L 220 360 L 210 420 Q 210 450 150 460 Q 90 450 90 420 L 80 360 L 75 300 L 75 180 L 80 120 Z"
-        fill="none"
-        stroke="#d1d5db"
-        strokeWidth="2"
-      />
-
-      {/* Windshield */}
-      <path
-        d="M 100 110 Q 150 95 200 110 L 195 140 Q 150 130 105 140 Z"
-        fill="#e5e7eb"
-        stroke="#d1d5db"
-        strokeWidth="1"
-      />
-      {/* Rear window */}
-      <path
-        d="M 105 350 Q 150 340 195 350 L 200 375 Q 150 385 100 375 Z"
-        fill="#e5e7eb"
-        stroke="#d1d5db"
-        strokeWidth="1"
-      />
-
-      {/* Tappable zone hotspots */}
-
-      {/* Front */}
-      <rect
-        x="85" y="20" width="130" height="65"
-        rx="8" fill={zoneColor('exterior_front')} stroke={zoneBorder('exterior_front')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_front')}
-      />
-      <text x="150" y="55" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Front</text>
-
-      {/* Hood */}
-      <rect
-        x="85" y="90" width="130" height="60"
-        rx="6" fill={zoneColor('exterior_hood')} stroke={zoneBorder('exterior_hood')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_hood')}
-      />
-      <text x="150" y="125" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Hood</text>
-
-      {/* Roof */}
-      <rect
-        x="90" y="160" width="120" height="80"
-        rx="6" fill={zoneColor('exterior_roof')} stroke={zoneBorder('exterior_roof')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_roof')}
-      />
-      <text x="150" y="205" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Roof</text>
-
-      {/* Driver Side */}
-      <rect
-        x="30" y="160" width="50" height="160"
-        rx="6" fill={zoneColor('exterior_driver_side')} stroke={zoneBorder('exterior_driver_side')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_driver_side')}
-      />
-      <text x="55" y="240" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500" transform="rotate(-90, 55, 240)">Driver Side</text>
-
-      {/* Passenger Side */}
-      <rect
-        x="220" y="160" width="50" height="160"
-        rx="6" fill={zoneColor('exterior_passenger_side')} stroke={zoneBorder('exterior_passenger_side')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_passenger_side')}
-      />
-      <text x="245" y="240" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500" transform="rotate(90, 245, 240)">Passenger Side</text>
-
-      {/* Trunk */}
-      <rect
-        x="85" y="340" width="130" height="60"
-        rx="6" fill={zoneColor('exterior_trunk')} stroke={zoneBorder('exterior_trunk')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_trunk')}
-      />
-      <text x="150" y="375" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Trunk</text>
-
-      {/* Rear */}
-      <rect
-        x="85" y="405" width="130" height="60"
-        rx="8" fill={zoneColor('exterior_rear')} stroke={zoneBorder('exterior_rear')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_rear')}
-      />
-      <text x="150" y="440" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Rear</text>
-
-      {/* Wheels */}
-      <rect
-        x="30" y="340" width="50" height="50"
-        rx="6" fill={zoneColor('exterior_wheels')} stroke={zoneBorder('exterior_wheels')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('exterior_wheels')}
-      />
-      <text x="55" y="369" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500">Wheels</text>
-
-      {/* Photo count badges */}
-      {EXTERIOR_ZONES.map((z) => {
-        const count = photoCounts[z.key] ?? 0;
-        if (count === 0) return null;
-        const positions: Record<string, { x: number; y: number }> = {
-          exterior_front: { x: 200, y: 35 },
-          exterior_hood: { x: 200, y: 105 },
-          exterior_roof: { x: 195, y: 175 },
-          exterior_driver_side: { x: 65, y: 175 },
-          exterior_passenger_side: { x: 255, y: 175 },
-          exterior_trunk: { x: 200, y: 355 },
-          exterior_rear: { x: 200, y: 420 },
-          exterior_wheels: { x: 65, y: 355 },
-        };
-        const pos = positions[z.key];
-        if (!pos) return null;
-        return (
-          <g key={z.key}>
-            <circle cx={pos.x} cy={pos.y} r="10" fill="#2563eb" />
-            <text x={pos.x} y={pos.y + 4} textAnchor="middle" fontSize="10" fill="white" fontWeight="bold">{count}</text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-// ─── Interior SVG Diagram (Layout View) ──────────────────────────────────────
-
-function InteriorDiagram({
-  photoCounts,
-  onZoneTap,
-}: {
-  photoCounts: Record<string, number>;
-  onZoneTap: (zone: string) => void;
-}) {
-  function zoneColor(key: string) {
-    return (photoCounts[key] ?? 0) > 0 ? '#dcfce7' : '#fee2e2';
-  }
-  function zoneBorder(key: string) {
-    return (photoCounts[key] ?? 0) > 0 ? '#16a34a' : '#dc2626';
-  }
-
-  return (
-    <svg viewBox="0 0 300 400" className="mx-auto w-full max-w-[260px]">
-      {/* Vehicle interior outline */}
-      <rect
-        x="30" y="20" width="240" height="360" rx="20"
-        fill="none" stroke="#d1d5db" strokeWidth="2"
-      />
-
-      {/* Dashboard */}
-      <rect
-        x="40" y="30" width="220" height="55"
-        rx="8" fill={zoneColor('interior_dashboard')} stroke={zoneBorder('interior_dashboard')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_dashboard')}
-      />
-      <text x="150" y="62" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Dashboard</text>
-
-      {/* Center Console */}
-      <rect
-        x="110" y="95" width="80" height="120"
-        rx="6" fill={zoneColor('interior_console')} stroke={zoneBorder('interior_console')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_console')}
-      />
-      <text x="150" y="152" textAnchor="middle" fontSize="10" fill="#374151" fontWeight="500">Console</text>
-
-      {/* Front Seats */}
-      <rect
-        x="40" y="95" width="60" height="70"
-        rx="6" fill={zoneColor('interior_seats_front')} stroke={zoneBorder('interior_seats_front')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_seats_front')}
-      />
-      <text x="70" y="134" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500">Front</text>
-      <text x="70" y="144" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500">Seats</text>
-
-      <rect
-        x="200" y="95" width="60" height="70"
-        rx="6" fill={zoneColor('interior_seats_front')} stroke={zoneBorder('interior_seats_front')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_seats_front')}
-      />
-
-      {/* Door Panels */}
-      <rect
-        x="40" y="175" width="60" height="40"
-        rx="6" fill={zoneColor('interior_door_panels')} stroke={zoneBorder('interior_door_panels')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_door_panels')}
-      />
-      <text x="70" y="199" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500">Doors</text>
-
-      <rect
-        x="200" y="175" width="60" height="40"
-        rx="6" fill={zoneColor('interior_door_panels')} stroke={zoneBorder('interior_door_panels')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_door_panels')}
-      />
-
-      {/* Rear Seats */}
-      <rect
-        x="40" y="225" width="220" height="50"
-        rx="6" fill={zoneColor('interior_seats_rear')} stroke={zoneBorder('interior_seats_rear')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_seats_rear')}
-      />
-      <text x="150" y="255" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Rear Seats</text>
-
-      {/* Carpet/Floor */}
-      <rect
-        x="40" y="285" width="220" height="45"
-        rx="6" fill={zoneColor('interior_carpet')} stroke={zoneBorder('interior_carpet')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_carpet')}
-      />
-      <text x="150" y="312" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Carpet / Floor</text>
-
-      {/* Trunk/Cargo */}
-      <rect
-        x="40" y="340" width="220" height="30"
-        rx="6" fill={zoneColor('interior_trunk_cargo')} stroke={zoneBorder('interior_trunk_cargo')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
-        onClick={() => onZoneTap('interior_trunk_cargo')}
-      />
-      <text x="150" y="360" textAnchor="middle" fontSize="10" fill="#374151" fontWeight="500">Trunk / Cargo</text>
-
-      {/* Photo count badges */}
-      {INTERIOR_ZONES.map((z) => {
-        const count = photoCounts[z.key] ?? 0;
-        if (count === 0) return null;
-        const positions: Record<string, { x: number; y: number }> = {
-          interior_dashboard: { x: 245, y: 45 },
-          interior_console: { x: 175, y: 110 },
-          interior_seats_front: { x: 85, y: 110 },
-          interior_seats_rear: { x: 245, y: 240 },
-          interior_carpet: { x: 245, y: 300 },
-          interior_door_panels: { x: 85, y: 190 },
-          interior_trunk_cargo: { x: 245, y: 350 },
-        };
-        const pos = positions[z.key];
-        if (!pos) return null;
-        return (
-          <g key={z.key}>
-            <circle cx={pos.x} cy={pos.y} r="10" fill="#2563eb" />
-            <text x={pos.x} y={pos.y + 4} textAnchor="middle" fontSize="10" fill="white" fontWeight="bold">{count}</text>
-          </g>
-        );
-      })}
-    </svg>
   );
 }
