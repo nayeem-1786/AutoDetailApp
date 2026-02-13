@@ -8,8 +8,10 @@ import { AppointmentCard } from '@/components/account/appointment-card';
 import { CouponCard } from '@/components/account/coupon-card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { BeforeAfterSlider } from '@/components/before-after-slider';
 import { formatPoints, formatCurrency } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
+import { ArrowRight, Camera } from 'lucide-react';
 
 interface CouponRewardData {
   applies_to: string;
@@ -32,6 +34,14 @@ interface CouponData {
   coupon_rewards?: CouponRewardData[];
 }
 
+interface LastServiceData {
+  date: string;
+  vehicle: { year: number; make: string; model: string; color: string | null } | null;
+  services: { name: string }[];
+  beforeSrc: string | null;
+  afterSrc: string | null;
+}
+
 export default function AccountDashboardPage() {
   const { customer } = useCustomerAuth();
   const [upcomingAppointments, setUpcomingAppointments] = useState<
@@ -39,6 +49,7 @@ export default function AccountDashboardPage() {
     any[]
   >([]);
   const [coupons, setCoupons] = useState<CouponData[]>([]);
+  const [lastService, setLastService] = useState<LastServiceData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadDashboard = useCallback(async () => {
@@ -47,8 +58,8 @@ export default function AccountDashboardPage() {
     const supabase = createClient();
     const today = new Date().toISOString().split('T')[0];
 
-    // Load appointments and coupons in parallel
-    const [apptResult, couponResult] = await Promise.all([
+    // Load appointments, coupons, and last service photos in parallel
+    const [apptResult, couponResult, photosResult] = await Promise.all([
       supabase
         .from('appointments')
         .select(
@@ -66,10 +77,59 @@ export default function AccountDashboardPage() {
         if (!res.ok) return { data: [] };
         return res.json();
       }),
+      fetch('/api/account/photos?limit=1&page=1').then(async (res) => {
+        if (!res.ok) return { visits: [] };
+        return res.json();
+      }),
     ]);
 
     setUpcomingAppointments(apptResult.data ?? []);
     setCoupons(couponResult.data ?? []);
+
+    // Extract last service with before/after pair
+    const visits = photosResult.visits || [];
+    if (visits.length > 0) {
+      const visit = visits[0];
+      // Find a zone with both before + after (prefer exterior)
+      let beforeSrc: string | null = null;
+      let afterSrc: string | null = null;
+
+      // Try to find exterior before/after first, then any zone
+      const intakePhotos = visit.photos?.intake || [];
+      const completionPhotos = visit.photos?.completion || [];
+
+      for (const intake of intakePhotos) {
+        if (intake.zone.startsWith('exterior_')) {
+          const match = completionPhotos.find((c: { zone: string }) => c.zone === intake.zone);
+          if (match) {
+            beforeSrc = intake.image_url;
+            afterSrc = match.image_url;
+            break;
+          }
+        }
+      }
+
+      // Fallback to any zone pair
+      if (!beforeSrc) {
+        for (const intake of intakePhotos) {
+          const match = completionPhotos.find((c: { zone: string }) => c.zone === intake.zone);
+          if (match) {
+            beforeSrc = intake.image_url;
+            afterSrc = match.image_url;
+            break;
+          }
+        }
+      }
+
+      setLastService({
+        date: visit.date,
+        vehicle: visit.vehicle,
+        services: visit.services,
+        beforeSrc,
+        afterSrc,
+      });
+    }
+
     setLoading(false);
   }, [customer]);
 
@@ -111,6 +171,58 @@ export default function AccountDashboardPage() {
           </p>
         </div>
       </Link>
+
+      {/* Last Service Card */}
+      {lastService && (
+        <div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Your Last Service
+            </h2>
+            <Link href="/account/photos">
+              <Button variant="ghost" size="sm" className="gap-1">
+                View all photos <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-gray-200 p-4">
+            <div className="mb-3">
+              <p className="text-sm font-medium text-gray-900">
+                {new Date(lastService.date).toLocaleDateString('en-US', {
+                  timeZone: 'America/Los_Angeles',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
+              <p className="text-sm text-gray-500">
+                {lastService.vehicle
+                  ? `${lastService.vehicle.year} ${lastService.vehicle.make} ${lastService.vehicle.model}${lastService.vehicle.color ? ` — ${lastService.vehicle.color}` : ''}`
+                  : ''}
+                {lastService.vehicle && lastService.services.length > 0 ? ' · ' : ''}
+                {lastService.services.map((s) => s.name).join(', ')}
+              </p>
+            </div>
+
+            {lastService.beforeSrc && lastService.afterSrc ? (
+              <div className="max-w-md">
+                <BeforeAfterSlider
+                  beforeSrc={lastService.beforeSrc}
+                  afterSrc={lastService.afterSrc}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
+                <Camera className="h-8 w-8 text-gray-300" />
+                <p className="text-sm text-gray-500">
+                  No before/after photos available for this service
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Active Coupons */}
       {coupons.length > 0 && (
