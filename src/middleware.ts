@@ -80,7 +80,7 @@ function getClientIp(request: NextRequest): string | null {
   return request.headers.get('x-real-ip');
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // IP restriction for POS routes (controlled by toggle in Settings > POS Security)

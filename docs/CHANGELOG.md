@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 47 — 2026-02-12 (Fix POS IP Restriction — Dead Middleware)
+
+### Fix: POS IP restriction was completely non-functional
+- In Session (commit 26dd5b3), `src/middleware.ts` was incorrectly renamed to `src/proxy.ts` — Next.js has no "proxy.ts" convention
+- The file became dead code: nothing imported it, the `proxy()` function never executed
+- Admin > Settings > POS Security saved IPs correctly to `business_settings`, but enforcement never ran
+- Fix: renamed `proxy.ts` → `middleware.ts`, renamed exported function `proxy()` → `middleware()`
+- Deleted vestigial `src/app/api/internal/allowed-ips/route.ts` (was used by old self-fetch approach, nothing calls it)
+- No logic changes — the IP check, cache, matcher, and Supabase query were all correct
+- Files: `src/middleware.ts` (renamed from `src/proxy.ts`), deleted `src/app/api/internal/allowed-ips/route.ts`
+
+---
+
 ## Session 46 — 2026-02-12 (Flag Flow UX Overhaul — Issue Dropdown, SMS Rewrite, Auth Page, Badge, Checkout Permission)
 
 ### Fix: Flag flow — issue type dropdown replaces service-name picker
