@@ -64,6 +64,7 @@ export default function JobsPage() {
           perUnitQty: null,
           perUnitLabel: null,
           perUnitPrice: null,
+          perUnitMax: null,
         };
       });
 

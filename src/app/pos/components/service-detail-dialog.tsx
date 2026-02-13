@@ -108,8 +108,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
           vehicleSizeClass,
           perUnitQty,
         });
+        toast.success(`Added ${service.name}`);
       }
-      toast.success(`Added ${service.name}`);
       onClose();
       return;
     }
@@ -127,8 +127,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         pricing: selectedTier,
         vehicleSizeClass,
       });
+      toast.success(`Added ${service.name}`);
     }
-    toast.success(`Added ${service.name}`);
     onClose();
   }
 

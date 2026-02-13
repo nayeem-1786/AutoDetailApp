@@ -122,53 +122,96 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
 
         {/* Right: qty controls + price + remove */}
         <div className="flex shrink-0 items-center gap-1">
-          <button
-            onClick={() =>
-              dispatch({
-                type: 'UPDATE_ITEM_QUANTITY',
-                itemId: item.id,
-                quantity: item.quantity - 1,
-              })
-            }
-            className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
-          >
-            <Minus className="h-3 w-3" />
-          </button>
-          {editing ? (
-            <input
-              ref={inputRef}
-              type="number"
-              min="0"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={commitEdit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitEdit();
-                if (e.key === 'Escape') setEditing(false);
-              }}
-              className="h-7 w-12 rounded border border-blue-400 bg-white text-center text-sm tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-blue-300"
-              autoFocus
-            />
+          {item.itemType === 'service' && item.perUnitQty != null && item.perUnitPrice != null ? (
+            /* Per-unit service: stepper controls perUnitQty with max enforcement */
+            <>
+              <button
+                onClick={() =>
+                  item.perUnitQty! > 1
+                    ? dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: item.id, perUnitQty: item.perUnitQty! - 1 })
+                    : dispatch({ type: 'REMOVE_ITEM', itemId: item.id })
+                }
+                className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              <span className="flex h-7 min-w-[28px] items-center justify-center px-1 text-sm tabular-nums text-gray-900">
+                {item.perUnitQty}
+              </span>
+              <button
+                onClick={() => {
+                  const max = item.perUnitMax ?? 10;
+                  if (item.perUnitQty! < max) {
+                    dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: item.id, perUnitQty: item.perUnitQty! + 1 });
+                  }
+                }}
+                disabled={item.perUnitQty! >= (item.perUnitMax ?? 10)}
+                className={`flex h-7 w-7 items-center justify-center rounded ${
+                  item.perUnitQty! >= (item.perUnitMax ?? 10)
+                    ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </>
+          ) : item.itemType === 'service' ? (
+            /* Regular service: no stepper — always qty 1 */
+            <span className="flex h-7 min-w-[28px] items-center justify-center px-1 text-sm tabular-nums text-gray-400">
+              1
+            </span>
           ) : (
-            <button
-              onClick={startEditing}
-              className="flex h-7 min-w-[28px] items-center justify-center rounded px-1 text-sm tabular-nums text-gray-900 hover:bg-blue-50 hover:text-blue-700"
-            >
-              {item.quantity}
-            </button>
+            /* Products and custom items: full quantity stepper */
+            <>
+              <button
+                onClick={() =>
+                  dispatch({
+                    type: 'UPDATE_ITEM_QUANTITY',
+                    itemId: item.id,
+                    quantity: item.quantity - 1,
+                  })
+                }
+                className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              {editing ? (
+                <input
+                  ref={inputRef}
+                  type="number"
+                  min="0"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={commitEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitEdit();
+                    if (e.key === 'Escape') setEditing(false);
+                  }}
+                  className="h-7 w-12 rounded border border-blue-400 bg-white text-center text-sm tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-blue-300"
+                  autoFocus
+                />
+              ) : (
+                <button
+                  onClick={startEditing}
+                  className="flex h-7 min-w-[28px] items-center justify-center rounded px-1 text-sm tabular-nums text-gray-900 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  {item.quantity}
+                </button>
+              )}
+              <button
+                onClick={() =>
+                  dispatch({
+                    type: 'UPDATE_ITEM_QUANTITY',
+                    itemId: item.id,
+                    quantity: item.quantity + 1,
+                  })
+                }
+                className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </>
           )}
-          <button
-            onClick={() =>
-              dispatch({
-                type: 'UPDATE_ITEM_QUANTITY',
-                itemId: item.id,
-                quantity: item.quantity + 1,
-              })
-            }
-            className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
-          >
-            <Plus className="h-3 w-3" />
-          </button>
 
           {/* Price */}
           <div className="w-16 text-right">

@@ -29,9 +29,11 @@ interface CatalogBrowserProps {
   onAddService?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
   /** Override vehicle size class (for quote builder where vehicle is in a different context) */
   vehicleSizeOverride?: VehicleSizeClass | null;
+  /** Set of service IDs already on the ticket — shows checkmark indicator */
+  addedServiceIds?: Set<string>;
 }
 
-export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride }: CatalogBrowserProps) {
+export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride, addedServiceIds }: CatalogBrowserProps) {
   const { products, services } = useCatalog();
   const { ticket, dispatch: ticketDispatch } = useTicket();
   const hasCallbacks = !!onAddProduct || !!onAddService;
@@ -149,7 +151,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     // Quick-add: single tier, not vehicle-size-aware
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
       quickAdd(service, pricing[0], vehicleSizeClass);
-      toast.success(`Added ${service.name}`);
+      if (!onAddService) toast.success(`Added ${service.name}`);
       return;
     }
 
@@ -169,7 +171,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         created_at: '',
       };
       quickAdd(service, syntheticPricing, vehicleSizeClass);
-      toast.success(`Added ${service.name}`);
+      if (!onAddService) toast.success(`Added ${service.name}`);
       return;
     }
 
@@ -181,15 +183,19 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
         if (matchingTier) {
           quickAdd(service, matchingTier, vehicleSizeClass);
-          const price = resolveServicePrice(matchingTier, vehicleSizeClass);
-          toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+          if (!onAddService) {
+            const price = resolveServicePrice(matchingTier, vehicleSizeClass);
+            toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+          }
           return;
         }
       }
       if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
         quickAdd(service, pricing[0], vehicleSizeClass);
-        const price = resolveServicePrice(pricing[0], vehicleSizeClass);
-        toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+        if (!onAddService) {
+          const price = resolveServicePrice(pricing[0], vehicleSizeClass);
+          toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+        }
         return;
       }
     }
@@ -215,7 +221,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         perUnitQty,
       });
     }
-    toast.success(`Added ${pickerService.name}`);
+    if (!onAddService) toast.success(`Added ${pickerService.name}`);
     setPickerService(null);
   }
 
@@ -264,6 +270,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
             services={searchResults as CatalogService[]}
             vehicleSizeClass={vehicleSizeClass}
             onTapService={handleTapServiceDirect}
+            addedServiceIds={addedServiceIds}
           />
         )}
         {dialogs}
@@ -296,6 +303,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
               services={categoryItems as CatalogService[]}
               vehicleSizeClass={vehicleSizeClass}
               onTapService={handleTapService}
+              addedServiceIds={addedServiceIds}
             />
           )}
         </div>

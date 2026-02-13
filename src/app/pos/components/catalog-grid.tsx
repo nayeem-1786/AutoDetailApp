@@ -30,12 +30,15 @@ interface ServiceGridProps {
   services: CatalogService[];
   vehicleSizeClass: string | null;
   onTapService: (service: CatalogService) => void;
+  /** Set of service IDs already on the ticket — shows checkmark indicator */
+  addedServiceIds?: Set<string>;
 }
 
 export function ServiceGrid({
   services,
   vehicleSizeClass,
   onTapService,
+  addedServiceIds,
 }: ServiceGridProps) {
   if (services.length === 0) {
     return (
@@ -53,6 +56,7 @@ export function ServiceGrid({
           service={service}
           vehicleSizeClass={vehicleSizeClass}
           onTap={onTapService}
+          isAdded={addedServiceIds?.has(service.id)}
         />
       ))}
     </div>

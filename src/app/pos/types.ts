@@ -30,6 +30,7 @@ export interface TicketItem {
   perUnitQty: number | null;        // e.g., 2 (headlights, panels)
   perUnitLabel: string | null;       // e.g., "panel", "headlight"
   perUnitPrice: number | null;       // e.g., 150 (price per single unit)
+  perUnitMax: number | null;         // max units allowed (from service.per_unit_max)
 }
 
 // ─── Ticket State ──────────────────────────────────────────────
@@ -57,6 +58,7 @@ export type TicketAction =
   | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number }
   | { type: 'ADD_CUSTOM_ITEM'; name: string; price: number; isTaxable: boolean }
   | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
+  | { type: 'UPDATE_PER_UNIT_QTY'; itemId: string; perUnitQty: number }
   | { type: 'REMOVE_ITEM'; itemId: string }
   | { type: 'SET_CUSTOMER'; customer: Customer | null }
   | { type: 'SET_VEHICLE'; vehicle: Vehicle | null }
@@ -130,6 +132,7 @@ export type QuoteAction =
   | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number }
   | { type: 'ADD_CUSTOM_ITEM'; name: string; price: number; isTaxable: boolean }
   | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
+  | { type: 'UPDATE_PER_UNIT_QTY'; itemId: string; perUnitQty: number }
   | { type: 'REMOVE_ITEM'; itemId: string }
   | { type: 'SET_CUSTOMER'; customer: Customer | null }
   | { type: 'SET_VEHICLE'; vehicle: Vehicle | null }

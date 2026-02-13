@@ -4,6 +4,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 42 — 2026-02-12 (Duplicate Toast Fix + Service Quantity Enforcement)
+
+### Fix: Duplicate toast on add service
+- Toast fired twice when adding a service from the catalog in the quote builder
+- Root cause: `catalog-browser.tsx` and `service-detail-dialog.tsx` fired their own toasts AND the callback (`handleAddService` in `quote-builder.tsx`) also fired a toast
+- Fix: When `onAddService`/`onAdd` callbacks are provided (callback mode), skip the local toast — let the caller own the notification
+- Files: `catalog-browser.tsx` (5 toast sites), `service-detail-dialog.tsx` (2 toast sites)
+
+### Feature: Service quantity enforcement in quote builder
+- **Single-per-vehicle rule**: Most detailing services (28 of 30) are one-per-vehicle. Adding a duplicate now shows warning toast "Already added — remove it first to swap" instead of creating a duplicate line item
+- **Per-unit services** (Scratch Repair): Tapping again increments `perUnitQty` up to `per_unit_max` (4 panels). At max, shows warning toast with max count
+- **Visual indicator**: Already-added services show green highlight with checkmark badge in the catalog grid (both search results and category browse)
+- **Stepper enforcement in item rows**:
+  - Regular services: quantity stepper hidden (always qty 1, use X to remove)
+  - Per-unit services: stepper controls `perUnitQty` with min 1 / max `per_unit_max`
+  - Products: stepper unchanged (unrestricted)
+- New reducer action: `UPDATE_PER_UNIT_QTY` — updates per-unit quantity and recalculates pricing
+- New `TicketItem` field: `perUnitMax` — stores service's max units for stepper enforcement
+- Applied to both quote builder (quote-reducer) and POS register (ticket-reducer)
+- Files: `types.ts`, `quote-reducer.ts`, `ticket-reducer.ts`, `quote-builder.tsx`, `catalog-browser.tsx`, `catalog-grid.tsx`, `catalog-card.tsx`, `quote-item-row.tsx`, `ticket-item-row.tsx`, `jobs/page.tsx`
+
+---
+
 ## Session 41 — 2026-02-12 (Toast Stacking Fix)
 
 ### Fix: Toast notifications stack vertically instead of overlapping

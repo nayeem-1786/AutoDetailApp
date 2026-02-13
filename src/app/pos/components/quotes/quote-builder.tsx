@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
@@ -82,6 +82,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           perUnitQty: null,
           perUnitLabel: null,
           perUnitPrice: null,
+          perUnitMax: null,
         } as TicketItem));
 
         const loadState: QuoteState = {
@@ -117,6 +118,12 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
 
   const vehicleSizeClass = quote.vehicle?.size_class ?? null;
 
+  // Track which services are already on the ticket for visual indicators
+  const addedServiceIds = useMemo(
+    () => new Set(quote.items.filter((i) => i.itemType === 'service' && i.serviceId).map((i) => i.serviceId!)),
+    [quote.items]
+  );
+
   // Callbacks for catalog browser to dispatch to quote context
   const handleAddProduct = useCallback((product: CatalogProduct) => {
     dispatch({ type: 'ADD_PRODUCT', product });
@@ -124,9 +131,34 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
   }, [dispatch]);
 
   const handleAddService = useCallback((service: CatalogService, pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) => {
+    // Check if this service is already on the ticket
+    const existing = quote.items.find(
+      (i) => i.itemType === 'service' && i.serviceId === service.id
+    );
+
+    if (existing) {
+      const isPerUnit = service.pricing_model === 'per_unit' && existing.perUnitQty != null && existing.perUnitPrice != null;
+
+      if (isPerUnit) {
+        const max = service.per_unit_max ?? 10;
+        if (existing.perUnitQty! >= max) {
+          const label = service.per_unit_label || 'unit';
+          toast.warning(`${service.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+        } else {
+          dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existing.id, perUnitQty: existing.perUnitQty! + 1 });
+          const label = service.per_unit_label || 'unit';
+          const newQty = existing.perUnitQty! + 1;
+          toast.success(`${service.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
+        }
+      } else {
+        toast.warning('Already added — remove it first to swap');
+      }
+      return;
+    }
+
     dispatch({ type: 'ADD_SERVICE', service, pricing, vehicleSizeClass: vsc, perUnitQty });
     toast.success(`Added ${service.name}`);
-  }, [dispatch]);
+  }, [dispatch, quote.items]);
 
   // Global search handlers (for search in the Register-like view)
   const searchLower = search.toLowerCase();
@@ -250,6 +282,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
                   services={filteredServices}
                   vehicleSizeClass={vehicleSizeClass}
                   onTapService={handleTapServiceSearch}
+                  addedServiceIds={addedServiceIds}
                 />
               )}
               {((tab === 'products' && filteredProducts.length === 0) ||
@@ -267,6 +300,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
               onAddProduct={handleAddProduct}
               onAddService={handleAddService}
               vehicleSizeOverride={vehicleSizeClass}
+              addedServiceIds={addedServiceIds}
             />
           )}
         </div>

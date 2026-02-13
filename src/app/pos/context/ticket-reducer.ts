@@ -95,6 +95,7 @@ export function ticketReducer(
           perUnitQty: null,
           perUnitLabel: null,
           perUnitPrice: null,
+          perUnitMax: null,
         };
         items = [...state.items, newItem];
       }
@@ -126,6 +127,7 @@ export function ticketReducer(
         perUnitQty: isPerUnit ? perUnitQty : null,
         perUnitLabel: isPerUnit ? (service.per_unit_label ?? null) : null,
         perUnitPrice: isPerUnit ? service.per_unit_price! : null,
+        perUnitMax: isPerUnit ? (service.per_unit_max ?? null) : null,
       };
       return recalculateTotals({
         ...state,
@@ -153,6 +155,7 @@ export function ticketReducer(
         perUnitQty: null,
         perUnitLabel: null,
         perUnitPrice: null,
+        perUnitMax: null,
       };
       return recalculateTotals({
         ...state,
@@ -180,6 +183,26 @@ export function ticketReducer(
             }
           : item
       );
+      return recalculateTotals({ ...state, items });
+    }
+
+    case 'UPDATE_PER_UNIT_QTY': {
+      const { itemId, perUnitQty } = action;
+      if (perUnitQty < 1) {
+        const items = state.items.filter((i) => i.id !== itemId);
+        return recalculateTotals({ ...state, items });
+      }
+      const items = state.items.map((item) => {
+        if (item.id !== itemId || !item.perUnitPrice) return item;
+        const unitPrice = item.perUnitPrice * perUnitQty;
+        return {
+          ...item,
+          perUnitQty,
+          unitPrice,
+          totalPrice: unitPrice * item.quantity,
+          taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
+        };
+      });
       return recalculateTotals({ ...state, items });
     }
 

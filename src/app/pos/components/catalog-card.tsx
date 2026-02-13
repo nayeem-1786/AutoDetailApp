@@ -1,5 +1,6 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { CatalogProduct, CatalogService } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
@@ -37,12 +38,15 @@ interface ServiceCardProps {
   service: CatalogService;
   vehicleSizeClass: string | null;
   onTap: (service: CatalogService) => void;
+  /** Whether this service is already on the ticket */
+  isAdded?: boolean;
 }
 
 export function ServiceCard({
   service,
   vehicleSizeClass,
   onTap,
+  isAdded,
 }: ServiceCardProps) {
   const priceDisplay = getServicePriceDisplay(service, vehicleSizeClass);
 
@@ -50,11 +54,18 @@ export function ServiceCard({
     <button
       onClick={() => onTap(service)}
       className={cn(
-        'flex flex-col items-start gap-1 rounded-lg border border-gray-200 bg-white p-3 text-left transition-all',
-        'min-h-[80px] active:scale-[0.98] active:bg-gray-50',
-        'hover:border-gray-300 hover:shadow-sm'
+        'relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all',
+        'min-h-[80px] active:scale-[0.98]',
+        isAdded
+          ? 'border-green-300 bg-green-50 hover:border-green-400'
+          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm active:bg-gray-50'
       )}
     >
+      {isAdded && (
+        <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-green-500">
+          <Check className="h-3 w-3 text-white" />
+        </span>
+      )}
       <span className="text-sm font-medium text-gray-900 line-clamp-2">
         {service.name}
       </span>

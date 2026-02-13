@@ -131,6 +131,8 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Coupon auto-apply toggle styling fixed — both status and auto-apply toggles on coupon detail page now use system-wide Switch pattern (`bg-green-500` active, `bg-gray-200` inactive). Previously auto-apply used `bg-blue-500`/`bg-gray-300`.
 - Coupon category validation fixed — `categoryId` added to `TicketItem` interface, populated from `product.category_id`/`service.category_id` in both ticket-reducer and quote-reducer, passed to all 5 cart item mapping locations (coupon-input, quote-coupon-input, ticket-context, promotions-tab ×2). POS validation endpoints already checked `category_id` but cart items never sent it.
 - Powered by Stripe SVG logo on booking payment step (`step-payment.tsx`) — `h-9 w-auto opacity-20`
+- Duplicate toast fix — `catalog-browser.tsx` and `service-detail-dialog.tsx` skip local toasts when `onAddService`/`onAdd` callbacks are provided (callback mode). Toast ownership belongs to the caller.
+- Service quantity enforcement — all non-per-unit services limited to qty=1 per ticket (one-per-vehicle rule). Per-unit services (Scratch Repair) increment `perUnitQty` up to `per_unit_max`. Visual checkmark badge on already-added services in catalog grid. Stepper restrictions in item rows: hidden for regular services, max-enforced for per-unit, unrestricted for products. New `TicketItem.perUnitMax` field + `UPDATE_PER_UNIT_QTY` reducer action. Applied to both quote-reducer and ticket-reducer.
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete

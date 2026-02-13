@@ -1186,6 +1186,34 @@ All classification and compatibility decisions confirmed by owner on 2026-02-01:
 
 ---
 
+## Service Quantity Rules (POS & Quote Builder)
+
+Most detailing services are one-per-vehicle — you can't wash a car twice on the same ticket. The quote builder and POS register enforce these limits.
+
+### Quantity Categories
+
+| Rule | Max Qty | Services | Enforcement |
+|------|---------|----------|-------------|
+| **Single only** | 1 | All 29 services except Scratch Repair | Block duplicate add; warning toast "Already added — remove it first to swap" |
+| **Per-unit** | `per_unit_max` (4) | Scratch Repair (per panel) | Tapping again increments unit count; at max shows "{service} is already at maximum ({max} panels)" |
+| **Products** | Unrestricted | All products | Quantity stepper allows free increment/decrement |
+
+### Visual Indicators
+
+- **Already-added services** in the catalog grid show a green highlight with a checkmark badge
+- **Regular services** in the ticket item row show static "1" (no quantity stepper)
+- **Per-unit services** in the ticket item row show a stepper with min=1 and max=`per_unit_max`
+- **Products** retain the full quantity stepper
+
+### Implementation Details
+
+- `TicketItem.perUnitMax` stores the service's `per_unit_max` value for stepper enforcement
+- `UPDATE_PER_UNIT_QTY` reducer action handles per-unit quantity changes and recalculates pricing
+- Enforcement applied in both `quote-reducer.ts` (quote builder) and `ticket-reducer.ts` (POS register)
+- Duplicate check happens in the UI callback (`handleAddService` in `quote-builder.tsx`) before dispatching to the reducer
+
+---
+
 ## Document Version History
 
 | Version | Date | Changes |
@@ -1195,3 +1223,4 @@ All classification and compatibility decisions confirmed by owner on 2026-02-01:
 | v3 | 2026-02-01 | Owner full review completed. Engine Bay Detail changed to in-shop only (mobile count 12→11). Hot Shampoo Complete Interior Extraction updated to vehicle-size pricing ($300/$350/$450). Removed marine/aviation product lists from open items. Document status: Approved. |
 | v4 | 2026-02-01 | Added Public URL Structure & SEO section: slug system, URL patterns, sitemap priorities (ceramic coatings = 1.0), pricing display per model, anon RLS policies. |
 | v5 | 2026-02-01 | Added Dynamic Business Info subsection: public pages fetch name/phone/address from `business_settings` table via `React.cache()`-deduped `getBusinessInfo()`. |
+| v6 | 2026-02-12 | Added Service Quantity Rules section: one-per-vehicle enforcement for all non-per-unit services, per-unit max enforcement (Scratch Repair), visual indicators, stepper restrictions. |
