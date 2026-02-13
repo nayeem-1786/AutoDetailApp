@@ -343,9 +343,22 @@ New tab in POS navigation: **Jobs** (alongside existing POS tabs)
 - Tap a job → opens job detail view
 
 ### Walk-In Creation
-- "New Walk-in" button at top of queue
-- Flow: Customer lookup (existing search) or quick-create → Vehicle select or quick-create → Service select (multi-select from catalog) → Creates job in `scheduled` status
+- "New Walk-in" button at top of job queue → navigates to `/pos/quotes?mode=builder&walkIn=true`
+- Uses the full Quote Builder in "walk-in mode": vehicle-size-aware pricing, scope tiers, per-unit quantities, products, coupons, loyalty points, manual discounts, custom items
+- Walk-in mode UI changes: header shows "New Walk-In", hides "Valid Until" date picker and "Send Quote" button, shows single "Create Job" button
+- On submit: saves quote as `status='converted'` for audit trail, then creates job via `POST /api/pos/jobs` with `quote_id` reference
+- Customer required (validation enforced), at least one service required
+- Products on quotes don't transfer to jobs — toast notifies user "Products will be added at checkout"
+- Coupon code stored in job notes as "Coupon: {code}" for cashier reference at checkout
 - Walk-in jobs have `appointment_id = NULL`
+- Old walk-in wizard (`walk-in-flow.tsx`) removed — quote builder fully replaces it
+
+### Quote-to-Job Conversion
+- "Create Job" button on quote detail view for quotes in `draft`, `sent`, `viewed`, or `accepted` status
+- Requires `pos.jobs.manage` permission and quote must have a customer
+- Maps service items to job services, creates job via `POST /api/pos/jobs`, updates quote status to `converted`
+- Duplicate prevention: server-side check rejects if a job already exists with the same `quote_id`
+- `jobs.quote_id` FK column links job back to source quote for audit trail
 
 ### Auto-Population from Appointments
 - Today's confirmed appointments auto-create `jobs` records

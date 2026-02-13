@@ -12,12 +12,15 @@ import {
   Mail,
   MessageSquare,
   Clock,
+  Briefcase,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
+import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 import { useQuote } from '../../context/quote-context';
+import { usePosPermission } from '../../context/pos-permission-context';
 import {
   STATUS_BADGE_CONFIG,
   formatQuoteDate,
@@ -86,13 +89,16 @@ interface Communication {
 }
 
 export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailProps) {
+  const router = useRouter();
   const { dispatch: quoteDispatch } = useQuote();
+  const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [creatingJob, setCreatingJob] = useState(false);
 
   const fetchQuote = useCallback(async () => {
     try {
@@ -146,6 +152,69 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
   function handleDeleteComplete() {
     setDeleteDialogOpen(false);
     onBack();
+  }
+
+  async function handleCreateJobFromQuote() {
+    if (!quote || !quote.customer) {
+      toast.error('Quote must have a customer to create a job');
+      return;
+    }
+
+    const serviceItems = quote.items.filter((item) => item.service_id);
+    if (serviceItems.length === 0) {
+      toast.error('Quote must have at least one service to create a job');
+      return;
+    }
+
+    setCreatingJob(true);
+    try {
+      // Map quote items to job services
+      const jobServices = serviceItems.map((item) => ({
+        id: item.service_id,
+        name: item.item_name,
+        price: item.total_price,
+        quantity: item.quantity,
+        tier_name: item.tier_name,
+      }));
+
+      // Create the job
+      const jobRes = await posFetch('/api/pos/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: quote.customer.id,
+          vehicle_id: quote.vehicle?.id || null,
+          services: jobServices,
+          quote_id: quote.id,
+          notes: quote.notes || undefined,
+        }),
+      });
+
+      if (!jobRes.ok) {
+        const data = await jobRes.json();
+        throw new Error(data.error || 'Failed to create job');
+      }
+
+      // Update quote status to converted
+      await posFetch(`/api/pos/quotes/${quote.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'converted' }),
+      });
+
+      // Notify about products
+      const productItems = quote.items.filter((item) => item.product_id);
+      if (productItems.length > 0) {
+        toast.info('Products will be added at checkout', { duration: 4000 });
+      }
+
+      toast.success(`Job created from quote #${quote.quote_number}`);
+      router.push('/pos/jobs');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create job');
+    } finally {
+      setCreatingJob(false);
+    }
   }
 
   // Calculate total duration from service items (hooks must be before early returns)
@@ -229,7 +298,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">
-          {/* Draft: Edit, Send, Convert, Delete */}
+          {/* Draft: Edit, Send, Convert, Create Job, Delete */}
           {quote.status === 'draft' && (
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
@@ -244,6 +313,21 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
                 Convert to Appointment
               </Button>
+              {canManageJobs && quote.customer && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateJobFromQuote}
+                  disabled={creatingJob}
+                >
+                  {creatingJob ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Briefcase className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Create Job
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -255,7 +339,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
             </>
           )}
 
-          {/* Sent/Viewed: Edit, Resend, Convert */}
+          {/* Sent/Viewed: Edit, Resend, Convert, Create Job */}
           {(quote.status === 'sent' || quote.status === 'viewed') && (
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
@@ -270,10 +354,25 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
                 Convert to Appointment
               </Button>
+              {canManageJobs && quote.customer && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateJobFromQuote}
+                  disabled={creatingJob}
+                >
+                  {creatingJob ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Briefcase className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Create Job
+                </Button>
+              )}
             </>
           )}
 
-          {/* Accepted: Convert, Edit */}
+          {/* Accepted: Convert, Edit, Create Job */}
           {quote.status === 'accepted' && (
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
@@ -284,6 +383,21 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
                 Convert to Appointment
               </Button>
+              {canManageJobs && quote.customer && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateJobFromQuote}
+                  disabled={creatingJob}
+                >
+                  {creatingJob ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Briefcase className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Create Job
+                </Button>
+              )}
             </>
           )}
 
@@ -295,10 +409,10 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
             </Button>
           )}
 
-          {/* Converted: View appointment info */}
-          {quote.status === 'converted' && quote.converted_appointment_id && (
+          {/* Converted: View conversion info */}
+          {quote.status === 'converted' && (
             <div className="rounded-md bg-teal-50 px-3 py-1.5 text-sm text-teal-700">
-              Converted to appointment
+              {quote.converted_appointment_id ? 'Converted to appointment' : 'Converted to job'}
             </div>
           )}
         </div>

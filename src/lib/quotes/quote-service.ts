@@ -143,7 +143,7 @@ export async function createQuote(
     quote_number: quoteNumber,
     customer_id: data.customer_id,
     vehicle_id: data.vehicle_id || null,
-    status: 'draft',
+    status: data.status || 'draft',
     subtotal,
     tax_amount: taxAmount,
     total_amount: totalAmount,

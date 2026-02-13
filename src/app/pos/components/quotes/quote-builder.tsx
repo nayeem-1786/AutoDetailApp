@@ -20,11 +20,12 @@ type CatalogTab = 'products' | 'services';
 
 interface QuoteBuilderProps {
   quoteId: string | null;
+  walkInMode?: boolean;
   onBack: () => void;
   onSaved: (quoteId: string) => void;
 }
 
-export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
+export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuilderProps) {
   const { quote, dispatch } = useQuote();
   const { products, services, loading: catalogLoading } = useCatalog();
   const [tab, setTab] = useState<CatalogTab>('services');
@@ -203,7 +204,7 @@ export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
               Back
             </button>
             <h1 className="text-base font-semibold text-gray-900">
-              {quoteId ? 'Edit Quote' : 'New Quote'}
+              {walkInMode ? 'New Walk-In' : quoteId ? 'Edit Quote' : 'New Quote'}
             </h1>
           </div>
           <SearchBar value={search} onChange={setSearch} />
@@ -272,7 +273,7 @@ export function QuoteBuilder({ quoteId, onBack, onSaved }: QuoteBuilderProps) {
       </div>
 
       {/* Right panel — Quote Ticket */}
-      <QuoteTicketPanel onSaved={onSaved} />
+      <QuoteTicketPanel onSaved={onSaved} walkInMode={walkInMode} />
 
       {/* Service Pricing Picker Dialog (for search results) */}
       {pickerService && (

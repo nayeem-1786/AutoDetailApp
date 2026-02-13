@@ -4,6 +4,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 38 — 2026-02-12 (Walk-In Mode on Quote Builder + Quote-to-Job Conversion)
+
+### Walk-In Mode on Quote Builder
+- "New Walk-In" button on Jobs tab now navigates to `/pos/quotes?mode=builder&walkIn=true`
+- Quote Builder accepts `walkInMode` prop: changes header to "New Walk-In", hides "Valid Until" date picker and "Send Quote" button, replaces "Save Draft" with "Create Job"
+- On "Create Job": saves quote as `status='converted'` for audit trail, maps service items to job services, creates job via `POST /api/pos/jobs`, navigates to Jobs tab
+- Customer required (validation enforced), at least one service required
+- Products on quotes notify user via toast "Products will be added at checkout"
+- Coupon code stored in job notes as "Coupon: {code}" for cashier reference
+
+### Quote-to-Job Conversion (Quote Detail)
+- "Create Job" button added to quote detail view for `draft`, `sent`, `viewed`, `accepted` statuses
+- Permission-gated: requires `pos.jobs.manage` and quote must have a customer
+- Maps service items to job services, creates job, updates quote status to `converted`
+- "Converted" status section now shows "Converted to job" vs "Converted to appointment"
+
+### Database Changes
+- Migration `20260212000009_jobs_add_quote_id.sql`: adds `quote_id` UUID FK column + partial index to `jobs` table
+- `POST /api/pos/jobs` now accepts `quote_id` and `notes` fields, includes server-side duplicate check (409 if job already exists for same quote)
+- `createQuote()` service function now respects optional `status` field (supports 'draft' | 'converted')
+
+### Old Walk-In Flow Removed
+- Deleted `src/app/pos/jobs/components/walk-in-flow.tsx` (612 lines)
+- Removed `WalkInFlow` import and `walkin` view mode from jobs page
+- Zero orphaned references
+
+### Files Changed
+- `src/app/pos/quotes/page.tsx` — reads `walkIn` query param, passes to builder
+- `src/app/pos/components/quotes/quote-builder.tsx` — accepts `walkInMode` prop, passes to ticket panel, updates header
+- `src/app/pos/components/quotes/quote-ticket-panel.tsx` — walk-in mode UI changes, `handleCreateJob()` handler
+- `src/app/pos/components/quotes/quote-detail.tsx` — "Create Job" button, `handleCreateJobFromQuote()` handler
+- `src/app/pos/jobs/page.tsx` — routes walk-in to quote builder, removed WalkInFlow
+- `src/app/api/pos/jobs/route.ts` — accepts `quote_id`/`notes`, duplicate check
+- `src/lib/quotes/quote-service.ts` — respects `status` field on create
+- `src/lib/utils/validation.ts` — added `status` to `createQuoteSchema`
+- `supabase/migrations/20260212000009_jobs_add_quote_id.sql` — new migration
+
+---
+
 ## Session 37 — 2026-02-12 (Job Source Badge + Editable Job Detail + Phone Format Fix)
 
 ### Notes Card Tap-to-Edit

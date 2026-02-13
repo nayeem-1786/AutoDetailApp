@@ -99,12 +99,16 @@ export async function POST(request: NextRequest) {
       assigned_staff_id: providedStaffId,
       services,
       estimated_pickup_at,
+      quote_id,
+      notes,
     } = body as {
       customer_id: string;
       vehicle_id?: string;
       assigned_staff_id?: string;
       services: JobServiceSnapshot[];
       estimated_pickup_at?: string;
+      quote_id?: string;
+      notes?: string;
     };
 
     if (!customer_id) {
@@ -113,6 +117,22 @@ export async function POST(request: NextRequest) {
 
     if (!services || !Array.isArray(services) || services.length === 0) {
       return NextResponse.json({ error: 'At least one service is required' }, { status: 400 });
+    }
+
+    // Prevent duplicate job from same quote
+    if (quote_id) {
+      const { data: existingJob } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('quote_id', quote_id)
+        .maybeSingle();
+
+      if (existingJob) {
+        return NextResponse.json(
+          { error: 'A job has already been created from this quote' },
+          { status: 409 }
+        );
+      }
     }
 
     // Auto-assign detailer if none provided (walk-in)
@@ -147,6 +167,8 @@ export async function POST(request: NextRequest) {
         status: 'scheduled',
         estimated_pickup_at: estimated_pickup_at || null,
         created_by: posEmployee.employee_id,
+        quote_id: quote_id || null,
+        intake_notes: notes || null,
       })
       .select(`
         *,

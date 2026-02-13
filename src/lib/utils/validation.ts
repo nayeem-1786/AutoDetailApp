@@ -504,6 +504,7 @@ export const createQuoteSchema = z.object({
   items: z.array(quoteItemSchema).min(1, 'At least one item is required'),
   notes: optionalString,
   valid_until: z.string().optional().nullable(),
+  status: z.enum(['draft', 'converted']).optional(),
 });
 
 export const updateQuoteSchema = z.object({

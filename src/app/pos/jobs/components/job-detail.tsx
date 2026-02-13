@@ -1377,8 +1377,7 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
               <CustomerLookup
                 onSelect={handleEditCustomerSelect}
                 onCreateNew={() => {
-                  // For now, close the modal — quick-add is in the walk-in flow
-                  toast.error('Create the customer first from the Walk-In flow, then change customer here');
+                  toast.error('Create the customer first via POS customer lookup, then change customer here');
                 }}
               />
               {savingEdit && (

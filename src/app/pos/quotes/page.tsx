@@ -9,7 +9,7 @@ import { QuoteBuilder } from '../components/quotes/quote-builder';
 type View =
   | { mode: 'list' }
   | { mode: 'detail'; quoteId: string }
-  | { mode: 'builder'; quoteId: string | null };
+  | { mode: 'builder'; quoteId: string | null; walkIn?: boolean };
 
 function QuotesPageInner() {
   const searchParams = useSearchParams();
@@ -20,8 +20,9 @@ function QuotesPageInner() {
     if (initialized) return;
     const mode = searchParams.get('mode');
     const quoteId = searchParams.get('quoteId');
+    const walkIn = searchParams.get('walkIn') === 'true';
     if (mode === 'builder') {
-      setView({ mode: 'builder', quoteId: quoteId || null });
+      setView({ mode: 'builder', quoteId: quoteId || null, walkIn });
     } else if (mode === 'detail' && quoteId) {
       setView({ mode: 'detail', quoteId });
     }
@@ -45,6 +46,7 @@ function QuotesPageInner() {
     return (
       <QuoteBuilder
         quoteId={view.quoteId}
+        walkInMode={view.walkIn}
         onBack={() => setView({ mode: 'list' })}
         onSaved={(quoteId) => setView({ mode: 'detail', quoteId })}
       />

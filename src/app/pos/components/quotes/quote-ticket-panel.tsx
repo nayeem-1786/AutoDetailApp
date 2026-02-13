@@ -26,13 +26,16 @@ import { VehicleSelector } from '../vehicle-selector';
 import { VehicleCreateDialog } from '../vehicle-create-dialog';
 import { QuoteSendDialog } from './quote-send-dialog';
 import type { Customer, Vehicle } from '@/lib/supabase/types';
+import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 
 interface QuoteTicketPanelProps {
   onSaved: (quoteId: string) => void;
+  walkInMode?: boolean;
 }
 
-export function QuoteTicketPanel({ onSaved }: QuoteTicketPanelProps) {
+export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps) {
+  const router = useRouter();
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
   const { quote, dispatch } = useQuote();
   const { services } = useCatalog();
@@ -293,6 +296,129 @@ export function QuoteTicketPanel({ onSaved }: QuoteTicketPanelProps) {
     }
   }
 
+  async function handleCreateJob() {
+    // Validate: customer required for walk-in jobs
+    if (!quote.customer) {
+      toast.error('Select a customer before creating a job');
+      return;
+    }
+
+    // Validate: at least one service item
+    const serviceItems = quote.items.filter((i) => i.itemType === 'service');
+    if (serviceItems.length === 0) {
+      toast.error('Add at least one service to create a job');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Step 1: Save the quote as 'converted' for audit trail
+      const items = quote.items.map((item) => ({
+        service_id: item.serviceId || null,
+        product_id: item.productId || null,
+        item_name: item.itemName,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        tier_name: item.tierName || null,
+        notes: item.notes || null,
+      }));
+
+      let savedQuoteId = quote.quoteId;
+
+      if (savedQuoteId) {
+        // Update existing quote and mark as converted
+        const res = await posFetch(`/api/pos/quotes/${savedQuoteId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: quote.customer.id,
+            vehicle_id: quote.vehicle?.id || null,
+            notes: quote.notes,
+            valid_until: quote.validUntil,
+            status: 'converted',
+            items,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to update quote');
+        }
+      } else {
+        // Create new quote as converted
+        const res = await posFetch('/api/pos/quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: quote.customer.id,
+            vehicle_id: quote.vehicle?.id || null,
+            notes: quote.notes,
+            valid_until: quote.validUntil,
+            status: 'converted',
+            items,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to save quote');
+        }
+        const data = await res.json();
+        savedQuoteId = data.quote.id;
+      }
+
+      // Step 2: Map quote items to job services
+      const jobServices = serviceItems.map((item) => ({
+        id: item.serviceId,
+        name: item.itemName,
+        price: item.totalPrice,
+        quantity: item.quantity,
+        tier_name: item.tierName,
+      }));
+
+      // Step 3: Build notes with coupon info
+      let jobNotes = quote.notes || '';
+      if (quote.coupon) {
+        const couponNote = `Coupon: ${quote.coupon.code}`;
+        jobNotes = jobNotes ? `${jobNotes}\n${couponNote}` : couponNote;
+      }
+
+      // Step 4: Create the job
+      const jobRes = await posFetch('/api/pos/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: quote.customer.id,
+          vehicle_id: quote.vehicle?.id || null,
+          services: jobServices,
+          quote_id: savedQuoteId,
+          notes: jobNotes || undefined,
+        }),
+      });
+
+      if (!jobRes.ok) {
+        const data = await jobRes.json();
+        throw new Error(data.error || 'Failed to create job');
+      }
+
+      const { data: job } = await jobRes.json();
+
+      // Step 5: Notify about products
+      const productItems = quote.items.filter((i) => i.itemType === 'product');
+      if (productItems.length > 0) {
+        toast.info('Products will be added at checkout', { duration: 4000 });
+      }
+
+      toast.success(`Walk-in job created for ${quote.customer.first_name} ${quote.customer.last_name}`);
+      dispatch({ type: 'CLEAR_QUOTE' });
+
+      // Step 6: Navigate to jobs tab
+      router.push('/pos/jobs');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create job');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="flex h-full flex-col border-l border-gray-200 bg-white">
       {/* Customer / Vehicle summary */}
@@ -315,7 +441,9 @@ export function QuoteTicketPanel({ onSaved }: QuoteTicketPanelProps) {
       {/* Header */}
       <div className="border-b border-gray-200 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-          Quote {quote.quoteNumber ? `#${quote.quoteNumber}` : '(New)'}
+          {walkInMode
+            ? 'Walk-In Job'
+            : `Quote ${quote.quoteNumber ? `#${quote.quoteNumber}` : '(New)'}`}
         </h2>
       </div>
 
@@ -446,19 +574,21 @@ export function QuoteTicketPanel({ onSaved }: QuoteTicketPanelProps) {
         </div>
       )}
 
-      {/* Valid Until */}
-      <div className="border-t border-gray-100 px-4 py-2">
-        <label className="flex items-center gap-1.5 text-xs text-gray-500">
-          <CalendarDays className="h-3 w-3" />
-          Valid Until
-        </label>
-        <input
-          type="date"
-          value={quote.validUntil || ''}
-          onChange={(e) => dispatch({ type: 'SET_VALID_UNTIL', date: e.target.value || null })}
-          className="mt-1 h-8 w-full rounded border border-gray-200 px-2 text-sm text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
-        />
-      </div>
+      {/* Valid Until — hidden in walk-in mode */}
+      {!walkInMode && (
+        <div className="border-t border-gray-100 px-4 py-2">
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
+            <CalendarDays className="h-3 w-3" />
+            Valid Until
+          </label>
+          <input
+            type="date"
+            value={quote.validUntil || ''}
+            onChange={(e) => dispatch({ type: 'SET_VALID_UNTIL', date: e.target.value || null })}
+            className="mt-1 h-8 w-full rounded border border-gray-200 px-2 text-sm text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+          />
+        </div>
+      )}
 
       {/* Notes */}
       <div className="border-t border-gray-100 px-4 py-2">
@@ -475,23 +605,35 @@ export function QuoteTicketPanel({ onSaved }: QuoteTicketPanelProps) {
       {/* Totals + Actions */}
       <div className="shrink-0 px-4 pb-4">
         <QuoteTotals />
-        <div className="mt-3 flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleSaveDraft}
-            disabled={saving || quote.items.length === 0}
-            className="flex-1"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Draft'}
-          </Button>
-          <Button
-            onClick={handleSendQuote}
-            disabled={saving || quote.items.length === 0}
-            className="flex-1"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Quote'}
-          </Button>
-        </div>
+        {walkInMode ? (
+          <div className="mt-3">
+            <Button
+              onClick={handleCreateJob}
+              disabled={saving || quote.items.length === 0}
+              className="w-full"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Job'}
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-3 flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSaveDraft}
+              disabled={saving || quote.items.length === 0}
+              className="flex-1"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Draft'}
+            </Button>
+            <Button
+              onClick={handleSendQuote}
+              disabled={saving || quote.items.length === 0}
+              className="flex-1"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Quote'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Customer Lookup Dialog */}

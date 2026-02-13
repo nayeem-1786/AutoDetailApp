@@ -284,7 +284,9 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Mobile business name:** Site header (`site-header.tsx`) shows "SD Auto Spa & Supplies" on mobile (<640px) and full `biz.name` on sm:+ to prevent header overflow. Uses `hidden sm:inline` / `sm:hidden` pattern.
 - **Supabase `.or()` on related tables** doesn't work. Query related table first, then `.in('foreign_key', ids)`
 - **Admin quotes are READ-ONLY.** All creation/editing via POS builder deep-links
-- **POS deep-links:** `/pos/quotes?mode=builder` (new), `?mode=builder&quoteId=<id>` (edit), `?mode=detail&quoteId=<id>` (view)
+- **POS deep-links:** `/pos/quotes?mode=builder` (new), `?mode=builder&quoteId=<id>` (edit), `?mode=detail&quoteId=<id>` (view), `?mode=builder&walkIn=true` (walk-in mode)
+- **Walk-in mode:** Jobs tab "New Walk-In" → opens quote builder in walk-in mode. Hides "Valid Until" + "Send Quote", shows "Create Job". Saves quote as `converted`, creates job via `POST /api/pos/jobs` with `quote_id`. Old walk-in wizard (`walk-in-flow.tsx`) deleted.
+- **Quote-to-job conversion:** "Create Job" button on quote detail (draft/sent/viewed/accepted) creates job from quote services. `jobs.quote_id` FK for audit trail. Server-side duplicate prevention.
 - **Customer search:** 2-char min, 300ms debounce, digits → phone search, text → name search
 - **Quotes use soft-delete** (`deleted_at` column). All quote queries MUST include `.is('deleted_at', null)` — except `quote-number.ts` (needs all quotes to prevent number reuse) and public quote page (needs deleted quotes for friendly messaging)
 - **Messaging inbound webhook** (`/api/webhooks/twilio/inbound`) is unauthenticated (called by Twilio) but validates Twilio HMAC signature. Uses `createAdminClient()` for DB operations.
@@ -394,7 +396,14 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 37 — Job Source Badge + Editable Job Detail)
+## Last Session: 2026-02-12 (Session 38 — Walk-In Mode on Quote Builder + Quote-to-Job Conversion)
+- **Walk-in mode on Quote Builder**: Jobs tab "New Walk-In" button navigates to `/pos/quotes?mode=builder&walkIn=true`. Quote builder enters walk-in mode: header shows "New Walk-In", hides "Valid Until" and "Send Quote", shows single "Create Job" button. On submit: saves quote as `status='converted'`, creates job via `POST /api/pos/jobs` with `quote_id` reference, navigates to Jobs tab. Full catalog (vehicle-size pricing, coupons, per-unit, products, etc.) now available for walk-ins.
+- **Quote-to-job conversion (Part 2)**: "Create Job" button added to quote detail view for draft/sent/viewed/accepted quotes. Permission-gated (`pos.jobs.manage`). Maps service items to job services, creates job, updates quote to `converted`. Duplicate prevention via server-side `quote_id` check (409 if job already exists).
+- **Database**: `jobs.quote_id` UUID FK column + partial index (migration `20260212000009`). `POST /api/pos/jobs` accepts `quote_id` and `notes`. `createQuote()` service respects optional `status` field.
+- **Old walk-in flow removed**: Deleted `walk-in-flow.tsx` (612 lines). Zero orphaned references.
+- TypeScript clean (zero errors)
+
+### Session 37 — Job Source Badge + Editable Job Detail
 - **Job source badge**: Walk-In (amber, Footprints icon) vs Appointment (purple, Calendar icon) pill badge on both job queue cards and job detail header. Derived from `appointment_id` presence.
 - **Editable job detail card**: Customer, vehicle, services, and notes are now editable on the job detail page.
   - All edits gated by `pos.jobs.manage` permission (client-side `usePosPermission` + server-side `checkPosPermission`)

@@ -1,30 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { JobQueue } from './components/job-queue';
-import { WalkInFlow } from './components/walk-in-flow';
 import { JobDetail } from './components/job-detail';
 
 type View =
   | { mode: 'queue' }
-  | { mode: 'walkin' }
   | { mode: 'detail'; jobId: string };
 
 export default function JobsPage() {
+  const router = useRouter();
   const [view, setView] = useState<View>({ mode: 'queue' });
   const [refreshKey, setRefreshKey] = useState(0);
-
-  if (view.mode === 'walkin') {
-    return (
-      <WalkInFlow
-        onBack={() => setView({ mode: 'queue' })}
-        onCreated={(jobId) => {
-          setRefreshKey((k) => k + 1);
-          setView({ mode: 'detail', jobId });
-        }}
-      />
-    );
-  }
 
   if (view.mode === 'detail') {
     return (
@@ -41,7 +29,7 @@ export default function JobsPage() {
   return (
     <JobQueue
       key={refreshKey}
-      onNewWalkIn={() => setView({ mode: 'walkin' })}
+      onNewWalkIn={() => router.push('/pos/quotes?mode=builder&walkIn=true')}
       onSelectJob={(jobId) => setView({ mode: 'detail', jobId })}
     />
   );
