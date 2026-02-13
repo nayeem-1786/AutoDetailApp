@@ -505,6 +505,7 @@ export const createQuoteSchema = z.object({
   notes: optionalString,
   valid_until: z.string().optional().nullable(),
   status: z.enum(['draft', 'converted']).optional(),
+  coupon_code: optionalString,
 });
 
 export const updateQuoteSchema = z.object({
@@ -514,6 +515,7 @@ export const updateQuoteSchema = z.object({
   notes: optionalString,
   valid_until: z.string().optional().nullable(),
   status: z.enum(['draft', 'sent', 'viewed', 'accepted', 'expired', 'converted']).optional(),
+  coupon_code: optionalString,
 });
 
 export const convertSchema = z.object({

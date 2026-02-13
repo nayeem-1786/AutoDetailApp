@@ -4,7 +4,11 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 
 /**
  * GET /api/pos/jobs/[id]/checkout-items
- * Returns line items for POS ticket from job services + approved addons.
+ * Returns line items for POS ticket from:
+ *   1. Job services (JSONB snapshot)
+ *   2. Approved job addons
+ *   3. Products from linked quote (via quote_id bridge)
+ *   4. Coupon code from linked quote
  */
 export async function GET(
   request: NextRequest,
@@ -23,7 +27,7 @@ export async function GET(
     const { data: job, error: jobError } = await supabase
       .from('jobs')
       .select(`
-        id, status, services, customer_id, vehicle_id,
+        id, status, services, customer_id, vehicle_id, quote_id,
         customer:customers!jobs_customer_id_fkey(id, first_name, last_name),
         vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color, size_class),
         addons:job_addons(
@@ -39,7 +43,14 @@ export async function GET(
     }
 
     // Build ticket items from services JSONB
-    const services = (job.services as Array<{ id: string; name: string; price: number }>) || [];
+    const services = (job.services as Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity?: number;
+      tier_name?: string;
+    }>) || [];
+
     const items: Array<{
       item_type: 'service' | 'product' | 'custom';
       service_id?: string;
@@ -49,6 +60,7 @@ export async function GET(
       unit_price: number;
       is_addon?: boolean;
       discount_amount?: number;
+      tier_name?: string;
     }> = [];
 
     for (const svc of services) {
@@ -56,8 +68,11 @@ export async function GET(
         item_type: 'service',
         service_id: svc.id,
         item_name: svc.name,
-        quantity: 1,
-        unit_price: svc.price,
+        quantity: svc.quantity ?? 1,
+        unit_price: svc.quantity && svc.quantity > 1
+          ? Math.round((svc.price / svc.quantity) * 100) / 100
+          : svc.price,
+        tier_name: svc.tier_name,
       });
     }
 
@@ -86,6 +101,41 @@ export async function GET(
       });
     }
 
+    // Bridge: load products + coupon from linked quote (if quote_id exists)
+    let coupon_code: string | null = null;
+
+    if (job.quote_id) {
+      // Fetch quote for coupon code
+      const { data: quote } = await supabase
+        .from('quotes')
+        .select('coupon_code')
+        .eq('id', job.quote_id)
+        .single();
+
+      if (quote?.coupon_code) {
+        coupon_code = quote.coupon_code;
+      }
+
+      // Fetch product items from quote
+      const { data: quoteProducts } = await supabase
+        .from('quote_items')
+        .select('id, product_id, item_name, quantity, unit_price, total_price, tier_name, notes')
+        .eq('quote_id', job.quote_id)
+        .not('product_id', 'is', null);
+
+      if (quoteProducts && quoteProducts.length > 0) {
+        for (const prod of quoteProducts) {
+          items.push({
+            item_type: 'product',
+            product_id: prod.product_id!,
+            item_name: prod.item_name,
+            quantity: prod.quantity,
+            unit_price: prod.unit_price,
+          });
+        }
+      }
+    }
+
     return NextResponse.json({
       data: {
         job_id: job.id,
@@ -94,6 +144,7 @@ export async function GET(
         customer: job.customer,
         vehicle: job.vehicle,
         items,
+        coupon_code,
         status: job.status,
       },
     });

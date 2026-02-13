@@ -150,6 +150,7 @@ export async function createQuote(
     notes: data.notes || null,
     valid_until: data.valid_until || null,
     access_token: accessToken,
+    coupon_code: data.coupon_code || null,
   };
 
   if (createdBy) {
@@ -251,6 +252,7 @@ export async function updateQuote(
   if (data.notes !== undefined) update.notes = data.notes;
   if (data.valid_until !== undefined) update.valid_until = data.valid_until;
   if (data.status !== undefined) update.status = data.status;
+  if (data.coupon_code !== undefined) update.coupon_code = data.coupon_code || null;
 
   // If items provided, recalculate totals
   if (data.items && data.items.length > 0) {

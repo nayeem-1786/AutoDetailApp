@@ -570,6 +570,7 @@ export interface Quote {
   accepted_at: string | null;
   converted_appointment_id: string | null;
   access_token: string | null;
+  coupon_code: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -146,6 +146,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             vehicle_id: quote.vehicle?.id || null,
             notes: quote.notes,
             valid_until: quote.validUntil,
+            coupon_code: quote.coupon?.code || null,
             items,
           }),
         });
@@ -167,6 +168,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             vehicle_id: quote.vehicle?.id || null,
             notes: quote.notes,
             valid_until: quote.validUntil,
+            coupon_code: quote.coupon?.code || null,
             items,
           }),
         });
@@ -220,6 +222,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             vehicle_id: quote.vehicle?.id || null,
             notes: quote.notes,
             valid_until: quote.validUntil,
+            coupon_code: quote.coupon?.code || null,
             items,
           }),
         });
@@ -270,6 +273,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             vehicle_id: quote.vehicle?.id || null,
             notes: quote.notes,
             valid_until: quote.validUntil,
+            coupon_code: quote.coupon?.code || null,
             items,
           }),
         });
@@ -303,16 +307,19 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       return;
     }
 
-    // Validate: at least one service item
-    const serviceItems = quote.items.filter((i) => i.itemType === 'service');
+    // Validate: at least one service item (products alone cannot create a job)
+    const serviceItems = quote.items.filter(
+      (i) => i.itemType === 'service' && i.serviceId
+    );
     if (serviceItems.length === 0) {
-      toast.error('Add at least one service to create a job');
+      toast.error('At least one service is required to create a job');
       return;
     }
 
     setSaving(true);
     try {
       // Step 1: Save the quote as 'converted' for audit trail
+      // ALL items (services + products) go into the quote for the checkout bridge
       const items = quote.items.map((item) => ({
         service_id: item.serviceId || null,
         product_id: item.productId || null,
@@ -323,6 +330,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         notes: item.notes || null,
       }));
 
+      const couponCode = quote.coupon?.code || null;
       let savedQuoteId = quote.quoteId;
 
       if (savedQuoteId) {
@@ -336,6 +344,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             notes: quote.notes,
             valid_until: quote.validUntil,
             status: 'converted',
+            coupon_code: couponCode,
             items,
           }),
         });
@@ -354,6 +363,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             notes: quote.notes,
             valid_until: quote.validUntil,
             status: 'converted',
+            coupon_code: couponCode,
             items,
           }),
         });
@@ -365,7 +375,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         savedQuoteId = data.quote.id;
       }
 
-      // Step 2: Map quote items to job services
+      // Step 2: Map ONLY service items to job services (products carry through via quote_id)
       const jobServices = serviceItems.map((item) => ({
         id: item.serviceId,
         name: item.itemName,
@@ -374,7 +384,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         tier_name: item.tierName,
       }));
 
-      // Step 3: Build notes with coupon info
+      // Step 3: Build notes with coupon info for cashier reference
       let jobNotes = quote.notes || '';
       if (quote.coupon) {
         const couponNote = `Coupon: ${quote.coupon.code}`;
@@ -401,10 +411,13 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
       const { data: job } = await jobRes.json();
 
-      // Step 5: Notify about products
+      // Step 5: Notify about products + coupon carryover
       const productItems = quote.items.filter((i) => i.itemType === 'product');
-      if (productItems.length > 0) {
-        toast.info('Products will be added at checkout', { duration: 4000 });
+      if (productItems.length > 0 || couponCode) {
+        const parts: string[] = [];
+        if (productItems.length > 0) parts.push(`${productItems.length} product(s)`);
+        if (couponCode) parts.push(`coupon ${couponCode}`);
+        toast.info(`${parts.join(' and ')} will carry over at checkout`, { duration: 4000 });
       }
 
       toast.success(`Walk-in job created for ${quote.customer.first_name} ${quote.customer.last_name}`);

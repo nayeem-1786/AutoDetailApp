@@ -4,6 +4,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 39 — 2026-02-12 (Walk-In Job Fix + Product & Coupon Checkout Bridge)
+
+### Walk-In Job Creation Fix
+- Added defensive `serviceId` null check in service item filter — `i.itemType === 'service' && i.serviceId` — prevents items with null service IDs from reaching the job creation API
+- Validation message clarified: "At least one service is required to create a job"
+
+### Product Carryover to Checkout (Quote → Job → Checkout Bridge)
+- `GET /api/pos/jobs/[id]/checkout-items` now checks `job.quote_id`
+- If linked quote exists, queries `quote_items` for product items (`product_id IS NOT NULL`)
+- Product items returned alongside service items and addons with `item_type: 'product'`
+- Services from JSONB now include `quantity` and `tier_name` when present
+- Non-walk-in jobs (no `quote_id`) continue working as before — no product lookup
+
+### Coupon Carryover to Checkout
+- Migration `20260212000010_add_coupon_code_to_quotes.sql`: adds `coupon_code TEXT` column to `quotes` table
+- `createQuoteSchema` and `updateQuoteSchema` accept optional `coupon_code` field
+- `createQuote()` and `updateQuote()` service functions save `coupon_code` to DB
+- All quote save paths (Save Draft, Send Quote, Create Job) now persist `coupon_code` from client state
+- `checkout-items` route reads `coupon_code` from linked quote and returns it in the response
+- POS register can auto-apply the coupon at checkout
+
+### Checkout Bridge Summary
+```
+Quote (services + products + coupon) → Create Job (services only, quote_id saved)
+→ Checkout Items (services from job JSONB + products from quote_items + coupon from quotes.coupon_code)
+→ Register ticket (everything)
+```
+
+### Files Changed
+- `supabase/migrations/20260212000010_add_coupon_code_to_quotes.sql` (new)
+- `src/lib/supabase/types.ts` (Quote.coupon_code field)
+- `src/lib/utils/validation.ts` (coupon_code in quote schemas)
+- `src/lib/quotes/quote-service.ts` (save coupon_code in create/update)
+- `src/app/pos/components/quotes/quote-ticket-panel.tsx` (defensive filter, coupon_code in all save paths, updated toast)
+- `src/app/api/pos/jobs/[id]/checkout-items/route.ts` (product + coupon bridge from linked quote)
+
+---
+
 ## Session 38 — 2026-02-12 (Walk-In Mode on Quote Builder + Quote-to-Job Conversion)
 
 ### Walk-In Mode on Quote Builder

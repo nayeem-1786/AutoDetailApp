@@ -724,9 +724,33 @@ If a customer claims damage after pickup, the full photo timeline exists as evid
    - Original booked services (from `jobs.services` JSONB)
    - Approved add-ons (from `job_addons` where `status = 'approved'`)
    - Discounts applied to add-ons
+   - Products from linked quote (via `quote_id` → `quote_items` where `product_id IS NOT NULL`)
+   - Coupon code from linked quote (via `quote_id` → `quotes.coupon_code`)
 4. Cashier can still modify the ticket (add/remove items, apply coupons) — standard POS flow
 5. Payment processed via existing POS transaction flow
 6. Transaction created → `jobs.transaction_id` set → job status → `closed`
+
+### Product & Coupon Bridge (Quote → Job → Checkout)
+
+Jobs only store **services** as JSONB snapshots. Products and coupons from the original quote are **not duplicated** into the job record. Instead, they're bridged at checkout time via the `quote_id` FK:
+
+```
+Quote (services + products + coupon_code)
+  ↓ Create Job
+Job (services JSONB only, quote_id FK)
+  ↓ Checkout Items API
+Ticket (services from job + products from quote_items + coupon from quotes.coupon_code)
+```
+
+**API**: `GET /api/pos/jobs/[id]/checkout-items`
+- Loads services from `jobs.services` JSONB
+- Loads approved addons from `job_addons`
+- If `job.quote_id` exists:
+  - Queries `quotes.coupon_code` for auto-apply at register
+  - Queries `quote_items` where `product_id IS NOT NULL` for product line items
+- Returns unified `items[]` array + `coupon_code` field
+
+**Coupon persistence**: The `quotes.coupon_code` column (TEXT, nullable) stores the coupon code applied during quote creation. All quote save paths (Save Draft, Send Quote, Create Job) persist this value. The register's coupon validation system re-validates and applies the discount at checkout time.
 
 ### Key Rule
 The job system generates line items, but the POS register remains the single source of truth for payment. No payment logic lives in the jobs system.

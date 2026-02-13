@@ -396,11 +396,11 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-12 (Session 38 — Walk-In Mode on Quote Builder + Quote-to-Job Conversion)
-- **Walk-in mode on Quote Builder**: Jobs tab "New Walk-In" button navigates to `/pos/quotes?mode=builder&walkIn=true`. Quote builder enters walk-in mode: header shows "New Walk-In", hides "Valid Until" and "Send Quote", shows single "Create Job" button. On submit: saves quote as `status='converted'`, creates job via `POST /api/pos/jobs` with `quote_id` reference, navigates to Jobs tab. Full catalog (vehicle-size pricing, coupons, per-unit, products, etc.) now available for walk-ins.
-- **Quote-to-job conversion (Part 2)**: "Create Job" button added to quote detail view for draft/sent/viewed/accepted quotes. Permission-gated (`pos.jobs.manage`). Maps service items to job services, creates job, updates quote to `converted`. Duplicate prevention via server-side `quote_id` check (409 if job already exists).
-- **Database**: `jobs.quote_id` UUID FK column + partial index (migration `20260212000009`). `POST /api/pos/jobs` accepts `quote_id` and `notes`. `createQuote()` service respects optional `status` field.
-- **Old walk-in flow removed**: Deleted `walk-in-flow.tsx` (612 lines). Zero orphaned references.
+## Last Session: 2026-02-12 (Session 39 — Walk-In Job Fix + Product & Coupon Checkout Bridge)
+- **Walk-in job creation fix**: Added defensive `serviceId` null check in service item filter. Only items with `itemType === 'service' && serviceId` are mapped to job services. Prevents null service IDs from reaching the job creation API.
+- **Product checkout bridge**: `GET /api/pos/jobs/[id]/checkout-items` now checks `job.quote_id`. If a linked quote exists, queries `quote_items` for product items (`product_id IS NOT NULL`) and includes them in the response with `item_type: 'product'`.
+- **Coupon checkout bridge**: New `coupon_code TEXT` column on `quotes` table (migration `20260212000010`). All quote save paths (Save Draft, Send Quote, Create Job) now persist `coupon_code`. Checkout-items route reads `coupon_code` from linked quote and returns it so the register can auto-apply.
+- **Quote→Job→Checkout flow**: Quote stores all items (services + products + coupon). Job stores only services. Checkout loads services from job JSONB + products from `quote_items` + coupon from `quotes.coupon_code`.
 - TypeScript clean (zero errors)
 
 ### Session 37 — Job Source Badge + Editable Job Detail
