@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 43 — 2026-02-12 (Checkout Items Response Parsing Fix)
+
+### Fix: Checkout items response parsing for job-to-register flow
+- "Failed to load checkout items" toast was shown even when API returned 200
+- Root cause: single overly-broad try/catch caught all errors (fetch, JSON parse, and processing) under one generic message, masking the actual failure point
+- Fix: separated error handling into distinct phases — fetch, JSON parse, response shape validation, and processing — each with specific error messages and `console.error` logging
+- Added explicit null/shape checks: validates `data` exists and `data.items` is an array before processing
+- Fixed TypeScript errors: `Customer` and `Vehicle` types now properly cast from partial API join results
+- Fixed `id` property duplication: spread `data.customer` first, then override `id` (was reversed, causing TS2783)
+
+### Feature: Auto-apply coupon from linked quote at checkout
+- When a job is linked to a quote that has a `coupon_code`, the coupon is now automatically validated and applied to the POS register ticket
+- Uses existing `/api/pos/coupons/validate` endpoint to verify coupon is still valid
+- Fails silently if coupon is expired/invalid — checkout still proceeds without discount
+- Files: `src/app/pos/jobs/page.tsx`
+
+---
+
 ## Session 42 — 2026-02-12 (Duplicate Toast Fix + Service Quantity Enforcement)
 
 ### Fix: Duplicate toast on add service

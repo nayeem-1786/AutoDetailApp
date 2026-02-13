@@ -9,6 +9,7 @@ import { useTicket } from '../context/ticket-context';
 import { calculateItemTax } from '../utils/tax';
 import { posFetch } from '../lib/pos-fetch';
 import type { TicketItem, TicketState } from '../types';
+import type { Customer, Vehicle } from '@/lib/supabase/types';
 
 type View =
   | { mode: 'queue' }
@@ -21,16 +22,43 @@ export default function JobsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleCheckout = useCallback(async (jobId: string) => {
+    // Fetch checkout items from API
+    let res: Response;
     try {
-      const res = await posFetch(`/api/pos/jobs/${jobId}/checkout-items`);
-      if (!res.ok) {
+      res = await posFetch(`/api/pos/jobs/${jobId}/checkout-items`);
+    } catch (err) {
+      console.error('Checkout fetch error:', err);
+      toast.error('Failed to load checkout items');
+      return;
+    }
+
+    if (!res.ok) {
+      try {
         const err = await res.json();
         toast.error(err.error || 'Failed to load checkout items');
-        return;
+      } catch {
+        toast.error('Failed to load checkout items');
       }
+      return;
+    }
 
-      const { data } = await res.json();
-      const checkoutItems = data.items as Array<{
+    // Parse response
+    let json: Record<string, unknown>;
+    try {
+      json = await res.json();
+    } catch (err) {
+      console.error('Checkout JSON parse error:', err);
+      toast.error('Failed to parse checkout response');
+      return;
+    }
+
+    const data = json.data as {
+      job_id: string;
+      customer_id: string | null;
+      vehicle_id: string | null;
+      customer: { id: string; first_name: string; last_name: string } | null;
+      vehicle: { id: string; year: number | null; make: string | null; model: string | null; color: string | null; size_class: string | null } | null;
+      items: Array<{
         item_type: 'service' | 'product' | 'custom';
         service_id?: string;
         product_id?: string;
@@ -42,8 +70,18 @@ export default function JobsPage() {
         is_taxable: boolean;
         category_id?: string;
       }>;
+      coupon_code: string | null;
+      status: string;
+    } | undefined;
 
-      const ticketItems: TicketItem[] = checkoutItems.map((item) => {
+    if (!data || !Array.isArray(data.items)) {
+      console.error('Unexpected checkout response shape:', json);
+      toast.error('Failed to load checkout items');
+      return;
+    }
+
+    try {
+      const ticketItems: TicketItem[] = data.items.map((item) => {
         const totalPrice = item.unit_price * item.quantity;
         const isTaxable = item.is_taxable ?? false;
         return {
@@ -69,7 +107,7 @@ export default function JobsPage() {
       });
 
       const ticketCustomer = data.customer
-        ? { id: data.customer_id, ...data.customer }
+        ? { ...data.customer, id: data.customer_id ?? data.customer.id } as Customer
         : null;
 
       const subtotal = ticketItems.reduce((sum, i) => sum + i.totalPrice, 0);
@@ -79,7 +117,7 @@ export default function JobsPage() {
       const newTicket: TicketState = {
         items: ticketItems,
         customer: ticketCustomer,
-        vehicle: data.vehicle || null,
+        vehicle: (data.vehicle || null) as Vehicle | null,
         coupon: null,
         loyaltyPointsToRedeem: 0,
         loyaltyDiscount: 0,
@@ -92,10 +130,51 @@ export default function JobsPage() {
       };
 
       dispatch({ type: 'RESTORE_TICKET', state: newTicket });
+
+      // Auto-apply coupon from linked quote if present
+      if (data.coupon_code) {
+        try {
+          const validateRes = await posFetch('/api/pos/coupons/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: data.coupon_code,
+              subtotal: newTicket.subtotal,
+              customer_id: data.customer_id,
+              items: ticketItems.map((ti) => ({
+                item_type: ti.itemType,
+                product_id: ti.productId || undefined,
+                service_id: ti.serviceId || undefined,
+                category_id: ti.categoryId || undefined,
+                unit_price: ti.unitPrice,
+                quantity: ti.quantity,
+                item_name: ti.itemName,
+              })),
+            }),
+          });
+          if (validateRes.ok) {
+            const couponJson = await validateRes.json();
+            const couponData = couponJson.data;
+            if (couponData && couponData.total_discount > 0) {
+              dispatch({
+                type: 'SET_COUPON',
+                coupon: {
+                  id: couponData.id,
+                  code: couponData.code,
+                  discount: couponData.total_discount,
+                },
+              });
+            }
+          }
+        } catch {
+          // Coupon auto-apply failed — continue without it
+        }
+      }
+
       toast.success('Job items loaded into register');
       router.push('/pos');
     } catch (err) {
-      console.error('Checkout error:', err);
+      console.error('Checkout processing error:', err);
       toast.error('Failed to load checkout items');
     }
   }, [dispatch, router]);
