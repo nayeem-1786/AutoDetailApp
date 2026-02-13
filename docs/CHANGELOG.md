@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 8 — Complete (Launch Ready)
+- Phase 8 Job Management & Photo Documentation fully operational
+- See `docs/POST_LAUNCH_ROADMAP.md` for deferred enhancements (marketing library, categories, collages, portfolio, vehicle SVG upgrade)
+
+---
+
 ## Session G — 2026-02-13 (Service History Tab, Sidebar Cleanup, Photo Feature Button)
 
 ### Changed: Customer Detail — Photos tab → Service History tab

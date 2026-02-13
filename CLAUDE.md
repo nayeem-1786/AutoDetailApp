@@ -21,6 +21,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | `docs/DESIGN_SYSTEM.md` | Visual consistency rules — color palette, typography, spacing, component patterns, page layouts, status indicators, dark mode, responsive breakpoints, anti-patterns. Reference when building any UI. |
 | `docs/QBO-INTEGRATION.md` | QuickBooks Online integration guide — architecture, entity mapping, OAuth setup, POS hooks, sync API, troubleshooting. Reference when touching QBO code. |
 | `docs/PHASE8_JOB_MANAGEMENT.md` | Phase 8 job management & photo documentation spec — schema, workflows, UI specs, zone system, authorization flow. Reference when touching job/photo code. |
+| `docs/POST_LAUNCH_ROADMAP.md` | Post-launch deferred features — marketing photo library, categories, collages, portfolio, vehicle SVG upgrade. Review at 2-week mark after deployment. |
 
 ---
 
@@ -40,6 +41,20 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **10** | Recurring Services (Dormant) | Not started |
 | **11** | Intelligence & Growth | Done |
 | **12** | iPad POS Optimization | Not started |
+
+### Phase 8 — What's Done (Launch Ready)
+- POS: Jobs tab with queue, walk-in creation, intake/progress/completion photo flows, job timer (pause/resume), mid-service flag issue flow, addon authorization (AI + customer link), pickup sign-off, checkout integration
+- Admin: Service Records page (`/admin/jobs`) with filterable table + job detail (Overview + Photos tabs), star/feature button on photos
+- Admin: Customer detail Service History tab (jobs table filtered to customer)
+- Admin: Photo Gallery (standalone sidebar item with browse, filter, bulk actions)
+- Customer Portal: Service History with visit list + service detail + before/after sliders
+- Customer Portal: Last Service card on dashboard
+- Public: Job photo gallery (`/jobs/[token]/photos`) with SEO metadata
+- Public: Gallery page (`/gallery`) with featured before/after photos, service type filters
+- IP Restrictions: middleware verified
+- Auto-assign detailer to walk-ins (schedule + active job conflict checks)
+- Job cancellation flow with customer notification (SMS + email)
+- Post-launch roadmap documented in `docs/POST_LAUNCH_ROADMAP.md` — review at 2-week mark after deployment.
 
 ### Phase 5 — What's Done
 - Coupon engine (CRUD, validation, types, POS integration, wizard with duplicate/usage warnings)
@@ -966,6 +981,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 ### Next Session Priorities
 1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
 2. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
+3. Post-launch review (2-4 weeks after deployment) — see `docs/POST_LAUNCH_ROADMAP.md`
 
 ---
 
