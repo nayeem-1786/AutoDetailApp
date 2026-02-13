@@ -408,7 +408,13 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-13 (Session 50 — Customer Portal Photo History Enhancements)
+## Last Session: 2026-02-13 (Session 51 — Admin Photo Gallery Enhancement)
+- **Admin photo gallery full spec rewrite**: Phase toggle pills (colored, single-select), staff dropdown filter (by `created_by`), featured-only checkbox, search text input (customer name/vehicle), enhanced cards with customer name + vehicle + date below image, hover scale+shadow, select mode toggle, floating bulk action bar, keyboard nav in modal (left/right/Escape), click-outside-to-close, job link in detail modal, empty state differentiation, labeled Featured/Internal toggles with ON/OFF indicators
+- **API response reshaped**: `{ photos: [...], total, page, limit }` with nested `job`, `customer`, `vehicle`, `taken_by` objects
+- Files: `src/app/admin/photos/page.tsx` (rewritten), `src/app/api/admin/photos/route.ts` (enhanced response shape)
+- TypeScript clean (zero errors)
+
+### Session 50 — 2026-02-13 (Customer Portal Photo History Enhancements)
 - **Enhanced /api/account/photos API**: Added pagination (`page`/`limit`), vehicle filter (`vehicle_id`), restructured response with photos grouped by phase (intake/completion), added `zone_label`, `photo_count`, `vehicles` array for filter dropdown, excluded progress-phase photos
 - **Enhanced /account/photos page**: Vehicle filter dropdown (shown when multiple vehicles), "Load more" pagination with count display, fullscreen photo lightbox (close, left/right navigation, counter, download), improved zone-by-zone before/after matching
 - **Last Service card on /account dashboard**: Shows most recent completed job date, vehicle, services. Features 1 `BeforeAfterSlider` pair (prefers exterior zones). "View all photos" link. Only visible with completed jobs with photos.

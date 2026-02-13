@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 51 — 2026-02-13 (Admin Photo Gallery Enhancement)
+
+### Enhanced: /admin/photos page (full spec rewrite)
+- **Phase toggle pills** — colored pill buttons (All | Intake | Progress | Completion) replace dropdown
+- **Staff dropdown filter** — "Taken By" dropdown populated from active employees, filters by `created_by`
+- **Featured toggle** — "Featured only" checkbox in filter bar
+- **Search text input** — searches customer name or vehicle make/model
+- **Enhanced photo cards** — customer name, vehicle (year make model), and date shown below each thumbnail
+- **Hover effects** — subtle scale + shadow on card hover
+- **Select mode toggle** — "Select" button in header toggles bulk selection (checkboxes hidden by default)
+- **Floating bulk action bar** — fixed bottom bar with Feature/Unfeature/Mark Internal/Mark Public actions
+- **Photo detail modal enhancements** — job link (clickable, opens POS), keyboard navigation (left/right arrows, Escape to close), "Featured on website" and "Internal only" as labeled toggle buttons with ON/OFF indicator, click-outside to close
+- **Empty state differentiation** — "No photos yet" (with helpful message) vs "No photos match your filters" (with clear filters link)
+
+### Enhanced: GET /api/admin/photos response shape
+- Response now uses `{ photos: [...], total, page, limit }` format (was `{ data, total }`)
+- Each photo includes nested `job`, `customer`, `vehicle`, `taken_by` objects
+- `taken_by` fetched from `created_by` → employees join (who took the photo)
+
+### Files Modified
+- `src/app/admin/photos/page.tsx` — full rewrite (748 → 587 lines, significantly enhanced UI)
+- `src/app/api/admin/photos/route.ts` — response shape transformation with `taken_by` employee lookup
+
+---
+
 ## Session 50 — 2026-02-13 (Customer Portal Photo History Enhancements)
 
 ### Enhanced: /api/account/photos API
