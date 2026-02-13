@@ -343,8 +343,10 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **photo_gallery flag** (default OFF): Gates the public gallery page at `/gallery`. When disabled, shows "Coming Soon" page. Does NOT affect admin photo gallery or customer portal photos (those use `photo_documentation` flag).
 - **Internal photos** (`is_internal = true`): MUST NEVER appear in customer-facing views (portal, public gallery, customer detail Photos tab). Only visible in admin photo gallery and POS job detail. All customer-facing queries filter `is_internal = false`.
 - **Admin photo gallery** (`/admin/photos`): Browse all job photos with filters. Permission-gated: `admin.photos.view` for viewing, `admin.photos.manage` for featured/internal toggles and bulk actions. Feature flag: `photo_documentation`.
-- **Customer portal photos** (`/account/photos`): Shows only completed/closed/pending_approval jobs. Excludes internal AND progress-phase photos. No admin auth — uses cookie session + customer lookup. API supports pagination (`page`/`limit`), vehicle filter (`vehicle_id`), returns photos grouped by phase (intake/completion) with zone_labels and photo_counts. Page features: vehicle filter dropdown (multiple vehicles), "Load more" pagination, fullscreen photo lightbox with navigation.
-- **Last Service card** on `/account` dashboard: Shows most recent completed job with date, vehicle, services, and 1 featured before/after `BeforeAfterSlider` (prefers exterior zones). "View all photos" link to `/account/photos`. Only visible when customer has completed jobs with photos.
+- **Customer portal Service History** (`/account/services`): Clean row-style visit list of completed/closed jobs. Each row: date, vehicle, services, addon count, photo count, status pill. Vehicle filter dropdown. "Load more" pagination (10/page). Click → detail page.
+- **Service Detail page** (`/account/services/[jobId]`): Full service summary (date, vehicle, services with prices, approved addons, duration, staff). Expandable before/after photos section with zone-by-zone BeforeAfterSliders. Link to public gallery. Auth: verifies job belongs to customer.
+- **Old `/account/photos`**: Redirects to `/account/services`. API at `/api/account/photos` still exists (used by dashboard Last Service card).
+- **Last Service card** on `/account` dashboard: Shows most recent completed job with date, vehicle, services, and 1 featured before/after `BeforeAfterSlider` (prefers exterior zones). "View service history" link to `/account/services`. Only visible when customer has completed jobs with photos.
 - **Public gallery** (`/gallery`): Server Component for SEO. Only shows `is_featured = true` AND `is_internal = false` photos with both intake + completion (before/after pairs). NO customer data exposed — only vehicle make/model and service names.
 - **AI addon authorization**: `buildSystemPrompt()` injects pending addon context when `customerId` provided. AI outputs `[AUTHORIZE_ADDON:uuid]` / `[DECLINE_ADDON:uuid]` blocks, parsed by `extractAddonActions()` in Twilio webhook. Blocks stripped before sending customer-facing message. Pattern mirrors `extractQuoteRequest()`.
 - **Flag flow issue types**: Detailers select from 10 predefined issue types (scratches, water_spots, paint_damage, pet_hair_stains, interior_stains, odor, headlight_haze, wheel_damage, tar_sap_overspray, other) instead of picking from the service catalog. Stored as `issue_type` + `issue_description` on `job_addons` table. DB CHECK constraint enforces valid values. Utility: `src/lib/utils/issue-types.ts` — `getIssueHumanReadable()`, `getIssueLabel()`, `friendlyServiceName()`.
@@ -408,10 +410,14 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-13 (Session 51 — Admin Photo Gallery Enhancement)
-- **Admin photo gallery full spec rewrite**: Phase toggle pills (colored, single-select), staff dropdown filter (by `created_by`), featured-only checkbox, search text input (customer name/vehicle), enhanced cards with customer name + vehicle + date below image, hover scale+shadow, select mode toggle, floating bulk action bar, keyboard nav in modal (left/right/Escape), click-outside-to-close, job link in detail modal, empty state differentiation, labeled Featured/Internal toggles with ON/OFF indicators
-- **API response reshaped**: `{ photos: [...], total, page, limit }` with nested `job`, `customer`, `vehicle`, `taken_by` objects
-- Files: `src/app/admin/photos/page.tsx` (rewritten), `src/app/api/admin/photos/route.ts` (enhanced response shape)
+## Last Session: 2026-02-13 (Session 52 — Customer Portal: Service Records Restructure)
+- **New `/account/services` page**: Clean row-style visit list — date, vehicle, services, addon count, photo count, status pill (green/slate). Vehicle filter dropdown. Load more pagination (10/page). Click → detail page.
+- **New `/account/services/[jobId]` detail page**: Service summary with prices, approved addons ("Additional services added during your visit"), duration (formatted from timer_seconds), staff attribution. Expandable before/after photos section with zone-by-zone BeforeAfterSliders. Link to public gallery.
+- **New APIs**: `GET /api/account/services` (paginated visit list with counts), `GET /api/account/services/[jobId]` (full detail with photos/addons/staff). Both use cookie auth + customer ownership verification.
+- **Nav updated**: "Photos" → "Service History" in portal tabs. Dashboard link → "View service history". Old `/account/photos` redirects to `/account/services`.
+- **Admin sidebar**: "Photos" → "Service Records" with children (All Jobs + Photo Gallery)
+- Files created: `src/app/(account)/account/services/page.tsx`, `src/app/(account)/account/services/[jobId]/page.tsx`, `src/app/api/account/services/route.ts`, `src/app/api/account/services/[jobId]/route.ts`
+- Files modified: `account-shell.tsx`, `account/page.tsx`, `account/photos/page.tsx` (redirect), `admin-shell.tsx`, `roles.ts`
 - TypeScript clean (zero errors)
 
 ### Session 50 — 2026-02-13 (Customer Portal Photo History Enhancements)

@@ -4,6 +4,58 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 52 — 2026-02-13 (Customer Portal: Service Records Restructure)
+
+### New: /account/services — Service History page
+- Clean row-style visit list (one row per completed/closed job, most recent first)
+- Each row: date, vehicle, comma-separated services, addon count, photo count, status pill
+- Status pills: Completed (green), Closed (slate)
+- Vehicle filter dropdown (shown when 2+ vehicles)
+- "Load more" pagination (10 per page)
+- Row click navigates to service detail page
+
+### New: /account/services/[jobId] — Service Detail page
+- Full service summary: date (weekday + full date), vehicle, services with prices, approved add-ons
+- Duration display (formatted from timer_seconds)
+- Staff attribution ("Serviced by Segundo")
+- Expandable "Before & After Photos" section with zone-by-zone BeforeAfterSliders
+- Link to public gallery page for full gallery view
+- Auth: verifies job belongs to logged-in customer, returns 404 otherwise
+
+### New: GET /api/account/services — Visit list API
+- Cookie-based customer auth
+- Returns paginated job list with vehicle, services, addon_count, photo_count, gallery_token
+- Supports page/limit/vehicle_id query params
+- Only shows completed/closed jobs
+
+### New: GET /api/account/services/[jobId] — Service detail API
+- Returns full job details: services, addons, photos (grouped by phase), staff, timer, vehicle
+- Excludes internal and progress-phase photos
+- Auth: customer must own the job
+
+### Updated: Customer portal navigation
+- "Photos" tab renamed to "Service History" → `/account/services`
+- Dashboard "View all photos" link changed to "View service history"
+- Old `/account/photos` redirects to `/account/services`
+
+### Updated: Admin sidebar
+- "Photos" renamed to "Service Records" with children: "All Jobs" + "Photo Gallery"
+
+### Files Created
+- `src/app/(account)/account/services/page.tsx` — visit list page
+- `src/app/(account)/account/services/[jobId]/page.tsx` — service detail page
+- `src/app/api/account/services/route.ts` — visit list API
+- `src/app/api/account/services/[jobId]/route.ts` — service detail API
+
+### Files Modified
+- `src/components/account/account-shell.tsx` — nav tab rename
+- `src/app/(account)/account/page.tsx` — dashboard link update
+- `src/app/(account)/account/photos/page.tsx` — replaced with redirect
+- `src/app/admin/admin-shell.tsx` — Briefcase icon + nav filter key
+- `src/lib/auth/roles.ts` — Service Records nav with children
+
+---
+
 ## Session 51 — 2026-02-13 (Admin Photo Gallery Enhancement)
 
 ### Enhanced: /admin/photos page (full spec rewrite)
