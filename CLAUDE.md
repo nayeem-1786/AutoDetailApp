@@ -341,7 +341,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **POS Services API** (`GET /api/pos/services`): Dedicated endpoint for walk-in service selection. The existing `useCatalog()` hook uses direct Supabase (cookie auth) which doesn't work with HMAC-authenticated POS API context.
 - **photo_documentation flag** (default ON): Core POS feature. Gates photo capture during intake/progress/completion phases.
 - **photo_gallery flag** (default OFF): Gates the public gallery page at `/gallery`. When disabled, shows "Coming Soon" page. Does NOT affect admin photo gallery or customer portal photos (those use `photo_documentation` flag).
-- **Internal photos** (`is_internal = true`): MUST NEVER appear in customer-facing views (portal, public gallery, customer detail Photos tab). Only visible in admin photo gallery and POS job detail. All customer-facing queries filter `is_internal = false`.
+- **Internal photos** (`is_internal = true`): MUST NEVER appear in customer-facing views (portal, public gallery). Only visible in admin photo gallery and POS job detail. All customer-facing queries filter `is_internal = false`.
 - **Admin photo gallery** (`/admin/photos`): Browse all job photos with filters. Permission-gated: `admin.photos.view` for viewing, `admin.photos.manage` for featured/internal toggles and bulk actions. Feature flag: `photo_documentation`.
 - **Customer portal Service History** (`/account/services`): Clean row-style visit list of completed/closed jobs. Each row: date, vehicle, services, addon count, photo count, status pill. Vehicle filter dropdown. "Load more" pagination (10/page). Click → detail page.
 - **Service Detail page** (`/account/services/[jobId]`): Full service summary (date, vehicle, services with prices, approved addons, duration, staff). Expandable before/after photos section with zone-by-zone BeforeAfterSliders. Link to public gallery. Auth: verifies job belongs to customer.
@@ -410,10 +410,17 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-13 (Session D — Admin Jobs / Service Records Page)
+## Last Session: 2026-02-13 (Session G — Service History Tab, Sidebar Cleanup, Photo Feature Button)
+- **Customer detail Photos → Service History tab**: Replaced before/after photo display with a full jobs table (date, vehicle, services, add-ons, photos, duration, staff, status). Filters: status dropdown, vehicle dropdown. Pagination 20/page. Row click → `/admin/jobs/[id]`. Uses `/api/admin/jobs?customer_id=` endpoint.
+- **Admin sidebar flattened**: "Service Records" is direct link to `/admin/jobs` (ClipboardList icon, no dropdown). "Photo Gallery" is standalone item (Camera icon). Both gated behind `photo_documentation` flag.
+- **Job detail photo star toggle**: Each photo thumbnail has a Star button (top-right, overlaid). Featured = filled yellow star. Unfeatured = outline white star. Toggles `is_featured` via `PATCH /api/admin/photos/[id]`. Optimistic UI with revert on error.
+- **API**: `/api/admin/jobs` now accepts `vehicle_id` filter.
+- Note: Marketing photo library page deferred until real data exists (2-4 weeks post-launch).
+
+### Session D — 2026-02-13 (Admin Jobs / Service Records Detail Page)
 - **New `/admin/jobs/[id]` detail page**: Full job detail with Overview + Photos tabs.
   - **Overview tab**: Job summary card (customer link, vehicle, staff, duration), timeline (created → intake → work → completed → pickup → cancelled), services list with pricing, add-ons section with status badges (approved/declined/pending/expired) + discount display, totals sidebar card, quick stats card, intake notes, pickup notes, cancellation info.
-  - **Photos tab**: Before/after `BeforeAfterSlider` per zone, photo grids grouped by phase (intake/progress/completion) with thumbnails, lightbox with metadata (zone, phase, creator, timestamp, featured/internal badges).
+  - **Photos tab**: Before/after `BeforeAfterSlider` per zone, photo grids grouped by phase (intake/progress/completion) with thumbnails, lightbox with metadata (zone, phase, creator, timestamp, featured/internal badges). Star toggle button per photo for `is_featured`.
   - Source badge: Appointment (purple) vs Walk-In (amber).
 - File created: `src/app/admin/jobs/[id]/page.tsx`
 - TypeScript clean (zero errors)
@@ -423,9 +430,9 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **New `/account/services/[jobId]` detail page**: Service summary with prices, approved addons ("Additional services added during your visit"), duration (formatted from timer_seconds), staff attribution. Expandable before/after photos section with zone-by-zone BeforeAfterSliders. Link to public gallery.
 - **New APIs**: `GET /api/account/services` (paginated visit list with counts), `GET /api/account/services/[jobId]` (full detail with photos/addons/staff). Both use cookie auth + customer ownership verification.
 - **Nav updated**: "Photos" → "Service History" in portal tabs. Dashboard link → "View service history". Old `/account/photos` redirects to `/account/services`.
-- **Admin sidebar**: "Photos" → "Service Records" with children (All Jobs + Photo Gallery). Icon: Briefcase. Feature flag: `photo_documentation`.
+- **Admin sidebar**: "Service Records" (ClipboardList icon, direct link to /admin/jobs) + standalone "Photo Gallery" (Camera icon). Feature flag: `photo_documentation`.
 - **New `/admin/jobs` table page**: Filterable table of all jobs — columns: date, customer (clickable link), vehicle + color, services (truncated), add-ons count badge, photo count, duration, staff, status pill. Filters: customer search (debounced), status dropdown, staff dropdown, date range. Sortable columns (date, duration, status). Pagination. Row click → `/admin/jobs/[id]`.
-- **New `GET /api/admin/jobs` API**: Paginated job list with customer/vehicle/staff joins, batch photo + approved addon counts. Filters: status, staff_id, customer_id, date_from, date_to, search (name/phone). Auth: `admin.photos.view` permission.
+- **New `GET /api/admin/jobs` API**: Paginated job list with customer/vehicle/staff joins, batch photo + approved addon counts. Filters: status, staff_id, customer_id, vehicle_id, date_from, date_to, search (name/phone). Auth: `admin.photos.view` permission.
 - **New `GET /api/admin/jobs/[id]` API**: Full job detail with customer, vehicle, staff, enriched addons (resolved service/product names), photos grouped by phase, photo creators, linked transaction. Auth: `admin.photos.view` permission.
 - Files created: `src/app/admin/jobs/page.tsx`, `src/app/api/admin/jobs/route.ts`, `src/app/api/admin/jobs/[id]/route.ts`, `src/app/(account)/account/services/page.tsx`, `src/app/(account)/account/services/[jobId]/page.tsx`, `src/app/api/account/services/route.ts`, `src/app/api/account/services/[jobId]/route.ts`
 - Files modified: `account-shell.tsx`, `account/page.tsx`, `account/photos/page.tsx` (redirect), `admin-shell.tsx`, `roles.ts`

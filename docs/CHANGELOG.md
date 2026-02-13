@@ -4,6 +4,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session G — 2026-02-13 (Service History Tab, Sidebar Cleanup, Photo Feature Button)
+
+### Changed: Customer Detail — Photos tab → Service History tab
+- Replaced the Photos tab (before/after sliders grouped by visit) with a full Service History table
+- Table columns: Date, Vehicle, Services (truncated >2), Add-ons count, Photos count, Duration, Staff, Status pill
+- All job statuses shown (scheduled, intake, in_progress, completed, closed, cancelled)
+- Filters: status dropdown, vehicle dropdown (when customer has 2+ vehicles)
+- Pagination: 20 per page
+- Row click navigates to `/admin/jobs/[id]`
+- Uses existing `/api/admin/jobs?customer_id=` endpoint (no new API)
+- Removed unused imports: `BeforeAfterSlider`, `getZoneLabel`, `Camera` icon
+
+### Changed: Admin Sidebar — Flatten Service Records
+- "Service Records" is now a direct link to `/admin/jobs` (no dropdown, no chevron)
+- Icon changed from `Briefcase` to `ClipboardList`
+- "Photo Gallery" is now a standalone sidebar item (same level, `Camera` icon)
+- Both gated behind `photo_documentation` feature flag
+
+### New: Job Detail — Star/Feature Button on Photos
+- Each photo thumbnail now has a star icon button (top-right corner, overlaid)
+- Unfeatured: outline star in white/gray; Featured: filled star in yellow/gold
+- Click toggles `is_featured` via `PATCH /api/admin/photos/[id]`
+- Optimistic UI with revert on error + success/error toasts
+- Tooltip: "Feature for marketing" / "Remove from featured"
+- Replaces the passive featured badge (yellow checkmark circle)
+
+### API: /api/admin/jobs — Added vehicle_id filter
+- New `vehicle_id` query param filters jobs by vehicle
+
+### Files Modified
+- `src/app/admin/customers/[id]/page.tsx` — Service History tab replaces Photos tab
+- `src/app/admin/jobs/[id]/page.tsx` — Star toggle button on photo thumbnails
+- `src/app/admin/admin-shell.tsx` — Photo Gallery feature flag gating
+- `src/lib/auth/roles.ts` — Sidebar structure flattened
+- `src/app/api/admin/jobs/route.ts` — vehicle_id filter
+
+---
+
 ## Session D — 2026-02-13 (Admin Jobs / Service Records Detail Page)
 
 ### New: /admin/jobs/[id] — Job Detail Page
