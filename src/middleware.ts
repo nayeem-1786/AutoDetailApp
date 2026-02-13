@@ -76,12 +76,12 @@ function getClientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) {
     const ip = forwarded.split(',')[0].trim();
-    // In dev, x-forwarded-for may be ::1 or 127.0.0.1 — treat as null
-    if (ip === '::1' || ip === '127.0.0.1') return null;
+    // In dev, x-forwarded-for may be ::1, 127.0.0.1, or ::ffff:127.0.0.1 — treat as null
+    if (ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1') return null;
     return ip;
   }
   const realIp = request.headers.get('x-real-ip');
-  if (realIp === '::1' || realIp === '127.0.0.1') return null;
+  if (realIp === '::1' || realIp === '127.0.0.1' || realIp === '::ffff:127.0.0.1') return null;
   return realIp;
 }
 

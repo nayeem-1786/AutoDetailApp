@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 49 — 2026-02-13 (Revert Vehicle SVG, Fix IP Restriction)
+
+### Revert: Vehicle silhouette changes
+- Previous session created a `feature/vehicle-silhouettes` branch with custom SVG vehicle zone picker components
+- Changes were never merged to main — branch left as-is for future reference if needed
+- No files on main were affected
+
+### Fix: Middleware missing `::ffff:127.0.0.1` localhost check
+- `getClientIp()` treated `::1` and `127.0.0.1` as null (localhost) but missed `::ffff:127.0.0.1`
+- `::ffff:127.0.0.1` is the IPv4-mapped IPv6 address Node.js commonly uses in dev
+- Added to both `x-forwarded-for` and `x-real-ip` checks in `src/middleware.ts`
+
+---
+
 ## Session 48 — 2026-02-13 (Fix POS IP Restriction — Dev Blocking + RLS)
 
 ### Fix: Middleware always blocked in dev due to IP mismatch
