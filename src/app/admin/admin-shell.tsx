@@ -42,6 +42,7 @@ import {
   ClipboardList,
   History,
   Camera,
+  Briefcase,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -75,6 +76,7 @@ const iconMap: Record<string, LucideIcon> = {
   History,
   Shield,
   Camera,
+  Briefcase,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
@@ -408,7 +410,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   const navItems = SIDEBAR_NAV.filter((item) => {
     if (item.href === '/admin/messaging') return twoWaySmsEnabled;
     if (item.href === '/admin/inventory') return inventoryEnabled;
-    if (item.href === '/admin/photos') return photoDocEnabled;
+    if (item.href === '/admin/jobs') return photoDocEnabled;
     return true;
   });
 

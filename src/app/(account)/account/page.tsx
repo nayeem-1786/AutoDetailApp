@@ -179,9 +179,9 @@ export default function AccountDashboardPage() {
             <h2 className="text-lg font-semibold text-gray-900">
               Your Last Service
             </h2>
-            <Link href="/account/photos">
+            <Link href="/account/services">
               <Button variant="ghost" size="sm" className="gap-1">
-                View all photos <ArrowRight className="h-4 w-4" />
+                View service history <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
           </div>

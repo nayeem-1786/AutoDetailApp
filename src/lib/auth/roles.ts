@@ -114,9 +114,21 @@ export const SIDEBAR_NAV: NavItem[] = [
     ],
   },
   {
-    label: 'Photos',
-    href: '/admin/photos',
-    icon: 'Camera',
+    label: 'Service Records',
+    href: '/admin/jobs',
+    icon: 'Briefcase',
+    children: [
+      {
+        label: 'All Jobs',
+        href: '/admin/jobs',
+        icon: 'Briefcase',
+      },
+      {
+        label: 'Photo Gallery',
+        href: '/admin/photos',
+        icon: 'Camera',
+      },
+    ],
   },
   {
     label: 'Staff',
