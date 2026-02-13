@@ -868,46 +868,18 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
                   <FileText className="h-4 w-4" />
                   <span>Notes</span>
                 </div>
-                {isEditable && !editingNotes && (
+                {isEditable && (
                   <button
                     onClick={handleStartEditNotes}
-                    className="rounded p-1 hover:bg-gray-100"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-gray-100"
                   >
-                    <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                    <Pencil className="h-4 w-4 text-gray-400" />
                   </button>
                 )}
               </div>
-              {editingNotes ? (
-                <div className="mt-2">
-                  <textarea
-                    value={notesValue}
-                    onChange={(e) => setNotesValue(e.target.value)}
-                    placeholder="Add notes about this job..."
-                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    rows={3}
-                    autoFocus
-                  />
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => setEditingNotes(false)}
-                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveNotes}
-                      disabled={savingEdit}
-                      className="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {savingEdit ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
-                  {job.intake_notes || <span className="italic text-gray-400">No notes</span>}
-                </p>
-              )}
+              <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+                {job.intake_notes || <span className="italic text-gray-400">No notes</span>}
+              </p>
             </div>
           )}
 
@@ -1480,6 +1452,50 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Notes Modal */}
+      {editingNotes && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Edit Notes</h3>
+                <button
+                  onClick={() => setEditingNotes(false)}
+                  className="rounded-lg p-1 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <textarea
+                value={notesValue}
+                onChange={(e) => setNotesValue(e.target.value)}
+                placeholder="Add notes about this job..."
+                className="w-full rounded-lg border border-gray-200 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                rows={5}
+                autoFocus
+              />
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setEditingNotes(false)}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveNotes}
+                  disabled={savingEdit}
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingEdit ? 'Saving...' : 'Save'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

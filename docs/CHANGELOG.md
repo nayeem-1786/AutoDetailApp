@@ -6,6 +6,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ## Session 37 — 2026-02-12 (Job Source Badge + Editable Job Detail + Phone Format Fix)
 
+### Notes Editing Modal (iPad UX)
+- Replaced inline textarea editing with bottom sheet modal matching other edit modals (customer, vehicle, services)
+- Full-width textarea (5 rows), auto-focus for immediate keyboard, Save/Cancel buttons
+- Pencil icon button meets 44x44px iPad touch target minimum
+- Notes card always read-only on the main view; pencil icon opens modal when `pos.jobs.manage` granted
+
 ### Phone Number Display Fix
 - Fixed raw E.164 format (+14243637450) displaying on job detail — now shows (424) 363-7450
 - Applied existing `formatPhone()` from `@/lib/utils/format` to both editable and read-only customer sections
