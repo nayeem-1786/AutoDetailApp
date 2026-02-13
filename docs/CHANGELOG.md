@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 37 — 2026-02-12 (Job Source Badge + Editable Job Detail)
+
+### Job Source Badge (Walk-In vs Appointment)
+- Source determined from `appointment_id` (NULL = Walk-In, NOT NULL = Appointment)
+- Badge pill on job queue cards: purple "Appt" with Calendar icon, amber "Walk-In" with Footprints icon
+- Badge pill on job detail header: same styling, right of status badge
+
+### Editable Job Detail Card
+- All edits gated by `pos.jobs.manage` permission (client + server)
+- Edits blocked on terminal statuses (completed, closed, cancelled)
+- **Edit Customer**: Tappable card opens bottom sheet with `CustomerLookup` component
+- **Edit Vehicle**: Tappable card opens bottom sheet with customer's vehicle list + "No vehicle" option
+- **Edit Services**: Tappable card opens full modal with search, multi-select toggle, running total, "Update Services" button
+- **Edit Notes**: Inline editable `intake_notes` field with textarea + save/cancel buttons
+- **API**: PATCH `/api/pos/jobs/[id]` now separates `MANAGE_FIELDS` (customer_id, vehicle_id, services, intake_notes) from `WORKFLOW_FIELDS`. Manage fields require `pos.jobs.manage` permission + non-terminal status check via `checkPosPermission()`.
+- New Vehicle card section added to job detail (previously only showed vehicle inline with customer)
+
 ## Session 36 — 2026-02-12 (Consolidate Job Permissions)
 
 - Consolidated `pos.jobs.create_walkin` into `pos.jobs.manage` — walk-in creation now gated by manage permission

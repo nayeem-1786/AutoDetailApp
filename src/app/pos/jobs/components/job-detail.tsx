@@ -18,6 +18,13 @@ import {
   ChevronRight,
   Check,
   X,
+  Calendar,
+  Footprints,
+  Pencil,
+  Car,
+  FileText,
+  Search,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
@@ -28,7 +35,8 @@ import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-d
 import { ZonePicker } from './zone-picker';
 import { JobTimer } from './job-timer';
 import { FlagIssueFlow } from './flag-issue-flow';
-import type { JobStatus, JobAddonStatus } from '@/lib/supabase/types';
+import { CustomerLookup } from '../../components/customer-lookup';
+import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot } from '@/lib/supabase/types';
 
 type ZonePickerMode = 'intake' | 'completion' | 'progress' | null;
 
@@ -214,6 +222,20 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [reassigning, setReassigning] = useState(false);
 
+  // Edit state
+  const [showEditCustomer, setShowEditCustomer] = useState(false);
+  const [showEditVehicle, setShowEditVehicle] = useState(false);
+  const [editVehicles, setEditVehicles] = useState<{ id: string; year: number | null; make: string | null; model: string | null; color: string | null }[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [showEditServices, setShowEditServices] = useState(false);
+  const [allServices, setAllServices] = useState<{ id: string; name: string; flat_price: number | null; pricing_model: string; pricing?: { tier_name: string; price: number }[] }[]>([]);
+  const [editSelectedServices, setEditSelectedServices] = useState<JobServiceSnapshot[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const fetchJob = useCallback(async () => {
     try {
       const res = await posFetch(`/api/pos/jobs/${jobId}`);
@@ -395,6 +417,111 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
     }
   }
 
+  // Determine if job fields are editable
+  const isEditable = canManageJobs && job != null && !['completed', 'closed', 'cancelled'].includes(job.status);
+
+  async function handlePatchJob(updates: Record<string, unknown>) {
+    setSavingEdit(true);
+    try {
+      const res = await posFetch(`/api/pos/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setJob(data);
+        toast.success('Job updated');
+        return true;
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to update job');
+        return false;
+      }
+    } catch {
+      toast.error('Failed to update job');
+      return false;
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleEditCustomerSelect(customer: Customer) {
+    const ok = await handlePatchJob({ customer_id: customer.id, vehicle_id: null });
+    if (ok) setShowEditCustomer(false);
+  }
+
+  async function handleOpenEditVehicle() {
+    if (!job?.customer) return;
+    setShowEditVehicle(true);
+    setLoadingVehicles(true);
+    try {
+      const res = await posFetch(`/api/pos/customers/${job.customer.id}/vehicles`);
+      if (res.ok) {
+        const { data } = await res.json();
+        setEditVehicles(data ?? []);
+      }
+    } catch {
+      toast.error('Failed to load vehicles');
+    } finally {
+      setLoadingVehicles(false);
+    }
+  }
+
+  async function handleEditVehicleSelect(vehicleId: string | null) {
+    const ok = await handlePatchJob({ vehicle_id: vehicleId });
+    if (ok) setShowEditVehicle(false);
+  }
+
+  async function handleOpenEditServices() {
+    if (!job) return;
+    setShowEditServices(true);
+    setEditSelectedServices([...job.services]);
+    setServiceSearch('');
+    setLoadingServices(true);
+    try {
+      const res = await posFetch('/api/pos/services');
+      if (res.ok) {
+        const { data } = await res.json();
+        setAllServices(data ?? []);
+      }
+    } catch {
+      toast.error('Failed to load services');
+    } finally {
+      setLoadingServices(false);
+    }
+  }
+
+  function handleToggleEditService(svc: JobServiceSnapshot) {
+    setEditSelectedServices((prev) => {
+      const exists = prev.find((s) => s.id === svc.id);
+      if (exists) return prev.filter((s) => s.id !== svc.id);
+      return [...prev, svc];
+    });
+  }
+
+  function getServicePrice(svc: { flat_price: number | null; pricing?: { tier_name: string; price: number }[] }): number {
+    if (svc.flat_price != null) return Number(svc.flat_price);
+    if (svc.pricing && svc.pricing.length > 0) return Number(svc.pricing[0].price);
+    return 0;
+  }
+
+  async function handleSaveEditServices() {
+    if (editSelectedServices.length === 0) return;
+    const ok = await handlePatchJob({ services: editSelectedServices });
+    if (ok) setShowEditServices(false);
+  }
+
+  function handleStartEditNotes() {
+    setNotesValue(job?.intake_notes || '');
+    setEditingNotes(true);
+  }
+
+  async function handleSaveNotes() {
+    const ok = await handlePatchJob({ intake_notes: notesValue.trim() || null });
+    if (ok) setEditingNotes(false);
+  }
+
   // Determine if cancel button should be visible (permission-gated)
   const canCancel = (() => {
     if (!job || !employee) return false;
@@ -552,6 +679,20 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
               </h1>
               <span
                 className={cn(
+                  'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                  job.appointment_id
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-amber-100 text-amber-700'
+                )}
+              >
+                {job.appointment_id ? (
+                  <><Calendar className="h-3 w-3" />Appointment</>
+                ) : (
+                  <><Footprints className="h-3 w-3" />Walk-In</>
+                )}
+              </span>
+              <span
+                className={cn(
                   'inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
                   statusConfig.color
                 )}
@@ -624,29 +765,55 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
           )}
 
           {/* Services */}
-          <div className="rounded-lg bg-white p-3 shadow-sm">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Wrench className="h-4 w-4" />
-              <span>Services</span>
-            </div>
-            <div className="mt-2 space-y-1">
-              {job.services.map((svc) => (
-                <div
-                  key={svc.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span className="text-gray-900">{svc.name}</span>
-                  <span className="text-gray-600">${svc.price.toFixed(2)}</span>
+          {isEditable ? (
+            <button
+              onClick={handleOpenEditServices}
+              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Wrench className="h-4 w-4" />
+                  <span>Services</span>
                 </div>
-              ))}
-              <div className="mt-1 border-t border-gray-100 pt-1">
-                <div className="flex items-center justify-between text-sm font-medium">
-                  <span className="text-gray-700">Total</span>
-                  <span className="text-gray-900">${servicesTotal.toFixed(2)}</span>
+                <Pencil className="h-4 w-4 text-gray-400" />
+              </div>
+              <div className="mt-2 space-y-1">
+                {job.services.map((svc) => (
+                  <div key={svc.id} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-900">{svc.name}</span>
+                    <span className="text-gray-600">${svc.price.toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="mt-1 border-t border-gray-100 pt-1">
+                  <div className="flex items-center justify-between text-sm font-medium">
+                    <span className="text-gray-700">Total</span>
+                    <span className="text-gray-900">${servicesTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+          ) : (
+            <div className="rounded-lg bg-white p-3 shadow-sm">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Wrench className="h-4 w-4" />
+                <span>Services</span>
+              </div>
+              <div className="mt-2 space-y-1">
+                {job.services.map((svc) => (
+                  <div key={svc.id} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-900">{svc.name}</span>
+                    <span className="text-gray-600">${svc.price.toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="mt-1 border-t border-gray-100 pt-1">
+                  <div className="flex items-center justify-between text-sm font-medium">
+                    <span className="text-gray-700">Total</span>
+                    <span className="text-gray-900">${servicesTotal.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Timing */}
           <div className="rounded-lg bg-white p-3 shadow-sm">
@@ -691,6 +858,57 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
               )}
             </div>
           </div>
+
+          {/* Notes */}
+          {(isEditable || job.intake_notes) && (
+            <div className="rounded-lg bg-white p-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <FileText className="h-4 w-4" />
+                  <span>Notes</span>
+                </div>
+                {isEditable && !editingNotes && (
+                  <button
+                    onClick={handleStartEditNotes}
+                    className="rounded p-1 hover:bg-gray-100"
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                  </button>
+                )}
+              </div>
+              {editingNotes ? (
+                <div className="mt-2">
+                  <textarea
+                    value={notesValue}
+                    onChange={(e) => setNotesValue(e.target.value)}
+                    placeholder="Add notes about this job..."
+                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    rows={3}
+                    autoFocus
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => setEditingNotes(false)}
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveNotes}
+                      disabled={savingEdit}
+                      className="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {savingEdit ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+                  {job.intake_notes || <span className="italic text-gray-400">No notes</span>}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Addons Section */}
           {allAddons.length > 0 && (
@@ -779,21 +997,79 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
             </div>
           )}
 
-          {/* Customer contact */}
-          {job.customer && (job.customer.phone || job.customer.email) && (
+          {/* Customer */}
+          {isEditable ? (
+            <button
+              onClick={() => setShowEditCustomer(true)}
+              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <User className="h-4 w-4" />
+                    <span>Customer</span>
+                  </div>
+                  <p className="mt-1 font-medium text-gray-900">
+                    {job.customer
+                      ? `${job.customer.first_name} ${job.customer.last_name}`
+                      : 'No customer'}
+                  </p>
+                  {job.customer?.phone && (
+                    <p className="text-sm text-gray-500">{job.customer.phone}</p>
+                  )}
+                  {job.customer?.email && (
+                    <p className="text-sm text-gray-400">{job.customer.email}</p>
+                  )}
+                </div>
+                <Pencil className="h-4 w-4 text-gray-400" />
+              </div>
+            </button>
+          ) : job.customer ? (
             <div className="rounded-lg bg-white p-3 shadow-sm">
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <User className="h-4 w-4" />
-                <span>Customer Contact</span>
+                <span>Customer</span>
               </div>
-              <div className="mt-1 space-y-0.5 text-sm">
-                {job.customer.phone && (
-                  <p className="text-gray-900">{job.customer.phone}</p>
-                )}
-                {job.customer.email && (
-                  <p className="text-gray-600">{job.customer.email}</p>
-                )}
+              <p className="mt-1 font-medium text-gray-900">
+                {job.customer.first_name} {job.customer.last_name}
+              </p>
+              {job.customer.phone && (
+                <p className="text-sm text-gray-500">{job.customer.phone}</p>
+              )}
+              {job.customer.email && (
+                <p className="text-sm text-gray-400">{job.customer.email}</p>
+              )}
+            </div>
+          ) : null}
+
+          {/* Vehicle */}
+          {isEditable ? (
+            <button
+              onClick={handleOpenEditVehicle}
+              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Car className="h-4 w-4" />
+                    <span>Vehicle</span>
+                  </div>
+                  <p className="mt-1 font-medium text-gray-900">
+                    {formatVehicle(job.vehicle)}
+                  </p>
+                </div>
+                <Pencil className="h-4 w-4 text-gray-400" />
               </div>
+            </button>
+          ) : (
+            <div className="rounded-lg bg-white p-3 shadow-sm">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Car className="h-4 w-4" />
+                <span>Vehicle</span>
+              </div>
+              <p className="mt-1 font-medium text-gray-900">
+                {formatVehicle(job.vehicle)}
+              </p>
             </div>
           )}
         </div>
@@ -1102,6 +1378,198 @@ export function JobDetail({ jobId, onBack }: JobDetailProps) {
         sendLabel="Cancel & Notify"
         cancelLabel="Back"
       />
+
+      {/* Edit Customer Modal */}
+      {showEditCustomer && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Change Customer</h3>
+                <button
+                  onClick={() => setShowEditCustomer(false)}
+                  className="rounded-lg p-1 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <CustomerLookup
+                onSelect={handleEditCustomerSelect}
+                onCreateNew={() => {
+                  // For now, close the modal — quick-add is in the walk-in flow
+                  toast.error('Create the customer first from the Walk-In flow, then change customer here');
+                }}
+              />
+              {savingEdit && (
+                <div className="mt-3 flex items-center justify-center">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Vehicle Modal */}
+      {showEditVehicle && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Change Vehicle</h3>
+                <button
+                  onClick={() => setShowEditVehicle(false)}
+                  className="rounded-lg p-1 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-2">
+              {loadingVehicles ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {/* No vehicle option */}
+                  <button
+                    onClick={() => handleEditVehicleSelect(null)}
+                    disabled={savingEdit}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50',
+                      !job?.vehicle && 'bg-blue-50'
+                    )}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">No vehicle</p>
+                      <p className="text-xs text-gray-400">Remove vehicle assignment</p>
+                    </div>
+                    {!job?.vehicle && <Check className="h-4 w-4 text-blue-600" />}
+                  </button>
+
+                  {editVehicles.map((v) => {
+                    const isCurrentVehicle = job?.vehicle?.id === v.id;
+                    const label = [v.color, v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle';
+                    return (
+                      <button
+                        key={v.id}
+                        onClick={() => handleEditVehicleSelect(v.id)}
+                        disabled={savingEdit}
+                        className={cn(
+                          'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50',
+                          isCurrentVehicle && 'bg-blue-50'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Car className="h-4 w-4 text-gray-400" />
+                          <p className="text-sm font-medium text-gray-900">{label}</p>
+                        </div>
+                        {isCurrentVehicle && <Check className="h-4 w-4 text-blue-600" />}
+                      </button>
+                    );
+                  })}
+
+                  {editVehicles.length === 0 && (
+                    <p className="py-6 text-center text-sm text-gray-400">
+                      No vehicles for this customer
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Services Modal */}
+      {showEditServices && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+          <div className="flex w-full max-w-md flex-col rounded-t-xl bg-white shadow-xl sm:max-h-[80vh] sm:rounded-xl">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Edit Services</h3>
+                <button
+                  onClick={() => setShowEditServices(false)}
+                  className="rounded-lg p-1 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="relative mt-3">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={serviceSearch}
+                  onChange={(e) => setServiceSearch(e.target.value)}
+                  placeholder="Search services..."
+                  className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2" style={{ maxHeight: '50vh' }}>
+              {loadingServices ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {allServices
+                    .filter((s) => !serviceSearch.trim() || s.name.toLowerCase().includes(serviceSearch.toLowerCase()))
+                    .map((svc) => {
+                      const isSelected = editSelectedServices.some((s) => s.id === svc.id);
+                      const price = getServicePrice(svc);
+                      return (
+                        <button
+                          key={svc.id}
+                          onClick={() => handleToggleEditService({ id: svc.id, name: svc.name, price })}
+                          className={cn(
+                            'flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors',
+                            isSelected
+                              ? 'bg-blue-50 ring-1 ring-blue-200'
+                              : 'hover:bg-gray-50'
+                          )}
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{svc.name}</p>
+                            <p className="text-xs text-gray-500">
+                              ${price.toFixed(2)}
+                              {svc.pricing_model !== 'flat' && ' (starting)'}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <div className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600">
+                              <Check className="h-4 w-4 text-white" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+            <div className="border-t border-gray-200 px-5 py-3">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-gray-500">
+                  {editSelectedServices.length} service{editSelectedServices.length !== 1 ? 's' : ''}
+                </span>
+                <span className="font-medium text-gray-900">
+                  ${editSelectedServices.reduce((sum, s) => sum + s.price, 0).toFixed(2)}
+                </span>
+              </div>
+              <button
+                onClick={handleSaveEditServices}
+                disabled={editSelectedServices.length === 0 || savingEdit}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingEdit ? 'Saving...' : 'Update Services'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

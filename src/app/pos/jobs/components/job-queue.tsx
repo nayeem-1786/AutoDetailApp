@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, RefreshCw, User, Clock, Bell } from 'lucide-react';
+import { Plus, RefreshCw, User, Clock, Bell, Calendar, Footprints } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
 import { usePosPermission } from '../../context/pos-permission-context';
@@ -13,6 +13,7 @@ type FilterType = 'mine' | 'all' | 'unassigned';
 interface JobListItem {
   id: string;
   status: JobStatus;
+  appointment_id: string | null;
   services: { id: string; name: string; price: number }[];
   estimated_pickup_at: string | null;
   created_at: string;
@@ -235,16 +236,32 @@ export function JobQueue({ onNewWalkIn, onSelectJob }: JobQueueProps) {
                       </p>
                     </div>
 
-                    {/* Right side: status + pickup */}
+                    {/* Right side: source + status + pickup */}
                     <div className="ml-3 flex flex-col items-end gap-1">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                          statusConfig.color
-                        )}
-                      >
-                        {statusConfig.label}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                            job.appointment_id
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-amber-100 text-amber-700'
+                          )}
+                        >
+                          {job.appointment_id ? (
+                            <><Calendar className="h-3 w-3" />Appt</>
+                          ) : (
+                            <><Footprints className="h-3 w-3" />Walk-In</>
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                            statusConfig.color
+                          )}
+                        >
+                          {statusConfig.label}
+                        </span>
+                      </div>
                       {pickupTime && (
                         <span className="flex items-center gap-1 text-xs text-gray-400">
                           <Clock className="h-3 w-3" />
