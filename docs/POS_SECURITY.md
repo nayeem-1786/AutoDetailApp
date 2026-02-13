@@ -45,15 +45,19 @@ Two keys in `business_settings` table:
 
 The middleware extracts just the IP addresses for validation. Location names are for display only.
 
+**RLS**: The `settings_write` policy on `business_settings` requires `is_admin_or_above()` — both `super_admin` and `admin` roles can save settings. The settings page uses `createClient()` (browser RLS client).
+
 ### Middleware
 
 File: `src/middleware.ts`
 
 The middleware:
 1. Checks if request path starts with `/pos`
-2. Fetches whitelist config from `/api/internal/allowed-ips`
-3. If enabled and IPs configured, validates client IP
-4. Returns 403 if IP not in whitelist
+2. Queries `business_settings` directly via Supabase service role client (with 10s in-memory cache)
+3. If enabled and IPs configured, extracts client IP from `x-forwarded-for` or `x-real-ip` headers
+4. Loopback addresses (`::1`, `127.0.0.1`) are treated as null — local dev connections always pass through
+5. Returns 403 (with the blocked IP in the message) only when a real public IP doesn't match the whitelist
+6. Falls back to `ALLOWED_POS_IPS` env var if database is unavailable
 
 ### Caching
 
@@ -65,7 +69,6 @@ The middleware:
 
 | Route | Purpose |
 |-------|---------|
-| `/api/internal/allowed-ips` | Returns `{ ips: string[], enabled: boolean }` for middleware |
 | `/api/admin/current-ip` | Returns requester's public IP for "Add My IP" feature |
 
 ## Testing with ngrok
@@ -140,6 +143,5 @@ For maximum security, combine IP restrictions with:
 | File | Purpose |
 |------|---------|
 | `src/app/admin/settings/pos-security/page.tsx` | Admin settings UI |
-| `src/app/api/internal/allowed-ips/route.ts` | API for middleware to fetch config |
 | `src/app/api/admin/current-ip/route.ts` | API to detect user's public IP |
 | `src/middleware.ts` | Request interception and IP validation |

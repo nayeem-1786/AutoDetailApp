@@ -864,7 +864,7 @@ Built but toggled OFF. Activate when business warrants:
 
 **Authentication & Security:**
 - PIN-based login: 4-digit PIN pad with rate limiting (5 failures → 15-minute lockout), magic link token generation via Supabase Auth
-- IP-based network restriction: `ALLOWED_POS_IPS` env var, enforced in middleware (production only)
+- IP-based network restriction: configurable via Admin > Settings > POS Security (`pos_allowed_ips` + `pos_ip_whitelist_enabled` in `business_settings`), enforced in `src/middleware.ts`. Env var `ALLOWED_POS_IPS` as fallback. Local dev connections (::1/127.0.0.1) always pass through.
 - Idle timeout: configurable via `pos_idle_timeout_minutes` in business_settings (default 15 min), auto-logout on inactivity
 - Role-based access: admin/super_admin vs cashier, manager-only end-of-day close
 
