@@ -8,7 +8,7 @@ BEGIN
   SELECT COALESCE(MAX(sort_order), 0) INTO max_sort FROM permission_definitions;
 
   -- Insert 7 CMS permission definitions
-  INSERT INTO permission_definitions (permission_key, name, description, category, sort_order)
+  INSERT INTO permission_definitions (key, name, description, category, sort_order)
   VALUES
     ('cms.hero.manage', 'Manage Hero', 'Create, edit, reorder, and delete hero slides', 'Website', max_sort + 1),
     ('cms.tickers.manage', 'Manage Tickers', 'Create, edit, and delete announcement tickers', 'Website', max_sort + 2),
@@ -17,13 +17,14 @@ BEGIN
     ('cms.about.manage', 'Manage About & Team', 'Edit team members, credentials, and about content', 'Website', max_sort + 5),
     ('cms.catalog_display.manage', 'Manage Catalog Display', 'Toggle show_on_website, featured, and sort order for services/products', 'Website', max_sort + 6),
     ('cms.seo.manage', 'Manage SEO', 'Edit per-page SEO config, meta tags, alt tags, city pages', 'Website', max_sort + 7)
-  ON CONFLICT (permission_key) DO NOTHING;
+  ON CONFLICT (key) DO NOTHING;
 END $$;
 
 -- Insert role defaults for all 4 system roles (7 keys x 4 roles = 28 rows)
 -- super_admin and admin get all CMS permissions, cashier and detailer get none
-INSERT INTO permissions (role_id, permission_key, granted)
-SELECT r.id, p.permission_key,
+-- Must include both role (enum) and role_id (FK) to satisfy valid_permission_target CHECK constraint
+INSERT INTO permissions (permission_key, role, role_id, granted)
+SELECT p.pkey, r.name::user_role, r.id,
   CASE WHEN r.name IN ('super_admin', 'admin') THEN true ELSE false END
 FROM roles r
 CROSS JOIN (
@@ -35,6 +36,6 @@ CROSS JOIN (
     ('cms.about.manage'),
     ('cms.catalog_display.manage'),
     ('cms.seo.manage')
-) AS p(permission_key)
+) AS p(pkey)
 WHERE r.name IN ('super_admin', 'admin', 'cashier', 'detailer')
 ON CONFLICT (permission_key, role_id) DO NOTHING;
