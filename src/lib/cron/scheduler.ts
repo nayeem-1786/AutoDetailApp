@@ -50,10 +50,16 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/theme-activation', 'theme-activation');
   });
 
+  // Google reviews refresh — daily at 6:00 AM PST (14:00 UTC)
+  cron.schedule('0 14 * * *', () => {
+    callCronEndpoint('/api/cron/google-reviews', 'google-reviews');
+  });
+
   console.log('[CRON] Scheduled jobs:');
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
   console.log('  - stock-alerts: daily at 8:00 AM PST');
   console.log('  - qbo-sync: every 30 minutes');
   console.log('  - theme-activation: every 15 minutes');
+  console.log('  - google-reviews: daily at 6:00 AM PST');
 }

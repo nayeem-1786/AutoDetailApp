@@ -13,18 +13,36 @@ import { FormField } from '@/components/ui/form-field';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Star } from 'lucide-react';
 
 interface ReviewSettings {
   google_review_url: string;
   yelp_review_url: string;
+  google_review_rating: string;
+  google_review_count: string;
+  google_reviews_updated_at: string;
+  yelp_review_rating: string;
+  yelp_review_count: string;
 }
 
-const SETTINGS_KEYS = ['google_review_url', 'yelp_review_url'] as const;
+const SETTINGS_KEYS = [
+  'google_review_url',
+  'yelp_review_url',
+  'google_review_rating',
+  'google_review_count',
+  'google_reviews_updated_at',
+  'yelp_review_rating',
+  'yelp_review_count',
+] as const;
 
 const DEFAULTS: ReviewSettings = {
   google_review_url: '',
   yelp_review_url: '',
+  google_review_rating: '',
+  google_review_count: '',
+  google_reviews_updated_at: '',
+  yelp_review_rating: '',
+  yelp_review_count: '',
 };
 
 /** Unwrap JSONB string value — handles both raw strings and JSON-encoded strings */
@@ -36,8 +54,11 @@ function unwrapValue(val: unknown): string {
 export default function ReviewsSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingYelp, setSavingYelp] = useState(false);
   const [settings, setSettings] = useState<ReviewSettings>(DEFAULTS);
   const [initial, setInitial] = useState<ReviewSettings>(DEFAULTS);
+  const [yelpRating, setYelpRating] = useState('');
+  const [yelpCount, setYelpCount] = useState('');
   const { enabled: reviewsEnabled, loading: flagLoading } = useFeatureFlag(
     FEATURE_FLAGS.GOOGLE_REVIEW_REQUESTS
   );
@@ -68,6 +89,8 @@ export default function ReviewsSettingsPage() {
 
       setSettings(loaded);
       setInitial(loaded);
+      setYelpRating(loaded.yelp_review_rating);
+      setYelpCount(loaded.yelp_review_count);
       setLoading(false);
     }
     load();
@@ -77,7 +100,9 @@ export default function ReviewsSettingsPage() {
     setSaving(true);
     const supabase = createClient();
 
-    for (const key of SETTINGS_KEYS) {
+    const keysToSave = ['google_review_url', 'yelp_review_url'] as const;
+
+    for (const key of keysToSave) {
       const { error } = await supabase
         .from('business_settings')
         .upsert(
@@ -95,6 +120,44 @@ export default function ReviewsSettingsPage() {
     toast.success('Review settings updated');
     setInitial({ ...settings });
     setSaving(false);
+  }
+
+  async function handleSaveYelp() {
+    setSavingYelp(true);
+    const supabase = createClient();
+
+    const updates = [
+      { key: 'yelp_review_rating', value: yelpRating },
+      { key: 'yelp_review_count', value: yelpCount },
+    ];
+
+    for (const { key, value } of updates) {
+      const { error } = await supabase
+        .from('business_settings')
+        .upsert(
+          { key, value: value as unknown, updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        );
+
+      if (error) {
+        toast.error(`Failed to save ${key}`);
+        setSavingYelp(false);
+        return;
+      }
+    }
+
+    toast.success('Yelp review data updated');
+    setSettings((prev) => ({
+      ...prev,
+      yelp_review_rating: yelpRating,
+      yelp_review_count: yelpCount,
+    }));
+    setInitial((prev) => ({
+      ...prev,
+      yelp_review_rating: yelpRating,
+      yelp_review_count: yelpCount,
+    }));
+    setSavingYelp(false);
   }
 
   if (loading) {
@@ -196,7 +259,93 @@ export default function ReviewsSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Card 2: Google Review Requests */}
+      {/* Card 2: Website Review Data */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Website Review Data</CardTitle>
+          <p className="text-sm text-gray-600 mt-2">
+            These values are displayed on the public website (trust bar, review cards, JSON-LD).
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Google Section (Read-Only) */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-900">Google Reviews</h3>
+              {settings.google_review_rating && settings.google_review_count ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                    <span className="text-2xl font-bold text-gray-900">
+                      {settings.google_review_rating}
+                    </span>
+                    <span className="text-gray-600">·</span>
+                    <span className="text-gray-700">
+                      {settings.google_review_count} reviews
+                    </span>
+                  </div>
+                  {settings.google_reviews_updated_at ? (
+                    <p className="text-xs text-gray-500">
+                      Last updated:{' '}
+                      {new Date(settings.google_reviews_updated_at).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500">Auto-refreshes daily</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">No Google review data available</p>
+              )}
+            </div>
+
+            {/* Yelp Section (Editable) */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-900">Yelp Reviews (Manual)</h3>
+              <FormField
+                label="Rating"
+                htmlFor="yelp_rating"
+                description="Enter Yelp rating (0-5)"
+              >
+                <Input
+                  id="yelp_rating"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="5"
+                  value={yelpRating}
+                  onChange={(e) => setYelpRating(e.target.value)}
+                  placeholder="5.0"
+                />
+              </FormField>
+              <FormField label="Review Count" htmlFor="yelp_count">
+                <Input
+                  id="yelp_count"
+                  type="number"
+                  min="0"
+                  value={yelpCount}
+                  onChange={(e) => setYelpCount(e.target.value)}
+                  placeholder="84"
+                />
+              </FormField>
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleSaveYelp}
+                  disabled={savingYelp}
+                  size="sm"
+                >
+                  {savingYelp ? 'Saving...' : 'Save Yelp Data'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Card 3: Google Review Requests */}
       <Card>
         <CardHeader>
           <CardTitle>Google Review Requests</CardTitle>

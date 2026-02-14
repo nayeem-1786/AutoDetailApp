@@ -5,6 +5,7 @@ import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
+import { getTeamData } from '@/lib/data/team';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { HeroSection } from '@/components/public/hero-section';
@@ -60,10 +61,11 @@ const differentiators = [
 ] as const;
 
 export default async function HomePage() {
-  const [categories, businessInfo, reviews] = await Promise.all([
+  const [categories, businessInfo, reviews, teamData] = await Promise.all([
     getServiceCategories(),
     getBusinessInfo(),
     getReviewData(),
+    getTeamData(),
   ]);
 
   return (
@@ -150,6 +152,96 @@ export default async function HomePage() {
           </HomeAnimations>
         </div>
       </section>
+
+      {/* Meet the Team */}
+      {teamData.members.length > 0 && (
+        <section className="bg-white dark:bg-gray-900 section-spacing">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <HomeAnimations type="section-header">
+              <div className="text-center">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+                  Meet the Team
+                </h2>
+                {teamData.aboutText && (
+                  <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-400">
+                    {teamData.aboutText}
+                  </p>
+                )}
+              </div>
+            </HomeAnimations>
+
+            <HomeAnimations type="stagger-grid" className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              {teamData.members.map((member, i) => {
+                const initials = member.name
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2);
+
+                return (
+                  <div key={i} className="text-center">
+                    <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+                      {member.photoUrl ? (
+                        <img
+                          src={member.photoUrl}
+                          alt={member.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-3xl font-bold text-white">
+                          {initials}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-4 font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      {member.name}
+                    </h3>
+                    <p className="text-sm font-medium text-brand-600 dark:text-brand-400">
+                      {member.role}
+                    </p>
+                    {member.bio && (
+                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                        {member.bio}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </HomeAnimations>
+
+            {teamData.credentials.length > 0 && (
+              <HomeAnimations type="section-header">
+                <div className="mt-12 border-t border-gray-200 dark:border-gray-800 pt-8">
+                  <div className="flex flex-wrap justify-center gap-8 items-center">
+                    {teamData.credentials.map((cred, i) => (
+                      <div key={i} className="flex items-center gap-3 text-center">
+                        {cred.imageUrl && (
+                          <img
+                            src={cred.imageUrl}
+                            alt={cred.title}
+                            className="h-12 w-auto object-contain"
+                          />
+                        )}
+                        <div className="text-left">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {cred.title}
+                          </p>
+                          {cred.description && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {cred.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </HomeAnimations>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Google Review Cards */}
       {reviews.google.reviews.length > 0 && (
