@@ -3,11 +3,15 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
+import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { GalleryClient } from './gallery-client';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const biz = await getBusinessInfo();
-  return {
+  const [biz, seoOverrides] = await Promise.all([
+    getBusinessInfo(),
+    getPageSeo('/gallery'),
+  ]);
+  const auto: Metadata = {
     title: `${biz.name} — Before & After Gallery | Auto Detailing Results`,
     description: `See the incredible transformations at ${biz.name}. Browse our before and after photos of ceramic coating, paint correction, and full detail services.`,
     openGraph: {
@@ -16,6 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: 'website',
     },
   };
+  return mergeMetadata(auto, seoOverrides);
 }
 
 interface GalleryPair {
@@ -33,7 +38,6 @@ async function getGalleryData(): Promise<{
 }> {
   const supabase = createAdminClient();
 
-  // Get featured, non-internal photos
   const { data: photos, error } = await supabase
     .from('job_photos')
     .select(
@@ -49,7 +53,6 @@ async function getGalleryData(): Promise<{
 
   if (error || !photos) return { pairs: [], serviceOptions: [] };
 
-  // Group by job
   const jobMap = new Map<string, {
     job_id: string;
     vehicle: { make: string; model: string; year: number | null } | null;
@@ -80,7 +83,6 @@ async function getGalleryData(): Promise<{
     else if (photo.phase === 'completion') entry.completionPhotos.push(photo);
   }
 
-  // Only jobs with both intake + completion
   const validPairs = [...jobMap.values()]
     .filter((j) => j.intakePhotos.length > 0 && j.completionPhotos.length > 0)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -108,7 +110,7 @@ export default async function GalleryPage() {
   if (!enabled) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-24 text-center sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900">Gallery Coming Soon</h1>
+        <h1 className="font-display text-3xl font-bold text-gray-900">Gallery Coming Soon</h1>
         <p className="mt-4 text-lg text-gray-600">
           We&apos;re building a showcase of our best work at {biz.name}.
           Check back soon to see incredible before and after transformations!
@@ -119,7 +121,6 @@ export default async function GalleryPage() {
 
   const { pairs, serviceOptions } = await getGalleryData();
 
-  // JSON-LD structured data
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ImageGallery',
@@ -141,18 +142,24 @@ export default async function GalleryPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Hero */}
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
+
+      {/* Hero */}
+      <section className="bg-gradient-hero">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 text-center">
+          <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl">
             Our Work
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-blue-100/60">
             See the difference professional detailing makes. Browse our before and after gallery
             featuring ceramic coatings, paint corrections, and premium detail services.
           </p>
+          {pairs.length > 0 && (
+            <p className="mt-2 text-sm text-blue-100/40">{pairs.length} featured transformations</p>
+          )}
         </div>
+      </section>
 
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <GalleryClient initialPairs={pairs} serviceOptions={serviceOptions} />
       </div>
     </>

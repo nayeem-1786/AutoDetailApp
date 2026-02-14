@@ -45,9 +45,15 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/qbo-sync', 'qbo-sync');
   });
 
+  // Theme auto-activation — every 15 minutes
+  cron.schedule('*/15 * * * *', () => {
+    callCronEndpoint('/api/cron/theme-activation', 'theme-activation');
+  });
+
   console.log('[CRON] Scheduled jobs:');
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
   console.log('  - stock-alerts: daily at 8:00 AM PST');
   console.log('  - qbo-sync: every 30 minutes');
+  console.log('  - theme-activation: every 15 minutes');
 }

@@ -89,6 +89,8 @@ export async function getProductsByCategory(
     .select('*, product_categories!inner(*)')
     .eq('category_id', category.id)
     .eq('is_active', true)
+    .eq('show_on_website', true)
+    .order('website_sort_order', { ascending: true })
     .order('name', { ascending: true });
 
   if (prodError) {
@@ -119,6 +121,7 @@ export async function getProductBySlug(
     .select('*, product_categories!inner(*)')
     .eq('slug', productSlug)
     .eq('is_active', true)
+    .eq('show_on_website', true)
     .eq('product_categories.slug', categorySlug)
     .eq('product_categories.is_active', true)
     .single();
@@ -148,6 +151,7 @@ export async function getAllProductsForSitemap(): Promise<SitemapProduct[]> {
     .from('products')
     .select('slug, updated_at, product_categories!inner(slug)')
     .eq('is_active', true)
+    .eq('show_on_website', true)
     .eq('product_categories.is_active', true);
 
   if (error) {

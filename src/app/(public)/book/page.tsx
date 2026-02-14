@@ -13,10 +13,14 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
+import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const businessInfo = await getBusinessInfo();
-  return {
+  const [businessInfo, seoOverrides] = await Promise.all([
+    getBusinessInfo(),
+    getPageSeo('/book'),
+  ]);
+  const auto: Metadata = {
     title: `Book an Appointment | ${businessInfo.name}`,
     description:
       'Schedule your auto detailing, ceramic coating, or car care appointment online. Choose your service, pick a time, and book instantly.',
@@ -27,6 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: `${SITE_URL}/book`,
     },
   };
+  return mergeMetadata(auto, seoOverrides);
 }
 
 interface BookPageProps {

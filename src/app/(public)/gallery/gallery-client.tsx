@@ -49,14 +49,14 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
     <>
       {/* Service filter pills */}
       {serviceOptions.length > 1 && (
-        <div className="mb-8 flex flex-wrap gap-2">
+        <div className="mb-10 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => { setServiceFilter(''); setVisibleCount(ITEMS_PER_PAGE); }}
             className={cn(
-              'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+              'px-4 py-1.5 text-sm font-medium transition-colors border-b-2',
               !serviceFilter
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
             )}
           >
             All
@@ -66,10 +66,10 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
               key={s}
               onClick={() => { setServiceFilter(s); setVisibleCount(ITEMS_PER_PAGE); }}
               className={cn(
-                'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+                'px-4 py-1.5 text-sm font-medium transition-colors border-b-2',
                 serviceFilter === s
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-900'
               )}
             >
               {s}
@@ -84,7 +84,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
           <p className="text-lg text-gray-500">No photos for this service type yet.</p>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="columns-1 gap-6 sm:columns-2 lg:columns-3">
           {visible.map((pair) => {
             const vehicleStr = pair.vehicle
               ? `${pair.vehicle.year ? pair.vehicle.year + ' ' : ''}${pair.vehicle.make} ${pair.vehicle.model}`
@@ -94,7 +94,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
             return (
               <div
                 key={pair.job_id}
-                className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200"
+                className="mb-6 break-inside-avoid overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 transition-shadow hover:shadow-md"
               >
                 <div aria-label={altText}>
                   <BeforeAfterSlider
@@ -103,10 +103,10 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
                   />
                 </div>
                 <div className="px-4 py-3">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="font-display text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {pair.service_names.join(', ')}
                   </p>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                     {vehicleStr && <>{vehicleStr} · </>}
                     {getZoneLabel(pair.zone)}
                   </p>
@@ -119,10 +119,10 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
 
       {/* Load more */}
       {hasMore && (
-        <div className="mt-10 text-center">
+        <div className="mt-12 text-center">
           <button
             onClick={() => setVisibleCount((prev) => prev + ITEMS_PER_PAGE)}
-            className="rounded-full bg-gray-900 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+            className="rounded-full bg-brand-600 px-8 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
           >
             Load More
           </button>

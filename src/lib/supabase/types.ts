@@ -138,6 +138,7 @@ export interface ProductImage {
   product_id: string;
   image_url: string;
   storage_path: string;
+  alt_text: string | null;
   sort_order: number;
   is_primary: boolean;
   created_at: string;
@@ -160,8 +161,12 @@ export interface Product {
   is_taxable: boolean;
   is_loyalty_eligible: boolean;
   image_url: string | null;
+  image_alt: string | null;
   barcode: string | null;
   is_active: boolean;
+  show_on_website: boolean;
+  is_featured: boolean;
+  website_sort_order: number;
   created_at: string;
   updated_at: string;
   // Joined relations
@@ -202,7 +207,10 @@ export interface Service {
   vehicle_compatibility: VehicleType[];
   special_requirements: string | null;
   image_url: string | null;
+  image_alt: string | null;
   is_active: boolean;
+  show_on_website: boolean;
+  is_featured: boolean;
   display_order: number;
   created_at: string;
   updated_at: string;
@@ -970,6 +978,175 @@ export interface JobAddon {
   customer_notified_via: string[];
   created_by: string | null;
   created_at: string;
+}
+
+// CMS types
+
+export type HeroSlideContentType = 'image' | 'video' | 'before_after';
+export type HeroSlideTextAlignment = 'left' | 'center' | 'right';
+export type TickerPlacement = 'top_bar' | 'section';
+export type TickerScrollSpeed = 'slow' | 'normal' | 'fast';
+export type TickerFontSize = 'xs' | 'sm' | 'base' | 'lg';
+export type AdSize = '728x90' | '300x250' | '336x280' | '160x600' | '300x600' | '320x50' | '320x100' | '970x90' | '970x250' | '250x250';
+export type AdDevice = 'all' | 'desktop' | 'mobile';
+export type AdEventType = 'impression' | 'click';
+export type ParticleEffect = 'snowfall' | 'fireworks' | 'confetti' | 'hearts' | 'leaves' | 'stars' | 'sparkles';
+export type PageSeoType = 'homepage' | 'service_category' | 'service_detail' | 'product_category' | 'product_detail' | 'gallery' | 'booking' | 'city_landing' | 'custom';
+
+export interface HeroSlide {
+  id: string;
+  title: string | null;
+  subtitle: string | null;
+  cta_text: string | null;
+  cta_url: string | null;
+  content_type: HeroSlideContentType;
+  image_url: string | null;
+  image_url_mobile: string | null;
+  image_alt: string | null;
+  video_url: string | null;
+  video_thumbnail_url: string | null;
+  before_image_url: string | null;
+  after_image_url: string | null;
+  before_label: string | null;
+  after_label: string | null;
+  overlay_opacity: number;
+  text_alignment: HeroSlideTextAlignment;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HeroCarouselConfig {
+  mode: 'carousel' | 'single';
+  interval_ms: number;
+  transition: 'fade' | 'slide';
+  pause_on_hover: boolean;
+}
+
+export interface AnnouncementTicker {
+  id: string;
+  message: string;
+  link_url: string | null;
+  link_text: string | null;
+  placement: TickerPlacement;
+  section_position: string | null;
+  bg_color: string;
+  text_color: string;
+  scroll_speed: TickerScrollSpeed;
+  font_size: TickerFontSize;
+  target_pages: string[];
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdCreative {
+  id: string;
+  name: string;
+  image_url: string;
+  image_url_mobile: string | null;
+  link_url: string | null;
+  alt_text: string | null;
+  ad_size: AdSize;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  impression_count: number;
+  click_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdPlacement {
+  id: string;
+  ad_creative_id: string;
+  page_path: string;
+  zone_id: string;
+  device: AdDevice;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  ad_creative?: AdCreative;
+}
+
+export interface AdEvent {
+  id: string;
+  ad_creative_id: string;
+  ad_placement_id: string | null;
+  event_type: AdEventType;
+  page_path: string | null;
+  zone_id: string | null;
+  ip_hash: string | null;
+  created_at: string;
+}
+
+export interface SeasonalTheme {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  color_overrides: Record<string, string>;
+  gradient_overrides: Record<string, string>;
+  particle_effect: ParticleEffect | null;
+  particle_intensity: number;
+  particle_color: string | null;
+  ticker_message: string | null;
+  ticker_bg_color: string | null;
+  ticker_text_color: string | null;
+  themed_ad_creative_id: string | null;
+  hero_bg_image_url: string | null;
+  body_bg_color: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  auto_activate: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PageSeo {
+  id: string;
+  page_path: string;
+  page_type: PageSeoType | null;
+  seo_title: string | null;
+  meta_description: string | null;
+  meta_keywords: string | null;
+  og_title: string | null;
+  og_description: string | null;
+  og_image_url: string | null;
+  canonical_url: string | null;
+  robots_directive: string;
+  structured_data_overrides: Record<string, unknown> | null;
+  focus_keyword: string | null;
+  internal_links: Array<{ text: string; url: string }> | null;
+  is_auto_generated: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CityLandingPage {
+  id: string;
+  city_name: string;
+  slug: string;
+  state: string;
+  distance_miles: number | null;
+  heading: string | null;
+  intro_text: string | null;
+  service_highlights: unknown | null;
+  local_landmarks: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  focus_keywords: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // Generic action result pattern

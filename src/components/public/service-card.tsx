@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { Clock, Car, ArrowRight } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils/format';
 import type { Service } from '@/lib/supabase/types';
@@ -70,38 +69,38 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
 
   return (
     <Link href={`/services/${categorySlug}/${service.slug}`} className="group block">
-      <Card className="h-full transition-shadow hover:shadow-md">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <CardTitle className="group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
-              {service.name}
-            </CardTitle>
-            <ArrowRight className="ml-3 mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+      <div className="h-full rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 transition-shadow hover:shadow-md">
+        <div className="flex items-start justify-between">
+          <h3 className="font-display text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-brand-600 transition-colors">
+            {service.name}
+          </h3>
+          <div className="ml-3 flex-shrink-0 text-gray-400 group-hover:text-brand-600 transition-colors">
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </div>
-          {service.description && (
-            <CardDescription className="mt-1.5">
-              {truncateDescription(service.description)}
-            </CardDescription>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              {priceDisplay}
-            </span>
-            <Badge variant="secondary">
-              <Clock className="mr-1 h-3 w-3" />
-              {service.base_duration_minutes} min
+        </div>
+
+        {service.description && (
+          <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+            {truncateDescription(service.description)}
+          </p>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-lg font-bold text-brand-600">
+            {priceDisplay}
+          </span>
+          <Badge variant="secondary" className="text-xs">
+            <Clock className="mr-1 h-3 w-3" />
+            {service.base_duration_minutes} min
+          </Badge>
+          {service.mobile_eligible && (
+            <Badge variant="info" className="text-xs">
+              <Car className="mr-1 h-3 w-3" />
+              Mobile
             </Badge>
-            {service.mobile_eligible && (
-              <Badge variant="info">
-                <Car className="mr-1 h-3 w-3" />
-                Mobile
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </div>
     </Link>
   );
 }

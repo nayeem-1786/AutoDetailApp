@@ -124,6 +124,58 @@ export const SIDEBAR_NAV: NavItem[] = [
     icon: 'Camera',
   },
   {
+    label: 'Website',
+    href: '/admin/website',
+    icon: 'Globe',
+    children: [
+      {
+        label: 'Hero',
+        href: '/admin/website/hero',
+        icon: 'Image',
+      },
+      {
+        label: 'Tickers',
+        href: '/admin/website/tickers',
+        icon: 'Megaphone',
+      },
+      {
+        label: 'Ads',
+        href: '/admin/website/ads',
+        icon: 'RectangleHorizontal',
+      },
+      {
+        label: 'Themes',
+        href: '/admin/website/themes',
+        icon: 'Palette',
+      },
+      {
+        label: 'About & Team',
+        href: '/admin/website/about',
+        icon: 'Users',
+      },
+      {
+        label: 'Catalog Display',
+        href: '/admin/website/catalog',
+        icon: 'LayoutGrid',
+      },
+      {
+        label: 'SEO',
+        href: '/admin/website/seo',
+        icon: 'Search',
+      },
+      {
+        label: 'City Pages',
+        href: '/admin/website/seo/cities',
+        icon: 'MapPin',
+      },
+      {
+        label: 'Terms & Conditions',
+        href: '/admin/website/terms',
+        icon: 'FileText',
+      },
+    ],
+  },
+  {
     label: 'Staff',
     href: '/admin/staff',
     icon: 'UserCog',

@@ -114,6 +114,7 @@ export async function getServicesByCategory(
     )
     .eq('category_id', category.id)
     .eq('is_active', true)
+    .eq('show_on_website', true)
     .order('display_order', { ascending: true });
 
   if (svcError) {
@@ -162,6 +163,7 @@ export async function getServiceBySlug(
     )
     .eq('slug', serviceSlug)
     .eq('is_active', true)
+    .eq('show_on_website', true)
     .eq('service_categories.slug', categorySlug)
     .eq('service_categories.is_active', true)
     .single();
@@ -203,6 +205,7 @@ export async function getAllServicesForSitemap(): Promise<SitemapService[]> {
       'slug, updated_at, service_categories!inner(slug)'
     )
     .eq('is_active', true)
+    .eq('show_on_website', true)
     .eq('service_categories.is_active', true);
 
   if (error) {

@@ -20,8 +20,16 @@ function localBusinessReference(business: BusinessInfo) {
 // Returns a LocalBusiness (AutoRepair subtype) JSON-LD object.
 // ---------------------------------------------------------------------------
 
-export function generateLocalBusinessSchema(business: BusinessInfo) {
-  return {
+interface ReviewData {
+  rating?: string;
+  count?: string;
+}
+
+export function generateLocalBusinessSchema(
+  business: BusinessInfo,
+  reviewData?: { google?: ReviewData; yelp?: ReviewData }
+) {
+  const schema: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'AutoRepair',
     name: business.name,
@@ -38,16 +46,35 @@ export function generateLocalBusinessSchema(business: BusinessInfo) {
     priceRange: '$$',
     areaServed: [
       {
-        '@type': 'Place',
-        name: 'South Bay',
+        '@type': 'GeoCircle',
+        geoMidpoint: {
+          '@type': 'GeoCoordinates',
+          latitude: 33.7922,
+          longitude: -118.3151,
+        },
+        geoRadius: '5 mi',
       },
       {
         '@type': 'Place',
-        name: 'Los Angeles',
+        name: 'South Bay, Los Angeles',
       },
     ],
     sameAs: [],
   };
+
+  // Add AggregateRating from Google reviews if available
+  const gRating = parseFloat(reviewData?.google?.rating ?? '');
+  const gCount = parseInt(reviewData?.google?.count ?? '', 10);
+  if (!isNaN(gRating) && !isNaN(gCount) && gCount > 0) {
+    schema.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: gRating.toFixed(1),
+      reviewCount: gCount,
+      bestRating: '5',
+    };
+  }
+
+  return schema;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +210,96 @@ export function generateProductSchema(
         : 'https://schema.org/OutOfStock',
       url,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// generateServiceFaqSchema
+// Returns a FAQPage JSON-LD object with common questions about a service.
+// ---------------------------------------------------------------------------
+
+export function generateServiceFaqSchema(
+  service: Service & { service_pricing?: ServicePricing[] },
+  categoryName: string,
+  businessName: string
+) {
+  const serviceName = service.name;
+  const mobileText = service.mobile_eligible
+    ? `Yes, ${serviceName} is available as a mobile service. Our technicians will come to your home or office with all the equipment needed.`
+    : `${serviceName} is currently offered at our shop location only. Please visit us for this service.`;
+
+  // Build duration text
+  let durationText = 'The duration varies based on vehicle size and condition.';
+  if (service.base_duration_minutes > 0) {
+    if (service.base_duration_minutes >= 60) {
+      const hours = Math.floor(service.base_duration_minutes / 60);
+      const mins = service.base_duration_minutes % 60;
+      durationText = `${serviceName} typically takes about ${hours} hour${hours > 1 ? 's' : ''}${mins > 0 ? ` and ${mins} minutes` : ''}. Actual time may vary based on vehicle size and condition.`;
+    } else {
+      durationText = `${serviceName} typically takes about ${service.base_duration_minutes} minutes. Actual time may vary based on vehicle size and condition.`;
+    }
+  }
+
+  // Build pricing answer
+  let pricingAnswer = `Pricing for ${serviceName} depends on your vehicle and specific needs. Contact ${businessName} for a personalized quote.`;
+  const offers = buildServiceOffers(service);
+  if (offers) {
+    if (offers['@type'] === 'AggregateOffer') {
+      pricingAnswer = `${serviceName} ranges from ${formatCurrency(offers.lowPrice as number)} to ${formatCurrency(offers.highPrice as number)}, depending on vehicle size. Contact ${businessName} for exact pricing for your vehicle.`;
+    } else if (offers.price != null) {
+      const price = offers.price as number;
+      if (offers.description && (offers.description as string).startsWith('Starting')) {
+        pricingAnswer = `${serviceName} starts at ${formatCurrency(price)}. Final pricing depends on your vehicle's size and condition.`;
+      } else {
+        pricingAnswer = `${serviceName} is priced at ${formatCurrency(price)}. Contact ${businessName} for any additional details.`;
+      }
+    }
+  }
+
+  // Build description of what's included
+  const includesAnswer = service.description
+    ? `${service.description} For full details on what's included, visit our ${serviceName} page or contact us directly.`
+    : `${serviceName} is a professional ${categoryName.toLowerCase()} service offered by ${businessName}. Contact us for full details on what's included.`;
+
+  const questions = [
+    {
+      '@type': 'Question',
+      name: `How much does ${serviceName} cost?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: pricingAnswer,
+      },
+    },
+    {
+      '@type': 'Question',
+      name: `How long does ${serviceName} take?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: durationText,
+      },
+    },
+    {
+      '@type': 'Question',
+      name: `Is ${serviceName} available as a mobile service?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: mobileText,
+      },
+    },
+    {
+      '@type': 'Question',
+      name: `What's included in ${serviceName}?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: includesAnswer,
+      },
+    },
+  ];
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: questions,
   };
 }
 

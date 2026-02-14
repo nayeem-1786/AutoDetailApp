@@ -200,6 +200,7 @@ export const PERMISSION_CATEGORIES = [
   'Reports',
   'Staff Management',
   'Settings',
+  'Website',
 ] as const;
 
 export type PermissionCategory = typeof PERMISSION_CATEGORIES[number];
@@ -221,6 +222,10 @@ export const FEATURE_FLAGS = {
   QBO_ENABLED: 'qbo_enabled',
   ONLINE_STORE: 'online_store',
   INVENTORY_MANAGEMENT: 'inventory_management',
+  HERO_CAROUSEL: 'hero_carousel',
+  ANNOUNCEMENT_TICKERS: 'announcement_tickers',
+  AD_PLACEMENTS: 'ad_placements',
+  SEASONAL_THEMES: 'seasonal_themes',
 } as const;
 
 // Messaging

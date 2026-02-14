@@ -557,6 +557,45 @@ export default function ProductDetailPage() {
               onReorder={handleReorder}
               disabled={saving}
             />
+
+            {/* Alt text inputs for each image */}
+            {productImages.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <p className="text-xs font-medium text-gray-500">Image Alt Text (for SEO and accessibility)</p>
+                {[...productImages].sort((a, b) => a.sort_order - b.sort_order).map((image, index) => (
+                  <div key={image.id} className="flex items-center gap-3">
+                    <img
+                      src={image.image_url}
+                      alt={image.alt_text ?? `Image ${index + 1}`}
+                      className="h-8 w-8 rounded object-cover flex-shrink-0"
+                    />
+                    <Input
+                      defaultValue={image.alt_text ?? ''}
+                      placeholder={`${product?.name ?? 'Product'} - image ${index + 1}`}
+                      className="text-sm"
+                      onBlur={async (e) => {
+                        const newAlt = e.target.value.trim() || null;
+                        if (newAlt === (image.alt_text ?? null)) return;
+                        const { error } = await supabase
+                          .from('product_images')
+                          .update({ alt_text: newAlt })
+                          .eq('id', image.id);
+                        if (error) {
+                          toast.error('Failed to update alt text');
+                        } else {
+                          setProductImages(prev =>
+                            prev.map(i => i.id === image.id ? { ...i, alt_text: newAlt } : i)
+                          );
+                        }
+                      }}
+                    />
+                    {image.is_primary && (
+                      <Badge variant="secondary" className="flex-shrink-0 text-[10px]">Primary</Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

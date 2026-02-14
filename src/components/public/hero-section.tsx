@@ -1,39 +1,73 @@
 import Link from 'next/link';
-import { cn } from '@/lib/utils/cn';
+import { Star } from 'lucide-react';
+import { getReviewData } from '@/lib/data/reviews';
+import { getHeroBeforeAfter } from '@/lib/data/featured-photos';
+import { HeroClient } from './hero-client';
 
-export function HeroSection() {
+export async function HeroSection() {
+  const [reviews, heroPhoto] = await Promise.all([
+    getReviewData(),
+    getHeroBeforeAfter(),
+  ]);
+
   return (
-    <section className="bg-gradient-to-br from-gray-900 to-gray-800">
-      <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8 lg:py-36">
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Professional Auto Detailing in Lomita, CA
-          </h1>
-          <p className="mt-6 text-lg leading-8 text-gray-300">
-            Expert ceramic coatings, paint correction, interior detailing, and car
-            care. Mobile detailing available throughout the South Bay.
-          </p>
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link
-              href="/services"
-              className={cn(
-                'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors',
-                'border border-white text-white hover:bg-white hover:text-gray-900',
-                'h-11 px-8'
-              )}
-            >
-              View Services
-            </Link>
-            <Link
-              href="/book"
-              className={cn(
-                'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors',
-                'bg-white text-gray-900 hover:bg-gray-100',
-                'h-11 px-8'
-              )}
-            >
-              Book Appointment
-            </Link>
+    <section className="relative bg-gradient-hero overflow-hidden">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          {/* Left — Text */}
+          <div>
+            <h1 className="font-display text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
+              Premium Mobile
+              <br />
+              Detailing
+            </h1>
+
+            {/* Inline review stats */}
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-blue-100/70">
+              <span className="flex items-center gap-1">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                <span className="font-semibold text-white">{reviews.google.rating}</span>
+                <span>&middot; {reviews.google.count} Google Reviews</span>
+              </span>
+              <span className="hidden sm:inline text-white/30">|</span>
+              <span className="flex items-center gap-1">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                <span className="font-semibold text-white">{reviews.yelp.rating}</span>
+                <span>&middot; {reviews.yelp.count} Yelp Reviews</span>
+              </span>
+            </div>
+
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-blue-100/60">
+              Expert ceramic coatings, paint correction, and premium detailing.
+              We bring showroom results directly to your doorstep.
+            </p>
+
+            <div className="mt-8">
+              <Link
+                href="/book"
+                className="inline-flex items-center justify-center rounded-full bg-white text-navy font-semibold text-base h-13 px-8 shadow-lg shadow-white/15 hover:shadow-xl hover:shadow-white/20 hover:-translate-y-0.5 transition-all duration-300"
+              >
+                Book Appointment
+              </Link>
+            </div>
+          </div>
+
+          {/* Right — Before/After Slider or placeholder */}
+          <div className="hidden lg:block">
+            {heroPhoto ? (
+              <div className="overflow-hidden rounded-2xl shadow-2xl shadow-black/40">
+                <HeroClient
+                  beforeSrc={heroPhoto.beforeUrl}
+                  afterSrc={heroPhoto.afterUrl}
+                  vehicleInfo={heroPhoto.vehicleInfo}
+                  serviceName={heroPhoto.serviceName}
+                />
+              </div>
+            ) : (
+              <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 flex items-center justify-center">
+                <p className="text-sm text-white/30">Before &amp; After showcase</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

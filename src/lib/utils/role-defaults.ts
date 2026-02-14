@@ -88,6 +88,13 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'settings.audit_log': true,
     'settings.api_keys': true,
     'settings.backup_export': true,
+    'cms.hero.manage': true,
+    'cms.tickers.manage': true,
+    'cms.ads.manage': true,
+    'cms.themes.manage': true,
+    'cms.about.manage': true,
+    'cms.catalog_display.manage': true,
+    'cms.seo.manage': true,
   },
 
   admin: {
@@ -173,6 +180,13 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'settings.audit_log': false,
     'settings.api_keys': false,
     'settings.backup_export': false,
+    'cms.hero.manage': true,
+    'cms.tickers.manage': true,
+    'cms.ads.manage': true,
+    'cms.themes.manage': true,
+    'cms.about.manage': true,
+    'cms.catalog_display.manage': true,
+    'cms.seo.manage': true,
   },
 
   cashier: {
@@ -258,6 +272,13 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'settings.audit_log': false,
     'settings.api_keys': false,
     'settings.backup_export': false,
+    'cms.hero.manage': false,
+    'cms.tickers.manage': false,
+    'cms.ads.manage': false,
+    'cms.themes.manage': false,
+    'cms.about.manage': false,
+    'cms.catalog_display.manage': false,
+    'cms.seo.manage': false,
   },
 
   detailer: {
@@ -343,5 +364,12 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'settings.audit_log': false,
     'settings.api_keys': false,
     'settings.backup_export': false,
+    'cms.hero.manage': false,
+    'cms.tickers.manage': false,
+    'cms.ads.manage': false,
+    'cms.themes.manage': false,
+    'cms.about.manage': false,
+    'cms.catalog_display.manage': false,
+    'cms.seo.manage': false,
   },
 };

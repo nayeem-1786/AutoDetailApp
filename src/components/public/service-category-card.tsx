@@ -1,42 +1,33 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import type { ServiceCategory } from '@/lib/supabase/types';
 
 interface ServiceCategoryCardProps {
   category: ServiceCategory;
   serviceCount?: number;
+  featured?: boolean;
 }
 
-export function ServiceCategoryCard({ category, serviceCount }: ServiceCategoryCardProps) {
+export function ServiceCategoryCard({ category, featured }: ServiceCategoryCardProps) {
   return (
-    <Link href={`/services/${category.slug}`} className="group block">
-      <Card className="h-full transition-shadow hover:shadow-md">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <CardTitle className="group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
-                {category.name}
-              </CardTitle>
-              {category.description && (
-                <CardDescription className="mt-1.5">
-                  {category.description}
-                </CardDescription>
-              )}
-            </div>
-            <ArrowRight className="ml-4 mt-1 h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+    <Link href={`/services/${category.slug}`} className="group block h-full">
+      <div className="relative h-full overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-7 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 transition-shadow duration-300 hover:shadow-md">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h3 className={`font-display font-semibold text-gray-900 dark:text-gray-100 ${featured ? 'text-xl' : 'text-lg'}`}>
+              {category.name}
+            </h3>
+            {category.description && (
+              <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2">
+                {category.description}
+              </p>
+            )}
           </div>
-        </CardHeader>
-        {typeof serviceCount === 'number' && (
-          <CardContent>
-            <Badge variant="secondary">
-              {serviceCount} {serviceCount === 1 ? 'service' : 'services'}
-            </Badge>
-          </CardContent>
-        )}
-      </Card>
+          <div className="ml-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 group-hover:text-brand-600 transition-colors">
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </div>
+        </div>
+      </div>
     </Link>
   );
 }

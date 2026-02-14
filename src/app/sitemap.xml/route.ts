@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getAllServicesForSitemap, getServiceCategories } from '@/lib/data/services';
 import { getAllProductsForSitemap, getProductCategories } from '@/lib/data/products';
+import { getActiveCities } from '@/lib/data/cities';
 
 // ---------------------------------------------------------------------------
 // Dynamic XML Sitemap
@@ -75,6 +76,24 @@ export async function GET() {
     priority: 0.8,
   });
 
+  entries.push({
+    loc: `${SITE_URL}/terms`,
+    changefreq: 'monthly',
+    priority: 0.3,
+  });
+
+  entries.push({
+    loc: `${SITE_URL}/gallery`,
+    changefreq: 'weekly',
+    priority: 0.6,
+  });
+
+  entries.push({
+    loc: `${SITE_URL}/book`,
+    changefreq: 'monthly',
+    priority: 0.7,
+  });
+
   // ---- Service category pages ----
   const serviceCategories = await getServiceCategories();
   for (const cat of serviceCategories) {
@@ -119,6 +138,21 @@ export async function GET() {
       changefreq: 'monthly',
       priority: 0.6,
     });
+  }
+
+  // ---- City landing pages ----
+  try {
+    const cities = await getActiveCities();
+    for (const city of cities) {
+      entries.push({
+        loc: `${SITE_URL}/areas/${city.slug}`,
+        lastmod: toISODate(city.updated_at),
+        changefreq: 'monthly',
+        priority: 0.8,
+      });
+    }
+  } catch {
+    // Cities table may not exist yet — skip gracefully
   }
 
   const xml = buildXml(entries);

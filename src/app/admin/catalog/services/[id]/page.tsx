@@ -107,6 +107,7 @@ export default function ServiceDetailPage() {
   // Image upload state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageAlt, setImageAlt] = useState<string>('');
 
   // Pricing state
   const [pricingValue, setPricingValue] = useState<PricingValue>(getDefaultPricingValue('vehicle_size'));
@@ -232,6 +233,7 @@ export default function ServiceDetailPage() {
 
     // Set image preview from existing URL
     if (svc.image_url) setImagePreview(svc.image_url);
+    setImageAlt(svc.image_alt ?? '');
 
     // Build pricing value from existing rows
     buildPricingValue(svc.pricing_model, pricingRes.data || [], svc);
@@ -424,6 +426,7 @@ export default function ServiceDetailPage() {
         is_active: formData.is_active,
         display_order: formData.display_order,
         image_url: imageUrl,
+        image_alt: imageAlt.trim() || null,
       };
 
       const { error } = await supabase
@@ -1020,6 +1023,22 @@ export default function ServiceDetailPage() {
                     onRemove={handleRemoveImage}
                     uploading={saving}
                   />
+                  {imagePreview && (
+                    <div className="mt-4">
+                      <FormField
+                        label="Image Alt Text"
+                        htmlFor="image_alt"
+                        description="Describes the image for search engines and accessibility"
+                      >
+                        <Input
+                          id="image_alt"
+                          value={imageAlt}
+                          onChange={(e) => setImageAlt(e.target.value)}
+                          placeholder={`${service?.name ?? 'Service'} - ${service?.service_categories?.name ?? 'Auto Detailing'}`}
+                        />
+                      </FormField>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

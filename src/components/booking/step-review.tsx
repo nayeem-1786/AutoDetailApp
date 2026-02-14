@@ -102,6 +102,7 @@ export function StepReview({
   const [couponInput, setCouponInput] = useState(couponCode ?? '');
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { enabled: cancellationFeeEnabled } = useFeatureFlag(FEATURE_FLAGS.CANCELLATION_FEE);
 
   // Loyalty points constants
@@ -729,6 +730,30 @@ export function StepReview({
           </div>
         )}
 
+        {/* Terms & Conditions Agreement */}
+        <div className="rounded-lg border border-gray-200 p-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span className="text-sm text-gray-700">
+              I agree to the{' '}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-600 hover:text-brand-700 underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Terms &amp; Conditions
+              </a>
+            </span>
+          </label>
+        </div>
+
         {/* Navigation */}
         <div className="flex justify-between">
           <Button
@@ -739,7 +764,7 @@ export function StepReview({
           >
             Back
           </Button>
-          <Button onClick={handleConfirm} disabled={submitting}>
+          <Button onClick={handleConfirm} disabled={submitting || !agreedToTerms}>
             {submitting ? (
               <>
                 <Spinner size="sm" className="text-white" />

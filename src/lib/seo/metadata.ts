@@ -117,7 +117,7 @@ export function generateProductMetadata(
   if (product.image_url) {
     metadata.openGraph = {
       ...metadata.openGraph,
-      images: [{ url: product.image_url, alt: product.name }],
+      images: [{ url: product.image_url, alt: product.image_alt ?? `${product.name} - ${businessName}` }],
     };
   }
 

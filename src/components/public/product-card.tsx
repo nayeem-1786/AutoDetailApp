@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { Package, ArrowRight } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import type { Product } from '@/lib/supabase/types';
 
@@ -19,42 +18,39 @@ function truncateDescription(text: string, maxLength: number = 120): string {
 export function ProductCard({ product, categorySlug }: ProductCardProps) {
   return (
     <Link href={`/products/${categorySlug}/${product.slug}`} className="group block">
-      <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
+      <div className="h-full overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 transition-shadow hover:shadow-md">
         {/* Image or Placeholder */}
-        <div className="relative aspect-[4/3] w-full bg-gray-100 dark:bg-gray-800">
+        <div className="relative aspect-[4/3] w-full bg-gray-50 dark:bg-gray-800 overflow-hidden">
           {product.image_url ? (
             <img
               src={product.image_url}
               alt={product.name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
               <Package className="h-12 w-12 text-gray-300 dark:text-gray-600" />
             </div>
           )}
+          {/* Price badge */}
+          <div className="absolute top-3 right-3 rounded-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm px-3 py-1 shadow-sm">
+            <span className="text-sm font-bold text-brand-600">
+              {formatCurrency(product.retail_price)}
+            </span>
+          </div>
         </div>
 
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between">
-            <CardTitle className="text-base group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
-              {product.name}
-            </CardTitle>
-            <ArrowRight className="ml-2 mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform group-hover:translate-x-1 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
-          </div>
+        <div className="p-4">
+          <h3 className="font-display text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-brand-600 transition-colors">
+            {product.name}
+          </h3>
           {product.description && (
-            <CardDescription className="mt-1">
+            <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
               {truncateDescription(product.description)}
-            </CardDescription>
+            </p>
           )}
-        </CardHeader>
-
-        <CardContent>
-          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {formatCurrency(product.retail_price)}
-          </span>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
   );
 }
