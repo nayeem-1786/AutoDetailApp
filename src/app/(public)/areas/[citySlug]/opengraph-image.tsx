@@ -29,7 +29,7 @@ export default async function CityOGImage({
   const cityName = city?.city_name ?? 'South Bay';
   const state = city?.state ?? 'CA';
 
-  const starCount = Math.round(parseFloat(reviews.google.rating));
+  const starCount = Math.round(parseFloat(reviews.google.rating || '0'));
   const stars = Array(starCount).fill(null);
 
   return new ImageResponse(
@@ -90,7 +90,7 @@ export default async function CityOGImage({
             letterSpacing: '-1px',
           }}
         >
-          Mobile Auto Detailing in {cityName}, {state}
+          {`Mobile Auto Detailing in ${cityName}, ${state}`}
         </div>
 
         {/* Review Stars */}
@@ -104,16 +104,22 @@ export default async function CityOGImage({
         >
           <div style={{ display: 'flex', gap: '4px' }}>
             {stars.map((_, i) => (
-              <span key={i} style={{ fontSize: 24, color: '#fbbf24' }}>
-                &#9733;
-              </span>
+              <div
+                key={i}
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: '#fbbf24',
+                }}
+              />
             ))}
           </div>
           <span style={{ fontSize: 20, color: '#e2e8f0', fontWeight: 600, marginLeft: 8 }}>
             {reviews.google.rating}
           </span>
-          <span style={{ fontSize: 18, color: '#64748b', marginLeft: 4 }}>
-            &middot; {reviews.google.count} Google Reviews
+          <span style={{ fontSize: 18, color: '#64748b', marginLeft: 4, display: 'flex' }}>
+            {`· ${reviews.google.count} Google Reviews`}
           </span>
         </div>
 

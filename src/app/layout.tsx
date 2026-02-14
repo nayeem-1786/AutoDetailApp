@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Urbanist, DM_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { getBusinessInfo } from "@/lib/data/business";
+import { SITE_URL } from "@/lib/utils/constants";
 import "./globals.css";
 
 const urbanist = Urbanist({
@@ -21,6 +22,7 @@ const dmSans = DM_Sans({
 export async function generateMetadata(): Promise<Metadata> {
   const businessInfo = await getBusinessInfo();
   return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || SITE_URL),
     title: businessInfo.name,
     description: `${businessInfo.name} — management platform`,
   };

@@ -13,7 +13,7 @@ export default async function OGImage() {
     getReviewData(),
   ]);
 
-  const starCount = Math.round(parseFloat(reviews.google.rating));
+  const starCount = Math.round(parseFloat(reviews.google.rating || '0'));
   const stars = Array(starCount).fill(null);
 
   return new ImageResponse(
@@ -87,15 +87,15 @@ export default async function OGImage() {
             }}
           >
             {stars.map((_, i) => (
-              <span
+              <div
                 key={i}
                 style={{
-                  fontSize: 28,
-                  color: '#fbbf24',
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  background: '#fbbf24',
                 }}
-              >
-                &#9733;
-              </span>
+              />
             ))}
           </div>
           <span
@@ -113,9 +113,10 @@ export default async function OGImage() {
               fontSize: 20,
               color: '#64748b',
               marginLeft: 4,
+              display: 'flex',
             }}
           >
-            &middot; {reviews.google.count} Google Reviews
+            {`· ${reviews.google.count} Google Reviews`}
           </span>
         </div>
 
