@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 interface BeforeAfterSliderProps {
   beforeSrc: string;
@@ -15,7 +16,7 @@ export function BeforeAfterSlider({
   beforeLabel = 'Before',
   afterLabel = 'After',
 }: BeforeAfterSliderProps) {
-  const [position, setPosition] = useState(50); // percentage 0-100
+  const [position, setPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,47 +37,29 @@ export function BeforeAfterSlider({
     return () => observer.disconnect();
   }, []);
 
-  const getPositionFromEvent = useCallback(
-    (clientX: number): number => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return 50;
-      const x = clientX - rect.left;
-      const pct = (x / rect.width) * 100;
-      return Math.max(0, Math.min(100, pct));
-    },
-    []
-  );
-
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault();
-      setIsDragging(true);
-      setPosition(getPositionFromEvent(e.clientX));
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    },
-    [getPositionFromEvent]
-  );
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!isDragging) return;
-      setPosition(getPositionFromEvent(e.clientX));
-    },
-    [isDragging, getPositionFromEvent]
-  );
-
-  const handlePointerUp = useCallback(() => {
-    setIsDragging(false);
+  const updatePosition = useCallback((clientX: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const pct = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
+    setPosition(pct);
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className="relative select-none overflow-hidden rounded-lg"
+      className="relative overflow-hidden rounded-2xl cursor-col-resize select-none group"
       style={{ touchAction: 'none' }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+        updatePosition(e.clientX);
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (isDragging) updatePosition(e.clientX);
+      }}
+      onPointerUp={() => setIsDragging(false)}
+      onPointerCancel={() => setIsDragging(false)}
     >
       {/* After image (full width, bottom layer) */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -102,31 +85,47 @@ export function BeforeAfterSlider({
         />
       </div>
 
-      {/* Divider line */}
+      {/* Divider */}
       <div
-        className="absolute bottom-0 top-0 w-0.5 bg-white shadow-lg"
+        className="absolute top-0 bottom-0 z-10"
         style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
       >
-        {/* Drag handle */}
-        <div className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-white/90 shadow-lg">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M7 4L3 10L7 16" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M13 4L17 10L13 16" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        <div className="w-0.5 h-full bg-white shadow-lg" />
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white shadow-2xl flex items-center justify-center transition-transform ${
+            isDragging ? 'scale-110' : 'group-hover:scale-105'
+          }`}
+        >
+          <div className="flex items-center gap-0.5">
+            <svg className="w-3 h-3 text-gray-700 rotate-180" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
+            </svg>
+            <svg className="w-3 h-3 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
+            </svg>
+          </div>
         </div>
       </div>
 
       {/* Labels */}
-      <div className="pointer-events-none absolute left-3 top-3">
-        <span className="rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="absolute top-4 left-4 z-20 pointer-events-none"
+      >
+        <span className="bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs font-bold uppercase tracking-wider">
           {beforeLabel}
         </span>
-      </div>
-      <div className="pointer-events-none absolute right-3 top-3">
-        <span className="rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="absolute top-4 right-4 z-20 pointer-events-none"
+      >
+        <span className="bg-red-600/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs font-bold uppercase tracking-wider">
           {afterLabel}
         </span>
-      </div>
+      </motion.div>
     </div>
   );
 }
