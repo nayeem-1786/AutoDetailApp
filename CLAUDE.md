@@ -252,7 +252,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 | Add `ANTHROPIC_API_KEY` to production environment variables | Configuration | High |
 | Edge case: customer wanting to modify an already-accepted quote — needs design | Feature | Low |
 | Add `CRON_API_KEY` to production environment variables | Configuration | High |
-| Design/UX audit — modern auto detailing aesthetic | Design | High |
+| ~~Design/UX audit — modern auto detailing aesthetic~~ | ~~Design~~ | ~~Done (Session J)~~ |
 | Add `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET` to production env vars | Configuration | High |
 
 ### Data Notes
@@ -425,7 +425,20 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-14 (Session I — AI Content Writer for City Pages)
+## Last Session: 2026-02-16 (Session J — Public Frontend Reskin)
+- **Complete visual overhaul** of all public-facing components with premium dark automotive aesthetic + framer-motion animations
+- **New dependency**: `framer-motion` for AnimatePresence, motion.div slide/fade transitions, animated labels
+- **AnnouncementTicker**: Replaced marquee with framer-motion y-axis slide rotation, 4s auto-rotate, session storage dismissal, dot indicators
+- **SiteHeader**: Split into server wrapper (`site-header.tsx`) + new client component (`header-client.tsx`). Scroll-aware backdrop blur, animated dropdown menus, mobile hamburger with motion height animation, red gradient "Book Now" CTA, utility bar with phone + "Mobile Service" info
+- **HeroCarousel**: Framer-motion slide transitions with `custom` direction, bottom-aligned content, red gradient CTAs, `overlay_opacity` 0-100 scale, first slide `<h1>` for SEO
+- **SiteFooter**: Split into server wrapper + client component (`footer-client.tsx`). Trust badges strip, 12-column grid, contact info with red accents, Google/Yelp review badges, service area city links
+- **BeforeAfterSlider**: Framer-motion animated labels (slide-in), improved drag handle with scale animations, `rounded-2xl` container, red "After" badge
+- **Dark theme scoping**: `bg-black text-white min-h-screen` wrapper on 3 layouts (public, customer-auth, account)
+- **CMS cache revalidation**: Added `revalidateTag()` calls to all CMS admin API routes for instant public page updates
+- **Orphaned files** (not deleted): `header-shell.tsx`, `mobile-menu.tsx`, `nav-dropdown.tsx` — no longer imported by site-header
+- TypeScript clean (zero errors)
+
+### Session I — 2026-02-14 (AI Content Writer for City Pages)
 - **AI Content Writer system**: Full content block management with AI generation for city landing pages and any other page type.
 - **DB schema**: `page_content_blocks` table with 5 block types (rich_text, faq, features_list, cta, testimonial_highlight), sort order, active toggle, AI tracking.
 - **Content data layer** (`src/lib/data/page-content.ts`): CRUD + reorder + bulk create functions for content blocks.
@@ -1004,7 +1017,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - TypeScript clean, committed and pushed
 
 ### Next Session Priorities
-1. Design/UX audit — modern auto detailing aesthetic (sleek, colorful, mobile-first). Must complete before Phase 9.
+1. Continue public frontend reskin — remaining pages (services, products, gallery, booking, city landing pages, about, terms)
 2. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
 3. Post-launch review (2-4 weeks after deployment) — see `docs/POST_LAUNCH_ROADMAP.md`
 

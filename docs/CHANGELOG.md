@@ -4,6 +4,76 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session J — 2026-02-16 (Public Frontend Reskin — Premium Dark Design)
+
+### Changed: Complete visual overhaul of all public-facing components
+- **Design direction**: Premium dark automotive aesthetic with framer-motion animations, scroll-aware header, animated hero carousel, and refined footer
+- **New dependency**: `framer-motion` installed for AnimatePresence, motion.div slide/fade transitions, animated labels
+
+### Component: AnnouncementTicker (`src/components/public/cms/announcement-ticker.tsx`)
+- Replaced marquee scroll with framer-motion animated rotation (y-axis slide transitions)
+- `AnimatePresence mode="wait"` with 4000ms auto-rotate interval
+- Session storage persistence for dismissal
+- Dot indicators for multiple tickers
+- Kept `TopBarTicker` and `SectionTicker` named exports, `tickers: AnnouncementTicker[]` prop interface
+
+### Component: SiteHeader (server/client split)
+- **`src/components/public/site-header.tsx`** (server wrapper): Thin async component fetching `getBusinessInfo()` and customer name via Supabase auth. Passes `navItems`, `businessName`, `phone`, `logoUrl`, `customerName` to client component
+- **`src/components/public/header-client.tsx`** (new client component): Scroll-aware backdrop blur header, animated dropdown menus, mobile hamburger with framer-motion height animation, red gradient "Book Now" CTA, desktop utility bar with phone and "Mobile Service" info, account link (Hi {name} or Sign In), logo fallback with red gradient "S" icon
+
+### Component: HeroCarousel (`src/components/public/cms/hero-carousel.tsx`)
+- Replaced CSS opacity transitions with framer-motion slide transitions using `custom` direction prop
+- Bottom-aligned content (flex items-end pb-16), red gradient CTA buttons with shadow effects
+- `overlay_opacity` correctly handled as 0-100 scale
+- First slide uses `<h1>`, subsequent slides use `<p>` for SEO
+- `<picture>` element preserved for mobile image variants
+- HeroBeforeAfter sub-component with clip-path slider
+
+### Component: SiteFooter (server/client split)
+- **`src/components/public/site-footer.tsx`** (server wrapper): Async component fetching business info, reviews, cities. Builds navColumns and reviewBadges from data
+- **`src/components/public/footer-client.tsx`** (new client component): Dark premium footer with trust badges strip (Shield, Award, Leaf, Clock icons), 12-column grid layout, contact info with red icon accents, review badges (Google/Yelp stars), service area city links, legal links bottom bar
+
+### Component: BeforeAfterSlider (`src/components/before-after-slider.tsx`)
+- Added framer-motion animated labels (slide-in from left/right)
+- Enhanced with `rounded-2xl` container, improved drag handle
+- Red "After" label badge, scale animation on drag handle (hover → scale-105, dragging → scale-110)
+- Kept named export and props: `beforeSrc`, `afterSrc`, `beforeLabel`, `afterLabel`
+
+### Dark Theme Scoping
+- `bg-black text-white min-h-screen` wrapper applied to 3 layouts:
+  - `src/app/(public)/layout.tsx`
+  - `src/app/(customer-auth)/layout.tsx`
+  - `src/app/(account)/layout.tsx`
+
+### CMS Cache Revalidation
+- Added `revalidateTag()` calls to all CMS admin API routes for instant public page updates:
+  - Hero slides, themes, navigation, pages, tickers, ads/creatives
+  - SEO pages, SEO cities, catalog (services/products/categories)
+  - About page, terms page, content blocks
+
+### Files Created
+- `src/components/public/header-client.tsx` — animated client header component
+
+### Files Modified
+- `src/components/public/cms/announcement-ticker.tsx` — framer-motion rotation
+- `src/components/public/site-header.tsx` — server wrapper for header-client
+- `src/components/public/header-client.tsx` — new animated client header
+- `src/components/public/cms/hero-carousel.tsx` — framer-motion slide transitions
+- `src/components/public/site-footer.tsx` — server wrapper for footer-client
+- `src/components/public/footer-client.tsx` — redesigned premium footer
+- `src/components/before-after-slider.tsx` — framer-motion labels + improved UX
+- `src/app/(public)/layout.tsx` — dark theme wrapper
+- `src/app/(customer-auth)/layout.tsx` — dark theme wrapper
+- `src/app/(account)/layout.tsx` — dark theme wrapper
+- Multiple CMS API routes — revalidateTag() calls added
+
+### Old Components (orphaned but not deleted)
+- `src/components/public/header-shell.tsx` — old scroll-aware header wrapper
+- `src/components/public/mobile-menu.tsx` — old mobile menu
+- `src/components/public/nav-dropdown.tsx` — old nav dropdown
+
+---
+
 ## Session I — 2026-02-14 (AI Content Writer for City Pages)
 
 ### New: AI Content Writer System
