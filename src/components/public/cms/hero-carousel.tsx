@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { BeforeAfterSlider } from '@/components/before-after-slider';
 import type { HeroSlide, HeroCarouselConfig } from '@/lib/supabase/types';
 
 interface HeroCarouselProps {
@@ -167,14 +166,12 @@ function SlideContent({ slide, isFirst }: { slide: HeroSlide; isFirst: boolean }
 
       {slide.content_type === 'before_after' && slide.before_image_url && slide.after_image_url && (
         <div className="absolute inset-0">
-          <div className="h-full w-full">
-            <BeforeAfterSlider
-              beforeSrc={slide.before_image_url}
-              afterSrc={slide.after_image_url}
-              beforeLabel={slide.before_label ?? 'Before'}
-              afterLabel={slide.after_label ?? 'After'}
-            />
-          </div>
+          <HeroBeforeAfter
+            beforeSrc={slide.before_image_url}
+            afterSrc={slide.after_image_url}
+            beforeLabel={slide.before_label ?? 'Before'}
+            afterLabel={slide.after_label ?? 'After'}
+          />
           <div
             className="absolute inset-0 pointer-events-none bg-black"
             style={{ opacity: slide.overlay_opacity / 100 }}
@@ -219,6 +216,126 @@ function SlideContent({ slide, isFirst }: { slide: HeroSlide; isFirst: boolean }
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hero Before/After Slider — contained within hero dimensions
+// Uses absolute-positioned images with object-cover so both images fill the
+// hero area identically. A clip-path on the "before" image reveals/hides
+// based on the drag position.
+// ---------------------------------------------------------------------------
+
+function HeroBeforeAfter({
+  beforeSrc,
+  afterSrc,
+  beforeLabel,
+  afterLabel,
+}: {
+  beforeSrc: string;
+  afterSrc: string;
+  beforeLabel: string;
+  afterLabel: string;
+}) {
+  const [position, setPosition] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const getPosition = useCallback((clientX: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return 50;
+    return Math.max(2, Math.min(98, ((clientX - rect.left) / rect.width) * 100));
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+      setPosition(getPosition(e.clientX));
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [getPosition]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDragging) return;
+      setPosition(getPosition(e.clientX));
+    },
+    [isDragging, getPosition]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-0 select-none"
+      style={{ touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
+      {/* After image — full background layer */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={afterSrc}
+        alt={afterLabel}
+        className="absolute inset-0 h-full w-full object-cover object-center"
+        draggable={false}
+      />
+
+      {/* Before image — clipped by slider position */}
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={beforeSrc}
+          alt={beforeLabel}
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          draggable={false}
+        />
+      </div>
+
+      {/* Draggable divider line */}
+      <div
+        className="absolute top-0 bottom-0 z-20 w-[3px] bg-white/90 shadow-[0_0_8px_rgba(0,0,0,0.4)]"
+        style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
+      >
+        {/* Grab handle */}
+        <div className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[3px] border-white bg-black/50 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 4L3 11L7 18" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M15 4L19 11L15 18" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Before label — top-left */}
+      <div
+        className="pointer-events-none absolute top-4 left-4 z-20 transition-opacity duration-200"
+        style={{ opacity: position > 10 ? 1 : 0 }}
+      >
+        <span className="rounded-md bg-black/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
+          {beforeLabel}
+        </span>
+      </div>
+
+      {/* After label — top-right */}
+      <div
+        className="pointer-events-none absolute top-4 right-4 z-20 transition-opacity duration-200"
+        style={{ opacity: position < 90 ? 1 : 0 }}
+      >
+        <span className="rounded-md bg-black/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
+          {afterLabel}
+        </span>
       </div>
     </div>
   );
