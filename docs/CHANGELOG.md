@@ -4,6 +4,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session I — 2026-02-14 (AI Content Writer for City Pages)
+
+### New: AI Content Writer System
+- **Content blocks schema** (`page_content_blocks` table): 5 block types (rich_text, faq, features_list, cta, testimonial_highlight), per-page ordering, active/inactive toggle, AI generation tracking. RLS: public read active blocks, authenticated manage.
+- **Content data layer** (`src/lib/data/page-content.ts`): CRUD functions for content blocks — `getPageContentBlocks()` (public), `getPageContentBlocksAdmin()` (all), `createContentBlock()`, `updateContentBlock()`, `deleteContentBlock()`, `reorderContentBlocks()`, `bulkCreateContentBlocks()`.
+- **AI Content Writer service** (`src/lib/services/ai-content-writer.ts`): Claude API integration for content generation. Context-aware prompts for city pages, service pages, and custom pages. Modes: full_page (multi-block), single_block, improve. Uses business info, city data, service data, and focus keywords for context.
+- **Content API routes**: CRUD at `/api/admin/cms/content` (list + create), `/api/admin/cms/content/[id]` (get + patch + delete), `/api/admin/cms/content/reorder` (patch). AI generation at `/api/admin/cms/content/ai-generate` with 4 modes: full_page, single_block, improve, batch_cities.
+- **Public content rendering** (`src/components/public/content-block-renderer.tsx`): Server Component rendering 5 block types — RichTextBlock (markdown→HTML), FaqBlock (accordion + FAQPage JSON-LD schema), FeaturesListBlock (grid cards), CtaBlock (gradient banner), TestimonialBlock (styled quote). `ContentBlocks` wrapper renders list with section spacing.
+- **City page integration**: Content blocks rendered on public city landing pages between service highlights and reviews sections.
+- **Admin content editors**: Markdown editor with toolbar (bold, italic, headings, links, lists) + live preview + word count + AI improve. FAQ editor with drag-reorder + AI generate. Features list, CTA, and testimonial editors with structured form fields.
+- **Content Block Editor** (`src/components/admin/content/content-block-editor.tsx`): Full block management component — add/delete/reorder blocks, type-specific inline editors, per-block AI improve, full-page AI generate, drag-and-drop reordering.
+- **City pages admin**: "Edit Content" button per city, "Generate All Content" batch button for AI content generation across all cities without content.
+- **SEO page integration**: Collapsible "Page Content Blocks" section in each page's expanded editor, allowing content block management for any page type.
+
+### Files Created
+- `supabase/migrations/20260214000010_page_content_blocks.sql` — content blocks table + RLS
+- `src/lib/data/page-content.ts` — content block data layer
+- `src/lib/services/ai-content-writer.ts` — AI content writer service
+- `src/app/api/admin/cms/content/route.ts` — content blocks list + create
+- `src/app/api/admin/cms/content/[id]/route.ts` — content block CRUD
+- `src/app/api/admin/cms/content/reorder/route.ts` — reorder blocks
+- `src/app/api/admin/cms/content/ai-generate/route.ts` — AI content generation
+- `src/components/public/content-block-renderer.tsx` — public content block renderer
+- `src/components/admin/content/markdown-editor.tsx` — markdown editor with toolbar
+- `src/components/admin/content/faq-editor.tsx` — FAQ Q&A pair editor
+- `src/components/admin/content/content-block-editor.tsx` — admin content block management
+
+### Files Modified
+- `src/lib/supabase/types.ts` — `PageContentBlock` interface, `ContentBlockType` type, `body_content` on `CityLandingPage`
+- `src/app/(public)/areas/[citySlug]/page.tsx` — content blocks fetch + render
+- `src/app/admin/website/seo/cities/page.tsx` — content editor dialog, batch generate button
+- `src/app/admin/website/seo/page.tsx` — page content blocks section in PageEditor
+
+---
+
 ## Session H — 2026-02-14 (AI-Powered SEO Agent)
 
 ### New: AI SEO Generation System

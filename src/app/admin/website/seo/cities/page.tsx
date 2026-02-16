@@ -14,7 +14,10 @@ import {
   Trash2,
   ExternalLink,
   X,
+  FileText,
+  Wand2,
 } from 'lucide-react';
+import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import type { CityLandingPage } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -86,6 +89,9 @@ export default function CitiesAdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CityFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [contentCitySlug, setContentCitySlug] = useState<string | null>(null);
+  const [contentCityName, setContentCityName] = useState<string>('');
+  const [batchGenerating, setBatchGenerating] = useState(false);
 
   // -----------------------------------------------------------------------
   // Data loading
@@ -231,6 +237,48 @@ export default function CitiesAdminPage() {
   };
 
   // -----------------------------------------------------------------------
+  // Open content editor
+  // -----------------------------------------------------------------------
+
+  const openContentEditor = (city: CityLandingPage) => {
+    setContentCitySlug(city.slug);
+    setContentCityName(city.city_name);
+  };
+
+  // -----------------------------------------------------------------------
+  // Batch generate content for all cities
+  // -----------------------------------------------------------------------
+
+  const handleBatchGenerate = async () => {
+    if (!confirm('Generate AI content for all cities that don\'t have content blocks yet? This may take a few minutes.')) {
+      return;
+    }
+
+    setBatchGenerating(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/content/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'batch_cities' }),
+      });
+
+      if (!res.ok) throw new Error('Failed');
+      const json = await res.json();
+      const { totalCities, successCount, message } = json.data;
+
+      if (message) {
+        toast.info(message);
+      } else {
+        toast.success(`Generated content for ${successCount} of ${totalCities} cities`);
+      }
+    } catch {
+      toast.error('Batch content generation failed');
+    } finally {
+      setBatchGenerating(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
 
@@ -248,10 +296,24 @@ export default function CitiesAdminPage() {
         title="City Landing Pages"
         description="Manage SEO landing pages for service areas"
         action={
-          <Button onClick={openAddDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add City
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleBatchGenerate}
+              disabled={batchGenerating}
+            >
+              {batchGenerating ? (
+                <Spinner size="sm" className="mr-2" />
+              ) : (
+                <Wand2 className="mr-2 h-4 w-4" />
+              )}
+              Generate All Content
+            </Button>
+            <Button onClick={openAddDialog}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add City
+            </Button>
+          </div>
         }
       />
 
@@ -277,6 +339,9 @@ export default function CitiesAdminPage() {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Distance
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Content
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Status
@@ -307,6 +372,16 @@ export default function CitiesAdminPage() {
                     {city.distance_miles != null
                       ? `${city.distance_miles} mi`
                       : '--'}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => openContentEditor(city)}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+                    >
+                      <FileText className="h-3 w-3" />
+                      Edit Content
+                    </button>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -352,6 +427,33 @@ export default function CitiesAdminPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Content Editor Dialog */}
+      {contentCitySlug && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Page Content — {contentCityName}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setContentCitySlug(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <ContentBlockEditor
+                pagePath={`/areas/${contentCitySlug}`}
+                pageType="city_landing"
+                onClose={() => setContentCitySlug(null)}
+              />
+            </div>
+          </div>
         </div>
       )}
 

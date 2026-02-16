@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import type { PageSeo } from '@/lib/supabase/types';
 import {
   Search,
@@ -661,6 +662,9 @@ function PageEditor({
         />
       </div>
 
+      {/* Page Content Blocks */}
+      <PageContentSection pagePath={page.page_path} pageType={page.page_type ?? 'custom'} />
+
       {/* Actions */}
       <div className="flex items-center justify-end gap-3 border-t border-gray-200 dark:border-gray-700 pt-4">
         <Button variant="outline" size="sm" onClick={onCancel}>
@@ -671,6 +675,37 @@ function PageEditor({
           Save Changes
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page Content Section — collapsible content blocks editor within PageEditor
+// ---------------------------------------------------------------------------
+
+function PageContentSection({ pagePath, pageType }: { pagePath: string; pageType: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 mb-3"
+      >
+        {expanded ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
+        Page Content Blocks
+      </button>
+      {expanded && (
+        <ContentBlockEditor
+          pagePath={pagePath}
+          pageType={pageType}
+        />
+      )}
     </div>
   );
 }

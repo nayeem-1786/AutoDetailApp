@@ -1145,6 +1145,24 @@ export interface CityLandingPage {
   focus_keywords: string | null;
   is_active: boolean;
   sort_order: number;
+  body_content: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ContentBlockType = 'rich_text' | 'faq' | 'features_list' | 'cta' | 'testimonial_highlight';
+
+export interface PageContentBlock {
+  id: string;
+  page_path: string;
+  page_type: string;
+  block_type: ContentBlockType;
+  title: string | null;
+  content: string;
+  sort_order: number;
+  is_active: boolean;
+  ai_generated: boolean;
+  ai_last_generated_at: string | null;
   created_at: string;
   updated_at: string;
 }

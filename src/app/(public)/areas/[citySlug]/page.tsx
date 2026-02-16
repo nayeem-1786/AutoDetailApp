@@ -9,9 +9,11 @@ import { getServiceCategories } from '@/lib/data/services';
 import { getReviewData } from '@/lib/data/reviews';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { generateLocalBusinessSchema, generateBreadcrumbSchema } from '@/lib/seo/json-ld';
+import { getPageContentBlocks } from '@/lib/data/page-content';
 import { JsonLd } from '@/components/public/json-ld';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
+import { ContentBlocks } from '@/components/public/content-block-renderer';
 import { CtaSection } from '@/components/public/cta-section';
 import { formatPhone, phoneToE164 } from '@/lib/utils/format';
 
@@ -87,11 +89,12 @@ export default async function CityLandingPage({
   params: Promise<{ citySlug: string }>;
 }) {
   const { citySlug } = await params;
-  const [city, businessInfo, categories, reviews] = await Promise.all([
+  const [city, businessInfo, categories, reviews, contentBlocks] = await Promise.all([
     getCityBySlug(citySlug),
     getBusinessInfo(),
     getServiceCategories(),
     getReviewData(),
+    getPageContentBlocks(`/areas/${citySlug}`),
   ]);
 
   if (!city) {
@@ -191,6 +194,9 @@ export default async function CityLandingPage({
           </div>
         </section>
       )}
+
+      {/* AI-Generated Content Blocks */}
+      <ContentBlocks blocks={contentBlocks} />
 
       {/* Reviews Section */}
       {reviews.google.reviews.length > 0 && (

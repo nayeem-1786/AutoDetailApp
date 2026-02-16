@@ -425,7 +425,21 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-14 (Session H — AI-Powered SEO Agent)
+## Last Session: 2026-02-14 (Session I — AI Content Writer for City Pages)
+- **AI Content Writer system**: Full content block management with AI generation for city landing pages and any other page type.
+- **DB schema**: `page_content_blocks` table with 5 block types (rich_text, faq, features_list, cta, testimonial_highlight), sort order, active toggle, AI tracking.
+- **Content data layer** (`src/lib/data/page-content.ts`): CRUD + reorder + bulk create functions for content blocks.
+- **AI Content Writer service** (`src/lib/services/ai-content-writer.ts`): Claude API integration with context-aware prompts. Modes: full_page, single_block, improve. Uses business info, city data, focus keywords.
+- **API routes**: CRUD at `/api/admin/cms/content/*`, AI generation at `/api/admin/cms/content/ai-generate` (4 modes: full_page, single_block, improve, batch_cities).
+- **Public rendering** (`content-block-renderer.tsx`): Server Component rendering 5 block types with FAQ schema markup (FAQPage JSON-LD) and markdown→HTML conversion.
+- **Admin editors**: MarkdownEditor (toolbar + preview), FaqEditor (drag reorder, AI generate), ContentBlockEditor (full block management with type-specific editors, drag reorder, AI generate/improve).
+- **City page integration**: Content blocks rendered between services and reviews on public city pages. Admin city page has "Edit Content" per city + "Generate All Content" batch button.
+- **SEO page integration**: Collapsible "Page Content Blocks" section in each page's expanded editor.
+- **Files created**: 11 new files (migration, data layer, AI service, 4 API routes, 4 components)
+- **Files modified**: `types.ts`, city page, admin cities page, admin SEO page
+- TypeScript clean (zero errors)
+
+### Session H — 2026-02-14 (AI-Powered SEO Agent)
 - **AI SEO generation system**: Full AI-powered SEO optimization built into the existing SEO dashboard. Uses Claude API (`claude-sonnet-4-20250514` via `ANTHROPIC_API_KEY`) to generate optimized SEO fields (title, description, keywords, focus keyword, OG fields) with context-aware page content extraction.
 - **Page content extractor** (`src/lib/services/page-content-extractor.ts`): Extracts text summaries from each page type (homepage, services, products, city pages, gallery, booking, terms) for AI context. Queries live DB data including pricing, categories, and business info.
 - **AI SEO service** (`src/lib/services/ai-seo.ts`): `generateSeoForPage()` and `generateSeoByPath()` — wraps Claude API with detailed system prompt for local auto detailing SEO optimization.
