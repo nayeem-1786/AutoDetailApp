@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from '@/lib/utils/revalidate';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
@@ -151,6 +152,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    revalidateTag('cms-content');
+
     return NextResponse.json({
       data: {
         totalCities: citiesWithoutContent.length,
@@ -229,6 +232,8 @@ export async function POST(request: NextRequest) {
 
       await admin.from('page_content_blocks').insert(rows);
     }
+
+    revalidateTag('cms-content');
 
     return NextResponse.json({
       data: {

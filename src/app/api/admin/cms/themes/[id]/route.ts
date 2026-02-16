@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET    /api/admin/cms/themes/[id] — Get single theme
@@ -79,6 +80,8 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  revalidateTag('cms-theme');
+  revalidateTag('cms-toggles');
   return NextResponse.json({ data });
 }
 
@@ -105,5 +108,7 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  revalidateTag('cms-theme');
+  revalidateTag('cms-toggles');
   return NextResponse.json({ success: true });
 }

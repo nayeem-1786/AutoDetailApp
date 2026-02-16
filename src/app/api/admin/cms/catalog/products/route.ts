@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/catalog/products — List products with CMS fields
@@ -74,5 +75,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: errors.join('; ') }, { status: 500 });
   }
 
+  revalidateTag('cms-catalog');
   return NextResponse.json({ success: true });
 }

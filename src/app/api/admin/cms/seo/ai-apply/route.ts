@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/cms/seo/ai-apply
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest) {
   const successCount = results.filter(r => r.status === 'success').length;
   const errorCount = results.filter(r => r.status === 'error').length;
 
+  revalidateTag('cms-seo');
   return NextResponse.json({
     data: {
       applied: successCount,

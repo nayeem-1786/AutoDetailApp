@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/seo/cities — List all city landing pages
@@ -95,5 +96,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  revalidateTag('cms-seo');
   return NextResponse.json({ data }, { status: 201 });
 }

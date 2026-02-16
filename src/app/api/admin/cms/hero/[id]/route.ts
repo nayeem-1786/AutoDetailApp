@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET    /api/admin/cms/hero/[id] — Get single slide
@@ -79,6 +81,22 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Auto-enable/disable hero_carousel flag based on active slide count
+  if ('is_active' in updates) {
+    if (data.is_active) {
+      await setFeatureFlag('hero_carousel', true);
+    } else {
+      const { count } = await admin
+        .from('hero_slides')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+      if (count === 0) {
+        await setFeatureFlag('hero_carousel', false);
+      }
+    }
+  }
+
+  revalidateTag('cms-hero');
   return NextResponse.json({ data });
 }
 
@@ -105,5 +123,15 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Check if any active slides remain — if not, disable the feature flag
+  const { count } = await admin
+    .from('hero_slides')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_active', true);
+  if (count === 0) {
+    await setFeatureFlag('hero_carousel', false);
+  }
+
+  revalidateTag('cms-hero');
   return NextResponse.json({ success: true });
 }

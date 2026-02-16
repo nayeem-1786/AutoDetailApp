@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
+
+export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
   const [biz, seoOverrides] = await Promise.all([
@@ -25,7 +27,7 @@ interface TcSection {
 }
 
 async function getTermsContent(): Promise<{ sections: TcSection[]; effectiveDate: string | null }> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data } = await supabase
     .from('business_settings')
     .select('key, value')
@@ -102,8 +104,10 @@ function getDefaultSections(): TcSection[] {
 }
 
 export default async function TermsPage() {
-  const biz = await getBusinessInfo();
-  const { sections, effectiveDate } = await getTermsContent();
+  const [biz, { sections, effectiveDate }] = await Promise.all([
+    getBusinessInfo(),
+    getTermsContent(),
+  ]);
 
   return (
     <>

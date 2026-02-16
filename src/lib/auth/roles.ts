@@ -129,6 +129,16 @@ export const SIDEBAR_NAV: NavItem[] = [
     icon: 'Globe',
     children: [
       {
+        label: 'Pages',
+        href: '/admin/website/pages',
+        icon: 'FileText',
+      },
+      {
+        label: 'Navigation',
+        href: '/admin/website/navigation',
+        icon: 'PanelTop',
+      },
+      {
         label: 'Hero',
         href: '/admin/website/hero',
         icon: 'Image',

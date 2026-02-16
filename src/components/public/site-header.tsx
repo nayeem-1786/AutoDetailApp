@@ -4,8 +4,14 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { createClient } from '@/lib/supabase/server';
 import { HeaderShell } from './header-shell';
 import { MobileMenu } from './mobile-menu';
+import { NavDropdown } from './nav-dropdown';
+import type { WebsiteNavItem } from '@/lib/supabase/types';
 
-export async function SiteHeader() {
+interface SiteHeaderProps {
+  navItems?: WebsiteNavItem[];
+}
+
+export async function SiteHeader({ navItems = [] }: SiteHeaderProps) {
   const biz = await getBusinessInfo();
 
   let customerName: string | null = null;
@@ -28,6 +34,16 @@ export async function SiteHeader() {
     // Not authenticated — ignore
   }
 
+  // Fallback if no nav items from DB
+  const links: WebsiteNavItem[] =
+    navItems.length > 0
+      ? navItems
+      : [
+          { id: '1', placement: 'header', label: 'Services', url: '/services', page_id: null, parent_id: null, target: '_self', icon: null, is_active: true, sort_order: 0, created_at: '' },
+          { id: '2', placement: 'header', label: 'Products', url: '/products', page_id: null, parent_id: null, target: '_self', icon: null, is_active: true, sort_order: 1, created_at: '' },
+          { id: '3', placement: 'header', label: 'Gallery', url: '/gallery', page_id: null, parent_id: null, target: '_self', icon: null, is_active: true, sort_order: 2, created_at: '' },
+        ];
+
   return (
     <HeaderShell>
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -45,20 +61,21 @@ export async function SiteHeader() {
 
         {/* Center Nav — desktop */}
         <div className="hidden md:flex md:items-center md:gap-1">
-          {[
-            { href: '/services', label: 'Services' },
-            { href: '/products', label: 'Products' },
-            { href: '/gallery', label: 'Gallery' },
-          ].map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="relative px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
-            >
-              {link.label}
-              <span className="absolute inset-x-4 -bottom-px h-0.5 bg-brand-600 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
-            </Link>
-          ))}
+          {links.map((item) =>
+            item.children && item.children.length > 0 ? (
+              <NavDropdown key={item.id} item={item} />
+            ) : (
+              <Link
+                key={item.id}
+                href={item.url}
+                target={item.target}
+                className="relative px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
+              >
+                {item.label}
+                <span className="absolute inset-x-4 -bottom-px h-0.5 bg-brand-600 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+              </Link>
+            )
+          )}
         </div>
 
         {/* Right Actions */}
@@ -80,7 +97,7 @@ export async function SiteHeader() {
           </Link>
 
           {/* Mobile hamburger */}
-          <MobileMenu customerName={customerName} />
+          <MobileMenu customerName={customerName} navItems={links} />
         </div>
       </nav>
     </HeaderShell>

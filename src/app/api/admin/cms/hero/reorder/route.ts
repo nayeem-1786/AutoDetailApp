@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // PATCH /api/admin/cms/hero/reorder — Batch update sort_order
@@ -41,5 +42,6 @@ export async function PATCH(request: Request) {
     }
   }
 
+  revalidateTag('cms-hero');
   return NextResponse.json({ success: true });
 }

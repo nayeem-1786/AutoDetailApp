@@ -15,3 +15,15 @@ export async function isFeatureEnabled(key: string): Promise<boolean> {
 
   return data?.enabled === true;
 }
+
+/**
+ * Set a feature flag to enabled or disabled.
+ * Used by CMS routes to auto-enable/disable flags when content is activated.
+ */
+export async function setFeatureFlag(key: string, enabled: boolean): Promise<void> {
+  const supabase = createAdminClient();
+  await supabase
+    .from('feature_flags')
+    .update({ enabled })
+    .eq('key', key);
+}

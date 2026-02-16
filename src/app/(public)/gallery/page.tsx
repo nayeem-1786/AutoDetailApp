@@ -1,10 +1,15 @@
+import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { getCmsToggles } from '@/lib/data/cms';
+import { AdZone } from '@/components/public/cms/ad-zone';
 import { GalleryClient } from './gallery-client';
+
+export const revalidate = 300;
 
 export async function generateMetadata(): Promise<Metadata> {
   const [biz, seoOverrides] = await Promise.all([
@@ -104,8 +109,12 @@ async function getGalleryData(): Promise<{
 }
 
 export default async function GalleryPage() {
-  const enabled = await isFeatureEnabled(FEATURE_FLAGS.PHOTO_GALLERY);
-  const biz = await getBusinessInfo();
+  const [enabled, biz, { pairs, serviceOptions }, cmsToggles] = await Promise.all([
+    isFeatureEnabled(FEATURE_FLAGS.PHOTO_GALLERY),
+    getBusinessInfo(),
+    getGalleryData(),
+    getCmsToggles(),
+  ]);
 
   if (!enabled) {
     return (
@@ -118,8 +127,6 @@ export default async function GalleryPage() {
       </div>
     );
   }
-
-  const { pairs, serviceOptions } = await getGalleryData();
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -158,6 +165,8 @@ export default async function GalleryPage() {
           )}
         </div>
       </section>
+
+      {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="below_hero" pagePath="/gallery" /></Suspense>}
 
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <GalleryClient initialPairs={pairs} serviceOptions={serviceOptions} />

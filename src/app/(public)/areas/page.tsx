@@ -10,6 +10,8 @@ import { JsonLd } from '@/components/public/json-ld';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 
+export const revalidate = 300;
+
 // ---------------------------------------------------------------------------
 // Metadata
 // ---------------------------------------------------------------------------

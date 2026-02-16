@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET   /api/admin/cms/seo/pages/[encodedPath] — Get page_seo for a path
@@ -100,6 +101,7 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidateTag('cms-seo');
     return NextResponse.json({ data });
   } else {
     // Create new row
@@ -113,6 +115,7 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidateTag('cms-seo');
     return NextResponse.json({ data }, { status: 201 });
   }
 }

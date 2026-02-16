@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET    /api/admin/cms/ads/placements/[id] — Get single placement
@@ -75,6 +77,22 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Auto-enable/disable ad_placements flag based on active placement count
+  if ('is_active' in updates) {
+    if (data.is_active) {
+      await setFeatureFlag('ad_placements', true);
+    } else {
+      const { count } = await admin
+        .from('ad_placements')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+      if (count === 0) {
+        await setFeatureFlag('ad_placements', false);
+      }
+    }
+  }
+
+  revalidateTag('cms-ads');
   return NextResponse.json({ data });
 }
 
@@ -101,5 +119,15 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Check if any active placements remain — if not, disable the feature flag
+  const { count } = await admin
+    .from('ad_placements')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_active', true);
+  if (count === 0) {
+    await setFeatureFlag('ad_placements', false);
+  }
+
+  revalidateTag('cms-ads');
   return NextResponse.json({ success: true });
 }

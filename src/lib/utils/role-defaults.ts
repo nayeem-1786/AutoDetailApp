@@ -95,6 +95,7 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.about.manage': true,
     'cms.catalog_display.manage': true,
     'cms.seo.manage': true,
+    'cms.pages.manage': true,
   },
 
   admin: {
@@ -187,6 +188,7 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.about.manage': true,
     'cms.catalog_display.manage': true,
     'cms.seo.manage': true,
+    'cms.pages.manage': true,
   },
 
   cashier: {
@@ -279,6 +281,7 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.about.manage': false,
     'cms.catalog_display.manage': false,
     'cms.seo.manage': false,
+    'cms.pages.manage': false,
   },
 
   detailer: {
@@ -371,5 +374,6 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.about.manage': false,
     'cms.catalog_display.manage': false,
     'cms.seo.manage': false,
+    'cms.pages.manage': false,
   },
 };

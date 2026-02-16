@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET /api/admin/cms/terms — Load terms & conditions content
@@ -82,5 +83,6 @@ export async function PATCH(request: Request) {
     }
   }
 
+  revalidateTag('cms-terms');
   return NextResponse.json({ success: true });
 }

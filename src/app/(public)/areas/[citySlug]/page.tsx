@@ -13,6 +13,8 @@ import { getPageContentBlocks } from '@/lib/data/page-content';
 import { JsonLd } from '@/components/public/json-ld';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
+
+export const revalidate = 300;
 import { ContentBlocks } from '@/components/public/content-block-renderer';
 import { CtaSection } from '@/components/public/cta-section';
 import { formatPhone, phoneToE164 } from '@/lib/utils/format';

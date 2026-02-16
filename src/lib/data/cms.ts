@@ -1,6 +1,5 @@
-import { cache } from 'react';
-import { createClient as createServerClient } from '@/lib/supabase/server';
-import { createAnonClient } from '@/lib/supabase/anon';
+import { unstable_cache } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type {
   HeroSlide,
   HeroCarouselConfig,
@@ -9,116 +8,115 @@ import type {
 } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function getSupabase() {
-  try {
-    return await createServerClient();
-  } catch {
-    return createAnonClient();
-  }
-}
-
-async function getBusinessSetting<T>(key: string): Promise<T | null> {
-  const supabase = await getSupabase();
-  const { data } = await supabase
-    .from('business_settings')
-    .select('value')
-    .eq('key', key)
-    .single();
-  return data?.value as T | null;
-}
-
-// ---------------------------------------------------------------------------
 // Hero Slides
 // ---------------------------------------------------------------------------
 
-export const getActiveHeroSlides = cache(async (): Promise<HeroSlide[]> => {
-  const supabase = await getSupabase();
-  const { data } = await supabase
-    .from('hero_slides')
-    .select('*')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true });
-  return (data ?? []) as HeroSlide[];
-});
+export const getActiveHeroSlides = unstable_cache(
+  async (): Promise<HeroSlide[]> => {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('hero_slides')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    return (data ?? []) as HeroSlide[];
+  },
+  ['active-hero-slides'],
+  { revalidate: 60, tags: ['cms-hero'] }
+);
 
-export const getHeroCarouselConfig = cache(async (): Promise<HeroCarouselConfig> => {
-  const config = await getBusinessSetting<HeroCarouselConfig>('hero_carousel_config');
-  return config ?? {
-    mode: 'single',
-    interval_ms: 5000,
-    transition: 'fade',
-    pause_on_hover: true,
-  };
-});
+export const getHeroCarouselConfig = unstable_cache(
+  async (): Promise<HeroCarouselConfig> => {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('business_settings')
+      .select('value')
+      .eq('key', 'hero_carousel_config')
+      .single();
+    const config = data?.value as HeroCarouselConfig | null;
+    return config ?? {
+      mode: 'single',
+      interval_ms: 5000,
+      transition: 'fade',
+      pause_on_hover: true,
+    };
+  },
+  ['hero-carousel-config'],
+  { revalidate: 60, tags: ['cms-hero'] }
+);
 
 // ---------------------------------------------------------------------------
 // Announcement Tickers
 // ---------------------------------------------------------------------------
 
-export const getTopBarTickers = cache(async (pagePath: string): Promise<AnnouncementTicker[]> => {
-  const supabase = await getSupabase();
-  const now = new Date().toISOString();
+export const getTopBarTickers = unstable_cache(
+  async (): Promise<AnnouncementTicker[]> => {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('announcement_tickers')
+      .select('*')
+      .eq('is_active', true)
+      .eq('placement', 'top_bar')
+      .order('sort_order', { ascending: true });
 
-  const { data } = await supabase
-    .from('announcement_tickers')
-    .select('*')
-    .eq('is_active', true)
-    .eq('placement', 'top_bar')
-    .or(`starts_at.is.null,starts_at.lte.${now}`)
-    .or(`ends_at.is.null,ends_at.gte.${now}`)
-    .order('sort_order', { ascending: true });
+    // Date filtering happens client-side since cached value must be stable
+    const now = Date.now();
+    return ((data ?? []) as AnnouncementTicker[]).filter((ticker) => {
+      if (ticker.starts_at && new Date(ticker.starts_at).getTime() > now) return false;
+      if (ticker.ends_at && new Date(ticker.ends_at).getTime() < now) return false;
+      return true;
+    });
+  },
+  ['top-bar-tickers'],
+  { revalidate: 60, tags: ['cms-tickers'] }
+);
 
-  // Filter by target_pages
-  return ((data ?? []) as AnnouncementTicker[]).filter((ticker) => {
-    const pages = ticker.target_pages;
-    if (!pages || pages.length === 0) return true;
-    return pages.includes('all') || pages.includes(pagePath);
-  });
-});
+export const getSectionTickers = unstable_cache(
+  async (pagePath: string, position?: string): Promise<AnnouncementTicker[]> => {
+    const supabase = createAdminClient();
+    let query = supabase
+      .from('announcement_tickers')
+      .select('*')
+      .eq('is_active', true)
+      .eq('placement', 'section');
 
-export const getSectionTickers = cache(async (pagePath: string, position?: string): Promise<AnnouncementTicker[]> => {
-  const supabase = await getSupabase();
-  const now = new Date().toISOString();
+    if (position) {
+      query = query.eq('section_position', position);
+    }
 
-  let query = supabase
-    .from('announcement_tickers')
-    .select('*')
-    .eq('is_active', true)
-    .eq('placement', 'section');
+    const { data } = await query.order('sort_order', { ascending: true });
 
-  if (position) {
-    query = query.eq('section_position', position);
-  }
-
-  const { data } = await query
-    .or(`starts_at.is.null,starts_at.lte.${now}`)
-    .or(`ends_at.is.null,ends_at.gte.${now}`)
-    .order('sort_order', { ascending: true });
-
-  return ((data ?? []) as AnnouncementTicker[]).filter((ticker) => {
-    const pages = ticker.target_pages;
-    if (!pages || pages.length === 0) return true;
-    return pages.includes('all') || pages.includes(pagePath);
-  });
-});
+    const now = Date.now();
+    return ((data ?? []) as AnnouncementTicker[]).filter((ticker) => {
+      if (ticker.starts_at && new Date(ticker.starts_at).getTime() > now) return false;
+      if (ticker.ends_at && new Date(ticker.ends_at).getTime() < now) return false;
+      const pages = ticker.target_pages;
+      if (!pages || pages.length === 0) return true;
+      return pages.includes('all') || pages.includes(pagePath);
+    });
+  },
+  ['section-tickers'],
+  { revalidate: 60, tags: ['cms-tickers'] }
+);
 
 // ---------------------------------------------------------------------------
 // Seasonal Themes
 // ---------------------------------------------------------------------------
 
-export const getActiveTheme = cache(async (): Promise<SeasonalTheme | null> => {
-  const supabase = await getSupabase();
-  const { data } = await supabase
-    .from('seasonal_themes')
-    .select('*')
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-  return data as SeasonalTheme | null;
-});
+export const getActiveTheme = unstable_cache(
+  async (): Promise<SeasonalTheme | null> => {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('seasonal_themes')
+      .select('*')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+    return data as SeasonalTheme | null;
+  },
+  ['active-theme'],
+  { revalidate: 60, tags: ['cms-theme'] }
+);
 
 // ---------------------------------------------------------------------------
 // CMS Feature Toggles
@@ -133,66 +131,72 @@ export interface CmsToggles {
   adsEnabled: boolean;
 }
 
-export const getCmsToggles = cache(async (): Promise<CmsToggles> => {
-  const supabase = await getSupabase();
+export const getCmsToggles = unstable_cache(
+  async (): Promise<CmsToggles> => {
+    const supabase = createAdminClient();
 
-  // Fetch feature flags
-  const { data: flags } = await supabase
-    .from('feature_flags')
-    .select('key, enabled')
-    .in('key', ['hero_carousel', 'announcement_tickers', 'ad_placements', 'seasonal_themes']);
+    const [{ data: flags }, { data: settings }] = await Promise.all([
+      supabase
+        .from('feature_flags')
+        .select('key, enabled')
+        .in('key', ['hero_carousel', 'announcement_tickers', 'ad_placements', 'seasonal_themes']),
+      supabase
+        .from('business_settings')
+        .select('key, value')
+        .in('key', ['ticker_enabled', 'ads_enabled']),
+    ]);
 
-  const flagMap: Record<string, boolean> = {};
-  for (const f of flags ?? []) {
-    flagMap[f.key] = f.enabled;
-  }
+    const flagMap: Record<string, boolean> = {};
+    for (const f of flags ?? []) {
+      flagMap[f.key] = f.enabled;
+    }
 
-  // Fetch master toggles from business_settings
-  const { data: settings } = await supabase
-    .from('business_settings')
-    .select('key, value')
-    .in('key', ['ticker_enabled', 'ads_enabled']);
+    const settingMap: Record<string, boolean> = {};
+    for (const s of settings ?? []) {
+      settingMap[s.key] = s.value === true || s.value === 'true';
+    }
 
-  const settingMap: Record<string, boolean> = {};
-  for (const s of settings ?? []) {
-    settingMap[s.key] = s.value === true || s.value === 'true';
-  }
-
-  return {
-    heroCarousel: flagMap.hero_carousel ?? true,
-    announcementTickers: flagMap.announcement_tickers ?? false,
-    adPlacements: flagMap.ad_placements ?? false,
-    seasonalThemes: flagMap.seasonal_themes ?? false,
-    tickerEnabled: settingMap.ticker_enabled ?? false,
-    adsEnabled: settingMap.ads_enabled ?? false,
-  };
-});
+    return {
+      heroCarousel: flagMap.hero_carousel ?? true,
+      announcementTickers: flagMap.announcement_tickers ?? false,
+      adPlacements: flagMap.ad_placements ?? false,
+      seasonalThemes: flagMap.seasonal_themes ?? false,
+      tickerEnabled: settingMap.ticker_enabled ?? false,
+      adsEnabled: settingMap.ads_enabled ?? false,
+    };
+  },
+  ['cms-toggles'],
+  { revalidate: 60, tags: ['cms-toggles'] }
+);
 
 // ---------------------------------------------------------------------------
 // Ads
 // ---------------------------------------------------------------------------
 
-export async function getAdsForZone(pagePath: string, zoneId: string) {
-  const supabase = await getSupabase();
-  const now = new Date().toISOString();
+export const getAdsForZone = unstable_cache(
+  async (pagePath: string, zoneId: string) => {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('ad_placements')
-    .select('*, ad_creative:ad_creatives(*)')
-    .eq('page_path', pagePath)
-    .eq('zone_id', zoneId)
-    .eq('is_active', true)
-    .order('priority', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const { data } = await supabase
+      .from('ad_placements')
+      .select('*, ad_creative:ad_creatives(*)')
+      .eq('page_path', pagePath)
+      .eq('zone_id', zoneId)
+      .eq('is_active', true)
+      .order('priority', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (!data?.ad_creative) return null;
+    if (!data?.ad_creative) return null;
 
-  const creative = data.ad_creative;
-  // Check date range
-  if (creative.starts_at && new Date(creative.starts_at) > new Date(now)) return null;
-  if (creative.ends_at && new Date(creative.ends_at) < new Date(now)) return null;
-  if (!creative.is_active) return null;
+    const creative = data.ad_creative;
+    const now = Date.now();
+    if (creative.starts_at && new Date(creative.starts_at).getTime() > now) return null;
+    if (creative.ends_at && new Date(creative.ends_at).getTime() < now) return null;
+    if (!creative.is_active) return null;
 
-  return { placement: data, creative };
-}
+    return { placement: data, creative };
+  },
+  ['ads-for-zone'],
+  { revalidate: 300, tags: ['cms-ads'] }
+);

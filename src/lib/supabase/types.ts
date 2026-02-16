@@ -1167,6 +1167,47 @@ export interface PageContentBlock {
   updated_at: string;
 }
 
+// CMS Pages & Navigation types
+
+export type PageTemplate = 'content' | 'landing' | 'blank';
+export type NavPlacement = 'header' | 'footer_quick_links' | 'footer_services';
+
+export interface WebsitePage {
+  id: string;
+  title: string;
+  slug: string;
+  page_template: PageTemplate;
+  parent_id: string | null;
+  content: string;
+  is_published: boolean;
+  show_in_nav: boolean;
+  sort_order: number;
+  meta_title: string | null;
+  meta_description: string | null;
+  og_image_url: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined relations
+  parent?: WebsitePage;
+  children?: WebsitePage[];
+}
+
+export interface WebsiteNavItem {
+  id: string;
+  placement: NavPlacement;
+  label: string;
+  url: string;
+  page_id: string | null;
+  parent_id: string | null;
+  target: '_self' | '_blank';
+  icon: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  // Runtime: nested children built by data layer
+  children?: WebsiteNavItem[];
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }

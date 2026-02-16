@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/ads/placements — List all placements with creative data
@@ -64,5 +66,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Auto-enable ad_placements flag when creating an active placement
+  if (data.is_active) {
+    await setFeatureFlag('ad_placements', true);
+  }
+
+  revalidateTag('cms-ads');
   return NextResponse.json({ data }, { status: 201 });
 }

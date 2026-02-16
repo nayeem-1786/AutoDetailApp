@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/hero — List all hero slides
@@ -79,5 +81,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Auto-enable hero_carousel flag when creating an active slide
+  if (data.is_active) {
+    await setFeatureFlag('hero_carousel', true);
+  }
+
+  revalidateTag('cms-hero');
   return NextResponse.json({ data }, { status: 201 });
 }

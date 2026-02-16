@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET    /api/admin/cms/tickers/[id] — Get single ticker
@@ -77,6 +79,22 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Auto-enable/disable announcement_tickers flag based on active ticker count
+  if ('is_active' in updates) {
+    if (data.is_active) {
+      await setFeatureFlag('announcement_tickers', true);
+    } else {
+      const { count } = await admin
+        .from('announcement_tickers')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+      if (count === 0) {
+        await setFeatureFlag('announcement_tickers', false);
+      }
+    }
+  }
+
+  revalidateTag('cms-tickers');
   return NextResponse.json({ data });
 }
 
@@ -103,5 +121,15 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Check if any active tickers remain — if not, disable the feature flag
+  const { count } = await admin
+    .from('announcement_tickers')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_active', true);
+  if (count === 0) {
+    await setFeatureFlag('announcement_tickers', false);
+  }
+
+  revalidateTag('cms-tickers');
   return NextResponse.json({ success: true });
 }

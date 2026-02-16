@@ -8,6 +8,8 @@ import { ProductCard } from '@/components/public/product-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 
+export const revalidate = 300;
+
 interface PageProps {
   params: Promise<{ categorySlug: string }>;
 }

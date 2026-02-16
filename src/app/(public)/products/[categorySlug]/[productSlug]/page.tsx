@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Package } from 'lucide-react';
@@ -11,6 +12,9 @@ import { formatCurrency } from '@/lib/utils/format';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 import { JsonLd } from '@/components/public/json-ld';
+import { AdZone } from '@/components/public/cms/ad-zone';
+
+export const revalidate = 300;
 
 interface PageProps {
   params: Promise<{ categorySlug: string; productSlug: string }>;
@@ -163,6 +167,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
               </div>
             </div>
           </div>
+
+          <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/products/${categorySlug}/${productSlug}`} className="mt-8" /></Suspense>
         </div>
       </article>
 

@@ -49,6 +49,7 @@ import {
   Palette,
   LayoutGrid,
   MapPin,
+  PanelTop,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -90,6 +91,7 @@ const iconMap: Record<string, LucideIcon> = {
   LayoutGrid,
   Search,
   MapPin,
+  PanelTop,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments

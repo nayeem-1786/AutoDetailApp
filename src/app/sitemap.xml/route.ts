@@ -3,6 +3,7 @@ import { SITE_URL } from '@/lib/utils/constants';
 import { getAllServicesForSitemap, getServiceCategories } from '@/lib/data/services';
 import { getAllProductsForSitemap, getProductCategories } from '@/lib/data/products';
 import { getActiveCities } from '@/lib/data/cities';
+import { getPublishedPages } from '@/lib/data/website-pages';
 
 // ---------------------------------------------------------------------------
 // Dynamic XML Sitemap
@@ -153,6 +154,21 @@ export async function GET() {
     }
   } catch {
     // Cities table may not exist yet — skip gracefully
+  }
+
+  // ---- Custom pages ----
+  try {
+    const customPages = await getPublishedPages();
+    for (const page of customPages) {
+      entries.push({
+        loc: `${SITE_URL}/p/${page.slug}`,
+        lastmod: toISODate(page.updated_at),
+        changefreq: 'monthly',
+        priority: 0.6,
+      });
+    }
+  } catch {
+    // website_pages table may not exist yet — skip gracefully
   }
 
   const xml = buildXml(entries);

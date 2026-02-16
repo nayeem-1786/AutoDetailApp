@@ -1,11 +1,16 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getProductCategories } from '@/lib/data/products';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { getCmsToggles } from '@/lib/data/cms';
 import { ProductCategoryCard } from '@/components/public/product-category-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import { AdZone } from '@/components/public/cms/ad-zone';
+
+export const revalidate = 300;
 
 export async function generateMetadata(): Promise<Metadata> {
   const [businessInfo, seoOverrides] = await Promise.all([
@@ -37,7 +42,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ProductsPage() {
-  const categories = await getProductCategories();
+  const [categories, cmsToggles] = await Promise.all([
+    getProductCategories(),
+    getCmsToggles(),
+  ]);
 
   return (
     <>
@@ -55,6 +63,8 @@ export default async function ProductsPage() {
         </div>
       </section>
 
+      {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="below_hero" pagePath="/products" /></Suspense>}
+
       <section className="bg-surface dark:bg-gray-900 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {categories.length > 0 ? (
@@ -70,6 +80,8 @@ export default async function ProductsPage() {
           )}
         </div>
       </section>
+
+      {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="above_cta" pagePath="/products" /></Suspense>}
 
       <CtaSection />
     </>

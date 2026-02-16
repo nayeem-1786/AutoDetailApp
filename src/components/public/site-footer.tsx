@@ -4,14 +4,33 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
 import { getActiveCities } from '@/lib/data/cities';
 import { formatPhone, phoneToE164 } from '@/lib/utils/format';
+import type { WebsiteNavItem } from '@/lib/supabase/types';
 
-export async function SiteFooter() {
+interface SiteFooterProps {
+  navItems?: WebsiteNavItem[];
+}
+
+const defaultQuickLinks = [
+  { href: '/services', label: 'All Services' },
+  { href: '/products', label: 'Shop Products' },
+  { href: '/gallery', label: 'Our Work' },
+  { href: '/book', label: 'Book Appointment' },
+  { href: '/signin', label: 'Customer Login' },
+  { href: '/account', label: 'My Account' },
+];
+
+export async function SiteFooter({ navItems = [] }: SiteFooterProps) {
   const [biz, reviews, cities] = await Promise.all([
     getBusinessInfo(),
     getReviewData(),
     getActiveCities(),
   ]);
   const currentYear = new Date().getFullYear();
+
+  const quickLinks =
+    navItems.length > 0
+      ? navItems.map((item) => ({ href: item.url, label: item.label, target: item.target }))
+      : defaultQuickLinks.map((l) => ({ ...l, target: '_self' as const }));
 
   return (
     <footer className="bg-navy text-white">
@@ -72,17 +91,11 @@ export async function SiteFooter() {
               Quick Links
             </h3>
             <ul className="mt-4 space-y-2.5">
-              {[
-                { href: '/services', label: 'All Services' },
-                { href: '/products', label: 'Shop Products' },
-                { href: '/gallery', label: 'Our Work' },
-                { href: '/book', label: 'Book Appointment' },
-                { href: '/signin', label: 'Customer Login' },
-                { href: '/account', label: 'My Account' },
-              ].map((link) => (
+              {quickLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                    target={link.target}
                     className="text-sm text-gray-300 hover:text-white transition-colors"
                   >
                     {link.label}

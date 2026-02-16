@@ -13,10 +13,23 @@ import {
   Search,
   MapPin,
   FileText,
+  PanelTop,
   ArrowRight,
 } from 'lucide-react';
 
 const sections = [
+  {
+    title: 'Pages',
+    description: 'Create and manage custom pages for your website.',
+    icon: FileText,
+    href: '/admin/website/pages',
+  },
+  {
+    title: 'Navigation',
+    description: 'Manage header and footer navigation links.',
+    icon: PanelTop,
+    href: '/admin/website/navigation',
+  },
   {
     title: 'Hero',
     description: 'Manage hero slides and carousel images for your homepage.',

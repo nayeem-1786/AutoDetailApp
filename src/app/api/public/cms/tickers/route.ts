@@ -14,7 +14,12 @@ export async function GET(request: Request) {
 
   let data;
   if (placement === 'top_bar') {
-    data = await getTopBarTickers(page);
+    const all = await getTopBarTickers();
+    data = all.filter((t) => {
+      const pages = t.target_pages;
+      if (!pages || pages.length === 0) return true;
+      return pages.includes('all') || pages.includes(page);
+    });
   } else {
     data = await getSectionTickers(page, position ?? undefined);
   }

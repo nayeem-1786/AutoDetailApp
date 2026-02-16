@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -6,9 +7,13 @@ import { getServiceCategories, getServicesByCategory } from '@/lib/data/services
 import { getBusinessInfo } from '@/lib/data/business';
 import { generateCategoryMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { getCmsToggles } from '@/lib/data/cms';
 import { ServiceCard } from '@/components/public/service-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import { AdZone } from '@/components/public/cms/ad-zone';
+
+export const revalidate = 300;
 
 interface PageProps {
   params: Promise<{ categorySlug: string }>;
@@ -50,7 +55,10 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
   const { category, services } = result;
 
   // Fetch all categories to show "Explore Other Services" section
-  const allCategories = await getServiceCategories();
+  const [allCategories, cmsToggles] = await Promise.all([
+    getServiceCategories(),
+    getCmsToggles(),
+  ]);
   const otherCategories = allCategories.filter((cat) => cat.slug !== categorySlug);
 
   return (
@@ -76,6 +84,8 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
         </div>
       </section>
 
+      {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="below_hero" pagePath={`/services/${categorySlug}`} /></Suspense>}
+
       <section className="bg-surface dark:bg-gray-900 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {services.length > 0 ? (
@@ -98,6 +108,8 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
           )}
         </div>
       </section>
+
+      {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="above_cta" pagePath={`/services/${categorySlug}`} /></Suspense>}
 
       {/* Explore Other Services */}
       {otherCategories.length > 0 && (

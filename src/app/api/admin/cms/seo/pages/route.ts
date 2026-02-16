@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { getKnownPages } from '@/lib/seo/known-pages';
 import type { PageSeoType } from '@/lib/supabase/types';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/seo/pages — List all page_seo rows with optional filters
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidateTag('cms-seo');
     return NextResponse.json({
       data: inserted,
       message: `Created ${inserted?.length ?? 0} SEO entries`,
@@ -117,5 +119,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  revalidateTag('cms-seo');
   return NextResponse.json({ data: inserted }, { status: 201 });
 }

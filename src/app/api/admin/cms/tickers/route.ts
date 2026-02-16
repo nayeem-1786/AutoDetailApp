@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/tickers — List all tickers
@@ -74,5 +76,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Auto-enable announcement_tickers flag when creating an active ticker
+  if (data.is_active) {
+    await setFeatureFlag('announcement_tickers', true);
+  }
+
+  revalidateTag('cms-tickers');
   return NextResponse.json({ data }, { status: 201 });
 }

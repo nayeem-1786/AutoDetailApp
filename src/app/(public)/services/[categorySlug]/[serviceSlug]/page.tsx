@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -18,6 +19,9 @@ import { ServiceCard } from '@/components/public/service-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 import { JsonLd } from '@/components/public/json-ld';
+import { AdZone } from '@/components/public/cms/ad-zone';
+
+export const revalidate = 300;
 
 interface PageProps {
   params: Promise<{ categorySlug: string; serviceSlug: string }>;
@@ -127,7 +131,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
             </div>
 
             {/* Right column: service details sidebar */}
-            <aside className="lg:col-span-1">
+            <aside className="lg:col-span-1 space-y-6">
               <div className="sticky top-24 rounded-2xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 p-6">
                 <h2 className="font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Service Details
@@ -206,6 +210,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   )}
                 </dl>
               </div>
+              <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/services/${categorySlug}/${serviceSlug}`} /></Suspense>
             </aside>
           </div>
 

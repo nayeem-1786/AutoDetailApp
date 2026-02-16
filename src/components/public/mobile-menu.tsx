@@ -3,19 +3,23 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
-
-const navLinks = [
-  { href: '/services', label: 'Services' },
-  { href: '/products', label: 'Products' },
-  { href: '/gallery', label: 'Gallery' },
-];
+import type { WebsiteNavItem } from '@/lib/supabase/types';
 
 interface MobileMenuProps {
   customerName: string | null;
+  navItems?: WebsiteNavItem[];
 }
 
-export function MobileMenu({ customerName }: MobileMenuProps) {
+const defaultNavLinks = [
+  { id: '1', label: 'Services', url: '/services', target: '_self' as const, children: [] as WebsiteNavItem[] },
+  { id: '2', label: 'Products', url: '/products', target: '_self' as const, children: [] as WebsiteNavItem[] },
+  { id: '3', label: 'Gallery', url: '/gallery', target: '_self' as const, children: [] as WebsiteNavItem[] },
+];
+
+export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
+
+  const links = navItems && navItems.length > 0 ? navItems : defaultNavLinks;
 
   return (
     <>
@@ -52,15 +56,33 @@ export function MobileMenu({ customerName }: MobileMenuProps) {
 
             {/* Nav links */}
             <nav className="flex flex-col items-center gap-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="font-display text-3xl font-semibold text-white hover:text-brand-200 transition-colors"
-                  onClick={() => setOpen(false)}
-                >
-                  {link.label}
-                </Link>
+              {links.map((item) => (
+                <div key={item.id} className="flex flex-col items-center gap-3">
+                  <Link
+                    href={item.url}
+                    target={item.target}
+                    className="font-display text-3xl font-semibold text-white hover:text-brand-200 transition-colors"
+                    onClick={() => setOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                  {/* Render children as indented sub-items */}
+                  {item.children && item.children.length > 0 && (
+                    <div className="flex flex-col items-center gap-2">
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.id}
+                          href={child.url}
+                          target={child.target}
+                          className="text-lg font-medium text-white/60 hover:text-white transition-colors"
+                          onClick={() => setOpen(false)}
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
               <div className="mt-4 h-px w-16 bg-white/20" />
               <Link

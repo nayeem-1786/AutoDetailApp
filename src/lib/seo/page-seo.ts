@@ -1,6 +1,5 @@
-import { cache } from 'react';
-import { createClient as createServerClient } from '@/lib/supabase/server';
-import { createAnonClient } from '@/lib/supabase/anon';
+import { unstable_cache } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { Metadata } from 'next';
 import type { PageSeo } from '@/lib/supabase/types';
 
@@ -8,27 +7,23 @@ import type { PageSeo } from '@/lib/supabase/types';
 // Per-Page SEO Data Layer
 // ---------------------------------------------------------------------------
 
-async function getSupabase() {
-  try {
-    return await createServerClient();
-  } catch {
-    return createAnonClient();
-  }
-}
-
 /**
  * Get SEO overrides for a specific page path.
  * Returns null if no custom SEO exists for this page.
  */
-export const getPageSeo = cache(async (pagePath: string): Promise<PageSeo | null> => {
-  const supabase = await getSupabase();
-  const { data } = await supabase
-    .from('page_seo')
-    .select('*')
-    .eq('page_path', pagePath)
-    .maybeSingle();
-  return data as PageSeo | null;
-});
+export const getPageSeo = unstable_cache(
+  async (pagePath: string): Promise<PageSeo | null> => {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('page_seo')
+      .select('*')
+      .eq('page_path', pagePath)
+      .maybeSingle();
+    return data as PageSeo | null;
+  },
+  ['page-seo'],
+  { revalidate: 300, tags: ['cms-seo'] }
+);
 
 /**
  * Merge auto-generated metadata with admin SEO overrides.

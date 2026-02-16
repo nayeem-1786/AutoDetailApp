@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { unstable_cache } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
 
@@ -9,23 +9,27 @@ import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
 /**
  * Get all active content blocks for a page (public-facing, sorted).
  */
-export async function getPageContentBlocks(pagePath: string): Promise<PageContentBlock[]> {
-  const supabase = await createClient();
+export const getPageContentBlocks = unstable_cache(
+  async (pagePath: string): Promise<PageContentBlock[]> => {
+    const supabase = createAdminClient();
 
-  const { data, error } = await supabase
-    .from('page_content_blocks')
-    .select('*')
-    .eq('page_path', pagePath)
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true });
+    const { data, error } = await supabase
+      .from('page_content_blocks')
+      .select('*')
+      .eq('page_path', pagePath)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
 
-  if (error) {
-    console.error('Failed to load page content blocks:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Failed to load page content blocks:', error);
+      return [];
+    }
 
-  return data as PageContentBlock[];
-}
+    return data as PageContentBlock[];
+  },
+  ['page-content-blocks'],
+  { revalidate: 300, tags: ['cms-content'] }
+);
 
 /**
  * Get all content blocks for a page including inactive (admin).

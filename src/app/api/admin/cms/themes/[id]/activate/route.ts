@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/cms/themes/[id]/activate — Activate theme (deactivates others)
@@ -40,5 +42,10 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Auto-enable the seasonal_themes feature flag
+  await setFeatureFlag('seasonal_themes', true);
+
+  revalidateTag('cms-theme');
+  revalidateTag('cms-toggles');
   return NextResponse.json({ data });
 }
