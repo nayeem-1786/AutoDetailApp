@@ -22,7 +22,44 @@ import {
   ExternalLink,
   Plus,
   Minus,
+  Bot,
+  Wand2,
+  ArrowRight,
+  CheckSquare,
+  Square,
+  AlertCircle,
 } from 'lucide-react';
+
+// ---------------------------------------------------------------------------
+// AI SEO Result Type (mirrors server-side)
+// ---------------------------------------------------------------------------
+
+interface AiSeoResult {
+  seo_title: string;
+  meta_description: string;
+  meta_keywords: string;
+  focus_keyword: string;
+  og_title: string;
+  og_description: string;
+  suggestions: string[];
+}
+
+interface AiPageResult {
+  pagePath: string;
+  generated: AiSeoResult;
+  current: {
+    seo_title: string | null;
+    meta_description: string | null;
+    meta_keywords: string | null;
+    focus_keyword: string | null;
+    og_title: string | null;
+    og_description: string | null;
+  };
+  status: 'success' | 'error';
+  error?: string;
+  selected?: boolean;
+  edited?: AiSeoResult; // admin-edited version
+}
 
 // ---------------------------------------------------------------------------
 // SEO Score Calculation
@@ -285,6 +322,59 @@ function PageEditor({
     internal_links: (page.internal_links ?? []) as Array<{ text: string; url: string }>,
   });
   const [saving, setSaving] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiModified, setAiModified] = useState(false);
+
+  // Store original values for revert
+  const [originalForm] = useState({ ...form });
+
+  const handleAiOptimize = async () => {
+    setAiGenerating(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/seo/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'single', pagePath: page.page_path }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'AI generation failed');
+      }
+      const { data } = await res.json();
+      const gen = data.generated as AiSeoResult;
+      setForm((prev) => ({
+        ...prev,
+        seo_title: gen.seo_title || prev.seo_title,
+        meta_description: gen.meta_description || prev.meta_description,
+        meta_keywords: gen.meta_keywords || prev.meta_keywords,
+        focus_keyword: gen.focus_keyword || prev.focus_keyword,
+        og_title: gen.og_title || prev.og_title,
+        og_description: gen.og_description || prev.og_description,
+      }));
+      setAiSuggestions(gen.suggestions || []);
+      setAiModified(true);
+      toast.success('AI optimization applied — review and save');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'AI generation failed');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const handleRevert = () => {
+    setForm((prev) => ({
+      ...prev,
+      seo_title: originalForm.seo_title,
+      meta_description: originalForm.meta_description,
+      meta_keywords: originalForm.meta_keywords,
+      focus_keyword: originalForm.focus_keyword,
+      og_title: originalForm.og_title,
+      og_description: originalForm.og_description,
+    }));
+    setAiModified(false);
+    setAiSuggestions([]);
+  };
 
   const fk = form.focus_keyword.toLowerCase().trim();
   const fkInTitle = fk ? form.seo_title.toLowerCase().includes(fk) : false;
@@ -334,15 +424,62 @@ function PageEditor({
 
   return (
     <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-5 space-y-5">
-      {/* Live Score */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          SEO Score:
-        </span>
-        <Badge variant={getScoreVariant(liveScore)}>
-          {liveScore}/100 — {getScoreLabel(liveScore)}
-        </Badge>
+      {/* Live Score + AI Optimize */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            SEO Score:
+          </span>
+          <Badge variant={getScoreVariant(liveScore)}>
+            {liveScore}/100 — {getScoreLabel(liveScore)}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          {aiModified && (
+            <Button variant="outline" size="sm" onClick={handleRevert}>
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              Revert
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAiOptimize}
+            disabled={aiGenerating}
+          >
+            {aiGenerating ? (
+              <Spinner size="sm" className="mr-1.5" />
+            ) : (
+              <Wand2 className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            AI Optimize
+          </Button>
+        </div>
       </div>
+
+      {/* AI Modified Banner */}
+      {aiModified && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 px-4 py-2.5 text-sm text-amber-800 dark:text-amber-200">
+          Fields updated by AI — review changes and click Save to apply.
+        </div>
+      )}
+
+      {/* AI Suggestions */}
+      {aiSuggestions.length > 0 && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 p-4">
+          <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wider mb-2">
+            AI Recommendations
+          </p>
+          <ul className="space-y-1">
+            {aiSuggestions.map((suggestion, i) => (
+              <li key={i} className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                <ArrowRight className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                {suggestion}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* SEO Title */}
       <div>
@@ -642,6 +779,315 @@ function AiTxtTab() {
 }
 
 // ---------------------------------------------------------------------------
+// AI Review Modal — shows side-by-side diff for global/batch AI generation
+// ---------------------------------------------------------------------------
+
+function AiReviewModal({
+  results,
+  generating,
+  onApply,
+  onClose,
+}: {
+  results: AiPageResult[];
+  generating: boolean;
+  onApply: (selected: AiPageResult[]) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState<AiPageResult[]>(
+    results.map((r) => ({ ...r, selected: r.status === 'success', edited: { ...r.generated } }))
+  );
+  const [applying, setApplying] = useState(false);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  // Sync new results as they arrive during global generation
+  useEffect(() => {
+    setItems(
+      results.map((r, i) => {
+        const existing = items[i];
+        if (existing && existing.pagePath === r.pagePath) return existing;
+        return { ...r, selected: r.status === 'success', edited: { ...r.generated } };
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results.length]);
+
+  const selectedCount = items.filter((i) => i.selected && i.status === 'success').length;
+  const successCount = items.filter((i) => i.status === 'success').length;
+
+  const toggleAll = (checked: boolean) => {
+    setItems((prev) =>
+      prev.map((i) => (i.status === 'success' ? { ...i, selected: checked } : i))
+    );
+  };
+
+  const toggleItem = (idx: number) => {
+    setItems((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, selected: !item.selected } : item))
+    );
+  };
+
+  const updateEdited = (idx: number, field: keyof AiSeoResult, value: string) => {
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === idx && item.edited
+          ? { ...item, edited: { ...item.edited, [field]: value } as AiSeoResult }
+          : item
+      )
+    );
+  };
+
+  const handleApply = async () => {
+    const selected = items.filter((i) => i.selected && i.status === 'success');
+    if (selected.length === 0) return;
+    setApplying(true);
+    try {
+      await onApply(selected);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const SEO_FIELDS: Array<{ key: keyof AiSeoResult; label: string }> = [
+    { key: 'seo_title', label: 'SEO Title' },
+    { key: 'meta_description', label: 'Meta Description' },
+    { key: 'meta_keywords', label: 'Keywords' },
+    { key: 'focus_keyword', label: 'Focus Keyword' },
+    { key: 'og_title', label: 'OG Title' },
+    { key: 'og_description', label: 'OG Description' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 flex max-h-[90vh] w-full max-w-5xl flex-col rounded-xl bg-white shadow-2xl dark:bg-gray-900">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              AI SEO Review
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {generating
+                ? `Generating... ${successCount} of ${items.length} complete`
+                : `${successCount} pages generated — ${selectedCount} selected`}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Progress bar during generation */}
+        {generating && (
+          <div className="h-1 bg-gray-100 dark:bg-gray-800">
+            <div
+              className="h-1 bg-blue-500 transition-all duration-500"
+              style={{
+                width: items.length > 0 ? `${(successCount / items.length) * 100}%` : '0%',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Select all / none */}
+        <div className="flex items-center gap-4 border-b border-gray-200 dark:border-gray-700 px-6 py-2.5">
+          <button
+            type="button"
+            onClick={() => toggleAll(true)}
+            className="text-xs font-medium text-blue-600 hover:text-blue-800"
+          >
+            Select All
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleAll(false)}
+            className="text-xs font-medium text-blue-600 hover:text-blue-800"
+          >
+            Select None
+          </button>
+          <span className="text-xs text-gray-400">
+            {selectedCount} of {successCount} selected
+          </span>
+        </div>
+
+        {/* Results list */}
+        <div className="flex-1 overflow-y-auto px-6 py-3">
+          {items.length === 0 && generating && (
+            <div className="flex h-40 items-center justify-center">
+              <Spinner size="lg" />
+            </div>
+          )}
+          <div className="space-y-2">
+            {items.map((item, idx) => {
+              const isExpanded = expandedIdx === idx;
+              return (
+                <div
+                  key={item.pagePath}
+                  className={`rounded-lg border ${
+                    item.status === 'error'
+                      ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+                      : item.selected
+                        ? 'border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-900/10'
+                        : 'border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  {/* Row header */}
+                  <div
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+                    onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+                  >
+                    {/* Checkbox */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (item.status === 'success') toggleItem(idx);
+                      }}
+                      disabled={item.status === 'error'}
+                      className="flex-shrink-0"
+                    >
+                      {item.selected && item.status === 'success' ? (
+                        <CheckSquare className="h-5 w-5 text-blue-600" />
+                      ) : (
+                        <Square className="h-5 w-5 text-gray-300 dark:text-gray-600" />
+                      )}
+                    </button>
+
+                    {/* Path + status */}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate block">
+                        {item.pagePath}
+                      </span>
+                      {item.status === 'success' && item.edited && (
+                        <span className="text-xs text-gray-500 truncate block">
+                          {item.edited.seo_title}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Status badge */}
+                    {item.status === 'error' && (
+                      <div className="flex items-center gap-1 text-xs text-red-600">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {item.error || 'Failed'}
+                      </div>
+                    )}
+
+                    {/* Expand chevron */}
+                    {item.status === 'success' && (
+                      isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      )
+                    )}
+                  </div>
+
+                  {/* Expanded detail with side-by-side diff */}
+                  {isExpanded && item.status === 'success' && item.edited && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 space-y-3">
+                      {SEO_FIELDS.map(({ key, label }) => {
+                        if (key === 'suggestions') return null;
+                        const currentVal =
+                          item.current[key as keyof typeof item.current] ?? '';
+                        const editedVal = item.edited?.[key] ?? '';
+                        const changed = currentVal !== editedVal;
+                        return (
+                          <div key={key}>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {label}
+                              {changed && (
+                                <span className="ml-2 text-amber-600 normal-case tracking-normal">
+                                  changed
+                                </span>
+                              )}
+                            </label>
+                            <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {/* Current */}
+                              <div className="rounded-md bg-gray-100 dark:bg-gray-800 px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                <span className="text-[10px] font-medium uppercase tracking-wider text-gray-400 block mb-0.5">
+                                  Current
+                                </span>
+                                {currentVal || (
+                                  <span className="italic text-gray-300 dark:text-gray-600">
+                                    Empty
+                                  </span>
+                                )}
+                              </div>
+                              {/* Generated (editable) */}
+                              <div>
+                                <span className="text-[10px] font-medium uppercase tracking-wider text-blue-500 block mb-0.5">
+                                  AI Generated
+                                </span>
+                                {key === 'meta_description' || key === 'og_description' ? (
+                                  <textarea
+                                    value={editedVal as string}
+                                    onChange={(e) => updateEdited(idx, key, e.target.value)}
+                                    rows={2}
+                                    className="block w-full rounded-md border border-blue-200 bg-white px-3 py-2 text-sm dark:border-blue-800 dark:bg-gray-800 dark:text-gray-200"
+                                  />
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={editedVal as string}
+                                    onChange={(e) => updateEdited(idx, key, e.target.value)}
+                                    className="block w-full rounded-md border border-blue-200 bg-white px-3 py-2 text-sm dark:border-blue-800 dark:bg-gray-800 dark:text-gray-200"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Suggestions */}
+                      {item.generated.suggestions?.length > 0 && (
+                        <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-3">
+                          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">
+                            AI Recommendations
+                          </p>
+                          <ul className="space-y-0.5">
+                            {item.generated.suggestions.map((s, si) => (
+                              <li key={si} className="text-xs text-blue-600 dark:text-blue-400 flex items-start gap-1.5">
+                                <ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                {s}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-6 py-4">
+          <Button variant="outline" onClick={onClose} disabled={applying}>
+            Cancel
+          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleApply}
+              disabled={selectedCount === 0 || applying || generating}
+            >
+              {applying ? (
+                <Spinner size="sm" className="mr-2" />
+              ) : (
+                <Check className="mr-2 h-4 w-4" />
+              )}
+              Apply {selectedCount} Page{selectedCount !== 1 ? 's' : ''}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main SEO Dashboard
 // ---------------------------------------------------------------------------
 
@@ -651,6 +1097,13 @@ export default function SeoDashboardPage() {
   const [autoPopulating, setAutoPopulating] = useState(false);
   const [expandedPath, setExpandedPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'ai-txt'>('overview');
+
+  // AI global generation state
+  const [showAiReviewModal, setShowAiReviewModal] = useState(false);
+  const [aiResults, setAiResults] = useState<AiPageResult[]>([]);
+  const [aiGeneratingGlobal, setAiGeneratingGlobal] = useState(false);
+  const [showAiConfirmDialog, setShowAiConfirmDialog] = useState(false);
+  const [aiOverwriteExisting, setAiOverwriteExisting] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -743,6 +1196,78 @@ export default function SeoDashboardPage() {
     }
   };
 
+  // AI Generate All — opens confirmation then generates
+  const handleAiGenerateAll = async () => {
+    setShowAiConfirmDialog(false);
+    setAiGeneratingGlobal(true);
+    setAiResults([]);
+    setShowAiReviewModal(true);
+
+    try {
+      const res = await adminFetch('/api/admin/cms/seo/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'global',
+          overwriteExisting: aiOverwriteExisting,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'AI generation failed');
+      }
+      const { data } = await res.json();
+      const mappedResults: AiPageResult[] = (data.results || []).map((r: AiPageResult) => ({
+        ...r,
+        selected: r.status === 'success',
+        edited: r.status === 'success' ? { ...r.generated } : undefined,
+      }));
+      setAiResults(mappedResults);
+      if (data.errors?.length > 0) {
+        toast.warning(`${data.errors.length} page${data.errors.length !== 1 ? 's' : ''} failed`);
+      } else {
+        toast.success(`AI generated SEO for ${mappedResults.filter((r: AiPageResult) => r.status === 'success').length} pages`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'AI generation failed');
+      setShowAiReviewModal(false);
+    } finally {
+      setAiGeneratingGlobal(false);
+    }
+  };
+
+  // Apply selected AI results
+  const handleAiApply = async (selected: AiPageResult[]) => {
+    const payload = selected.map((item) => ({
+      pagePath: item.pagePath,
+      seo_title: item.edited?.seo_title ?? item.generated.seo_title,
+      meta_description: item.edited?.meta_description ?? item.generated.meta_description,
+      meta_keywords: item.edited?.meta_keywords ?? item.generated.meta_keywords,
+      focus_keyword: item.edited?.focus_keyword ?? item.generated.focus_keyword,
+      og_title: item.edited?.og_title ?? item.generated.og_title,
+      og_description: item.edited?.og_description ?? item.generated.og_description,
+    }));
+
+    try {
+      const res = await adminFetch('/api/admin/cms/seo/ai-apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pages: payload }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to apply');
+      }
+      const { message } = await res.json();
+      toast.success(message || `Applied SEO to ${selected.length} pages`);
+      setShowAiReviewModal(false);
+      setAiResults([]);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to apply AI SEO');
+    }
+  };
+
   const savePage = async (pagePath: string, updates: Partial<PageSeo>) => {
     const encoded = encodeURIComponent(pagePath);
     try {
@@ -783,14 +1308,28 @@ export default function SeoDashboardPage() {
         description="Manage per-page SEO settings, meta tags, and AI crawler access"
         action={
           activeTab === 'overview' ? (
-            <Button onClick={autoPopulate} disabled={autoPopulating}>
-              {autoPopulating ? (
-                <Spinner size="sm" className="mr-2" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              Auto-Populate Missing
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowAiConfirmDialog(true)}
+                disabled={aiGeneratingGlobal}
+              >
+                {aiGeneratingGlobal ? (
+                  <Spinner size="sm" className="mr-2" />
+                ) : (
+                  <Bot className="mr-2 h-4 w-4" />
+                )}
+                AI Generate All
+              </Button>
+              <Button onClick={autoPopulate} disabled={autoPopulating}>
+                {autoPopulating ? (
+                  <Spinner size="sm" className="mr-2" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Auto-Populate Missing
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -1047,6 +1586,62 @@ export default function SeoDashboardPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* AI Confirm Dialog */}
+      {showAiConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="rounded-full bg-blue-100 dark:bg-blue-900/30 p-2">
+                <Bot className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                AI SEO Generation
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Generate optimized SEO content for all pages using AI. You&apos;ll review and approve
+              changes before they&apos;re applied.
+            </p>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mb-6 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={aiOverwriteExisting}
+                onChange={(e) => setAiOverwriteExisting(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Overwrite pages with existing custom SEO
+            </label>
+            <div className="flex items-center justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowAiConfirmDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAiGenerateAll}>
+                <Bot className="mr-2 h-4 w-4" />
+                Generate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Review Modal */}
+      {showAiReviewModal && (
+        <AiReviewModal
+          results={aiResults}
+          generating={aiGeneratingGlobal}
+          onApply={handleAiApply}
+          onClose={() => {
+            if (!aiGeneratingGlobal) {
+              setShowAiReviewModal(false);
+              setAiResults([]);
+            }
+          }}
+        />
       )}
     </div>
   );

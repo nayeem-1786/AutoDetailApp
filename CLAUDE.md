@@ -425,7 +425,18 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-13 (Session G — Service History Tab, Sidebar Cleanup, Photo Feature Button)
+## Last Session: 2026-02-14 (Session H — AI-Powered SEO Agent)
+- **AI SEO generation system**: Full AI-powered SEO optimization built into the existing SEO dashboard. Uses Claude API (`claude-sonnet-4-20250514` via `ANTHROPIC_API_KEY`) to generate optimized SEO fields (title, description, keywords, focus keyword, OG fields) with context-aware page content extraction.
+- **Page content extractor** (`src/lib/services/page-content-extractor.ts`): Extracts text summaries from each page type (homepage, services, products, city pages, gallery, booking, terms) for AI context. Queries live DB data including pricing, categories, and business info.
+- **AI SEO service** (`src/lib/services/ai-seo.ts`): `generateSeoForPage()` and `generateSeoByPath()` — wraps Claude API with detailed system prompt for local auto detailing SEO optimization.
+- **API routes**: `POST /api/admin/cms/seo/ai-generate` (single/global/batch modes), `POST /api/admin/cms/seo/ai-apply` (save reviewed AI SEO to DB).
+- **Per-page AI Optimize**: "AI Optimize" button in page editor → populates form fields → amber "Fields updated by AI" banner → blue suggestions panel → "Revert" button to restore originals.
+- **Global AI Generate All**: Button in page header → confirmation dialog with "Overwrite existing?" option → AI Review Modal with side-by-side current vs generated diff, inline editing, checkboxes for select/deselect, progress bar, "Apply N Pages" button.
+- **Files created**: `page-content-extractor.ts`, `ai-seo.ts`, `ai-generate/route.ts`, `ai-apply/route.ts`
+- **Files modified**: `seo/page.tsx` (AI Optimize, AI Review Modal, AI Generate All, confirm dialog)
+- TypeScript clean (zero errors)
+
+### Session G — 2026-02-13 (Service History Tab, Sidebar Cleanup, Photo Feature Button)
 - **Customer detail Photos → Service History tab**: Replaced before/after photo display with a full jobs table (date, vehicle, services, add-ons, photos, duration, staff, status). Filters: status dropdown, vehicle dropdown. Pagination 20/page. Row click → `/admin/jobs/[id]`. Uses `/api/admin/jobs?customer_id=` endpoint.
 - **Admin sidebar flattened**: "Service Records" is direct link to `/admin/jobs` (ClipboardList icon, no dropdown). "Photo Gallery" is standalone item (Camera icon). Both gated behind `photo_documentation` flag.
 - **Job detail photo star toggle**: Each photo thumbnail has a Star button (top-right, overlaid). Featured = filled yellow star. Unfeatured = outline white star. Toggles `is_featured` via `PATCH /api/admin/photos/[id]`. Optimistic UI with revert on error.

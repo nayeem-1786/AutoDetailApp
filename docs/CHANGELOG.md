@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session H — 2026-02-14 (AI-Powered SEO Agent)
+
+### New: AI SEO Generation System
+- **Page content extractor** (`src/lib/services/page-content-extractor.ts`): Extracts text content from each page type for AI context. Master router function handles homepage, services (index/category/detail), products (index/category/detail), city landing pages, gallery, booking, terms. Queries DB for live data (services, products, categories, pricing, business info).
+- **AI SEO service** (`src/lib/services/ai-seo.ts`): Claude API wrapper for SEO content generation. Detailed system prompt with rules for title (50-60 chars), description (150-160 chars), keywords, focus keyword, OG fields, local SEO priorities. Uses `claude-sonnet-4-20250514` model via `ANTHROPIC_API_KEY`.
+- **AI Generate API** (`/api/admin/cms/seo/ai-generate`): POST endpoint with three modes — `single` (one page for inline preview), `global` (all pages with empty/auto-generated SEO), `batch` (specific page paths). Supports `overwriteExisting` flag.
+- **AI Apply API** (`/api/admin/cms/seo/ai-apply`): POST endpoint to save AI-generated (admin-reviewed) SEO to `page_seo` table. Upserts each page, sets `is_auto_generated: false`.
+- **Per-page AI Optimize**: "AI Optimize" button in PageEditor calls single-mode API, populates form fields with AI suggestions. "Revert" button restores original values. Amber "Fields updated by AI" banner. Blue "AI Recommendations" panel with actionable suggestions.
+- **Global AI Generate All**: "AI Generate All" button in page header with confirmation dialog and "Overwrite existing?" checkbox. Opens AI Review Modal showing all results with side-by-side current vs generated diff, inline editing, select/deselect checkboxes, progress bar during generation, and "Apply N Pages" button.
+
+### Files Created
+- `src/lib/services/page-content-extractor.ts` — page content extraction for AI context
+- `src/lib/services/ai-seo.ts` — Claude API wrapper for SEO generation
+- `src/app/api/admin/cms/seo/ai-generate/route.ts` — AI SEO generation endpoint
+- `src/app/api/admin/cms/seo/ai-apply/route.ts` — AI SEO apply endpoint
+
+### Files Modified
+- `src/app/admin/website/seo/page.tsx` — AI Optimize button, AI Review Modal, AI Generate All button, confirm dialog
+
+---
+
 ## Phase 8 — Complete (Launch Ready)
 - Phase 8 Job Management & Photo Documentation fully operational
 - See `docs/POST_LAUNCH_ROADMAP.md` for deferred enhancements (marketing library, categories, collages, portfolio, vehicle SVG upgrade)
