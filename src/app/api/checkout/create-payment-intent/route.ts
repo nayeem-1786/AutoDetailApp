@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
       const taxableAfterDiscountCents = Math.round(
         taxableSubtotalCents * (1 - discountRatio)
       );
-      taxCents = Math.round(taxableAfterDiscountCents * TAX_RATE);
+      taxCents = Math.max(0, Math.round(taxableAfterDiscountCents * TAX_RATE));
     }
 
     // 5. Shipping

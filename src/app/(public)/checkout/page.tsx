@@ -364,7 +364,7 @@ function CheckoutContent() {
 
   const estimatedTaxCents =
     showTax && displayTaxState === 'CA'
-      ? Math.round(subtotal * 100 * TAX_RATE)
+      ? Math.max(0, Math.round(subtotal * 100 * TAX_RATE))
       : 0;
 
   // Shipping amount for display
@@ -474,6 +474,15 @@ function CheckoutContent() {
       router.replace('/cart');
     }
   }, [items.length, clientSecret, router]);
+
+  // Clear shipping state when fulfillment method changes (Bug 1 — prevents flash)
+  useEffect(() => {
+    setShippingRates([]);
+    setSelectedRateId(null);
+    setRatesFetched(false);
+    setRatesError(null);
+    setAddressWarning(null);
+  }, [fulfillmentMethod]);
 
   // Validate address via Shippo (non-blocking)
   const validateShippingAddress = useCallback(async () => {
@@ -1372,7 +1381,7 @@ function CheckoutContent() {
                         : 'FREE'}
                     </span>
                   ) : fulfillmentMethod === 'pickup' ? (
-                    <span className="text-lime font-medium text-xs">
+                    <span className="text-lime font-medium">
                       FREE (Local Pickup)
                     </span>
                   ) : selectedRate ? (
@@ -1396,15 +1405,11 @@ function CheckoutContent() {
                         : '$0.00'}
                     </span>
                   ) : showTax ? (
-                    displayTaxState === 'CA' ? (
-                      <span className="text-site-text-faint tabular-nums text-xs">
-                        ~{formatCurrency(estimatedTaxCents / 100)}
-                      </span>
-                    ) : (
-                      <span className="text-site-text-faint text-xs">
-                        $0.00 (no CA tax)
-                      </span>
-                    )
+                    <span className="text-site-text tabular-nums">
+                      {displayTaxState === 'CA'
+                        ? formatCurrency(estimatedTaxCents / 100)
+                        : '$0.00'}
+                    </span>
                   ) : (
                     <span className="text-site-text-faint">—</span>
                   )}
@@ -1418,9 +1423,10 @@ function CheckoutContent() {
                     {totals
                       ? formatCurrency(totals.total / 100)
                       : formatCurrency(
-                          subtotal + displayShippingCents / 100
+                          subtotal +
+                            displayShippingCents / 100 +
+                            estimatedTaxCents / 100
                         )}
-                    {!totals && '+'}
                   </span>
                 </div>
               </div>

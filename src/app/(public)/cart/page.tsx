@@ -276,7 +276,7 @@ export default function CartPage() {
                 <div className="border-t border-site-border pt-3 flex justify-between">
                   <span className="text-base font-bold text-site-text">Estimated Total</span>
                   <span className="text-base font-bold text-site-text tabular-nums">
-                    {formatCurrency(total)}+
+                    {formatCurrency(total)}
                   </span>
                 </div>
               </div>
