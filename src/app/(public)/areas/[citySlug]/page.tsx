@@ -135,7 +135,7 @@ export default async function CityLandingPage({
       <JsonLd data={breadcrumbSchema} />
 
       {/* Hero Section */}
-      <section className="bg-black py-16 sm:py-20 lg:py-24 relative overflow-hidden">
+      <section className="bg-brand-black py-16 sm:py-20 lg:py-24 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-lime/3 rounded-full blur-3xl" />
         </div>
@@ -289,7 +289,7 @@ export default async function CityLandingPage({
       />
 
       {/* Business Info Footer */}
-      <section className="bg-black border-t border-white/10 py-10">
+      <section className="bg-brand-black border-t border-white/10 py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-center sm:gap-8 sm:text-left">
             <div className="flex items-center gap-2 text-sm text-gray-400">

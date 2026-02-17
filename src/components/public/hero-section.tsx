@@ -11,7 +11,7 @@ export async function HeroSection() {
   ]);
 
   return (
-    <section className="relative bg-black overflow-hidden">
+    <section className="relative bg-brand-black overflow-hidden">
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
           {/* Left — Text */}

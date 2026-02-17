@@ -18,6 +18,10 @@
   --surface-raised: #ffffff;
   --navy: #0f172a;
   --navy-light: #1e293b;
+
+  /* Seasonal theme accent RGB — used by shadows, glows, animations.
+     ThemeProvider overrides this when a seasonal theme is active. */
+  --theme-accent-glow-rgb: 204, 255, 0;
 }
 
 @theme inline {
@@ -41,7 +45,8 @@
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
 
-  /* Lime accent palette */
+  /* Lime accent palette — seasonal themes override via ThemeProvider
+     which sets --color-lime, --color-lime-200, etc. on a wrapper div. */
   --color-lime: #CCFF00;
   --color-lime-50: #F5FFD6;
   --color-lime-100: #ECFF99;
@@ -51,7 +56,7 @@
   --color-lime-500: #A3CC00;
   --color-lime-600: #7A9900;
 
-  /* Dark brand surfaces */
+  /* Dark brand surfaces — seasonal themes can tint these */
   --color-brand-black: #000000;
   --color-brand-dark: #0A0A0A;
   --color-brand-darker: #111111;
@@ -59,11 +64,11 @@
   --color-brand-grey-light: #374151;
   --color-brand-surface: #1A1A1A;
 
-  /* Lime glow shadows */
-  --shadow-lime-sm: 0 0 10px rgba(204, 255, 0, 0.1);
-  --shadow-lime: 0 0 20px rgba(204, 255, 0, 0.15);
-  --shadow-lime-lg: 0 0 40px rgba(204, 255, 0, 0.25);
-  --shadow-lime-glow: 0 0 60px rgba(204, 255, 0, 0.3);
+  /* Accent glow shadows — use the RGB var so seasonal themes auto-update */
+  --shadow-lime-sm: 0 0 10px rgba(var(--theme-accent-glow-rgb), 0.1);
+  --shadow-lime: 0 0 20px rgba(var(--theme-accent-glow-rgb), 0.15);
+  --shadow-lime-lg: 0 0 40px rgba(var(--theme-accent-glow-rgb), 0.25);
+  --shadow-lime-glow: 0 0 60px rgba(var(--theme-accent-glow-rgb), 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -253,14 +258,9 @@ h1, h2, h3 {
    Smart Details Brand — Public Pages Only
    ============================================ */
 
-.public-theme {
-  --color-lime: #CCFF00;
-  --color-lime-dim: rgba(204, 255, 0, 0.7);
-  --color-lime-glow: rgba(204, 255, 0, 0.15);
-}
-
+/* Gradient text — references --color-lime so seasonal themes auto-update */
 .text-gradient-lime {
-  background: linear-gradient(135deg, #CCFF00, #A3CC00);
+  background: linear-gradient(135deg, var(--color-lime), var(--color-lime-500));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -273,6 +273,7 @@ h1, h2, h3 {
   background-clip: text;
 }
 
+/* Button glow — uses accent RGB var for seasonal theme support */
 .btn-lime-glow {
   position: relative;
   overflow: hidden;
@@ -281,7 +282,7 @@ h1, h2, h3 {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(204, 255, 0, 0.15), transparent 70%);
+  background: radial-gradient(circle at center, rgba(var(--theme-accent-glow-rgb), 0.15), transparent 70%);
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
@@ -290,13 +291,15 @@ h1, h2, h3 {
   opacity: 1;
 }
 
+/* Scrollbar — references --color-lime for accent thumb hover */
 .public-theme::-webkit-scrollbar { width: 8px; }
-.public-theme::-webkit-scrollbar-track { background: #0A0A0A; }
-.public-theme::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
-.public-theme::-webkit-scrollbar-thumb:hover { background: #CCFF00; }
+.public-theme::-webkit-scrollbar-track { background: var(--color-brand-dark); }
+.public-theme::-webkit-scrollbar-thumb { background: var(--color-brand-grey-light); border-radius: 4px; }
+.public-theme::-webkit-scrollbar-thumb:hover { background: var(--color-lime); }
 
+/* Pulse animation — uses accent RGB var */
 @keyframes lime-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(204, 255, 0, 0.3); }
-  50% { box-shadow: 0 0 0 8px rgba(204, 255, 0, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--theme-accent-glow-rgb), 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--theme-accent-glow-rgb), 0); }
 }
 .animate-lime-pulse { animation: lime-pulse 2s ease-in-out infinite; }

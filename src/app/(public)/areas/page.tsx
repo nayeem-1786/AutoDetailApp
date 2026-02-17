@@ -66,7 +66,7 @@ export default async function AreasIndexPage() {
       <JsonLd data={breadcrumbSchema} />
 
       {/* Hero */}
-      <section className="bg-black py-16 sm:py-20 lg:py-24">
+      <section className="bg-brand-black py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs items={[{ label: 'Service Areas' }]} />
           <AnimatedSection>

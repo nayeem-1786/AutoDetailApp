@@ -97,7 +97,7 @@ export default async function HomePage() {
       <TrustBar />
 
       {/* Our Services — Bento Grid */}
-      <section className="bg-black section-spacing">
+      <section className="bg-brand-black section-spacing">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <HomeAnimations type="section-header">
             <div className="text-center">
@@ -172,7 +172,7 @@ export default async function HomePage() {
 
       {/* Meet the Team */}
       {teamData.members.length > 0 && (
-        <section className="bg-black section-spacing">
+        <section className="bg-brand-black section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <HomeAnimations type="section-header">
               <div className="text-center">

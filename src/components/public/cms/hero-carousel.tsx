@@ -78,7 +78,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
 
   return (
     <section
-      className="relative overflow-hidden bg-black min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh]"
+      className="relative overflow-hidden bg-brand-black min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh]"
       onMouseEnter={() => config.pause_on_hover && setIsPaused(true)}
       onMouseLeave={() => config.pause_on_hover && setIsPaused(false)}
     >

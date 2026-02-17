@@ -4,6 +4,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session K — 2026-02-16 (Theme System Audit + Fix Seasonal Themes)
+
+### Theme System Audit (Parts 1A-1F)
+- **1A Database**: PASS — `seasonal_themes` table exists with 8 presets defined
+- **1B Data Flow**: PASS — `getActiveTheme()` queries correctly, layout passes to ThemeProvider
+- **1B WARN**: `seasonalThemes` feature flag defaults to `false` — must enable to see themes
+- **1C CSS Variables**: ROOT CAUSE FOUND — ThemeProvider was setting `--brand-500/600/700` (old design) but no component uses these. Session J redesigned to lime-on-black palette
+- **1D Disconnect**: `.public-theme` block in globals.css explicitly set `--color-lime: #CCFF00`, BLOCKING ThemeProvider overrides due to CSS specificity
+- **1E Particle Canvas**: PASS — reads theme colors correctly
+- **1F Theme Cron**: PASS — activation route exists, scheduler registered
+
+### Default Theme Baseline (Part 2)
+- Created `src/lib/utils/default-theme.ts` — structured `DEFAULT_THEME` constant with all extracted values (accent palette, backgrounds, text, borders, typography, buttons, shadows, spacing)
+- Exports `THEME_CSS_VARS` and `ThemeCssVar` type for reference
+
+### Fix CSS Variable Pipeline (Part 3)
+
+#### `src/app/globals.css`
+- Added `--theme-accent-glow-rgb: 204, 255, 0` to `:root` for shadow/glow calculations
+- Updated `@theme inline` shadow values to use `rgba(var(--theme-accent-glow-rgb), ...)` instead of hardcoded hex
+- **REMOVED** `.public-theme { --color-lime: #CCFF00; }` block that was blocking ThemeProvider overrides
+- Updated `.text-gradient-lime` to use `var(--color-lime)` and `var(--color-lime-500)`
+- Updated `.btn-lime-glow` to use `var(--theme-accent-glow-rgb)`
+- Updated scrollbar styles to use `var(--color-lime)` and `var(--color-brand-dark)`
+- Updated `lime-pulse` animation to use `var(--theme-accent-glow-rgb)`
+
+#### `src/components/public/cms/theme-provider.tsx` (rewritten)
+- New `buildCssVars()` maps theme `colorOverrides` keys to `--color-{key}` CSS custom properties
+- Special handling: `accent-glow-rgb` → `--theme-accent-glow-rgb`, `body_bg_color` → `--color-brand-black`
+- Gradient overrides via scoped `<style>` tag with `!important`
+
+#### `src/lib/utils/cms-theme-presets.ts` (rewritten)
+- All 8 theme presets updated from old keys (`brand-500`, `accent-500`) to new Tailwind v4 token keys
+- Each preset now includes: `lime` through `lime-600`, `brand-dark`, `brand-surface`, `accent-glow-rgb`
+
+#### Component Migrations (`bg-black` → `bg-brand-black`)
+- `src/app/(public)/layout.tsx` — main public wrapper
+- 10 public page files (homepage, services ×3, products ×2, gallery, terms, areas ×2)
+- `src/components/public/header-client.tsx` — header bg + scrolled state + dropdown + mobile menu
+- `src/components/public/footer-client.tsx` — footer bg
+- `src/components/public/hero-section.tsx` — section bg
+- `src/components/public/cms/hero-carousel.tsx` — section bg
+- **NOT changed**: Admin panel, customer auth, overlays, badges (intentional)
+
+### Verification (Part 4)
+- Valentine's Day preset: correct pink palette, hearts particles, rose-tinted surfaces
+- ThemeProvider pipeline: `buildCssVars()` correctly generates `--color-lime`, `--color-brand-dark`, etc.
+- CSS cascade: no blocking overrides, all utilities use `var()` references
+- TypeScript: zero errors
+- Next.js build: passes
+
+---
+
 ## Session J — 2026-02-16 (Public Frontend Reskin — Premium Dark Design)
 
 ### Changed: Complete visual overhaul of all public-facing components

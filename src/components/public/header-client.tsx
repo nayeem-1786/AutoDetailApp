@@ -36,8 +36,8 @@ export function HeaderClient({
     <header
       className={`sticky top-0 z-50 transition-all duration-500 ${
         scrolled
-          ? 'bg-black/95 backdrop-blur-xl shadow-2xl shadow-black/20'
-          : 'bg-black'
+          ? 'bg-brand-black/95 backdrop-blur-xl shadow-2xl shadow-black/20'
+          : 'bg-brand-black'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -120,7 +120,7 @@ export function HeaderClient({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.96 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute top-full left-0 mt-1 w-72 bg-[#1A1A1A] border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden p-2"
+                        className="absolute top-full left-0 mt-1 w-72 bg-brand-surface border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden p-2"
                       >
                         {item.children.map((child) => (
                           <Link
@@ -184,7 +184,7 @@ export function HeaderClient({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="lg:hidden overflow-hidden border-t border-white/10 bg-[#0A0A0A]"
+            className="lg:hidden overflow-hidden border-t border-white/10 bg-brand-dark"
           >
             <div className="px-4 py-4 space-y-1">
               {navItems.map((item) => (

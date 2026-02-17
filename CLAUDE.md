@@ -425,7 +425,18 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session J — Public Frontend Reskin, 2 sessions)
+## Last Session: 2026-02-16 (Session K — Theme System Audit + Fix Seasonal Themes)
+
+### Session K — Theme System Audit + Fix Seasonal Themes
+- **Full audit** of seasonal theme pipeline: DB layer, data flow, CSS variables, particle canvas, theme cron — identified root cause: ThemeProvider was setting old `brand-500/600/700` vars that nothing reads, plus `.public-theme` CSS block was blocking overrides
+- **Created** `src/lib/utils/default-theme.ts` — `DEFAULT_THEME` constant capturing all baseline values
+- **Rewrote** `src/components/public/cms/theme-provider.tsx` — new `buildCssVars()` maps colorOverrides keys to `--color-{key}` (Tailwind v4 tokens)
+- **Rewrote** `src/lib/utils/cms-theme-presets.ts` — all 8 presets updated from old keys to actual Tailwind tokens (`lime`, `lime-200`, `brand-dark`, `brand-surface`, `accent-glow-rgb`)
+- **Fixed** `src/app/globals.css` — removed `.public-theme` color override that blocked ThemeProvider, converted all shadow/glow/animation utilities from hardcoded hex to `var()` references
+- **Migrated** 15+ public components from `bg-black` → `bg-brand-black` for theme support
+- TypeScript clean, build passes
+
+## Session J — 2026-02-16 (Public Frontend Reskin, 2 sessions)
 
 ### Session J — Part 1: Layout Shell, Animations, Dark Theme Foundation
 - **Complete visual overhaul** of all public-facing components with premium dark automotive aesthetic + framer-motion animations

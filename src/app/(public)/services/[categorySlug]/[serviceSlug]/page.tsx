@@ -95,7 +95,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
       {/* Service Header */}
-      <section className="bg-black py-14 sm:py-16 lg:py-20">
+      <section className="bg-brand-black py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[

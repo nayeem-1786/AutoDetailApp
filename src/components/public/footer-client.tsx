@@ -51,7 +51,7 @@ export function FooterClient({
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-[#0A0A0A] border-t border-white/5">
+    <footer className="bg-brand-dark border-t border-white/5">
       {/* Trust badges strip */}
       <div className="border-b border-white/10">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">

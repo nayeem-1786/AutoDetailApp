@@ -152,7 +152,7 @@ export default async function GalleryPage() {
       />
 
       {/* Hero */}
-      <section className="bg-black py-16 sm:py-20 lg:py-24">
+      <section className="bg-brand-black py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <AnimatedSection>
             <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl">
