@@ -1,8 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
- * Generate the next sequential order number: SD-10001, SD-10002, etc.
+ * Generate the next sequential order number: WO-10001, WO-10002, etc.
  * Orders by order_number DESC to prevent reuse.
+ * Prefix 'WO' (Web Order) to avoid overlap with 'SD' transaction numbers.
  */
 export async function generateOrderNumber(
   supabase?: ReturnType<typeof createAdminClient>
@@ -19,11 +20,11 @@ export async function generateOrderNumber(
   let nextNum = 10001;
 
   if (data?.order_number) {
-    const match = data.order_number.match(/^SD-(\d+)$/);
+    const match = data.order_number.match(/^WO-(\d+)$/);
     if (match) {
       nextNum = parseInt(match[1], 10) + 1;
     }
   }
 
-  return `SD-${String(nextNum).padStart(5, '0')}`;
+  return `WO-${String(nextNum).padStart(5, '0')}`;
 }
