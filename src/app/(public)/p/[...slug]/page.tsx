@@ -59,7 +59,7 @@ function markdownToHtml(md: string): string {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
   // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-brand-600 hover:underline">$1</a>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-lime hover:underline">$1</a>');
 
   // Unordered lists
   html = html.replace(
@@ -103,12 +103,12 @@ export default async function CustomPage({ params }: PageProps) {
   if (page.page_template === 'content') {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-        <h1 className="font-display text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-5xl">
+        <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl">
           {page.title}
         </h1>
         {page.content && (
           <div
-            className="mt-8 prose prose-gray dark:prose-invert max-w-none"
+            className="mt-8 prose prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: markdownToHtml(page.content) }}
           />
         )}
@@ -128,7 +128,7 @@ export default async function CustomPage({ params }: PageProps) {
         {page.content && (
           <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
             <div
-              className="prose prose-gray dark:prose-invert max-w-none"
+              className="prose prose-invert max-w-none"
               dangerouslySetInnerHTML={{ __html: markdownToHtml(page.content) }}
             />
           </div>

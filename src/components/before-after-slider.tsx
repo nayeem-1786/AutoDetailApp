@@ -49,6 +49,16 @@ export function BeforeAfterSlider({
       ref={containerRef}
       className="relative overflow-hidden rounded-2xl cursor-col-resize select-none group"
       style={{ touchAction: 'none' }}
+      role="slider"
+      aria-valuenow={Math.round(position)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="Before and after comparison slider"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') setPosition((p) => Math.max(0, p - 2));
+        if (e.key === 'ArrowRight') setPosition((p) => Math.min(100, p + 2));
+      }}
       onPointerDown={(e) => {
         e.preventDefault();
         setIsDragging(true);
@@ -90,17 +100,18 @@ export function BeforeAfterSlider({
         className="absolute top-0 bottom-0 z-10"
         style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
       >
-        <div className="w-0.5 h-full bg-white shadow-lg" />
+        <div className="w-[3px] h-full bg-lime" style={{ boxShadow: '0 0 20px rgba(204, 255, 0, 0.15)' }} />
         <div
-          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white shadow-2xl flex items-center justify-center transition-transform ${
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-black border-2 border-lime flex items-center justify-center transition-transform ${
             isDragging ? 'scale-110' : 'group-hover:scale-105'
           }`}
+          style={{ boxShadow: isDragging ? '0 0 40px rgba(204, 255, 0, 0.25)' : '0 0 20px rgba(204, 255, 0, 0.15)' }}
         >
           <div className="flex items-center gap-0.5">
-            <svg className="w-3 h-3 text-gray-700 rotate-180" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-lime rotate-180" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
             </svg>
-            <svg className="w-3 h-3 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-lime" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
             </svg>
           </div>
@@ -122,7 +133,7 @@ export function BeforeAfterSlider({
         animate={{ opacity: 1, x: 0 }}
         className="absolute top-4 right-4 z-20 pointer-events-none"
       >
-        <span className="bg-red-600/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs font-bold uppercase tracking-wider">
+        <span className="bg-lime/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-black text-xs font-bold uppercase tracking-wider">
           {afterLabel}
         </span>
       </motion.div>

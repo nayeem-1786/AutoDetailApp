@@ -39,7 +39,7 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
       />
       <ol className={cn(
         'flex flex-wrap items-center gap-1.5 text-sm',
-        isLight ? 'text-blue-200/70' : 'text-gray-500 dark:text-gray-400'
+        isLight ? 'text-blue-200/70' : 'text-gray-400'
       )}>
         {allItems.map((item, index) => {
           const isLast = index === allItems.length - 1;
@@ -50,7 +50,7 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
                 <ChevronRight
                   className={cn(
                     'h-3.5 w-3.5',
-                    isLight ? 'text-blue-300/40' : 'text-gray-300 dark:text-gray-600'
+                    isLight ? 'text-blue-300/40' : 'text-gray-600'
                   )}
                   aria-hidden="true"
                 />
@@ -59,7 +59,7 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
                 <span
                   className={cn(
                     'font-medium',
-                    isLight ? 'text-white' : 'text-gray-900 dark:text-gray-100'
+                    isLight ? 'text-white' : 'text-white'
                   )}
                   aria-current={isLast ? 'page' : undefined}
                 >
@@ -72,7 +72,7 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
                     'underline underline-offset-2 transition-colors',
                     isLight
                       ? 'decoration-blue-300/30 hover:text-white hover:decoration-blue-300/60'
-                      : 'decoration-gray-300 hover:text-gray-900 hover:decoration-gray-500 dark:decoration-gray-600 dark:hover:text-gray-100 dark:hover:decoration-gray-400'
+                      : 'decoration-gray-600 hover:text-lime hover:decoration-lime'
                   )}
                 >
                   {item.label}

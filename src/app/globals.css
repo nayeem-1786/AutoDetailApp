@@ -40,6 +40,30 @@
   --color-navy-light: var(--navy-light);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
+
+  /* Lime accent palette */
+  --color-lime: #CCFF00;
+  --color-lime-50: #F5FFD6;
+  --color-lime-100: #ECFF99;
+  --color-lime-200: #DDFF4D;
+  --color-lime-300: #CCFF00;
+  --color-lime-400: #B8E600;
+  --color-lime-500: #A3CC00;
+  --color-lime-600: #7A9900;
+
+  /* Dark brand surfaces */
+  --color-brand-black: #000000;
+  --color-brand-dark: #0A0A0A;
+  --color-brand-darker: #111111;
+  --color-brand-grey: #1F2937;
+  --color-brand-grey-light: #374151;
+  --color-brand-surface: #1A1A1A;
+
+  /* Lime glow shadows */
+  --shadow-lime-sm: 0 0 10px rgba(204, 255, 0, 0.1);
+  --shadow-lime: 0 0 20px rgba(204, 255, 0, 0.15);
+  --shadow-lime-lg: 0 0 40px rgba(204, 255, 0, 0.25);
+  --shadow-lime-glow: 0 0 60px rgba(204, 255, 0, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -224,3 +248,55 @@ h1, h2, h3 {
     padding-right: 2rem;
   }
 }
+
+/* ============================================
+   Smart Details Brand — Public Pages Only
+   ============================================ */
+
+.public-theme {
+  --color-lime: #CCFF00;
+  --color-lime-dim: rgba(204, 255, 0, 0.7);
+  --color-lime-glow: rgba(204, 255, 0, 0.15);
+}
+
+.text-gradient-lime {
+  background: linear-gradient(135deg, #CCFF00, #A3CC00);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-white {
+  background: linear-gradient(135deg, #FFFFFF, #9CA3AF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.btn-lime-glow {
+  position: relative;
+  overflow: hidden;
+}
+.btn-lime-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(204, 255, 0, 0.15), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.btn-lime-glow:hover::after {
+  opacity: 1;
+}
+
+.public-theme::-webkit-scrollbar { width: 8px; }
+.public-theme::-webkit-scrollbar-track { background: #0A0A0A; }
+.public-theme::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+.public-theme::-webkit-scrollbar-thumb:hover { background: #CCFF00; }
+
+@keyframes lime-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(204, 255, 0, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(204, 255, 0, 0); }
+}
+.animate-lime-pulse { animation: lime-pulse 2s ease-in-out infinite; }

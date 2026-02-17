@@ -155,7 +155,7 @@ export default async function CityLandingPage({
           <div className="mt-8">
             <Link
               href="/book"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-white text-navy font-semibold text-base h-13 px-8 shadow-lg shadow-brand-900/25 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-semibold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
             >
               Book Your Detail
               <ArrowRight className="h-4 w-4" />
@@ -166,13 +166,13 @@ export default async function CityLandingPage({
 
       {/* Service Highlights */}
       {topCategories.length > 0 && (
-        <section className="bg-white dark:bg-gray-900 section-spacing">
+        <section className="bg-black section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 Services Available in {city.city_name}
               </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-400">
+              <p className="mx-auto mt-4 max-w-2xl text-gray-400">
                 From express washes to multi-year ceramic coating packages, we bring
                 professional auto detailing directly to you in {city.city_name}.
               </p>
@@ -187,7 +187,7 @@ export default async function CityLandingPage({
             <div className="mt-10 text-center">
               <Link
                 href="/services"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors group"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
               >
                 View all services
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -202,13 +202,13 @@ export default async function CityLandingPage({
 
       {/* Reviews Section */}
       {reviews.google.reviews.length > 0 && (
-        <section className="bg-gray-50 dark:bg-gray-950 section-spacing">
+        <section className="bg-brand-dark section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 What Our Customers Say
               </h2>
-              <p className="mx-auto mt-3 max-w-xl text-gray-600 dark:text-gray-400">
+              <p className="mx-auto mt-3 max-w-xl text-gray-400">
                 Rated {reviews.google.rating} stars across{' '}
                 {reviews.google.count} Google reviews
               </p>
@@ -218,7 +218,7 @@ export default async function CityLandingPage({
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
                 <div
                   key={i}
-                  className="rounded-2xl bg-white dark:bg-gray-800 p-7 ring-1 ring-gray-100 dark:ring-gray-700"
+                  className="rounded-2xl bg-brand-surface p-7 border border-white/10"
                 >
                   <div className="flex items-center gap-1">
                     {Array.from({ length: review.rating }).map((_, j) => (
@@ -228,11 +228,11 @@ export default async function CityLandingPage({
                       />
                     ))}
                   </div>
-                  <p className="mt-4 text-sm leading-relaxed text-gray-700 dark:text-gray-300 line-clamp-4">
+                  <p className="mt-4 text-sm leading-relaxed text-gray-300 line-clamp-4">
                     &ldquo;{review.text}&rdquo;
                   </p>
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <span className="text-sm font-medium text-white">
                       {review.author}
                     </span>
                     <span className="text-xs text-gray-400">
@@ -248,7 +248,7 @@ export default async function CityLandingPage({
                 href="https://search.google.com/local/reviews?placeid=ChIJf7qNDhW1woAROX-FX8CScGE"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-600 hover:text-brand-700 font-medium transition-colors"
+                className="text-lime hover:text-lime-400 font-medium transition-colors"
               >
                 See all {reviews.google.count} reviews on Google &rarr;
               </a>
@@ -264,16 +264,16 @@ export default async function CityLandingPage({
       />
 
       {/* Business Info Footer */}
-      <section className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 py-10">
+      <section className="bg-black border-t border-white/10 py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-center sm:gap-8 sm:text-left">
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
               <MapPin className="h-4 w-4 text-gray-400" />
               {businessInfo.address}
             </div>
             <a
               href={`tel:${phoneToE164(businessInfo.phone)}`}
-              className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+              className="flex items-center gap-2 text-sm text-gray-400 hover:text-lime transition-colors"
             >
               <Phone className="h-4 w-4 text-gray-400" />
               {formatPhone(businessInfo.phone)}

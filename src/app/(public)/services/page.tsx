@@ -65,7 +65,7 @@ export default async function ServicesPage() {
 
       {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="below_hero" pagePath="/services" /></Suspense>}
 
-      <section className="bg-surface dark:bg-gray-900 py-12 sm:py-16">
+      <section className="bg-brand-dark py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {categories.length > 0 ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -74,7 +74,7 @@ export default async function ServicesPage() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400">
+            <p className="text-gray-400">
               No service categories are currently available. Please check back soon.
             </p>
           )}

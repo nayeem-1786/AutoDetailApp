@@ -166,7 +166,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
               {slide.cta_text && slide.cta_url && (
                 <Link
                   href={slide.cta_url}
-                  className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-3.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold text-sm uppercase tracking-wider rounded-full hover:from-red-500 hover:to-red-400 transition-all duration-300 shadow-xl shadow-red-500/30 hover:shadow-red-500/50 hover:scale-[1.03]"
+                  className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-3.5 bg-lime text-black font-bold text-sm uppercase tracking-wider rounded-full hover:bg-lime-200 transition-all duration-300 shadow-xl shadow-lime/30 hover:shadow-lime/50 hover:scale-[1.03] btn-lime-glow"
                 >
                   {slide.content_type === 'video' && <Play className="w-4 h-4" />}
                   {slide.cta_text}
@@ -209,7 +209,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
               onClick={() => goTo(i, i > current ? 1 : -1)}
               className={`h-1.5 rounded-full transition-all duration-500 ${
                 i === current
-                  ? 'bg-red-500 w-8'
+                  ? 'bg-lime w-8'
                   : 'bg-white/30 w-1.5 hover:bg-white/50'
               }`}
               aria-label={`Go to slide ${i + 1}`}
@@ -310,7 +310,7 @@ function HeroBeforeAfter({
         className="pointer-events-none absolute top-4 right-4 z-20 transition-opacity duration-200"
         style={{ opacity: position < 90 ? 1 : 0 }}
       >
-        <span className="bg-red-600/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs font-bold uppercase tracking-wider">
+        <span className="bg-lime/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-black text-xs font-bold uppercase tracking-wider">
           {afterLabel}
         </span>
       </div>

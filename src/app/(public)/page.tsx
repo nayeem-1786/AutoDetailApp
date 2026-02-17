@@ -97,14 +97,14 @@ export default async function HomePage() {
       <TrustBar />
 
       {/* Our Services — Bento Grid */}
-      <section className="bg-white dark:bg-gray-900 section-spacing">
+      <section className="bg-black section-spacing">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <HomeAnimations type="section-header">
             <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 Our Services
               </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-400">
+              <p className="mx-auto mt-4 max-w-2xl text-gray-400">
                 From express washes to multi-year ceramic coating packages, we offer
                 comprehensive auto detailing tailored to your vehicle&apos;s needs.
               </p>
@@ -127,7 +127,7 @@ export default async function HomePage() {
             <div className="mt-10 text-center">
               <Link
                 href="/services"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors group"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
               >
                 View all services
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -138,11 +138,11 @@ export default async function HomePage() {
       </section>
 
       {/* Why Choose Us — 3 items with dividers */}
-      <section className="bg-gray-50 dark:bg-gray-950 section-spacing">
+      <section className="bg-brand-dark section-spacing">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <HomeAnimations type="section-header">
             <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 Why Choose {businessInfo.name}?
               </h2>
             </div>
@@ -150,17 +150,17 @@ export default async function HomePage() {
 
           <HomeAnimations
             type="stagger-grid"
-            className="mt-14 grid gap-0 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0 divide-gray-200 dark:divide-gray-800"
+            className="mt-14 grid gap-0 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0 divide-white/10"
           >
             {differentiators.map((item) => {
               const Icon = item.icon;
               return (
                 <div key={item.title} className="px-6 py-8 text-center sm:py-0 sm:first:pl-0 sm:last:pr-0">
-                  <Icon className="mx-auto h-8 w-8 text-brand-600" />
-                  <h3 className="mt-4 font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  <Icon className="mx-auto h-8 w-8 text-lime" />
+                  <h3 className="mt-4 font-display text-lg font-semibold text-white">
                     {item.title}
                   </h3>
-                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  <p className="mt-2 text-sm text-gray-400">
                     {item.description}
                   </p>
                 </div>
@@ -172,15 +172,15 @@ export default async function HomePage() {
 
       {/* Meet the Team */}
       {teamData.members.length > 0 && (
-        <section className="bg-white dark:bg-gray-900 section-spacing">
+        <section className="bg-black section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <HomeAnimations type="section-header">
               <div className="text-center">
-                <h2 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
                   Meet the Team
                 </h2>
                 {teamData.aboutText && (
-                  <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-400">
+                  <p className="mx-auto mt-4 max-w-2xl text-gray-400">
                     {teamData.aboutText}
                   </p>
                 )}
@@ -198,7 +198,7 @@ export default async function HomePage() {
 
                 return (
                   <div key={i} className="text-center">
-                    <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+                    <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-brand-surface border border-white/10 flex items-center justify-center">
                       {member.photoUrl ? (
                         <img
                           src={member.photoUrl}
@@ -206,19 +206,19 @@ export default async function HomePage() {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <span className="text-3xl font-bold text-white">
+                        <span className="text-3xl font-bold text-lime">
                           {initials}
                         </span>
                       )}
                     </div>
-                    <h3 className="mt-4 font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    <h3 className="mt-4 font-display text-lg font-semibold text-white">
                       {member.name}
                     </h3>
-                    <p className="text-sm font-medium text-brand-600 dark:text-brand-400">
+                    <p className="text-sm font-medium text-lime">
                       {member.role}
                     </p>
                     {member.bio && (
-                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                      <p className="mt-2 text-sm text-gray-400 line-clamp-2">
                         {member.bio}
                       </p>
                     )}
@@ -229,7 +229,7 @@ export default async function HomePage() {
 
             {teamData.credentials.length > 0 && (
               <HomeAnimations type="section-header">
-                <div className="mt-12 border-t border-gray-200 dark:border-gray-800 pt-8">
+                <div className="mt-12 border-t border-white/10 pt-8">
                   <div className="flex flex-wrap justify-center gap-8 items-center">
                     {teamData.credentials.map((cred, i) => (
                       <div key={i} className="flex items-center gap-3 text-center">
@@ -241,11 +241,11 @@ export default async function HomePage() {
                           />
                         )}
                         <div className="text-left">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          <p className="text-sm font-semibold text-white">
                             {cred.title}
                           </p>
                           {cred.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-gray-400">
                               {cred.description}
                             </p>
                           )}
@@ -264,11 +264,11 @@ export default async function HomePage() {
 
       {/* Google Review Cards */}
       {reviews.google.reviews.length > 0 && (
-        <section className="bg-white dark:bg-gray-900 section-spacing">
+        <section className="bg-brand-dark section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <HomeAnimations type="section-header">
               <div className="text-center">
-                <h2 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
                   What Our Customers Say
                 </h2>
               </div>
@@ -278,21 +278,21 @@ export default async function HomePage() {
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
                 <div
                   key={i}
-                  className="rounded-2xl bg-gray-50 dark:bg-gray-800 p-7 ring-1 ring-gray-100 dark:ring-gray-700"
+                  className="rounded-2xl bg-brand-surface p-7 border border-white/10 hover:border-lime/30 transition-colors"
                 >
                   <div className="flex items-center gap-1">
                     {Array.from({ length: review.rating }).map((_, j) => (
-                      <Star key={j} className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      <Star key={j} className="h-4 w-4 fill-lime text-lime" />
                     ))}
                   </div>
-                  <p className="mt-4 text-sm leading-relaxed text-gray-700 dark:text-gray-300 line-clamp-4">
+                  <p className="mt-4 text-sm leading-relaxed text-gray-300 line-clamp-4">
                     &ldquo;{review.text}&rdquo;
                   </p>
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <span className="text-sm font-medium text-white">
                       {review.author}
                     </span>
-                    <span className="text-xs text-gray-400">{review.relativeTime}</span>
+                    <span className="text-xs text-gray-500">{review.relativeTime}</span>
                   </div>
                 </div>
               ))}
@@ -303,7 +303,7 @@ export default async function HomePage() {
                 href={`https://search.google.com/local/reviews?placeid=ChIJf7qNDhW1woAROX-FX8CScGE`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-600 hover:text-brand-700 font-medium transition-colors"
+                className="text-lime hover:text-lime-400 font-medium transition-colors"
               >
                 See all {reviews.google.count} reviews on Google &rarr;
               </a>

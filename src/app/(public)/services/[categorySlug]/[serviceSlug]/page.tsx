@@ -116,13 +116,13 @@ export default async function ServiceDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      <article className="bg-surface dark:bg-gray-900 py-12 sm:py-16">
+      <article className="bg-brand-dark py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Two-column layout: pricing + details */}
           <div className="grid gap-10 lg:grid-cols-3">
             {/* Left column: pricing */}
             <div className="lg:col-span-2">
-              <h2 className="font-display text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <h2 className="font-display text-xl font-semibold text-white">
                 Pricing
               </h2>
               <div className="mt-4">
@@ -132,21 +132,21 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
             {/* Right column: service details sidebar */}
             <aside className="lg:col-span-1 space-y-6">
-              <div className="sticky top-24 rounded-2xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 p-6">
-                <h2 className="font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <div className="sticky top-24 rounded-2xl bg-brand-surface border border-white/10 p-6">
+                <h2 className="font-display text-lg font-semibold text-white">
                   Service Details
                 </h2>
                 <dl className="mt-4 space-y-4">
                   {service.base_duration_minutes > 0 && (
                     <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-900/30">
-                        <Clock className="h-4 w-4 text-brand-600" />
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime/5">
+                        <Clock className="h-4 w-4 text-lime" />
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <dt className="text-sm font-medium text-gray-400">
                           Estimated Duration
                         </dt>
-                        <dd className="mt-0.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <dd className="mt-0.5 text-sm font-medium text-white">
                           {service.base_duration_minutes >= 60
                             ? `${Math.floor(service.base_duration_minutes / 60)}h ${service.base_duration_minutes % 60 > 0 ? `${service.base_duration_minutes % 60}m` : ''}`
                             : `${service.base_duration_minutes} minutes`}
@@ -156,14 +156,14 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   )}
 
                   <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-900/30">
-                      <Truck className="h-4 w-4 text-brand-600" />
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime/5">
+                      <Truck className="h-4 w-4 text-lime" />
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      <dt className="text-sm font-medium text-gray-400">
                         Mobile Service
                       </dt>
-                      <dd className="mt-0.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <dd className="mt-0.5 text-sm font-medium text-white">
                         {service.mobile_eligible
                           ? 'Available — we come to you'
                           : 'In-shop only'}
@@ -172,14 +172,14 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-900/30">
-                      <Tag className="h-4 w-4 text-brand-600" />
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime/5">
+                      <Tag className="h-4 w-4 text-lime" />
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      <dt className="text-sm font-medium text-gray-400">
                         Service Type
                       </dt>
-                      <dd className="mt-0.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <dd className="mt-0.5 text-sm font-medium text-white">
                         {CLASSIFICATION_LABELS[service.classification] ??
                           service.classification}
                       </dd>
@@ -187,21 +187,21 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   </div>
 
                   {service.special_requirements && (
-                    <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <div className="border-t border-white/10 pt-4">
+                      <dt className="text-sm font-medium text-gray-400">
                         Special Requirements
                       </dt>
-                      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                      <dd className="mt-1 text-sm text-white">
                         {service.special_requirements}
                       </dd>
                     </div>
                   )}
 
                   {service.online_bookable && (
-                    <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                    <div className="border-t border-white/10 pt-4">
                       <Link
                         href={`/book?service=${service.slug}`}
-                        className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+                        className="flex w-full items-center justify-center gap-2 rounded-full bg-lime px-4 py-3 text-sm font-semibold text-black shadow-sm hover:bg-lime-400 transition-colors btn-lime-glow"
                       >
                         <CalendarDays className="h-4 w-4" />
                         Book This Service
@@ -217,10 +217,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
           {/* Suggested Add-Ons */}
           {addonSuggestions.length > 0 && (
             <section className="mt-16">
-              <h2 className="font-display text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <h2 className="font-display text-xl font-semibold text-white">
                 Recommended Add-Ons
               </h2>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
+              <p className="mt-2 text-gray-400">
                 Enhance your {service.name.toLowerCase()} with these popular add-on services.
               </p>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -243,24 +243,24 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <Link
                       key={suggestion.id}
                       href={addonHref}
-                      className="group flex items-center justify-between rounded-2xl bg-white dark:bg-gray-800 p-4 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 transition-shadow hover:shadow-md"
+                      className="group flex items-center justify-between rounded-2xl bg-brand-surface p-4 border border-white/10 transition-shadow hover:shadow-md"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-brand-600 transition-colors">
+                        <h3 className="text-sm font-semibold text-white group-hover:text-lime transition-colors">
                           {addon.name}
                         </h3>
                         {addon.description && (
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                          <p className="mt-1 text-xs text-gray-400 line-clamp-2">
                             {addon.description}
                           </p>
                         )}
                         {priceLabel && (
-                          <p className="mt-1 text-sm font-bold text-brand-600">
+                          <p className="mt-1 text-sm font-bold text-lime">
                             {priceLabel}
                           </p>
                         )}
                       </div>
-                      <div className="ml-3 flex-shrink-0 text-gray-400 group-hover:text-brand-600 transition-colors">
+                      <div className="ml-3 flex-shrink-0 text-gray-500 group-hover:text-lime transition-colors">
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </Link>
@@ -274,12 +274,12 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
       {/* You May Also Like */}
       {relatedServices.length > 0 && (
-        <section className="bg-white dark:bg-gray-800 py-12 sm:py-16">
+        <section className="bg-brand-surface py-12 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="font-display text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <h2 className="font-display text-2xl font-bold text-white">
               You May Also Like
             </h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
+            <p className="mt-2 text-gray-400">
               Explore other {category.name.toLowerCase()} services we offer.
             </p>
             <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

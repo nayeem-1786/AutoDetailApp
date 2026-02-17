@@ -425,18 +425,24 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session J — Public Frontend Reskin)
+## Last Session: 2026-02-16 (Session J — Public Frontend Reskin + Dark Theme + Lime Accent)
 - **Complete visual overhaul** of all public-facing components with premium dark automotive aesthetic + framer-motion animations
 - **New dependency**: `framer-motion` for AnimatePresence, motion.div slide/fade transitions, animated labels
 - **AnnouncementTicker**: Replaced marquee with framer-motion y-axis slide rotation, 4s auto-rotate, session storage dismissal, dot indicators
-- **SiteHeader**: Split into server wrapper (`site-header.tsx`) + new client component (`header-client.tsx`). Scroll-aware backdrop blur, animated dropdown menus, mobile hamburger with motion height animation, red gradient "Book Now" CTA, utility bar with phone + "Mobile Service" info
-- **HeroCarousel**: Framer-motion slide transitions with `custom` direction, bottom-aligned content, red gradient CTAs, `overlay_opacity` 0-100 scale, first slide `<h1>` for SEO
-- **SiteFooter**: Split into server wrapper + client component (`footer-client.tsx`). Trust badges strip, 12-column grid, contact info with red accents, Google/Yelp review badges, service area city links
-- **BeforeAfterSlider**: Framer-motion animated labels (slide-in), improved drag handle with scale animations, `rounded-2xl` container, red "After" badge
+- **SiteHeader**: Split into server wrapper (`site-header.tsx`) + new client component (`header-client.tsx`). Scroll-aware backdrop blur, animated dropdown menus, mobile hamburger with motion height animation, lime "Book Now" CTA, utility bar with phone + "Mobile Service" info
+- **HeroCarousel**: Framer-motion slide transitions with `custom` direction, bottom-aligned content, lime CTAs, `overlay_opacity` 0-100 scale, first slide `<h1>` for SEO
+- **SiteFooter**: Split into server wrapper + client component (`footer-client.tsx`). Trust badges strip, 12-column grid, contact info with lime accents, Google/Yelp review badges, service area city links
+- **BeforeAfterSlider**: Framer-motion animated labels (slide-in), improved drag handle, lime divider/handle, `rounded-2xl` container, lime "After" badge, keyboard a11y
 - **Dark theme scoping**: `bg-black text-white min-h-screen` wrapper on 3 layouts (public, customer-auth, account)
 - **CMS cache revalidation**: Added `revalidateTag()` calls to all CMS admin API routes for instant public page updates
 - **Orphaned files** (not deleted): `header-shell.tsx`, `mobile-menu.tsx`, `nav-dropdown.tsx` — no longer imported by site-header
-- TypeScript clean (zero errors)
+- **Design Foundation (Session J continued)**:
+  - Lime brand tokens in `@theme inline`: `--color-lime: #CCFF00`, full lime palette, brand-dark (#0A0A0A), brand-surface (#1A1A1A)
+  - Brand CSS utilities: `.btn-lime-glow`, `.bg-gradient-hero`, `.text-gradient-lime`, `.section-spacing`, `.animate-lime-pulse`
+  - Animations library (`src/lib/animations.ts`): Framer Motion variants (fadeIn, fadeInUp, slideIn, scaleIn, stagger)
+  - **Accent color**: All red accents → lime (#CCFF00) across header, footer, ticker, hero, before-after slider
+  - **Dark theme pass on ALL public pages**: Removed every `dark:` prefixed class. Replaced with permanent dark values (bg-brand-dark, bg-brand-surface, border-white/10, text-white/gray-400). Pages: homepage, services (3), products (4), gallery (2), areas (2), terms, booking, quotes (2), custom pages. Components: trust-bar, cta-section, service-category-card, product-category-card, service-card, service-pricing-display, content-block-renderer, breadcrumbs
+- TypeScript clean, build clean (zero errors)
 
 ### Session I — 2026-02-14 (AI Content Writer for City Pages)
 - **AI Content Writer system**: Full content block management with AI generation for city landing pages and any other page type.
@@ -1017,7 +1023,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - TypeScript clean, committed and pushed
 
 ### Next Session Priorities
-1. Continue public frontend reskin — remaining pages (services, products, gallery, booking, city landing pages, about, terms)
+1. Session 2 of frontend reskin — add Framer Motion scroll-reveal animations to page sections, refine responsive behavior, polish micro-interactions
 2. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
 3. Post-launch review (2-4 weeks after deployment) — see `docs/POST_LAUNCH_ROADMAP.md`
 

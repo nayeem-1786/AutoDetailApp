@@ -79,7 +79,7 @@ export default async function AreasIndexPage() {
       </section>
 
       {/* City Grid */}
-      <section className="bg-white dark:bg-gray-900 section-spacing">
+      <section className="bg-brand-dark section-spacing">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {cities.length > 0 ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -89,25 +89,25 @@ export default async function AreasIndexPage() {
                   href={`/areas/${city.slug}`}
                   className="group block h-full"
                 >
-                  <div className="relative h-full overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-7 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 transition-shadow duration-300 hover:shadow-md">
+                  <div className="relative h-full overflow-hidden rounded-2xl bg-brand-surface p-7 border border-white/10 transition-shadow duration-300 hover:shadow-md">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <h2 className="font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <h2 className="font-display text-lg font-semibold text-white">
                           {city.city_name}, {city.state}
                         </h2>
                         {city.distance_miles != null && (
-                          <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                          <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-400">
                             <MapPin className="h-3.5 w-3.5" />
                             {city.distance_miles} miles away
                           </p>
                         )}
                         {city.intro_text && (
-                          <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2">
+                          <p className="mt-2 text-sm leading-relaxed text-gray-400 line-clamp-2">
                             {city.intro_text}
                           </p>
                         )}
                       </div>
-                      <div className="ml-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 group-hover:text-brand-600 transition-colors">
+                      <div className="ml-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 group-hover:text-lime transition-colors">
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </div>
@@ -116,7 +116,7 @@ export default async function AreasIndexPage() {
               ))}
             </div>
           ) : (
-            <p className="text-center text-gray-500 dark:text-gray-400">
+            <p className="text-center text-gray-400">
               No service areas are currently listed. Please check back soon.
             </p>
           )}

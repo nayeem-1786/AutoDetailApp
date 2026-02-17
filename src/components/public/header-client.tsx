@@ -67,14 +67,14 @@ export function HeaderClient({
               <img src={logoUrl} alt={businessName} className="h-10 lg:h-12 w-auto" />
             ) : (
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
-                  <span className="text-white font-black text-lg lg:text-xl">S</span>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-lime flex items-center justify-center">
+                  <span className="text-black font-black text-lg lg:text-xl">S</span>
                 </div>
                 <div className="hidden sm:block">
                   <div className="text-white font-bold text-sm lg:text-base tracking-tight leading-none">
                     {businessName}
                   </div>
-                  <div className="text-red-500 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase">
+                  <div className="text-lime text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase">
                     Premium Detail
                   </div>
                 </div>
@@ -129,7 +129,7 @@ export function HeaderClient({
                             target={child.target || '_self'}
                             className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                           >
-                            <div className="text-sm font-medium text-white group-hover:text-red-400 transition-colors">
+                            <div className="text-sm font-medium text-white group-hover:text-lime transition-colors">
                               {child.label}
                             </div>
                           </Link>
@@ -154,7 +154,7 @@ export function HeaderClient({
             {/* CTA */}
             <Link
               href="/book"
-              className="hidden sm:inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white text-sm font-bold rounded-full hover:from-red-500 hover:to-red-400 transition-all duration-300 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 hover:scale-[1.02]"
+              className="hidden sm:inline-flex items-center gap-2 px-6 py-2.5 bg-lime text-black text-sm font-bold rounded-full hover:bg-lime-200 transition-all duration-300 shadow-lg shadow-lime/25 hover:shadow-lime/40 hover:scale-[1.02] btn-lime-glow"
             >
               Book Now
             </Link>
@@ -233,7 +233,7 @@ export function HeaderClient({
               <div className="pt-3">
                 <Link
                   href="/book"
-                  className="block w-full text-center py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl"
+                  className="block w-full text-center py-3 bg-lime text-black font-bold rounded-xl"
                   onClick={() => setMobileOpen(false)}
                 >
                   Book Now

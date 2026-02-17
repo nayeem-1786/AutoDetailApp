@@ -72,7 +72,7 @@ export default async function ProductCategoryPage({ params }: PageProps) {
         </div>
       </section>
 
-      <section className="bg-surface dark:bg-gray-900 py-12 sm:py-16">
+      <section className="bg-brand-dark py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {products.length > 0 ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -85,7 +85,7 @@ export default async function ProductCategoryPage({ params }: PageProps) {
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400">
+            <p className="text-gray-400">
               No products are currently available in this category. Please check back soon.
             </p>
           )}

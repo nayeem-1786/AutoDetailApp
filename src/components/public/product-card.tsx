@@ -18,9 +18,9 @@ function truncateDescription(text: string, maxLength: number = 120): string {
 export function ProductCard({ product, categorySlug }: ProductCardProps) {
   return (
     <Link href={`/products/${categorySlug}/${product.slug}`} className="group block">
-      <div className="h-full overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 transition-shadow hover:shadow-md">
+      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-white/10 transition-shadow hover:shadow-md">
         {/* Image or Placeholder */}
-        <div className="relative aspect-[4/3] w-full bg-gray-50 dark:bg-gray-800 overflow-hidden">
+        <div className="relative aspect-[4/3] w-full bg-brand-surface overflow-hidden">
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -29,23 +29,23 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <Package className="h-12 w-12 text-gray-300 dark:text-gray-600" />
+              <Package className="h-12 w-12 text-gray-600" />
             </div>
           )}
           {/* Price badge */}
-          <div className="absolute top-3 right-3 rounded-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm px-3 py-1 shadow-sm">
-            <span className="text-sm font-bold text-brand-600">
+          <div className="absolute top-3 right-3 rounded-full bg-black/80 backdrop-blur-sm px-3 py-1 shadow-sm">
+            <span className="text-sm font-bold text-lime">
               {formatCurrency(product.retail_price)}
             </span>
           </div>
         </div>
 
         <div className="p-4">
-          <h3 className="font-display text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-brand-600 transition-colors">
+          <h3 className="font-display text-base font-semibold text-white group-hover:text-lime transition-colors">
             {product.name}
           </h3>
           {product.description && (
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+            <p className="mt-1.5 text-sm text-gray-400 line-clamp-2">
               {truncateDescription(product.description)}
             </p>
           )}

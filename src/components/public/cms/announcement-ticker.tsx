@@ -45,8 +45,8 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
     <div
       className="relative overflow-hidden py-2.5 px-4"
       style={{
-        backgroundColor: current.bg_color || '#E53935',
-        color: current.text_color || '#FFFFFF',
+        backgroundColor: current.bg_color || '#CCFF00',
+        color: current.text_color || '#000000',
       }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-center">
@@ -82,7 +82,7 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
       <button
         type="button"
         onClick={dismiss}
-        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/20 transition-colors"
+        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-black/10 transition-colors"
         aria-label="Dismiss announcements"
       >
         <X className="w-3.5 h-3.5" />
@@ -94,7 +94,7 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
             <div
               key={i}
               className={`w-1 h-1 rounded-full transition-all duration-300 ${
-                i === currentIndex ? 'bg-white w-3' : 'bg-white/40'
+                i === currentIndex ? 'bg-black w-3' : 'bg-black/30'
               }`}
             />
           ))}
@@ -126,8 +126,8 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
     <div
       className="overflow-hidden py-2.5 px-4"
       style={{
-        backgroundColor: current.bg_color || '#E53935',
-        color: current.text_color || '#FFFFFF',
+        backgroundColor: current.bg_color || '#CCFF00',
+        color: current.text_color || '#000000',
       }}
     >
       <div className="max-w-7xl mx-auto">

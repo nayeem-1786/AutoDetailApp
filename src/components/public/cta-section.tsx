@@ -15,19 +15,19 @@ export async function CtaSection({
   const biz = await getBusinessInfo();
 
   return (
-    <section className="bg-gradient-cta section-spacing">
+    <section className="bg-brand-dark section-spacing">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
             {title}
           </h2>
-          <p className="mt-5 text-lg text-blue-100/60">
+          <p className="mt-5 text-lg text-gray-400">
             {description}
           </p>
           <div className="mt-10">
             <Link
               href="/book"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-white text-navy font-semibold text-base h-13 px-8 shadow-lg shadow-brand-900/25 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-bold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
             >
               Book Your Detail
               <ArrowRight className="h-4 w-4" />
@@ -35,7 +35,7 @@ export async function CtaSection({
           </div>
           <a
             href={`tel:${phoneToE164(biz.phone)}`}
-            className="mt-5 inline-block text-sm font-medium text-blue-100/50 hover:text-white transition-colors"
+            className="mt-5 inline-block text-sm font-medium text-gray-500 hover:text-lime transition-colors"
           >
             or call {formatPhone(biz.phone)}
           </a>

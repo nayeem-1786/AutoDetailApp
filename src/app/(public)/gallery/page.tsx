@@ -119,8 +119,8 @@ export default async function GalleryPage() {
   if (!enabled) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-24 text-center sm:px-6 lg:px-8">
-        <h1 className="font-display text-3xl font-bold text-gray-900">Gallery Coming Soon</h1>
-        <p className="mt-4 text-lg text-gray-600">
+        <h1 className="font-display text-3xl font-bold text-white">Gallery Coming Soon</h1>
+        <p className="mt-4 text-lg text-gray-400">
           We&apos;re building a showcase of our best work at {biz.name}.
           Check back soon to see incredible before and after transformations!
         </p>

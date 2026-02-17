@@ -63,7 +63,7 @@ export function FooterClient({
                   key={badge.label}
                   className="flex items-center gap-2 text-sm text-gray-400"
                 >
-                  <Icon className="h-4 w-4 text-red-500" />
+                  <Icon className="h-4 w-4 text-lime" />
                   <span className="font-medium">{badge.label}</span>
                 </div>
               );
@@ -81,8 +81,8 @@ export function FooterClient({
               <img src={logoUrl} alt={businessName} className="h-12 w-auto mb-4" />
             ) : (
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
-                  <span className="text-white font-black text-lg">S</span>
+                <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
+                  <span className="text-black font-black text-lg">S</span>
                 </div>
                 <span className="text-white font-bold text-lg">{businessName}</span>
               </div>
@@ -99,7 +99,7 @@ export function FooterClient({
                 href={`tel:${phone}`}
                 className="flex items-center gap-3 text-sm text-gray-400 hover:text-white transition-colors"
               >
-                <Phone className="w-4 h-4 text-red-500 shrink-0" />
+                <Phone className="w-4 h-4 text-lime shrink-0" />
                 {phone}
               </a>
               {email && (
@@ -107,12 +107,12 @@ export function FooterClient({
                   href={`mailto:${email}`}
                   className="flex items-center gap-3 text-sm text-gray-400 hover:text-white transition-colors"
                 >
-                  <Mail className="w-4 h-4 text-red-500 shrink-0" />
+                  <Mail className="w-4 h-4 text-lime shrink-0" />
                   {email}
                 </a>
               )}
               <div className="flex items-start gap-3 text-sm text-gray-400">
-                <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <MapPin className="w-4 h-4 text-lime shrink-0 mt-0.5" />
                 {address}
               </div>
             </div>
@@ -149,7 +149,7 @@ export function FooterClient({
                       <Link
                         href={link.url}
                         target={link.target || '_self'}
-                        className="text-sm text-gray-400 hover:text-white transition-colors"
+                        className="text-sm text-gray-400 hover:text-lime transition-colors"
                       >
                         {link.label}
                       </Link>

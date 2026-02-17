@@ -74,7 +74,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
       <JsonLd data={generateProductSchema(product, category, businessInfo.name)} />
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
-      <article className="bg-surface dark:bg-gray-900 py-8 sm:py-12">
+      <article className="bg-brand-dark py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
@@ -86,7 +86,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
           <div className="mt-2 grid gap-10 lg:grid-cols-2">
             {/* Left column: product image */}
-            <div className="relative aspect-square overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700">
+            <div className="relative aspect-square overflow-hidden rounded-2xl bg-brand-surface border border-white/10">
               {product.image_url ? (
                 <img
                   src={product.image_url}
@@ -95,30 +95,30 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <Package className="h-24 w-24 text-gray-300 dark:text-gray-600" />
+                  <Package className="h-24 w-24 text-gray-600" />
                 </div>
               )}
             </div>
 
             {/* Right column: product details */}
             <div className="lg:sticky lg:top-24 lg:self-start">
-              <h1 className="font-display text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+              <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 {product.name}
               </h1>
 
-              <p className="mt-4 font-display text-3xl font-bold text-brand-600">
+              <p className="mt-4 font-display text-3xl font-bold text-lime">
                 {formatCurrency(product.retail_price)}
               </p>
 
               {/* Availability */}
               <div className="mt-4">
                 {inStock ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-950 px-3 py-1 text-sm font-medium text-green-700 dark:text-green-300">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-950 px-3 py-1 text-sm font-medium text-green-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                     In Stock
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 dark:bg-red-950 px-3 py-1 text-sm font-medium text-red-700 dark:text-red-300">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-red-950 px-3 py-1 text-sm font-medium text-red-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
                     Out of Stock
                   </span>
@@ -128,38 +128,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
               {/* Description */}
               {product.description && (
                 <div className="mt-8">
-                  <h2 className="font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  <h2 className="font-display text-lg font-semibold text-white">
                     Description
                   </h2>
-                  <div className="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">
+                  <div className="mt-3 text-gray-400 leading-relaxed whitespace-pre-line">
                     {product.description}
                   </div>
                 </div>
               )}
 
               {/* Product details */}
-              <div className="mt-8 rounded-2xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700 p-6">
-                <h2 className="font-display text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <div className="mt-8 rounded-2xl bg-brand-surface border border-white/10 p-6">
+                <h2 className="font-display text-lg font-semibold text-white">
                   Product Details
                 </h2>
                 <dl className="mt-4 space-y-3 text-sm">
                   {product.sku && (
                     <div className="flex justify-between">
-                      <dt className="text-gray-500 dark:text-gray-400">SKU</dt>
-                      <dd className="font-medium text-gray-900 dark:text-gray-100">
+                      <dt className="text-gray-400">SKU</dt>
+                      <dd className="font-medium text-white">
                         {product.sku}
                       </dd>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">Category</dt>
-                    <dd className="font-medium text-gray-900 dark:text-gray-100">
+                    <dt className="text-gray-400">Category</dt>
+                    <dd className="font-medium text-white">
                       {category.name}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">Availability</dt>
-                    <dd className="font-medium text-gray-900 dark:text-gray-100">
+                    <dt className="text-gray-400">Availability</dt>
+                    <dd className="font-medium text-white">
                       {inStock ? 'Available in store' : 'Currently unavailable'}
                     </dd>
                   </div>

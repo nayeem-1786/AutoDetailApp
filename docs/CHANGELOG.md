@@ -72,6 +72,81 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - `src/components/public/mobile-menu.tsx` — old mobile menu
 - `src/components/public/nav-dropdown.tsx` — old nav dropdown
 
+### Session J (continued) — Design Foundation, Lime Accent & Dark Theme Pass
+
+#### Design System Foundation
+- **Lime brand tokens** added to `globals.css` `@theme inline`: `--color-lime: #CCFF00`, lime-50 through lime-900, `--color-brand-dark: #0A0A0A`, `--color-brand-surface: #1A1A1A`
+- **Lime glow shadows**: `--shadow-lime-glow`, `--shadow-lime-glow-lg` CSS custom properties
+- **Brand CSS utilities**: `.text-gradient-lime`, `.btn-lime-glow` (box-shadow + hover scale), `.bg-gradient-hero` (radial blue/black), `.section-spacing` (responsive padding), `.animate-lime-pulse`
+- **Animations library**: Created `src/lib/animations.ts` — Framer Motion variants (fadeIn, fadeInUp, fadeInDown, slideIn, scaleIn, stagger containers, premiumEase)
+
+#### Accent Color: Red → Lime (#CCFF00)
+- `header-client.tsx`: Logo fallback `bg-lime`, subtitle `text-lime`, dropdown `group-hover:text-lime`, Book Now CTA `bg-lime text-black btn-lime-glow`
+- `footer-client.tsx`: All `text-red-500` → `text-lime`, logo fallback → `bg-lime`, nav links → `hover:text-lime`
+- `announcement-ticker.tsx`: Default bg `#E53935` → `#CCFF00`, text `#FFFFFF` → `#000000`
+- `hero-carousel.tsx`: CTA → `bg-lime text-black btn-lime-glow`, indicators → `bg-lime`
+- `hero-section.tsx`: CTA → `bg-lime text-black btn-lime-glow`
+- `before-after-slider.tsx`: Divider → `bg-lime` with lime glow, handle → `bg-black border-lime`, After label → `bg-lime/90 text-black`
+
+#### Dark Theme Pass — All Public Pages
+Replaced all dual `light/dark:` Tailwind patterns with permanent dark values (since layout forces `bg-black text-white`):
+
+- **Homepage** (`page.tsx`): Sections → `bg-black`/`bg-brand-dark`, cards → `bg-brand-surface border-white/10`, stars → `fill-lime text-lime`, links → `text-lime`
+- **Trust bar**: `bg-brand-dark`, stars/icons → `text-lime`
+- **CTA section**: `bg-brand-dark`, CTA → `bg-lime text-black btn-lime-glow`
+- **Service category card**: `bg-brand-surface border-white/10 hover:border-lime/30`, arrow → `group-hover:text-lime`
+- **Services pages** (3 files): Headers → `bg-gradient-hero`, cards → `bg-brand-surface`, icons → `bg-lime/5 text-lime`, "Book This Service" → `bg-lime text-black btn-lime-glow`
+- **Products pages** (4 files): Full dark theme, product cards → `bg-brand-surface border-white/10`
+- **Product category card**: `bg-brand-surface`, title → `group-hover:text-lime`
+- **Gallery** (2 files): Filter pills → `border-lime text-lime`, Load More → `bg-lime text-black`
+- **Areas** (2 files): City cards → `bg-brand-surface border-white/10`, CTA → `bg-lime text-black btn-lime-glow`
+- **Terms page**: Prose → `prose-invert`, headings → `text-white`
+- **Custom pages** (`p/[...slug]`): Dark theme applied
+- **Booking page**: Section → `bg-brand-dark`, heading → `text-white`
+- **Quote pages** (2 files): Cards → `bg-brand-dark border-white/10`, status banners → dark variants (red-950, green-950, purple-950, amber-950)
+- **Service pricing display**: Tables → `bg-brand-surface border-white/10`, prices → `text-lime`, alternating rows → `bg-white/[0.02]`
+- **Content block renderer**: Prose → `prose-invert prose-a:text-lime`, FAQ → `border-white/10`, CTA → `bg-lime text-black btn-lime-glow`, quote icon → `text-lime`
+- **Breadcrumbs**: Links → `hover:text-lime hover:decoration-lime`
+- **Service card**: Dark theme applied
+
+#### Files Created
+- `src/lib/animations.ts` — Framer Motion animation variants library
+
+#### Files Modified (Dark Theme + Lime Accent)
+- `src/app/globals.css` — lime tokens, brand utilities, glow shadows
+- `src/app/(public)/layout.tsx` — added `public-theme antialiased` classes
+- `src/components/public/header-client.tsx` — red → lime accent
+- `src/components/public/footer-client.tsx` — red → lime accent
+- `src/components/public/cms/announcement-ticker.tsx` — red → lime defaults
+- `src/components/public/cms/hero-carousel.tsx` — red → lime CTA
+- `src/components/public/hero-section.tsx` — red → lime CTA
+- `src/components/before-after-slider.tsx` — lime accents + keyboard a11y
+- `src/app/(public)/page.tsx` — full dark theme
+- `src/components/public/trust-bar.tsx` — dark theme
+- `src/components/public/cta-section.tsx` — dark theme + lime CTA
+- `src/components/public/service-category-card.tsx` — dark theme
+- `src/app/(public)/services/page.tsx` — dark theme
+- `src/app/(public)/services/[categorySlug]/page.tsx` — dark theme
+- `src/app/(public)/services/[categorySlug]/[serviceSlug]/page.tsx` — dark theme + lime CTA
+- `src/app/(public)/products/page.tsx` — dark theme
+- `src/app/(public)/products/[categorySlug]/page.tsx` — dark theme
+- `src/app/(public)/products/[categorySlug]/[productSlug]/page.tsx` — dark theme
+- `src/components/public/product-card.tsx` — dark theme
+- `src/components/public/product-category-card.tsx` — dark theme
+- `src/app/(public)/gallery/page.tsx` — dark theme
+- `src/app/(public)/gallery/gallery-client.tsx` — dark theme
+- `src/app/(public)/areas/page.tsx` — dark theme
+- `src/app/(public)/areas/[citySlug]/page.tsx` — dark theme + lime CTA
+- `src/app/(public)/terms/page.tsx` — dark theme
+- `src/app/(public)/p/[...slug]/page.tsx` — dark theme
+- `src/app/(public)/book/page.tsx` — dark theme
+- `src/app/(public)/quote/[token]/page.tsx` — dark theme
+- `src/app/(public)/quote/[token]/accept-button.tsx` — dark theme
+- `src/components/public/breadcrumbs.tsx` — lime hover accents
+- `src/components/public/service-card.tsx` — dark theme
+- `src/components/public/service-pricing-display.tsx` — dark theme
+- `src/components/public/content-block-renderer.tsx` — dark theme + lime accents
+
 ---
 
 ## Session I — 2026-02-14 (AI Content Writer for City Pages)

@@ -50,12 +50,12 @@ function RichTextBlock({ block }: { block: PageContentBlock }) {
   return (
     <div className="content-block">
       {block.title && (
-        <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-3xl mb-6">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl mb-6">
           {block.title}
         </h2>
       )}
       <div
-        className="prose prose-gray dark:prose-invert max-w-none prose-headings:font-display prose-h2:text-2xl prose-h3:text-xl prose-p:text-gray-600 dark:prose-p:text-gray-400 prose-p:leading-relaxed prose-a:text-brand-600 hover:prose-a:text-brand-700 prose-li:text-gray-600 dark:prose-li:text-gray-400"
+        className="prose prose-invert max-w-none prose-headings:font-display prose-h2:text-2xl prose-h3:text-xl prose-p:text-gray-400 prose-p:leading-relaxed prose-a:text-lime hover:prose-a:text-lime-400 prose-li:text-gray-400"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>
@@ -91,20 +91,20 @@ function FaqBlock({ block }: { block: PageContentBlock }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       {block.title && (
-        <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-3xl mb-8">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl mb-8">
           {block.title}
         </h2>
       )}
-      <div className="divide-y divide-gray-200 dark:divide-gray-700 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="divide-y divide-white/10 rounded-2xl border border-white/10 overflow-hidden">
         {items.map((item, i) => (
           <details key={i} className="group">
-            <summary className="flex cursor-pointer items-center justify-between px-6 py-5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-              <span className="text-base font-medium text-gray-900 dark:text-gray-100 pr-4">
+            <summary className="flex cursor-pointer items-center justify-between px-6 py-5 text-left hover:bg-white/5 transition-colors">
+              <span className="text-base font-medium text-white pr-4">
                 {item.question}
               </span>
               <ArrowRight className="h-5 w-5 flex-shrink-0 text-gray-400 transition-transform group-open:rotate-90" />
             </summary>
-            <div className="px-6 pb-5 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+            <div className="px-6 pb-5 text-sm leading-relaxed text-gray-400">
               {item.answer}
             </div>
           </details>
@@ -125,7 +125,7 @@ function FeaturesListBlock({ block }: { block: PageContentBlock }) {
   return (
     <div className="content-block">
       {block.title && (
-        <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-3xl mb-8">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl mb-8">
           {block.title}
         </h2>
       )}
@@ -133,15 +133,15 @@ function FeaturesListBlock({ block }: { block: PageContentBlock }) {
         {items.map((item, i) => (
           <div
             key={i}
-            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6"
+            className="rounded-xl border border-white/10 bg-brand-surface p-6"
           >
             <div className="flex items-start gap-3">
-              <CheckCircle className="h-6 w-6 flex-shrink-0 text-brand-500 mt-0.5" />
+              <CheckCircle className="h-6 w-6 flex-shrink-0 text-lime mt-0.5" />
               <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="text-base font-semibold text-white">
                   {item.title}
                 </h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                <p className="mt-1.5 text-sm leading-relaxed text-gray-400">
                   {item.description}
                 </p>
               </div>
@@ -173,7 +173,7 @@ function CtaBlock({ block }: { block: PageContentBlock }) {
         <div className="mt-8">
           <Link
             href={data.button_url || '/book'}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-white text-navy font-semibold text-base h-13 px-8 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black btn-lime-glow font-semibold text-base h-13 px-8 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
           >
             {data.button_text || 'Book Now'}
             <ArrowRight className="h-4 w-4" />
@@ -194,14 +194,14 @@ function TestimonialBlock({ block }: { block: PageContentBlock }) {
 
   return (
     <div className="content-block">
-      <div className="rounded-2xl bg-gray-50 dark:bg-gray-800 p-8 sm:p-10">
-        <Quote className="h-8 w-8 text-brand-400 mb-4" />
-        <blockquote className="text-lg leading-relaxed text-gray-800 dark:text-gray-200 italic">
+      <div className="rounded-2xl bg-brand-surface p-8 sm:p-10">
+        <Quote className="h-8 w-8 text-lime mb-4" />
+        <blockquote className="text-lg leading-relaxed text-gray-200 italic">
           &ldquo;{data.quote}&rdquo;
         </blockquote>
         <div className="mt-6 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-semibold text-white">
               {data.author}
             </p>
             {data.source && (
@@ -252,7 +252,7 @@ export function ContentBlocks({ blocks }: { blocks: PageContentBlock[] }) {
   if (blocks.length === 0) return null;
 
   return (
-    <section className="bg-white dark:bg-gray-900 section-spacing">
+    <section className="bg-brand-dark section-spacing">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 space-y-12">
         {blocks.map((block) => (
           <ContentBlockRenderer key={block.id} block={block} />

@@ -125,30 +125,30 @@ export default async function TermsPage() {
         </div>
       </section>
 
-      <section className="bg-surface dark:bg-gray-900 py-12 sm:py-16">
+      <section className="bg-brand-dark py-12 sm:py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="space-y-10">
             {sections.map((section, idx) => (
               <div key={idx}>
-                <h2 className="font-display text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <h2 className="font-display text-xl font-semibold text-white">
                   {idx + 1}. {section.title}
                 </h2>
-                <div className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                <div className="mt-3 text-sm leading-relaxed text-gray-400 whitespace-pre-line">
                   {section.content}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-16 border-t border-gray-200 dark:border-gray-700 pt-8">
+          <div className="mt-16 border-t border-white/10 pt-8">
             <p className="text-xs text-gray-400">
               If you have questions about these terms, please contact us at{' '}
               {biz.email ? (
-                <a href={`mailto:${biz.email}`} className="text-brand-600 hover:underline">
+                <a href={`mailto:${biz.email}`} className="text-lime hover:underline">
                   {biz.email}
                 </a>
               ) : (
-                <a href={`tel:${biz.phone}`} className="text-brand-600 hover:underline">
+                <a href={`tel:${biz.phone}`} className="text-lime hover:underline">
                   {biz.phone}
                 </a>
               )}
