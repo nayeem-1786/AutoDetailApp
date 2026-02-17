@@ -426,7 +426,19 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session O — Hero Image Upload)
+## Last Session: 2026-02-17 (Session R — Fix Holiday Seasonal Themes)
+
+### Session R — Fix Holiday Seasonal Themes
+- **Full pipeline audit**: Database records, feature flags, data layer, public layout, ThemeProvider, CSS variable indirection, Tailwind v4 compilation, admin pages, API routes, sidebar links, cron scheduler — all verified present and correct.
+- **Page background fix**: Added `bodyBgColor` field to `ThemePreset` interface. All 8 presets now include distinct dark-tinted page backgrounds (Christmas=#050f05 evergreen, Valentine's=#0a0508 rose, Halloween=#0f050f purple, etc.). Updated existing DB themes.
+- **Admin color preview swatch fix**: Theme list page referenced `brand-500` which no preset has — changed to `lime` (primary accent).
+- **Editor COLOR_KEYS expanded**: 6 → 10 keys (added `lime-50`, `lime-100`, `lime-300`, `lime-600`).
+- **Hero gradient editor**: Added hero gradient override text input to theme editor page.
+- **Preset creation fixed**: "Use Preset" now passes `body_bg_color` to API.
+- TypeScript clean, build passes.
+
+### Session Q — Booking Module Theme Fix
+- See `docs/CHANGELOG.md` for full details.
 
 ### Session O — Hero Image Upload
 - **HeroImageUpload component**: Drag-drop image upload for hero slides. Client-side resize (max 2560px, 85% quality), file validation (JPEG/PNG/WebP, 10MB max), preview with replace/remove hover overlay, loading spinner. Uses existing `cms-assets` storage bucket.

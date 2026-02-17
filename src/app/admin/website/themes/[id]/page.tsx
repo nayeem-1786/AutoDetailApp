@@ -25,9 +25,13 @@ const PARTICLE_EFFECTS: { value: ParticleEffect | ''; label: string }[] = [
 
 const COLOR_KEYS: { key: string; label: string }[] = [
   { key: 'lime', label: 'Primary Accent' },
+  { key: 'lime-50', label: 'Accent Lightest' },
+  { key: 'lime-100', label: 'Accent Light' },
   { key: 'lime-200', label: 'Accent Hover' },
+  { key: 'lime-300', label: 'Accent Mid-Light' },
   { key: 'lime-400', label: 'Accent Mid' },
   { key: 'lime-500', label: 'Accent Dark' },
+  { key: 'lime-600', label: 'Accent Darkest' },
   { key: 'brand-dark', label: 'Section BG' },
   { key: 'brand-surface', label: 'Card BG' },
 ];
@@ -201,12 +205,12 @@ export default function ThemeEditorPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Body Background Color (optional)
+            Body Background Color (optional — overrides page background)
           </label>
           <div className="mt-1 flex items-center gap-2">
             <input
               type="color"
-              value={theme.body_bg_color ?? '#ffffff'}
+              value={theme.body_bg_color ?? '#000000'}
               onChange={(e) => update('body_bg_color', e.target.value)}
               className="h-9 w-12 cursor-pointer rounded border border-gray-300"
             />
@@ -214,9 +218,32 @@ export default function ThemeEditorPage() {
               value={theme.body_bg_color || ''}
               onChange={(e) => update('body_bg_color', e.target.value || null)}
               className="w-40 font-mono text-xs"
-              placeholder="#ffffff"
+              placeholder="#000000"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Hero Gradient Override (optional — CSS gradient value)
+          </label>
+          <Input
+            value={theme.gradient_overrides?.['hero'] || ''}
+            onChange={(e) => {
+              setTheme((prev) => {
+                if (!prev) return null;
+                const overrides = { ...(prev.gradient_overrides ?? {}) };
+                if (e.target.value) {
+                  overrides['hero'] = e.target.value;
+                } else {
+                  delete overrides['hero'];
+                }
+                return { ...prev, gradient_overrides: overrides };
+              });
+            }}
+            className="mt-1 font-mono text-xs"
+            placeholder="linear-gradient(135deg, #991b1b 0%, #14532d 100%)"
+          />
         </div>
       </div>
 

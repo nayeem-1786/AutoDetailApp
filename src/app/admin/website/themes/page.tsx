@@ -46,6 +46,7 @@ export default function ThemeManagerPage() {
             description: preset.description,
             color_overrides: preset.colorOverrides,
             gradient_overrides: preset.gradientOverrides,
+            body_bg_color: preset.bodyBgColor,
             particle_effect: preset.particleEffect,
             particle_intensity: preset.particleIntensity,
             particle_color: preset.particleColor,
@@ -141,7 +142,7 @@ export default function ThemeManagerPage() {
                 <div className="flex items-center gap-2 mb-1">
                   <div
                     className="h-4 w-4 rounded-full"
-                    style={{ backgroundColor: preset.colorOverrides['brand-500'] }}
+                    style={{ backgroundColor: preset.colorOverrides['lime'] }}
                   />
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {preset.name}
@@ -186,7 +187,7 @@ export default function ThemeManagerPage() {
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md"
                   style={{
                     background: Object.values(theme.gradient_overrides ?? {})[0] ??
-                      theme.color_overrides?.['brand-500'] ?? '#6b7280',
+                      theme.color_overrides?.['lime'] ?? '#6b7280',
                   }}
                 >
                   <Palette className="h-4 w-4 text-white" />

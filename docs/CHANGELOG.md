@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session R — 2026-02-17 (Fix Holiday Seasonal Themes)
+
+### Fix: Holiday seasonal themes now apply to public frontend — full pipeline verified
+
+#### Diagnosis
+Full end-to-end audit of the seasonal theme pipeline: database records, feature flags, data layer (`cms.ts`), public layout, ThemeProvider, CSS variable indirection, Tailwind v4 compilation, admin pages, API routes, sidebar links, cron scheduler. All infrastructure verified present and correct. CSS compilation confirmed: `bg-lime` → `var(--lime)`, cascades properly.
+
+#### Issues Found & Fixed
+1. **Page background never changed** — Presets and DB themes had no `body_bg_color`, so `bg-brand-black` (page background) stayed pure black. Added `bodyBgColor` field to `ThemePreset` interface and set distinct dark-tinted backgrounds for all 8 presets (e.g., Christmas = `#050f05` deep evergreen, Valentine's = `#0a0508` rose-tinted). Updated existing DB themes.
+2. **Admin color preview swatch broken** — Theme list page referenced `brand-500` in `colorOverrides` which no preset has. Changed to `lime` key (the primary accent color).
+3. **Editor showed only 6 of 11 color keys** — `COLOR_KEYS` was missing `lime-50`, `lime-100`, `lime-300`, `lime-600`. Expanded to all 10 palette keys.
+4. **No hero gradient editor** — Added hero gradient override text input to theme editor page.
+5. **Preset creation missing `body_bg_color`** — The "Use Preset" flow didn't pass `body_bg_color` to the API. Now included.
+
+#### Files Modified (3)
+- `src/lib/utils/cms-theme-presets.ts` — Added `bodyBgColor` field to interface + all 8 presets
+- `src/app/admin/website/themes/page.tsx` — Fixed color swatch (`brand-500` → `lime`), pass `body_bg_color` on preset creation
+- `src/app/admin/website/themes/[id]/page.tsx` — Expanded `COLOR_KEYS` (6 → 10), added hero gradient override input
+
+#### DB Updates
+- New Year theme: `body_bg_color = '#050503'`
+- Halloween theme: `body_bg_color = '#0f050f'`
+
+---
+
 ## Session Q — 2026-02-16 (Booking Module Theme Fix)
 
 ### Fix: Booking module now follows site dark theme — proper contrast, readable inputs and text

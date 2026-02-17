@@ -17,6 +17,7 @@ export interface ThemePreset {
   description: string;
   colorOverrides: Record<string, string>;
   gradientOverrides: Record<string, string>;
+  bodyBgColor: string;
   particleEffect: ParticleEffect | null;
   particleIntensity: number;
   particleColor: string | null;
@@ -48,6 +49,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #991b1b 0%, #14532d 100%)',
     },
+    bodyBgColor: '#050f05',
     particleEffect: 'snowfall',
     particleIntensity: 60,
     particleColor: '#ffffff',
@@ -75,6 +77,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #9a3412 0%, #581c87 100%)',
     },
+    bodyBgColor: '#0f050f',
     particleEffect: 'sparkles',
     particleIntensity: 40,
     particleColor: '#f97316',
@@ -102,6 +105,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #1e3a8a 0%, #7f1d1d 100%)',
     },
+    bodyBgColor: '#05050f',
     particleEffect: 'fireworks',
     particleIntensity: 50,
     particleColor: null,
@@ -129,6 +133,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #172554 0%, #7f1d1d 100%)',
     },
+    bodyBgColor: '#05050a',
     particleEffect: 'stars',
     particleIntensity: 30,
     particleColor: '#fbbf24',
@@ -156,6 +161,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #172554 0%, #713f12 100%)',
     },
+    bodyBgColor: '#050508',
     particleEffect: 'stars',
     particleIntensity: 25,
     particleColor: '#fbbf24',
@@ -185,6 +191,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #be185d 0%, #881337 100%)',
     },
+    bodyBgColor: '#0a0508',
     particleEffect: 'hearts',
     particleIntensity: 40,
     particleColor: '#fda4af',
@@ -212,6 +219,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #92400e 0%, #7f1d1d 100%)',
     },
+    bodyBgColor: '#0a0503',
     particleEffect: 'leaves',
     particleIntensity: 45,
     particleColor: '#d97706',
@@ -239,6 +247,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #0f172a 0%, #854d0e 100%)',
     },
+    bodyBgColor: '#050503',
     particleEffect: 'confetti',
     particleIntensity: 55,
     particleColor: null,
