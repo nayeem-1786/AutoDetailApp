@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 9, Session 2 — 2026-02-17 (Cart Page + Checkout + Orders)
+
+### feat: Cart page, Stripe checkout, orders database, confirmation page, stock management
+
+#### Migration (1)
+- `20260217000001_orders.sql` — `orders` + `order_items` tables with RLS policies, indexes, `update_updated_at` trigger. Orders store financials in cents. RLS: customers view own orders (via `auth_user_id` join), service role full access.
+
+#### New Files (7)
+- `src/lib/utils/order-number.ts` — Sequential order number generator (SD-10001, SD-10002, ...)
+- `src/app/(public)/cart/page.tsx` — Full cart page with qty controls, coupon input, order summary sidebar, tax calc, empty state
+- `src/app/(public)/checkout/page.tsx` — Checkout with 3-step flow (contact info → fulfillment → Stripe Payment Element), order summary
+- `src/app/(public)/checkout/confirmation/page.tsx` — Post-payment confirmation with order details, clears cart
+- `src/app/api/checkout/create-payment-intent/route.ts` — Server-side cart validation, stock check, coupon eval, tax calc, order creation, Stripe PI
+- `src/app/api/checkout/order/route.ts` — GET order by number for confirmation page
+- `src/app/api/webhooks/stripe/route.ts` — Stripe webhook: payment_intent.succeeded (mark paid, decrement stock, coupon usage, customer spend, confirmation email) + payment_intent.payment_failed
+
+#### Modified Files (1)
+- `src/lib/supabase/types.ts` — Added `Order`, `OrderItem`, `OrderPaymentStatus`, `OrderFulfillmentStatus`, `OrderFulfillmentMethod` types
+
+---
+
 ## Phase 9, Session 1 — 2026-02-17 (Cart System)
 
 ### feat: Shopping cart context, Add to Cart buttons, cart drawer, header cart icon

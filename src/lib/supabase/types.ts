@@ -1282,6 +1282,61 @@ export interface WebsiteNavItem {
   children?: WebsiteNavItem[];
 }
 
+// ─── Orders ──────────────────────────────────────────────────
+
+export type OrderPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded';
+export type OrderFulfillmentStatus = 'unfulfilled' | 'processing' | 'ready_for_pickup' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderFulfillmentMethod = 'pickup' | 'shipping' | 'delivery';
+
+export interface Order {
+  id: string;
+  order_number: string;
+  customer_id: string | null;
+  email: string;
+  phone: string | null;
+  first_name: string;
+  last_name: string;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  shipping_amount: number;
+  total: number;
+  coupon_id: string | null;
+  coupon_code: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  payment_status: OrderPaymentStatus;
+  paid_at: string | null;
+  fulfillment_status: OrderFulfillmentStatus;
+  fulfillment_method: OrderFulfillmentMethod;
+  shipping_address_line1: string | null;
+  shipping_address_line2: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_zip: string | null;
+  customer_notes: string | null;
+  internal_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined relations
+  items?: OrderItem[];
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  product_name: string;
+  product_slug: string | null;
+  category_slug: string | null;
+  product_image_url: string | null;
+  unit_price: number;
+  quantity: number;
+  line_total: number;
+  discount_amount: number;
+  created_at: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }

@@ -235,6 +235,21 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Public layout: wrapped with CartProviderWrapper, CartDrawer rendered
 - `retail_price` is in dollars (not cents) — uses `formatCurrency()` directly
 
+#### Session 2 — Cart Page, Stripe Checkout, Orders (Done)
+- Database: `orders` + `order_items` tables (migration `20260217000001_orders.sql`), RLS policies (customer view own, service role full), indexes, `update_updated_at` trigger
+- Types: `Order`, `OrderItem`, `OrderPaymentStatus`, `OrderFulfillmentStatus`, `OrderFulfillmentMethod` in `types.ts`
+- `generateOrderNumber()` in `src/lib/utils/order-number.ts`: SD-10001, SD-10002, etc. (same pattern as quote numbers)
+- Cart page (`/cart`): full-width item list with qty controls, coupon code input (reuses booking validate-coupon API), order summary sidebar with subtotal/discount/tax/total, empty state
+- Checkout page (`/checkout`): 3-step flow (contact → fulfillment → payment), Stripe Payment Element (dark theme), order summary sidebar, coupon passthrough from cart
+- `POST /api/checkout/create-payment-intent`: server-side price validation (re-fetches from DB), stock check, coupon validation via `calculateCouponDiscount()`, tax calc (10.25% on taxable products), order+items creation, Stripe PI creation with order metadata
+- `POST /api/webhooks/stripe`: handles `payment_intent.succeeded` (mark paid, decrement stock, increment coupon usage, update customer lifetime_spend, send confirmation email) and `payment_intent.payment_failed`
+- Confirmation page (`/checkout/confirmation`): order summary, clears cart, success header
+- `GET /api/checkout/order`: fetches order by number for confirmation page
+- Order confirmation email: dark-mode HTML template via Mailgun (`sendEmail()`), item table, totals, fulfillment info
+- Money: orders table stores cents (integers). `retail_price` (dollars) → `Math.round(price * 100)` for order items
+- Tax: 10.25% on taxable products only (`TAX_RATE` from constants), proportional discount adjustment
+- Stock: decremented in Stripe webhook on successful payment
+
 ---
 
 ## Testing Checklist
