@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { ArrowLeft, Save, Image as ImageIcon, Video, Columns } from 'lucide-react';
+import { HeroImageUpload } from '../components/hero-image-upload';
 import type { HeroSlide } from '@/lib/supabase/types';
 
 const CONTENT_TYPES = [
@@ -211,29 +212,25 @@ export default function HeroSlideEditorPage() {
       {/* Image Fields */}
       {slide.content_type === 'image' && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Image</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Background Image</h3>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Image URL</label>
-            <Input
-              value={slide.image_url || ''}
-              onChange={(e) => update('image_url', e.target.value || null)}
-              className="mt-1"
-              placeholder="https://..."
-            />
-          </div>
+          <HeroImageUpload
+            imageUrl={slide.image_url}
+            slideId={id}
+            pathPrefix="hero-slides"
+            onChange={(url) => update('image_url', url)}
+            label="Desktop Image"
+            aspect="landscape"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Mobile Image URL (optional)
-            </label>
-            <Input
-              value={slide.image_url_mobile || ''}
-              onChange={(e) => update('image_url_mobile', e.target.value || null)}
-              className="mt-1"
-              placeholder="https://..."
-            />
-          </div>
+          <HeroImageUpload
+            imageUrl={slide.image_url_mobile}
+            slideId={id}
+            pathPrefix="hero-slides-mobile"
+            onChange={(url) => update('image_url_mobile', url)}
+            label="Mobile Image (optional)"
+            aspect="square"
+          />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Alt Text</label>
@@ -264,17 +261,14 @@ export default function HeroSlideEditorPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Poster / Thumbnail URL
-            </label>
-            <Input
-              value={slide.video_thumbnail_url || ''}
-              onChange={(e) => update('video_thumbnail_url', e.target.value || null)}
-              className="mt-1"
-              placeholder="https://..."
-            />
-          </div>
+          <HeroImageUpload
+            imageUrl={slide.video_thumbnail_url}
+            slideId={id}
+            pathPrefix="hero-slides-thumbs"
+            onChange={(url) => update('video_thumbnail_url', url)}
+            label="Poster / Thumbnail Image"
+            aspect="landscape"
+          />
         </div>
       )}
 
@@ -284,24 +278,22 @@ export default function HeroSlideEditorPage() {
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Before / After</h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Before Image URL</label>
-              <Input
-                value={slide.before_image_url || ''}
-                onChange={(e) => update('before_image_url', e.target.value || null)}
-                className="mt-1"
-                placeholder="https://..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">After Image URL</label>
-              <Input
-                value={slide.after_image_url || ''}
-                onChange={(e) => update('after_image_url', e.target.value || null)}
-                className="mt-1"
-                placeholder="https://..."
-              />
-            </div>
+            <HeroImageUpload
+              imageUrl={slide.before_image_url}
+              slideId={id}
+              pathPrefix="hero-slides-before"
+              onChange={(url) => update('before_image_url', url)}
+              label="Before Image"
+              aspect="square"
+            />
+            <HeroImageUpload
+              imageUrl={slide.after_image_url}
+              slideId={id}
+              pathPrefix="hero-slides-after"
+              onChange={(url) => update('after_image_url', url)}
+              label="After Image"
+              aspect="square"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

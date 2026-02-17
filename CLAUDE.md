@@ -425,7 +425,13 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session N — Theme System Pipeline Fix)
+## Last Session: 2026-02-16 (Session O — Hero Image Upload)
+
+### Session O — Hero Image Upload
+- **HeroImageUpload component**: Drag-drop image upload for hero slides. Client-side resize (max 2560px, 85% quality), file validation (JPEG/PNG/WebP, 10MB max), preview with replace/remove hover overlay, loading spinner. Uses existing `cms-assets` storage bucket.
+- **Slide editor updated**: Replaced all plain URL text inputs with `HeroImageUpload` — desktop image (landscape), mobile image (square), before/after images (side-by-side), video thumbnail (landscape). Alt text remains as text input.
+- **Storage cleanup on delete**: DELETE endpoint now fetches slide before deletion, extracts storage paths from all image URL fields, removes from `cms-assets` bucket (best-effort).
+- **Files**: `hero/components/hero-image-upload.tsx` (new), `hero/[id]/page.tsx` (updated), `api/admin/cms/hero/[id]/route.ts` (updated)
 
 ### Session N — Theme System Pipeline Fix
 - **Root cause found**: Two bugs prevented themes from applying: (1) Tailwind v4's `@theme inline` inlined values directly into utility classes (`bg-lime { background-color: #cf0 }`) so ThemeProvider's CSS variable overrides had no effect; (2) Valentine's Day theme in DB had wrong `color_overrides` keys (`brand-500`/`brand-600`/`brand-700`/`accent-500`) from admin editor's stale `COLOR_KEYS`.

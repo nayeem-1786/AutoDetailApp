@@ -114,6 +114,14 @@ export async function DELETE(
 
   const { id } = await params;
   const admin = createAdminClient();
+
+  // Fetch the slide first to find images to clean up from storage
+  const { data: slide } = await admin
+    .from('hero_slides')
+    .select('image_url, image_url_mobile, video_thumbnail_url, before_image_url, after_image_url')
+    .eq('id', id)
+    .single();
+
   const { error } = await admin
     .from('hero_slides')
     .delete()
@@ -121,6 +129,28 @@ export async function DELETE(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Clean up images from cms-assets storage (best-effort, don't fail the request)
+  if (slide) {
+    const imageUrls = [
+      slide.image_url,
+      slide.image_url_mobile,
+      slide.video_thumbnail_url,
+      slide.before_image_url,
+      slide.after_image_url,
+    ].filter(Boolean) as string[];
+
+    const storagePaths = imageUrls
+      .map((url) => {
+        const match = url.match(/cms-assets\/(.+)/);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean) as string[];
+
+    if (storagePaths.length > 0) {
+      await admin.storage.from('cms-assets').remove(storagePaths).catch(() => {});
+    }
   }
 
   // Check if any active slides remain — if not, disable the feature flag

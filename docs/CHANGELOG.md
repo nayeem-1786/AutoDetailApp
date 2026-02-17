@@ -4,6 +4,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session O — 2026-02-16 (Hero Image Upload)
+
+### Feature: Image Upload for Hero Carousel Admin
+Added drag-and-drop image upload to the hero slide editor, replacing plain URL text inputs.
+
+### HeroImageUpload Component
+- New reusable component at `src/app/admin/website/hero/components/hero-image-upload.tsx`
+- Drag-and-drop zone with visual feedback (drag highlight, loading spinner)
+- Click-to-browse alternative
+- Image preview with hover overlay showing Replace/Remove buttons
+- Client-side resize: images wider than 2560px are downscaled before upload (canvas API, 85% quality)
+- File validation: JPEG, PNG, WebP only; max 10MB
+- Uploads to `cms-assets` Supabase storage bucket (already existed)
+- Storage path pattern: `{prefix}/{slideId}/{timestamp}.{ext}` — avoids cache issues on replace
+- Old image automatically deleted from storage when replacing
+- Landscape (16:9) or square aspect ratio modes
+
+### Slide Editor Updates
+- Desktop image: drag-drop upload with landscape preview
+- Mobile image: drag-drop upload with square preview
+- Before/After images: side-by-side drag-drop uploads
+- Video thumbnail: drag-drop upload with landscape preview
+- Alt text field preserved as manual text input
+
+### Storage Cleanup on Slide Deletion
+- DELETE endpoint now fetches slide data before deletion
+- Extracts storage paths from all image URL fields (image_url, image_url_mobile, video_thumbnail_url, before_image_url, after_image_url)
+- Removes all associated images from `cms-assets` bucket (best-effort, non-blocking)
+
+### Files Changed
+- `src/app/admin/website/hero/components/hero-image-upload.tsx` — new component
+- `src/app/admin/website/hero/[id]/page.tsx` — replaced URL inputs with upload components
+- `src/app/api/admin/cms/hero/[id]/route.ts` — storage cleanup on DELETE
+
+---
+
 ## Session N — 2026-02-16 (Theme System Pipeline Fix)
 
 ### Root Cause: Two Critical Bugs
