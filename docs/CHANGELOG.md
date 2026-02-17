@@ -72,6 +72,58 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - `src/components/public/mobile-menu.tsx` — old mobile menu
 - `src/components/public/nav-dropdown.tsx` — old nav dropdown
 
+### Session J (continued — Session 3) — Scroll Animations, Auth Dark Theme & Final Polish
+
+#### AnimatedSection Wrapper (`src/components/public/animated-section.tsx`)
+- NEW reusable client component for scroll-triggered framer-motion animations in server component pages
+- `AnimatedSection` — wraps content with `whileInView` fade-in, supports `stagger` mode for grids
+- `AnimatedItem` — child wrapper for staggered grid items
+- Uses `fadeInUp` and `staggerContainer` variants from `@/lib/animations`
+- `viewport={{ once: true, margin: '-80px' }}` for natural trigger point
+
+#### Customer Auth Dark Theme (3 pages)
+- **signin/page.tsx**: Removed all `dark:` prefixed classes, permanent dark theme. Cards: `bg-brand-surface border-white/10`. Buttons: `bg-lime text-black font-bold`. Links: `text-lime`. Error: `bg-red-950 text-red-300`. Session expired: `bg-amber-950 border-amber-800 text-amber-200`.
+- **signup/page.tsx**: Same conversion pattern across all 4 form states (full registration, phone-otp, phone-verify, otp-profile)
+- **reset-password/page.tsx**: Same conversion pattern
+
+#### Content Block Renderer CTA Fix
+- Fixed CTA block gradient: `from-brand-600 to-brand-800` → `from-brand-grey to-black border-white/10`
+- Added radial lime glow overlay (`bg-lime/5 rounded-full blur-3xl`)
+
+#### Ad Zone Polish
+- Container: `rounded` → `rounded-2xl`
+
+#### Scroll Animations Added To
+- City page (`areas/[citySlug]`): Hero, services grid, reviews — lime gradient city name
+- Areas index (`areas/page`): Hero, staggered city card grid — lime gradient, hover lift effects
+- Services index + category: Hero heading, staggered card grids
+- Products index + category: Hero heading, staggered card grids
+- Gallery: Hero heading
+- Terms: Hero heading
+
+#### Animations Library Fix (`src/lib/animations.ts`)
+- Added explicit `Variants` type annotations to all exported variants
+- Fixed `ease` array type: `number[]` → `[number, number, number, number]` tuple for framer-motion compatibility
+
+#### Files Created
+- `src/components/public/animated-section.tsx`
+
+#### Files Modified
+- `src/app/(customer-auth)/signin/page.tsx` — permanent dark theme
+- `src/app/(customer-auth)/signup/page.tsx` — permanent dark theme
+- `src/app/(customer-auth)/signin/reset-password/page.tsx` — permanent dark theme
+- `src/components/public/content-block-renderer.tsx` — CTA block gradient fix
+- `src/components/public/cms/ad-zone.tsx` — rounded-2xl
+- `src/app/(public)/areas/[citySlug]/page.tsx` — AnimatedSection + lime gradient
+- `src/app/(public)/areas/page.tsx` — AnimatedSection + lime gradient
+- `src/app/(public)/terms/page.tsx` — AnimatedSection
+- `src/app/(public)/services/page.tsx` — AnimatedSection
+- `src/app/(public)/services/[categorySlug]/page.tsx` — AnimatedSection
+- `src/app/(public)/products/page.tsx` — AnimatedSection
+- `src/app/(public)/products/[categorySlug]/page.tsx` — AnimatedSection
+- `src/app/(public)/gallery/page.tsx` — AnimatedSection
+- `src/lib/animations.ts` — Variants type annotations
+
 ### Session J (continued — Session 2) — Hero/Card/Page Polish & Animations
 
 #### HeroCarousel Enhancements

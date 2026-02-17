@@ -249,16 +249,16 @@ export default function CustomerSignUpPage() {
 
   return (
     <section className="flex items-center justify-center py-12 sm:py-16">
-      <div className="w-full max-w-md space-y-6">
+      <div className="w-full max-w-md space-y-6 px-4">
         {/* Business Icon + Heading */}
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-900 dark:bg-white text-xl font-bold text-white dark:text-gray-900">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
             SD
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="mt-4 text-2xl font-bold text-white">
             {mode === 'otp-profile' ? 'Complete Your Profile' : 'Create Account'}
           </h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-400">
             {mode === 'otp-profile'
               ? `Sign up to manage your appointments at ${businessInfo?.name || 'our shop'}`
               : `Join ${businessInfo?.name || 'us'} to book and manage appointments`}
@@ -266,9 +266,9 @@ export default function CustomerSignUpPage() {
         </div>
 
         {/* Card Container */}
-        <div className="rounded-2xl bg-white dark:bg-gray-900 p-8 shadow-lg dark:shadow-gray-900/50">
+        <div className="rounded-2xl bg-brand-surface border border-white/10 p-8">
           {error && (
-            <div className="mb-5 rounded-md bg-red-50 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-300">
+            <div className="mb-5 rounded-md bg-red-950 p-3 text-sm text-red-300">
               {error}
             </div>
           )}
@@ -282,7 +282,7 @@ export default function CustomerSignUpPage() {
                   id="otp-phone"
                   value={otpPhone || phoneParam || ''}
                   readOnly
-                  className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+                  className="bg-brand-dark text-gray-400"
                 />
               </FormField>
 
@@ -332,7 +332,7 @@ export default function CustomerSignUpPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
               >
                 {loading ? <Spinner size="sm" /> : 'Complete Sign Up'}
               </Button>
@@ -368,16 +368,16 @@ export default function CustomerSignUpPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
               >
                 {loading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs font-medium text-gray-400 dark:text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs font-medium text-gray-500">OR</span>
+                <div className="h-px flex-1 bg-white/10" />
               </div>
 
               <button
@@ -386,7 +386,7 @@ export default function CustomerSignUpPage() {
                   setMode('full');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
               >
                 Sign up with email
               </button>
@@ -397,8 +397,8 @@ export default function CustomerSignUpPage() {
           {mode === 'phone-verify' && (
             <form onSubmit={otpVerifyForm.handleSubmit(verifyOtp)} className="space-y-5">
               <div className="text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  We sent a 6-digit code to <span className="font-medium text-gray-900 dark:text-gray-100">{otpPhone}</span>
+                <p className="text-sm text-gray-400">
+                  We sent a 6-digit code to <span className="font-medium text-white">{otpPhone}</span>
                 </p>
               </div>
 
@@ -423,7 +423,7 @@ export default function CustomerSignUpPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
               >
                 {loading ? <Spinner size="sm" /> : 'Verify'}
               </Button>
@@ -436,7 +436,7 @@ export default function CustomerSignUpPage() {
                     setError(null);
                     otpVerifyForm.reset();
                   }}
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  className="text-gray-400 hover:text-white"
                 >
                   Change number
                 </button>
@@ -444,7 +444,7 @@ export default function CustomerSignUpPage() {
                   type="button"
                   onClick={resendOtp}
                   disabled={resendCooldown > 0}
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:text-gray-400 dark:disabled:text-gray-600"
+                  className="text-gray-400 hover:text-white disabled:text-gray-600"
                 >
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
                 </button>
@@ -542,16 +542,16 @@ export default function CustomerSignUpPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
               >
                 {loading ? <Spinner size="sm" /> : 'Create Account'}
               </Button>
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs font-medium text-gray-400 dark:text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs font-medium text-gray-500">OR</span>
+                <div className="h-px flex-1 bg-white/10" />
               </div>
 
               <button
@@ -560,7 +560,7 @@ export default function CustomerSignUpPage() {
                   setMode('phone-otp');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
               >
                 Sign up with phone
               </button>
@@ -569,11 +569,11 @@ export default function CustomerSignUpPage() {
         </div>
 
         {/* Sign in link */}
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-center text-sm text-gray-400">
           Already have an account?{' '}
           <Link
             href="/signin"
-            className="font-medium text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+            className="font-medium text-lime hover:text-lime-400 transition-colors"
           >
             Sign In
           </Link>

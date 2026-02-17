@@ -50,23 +50,23 @@ export default function CustomerResetPasswordPage() {
 
   return (
     <section className="flex items-center justify-center py-12 sm:py-16">
-      <div className="w-full max-w-md space-y-6">
+      <div className="w-full max-w-md space-y-6 px-4">
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-900 dark:bg-white text-xl font-bold text-white dark:text-gray-900">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
             SD
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="mt-4 text-2xl font-bold text-white">
             Set New Password
           </h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-400">
             {businessInfo?.name || 'Our Portal'}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-900 p-8 shadow-lg dark:shadow-gray-900/50">
+        <div className="rounded-2xl bg-brand-surface border border-white/10 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="rounded-md bg-red-50 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-300">
+              <div className="rounded-md bg-red-950 p-3 text-sm text-red-300">
                 {error}
               </div>
             )}
@@ -96,7 +96,7 @@ export default function CustomerResetPasswordPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+              className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
             >
               {loading ? 'Updating...' : 'Update Password'}
             </Button>

@@ -18,6 +18,7 @@ export const revalidate = 300;
 import { ContentBlocks } from '@/components/public/content-block-renderer';
 import { CtaSection } from '@/components/public/cta-section';
 import { formatPhone, phoneToE164 } from '@/lib/utils/format';
+import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 // ---------------------------------------------------------------------------
 // Static params — pre-render all active cities at build time
@@ -124,74 +125,98 @@ export default async function CityLandingPage({
     { name: city.city_name, url: `${SITE_URL}/areas/${city.slug}` },
   ]);
 
+  // Extract city name from heading for lime gradient effect
+  const headingParts = heading.split(city.city_name);
+  const hasCity = headingParts.length > 1;
+
   return (
     <>
       <JsonLd data={localBusinessSchema} />
       <JsonLd data={breadcrumbSchema} />
 
       {/* Hero Section */}
-      <section className="bg-black py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className="bg-black py-16 sm:py-20 lg:py-24 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-lime/3 rounded-full blur-3xl" />
+        </div>
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
               { label: 'Service Areas', href: '/areas' },
               { label: city.city_name },
             ]}
           />
-          <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-            {heading}
-          </h1>
-          <p className="mt-4 max-w-3xl text-lg text-gray-400">
-            {introText}
-          </p>
-          {city.distance_miles != null && (
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-500">
-              <MapPin className="h-4 w-4" />
-              {city.distance_miles} miles from our shop in {businessInfo.city},{' '}
-              {businessInfo.state}
+          <AnimatedSection>
+            <h1 className="font-display text-3xl font-black tracking-tight text-white uppercase sm:text-4xl lg:text-5xl">
+              {hasCity ? (
+                <>
+                  {headingParts[0]}
+                  <span className="text-gradient-lime">{city.city_name}</span>
+                  {headingParts[1]}
+                </>
+              ) : (
+                heading
+              )}
+            </h1>
+            <p className="mt-4 max-w-3xl text-lg text-gray-400">
+              {introText}
             </p>
-          )}
-          <div className="mt-8">
-            <Link
-              href="/book"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-semibold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
-            >
-              Book Your Detail
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
+            {city.distance_miles != null && (
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-500">
+                <MapPin className="h-4 w-4" />
+                {city.distance_miles} miles from our shop in {businessInfo.city},{' '}
+                {businessInfo.state}
+              </p>
+            )}
+            <div className="mt-8">
+              <Link
+                href="/book"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-bold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
+              >
+                Book Your Detail
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </AnimatedSection>
         </div>
       </section>
 
       {/* Service Highlights */}
       {topCategories.length > 0 && (
-        <section className="bg-black section-spacing">
+        <section className="bg-brand-dark section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                Services Available in {city.city_name}
-              </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-gray-400">
-                From express washes to multi-year ceramic coating packages, we bring
-                professional auto detailing directly to you in {city.city_name}.
-              </p>
-            </div>
+            <AnimatedSection>
+              <div className="text-center">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                  Services Available in{' '}
+                  <span className="text-gradient-lime">{city.city_name}</span>
+                </h2>
+                <p className="mx-auto mt-4 max-w-2xl text-gray-400">
+                  From express washes to multi-year ceramic coating packages, we bring
+                  professional auto detailing directly to you in {city.city_name}.
+                </p>
+              </div>
+            </AnimatedSection>
 
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <AnimatedSection stagger className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {topCategories.map((category) => (
-                <ServiceCategoryCard key={category.id} category={category} />
+                <AnimatedItem key={category.id}>
+                  <ServiceCategoryCard category={category} />
+                </AnimatedItem>
               ))}
-            </div>
+            </AnimatedSection>
 
-            <div className="mt-10 text-center">
-              <Link
-                href="/services"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
-              >
-                View all services
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </div>
+            <AnimatedSection delay={0.3}>
+              <div className="mt-10 text-center">
+                <Link
+                  href="/services"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
+                >
+                  View all services
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
+            </AnimatedSection>
           </div>
         </section>
       )}
@@ -201,46 +226,47 @@ export default async function CityLandingPage({
 
       {/* Reviews Section */}
       {reviews.google.reviews.length > 0 && (
-        <section className="bg-brand-dark section-spacing">
+        <section className="bg-brand-grey section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                What Our Customers Say
-              </h2>
-              <p className="mx-auto mt-3 max-w-xl text-gray-400">
-                Rated {reviews.google.rating} stars across{' '}
-                {reviews.google.count} Google reviews
-              </p>
-            </div>
+            <AnimatedSection>
+              <div className="text-center">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                  What Our Customers Say
+                </h2>
+                <p className="mx-auto mt-3 max-w-xl text-gray-400">
+                  Rated {reviews.google.rating} stars across{' '}
+                  {reviews.google.count} Google reviews
+                </p>
+              </div>
+            </AnimatedSection>
 
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <AnimatedSection stagger className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
-                <div
-                  key={i}
-                  className="rounded-2xl bg-brand-surface p-7 border border-white/10"
-                >
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: review.rating }).map((_, j) => (
-                      <Star
-                        key={j}
-                        className="h-4 w-4 fill-amber-400 text-amber-400"
-                      />
-                    ))}
+                <AnimatedItem key={i}>
+                  <div className="rounded-2xl bg-brand-surface p-7 border border-white/10 hover:border-lime/20 transition-colors">
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: review.rating }).map((_, j) => (
+                        <Star
+                          key={j}
+                          className="h-4 w-4 fill-amber-400 text-amber-400"
+                        />
+                      ))}
+                    </div>
+                    <p className="mt-4 text-sm leading-relaxed text-gray-300 line-clamp-4 italic">
+                      &ldquo;{review.text}&rdquo;
+                    </p>
+                    <div className="mt-4 flex items-center justify-between">
+                      <span className="text-sm font-medium text-white">
+                        {review.author}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {review.relativeTime}
+                      </span>
+                    </div>
                   </div>
-                  <p className="mt-4 text-sm leading-relaxed text-gray-300 line-clamp-4">
-                    &ldquo;{review.text}&rdquo;
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">
-                      {review.author}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {review.relativeTime}
-                    </span>
-                  </div>
-                </div>
+                </AnimatedItem>
               ))}
-            </div>
+            </AnimatedSection>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm">
               <a
@@ -267,14 +293,14 @@ export default async function CityLandingPage({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-center sm:gap-8 sm:text-left">
             <div className="flex items-center gap-2 text-sm text-gray-400">
-              <MapPin className="h-4 w-4 text-gray-400" />
+              <MapPin className="h-4 w-4 text-gray-500" />
               {businessInfo.address}
             </div>
             <a
               href={`tel:${phoneToE164(businessInfo.phone)}`}
               className="flex items-center gap-2 text-sm text-gray-400 hover:text-lime transition-colors"
             >
-              <Phone className="h-4 w-4 text-gray-400" />
+              <Phone className="h-4 w-4 text-gray-500" />
               {formatPhone(businessInfo.phone)}
             </a>
           </div>

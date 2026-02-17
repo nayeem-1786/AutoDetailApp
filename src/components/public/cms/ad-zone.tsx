@@ -133,7 +133,7 @@ export function AdZone({ zoneId, pagePath, className, ad: preloaded }: AdZonePro
       className={`flex justify-center ${className ?? ''}`}
     >
       <div
-        className={`overflow-hidden rounded ${ad.creative.link_url ? 'cursor-pointer' : ''}`}
+        className={`overflow-hidden rounded-2xl ${ad.creative.link_url ? 'cursor-pointer' : ''}`}
         onClick={handleClick}
         role={ad.creative.link_url ? 'link' : undefined}
         style={{ maxWidth: width, maxHeight: height }}

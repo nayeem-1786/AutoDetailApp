@@ -4,6 +4,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
+import AnimatedSection from '@/components/public/animated-section';
 
 export const revalidate = 3600;
 
@@ -114,14 +115,16 @@ export default async function TermsPage() {
       <section className="bg-black py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs items={[{ label: 'Terms & Conditions' }]} />
-          <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Terms &amp; Conditions
-          </h1>
-          {effectiveDate && (
-            <p className="mt-3 text-sm text-gray-400">
-              Effective Date: {new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          )}
+          <AnimatedSection>
+            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Terms &amp; Conditions
+            </h1>
+            {effectiveDate && (
+              <p className="mt-3 text-sm text-gray-400">
+                Effective Date: {new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            )}
+          </AnimatedSection>
         </div>
       </section>
 

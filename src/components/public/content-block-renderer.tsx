@@ -163,11 +163,15 @@ function CtaBlock({ block }: { block: PageContentBlock }) {
 
   return (
     <div className="content-block">
-      <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 px-8 py-12 text-center sm:px-12 sm:py-16">
+      <div className="rounded-2xl bg-gradient-to-br from-brand-grey to-black border border-white/10 px-8 py-12 text-center sm:px-12 sm:py-16 relative overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+          <div className="w-64 h-64 bg-lime/5 rounded-full blur-3xl" />
+        </div>
+        <div className="relative">
         <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
           {data.heading}
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-brand-100">
+        <p className="mx-auto mt-4 max-w-2xl text-gray-400">
           {data.description}
         </p>
         <div className="mt-8">
@@ -178,6 +182,7 @@ function CtaBlock({ block }: { block: PageContentBlock }) {
             {data.button_text || 'Book Now'}
             <ArrowRight className="h-4 w-4" />
           </Link>
+        </div>
         </div>
       </div>
     </div>

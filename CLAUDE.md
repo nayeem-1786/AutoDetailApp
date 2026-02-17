@@ -456,6 +456,15 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **New file**: `trust-bar-client.tsx` (client component with CountUp)
 - TypeScript clean, build clean (zero errors)
 
+### Session J — Part 3: Scroll Animations, Auth Dark Theme & Final Polish
+- **AnimatedSection wrapper** (`src/components/public/animated-section.tsx`): NEW reusable client component for scroll-triggered framer-motion animations in server component pages. Exports `AnimatedSection` (with stagger mode) and `AnimatedItem`.
+- **Customer auth dark theme**: Converted all 3 customer auth pages (signin, signup, reset-password) from `dark:` prefixed dual-theme to permanent dark theme. Cards: `bg-brand-surface border-white/10`. Buttons: `bg-lime text-black`. Links: `text-lime`.
+- **Content-block-renderer CTA fix**: Gradient `from-brand-600 to-brand-800` → `from-brand-grey to-black` with radial lime glow overlay
+- **Ad-zone polish**: Container `rounded` → `rounded-2xl`
+- **Scroll animations added to**: City pages (hero, services, reviews), areas index (hero, grid), services index + category, products index + category, gallery hero, terms hero
+- **Animations.ts fix**: Added explicit `Variants` type annotations, fixed `ease` tuple type for framer-motion compatibility
+- TypeScript clean, build clean (zero errors)
+
 ### Session I — 2026-02-14 (AI Content Writer for City Pages)
 - **AI Content Writer system**: Full content block management with AI generation for city landing pages and any other page type.
 - **DB schema**: `page_content_blocks` table with 5 block types (rich_text, faq, features_list, cta, testimonial_highlight), sort order, active toggle, AI tracking.

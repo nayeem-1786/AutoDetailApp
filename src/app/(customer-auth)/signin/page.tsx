@@ -300,26 +300,26 @@ export default function CustomerSignInPage() {
 
   return (
     <section className="flex items-center justify-center py-12 sm:py-16">
-      <div className="w-full max-w-md space-y-6">
+      <div className="w-full max-w-md space-y-6 px-4">
         {/* Business Logo/Icon + Heading */}
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-900 dark:bg-white text-xl font-bold text-white dark:text-gray-900">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
             SD
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="mt-4 text-2xl font-bold text-white">
             Welcome to {businessInfo?.name || 'Our Portal'}
           </h1>
         </div>
 
         {/* Card Container */}
-        <div className="rounded-2xl bg-white dark:bg-gray-900 p-8 shadow-lg dark:shadow-gray-900/50">
+        <div className="rounded-2xl bg-brand-surface border border-white/10 p-8">
           {sessionExpired && (
-            <div className="mb-5 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 p-3 text-sm text-amber-800 dark:text-amber-200">
+            <div className="mb-5 rounded-md border border-amber-800 bg-amber-950 p-3 text-sm text-amber-200">
               Your session has expired. Please sign in again.
             </div>
           )}
           {error && (
-            <div className="mb-5 rounded-md bg-red-50 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-300">
+            <div className="mb-5 rounded-md bg-red-950 p-3 text-sm text-red-300">
               {error}
             </div>
           )}
@@ -353,16 +353,16 @@ export default function CustomerSignInPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
               >
                 {loading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs font-medium text-gray-400 dark:text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs font-medium text-gray-500">OR</span>
+                <div className="h-px flex-1 bg-white/10" />
               </div>
 
               <button
@@ -371,7 +371,7 @@ export default function CustomerSignInPage() {
                   setMode('email');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
               >
                 Sign in with email
               </button>
@@ -382,8 +382,8 @@ export default function CustomerSignInPage() {
           {mode === 'otp' && (
             <form onSubmit={otpForm.handleSubmit(verifyOtp)} className="space-y-5">
               <div className="text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  We sent a 6-digit code to <span className="font-medium text-gray-900 dark:text-gray-100">{otpPhone}</span>
+                <p className="text-sm text-gray-400">
+                  We sent a 6-digit code to <span className="font-medium text-white">{otpPhone}</span>
                 </p>
               </div>
 
@@ -408,7 +408,7 @@ export default function CustomerSignInPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
               >
                 {loading ? <Spinner size="sm" /> : 'Verify'}
               </Button>
@@ -421,7 +421,7 @@ export default function CustomerSignInPage() {
                     setError(null);
                     otpForm.reset();
                   }}
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  className="text-gray-400 hover:text-white"
                 >
                   Change number
                 </button>
@@ -429,7 +429,7 @@ export default function CustomerSignInPage() {
                   type="button"
                   onClick={resendOtp}
                   disabled={resendCooldown > 0}
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:text-gray-400 dark:disabled:text-gray-600"
+                  className="text-gray-400 hover:text-white disabled:text-gray-600"
                 >
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
                 </button>
@@ -473,7 +473,7 @@ export default function CustomerSignInPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
               >
                 {loading ? <Spinner size="sm" /> : 'Sign In'}
               </Button>
@@ -484,16 +484,16 @@ export default function CustomerSignInPage() {
                   setForgotMode(true);
                   setError(null);
                 }}
-                className="block w-full text-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                className="block w-full text-center text-sm text-gray-400 hover:text-lime transition-colors"
               >
                 Forgot password?
               </button>
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs font-medium text-gray-400 dark:text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs font-medium text-gray-500">OR</span>
+                <div className="h-px flex-1 bg-white/10" />
               </div>
 
               <button
@@ -502,7 +502,7 @@ export default function CustomerSignInPage() {
                   setMode('phone');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
               >
                 Sign in with phone
               </button>
@@ -514,7 +514,7 @@ export default function CustomerSignInPage() {
             <div className="space-y-5">
               {resetSent ? (
                 <div className="space-y-4">
-                  <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3 text-sm text-green-800 dark:text-green-200">
+                  <div className="rounded-md bg-green-950 border border-green-800 p-3 text-sm text-green-200">
                     Check your email for a reset link. It may take a minute to arrive.
                   </div>
                   <button
@@ -525,14 +525,14 @@ export default function CustomerSignInPage() {
                       setResetEmail('');
                       setError(null);
                     }}
-                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                    className="text-sm text-gray-400 hover:text-white"
                   >
                     &larr; Back to sign in
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-5">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-400">
                     Enter your email address and we&apos;ll send you a link to reset your password.
                   </p>
 
@@ -550,7 +550,7 @@ export default function CustomerSignInPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full rounded-full bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                    className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
                   >
                     {loading ? <Spinner size="sm" /> : 'Send Reset Link'}
                   </Button>
@@ -562,7 +562,7 @@ export default function CustomerSignInPage() {
                       setResetEmail('');
                       setError(null);
                     }}
-                    className="block text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                    className="block text-sm text-gray-400 hover:text-white"
                   >
                     &larr; Back to sign in
                   </button>
@@ -573,11 +573,11 @@ export default function CustomerSignInPage() {
         </div>
 
         {/* Sign up link */}
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-center text-sm text-gray-400">
           Don&apos;t have an account?{' '}
           <Link
             href="/signup"
-            className="font-medium text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+            className="font-medium text-lime hover:text-lime-400 transition-colors"
           >
             Sign up
           </Link>

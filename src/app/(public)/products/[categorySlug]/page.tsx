@@ -7,6 +7,7 @@ import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { ProductCard } from '@/components/public/product-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 export const revalidate = 300;
 
@@ -60,29 +61,32 @@ export default async function ProductCategoryPage({ params }: PageProps) {
               { label: category.name },
             ]}
           />
-          <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            {category.name}
-          </h1>
-          {category.description && (
-            <p className="mt-4 max-w-3xl text-lg text-gray-400">
-              {category.description}
-            </p>
-          )}
+          <AnimatedSection>
+            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {category.name}
+            </h1>
+            {category.description && (
+              <p className="mt-4 max-w-3xl text-lg text-gray-400">
+                {category.description}
+              </p>
+            )}
+          </AnimatedSection>
         </div>
       </section>
 
       <section className="bg-brand-dark py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {products.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <AnimatedSection stagger className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  categorySlug={categorySlug}
-                />
+                <AnimatedItem key={product.id}>
+                  <ProductCard
+                    product={product}
+                    categorySlug={categorySlug}
+                  />
+                </AnimatedItem>
               ))}
-            </div>
+            </AnimatedSection>
           ) : (
             <p className="text-gray-400">
               No products are currently available in this category. Please check back soon.

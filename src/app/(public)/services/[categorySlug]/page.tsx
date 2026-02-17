@@ -12,6 +12,7 @@ import { ServiceCard } from '@/components/public/service-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 import { AdZone } from '@/components/public/cms/ad-zone';
+import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 export const revalidate = 300;
 
@@ -72,14 +73,16 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
               { label: category.name },
             ]}
           />
-          <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            {category.name}
-          </h1>
-          {category.description && (
-            <p className="mt-4 max-w-3xl text-lg text-gray-400">
-              {category.description}
-            </p>
-          )}
+          <AnimatedSection>
+            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {category.name}
+            </h1>
+            {category.description && (
+              <p className="mt-4 max-w-3xl text-lg text-gray-400">
+                {category.description}
+              </p>
+            )}
+          </AnimatedSection>
         </div>
       </section>
 
@@ -88,18 +91,19 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
       <section className="bg-brand-dark py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {services.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2">
+            <AnimatedSection stagger className="grid gap-6 sm:grid-cols-2">
               {services.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  service={{
-                    ...service,
-                    pricing: service.service_pricing,
-                  }}
-                  categorySlug={categorySlug}
-                />
+                <AnimatedItem key={service.id}>
+                  <ServiceCard
+                    service={{
+                      ...service,
+                      pricing: service.service_pricing,
+                    }}
+                    categorySlug={categorySlug}
+                  />
+                </AnimatedItem>
               ))}
-            </div>
+            </AnimatedSection>
           ) : (
             <p className="text-gray-400">
               No services are currently available in this category. Please check back soon.
