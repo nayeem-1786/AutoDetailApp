@@ -615,9 +615,7 @@ function CheckoutContent() {
       setShippingRates(rates);
       setRatesFetched(true);
 
-      if (rates.length > 0) {
-        setSelectedRateId(rates[0].id);
-      }
+      // Do NOT auto-select — user must explicitly choose a shipping option
     } catch {
       setRatesError('Failed to fetch shipping rates');
     } finally {
@@ -1215,8 +1213,14 @@ function CheckoutContent() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleCreatePaymentIntent}
-                    disabled={buttonState.disabled || loading}
+                    onClick={() => {
+                      if (fulfillmentMethod === 'shipping' && !selectedRateId) {
+                        toast.error('Please select a shipping option');
+                        return;
+                      }
+                      handleCreatePaymentIntent();
+                    }}
+                    disabled={loading || (!contactValid) || (fulfillmentMethod === 'shipping' && !shippingAddressValid) || ratesLoading}
                     className="flex items-center justify-center gap-2 rounded-xl bg-lime px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={buttonState.disabled ? buttonState.label : undefined}
                   >
