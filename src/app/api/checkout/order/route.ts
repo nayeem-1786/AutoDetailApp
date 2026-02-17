@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const { data: order, error } = await admin
     .from('orders')
-    .select('order_number, email, first_name, subtotal, discount_amount, tax_amount, shipping_amount, total, coupon_code, fulfillment_method, payment_status, order_items:order_items(product_name, quantity, unit_price, line_total, product_image_url)')
+    .select('order_number, email, first_name, subtotal, discount_amount, tax_amount, shipping_amount, total, coupon_code, fulfillment_method, payment_status, shipping_address_line1, shipping_address_line2, shipping_city, shipping_state, shipping_zip, shipping_carrier, shipping_service, order_items:order_items(product_name, quantity, unit_price, line_total, product_image_url)')
     .eq('order_number', orderNumber)
     .single();
 
@@ -32,6 +32,13 @@ export async function GET(request: NextRequest) {
     coupon_code: order.coupon_code,
     fulfillment_method: order.fulfillment_method,
     payment_status: order.payment_status,
+    shipping_address_line1: order.shipping_address_line1,
+    shipping_address_line2: order.shipping_address_line2,
+    shipping_city: order.shipping_city,
+    shipping_state: order.shipping_state,
+    shipping_zip: order.shipping_zip,
+    shipping_carrier: order.shipping_carrier,
+    shipping_service: order.shipping_service,
     items: order.order_items,
   });
 }

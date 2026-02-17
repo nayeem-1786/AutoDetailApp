@@ -24,6 +24,14 @@ interface ContactInfo {
   phone?: string;
 }
 
+interface ShippingAddress {
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -33,12 +41,22 @@ export async function POST(request: NextRequest) {
       contact,
       fulfillmentMethod = 'pickup',
       customerNotes,
+      shippingAddress,
+      shippoRateId,
+      shippingAmountCents,
+      shippingCarrier,
+      shippingService,
     } = body as {
       items: CheckoutItem[];
       couponCode?: string;
       contact: ContactInfo;
       fulfillmentMethod?: 'pickup' | 'shipping';
       customerNotes?: string;
+      shippingAddress?: ShippingAddress;
+      shippoRateId?: string;
+      shippingAmountCents?: number;
+      shippingCarrier?: string;
+      shippingService?: string;
     };
 
     if (!items || items.length === 0) {
@@ -48,6 +66,16 @@ export async function POST(request: NextRequest) {
     if (!contact?.email || !contact?.firstName || !contact?.lastName) {
       return NextResponse.json(
         { error: 'Contact information is required' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      fulfillmentMethod === 'shipping' &&
+      (!shippingAddress?.line1 || !shippingAddress?.city || !shippingAddress?.state || !shippingAddress?.zip)
+    ) {
+      return NextResponse.json(
+        { error: 'Shipping address is required' },
         { status: 400 }
       );
     }
@@ -197,8 +225,11 @@ export async function POST(request: NextRequest) {
     );
     const taxCents = Math.round(taxableAfterDiscountCents * TAX_RATE);
 
-    // 5. Shipping (free for pickup)
-    const shippingCents = 0; // Future: calculate based on fulfillment method
+    // 5. Shipping
+    let shippingCents = 0;
+    if (fulfillmentMethod === 'shipping' && shippingAmountCents != null) {
+      shippingCents = Math.max(0, Math.round(shippingAmountCents));
+    }
 
     // 6. Total
     const totalCents = subtotalCents - discountCents + taxCents + shippingCents;
@@ -233,27 +264,41 @@ export async function POST(request: NextRequest) {
     // 8. Generate order number & create order
     const orderNumber = await generateOrderNumber(admin);
 
+    const orderData: Record<string, unknown> = {
+      order_number: orderNumber,
+      customer_id: customerId,
+      email: contact.email,
+      phone: contact.phone || null,
+      first_name: contact.firstName,
+      last_name: contact.lastName,
+      subtotal: subtotalCents,
+      discount_amount: discountCents,
+      tax_amount: taxCents,
+      shipping_amount: shippingCents,
+      total: totalCents,
+      coupon_id: couponId,
+      coupon_code: resolvedCouponCode,
+      fulfillment_method: fulfillmentMethod,
+      customer_notes: customerNotes || null,
+      payment_status: 'pending',
+      fulfillment_status: 'unfulfilled',
+    };
+
+    // Add shipping details
+    if (fulfillmentMethod === 'shipping' && shippingAddress) {
+      orderData.shipping_address_line1 = shippingAddress.line1;
+      orderData.shipping_address_line2 = shippingAddress.line2 || null;
+      orderData.shipping_city = shippingAddress.city;
+      orderData.shipping_state = shippingAddress.state;
+      orderData.shipping_zip = shippingAddress.zip;
+      orderData.shippo_rate_id = shippoRateId || null;
+      orderData.shipping_carrier = shippingCarrier || null;
+      orderData.shipping_service = shippingService || null;
+    }
+
     const { data: order, error: orderError } = await admin
       .from('orders')
-      .insert({
-        order_number: orderNumber,
-        customer_id: customerId,
-        email: contact.email,
-        phone: contact.phone || null,
-        first_name: contact.firstName,
-        last_name: contact.lastName,
-        subtotal: subtotalCents,
-        discount_amount: discountCents,
-        tax_amount: taxCents,
-        shipping_amount: shippingCents,
-        total: totalCents,
-        coupon_id: couponId,
-        coupon_code: resolvedCouponCode,
-        fulfillment_method: fulfillmentMethod,
-        customer_notes: customerNotes || null,
-        payment_status: 'pending',
-        fulfillment_status: 'unfulfilled',
-      })
+      .insert(orderData)
       .select('id, order_number')
       .single();
 

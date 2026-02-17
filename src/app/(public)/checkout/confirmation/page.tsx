@@ -19,6 +19,13 @@ interface OrderData {
   coupon_code: string | null;
   fulfillment_method: string;
   payment_status: string;
+  shipping_address_line1: string | null;
+  shipping_address_line2: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_zip: string | null;
+  shipping_carrier: string | null;
+  shipping_service: string | null;
   items: Array<{
     product_name: string;
     quantity: number;
@@ -210,7 +217,11 @@ function ConfirmationContent() {
             </div>
             <div className="flex justify-between">
               <span className="text-site-text-muted">Shipping</span>
-              <span className="text-lime font-medium">FREE</span>
+              <span className={`tabular-nums ${order.shipping_amount > 0 ? 'text-site-text' : 'text-lime font-medium'}`}>
+                {order.shipping_amount > 0
+                  ? formatCurrency(order.shipping_amount / 100)
+                  : 'FREE'}
+              </span>
             </div>
             <div className="border-t border-site-border pt-3 flex justify-between">
               <span className="text-base font-bold text-site-text">Total</span>
@@ -222,14 +233,44 @@ function ConfirmationContent() {
 
           {/* Fulfillment */}
           <div className="border-t border-site-border pt-4">
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-sm mb-2">
               <Package className="h-4 w-4 text-lime" />
-              <span className="text-site-text">
+              <span className="font-medium text-site-text">
                 {order.fulfillment_method === 'pickup'
-                  ? 'Local Pickup — we\'ll notify you when ready'
-                  : 'Shipping — tracking info will be sent via email'}
+                  ? 'Local Pickup'
+                  : 'Shipping'}
               </span>
             </div>
+            {order.fulfillment_method === 'shipping' &&
+            order.shipping_address_line1 ? (
+              <div className="ml-6 space-y-1">
+                <p className="text-sm text-site-text">
+                  {order.shipping_address_line1}
+                </p>
+                {order.shipping_address_line2 && (
+                  <p className="text-sm text-site-text">
+                    {order.shipping_address_line2}
+                  </p>
+                )}
+                <p className="text-sm text-site-text">
+                  {order.shipping_city}, {order.shipping_state}{' '}
+                  {order.shipping_zip}
+                </p>
+                {order.shipping_carrier && (
+                  <p className="text-xs text-site-text-muted mt-1">
+                    {order.shipping_carrier.toUpperCase()}
+                    {order.shipping_service && ` — ${order.shipping_service}`}
+                  </p>
+                )}
+                <p className="text-xs text-site-text-muted">
+                  Tracking info will be sent via email
+                </p>
+              </div>
+            ) : (
+              <p className="ml-6 text-sm text-site-text-muted">
+                We&apos;ll notify you when your order is ready for pickup
+              </p>
+            )}
           </div>
         </div>
 
