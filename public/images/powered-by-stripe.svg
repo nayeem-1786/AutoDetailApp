@@ -8,7 +8,7 @@
       }
 
       .st0, .st1 {
-        fill: #424770;
+        fill: #ffffff;
         fill-rule: evenodd;
         isolation: isolate;
       }
