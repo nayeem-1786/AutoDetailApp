@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
+import { AddToCartButton } from './cart/add-to-cart-button';
 import type { Product } from '@/lib/supabase/types';
 
 interface ProductCardProps {
@@ -9,10 +10,12 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, categorySlug }: ProductCardProps) {
+  const href = `/products/${categorySlug}/${product.slug}`;
+
   return (
-    <Link href={`/products/${categorySlug}/${product.slug}`} className="group block">
-      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
-        {/* Image */}
+    <div className="group h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
+      {/* Image — links to detail */}
+      <Link href={href} className="block">
         <div className="relative aspect-[4/3] w-full bg-brand-surface overflow-hidden">
           {product.image_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -33,23 +36,35 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
             </span>
           </div>
         </div>
+      </Link>
 
-        <div className="p-5">
+      <div className="p-5">
+        <Link href={href}>
           <h3 className="font-display text-base font-bold text-site-text group-hover:text-lime transition-colors">
             {product.name}
           </h3>
-          {product.description && (
-            <p className="mt-1.5 text-sm text-site-text-muted line-clamp-2">
-              {product.description}
-            </p>
-          )}
-          <div className="mt-4">
-            <span className="block w-full text-center py-2.5 bg-site-border-light border border-site-border text-site-text text-sm font-medium rounded-xl group-hover:bg-lime group-hover:text-site-text-on-primary group-hover:border-lime transition-all duration-300">
-              View Details
-            </span>
-          </div>
+        </Link>
+        {product.description && (
+          <p className="mt-1.5 text-sm text-site-text-muted line-clamp-2">
+            {product.description}
+          </p>
+        )}
+        <div className="mt-4">
+          <AddToCartButton
+            product={{
+              id: product.id,
+              name: product.name,
+              slug: product.slug,
+              categorySlug,
+              price: product.retail_price,
+              stockQuantity: product.quantity_on_hand,
+              imageUrl: product.image_url,
+            }}
+            variant="compact"
+            className="w-full"
+          />
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

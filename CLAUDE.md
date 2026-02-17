@@ -37,7 +37,7 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 | **6** | Inventory Management | Done |
 | **7** | QuickBooks Integration & Reporting | Done |
 | **8** | Job Management & Photo Documentation | Done |
-| **9** | Native Online Store | Not started |
+| **9** | Native Online Store | In progress |
 | **10** | Recurring Services (Dormant) | Not started |
 | **11** | Intelligence & Growth | Done |
 | **12** | iPad POS Optimization | Not started |
@@ -220,6 +220,20 @@ Intelligence & Growth features were built organically across Phases 3, 5, 6, and
 
 ### Phase 9 — Native Online Store (NOT WooCommerce)
 Build full e-commerce within the existing Next.js app. Product catalog pages already exist at `/products` with SEO, categories, and product detail pages. Needs: cart (React context), cart drawer/page, Stripe checkout flow, order management (`orders` table, status tracking), order confirmation + email, shipping/pickup selection, order history in customer dashboard, admin order management page. No WordPress/WooCommerce — everything stays in this app. Stripe is already integrated from booking payments.
+
+#### Session 1 — Cart System (Done)
+- Cart context provider (`src/lib/contexts/cart-context.tsx`): React Context + useReducer, localStorage persistence (key: `smart-details-cart`), SSR-safe hydration, sonner toasts
+- CartProvider wrapper (`src/components/public/cart/cart-provider-wrapper.tsx`): client component wrapper for server layout
+- AddToCartButton (`src/components/public/cart/add-to-cart-button.tsx`): `default`/`compact`/`icon-only` variants, stock-aware states (out of stock, max reached, in cart), theme-aware
+- QuantitySelector (`src/components/public/cart/quantity-selector.tsx`): plus/minus with `sm`/`md` sizes, min/max enforcement
+- ProductAddToCart (`src/components/public/cart/product-add-to-cart.tsx`): product detail page CTA with qty selector + add button, "already in cart" indicator
+- CartDrawer (`src/components/public/cart/cart-drawer.tsx`): slide-out from right, item list with thumbnails/qty/remove, subtotal, View Cart + Checkout CTAs, empty state, focus trap, ESC close, backdrop click close, body scroll lock, route-change auto-close. Responsive: full-width mobile, 50vw tablet, 400px desktop
+- CartIconButton (`src/components/public/cart/cart-icon-button.tsx`): header cart icon with item count badge (lime bg)
+- Product card restructured: outer `<Link>` replaced with `<div>` to avoid nested interactive elements; image + title link separately, Add to Cart button below
+- Product detail page: enhanced stock status (In Stock / Low Stock with count / Out of Stock), Add to Cart section with qty selector
+- Header: cart icon always visible (between Sign In and Book Now)
+- Public layout: wrapped with CartProviderWrapper, CartDrawer rendered
+- `retail_price` is in dollars (not cents) — uses `formatCurrency()` directly
 
 ---
 

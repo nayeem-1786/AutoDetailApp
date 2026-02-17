@@ -13,6 +13,7 @@ import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 import { JsonLd } from '@/components/public/json-ld';
 import { AdZone } from '@/components/public/cms/ad-zone';
+import { ProductAddToCart } from '@/components/public/cart/product-add-to-cart';
 
 export const revalidate = 300;
 
@@ -112,10 +113,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
               {/* Availability */}
               <div className="mt-4">
-                {inStock ? (
+                {product.quantity_on_hand > 5 ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-green-950 px-3 py-1 text-sm font-medium text-green-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                     In Stock
+                  </span>
+                ) : product.quantity_on_hand > 0 ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-950 px-3 py-1 text-sm font-medium text-amber-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Low Stock ({product.quantity_on_hand} left)
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-red-950 px-3 py-1 text-sm font-medium text-red-400">
@@ -124,6 +130,19 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   </span>
                 )}
               </div>
+
+              {/* Add to Cart */}
+              <ProductAddToCart
+                product={{
+                  id: product.id,
+                  name: product.name,
+                  slug: product.slug,
+                  categorySlug: category.slug,
+                  price: product.retail_price,
+                  stockQuantity: product.quantity_on_hand,
+                  imageUrl: product.image_url,
+                }}
+              />
 
               {/* Description */}
               {product.description && (

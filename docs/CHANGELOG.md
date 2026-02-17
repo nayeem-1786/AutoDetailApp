@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 9, Session 1 — 2026-02-17 (Cart System)
+
+### feat: Shopping cart context, Add to Cart buttons, cart drawer, header cart icon
+
+#### New Files (7)
+- `src/lib/contexts/cart-context.tsx` — Cart state management (React Context + useReducer), localStorage persistence, SSR-safe hydration, sonner toasts, cart drawer open/close state
+- `src/components/public/cart/cart-provider-wrapper.tsx` — Client component wrapper for server layout
+- `src/components/public/cart/add-to-cart-button.tsx` — Add to Cart button with `default`/`compact`/`icon-only` variants, stock-aware disabled states
+- `src/components/public/cart/quantity-selector.tsx` — Plus/minus quantity selector with `sm`/`md` sizes
+- `src/components/public/cart/product-add-to-cart.tsx` — Product detail page CTA (qty selector + add button + "already in cart" indicator)
+- `src/components/public/cart/cart-drawer.tsx` — Slide-out cart panel with item list, thumbnails, qty controls, remove, subtotal, View Cart + Checkout CTAs, empty state, focus trap, ESC/backdrop close, body scroll lock, responsive widths
+- `src/components/public/cart/cart-icon-button.tsx` — Header cart icon with lime badge showing item count
+
+#### Modified Files (4)
+- `src/app/(public)/layout.tsx` — Wrapped with CartProviderWrapper, added CartDrawer
+- `src/components/public/header-client.tsx` — Added CartIconButton between Sign In and Book Now
+- `src/components/public/product-card.tsx` — Restructured from outer `<Link>` to `<div>` with separate image/title links + compact Add to Cart button
+- `src/app/(public)/products/[categorySlug]/[productSlug]/page.tsx` — Enhanced stock status (In Stock / Low Stock / Out of Stock), added ProductAddToCart section
+
+---
+
 ## Session R — 2026-02-17 (Fix Holiday Seasonal Themes)
 
 ### Fix: Holiday seasonal themes now apply to public frontend — full pipeline verified

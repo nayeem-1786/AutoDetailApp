@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ChevronDown, Phone, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import type { WebsiteNavItem } from '@/lib/supabase/types';
+import { CartIconButton } from './cart/cart-icon-button';
 
 interface HeaderClientProps {
   navItems: WebsiteNavItem[];
@@ -150,6 +151,9 @@ export function HeaderClient({
             >
               {customerName ? `Hi, ${customerName}` : 'Sign In'}
             </Link>
+
+            {/* Cart icon — always visible */}
+            <CartIconButton />
 
             {/* CTA */}
             <Link
