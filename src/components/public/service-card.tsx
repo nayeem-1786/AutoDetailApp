@@ -62,7 +62,7 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
 
   return (
     <Link href={`/services/${categorySlug}/${service.slug}`} className="group block">
-      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-white/10 transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
+      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
         {/* Service image */}
         {service.image_url && (
           <div className="relative w-full h-48 sm:h-56 overflow-hidden">
@@ -77,21 +77,21 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
 
         <div className="p-6">
           <div className="flex items-start justify-between">
-            <h3 className="font-display text-lg font-bold text-white group-hover:text-lime transition-colors">
+            <h3 className="font-display text-lg font-bold text-site-text group-hover:text-lime transition-colors">
               {service.name}
             </h3>
-            <div className="ml-3 flex-shrink-0 text-gray-500 group-hover:text-lime transition-colors">
+            <div className="ml-3 flex-shrink-0 text-site-text-dim group-hover:text-lime transition-colors">
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </div>
           </div>
 
           {service.description && (
-            <p className="mt-2 text-sm leading-relaxed text-gray-400 line-clamp-2">
+            <p className="mt-2 text-sm leading-relaxed text-site-text-muted line-clamp-2">
               {service.description}
             </p>
           )}
 
-          <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+          <div className="mt-4 pt-4 border-t border-site-border flex flex-wrap items-center justify-between gap-2">
             <span className="text-lg font-bold text-lime">
               {priceDisplay}
             </span>

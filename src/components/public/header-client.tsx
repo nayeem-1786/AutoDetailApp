@@ -43,10 +43,10 @@ export function HeaderClient({
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Top utility bar */}
         {phone && (
-          <div className="hidden lg:flex items-center justify-end gap-6 py-1.5 text-xs text-gray-400 border-b border-white/5">
+          <div className="hidden lg:flex items-center justify-end gap-6 py-1.5 text-xs text-site-text-muted border-b border-site-border-light">
             <a
               href={`tel:${phone}`}
-              className="flex items-center gap-1.5 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 hover:text-site-text transition-colors"
             >
               <Phone className="w-3 h-3" />
               {phone}
@@ -71,7 +71,7 @@ export function HeaderClient({
                   <span className="text-black font-black text-lg lg:text-xl">S</span>
                 </div>
                 <div className="hidden sm:block">
-                  <div className="text-white font-bold text-sm lg:text-base tracking-tight leading-none">
+                  <div className="text-site-text font-bold text-sm lg:text-base tracking-tight leading-none">
                     {businessName}
                   </div>
                   <div className="text-lime text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase">
@@ -98,7 +98,7 @@ export function HeaderClient({
                 <Link
                   href={item.url}
                   target={item.target || '_self'}
-                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-site-text-secondary hover:text-site-text transition-colors rounded-lg hover:bg-site-border-light"
                 >
                   {item.label}
                   {item.children && item.children.length > 0 && (
@@ -120,16 +120,16 @@ export function HeaderClient({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.96 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute top-full left-0 mt-1 w-72 bg-brand-surface border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden p-2"
+                        className="absolute top-full left-0 mt-1 w-72 bg-brand-surface border border-site-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden p-2"
                       >
                         {item.children.map((child) => (
                           <Link
                             key={child.id}
                             href={child.url}
                             target={child.target || '_self'}
-                            className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                            className="flex items-start gap-3 p-3 rounded-xl hover:bg-site-border-light transition-colors group"
                           >
-                            <div className="text-sm font-medium text-white group-hover:text-lime transition-colors">
+                            <div className="text-sm font-medium text-site-text group-hover:text-lime transition-colors">
                               {child.label}
                             </div>
                           </Link>
@@ -146,7 +146,7 @@ export function HeaderClient({
             {/* Account link — desktop */}
             <Link
               href={customerName ? '/account' : '/signin'}
-              className="hidden lg:inline-flex items-center text-sm font-medium text-gray-400 hover:text-white transition-colors"
+              className="hidden lg:inline-flex items-center text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
             >
               {customerName ? `Hi, ${customerName}` : 'Sign In'}
             </Link>
@@ -163,7 +163,7 @@ export function HeaderClient({
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden p-2 text-white rounded-lg hover:bg-white/10 transition-colors"
+              className="lg:hidden p-2 text-site-text rounded-lg hover:bg-site-border transition-colors"
               aria-label="Toggle menu"
             >
               {mobileOpen ? (
@@ -184,14 +184,14 @@ export function HeaderClient({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="lg:hidden overflow-hidden border-t border-white/10 bg-brand-dark"
+            className="lg:hidden overflow-hidden border-t border-site-border bg-brand-dark"
           >
             <div className="px-4 py-4 space-y-1">
               {navItems.map((item) => (
                 <div key={item.id}>
                   <Link
                     href={item.url}
-                    className="flex items-center justify-between py-3 px-3 text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+                    className="flex items-center justify-between py-3 px-3 text-site-text-secondary hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors"
                     onClick={() =>
                       !(item.children && item.children.length > 0) &&
                       setMobileOpen(false)
@@ -208,7 +208,7 @@ export function HeaderClient({
                         <Link
                           key={child.id}
                           href={child.url}
-                          className="block py-2 px-3 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                          className="block py-2 px-3 text-sm text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-lg transition-colors"
                           onClick={() => setMobileOpen(false)}
                         >
                           {child.label}
@@ -220,10 +220,10 @@ export function HeaderClient({
               ))}
 
               {/* Account link — mobile */}
-              <div className="pt-2 border-t border-white/10">
+              <div className="pt-2 border-t border-site-border">
                 <Link
                   href={customerName ? '/account' : '/signin'}
-                  className="block py-3 px-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium"
+                  className="block py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
                   onClick={() => setMobileOpen(false)}
                 >
                   {customerName ? `Hi, ${customerName}` : 'Sign In'}

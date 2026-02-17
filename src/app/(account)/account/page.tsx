@@ -147,7 +147,7 @@ export default function AccountDashboardPage() {
           <h1 className="text-2xl font-bold text-gray-900">
             Welcome back, {customer.first_name}
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-site-text-faint">
             Manage your appointments, vehicles, and profile.
           </p>
         </div>
@@ -159,14 +159,14 @@ export default function AccountDashboardPage() {
       {/* Loyalty Points */}
       <Link href="/account/loyalty" className="block">
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 transition-colors hover:bg-gray-100">
-          <p className="text-sm font-medium text-gray-600">Loyalty Points</p>
+          <p className="text-sm font-medium text-site-text-faint">Loyalty Points</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
             {formatPoints(customer.loyalty_points_balance)}
           </p>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-site-text-faint">
             That&apos;s {formatCurrency(customer.loyalty_points_balance * LOYALTY.REDEEM_RATE)} off your next visit
           </p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-site-text-dim">
             Tap to view rewards details
           </p>
         </div>
@@ -196,7 +196,7 @@ export default function AccountDashboardPage() {
                   day: 'numeric',
                 })}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-site-text-dim">
                 {lastService.vehicle
                   ? `${lastService.vehicle.year} ${lastService.vehicle.make} ${lastService.vehicle.model}${lastService.vehicle.color ? ` — ${lastService.vehicle.color}` : ''}`
                   : ''}
@@ -214,8 +214,8 @@ export default function AccountDashboardPage() {
               </div>
             ) : (
               <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
-                <Camera className="h-8 w-8 text-gray-300" />
-                <p className="text-sm text-gray-500">
+                <Camera className="h-8 w-8 text-site-text-secondary" />
+                <p className="text-sm text-site-text-dim">
                   No before/after photos available for this service
                 </p>
               </div>
@@ -230,7 +230,7 @@ export default function AccountDashboardPage() {
           <h2 className="text-lg font-semibold text-gray-900">
             Your Coupons
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-site-text-dim">
             These discounts are ready to use on your next booking.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -259,7 +259,7 @@ export default function AccountDashboardPage() {
             <Spinner />
           </div>
         ) : upcomingAppointments.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="mt-4 text-sm text-site-text-dim">
             No upcoming appointments.
           </p>
         ) : (

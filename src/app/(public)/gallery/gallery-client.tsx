@@ -38,7 +38,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
   if (initialPairs.length === 0) {
     return (
       <div className="py-16 text-center">
-        <p className="text-lg text-gray-400">
+        <p className="text-lg text-site-text-muted">
           Gallery photos coming soon. Check back after our next few services!
         </p>
       </div>
@@ -56,7 +56,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
               'px-4 py-2 text-sm font-medium rounded-full border transition-all duration-300',
               !serviceFilter
                 ? 'bg-lime text-black border-lime'
-                : 'bg-white/5 border-white/10 text-gray-300 hover:border-lime/30 hover:text-lime'
+                : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-lime/30 hover:text-lime'
             )}
           >
             All
@@ -69,7 +69,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
                 'px-4 py-2 text-sm font-medium rounded-full border transition-all duration-300',
                 serviceFilter === s
                   ? 'bg-lime text-black border-lime'
-                  : 'bg-white/5 border-white/10 text-gray-300 hover:border-lime/30 hover:text-lime'
+                  : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-lime/30 hover:text-lime'
               )}
             >
               {s}
@@ -81,7 +81,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
       {/* Gallery grid */}
       {filtered.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-lg text-gray-400">No photos for this service type yet.</p>
+          <p className="text-lg text-site-text-muted">No photos for this service type yet.</p>
         </div>
       ) : (
         <div className="columns-1 gap-6 sm:columns-2 lg:columns-3">
@@ -94,7 +94,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
             return (
               <div
                 key={pair.job_id}
-                className="mb-6 break-inside-avoid overflow-hidden rounded-2xl bg-brand-surface border border-white/10 transition-all duration-300 hover:border-lime/30 hover:shadow-lime-sm group"
+                className="mb-6 break-inside-avoid overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-lime/30 hover:shadow-lime-sm group"
               >
                 <div aria-label={altText} className="relative">
                   <BeforeAfterSlider
@@ -109,10 +109,10 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
                   </div>
                 </div>
                 <div className="px-4 py-3">
-                  <p className="font-display text-sm font-semibold text-white group-hover:text-lime transition-colors">
+                  <p className="font-display text-sm font-semibold text-site-text group-hover:text-lime transition-colors">
                     {pair.service_names.join(', ')}
                   </p>
-                  <p className="mt-0.5 text-xs text-gray-400">
+                  <p className="mt-0.5 text-xs text-site-text-muted">
                     {vehicleStr && <>{vehicleStr} · </>}
                     {getZoneLabel(pair.zone)}
                   </p>

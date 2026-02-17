@@ -120,8 +120,8 @@ export default async function GalleryPage() {
   if (!enabled) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-24 text-center sm:px-6 lg:px-8">
-        <h1 className="font-display text-3xl font-bold text-white">Gallery Coming Soon</h1>
-        <p className="mt-4 text-lg text-gray-400">
+        <h1 className="font-display text-3xl font-bold text-site-text">Gallery Coming Soon</h1>
+        <p className="mt-4 text-lg text-site-text-muted">
           We&apos;re building a showcase of our best work at {biz.name}.
           Check back soon to see incredible before and after transformations!
         </p>
@@ -155,15 +155,15 @@ export default async function GalleryPage() {
       <section className="bg-brand-black py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <AnimatedSection>
-            <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl">
+            <h1 className="font-display text-4xl font-bold tracking-tight text-site-text sm:text-5xl">
               Our <span className="text-gradient-lime">Work</span>
             </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-400">
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-site-text-muted">
               See the difference professional detailing makes. Browse our before and after gallery
               featuring ceramic coatings, paint corrections, and premium detail services.
             </p>
             {pairs.length > 0 && (
-              <p className="mt-2 text-sm text-gray-500">{pairs.length} featured transformations</p>
+              <p className="mt-2 text-sm text-site-text-dim">{pairs.length} featured transformations</p>
             )}
           </AnimatedSection>
         </div>

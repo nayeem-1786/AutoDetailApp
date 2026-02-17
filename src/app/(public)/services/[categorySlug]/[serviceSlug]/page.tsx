@@ -104,11 +104,11 @@ export default async function ServiceDetailPage({ params }: PageProps) {
               { label: service.name },
             ]}
           />
-          <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
             {service.name}
           </h1>
           {service.description && (
-            <p className="mt-4 max-w-3xl text-lg leading-relaxed text-gray-400">
+            <p className="mt-4 max-w-3xl text-lg leading-relaxed text-site-text-muted">
               {service.description}
             </p>
           )}
@@ -121,7 +121,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
           <div className="grid gap-10 lg:grid-cols-3">
             {/* Left column: pricing */}
             <div className="lg:col-span-2">
-              <h2 className="font-display text-xl font-semibold text-white">
+              <h2 className="font-display text-xl font-semibold text-site-text">
                 Pricing
               </h2>
               <div className="mt-4">
@@ -131,8 +131,8 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
             {/* Right column: service details sidebar */}
             <aside className="lg:col-span-1 space-y-6">
-              <div className="sticky top-24 rounded-2xl bg-brand-surface border border-white/10 p-6">
-                <h2 className="font-display text-lg font-semibold text-white">
+              <div className="sticky top-24 rounded-2xl bg-brand-surface border border-site-border p-6">
+                <h2 className="font-display text-lg font-semibold text-site-text">
                   Service Details
                 </h2>
                 <dl className="mt-4 space-y-4">
@@ -142,10 +142,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                         <Clock className="h-4 w-4 text-lime" />
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-gray-400">
+                        <dt className="text-sm font-medium text-site-text-muted">
                           Estimated Duration
                         </dt>
-                        <dd className="mt-0.5 text-sm font-medium text-white">
+                        <dd className="mt-0.5 text-sm font-medium text-site-text">
                           {service.base_duration_minutes >= 60
                             ? `${Math.floor(service.base_duration_minutes / 60)}h ${service.base_duration_minutes % 60 > 0 ? `${service.base_duration_minutes % 60}m` : ''}`
                             : `${service.base_duration_minutes} minutes`}
@@ -159,10 +159,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                       <Truck className="h-4 w-4 text-lime" />
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-400">
+                      <dt className="text-sm font-medium text-site-text-muted">
                         Mobile Service
                       </dt>
-                      <dd className="mt-0.5 text-sm font-medium text-white">
+                      <dd className="mt-0.5 text-sm font-medium text-site-text">
                         {service.mobile_eligible
                           ? 'Available — we come to you'
                           : 'In-shop only'}
@@ -175,10 +175,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                       <Tag className="h-4 w-4 text-lime" />
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-400">
+                      <dt className="text-sm font-medium text-site-text-muted">
                         Service Type
                       </dt>
-                      <dd className="mt-0.5 text-sm font-medium text-white">
+                      <dd className="mt-0.5 text-sm font-medium text-site-text">
                         {CLASSIFICATION_LABELS[service.classification] ??
                           service.classification}
                       </dd>
@@ -186,18 +186,18 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   </div>
 
                   {service.special_requirements && (
-                    <div className="border-t border-white/10 pt-4">
-                      <dt className="text-sm font-medium text-gray-400">
+                    <div className="border-t border-site-border pt-4">
+                      <dt className="text-sm font-medium text-site-text-muted">
                         Special Requirements
                       </dt>
-                      <dd className="mt-1 text-sm text-white">
+                      <dd className="mt-1 text-sm text-site-text">
                         {service.special_requirements}
                       </dd>
                     </div>
                   )}
 
                   {service.online_bookable && (
-                    <div className="border-t border-white/10 pt-4">
+                    <div className="border-t border-site-border pt-4">
                       <Link
                         href={`/book?service=${service.slug}`}
                         className="flex w-full items-center justify-center gap-2 rounded-full bg-lime px-4 py-3 text-sm font-bold text-black shadow-sm hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
@@ -216,10 +216,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
           {/* Suggested Add-Ons */}
           {addonSuggestions.length > 0 && (
             <section className="mt-16">
-              <h2 className="font-display text-xl font-semibold text-white">
+              <h2 className="font-display text-xl font-semibold text-site-text">
                 Recommended Add-Ons
               </h2>
-              <p className="mt-2 text-gray-400">
+              <p className="mt-2 text-site-text-muted">
                 Enhance your {service.name.toLowerCase()} with these popular add-on services.
               </p>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -242,14 +242,14 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <Link
                       key={suggestion.id}
                       href={addonHref}
-                      className="group flex items-center justify-between rounded-2xl bg-brand-surface p-4 border border-white/10 transition-all duration-300 hover:border-lime/30 hover:-translate-y-0.5"
+                      className="group flex items-center justify-between rounded-2xl bg-brand-surface p-4 border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-0.5"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold text-white group-hover:text-lime transition-colors">
+                        <h3 className="text-sm font-semibold text-site-text group-hover:text-lime transition-colors">
                           {addon.name}
                         </h3>
                         {addon.description && (
-                          <p className="mt-1 text-xs text-gray-400 line-clamp-2">
+                          <p className="mt-1 text-xs text-site-text-muted line-clamp-2">
                             {addon.description}
                           </p>
                         )}
@@ -259,7 +259,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                           </p>
                         )}
                       </div>
-                      <div className="ml-3 flex-shrink-0 text-gray-500 group-hover:text-lime transition-colors">
+                      <div className="ml-3 flex-shrink-0 text-site-text-dim group-hover:text-lime transition-colors">
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </Link>
@@ -275,10 +275,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
       {relatedServices.length > 0 && (
         <section className="bg-brand-surface py-12 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="font-display text-2xl font-bold text-white">
+            <h2 className="font-display text-2xl font-bold text-site-text">
               You May Also Like
             </h2>
-            <p className="mt-2 text-gray-400">
+            <p className="mt-2 text-site-text-muted">
               Explore other {category.name.toLowerCase()} services we offer.
             </p>
             <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

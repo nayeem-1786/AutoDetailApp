@@ -306,13 +306,13 @@ export default function CustomerSignInPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
             SD
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-white">
+          <h1 className="mt-4 text-2xl font-bold text-site-text">
             Welcome to {businessInfo?.name || 'Our Portal'}
           </h1>
         </div>
 
         {/* Card Container */}
-        <div className="rounded-2xl bg-brand-surface border border-white/10 p-8">
+        <div className="rounded-2xl bg-brand-surface border border-site-border p-8">
           {sessionExpired && (
             <div className="mb-5 rounded-md border border-amber-800 bg-amber-950 p-3 text-sm text-amber-200">
               Your session has expired. Please sign in again.
@@ -360,9 +360,9 @@ export default function CustomerSignInPage() {
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-white/10" />
-                <span className="text-xs font-medium text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-white/10" />
+                <div className="h-px flex-1 bg-site-border" />
+                <span className="text-xs font-medium text-site-text-dim">OR</span>
+                <div className="h-px flex-1 bg-site-border" />
               </div>
 
               <button
@@ -371,7 +371,7 @@ export default function CustomerSignInPage() {
                   setMode('email');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
+                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
                 Sign in with email
               </button>
@@ -382,8 +382,8 @@ export default function CustomerSignInPage() {
           {mode === 'otp' && (
             <form onSubmit={otpForm.handleSubmit(verifyOtp)} className="space-y-5">
               <div className="text-center">
-                <p className="text-sm text-gray-400">
-                  We sent a 6-digit code to <span className="font-medium text-white">{otpPhone}</span>
+                <p className="text-sm text-site-text-muted">
+                  We sent a 6-digit code to <span className="font-medium text-site-text">{otpPhone}</span>
                 </p>
               </div>
 
@@ -421,7 +421,7 @@ export default function CustomerSignInPage() {
                     setError(null);
                     otpForm.reset();
                   }}
-                  className="text-gray-400 hover:text-white"
+                  className="text-site-text-muted hover:text-site-text"
                 >
                   Change number
                 </button>
@@ -429,7 +429,7 @@ export default function CustomerSignInPage() {
                   type="button"
                   onClick={resendOtp}
                   disabled={resendCooldown > 0}
-                  className="text-gray-400 hover:text-white disabled:text-gray-600"
+                  className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
                 >
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
                 </button>
@@ -484,16 +484,16 @@ export default function CustomerSignInPage() {
                   setForgotMode(true);
                   setError(null);
                 }}
-                className="block w-full text-center text-sm text-gray-400 hover:text-lime transition-colors"
+                className="block w-full text-center text-sm text-site-text-muted hover:text-lime transition-colors"
               >
                 Forgot password?
               </button>
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-white/10" />
-                <span className="text-xs font-medium text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-white/10" />
+                <div className="h-px flex-1 bg-site-border" />
+                <span className="text-xs font-medium text-site-text-dim">OR</span>
+                <div className="h-px flex-1 bg-site-border" />
               </div>
 
               <button
@@ -502,7 +502,7 @@ export default function CustomerSignInPage() {
                   setMode('phone');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
+                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
                 Sign in with phone
               </button>
@@ -525,14 +525,14 @@ export default function CustomerSignInPage() {
                       setResetEmail('');
                       setError(null);
                     }}
-                    className="text-sm text-gray-400 hover:text-white"
+                    className="text-sm text-site-text-muted hover:text-site-text"
                   >
                     &larr; Back to sign in
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-5">
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-site-text-muted">
                     Enter your email address and we&apos;ll send you a link to reset your password.
                   </p>
 
@@ -562,7 +562,7 @@ export default function CustomerSignInPage() {
                       setResetEmail('');
                       setError(null);
                     }}
-                    className="block text-sm text-gray-400 hover:text-white"
+                    className="block text-sm text-site-text-muted hover:text-site-text"
                   >
                     &larr; Back to sign in
                   </button>
@@ -573,7 +573,7 @@ export default function CustomerSignInPage() {
         </div>
 
         {/* Sign up link */}
-        <p className="text-center text-sm text-gray-400">
+        <p className="text-center text-sm text-site-text-muted">
           Don&apos;t have an account?{' '}
           <Link
             href="/signup"

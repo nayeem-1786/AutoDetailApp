@@ -86,7 +86,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
           <div className="mt-2 grid gap-10 lg:grid-cols-2">
             {/* Left column: product image */}
-            <div className="relative aspect-square overflow-hidden rounded-2xl bg-brand-surface border border-white/10">
+            <div className="relative aspect-square overflow-hidden rounded-2xl bg-brand-surface border border-site-border">
               {product.image_url ? (
                 <img
                   src={product.image_url}
@@ -95,14 +95,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <Package className="h-24 w-24 text-gray-600" />
+                  <Package className="h-24 w-24 text-site-text-faint" />
                 </div>
               )}
             </div>
 
             {/* Right column: product details */}
             <div className="lg:sticky lg:top-24 lg:self-start">
-              <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                 {product.name}
               </h1>
 
@@ -128,38 +128,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
               {/* Description */}
               {product.description && (
                 <div className="mt-8">
-                  <h2 className="font-display text-lg font-semibold text-white">
+                  <h2 className="font-display text-lg font-semibold text-site-text">
                     Description
                   </h2>
-                  <div className="mt-3 text-gray-400 leading-relaxed whitespace-pre-line">
+                  <div className="mt-3 text-site-text-muted leading-relaxed whitespace-pre-line">
                     {product.description}
                   </div>
                 </div>
               )}
 
               {/* Product details */}
-              <div className="mt-8 rounded-2xl bg-brand-surface border border-white/10 p-6">
-                <h2 className="font-display text-lg font-semibold text-white">
+              <div className="mt-8 rounded-2xl bg-brand-surface border border-site-border p-6">
+                <h2 className="font-display text-lg font-semibold text-site-text">
                   Product Details
                 </h2>
                 <dl className="mt-4 space-y-3 text-sm">
                   {product.sku && (
                     <div className="flex justify-between">
-                      <dt className="text-gray-400">SKU</dt>
-                      <dd className="font-medium text-white">
+                      <dt className="text-site-text-muted">SKU</dt>
+                      <dd className="font-medium text-site-text">
                         {product.sku}
                       </dd>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <dt className="text-gray-400">Category</dt>
-                    <dd className="font-medium text-white">
+                    <dt className="text-site-text-muted">Category</dt>
+                    <dd className="font-medium text-site-text">
                       {category.name}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-gray-400">Availability</dt>
-                    <dd className="font-medium text-white">
+                    <dt className="text-site-text-muted">Availability</dt>
+                    <dd className="font-medium text-site-text">
                       {inStock ? 'Available in store' : 'Currently unavailable'}
                     </dd>
                   </div>

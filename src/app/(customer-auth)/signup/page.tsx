@@ -255,10 +255,10 @@ export default function CustomerSignUpPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
             SD
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-white">
+          <h1 className="mt-4 text-2xl font-bold text-site-text">
             {mode === 'otp-profile' ? 'Complete Your Profile' : 'Create Account'}
           </h1>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-site-text-muted">
             {mode === 'otp-profile'
               ? `Sign up to manage your appointments at ${businessInfo?.name || 'our shop'}`
               : `Join ${businessInfo?.name || 'us'} to book and manage appointments`}
@@ -266,7 +266,7 @@ export default function CustomerSignUpPage() {
         </div>
 
         {/* Card Container */}
-        <div className="rounded-2xl bg-brand-surface border border-white/10 p-8">
+        <div className="rounded-2xl bg-brand-surface border border-site-border p-8">
           {error && (
             <div className="mb-5 rounded-md bg-red-950 p-3 text-sm text-red-300">
               {error}
@@ -282,7 +282,7 @@ export default function CustomerSignUpPage() {
                   id="otp-phone"
                   value={otpPhone || phoneParam || ''}
                   readOnly
-                  className="bg-brand-dark text-gray-400"
+                  className="bg-brand-dark text-site-text-muted"
                 />
               </FormField>
 
@@ -375,9 +375,9 @@ export default function CustomerSignUpPage() {
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-white/10" />
-                <span className="text-xs font-medium text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-white/10" />
+                <div className="h-px flex-1 bg-site-border" />
+                <span className="text-xs font-medium text-site-text-dim">OR</span>
+                <div className="h-px flex-1 bg-site-border" />
               </div>
 
               <button
@@ -386,7 +386,7 @@ export default function CustomerSignUpPage() {
                   setMode('full');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
+                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
                 Sign up with email
               </button>
@@ -397,8 +397,8 @@ export default function CustomerSignUpPage() {
           {mode === 'phone-verify' && (
             <form onSubmit={otpVerifyForm.handleSubmit(verifyOtp)} className="space-y-5">
               <div className="text-center">
-                <p className="text-sm text-gray-400">
-                  We sent a 6-digit code to <span className="font-medium text-white">{otpPhone}</span>
+                <p className="text-sm text-site-text-muted">
+                  We sent a 6-digit code to <span className="font-medium text-site-text">{otpPhone}</span>
                 </p>
               </div>
 
@@ -436,7 +436,7 @@ export default function CustomerSignUpPage() {
                     setError(null);
                     otpVerifyForm.reset();
                   }}
-                  className="text-gray-400 hover:text-white"
+                  className="text-site-text-muted hover:text-site-text"
                 >
                   Change number
                 </button>
@@ -444,7 +444,7 @@ export default function CustomerSignUpPage() {
                   type="button"
                   onClick={resendOtp}
                   disabled={resendCooldown > 0}
-                  className="text-gray-400 hover:text-white disabled:text-gray-600"
+                  className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
                 >
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
                 </button>
@@ -549,9 +549,9 @@ export default function CustomerSignUpPage() {
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-white/10" />
-                <span className="text-xs font-medium text-gray-500">OR</span>
-                <div className="h-px flex-1 bg-white/10" />
+                <div className="h-px flex-1 bg-site-border" />
+                <span className="text-xs font-medium text-site-text-dim">OR</span>
+                <div className="h-px flex-1 bg-site-border" />
               </div>
 
               <button
@@ -560,7 +560,7 @@ export default function CustomerSignUpPage() {
                   setMode('phone-otp');
                   setError(null);
                 }}
-                className="w-full rounded-full border border-white/10 bg-brand-dark px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5"
+                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
                 Sign up with phone
               </button>
@@ -569,7 +569,7 @@ export default function CustomerSignUpPage() {
         </div>
 
         {/* Sign in link */}
-        <p className="text-center text-sm text-gray-400">
+        <p className="text-center text-sm text-site-text-muted">
           Already have an account?{' '}
           <Link
             href="/signin"

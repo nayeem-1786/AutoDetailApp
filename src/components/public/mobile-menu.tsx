@@ -26,7 +26,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
       {/* Hamburger button */}
       <button
         type="button"
-        className="inline-flex md:hidden items-center justify-center h-10 w-10 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className="inline-flex md:hidden items-center justify-center h-10 w-10 rounded-full text-site-text-muted hover:bg-site-border transition-colors"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
       >
@@ -47,7 +47,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
             {/* Close button */}
             <button
               type="button"
-              className="absolute top-5 right-5 flex items-center justify-center h-10 w-10 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              className="absolute top-5 right-5 flex items-center justify-center h-10 w-10 rounded-full text-site-text/60 hover:text-site-text hover:bg-site-border transition-colors"
               onClick={() => setOpen(false)}
               aria-label="Close menu"
             >
@@ -61,7 +61,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
                   <Link
                     href={item.url}
                     target={item.target}
-                    className="font-display text-3xl font-semibold text-white hover:text-brand-200 transition-colors"
+                    className="font-display text-3xl font-semibold text-site-text hover:text-brand-200 transition-colors"
                     onClick={() => setOpen(false)}
                   >
                     {item.label}
@@ -74,7 +74,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
                           key={child.id}
                           href={child.url}
                           target={child.target}
-                          className="text-lg font-medium text-white/60 hover:text-white transition-colors"
+                          className="text-lg font-medium text-site-text/60 hover:text-site-text transition-colors"
                           onClick={() => setOpen(false)}
                         >
                           {child.label}
@@ -84,10 +84,10 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
                   )}
                 </div>
               ))}
-              <div className="mt-4 h-px w-16 bg-white/20" />
+              <div className="mt-4 h-px w-16 bg-site-border-medium" />
               <Link
                 href={customerName ? '/account' : '/signin'}
-                className="text-lg font-medium text-white/60 hover:text-white transition-colors"
+                className="text-lg font-medium text-site-text/60 hover:text-site-text transition-colors"
                 onClick={() => setOpen(false)}
               >
                 {customerName ? `Hi, ${customerName}` : 'Sign In'}

@@ -34,7 +34,7 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ol className="flex flex-wrap items-center gap-1.5 text-sm text-gray-400">
+      <ol className="flex flex-wrap items-center gap-1.5 text-sm text-site-text-muted">
         {allItems.map((item, index) => {
           const isLast = index === allItems.length - 1;
 
@@ -42,13 +42,13 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
             <li key={index} className="flex items-center gap-1.5">
               {index > 0 && (
                 <ChevronRight
-                  className="h-3.5 w-3.5 text-gray-600"
+                  className="h-3.5 w-3.5 text-site-text-faint"
                   aria-hidden="true"
                 />
               )}
               {isLast || !item.href ? (
                 <span
-                  className="font-medium text-white"
+                  className="font-medium text-site-text"
                   aria-current={isLast ? 'page' : undefined}
                 >
                   {item.label}
@@ -56,7 +56,7 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
               ) : (
                 <Link
                   href={item.href}
-                  className="underline underline-offset-2 decoration-gray-600 transition-colors hover:text-lime hover:decoration-lime"
+                  className="underline underline-offset-2 decoration-site-text-faint transition-colors hover:text-lime hover:decoration-lime"
                 >
                   {item.label}
                 </Link>

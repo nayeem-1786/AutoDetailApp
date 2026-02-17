@@ -101,10 +101,10 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <HomeAnimations type="section-header">
             <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                 Our Services
               </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-gray-400">
+              <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
                 From express washes to multi-year ceramic coating packages, we offer
                 comprehensive auto detailing tailored to your vehicle&apos;s needs.
               </p>
@@ -142,7 +142,7 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <HomeAnimations type="section-header">
             <div className="text-center">
-              <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                 Why Choose {businessInfo.name}?
               </h2>
             </div>
@@ -150,17 +150,17 @@ export default async function HomePage() {
 
           <HomeAnimations
             type="stagger-grid"
-            className="mt-14 grid gap-0 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0 divide-white/10"
+            className="mt-14 grid gap-0 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0 divide-site-border"
           >
             {differentiators.map((item) => {
               const Icon = item.icon;
               return (
                 <div key={item.title} className="px-6 py-8 text-center sm:py-0 sm:first:pl-0 sm:last:pr-0">
                   <Icon className="mx-auto h-8 w-8 text-lime" />
-                  <h3 className="mt-4 font-display text-lg font-semibold text-white">
+                  <h3 className="mt-4 font-display text-lg font-semibold text-site-text">
                     {item.title}
                   </h3>
-                  <p className="mt-2 text-sm text-gray-400">
+                  <p className="mt-2 text-sm text-site-text-muted">
                     {item.description}
                   </p>
                 </div>
@@ -176,11 +176,11 @@ export default async function HomePage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <HomeAnimations type="section-header">
               <div className="text-center">
-                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                   Meet the Team
                 </h2>
                 {teamData.aboutText && (
-                  <p className="mx-auto mt-4 max-w-2xl text-gray-400">
+                  <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
                     {teamData.aboutText}
                   </p>
                 )}
@@ -198,7 +198,7 @@ export default async function HomePage() {
 
                 return (
                   <div key={i} className="text-center">
-                    <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-brand-surface border border-white/10 flex items-center justify-center">
+                    <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-brand-surface border border-site-border flex items-center justify-center">
                       {member.photoUrl ? (
                         <img
                           src={member.photoUrl}
@@ -211,14 +211,14 @@ export default async function HomePage() {
                         </span>
                       )}
                     </div>
-                    <h3 className="mt-4 font-display text-lg font-semibold text-white">
+                    <h3 className="mt-4 font-display text-lg font-semibold text-site-text">
                       {member.name}
                     </h3>
                     <p className="text-sm font-medium text-lime">
                       {member.role}
                     </p>
                     {member.bio && (
-                      <p className="mt-2 text-sm text-gray-400 line-clamp-2">
+                      <p className="mt-2 text-sm text-site-text-muted line-clamp-2">
                         {member.bio}
                       </p>
                     )}
@@ -229,7 +229,7 @@ export default async function HomePage() {
 
             {teamData.credentials.length > 0 && (
               <HomeAnimations type="section-header">
-                <div className="mt-12 border-t border-white/10 pt-8">
+                <div className="mt-12 border-t border-site-border pt-8">
                   <div className="flex flex-wrap justify-center gap-8 items-center">
                     {teamData.credentials.map((cred, i) => (
                       <div key={i} className="flex items-center gap-3 text-center">
@@ -241,11 +241,11 @@ export default async function HomePage() {
                           />
                         )}
                         <div className="text-left">
-                          <p className="text-sm font-semibold text-white">
+                          <p className="text-sm font-semibold text-site-text">
                             {cred.title}
                           </p>
                           {cred.description && (
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-site-text-muted">
                               {cred.description}
                             </p>
                           )}
@@ -268,7 +268,7 @@ export default async function HomePage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <HomeAnimations type="section-header">
               <div className="text-center">
-                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                   What Our Customers Say
                 </h2>
               </div>
@@ -278,7 +278,7 @@ export default async function HomePage() {
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
                 <div
                   key={i}
-                  className="relative rounded-2xl bg-brand-surface p-7 sm:p-8 border border-white/10 hover:border-lime/30 transition-all duration-300"
+                  className="relative rounded-2xl bg-brand-surface p-7 sm:p-8 border border-site-border hover:border-lime/30 transition-all duration-300"
                 >
                   {/* Decorative quote mark */}
                   <span className="absolute -top-2 -left-1 text-6xl font-serif text-lime/20 leading-none select-none" aria-hidden="true">
@@ -289,14 +289,14 @@ export default async function HomePage() {
                       <Star key={j} className="h-4 w-4 fill-lime text-lime" />
                     ))}
                   </div>
-                  <p className="mt-4 text-base sm:text-lg leading-relaxed text-gray-300 italic line-clamp-4">
+                  <p className="mt-4 text-base sm:text-lg leading-relaxed text-site-text-secondary italic line-clamp-4">
                     &ldquo;{review.text}&rdquo;
                   </p>
                   <div className="mt-6 flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">
+                    <span className="text-sm font-bold text-site-text">
                       {review.author}
                     </span>
-                    <span className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1 text-gray-400">
+                    <span className="text-xs bg-site-border-light border border-site-border rounded-full px-3 py-1 text-site-text-muted">
                       Google
                     </span>
                   </div>

@@ -425,7 +425,15 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session L — Theme & Style Settings Admin Page)
+## Last Session: 2026-02-16 (Session M — Complete Theme Variable Migration)
+
+### Session M — Complete Theme Variable Migration
+- **Complete migration**: All remaining hardcoded Tailwind colors in public-facing pages migrated to CSS theme variables. Zero remaining `text-white`, `text-gray-*`, `border-white/*`, `bg-gray-*`, `hover:text-white`, `hover:bg-white/*` across `(public)`, `(customer-auth)`, `(account)`, and `components/public` directories.
+- **New CSS variable**: `--color-site-border-medium: rgba(255, 255, 255, 0.2)` in `globals.css` for `border-white/20` replacements
+- **ThemeProvider added**: Customer-auth layout and account layout now wrap children in `ThemeProvider` with site theme + seasonal theme support (matching public layout pattern)
+- **Files migrated (14 total)**: 2 layouts, 3 auth pages (signin, signup, reset-password), 2 quote pages, 1 public component (mobile-menu), 8 account portal pages (dashboard, profile, vehicles, appointments, services, services/[jobId], loyalty, transactions)
+- **Preserved exceptions**: Status badges (green/red/amber/purple), image overlays (bg-black/60), standalone pages (/unsubscribe, /authorize, /jobs)
+- **Verified**: TypeScript clean (zero errors), grep clean (zero hardcoded colors), no FODT issue (SSR renders CSS variables in initial HTML)
 
 ### Session L — Theme & Style Settings Admin Page
 - **New table**: `site_theme_settings` — persistent site theme customization (50+ fields for colors, typography, buttons, borders, spacing). NULL fields = use CSS defaults. Separate from seasonal themes (which are temporary overlays).

@@ -55,7 +55,7 @@ export default function AccountAppointmentsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-site-text-faint">
         View your upcoming and past appointments.
       </p>
 
@@ -64,13 +64,13 @@ export default function AccountAppointmentsPage() {
           <Spinner />
         </div>
       ) : appointments.length === 0 ? (
-        <p className="mt-8 text-sm text-gray-500">No appointments yet.</p>
+        <p className="mt-8 text-sm text-site-text-dim">No appointments yet.</p>
       ) : (
         <>
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <div className="mt-6">
-              <h2 className="mb-3 text-sm font-medium uppercase text-gray-500">
+              <h2 className="mb-3 text-sm font-medium uppercase text-site-text-dim">
                 Upcoming
               </h2>
               <div className="space-y-3">
@@ -88,7 +88,7 @@ export default function AccountAppointmentsPage() {
           {/* Past */}
           {past.length > 0 && (
             <div className="mt-8">
-              <h2 className="mb-3 text-sm font-medium uppercase text-gray-500">
+              <h2 className="mb-3 text-sm font-medium uppercase text-site-text-dim">
                 Past
               </h2>
               <div className="space-y-3">

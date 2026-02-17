@@ -50,12 +50,12 @@ function RichTextBlock({ block }: { block: PageContentBlock }) {
   return (
     <div className="content-block">
       {block.title && (
-        <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl mb-6">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-6">
           {block.title}
         </h2>
       )}
       <div
-        className="prose prose-invert max-w-none prose-headings:font-display prose-h2:text-2xl prose-h3:text-xl prose-p:text-gray-400 prose-p:leading-relaxed prose-a:text-lime hover:prose-a:text-lime-400 prose-li:text-gray-400"
+        className="prose prose-invert max-w-none prose-headings:font-display prose-h2:text-2xl prose-h3:text-xl prose-p:text-site-text-muted prose-p:leading-relaxed prose-a:text-lime hover:prose-a:text-lime-400 prose-li:text-site-text-muted"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>
@@ -91,20 +91,20 @@ function FaqBlock({ block }: { block: PageContentBlock }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       {block.title && (
-        <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl mb-8">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-8">
           {block.title}
         </h2>
       )}
-      <div className="divide-y divide-white/10 rounded-2xl border border-white/10 overflow-hidden">
+      <div className="divide-y divide-site-border rounded-2xl border border-site-border overflow-hidden">
         {items.map((item, i) => (
           <details key={i} className="group">
-            <summary className="flex cursor-pointer items-center justify-between px-6 py-5 text-left hover:bg-white/5 transition-colors">
-              <span className="text-base font-medium text-white pr-4">
+            <summary className="flex cursor-pointer items-center justify-between px-6 py-5 text-left hover:bg-site-border-light transition-colors">
+              <span className="text-base font-medium text-site-text pr-4">
                 {item.question}
               </span>
-              <ArrowRight className="h-5 w-5 flex-shrink-0 text-gray-400 transition-transform group-open:rotate-90" />
+              <ArrowRight className="h-5 w-5 flex-shrink-0 text-site-text-muted transition-transform group-open:rotate-90" />
             </summary>
-            <div className="px-6 pb-5 text-sm leading-relaxed text-gray-400">
+            <div className="px-6 pb-5 text-sm leading-relaxed text-site-text-muted">
               {item.answer}
             </div>
           </details>
@@ -125,7 +125,7 @@ function FeaturesListBlock({ block }: { block: PageContentBlock }) {
   return (
     <div className="content-block">
       {block.title && (
-        <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl mb-8">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-8">
           {block.title}
         </h2>
       )}
@@ -133,15 +133,15 @@ function FeaturesListBlock({ block }: { block: PageContentBlock }) {
         {items.map((item, i) => (
           <div
             key={i}
-            className="rounded-xl border border-white/10 bg-brand-surface p-6"
+            className="rounded-xl border border-site-border bg-brand-surface p-6"
           >
             <div className="flex items-start gap-3">
               <CheckCircle className="h-6 w-6 flex-shrink-0 text-lime mt-0.5" />
               <div>
-                <h3 className="text-base font-semibold text-white">
+                <h3 className="text-base font-semibold text-site-text">
                   {item.title}
                 </h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-gray-400">
+                <p className="mt-1.5 text-sm leading-relaxed text-site-text-muted">
                   {item.description}
                 </p>
               </div>
@@ -163,15 +163,15 @@ function CtaBlock({ block }: { block: PageContentBlock }) {
 
   return (
     <div className="content-block">
-      <div className="rounded-2xl bg-gradient-to-br from-brand-grey to-black border border-white/10 px-8 py-12 text-center sm:px-12 sm:py-16 relative overflow-hidden">
+      <div className="rounded-2xl bg-gradient-to-br from-brand-grey to-black border border-site-border px-8 py-12 text-center sm:px-12 sm:py-16 relative overflow-hidden">
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
           <div className="w-64 h-64 bg-lime/5 rounded-full blur-3xl" />
         </div>
         <div className="relative">
-        <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl">
           {data.heading}
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-gray-400">
+        <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
           {data.description}
         </p>
         <div className="mt-8">
@@ -201,16 +201,16 @@ function TestimonialBlock({ block }: { block: PageContentBlock }) {
     <div className="content-block">
       <div className="rounded-2xl bg-brand-surface p-8 sm:p-10">
         <Quote className="h-8 w-8 text-lime mb-4" />
-        <blockquote className="text-lg leading-relaxed text-gray-200 italic">
+        <blockquote className="text-lg leading-relaxed text-site-text-secondary italic">
           &ldquo;{data.quote}&rdquo;
         </blockquote>
         <div className="mt-6 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-sm font-semibold text-site-text">
               {data.author}
             </p>
             {data.source && (
-              <p className="text-xs text-gray-500">{data.source}</p>
+              <p className="text-xs text-site-text-dim">{data.source}</p>
             )}
           </div>
           {data.rating > 0 && (

@@ -51,7 +51,7 @@ export function NavDropdown({ item }: NavDropdownProps) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="relative flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
+        className="relative flex items-center gap-1 px-4 py-2 text-sm font-medium text-site-text-muted hover:text-site-text transition-colors group"
       >
         {item.label}
         <ChevronDown
@@ -59,17 +59,17 @@ export function NavDropdown({ item }: NavDropdownProps) {
             open ? 'rotate-180' : ''
           }`}
         />
-        <span className="absolute inset-x-4 -bottom-px h-0.5 bg-brand-600 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+        <span className="absolute inset-x-4 -bottom-px h-0.5 bg-lime scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
       </button>
 
       {open && item.children && item.children.length > 0 && (
-        <div className="absolute left-0 top-full mt-1 w-48 rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10 py-1 z-50">
+        <div className="absolute left-0 top-full mt-1 w-48 rounded-lg bg-brand-surface shadow-lg ring-1 ring-site-border py-1 z-50">
           {item.children.map((child) => (
             <Link
               key={child.id}
               href={child.url}
               target={child.target}
-              className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              className="block px-4 py-2 text-sm text-site-text-secondary hover:bg-site-border-light hover:text-site-text transition-colors"
               onClick={() => setOpen(false)}
             >
               {child.label}

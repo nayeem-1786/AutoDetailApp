@@ -55,10 +55,10 @@ export default async function ProductsPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs items={[{ label: 'Products' }]} />
           <AnimatedSection>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+            <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl lg:text-5xl">
               Our <span className="text-gradient-lime">Products</span>
             </h1>
-            <p className="mt-4 max-w-3xl text-lg text-gray-400">
+            <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
               Professional-grade products for every need. The same products our
               technicians trust and recommend.
             </p>
@@ -79,7 +79,7 @@ export default async function ProductsPage() {
               ))}
             </AnimatedSection>
           ) : (
-            <p className="text-gray-400">
+            <p className="text-site-text-muted">
               No product categories are currently available. Please check back soon.
             </p>
           )}

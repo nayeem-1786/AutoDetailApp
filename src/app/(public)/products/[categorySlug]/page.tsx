@@ -62,11 +62,11 @@ export default async function ProductCategoryPage({ params }: PageProps) {
             ]}
           />
           <AnimatedSection>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
               {category.name}
             </h1>
             {category.description && (
-              <p className="mt-4 max-w-3xl text-lg text-gray-400">
+              <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
                 {category.description}
               </p>
             )}
@@ -88,7 +88,7 @@ export default async function ProductCategoryPage({ params }: PageProps) {
               ))}
             </AnimatedSection>
           ) : (
-            <p className="text-gray-400">
+            <p className="text-site-text-muted">
               No products are currently available in this category. Please check back soon.
             </p>
           )}

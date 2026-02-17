@@ -74,11 +74,11 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
             ]}
           />
           <AnimatedSection>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
               {category.name}
             </h1>
             {category.description && (
-              <p className="mt-4 max-w-3xl text-lg text-gray-400">
+              <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
                 {category.description}
               </p>
             )}
@@ -105,7 +105,7 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
               ))}
             </AnimatedSection>
           ) : (
-            <p className="text-gray-400">
+            <p className="text-site-text-muted">
               No services are currently available in this category. Please check back soon.
             </p>
           )}
@@ -118,10 +118,10 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
       {otherCategories.length > 0 && (
         <section className="bg-brand-surface py-12 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="font-display text-2xl font-bold text-white">
+            <h2 className="font-display text-2xl font-bold text-site-text">
               Explore Our Other Services
             </h2>
-            <p className="mt-2 text-gray-400">
+            <p className="mt-2 text-site-text-muted">
               Browse our full range of professional auto care services.
             </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -129,19 +129,19 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
                 <Link
                   key={cat.id}
                   href={`/services/${cat.slug}`}
-                  className="group flex items-center justify-between rounded-2xl bg-brand-dark p-5 border border-white/10 transition-all duration-300 hover:border-lime/30 hover:bg-white/5"
+                  className="group flex items-center justify-between rounded-2xl bg-brand-dark p-5 border border-site-border transition-all duration-300 hover:border-lime/30 hover:bg-site-border-light"
                 >
                   <div>
-                    <h3 className="font-display text-base font-semibold text-white group-hover:text-lime transition-colors">
+                    <h3 className="font-display text-base font-semibold text-site-text group-hover:text-lime transition-colors">
                       {cat.name}
                     </h3>
                     {cat.description && (
-                      <p className="mt-1 text-sm text-gray-400 line-clamp-2">
+                      <p className="mt-1 text-sm text-site-text-muted line-clamp-2">
                         {cat.description}
                       </p>
                     )}
                   </div>
-                  <ArrowRight className="ml-3 h-4 w-4 flex-shrink-0 text-gray-500 group-hover:text-lime transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight className="ml-3 h-4 w-4 flex-shrink-0 text-site-text-dim group-hover:text-lime transition-transform group-hover:translate-x-0.5" />
                 </Link>
               ))}
             </div>

@@ -4,6 +4,69 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session M — 2026-02-16 (Complete Theme Variable Migration)
+
+### Complete Component Migration
+Migrated ALL remaining hardcoded colors across public-facing pages to CSS theme variables. Zero hardcoded colors remain in `(public)`, `(customer-auth)`, `(account)`, or `components/public` directories.
+
+### CSS Variables
+- Added `--color-site-border-medium: rgba(255, 255, 255, 0.2)` to `@theme inline` in `globals.css` for `border-white/20` replacements
+
+### Layout Updates
+- **Customer-auth layout** (`src/app/(customer-auth)/layout.tsx`): Rewrote to include `ThemeProvider` with site theme + seasonal theme support
+- **Account layout** (`src/app/(account)/layout.tsx`): Rewrote to include `ThemeProvider` with site theme + seasonal theme support
+- Both layouts now fetch `getCmsToggles()`, `getActiveTheme()`, `getSiteThemeSettings()` and pass to `ThemeProvider`
+
+### Files Migrated (Color Mapping)
+All files below had hardcoded Tailwind colors replaced with theme variables:
+- `text-white` → `text-site-text`
+- `text-gray-300` → `text-site-text-secondary`
+- `text-gray-400` → `text-site-text-muted`
+- `text-gray-500` → `text-site-text-dim`
+- `text-gray-600` → `text-site-text-faint`
+- `border-white/10` → `border-site-border`
+- `border-white/20` → `border-site-border-medium`
+- `hover:text-white` → `hover:text-site-text`
+- `hover:bg-white/5` → `hover:bg-site-border-light`
+- `bg-white/10` → `bg-site-border` (dividers)
+- `bg-white/20` → `bg-site-border-medium`
+
+**Customer Auth Pages (3 files):**
+- `src/app/(customer-auth)/signin/page.tsx`
+- `src/app/(customer-auth)/signup/page.tsx`
+- `src/app/(customer-auth)/signin/reset-password/page.tsx`
+
+**Quote Pages (2 files):**
+- `src/app/(public)/quote/[token]/page.tsx`
+- `src/app/(public)/quote/[token]/accept-button.tsx`
+
+**Public Components (1 file):**
+- `src/components/public/mobile-menu.tsx`
+
+**Account Portal Pages (8 files):**
+- `src/app/(account)/account/page.tsx`
+- `src/app/(account)/account/profile/page.tsx`
+- `src/app/(account)/account/vehicles/page.tsx`
+- `src/app/(account)/account/appointments/page.tsx`
+- `src/app/(account)/account/services/page.tsx`
+- `src/app/(account)/account/services/[jobId]/page.tsx`
+- `src/app/(account)/account/loyalty/page.tsx`
+- `src/app/(account)/account/transactions/page.tsx`
+
+### Preserved (Intentional Exceptions)
+- **Status/semantic colors**: green (success), red (error), amber (warning), purple (converted) — kept as-is
+- **Image overlays**: `bg-black/60`, `bg-white/10` on photo badges, hero carousel, product cards — design-specific
+- **Standalone pages**: `/unsubscribe`, `/authorize`, `/jobs` — own light-mode design, not in public layout
+- **Admin panel**: Not in scope for public theme migration
+
+### Verification
+- `npx tsc --noEmit` — zero errors
+- Grep for hardcoded colors across all 4 directories — zero matches
+- No `dark:` prefixed classes found (already removed in Session J)
+- No FODT issue — ThemeProvider renders CSS variables during SSR via inline `style` attribute
+
+---
+
 ## Session L — 2026-02-16 (Theme & Style Settings Admin Page)
 
 ### Database

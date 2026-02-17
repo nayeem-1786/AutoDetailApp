@@ -104,7 +104,7 @@ export default function ServiceDetailPage() {
     return (
       <div className="py-16 text-center">
         <h2 className="text-xl font-semibold text-gray-900">Service not found</h2>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-site-text-dim">
           This service record doesn&apos;t exist or isn&apos;t available.
         </p>
         <Button variant="outline" className="mt-4" onClick={() => router.push('/account/services')}>
@@ -150,7 +150,7 @@ export default function ServiceDetailPage() {
       {/* Back button */}
       <button
         onClick={() => router.push('/account/services')}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        className="flex items-center gap-1 text-sm text-site-text-dim hover:text-gray-700"
       >
         <ArrowLeft className="h-4 w-4" />
         Service History
@@ -160,7 +160,7 @@ export default function ServiceDetailPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{dateFormatted}</h1>
         {vehicleStr && (
-          <p className="mt-1 text-gray-600">{vehicleStr}</p>
+          <p className="mt-1 text-site-text-faint">{vehicleStr}</p>
         )}
       </div>
 
@@ -169,7 +169,7 @@ export default function ServiceDetailPage() {
         {/* Services Performed */}
         <div className="border-b border-gray-100 p-5">
           <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-900">
-            <Wrench className="h-4 w-4 text-gray-400" />
+            <Wrench className="h-4 w-4 text-site-text-muted" />
             Services Performed
           </div>
           <ul className="space-y-1.5">
@@ -186,10 +186,10 @@ export default function ServiceDetailPage() {
         {job.addons.length > 0 && (
           <div className="border-b border-gray-100 p-5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-900">
-              <Plus className="h-4 w-4 text-gray-400" />
+              <Plus className="h-4 w-4 text-site-text-muted" />
               Additional Services
             </div>
-            <p className="mb-2 text-xs text-gray-400">Added during your visit</p>
+            <p className="mb-2 text-xs text-site-text-muted">Added during your visit</p>
             <ul className="space-y-1.5">
               {job.addons.map((a, i) => (
                 <li key={i} className="text-sm text-gray-700">{a.name}</li>
@@ -202,24 +202,24 @@ export default function ServiceDetailPage() {
         <div className="flex flex-wrap gap-x-6 gap-y-3 p-5">
           {/* Vehicle */}
           {vehicleStr && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Car className="h-4 w-4 text-gray-400" />
+            <div className="flex items-center gap-2 text-sm text-site-text-faint">
+              <Car className="h-4 w-4 text-site-text-muted" />
               {vehicleStr}
             </div>
           )}
 
           {/* Duration */}
           {duration && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Clock className="h-4 w-4 text-gray-400" />
+            <div className="flex items-center gap-2 text-sm text-site-text-faint">
+              <Clock className="h-4 w-4 text-site-text-muted" />
               {duration}
             </div>
           )}
 
           {/* Staff */}
           {job.staff && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <User className="h-4 w-4 text-gray-400" />
+            <div className="flex items-center gap-2 text-sm text-site-text-faint">
+              <User className="h-4 w-4 text-site-text-muted" />
               Serviced by {job.staff.first_name}
             </div>
           )}
@@ -234,15 +234,15 @@ export default function ServiceDetailPage() {
             className="flex w-full items-center justify-between p-5 text-left"
           >
             <div className="flex items-center gap-2">
-              <Camera className="h-5 w-5 text-gray-400" />
+              <Camera className="h-5 w-5 text-site-text-muted" />
               <span className="text-sm font-medium text-gray-900">
                 Before &amp; After Photos ({job.photo_count})
               </span>
             </div>
             {showPhotos ? (
-              <ChevronUp className="h-5 w-5 text-gray-400" />
+              <ChevronUp className="h-5 w-5 text-site-text-muted" />
             ) : (
-              <ChevronDown className="h-5 w-5 text-gray-400" />
+              <ChevronDown className="h-5 w-5 text-site-text-muted" />
             )}
           </button>
 

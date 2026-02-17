@@ -93,7 +93,7 @@ export default function ServiceHistoryPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Service History</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-site-text-dim">
             Your completed service visits
           </p>
         </div>
@@ -117,9 +117,9 @@ export default function ServiceHistoryPage() {
       {/* Empty state */}
       {visits.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-          <ClipboardList className="mx-auto h-12 w-12 text-gray-300" />
+          <ClipboardList className="mx-auto h-12 w-12 text-site-text-secondary" />
           <h3 className="mt-4 text-lg font-semibold text-gray-900">No service records yet</h3>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-site-text-dim">
             Completed services will appear here after your next visit.
           </p>
         </div>
@@ -166,17 +166,17 @@ export default function ServiceHistoryPage() {
                     )}
 
                     {/* Services */}
-                    <p className="mt-0.5 truncate text-sm text-gray-500">{serviceNames}</p>
+                    <p className="mt-0.5 truncate text-sm text-site-text-dim">{serviceNames}</p>
 
                     {/* Meta row: addons + photos */}
                     <div className="mt-1.5 flex items-center gap-3">
                       {visit.addon_count > 0 && (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-site-text-muted">
                           +{visit.addon_count} add-on{visit.addon_count > 1 ? 's' : ''}
                         </span>
                       )}
                       {visit.photo_count > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                        <span className="flex items-center gap-1 text-xs text-site-text-muted">
                           <Camera className="h-3 w-3" />
                           {visit.photo_count} photo{visit.photo_count !== 1 ? 's' : ''}
                         </span>
@@ -185,7 +185,7 @@ export default function ServiceHistoryPage() {
                   </div>
 
                   {/* Chevron */}
-                  <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-300" />
+                  <ChevronRight className="h-5 w-5 flex-shrink-0 text-site-text-secondary" />
                 </button>
               );
             })}

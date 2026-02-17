@@ -51,9 +51,9 @@ export function FooterClient({
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-brand-dark border-t border-white/5">
+    <footer className="bg-brand-dark border-t border-site-border-light">
       {/* Trust badges strip */}
-      <div className="border-b border-white/10">
+      <div className="border-b border-site-border">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
             {trustBadges.map((badge) => {
@@ -61,7 +61,7 @@ export function FooterClient({
               return (
                 <div
                   key={badge.label}
-                  className="flex items-center gap-2 text-sm text-gray-400"
+                  className="flex items-center gap-2 text-sm text-site-text-muted"
                 >
                   <Icon className="h-4 w-4 text-lime" />
                   <span className="font-medium">{badge.label}</span>
@@ -84,11 +84,11 @@ export function FooterClient({
                 <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
                   <span className="text-black font-black text-lg">S</span>
                 </div>
-                <span className="text-white font-bold text-lg">{businessName}</span>
+                <span className="text-site-text font-bold text-lg">{businessName}</span>
               </div>
             )}
 
-            <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
+            <p className="text-site-text-muted text-sm leading-relaxed max-w-xs">
               Professional auto detailing and ceramic coating specialists serving
               the South Bay area. We bring premium car care directly to you.
             </p>
@@ -97,7 +97,7 @@ export function FooterClient({
             <div className="mt-6 space-y-3">
               <a
                 href={`tel:${phone}`}
-                className="flex items-center gap-3 text-sm text-gray-400 hover:text-white transition-colors"
+                className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
               >
                 <Phone className="w-4 h-4 text-lime shrink-0" />
                 {phone}
@@ -105,13 +105,13 @@ export function FooterClient({
               {email && (
                 <a
                   href={`mailto:${email}`}
-                  className="flex items-center gap-3 text-sm text-gray-400 hover:text-white transition-colors"
+                  className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
                 >
                   <Mail className="w-4 h-4 text-lime shrink-0" />
                   {email}
                 </a>
               )}
-              <div className="flex items-start gap-3 text-sm text-gray-400">
+              <div className="flex items-start gap-3 text-sm text-site-text-muted">
                 <MapPin className="w-4 h-4 text-lime shrink-0 mt-0.5" />
                 {address}
               </div>
@@ -123,13 +123,13 @@ export function FooterClient({
                 {reviews.map((r) => (
                   <div
                     key={r.platform}
-                    className="flex items-center gap-1.5 text-sm text-gray-300"
+                    className="flex items-center gap-1.5 text-sm text-site-text-secondary"
                   >
                     <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
                     <span className="font-semibold">{r.rating}</span>
-                    <span className="text-gray-500">on {r.platform}</span>
-                    <span className="text-gray-600">&middot;</span>
-                    <span className="text-gray-500">{r.count} reviews</span>
+                    <span className="text-site-text-dim">on {r.platform}</span>
+                    <span className="text-site-text-faint">&middot;</span>
+                    <span className="text-site-text-dim">{r.count} reviews</span>
                   </div>
                 ))}
               </div>
@@ -140,7 +140,7 @@ export function FooterClient({
           <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
             {navColumns.map((col, i) => (
               <div key={i}>
-                <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">
+                <h4 className="text-site-text font-bold text-sm uppercase tracking-wider mb-4">
                   {col.title}
                 </h4>
                 <ul className="space-y-2.5">
@@ -149,7 +149,7 @@ export function FooterClient({
                       <Link
                         href={link.url}
                         target={link.target || '_self'}
-                        className="text-sm text-gray-400 hover:text-lime transition-colors"
+                        className="text-sm text-site-text-muted hover:text-lime transition-colors"
                       >
                         {link.label}
                       </Link>
@@ -163,18 +163,18 @@ export function FooterClient({
 
         {/* Service Areas */}
         {cities.length > 0 && (
-          <div className="mt-10 border-t border-white/10 pt-8">
-            <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="mt-10 border-t border-site-border pt-8">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-site-text-muted">
               Service Areas
             </h4>
-            <p className="mt-3 text-sm text-gray-400">
+            <p className="mt-3 text-sm text-site-text-muted">
               Mobile Detailing in{' '}
               {cities.map((city, i) => (
                 <span key={city.id}>
-                  {i > 0 && <span className="text-gray-600"> | </span>}
+                  {i > 0 && <span className="text-site-text-faint"> | </span>}
                   <Link
                     href={`/areas/${city.slug}`}
-                    className="text-gray-300 hover:text-white transition-colors"
+                    className="text-site-text-secondary hover:text-site-text transition-colors"
                   >
                     {city.city_name}
                   </Link>
@@ -186,21 +186,21 @@ export function FooterClient({
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/5">
+      <div className="border-t border-site-border-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-site-text-dim">
             &copy; {year} {businessName}. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <Link
               href="/terms"
-              className="text-xs text-gray-500 hover:text-white transition-colors"
+              className="text-xs text-site-text-dim hover:text-site-text transition-colors"
             >
               Terms &amp; Conditions
             </Link>
             <Link
               href="/unsubscribe"
-              className="text-xs text-gray-500 hover:text-white transition-colors"
+              className="text-xs text-site-text-dim hover:text-site-text transition-colors"
             >
               Unsubscribe
             </Link>

@@ -64,14 +64,14 @@ export function AcceptQuoteButton({ quoteId, accessToken, totalAmount }: AcceptQ
           <button
             onClick={handleAccept}
             disabled={accepting}
-            className="inline-flex items-center justify-center rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-site-text shadow-sm transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {accepting ? 'Accepting...' : 'Yes, Accept'}
           </button>
           <button
             onClick={() => setConfirming(false)}
             disabled={accepting}
-            className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-brand-surface px-6 py-2.5 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5 disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-lg border border-site-border-medium bg-brand-surface px-6 py-2.5 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light disabled:opacity-50"
           >
             Go Back
           </button>
@@ -85,11 +85,11 @@ export function AcceptQuoteButton({ quoteId, accessToken, totalAmount }: AcceptQ
     <div className="space-y-3">
       <button
         onClick={() => setConfirming(true)}
-        className="inline-flex items-center justify-center rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+        className="inline-flex items-center justify-center rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-site-text shadow-sm transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
       >
         Accept Quote
       </button>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-site-text-dim">
         By accepting this quote, you agree to the services and pricing listed above.
       </p>
     </div>

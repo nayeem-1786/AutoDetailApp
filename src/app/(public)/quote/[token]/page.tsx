@@ -84,8 +84,8 @@ export default async function PublicQuotePage({ params }: PageProps) {
   if (!quote) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold text-white">Quote Not Found</h1>
-        <p className="mt-2 text-gray-400">
+        <h1 className="text-2xl font-bold text-site-text">Quote Not Found</h1>
+        <p className="mt-2 text-site-text-muted">
           This quote link is invalid or has expired. Please contact us for assistance.
         </p>
       </div>
@@ -96,29 +96,29 @@ export default async function PublicQuotePage({ params }: PageProps) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-white">{businessInfo.name}</h1>
-          <p className="mt-1 text-sm text-gray-400">{businessInfo.address}</p>
+          <h1 className="text-2xl font-bold text-site-text">{businessInfo.name}</h1>
+          <p className="mt-1 text-sm text-site-text-muted">{businessInfo.address}</p>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-brand-dark p-8 shadow-sm text-center">
-          <h2 className="text-xl font-semibold text-white">
+        <div className="rounded-lg border border-site-border bg-brand-dark p-8 shadow-sm text-center">
+          <h2 className="text-xl font-semibold text-site-text">
             This Estimate Is No Longer Available
           </h2>
-          <p className="mt-3 text-gray-400">
+          <p className="mt-3 text-site-text-muted">
             This estimate is no longer active. We&apos;d love to help you with a new one!
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <a
               href={`tel:${businessInfo.phone}`}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 px-6 py-3 text-sm font-semibold text-gray-200 hover:bg-white/5 transition-colors"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-site-border-medium px-6 py-3 text-sm font-semibold text-site-text-secondary hover:bg-site-border-light transition-colors"
             >
               <Phone className="h-4 w-4" />
               Call {formatPhone(businessInfo.phone)}
             </a>
             <a
               href="/book"
-              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-site-text hover:bg-blue-700 transition-colors"
             >
               Book Online
             </a>
@@ -137,22 +137,22 @@ export default async function PublicQuotePage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
       {/* Business Header */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-white">{businessInfo.name}</h1>
-        <p className="mt-1 text-sm text-gray-400">{businessInfo.address}</p>
+        <h1 className="text-2xl font-bold text-site-text">{businessInfo.name}</h1>
+        <p className="mt-1 text-sm text-site-text-muted">{businessInfo.address}</p>
       </div>
 
       {/* Quote Header */}
-      <div className="mb-8 rounded-lg border border-white/10 bg-brand-dark p-6 shadow-sm">
+      <div className="mb-8 rounded-lg border border-site-border bg-brand-dark p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-semibold text-site-text">
               Quote {quote.quote_number}
             </h2>
-            <p className="mt-1 text-sm text-gray-400">
+            <p className="mt-1 text-sm text-site-text-muted">
               Date: {formatDate(quote.created_at)}
             </p>
             {quote.valid_until && (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-site-text-muted">
                 Valid Until: {formatDate(quote.valid_until)}
               </p>
             )}
@@ -160,16 +160,16 @@ export default async function PublicQuotePage({ params }: PageProps) {
           <div className="text-right">
             {quote.customer && (
               <div>
-                <p className="text-sm font-medium text-white">
+                <p className="text-sm font-medium text-site-text">
                   {quote.customer.first_name} {quote.customer.last_name}
                 </p>
                 {quote.customer.email && (
-                  <p className="text-sm text-gray-400">{quote.customer.email}</p>
+                  <p className="text-sm text-site-text-muted">{quote.customer.email}</p>
                 )}
               </div>
             )}
             {quote.vehicle && (
-              <p className="mt-1 text-sm text-gray-400">
+              <p className="mt-1 text-sm text-site-text-muted">
                 {[quote.vehicle.year, quote.vehicle.make, quote.vehicle.model]
                   .filter(Boolean)
                   .join(' ')}
@@ -212,34 +212,34 @@ export default async function PublicQuotePage({ params }: PageProps) {
       )}
 
       {/* Line Items Table */}
-      <div className="mb-6 overflow-hidden rounded-lg border border-white/10 bg-brand-dark shadow-sm">
+      <div className="mb-6 overflow-hidden rounded-lg border border-site-border bg-brand-dark shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-brand-dark">
-                <th className="px-6 py-3 text-left font-medium text-gray-400">Item</th>
-                <th className="px-4 py-3 text-center font-medium text-gray-400">Qty</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-400">Unit Price</th>
-                <th className="px-6 py-3 text-right font-medium text-gray-400">Total</th>
+              <tr className="border-b border-site-border bg-brand-dark">
+                <th className="px-6 py-3 text-left font-medium text-site-text-muted">Item</th>
+                <th className="px-4 py-3 text-center font-medium text-site-text-muted">Qty</th>
+                <th className="px-4 py-3 text-right font-medium text-site-text-muted">Unit Price</th>
+                <th className="px-6 py-3 text-right font-medium text-site-text-muted">Total</th>
               </tr>
             </thead>
             <tbody>
               {(quote.items || []).map((item) => (
-                <tr key={item.id} className="border-b border-white/10">
+                <tr key={item.id} className="border-b border-site-border">
                   <td className="px-6 py-4">
-                    <div className="font-medium text-white">{item.item_name}</div>
+                    <div className="font-medium text-site-text">{item.item_name}</div>
                     {item.tier_name && (
-                      <div className="text-xs text-gray-400">{item.tier_name}</div>
+                      <div className="text-xs text-site-text-muted">{item.tier_name}</div>
                     )}
                     {item.notes && (
-                      <div className="mt-1 text-xs text-gray-500">{item.notes}</div>
+                      <div className="mt-1 text-xs text-site-text-dim">{item.notes}</div>
                     )}
                   </td>
-                  <td className="px-4 py-4 text-center text-gray-400">{item.quantity}</td>
-                  <td className="px-4 py-4 text-right text-gray-400">
+                  <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>
+                  <td className="px-4 py-4 text-right text-site-text-muted">
                     {formatCurrency(item.unit_price)}
                   </td>
-                  <td className="px-6 py-4 text-right font-medium text-white">
+                  <td className="px-6 py-4 text-right font-medium text-site-text">
                     {formatCurrency(item.total_price)}
                   </td>
                 </tr>
@@ -249,23 +249,23 @@ export default async function PublicQuotePage({ params }: PageProps) {
         </div>
 
         {/* Totals */}
-        <div className="border-t border-white/10 bg-brand-dark px-6 py-4">
+        <div className="border-t border-site-border bg-brand-dark px-6 py-4">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Subtotal</span>
-              <span className="font-medium text-white">{formatCurrency(quote.subtotal)}</span>
+              <span className="text-site-text-muted">Subtotal</span>
+              <span className="font-medium text-site-text">{formatCurrency(quote.subtotal)}</span>
             </div>
             {quote.tax_amount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Tax</span>
-                <span className="font-medium text-white">
+                <span className="text-site-text-muted">Tax</span>
+                <span className="font-medium text-site-text">
                   {formatCurrency(quote.tax_amount)}
                 </span>
               </div>
             )}
-            <div className="flex justify-between border-t border-white/10 pt-2">
-              <span className="text-base font-semibold text-white">Total</span>
-              <span className="text-lg font-bold text-white">
+            <div className="flex justify-between border-t border-site-border pt-2">
+              <span className="text-base font-semibold text-site-text">Total</span>
+              <span className="text-lg font-bold text-site-text">
                 {formatCurrency(quote.total_amount)}
               </span>
             </div>
@@ -275,9 +275,9 @@ export default async function PublicQuotePage({ params }: PageProps) {
 
       {/* Notes */}
       {quote.notes && (
-        <div className="mb-6 rounded-lg border border-white/10 bg-brand-dark px-6 py-4 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-300">Notes</h3>
-          <p className="mt-1 text-sm text-gray-400 whitespace-pre-wrap">{quote.notes}</p>
+        <div className="mb-6 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm">
+          <h3 className="text-sm font-medium text-site-text-secondary">Notes</h3>
+          <p className="mt-1 text-sm text-site-text-muted whitespace-pre-wrap">{quote.notes}</p>
         </div>
       )}
 

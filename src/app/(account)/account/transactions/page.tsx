@@ -177,7 +177,7 @@ export default function AccountTransactionsPage() {
       size: 110,
       accessorFn: (row) => row.transaction_date,
       cell: ({ row }) => (
-        <div className="text-center text-sm text-gray-600">
+        <div className="text-center text-sm text-site-text-faint">
           {formatDate(row.original.transaction_date)}
         </div>
       ),
@@ -188,7 +188,7 @@ export default function AccountTransactionsPage() {
       size: 100,
       cell: ({ row }) => {
         const receiptNum = row.original.receipt_number;
-        if (!receiptNum) return <div className="text-center text-sm text-gray-400">—</div>;
+        if (!receiptNum) return <div className="text-center text-sm text-site-text-muted">—</div>;
         return (
           <div className="text-center">
             <button
@@ -206,7 +206,7 @@ export default function AccountTransactionsPage() {
       id: 'vehicle',
       header: () => <div className="text-center">Vehicle</div>,
       cell: ({ row }) => (
-        <div className="text-center text-sm text-gray-600">
+        <div className="text-center text-sm text-site-text-faint">
           {formatVehicle(row.original.vehicles)}
         </div>
       ),
@@ -242,7 +242,7 @@ export default function AccountTransactionsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Transaction History</h1>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-site-text-faint">
         View your past purchases and receipts. Click any receipt number to view or print.
       </p>
 
@@ -257,7 +257,7 @@ export default function AccountTransactionsPage() {
             <div className="mt-6 grid gap-4 sm:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-site-text-dim">
                     <CalendarDays className="h-4 w-4" />
                     Member Since
                   </div>
@@ -268,7 +268,7 @@ export default function AccountTransactionsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-site-text-dim">
                     <ShoppingCart className="h-4 w-4" />
                     Total Visits
                   </div>
@@ -279,7 +279,7 @@ export default function AccountTransactionsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-site-text-dim">
                     <DollarSign className="h-4 w-4" />
                     Lifetime Spend
                   </div>
@@ -290,7 +290,7 @@ export default function AccountTransactionsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-site-text-dim">
                     <Award className="h-4 w-4" />
                     Loyalty Points
                   </div>

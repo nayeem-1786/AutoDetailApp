@@ -55,10 +55,10 @@ export default async function ServicesPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs items={[{ label: 'Services' }]} />
           <AnimatedSection>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+            <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl lg:text-5xl">
               Our Detailing <span className="text-gradient-lime">Services</span>
             </h1>
-            <p className="mt-4 max-w-3xl text-lg text-gray-400">
+            <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
               From express washes to multi-year ceramic coating packages, our trained technicians
               deliver results you can see and feel.
             </p>
@@ -79,7 +79,7 @@ export default async function ServicesPage() {
               ))}
             </AnimatedSection>
           ) : (
-            <p className="text-gray-400">
+            <p className="text-site-text-muted">
               No service categories are currently available. Please check back soon.
             </p>
           )}

@@ -28,18 +28,17 @@ interface ThemeProviderProps {
 function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
   const vars: Record<string, string> = {};
 
-  // Background colors
+  // Background colors — map to Tailwind token vars for utility class support
   if (st.color_page_bg) vars['--color-brand-black'] = st.color_page_bg;
   if (st.color_card_bg) vars['--color-brand-surface'] = st.color_card_bg;
   if (st.color_section_alt_bg) vars['--color-brand-dark'] = st.color_section_alt_bg;
-  if (st.color_header_bg) vars['--site-header-bg'] = st.color_header_bg;
-  if (st.color_footer_bg) vars['--site-footer-bg'] = st.color_footer_bg;
+  if (st.color_header_bg) vars['--color-site-header-bg'] = st.color_header_bg;
+  if (st.color_footer_bg) vars['--color-site-footer-bg'] = st.color_footer_bg;
 
-  // Text colors
-  if (st.color_text_primary) vars['--site-text-primary'] = st.color_text_primary;
-  if (st.color_text_secondary) vars['--site-text-secondary'] = st.color_text_secondary;
-  if (st.color_text_muted) vars['--site-text-muted'] = st.color_text_muted;
-  if (st.color_text_on_primary) vars['--site-text-on-primary'] = st.color_text_on_primary;
+  // Text colors — map to --color-site-text-* for Tailwind utility class support
+  if (st.color_text_primary) vars['--color-site-text'] = st.color_text_primary;
+  if (st.color_text_secondary) vars['--color-site-text-secondary'] = st.color_text_secondary;
+  if (st.color_text_muted) vars['--color-site-text-muted'] = st.color_text_muted;
 
   // Brand / accent colors — map to lime palette for Tailwind token override
   if (st.color_primary) {
@@ -50,26 +49,13 @@ function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
   if (st.color_accent) vars['--color-lime-400'] = st.color_accent;
   if (st.color_accent_hover) vars['--color-lime-500'] = st.color_accent_hover;
 
-  // Link colors
-  if (st.color_link) vars['--site-link'] = st.color_link;
-  if (st.color_link_hover) vars['--site-link-hover'] = st.color_link_hover;
-
-  // Border colors
-  if (st.color_border) vars['--site-border'] = st.color_border;
-  if (st.color_border_light) vars['--site-border-light'] = st.color_border_light;
-  if (st.color_divider) vars['--site-divider'] = st.color_divider;
+  // Border colors — map to --color-site-border-* for Tailwind utility class support
+  if (st.color_border) vars['--color-site-border'] = st.color_border;
+  if (st.color_border_light) vars['--color-site-border-light'] = st.color_border_light;
 
   // Typography
   if (st.font_family) vars['--font-body'] = st.font_family;
   if (st.font_heading_family) vars['--font-display'] = st.font_heading_family;
-  if (st.font_line_height) vars['--site-line-height'] = st.font_line_height;
-  if (st.font_h1_size) vars['--site-h1-size'] = st.font_h1_size;
-  if (st.font_h2_size) vars['--site-h2-size'] = st.font_h2_size;
-  if (st.font_h3_size) vars['--site-h3-size'] = st.font_h3_size;
-  if (st.font_body_size) vars['--site-body-size'] = st.font_body_size;
-  if (st.font_small_size) vars['--site-small-size'] = st.font_small_size;
-  if (st.font_heading_weight) vars['--site-heading-weight'] = st.font_heading_weight;
-  if (st.font_body_weight) vars['--site-body-weight'] = st.font_body_weight;
 
   // Buttons
   if (st.btn_primary_bg) vars['--site-btn-primary-bg'] = st.btn_primary_bg;
@@ -80,14 +66,6 @@ function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
   if (st.btn_cta_text) vars['--site-btn-cta-text'] = st.btn_cta_text;
   if (st.btn_cta_hover_bg) vars['--site-btn-cta-hover-bg'] = st.btn_cta_hover_bg;
   if (st.btn_cta_radius) vars['--site-btn-cta-radius'] = st.btn_cta_radius;
-
-  // Borders & spacing
-  if (st.border_radius) vars['--site-border-radius'] = st.border_radius;
-  if (st.border_card_radius) vars['--site-card-radius'] = st.border_card_radius;
-  if (st.border_width) vars['--site-border-width'] = st.border_width;
-  if (st.spacing_section_padding) vars['--site-section-padding'] = st.spacing_section_padding;
-  if (st.spacing_card_padding) vars['--site-card-padding'] = st.spacing_card_padding;
-  if (st.spacing_header_height) vars['--site-header-height'] = st.spacing_header_height;
 
   return vars;
 }

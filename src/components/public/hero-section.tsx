@@ -16,28 +16,28 @@ export async function HeroSection() {
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
           {/* Left — Text */}
           <div>
-            <h1 className="font-display text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="font-display text-4xl font-extrabold tracking-tight text-site-text sm:text-5xl lg:text-6xl">
               Premium Mobile
               <br />
               Detailing
             </h1>
 
             {/* Inline review stats */}
-            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-400">
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-site-text-muted">
               <span className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-lime text-lime" />
-                <span className="font-semibold text-white">{reviews.google.rating}</span>
+                <span className="font-semibold text-site-text">{reviews.google.rating}</span>
                 <span>&middot; {reviews.google.count} Google Reviews</span>
               </span>
               <span className="hidden sm:inline text-white/30">|</span>
               <span className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-lime text-lime" />
-                <span className="font-semibold text-white">{reviews.yelp.rating}</span>
+                <span className="font-semibold text-site-text">{reviews.yelp.rating}</span>
                 <span>&middot; {reviews.yelp.count} Yelp Reviews</span>
               </span>
             </div>
 
-            <p className="mt-6 max-w-lg text-lg leading-relaxed text-gray-400">
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-site-text-muted">
               Expert ceramic coatings, paint correction, and premium detailing.
               We bring showroom results directly to your doorstep.
             </p>
@@ -64,7 +64,7 @@ export async function HeroSection() {
                 />
               </div>
             ) : (
-              <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 flex items-center justify-center">
+              <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-site-border-light ring-1 ring-white/10 flex items-center justify-center">
                 <p className="text-sm text-white/30">Before &amp; After showcase</p>
               </div>
             )}

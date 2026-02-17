@@ -115,7 +115,7 @@ export default function AccountVehiclesPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Your Vehicles</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-site-text-faint">
             Add all your vehicles here so we can track their service history and provide personalized recommendations.
           </p>
         </div>
@@ -133,9 +133,9 @@ export default function AccountVehiclesPage() {
         <Card className="mt-6">
           <CardContent className="pt-6">
             <div className="text-center py-8">
-              <Car className="mx-auto h-12 w-12 text-gray-300" />
+              <Car className="mx-auto h-12 w-12 text-site-text-secondary" />
               <h3 className="mt-4 text-lg font-medium text-gray-900">No vehicles yet</h3>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-site-text-dim">
                 Add your first vehicle to get started. We&apos;ll keep track of its service history for you.
               </p>
               <Button onClick={handleAdd} className="mt-4">
@@ -156,7 +156,7 @@ export default function AccountVehiclesPage() {
               <Card key={type}>
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-gray-500" />
+                    <Icon className="h-5 w-5 text-site-text-dim" />
                     <CardTitle>{typeLabel}{count > 1 ? 's' : ''}</CardTitle>
                   </div>
                   <CardDescription>
@@ -188,7 +188,7 @@ export default function AccountVehiclesPage() {
                               )}
                             </div>
                             {vehicle.license_plate && (
-                              <p className="mt-2 text-xs font-mono text-gray-500">
+                              <p className="mt-2 text-xs font-mono text-site-text-dim">
                                 Plate: {vehicle.license_plate}
                               </p>
                             )}

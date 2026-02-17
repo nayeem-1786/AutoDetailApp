@@ -136,7 +136,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
               />
             </picture>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />
+            <div className="absolute inset-0 bg-gradient-to-br from-brand-grey to-brand-black" />
           )}
 
           {/* Slow zoom effect on image slides */}
@@ -176,11 +176,11 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
             >
               {slide.title && (
                 current === 0 ? (
-                  <h1 className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.9] tracking-tight uppercase">
+                  <h1 className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-site-text leading-[0.9] tracking-tight uppercase">
                     {renderTitle(slide.title)}
                   </h1>
                 ) : (
-                  <p className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.9] tracking-tight uppercase">
+                  <p className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-site-text leading-[0.9] tracking-tight uppercase">
                     {renderTitle(slide.title)}
                   </p>
                 )
@@ -190,7 +190,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.5, delay: 0.35 }}
-                  className="mt-4 sm:mt-6 text-base sm:text-lg lg:text-xl text-gray-300 max-w-lg leading-relaxed"
+                  className="mt-4 sm:mt-6 text-base sm:text-lg lg:text-xl text-site-text-secondary max-w-lg leading-relaxed"
                 >
                   {slide.subtitle}
                 </motion.p>

@@ -22,7 +22,7 @@ export function ServicePricingDisplay({ service }: ServicePricingDisplayProps) {
       return <CustomPricing service={service} />;
     default:
       return (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-site-text-muted">
           Contact us for pricing information.
         </p>
       );
@@ -35,16 +35,16 @@ function VehicleSizePricing({ service }: { service: Service }) {
     : [];
 
   if (tiers.length === 0) {
-    return <p className="text-sm text-gray-400">Contact us for pricing.</p>;
+    return <p className="text-sm text-site-text-muted">Contact us for pricing.</p>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-white/10">
+    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-white/10">
+          <tr className="border-b border-site-border">
             {tiers.map((tier) => (
-              <th key={tier.id} className="px-4 py-3 text-left font-display font-semibold text-white">
+              <th key={tier.id} className="px-4 py-3 text-left font-display font-semibold text-site-text">
                 {tier.tier_label ?? tier.tier_name}
               </th>
             ))}
@@ -70,18 +70,18 @@ function ScopePricing({ service }: { service: Service }) {
     : [];
 
   if (tiers.length === 0) {
-    return <p className="text-sm text-gray-400">Contact us for pricing.</p>;
+    return <p className="text-sm text-site-text-muted">Contact us for pricing.</p>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-white/10">
+    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-white/10">
-            <th className="px-4 py-3 text-left font-display font-semibold text-white">
+          <tr className="border-b border-site-border">
+            <th className="px-4 py-3 text-left font-display font-semibold text-site-text">
               Option
             </th>
-            <th className="px-4 py-3 text-right font-display font-semibold text-white">
+            <th className="px-4 py-3 text-right font-display font-semibold text-site-text">
               Price
             </th>
           </tr>
@@ -105,13 +105,13 @@ function ScopeTierRow({ tier, index }: { tier: ServicePricing; index: number }) 
         <tr className={rowBg}>
           <td
             colSpan={2}
-            className="px-4 pt-3 pb-1 font-display font-medium text-white"
+            className="px-4 pt-3 pb-1 font-display font-medium text-site-text"
           >
             {tier.tier_label ?? tier.tier_name}
           </td>
         </tr>
         <tr className={rowBg}>
-          <td className="px-4 py-1 pl-8 text-gray-400">Sedan</td>
+          <td className="px-4 py-1 pl-8 text-site-text-muted">Sedan</td>
           <td className="px-4 py-1 text-right font-bold text-lime">
             {tier.vehicle_size_sedan_price !== null
               ? formatCurrency(tier.vehicle_size_sedan_price)
@@ -119,7 +119,7 @@ function ScopeTierRow({ tier, index }: { tier: ServicePricing; index: number }) 
           </td>
         </tr>
         <tr className={rowBg}>
-          <td className="px-4 py-1 pl-8 text-gray-400">Truck / SUV</td>
+          <td className="px-4 py-1 pl-8 text-site-text-muted">Truck / SUV</td>
           <td className="px-4 py-1 text-right font-bold text-lime">
             {tier.vehicle_size_truck_suv_price !== null
               ? formatCurrency(tier.vehicle_size_truck_suv_price)
@@ -127,7 +127,7 @@ function ScopeTierRow({ tier, index }: { tier: ServicePricing; index: number }) 
           </td>
         </tr>
         <tr className={rowBg}>
-          <td className="px-4 pb-3 py-1 pl-8 text-gray-400">SUV / Van</td>
+          <td className="px-4 pb-3 py-1 pl-8 text-site-text-muted">SUV / Van</td>
           <td className="px-4 pb-3 py-1 text-right font-bold text-lime">
             {tier.vehicle_size_suv_van_price !== null
               ? formatCurrency(tier.vehicle_size_suv_van_price)
@@ -140,7 +140,7 @@ function ScopeTierRow({ tier, index }: { tier: ServicePricing; index: number }) 
 
   return (
     <tr className={rowBg}>
-      <td className="px-4 py-3 text-gray-300">
+      <td className="px-4 py-3 text-site-text-secondary">
         {tier.tier_label ?? tier.tier_name}
       </td>
       <td className="px-4 py-3 text-right font-bold text-lime">
@@ -157,12 +157,12 @@ function PerUnitPricing({ service }: { service: Service }) {
         {service.per_unit_price !== null
           ? formatCurrency(service.per_unit_price)
           : '--'}{' '}
-        <span className="text-base font-normal text-gray-400">
+        <span className="text-base font-normal text-site-text-muted">
           per {service.per_unit_label ?? 'unit'}
         </span>
       </p>
       {service.per_unit_max !== null && (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-site-text-muted">
           Maximum {service.per_unit_max} {service.per_unit_label ?? 'units'}
         </p>
       )}
@@ -176,18 +176,18 @@ function SpecialtyPricing({ service }: { service: Service }) {
     : [];
 
   if (tiers.length === 0) {
-    return <p className="text-sm text-gray-400">Contact us for pricing.</p>;
+    return <p className="text-sm text-site-text-muted">Contact us for pricing.</p>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-white/10">
+    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-white/10">
-            <th className="px-4 py-3 text-left font-display font-semibold text-white">
+          <tr className="border-b border-site-border">
+            <th className="px-4 py-3 text-left font-display font-semibold text-site-text">
               Option
             </th>
-            <th className="px-4 py-3 text-right font-display font-semibold text-white">
+            <th className="px-4 py-3 text-right font-display font-semibold text-site-text">
               Price
             </th>
           </tr>
@@ -195,7 +195,7 @@ function SpecialtyPricing({ service }: { service: Service }) {
         <tbody>
           {tiers.map((tier, index) => (
             <tr key={tier.id} className={index % 2 === 1 ? 'bg-white/[0.02]' : ''}>
-              <td className="px-4 py-3 text-gray-300">
+              <td className="px-4 py-3 text-site-text-secondary">
                 {tier.tier_label ?? tier.tier_name}
               </td>
               <td className="px-4 py-3 text-right font-bold text-lime">
@@ -229,7 +229,7 @@ function CustomPricing({ service }: { service: Service }) {
           ? `Starting at ${formatCurrency(service.custom_starting_price)}`
           : 'Custom pricing'}
       </p>
-      <p className="flex items-center gap-1.5 text-sm text-gray-400">
+      <p className="flex items-center gap-1.5 text-sm text-site-text-muted">
         <MessageSquare className="h-4 w-4" />
         Contact for exact quote
       </p>

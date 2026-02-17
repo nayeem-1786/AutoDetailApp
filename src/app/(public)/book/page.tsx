@@ -131,10 +131,10 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     <section className="bg-brand-dark py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
             Book Your Appointment
           </h1>
-          <p className="mt-3 text-lg text-gray-400">
+          <p className="mt-3 text-lg text-site-text-muted">
             Select a service, configure your options, and pick a time that works
             for you.
           </p>

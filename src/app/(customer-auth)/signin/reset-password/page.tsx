@@ -55,15 +55,15 @@ export default function CustomerResetPasswordPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
             SD
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-white">
+          <h1 className="mt-4 text-2xl font-bold text-site-text">
             Set New Password
           </h1>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-site-text-muted">
             {businessInfo?.name || 'Our Portal'}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-brand-surface border border-white/10 p-8">
+        <div className="rounded-2xl bg-brand-surface border border-site-border p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="rounded-md bg-red-950 p-3 text-sm text-red-300">

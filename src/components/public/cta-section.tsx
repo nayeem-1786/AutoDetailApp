@@ -23,10 +23,10 @@ export async function CtaSection({
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+          <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl lg:text-5xl">
             {title}
           </h2>
-          <p className="mt-5 text-lg text-gray-400">
+          <p className="mt-5 text-lg text-site-text-muted">
             {description}
           </p>
           <div className="mt-10">
@@ -40,7 +40,7 @@ export async function CtaSection({
           </div>
           <a
             href={`tel:${phoneToE164(biz.phone)}`}
-            className="mt-5 inline-block text-sm font-medium text-gray-500 hover:text-lime transition-colors"
+            className="mt-5 inline-block text-sm font-medium text-site-text-dim hover:text-lime transition-colors"
           >
             or call {formatPhone(biz.phone)}
           </a>

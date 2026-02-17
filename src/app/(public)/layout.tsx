@@ -23,26 +23,17 @@ export default async function PublicLayout({
   const showTheme = cmsToggles.seasonalThemes && activeTheme !== null;
   const hasSiteTheme = siteTheme !== null && siteTheme.is_active;
 
-  const content = (
-    <div className="public-theme bg-brand-black text-white min-h-screen antialiased">
-      {showTickers && <TopBarTicker tickers={topBarTickers} />}
-      <SiteHeader navItems={headerNav} />
-      <main className="min-h-[calc(100vh-4rem)]">{children}</main>
-      <SiteFooter navItems={footerNav} />
-    </div>
+  return (
+    <ThemeProvider
+      theme={showTheme ? activeTheme : null}
+      siteTheme={hasSiteTheme ? siteTheme : null}
+    >
+      <div className="public-theme bg-brand-black text-site-text min-h-screen antialiased">
+        {showTickers && <TopBarTicker tickers={topBarTickers} />}
+        <SiteHeader navItems={headerNav} />
+        <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+        <SiteFooter navItems={footerNav} />
+      </div>
+    </ThemeProvider>
   );
-
-  // Wrap in ThemeProvider if either a seasonal theme or site theme is active
-  if (showTheme || hasSiteTheme) {
-    return (
-      <ThemeProvider
-        theme={showTheme ? activeTheme : null}
-        siteTheme={hasSiteTheme ? siteTheme : null}
-      >
-        {content}
-      </ThemeProvider>
-    );
-  }
-
-  return content;
 }

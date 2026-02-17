@@ -116,11 +116,11 @@ export default async function TermsPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs items={[{ label: 'Terms & Conditions' }]} />
           <AnimatedSection>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
               Terms &amp; Conditions
             </h1>
             {effectiveDate && (
-              <p className="mt-3 text-sm text-gray-400">
+              <p className="mt-3 text-sm text-site-text-muted">
                 Effective Date: {new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             )}
@@ -133,18 +133,18 @@ export default async function TermsPage() {
           <div className="space-y-10">
             {sections.map((section, idx) => (
               <div key={idx}>
-                <h2 className="font-display text-xl font-semibold text-white">
+                <h2 className="font-display text-xl font-semibold text-site-text">
                   {idx + 1}. {section.title}
                 </h2>
-                <div className="mt-3 text-sm leading-relaxed text-gray-400 whitespace-pre-line">
+                <div className="mt-3 text-sm leading-relaxed text-site-text-muted whitespace-pre-line">
                   {section.content}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-16 border-t border-white/10 pt-8">
-            <p className="text-xs text-gray-400">
+          <div className="mt-16 border-t border-site-border pt-8">
+            <p className="text-xs text-site-text-muted">
               If you have questions about these terms, please contact us at{' '}
               {biz.email ? (
                 <a href={`mailto:${biz.email}`} className="text-lime hover:underline">

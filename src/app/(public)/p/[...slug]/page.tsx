@@ -103,7 +103,7 @@ export default async function CustomPage({ params }: PageProps) {
   if (page.page_template === 'content') {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-        <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl">
+        <h1 className="font-display text-4xl font-bold tracking-tight text-site-text sm:text-5xl">
           {page.title}
         </h1>
         {page.content && (

@@ -147,7 +147,7 @@ export default async function CityLandingPage({
             ]}
           />
           <AnimatedSection>
-            <h1 className="font-display text-3xl font-black tracking-tight text-white uppercase sm:text-4xl lg:text-5xl">
+            <h1 className="font-display text-3xl font-black tracking-tight text-site-text uppercase sm:text-4xl lg:text-5xl">
               {hasCity ? (
                 <>
                   {headingParts[0]}
@@ -158,11 +158,11 @@ export default async function CityLandingPage({
                 heading
               )}
             </h1>
-            <p className="mt-4 max-w-3xl text-lg text-gray-400">
+            <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
               {introText}
             </p>
             {city.distance_miles != null && (
-              <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-500">
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-site-text-dim">
                 <MapPin className="h-4 w-4" />
                 {city.distance_miles} miles from our shop in {businessInfo.city},{' '}
                 {businessInfo.state}
@@ -187,11 +187,11 @@ export default async function CityLandingPage({
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <AnimatedSection>
               <div className="text-center">
-                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                   Services Available in{' '}
                   <span className="text-gradient-lime">{city.city_name}</span>
                 </h2>
-                <p className="mx-auto mt-4 max-w-2xl text-gray-400">
+                <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
                   From express washes to multi-year ceramic coating packages, we bring
                   professional auto detailing directly to you in {city.city_name}.
                 </p>
@@ -230,10 +230,10 @@ export default async function CityLandingPage({
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <AnimatedSection>
               <div className="text-center">
-                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                   What Our Customers Say
                 </h2>
-                <p className="mx-auto mt-3 max-w-xl text-gray-400">
+                <p className="mx-auto mt-3 max-w-xl text-site-text-muted">
                   Rated {reviews.google.rating} stars across{' '}
                   {reviews.google.count} Google reviews
                 </p>
@@ -243,7 +243,7 @@ export default async function CityLandingPage({
             <AnimatedSection stagger className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
                 <AnimatedItem key={i}>
-                  <div className="rounded-2xl bg-brand-surface p-7 border border-white/10 hover:border-lime/20 transition-colors">
+                  <div className="rounded-2xl bg-brand-surface p-7 border border-site-border hover:border-lime/20 transition-colors">
                     <div className="flex items-center gap-1">
                       {Array.from({ length: review.rating }).map((_, j) => (
                         <Star
@@ -252,14 +252,14 @@ export default async function CityLandingPage({
                         />
                       ))}
                     </div>
-                    <p className="mt-4 text-sm leading-relaxed text-gray-300 line-clamp-4 italic">
+                    <p className="mt-4 text-sm leading-relaxed text-site-text-secondary line-clamp-4 italic">
                       &ldquo;{review.text}&rdquo;
                     </p>
                     <div className="mt-4 flex items-center justify-between">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-site-text">
                         {review.author}
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-site-text-dim">
                         {review.relativeTime}
                       </span>
                     </div>
@@ -289,18 +289,18 @@ export default async function CityLandingPage({
       />
 
       {/* Business Info Footer */}
-      <section className="bg-brand-black border-t border-white/10 py-10">
+      <section className="bg-brand-black border-t border-site-border py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-center sm:gap-8 sm:text-left">
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <MapPin className="h-4 w-4 text-gray-500" />
+            <div className="flex items-center gap-2 text-sm text-site-text-muted">
+              <MapPin className="h-4 w-4 text-site-text-dim" />
               {businessInfo.address}
             </div>
             <a
               href={`tel:${phoneToE164(businessInfo.phone)}`}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-lime transition-colors"
+              className="flex items-center gap-2 text-sm text-site-text-muted hover:text-lime transition-colors"
             >
-              <Phone className="h-4 w-4 text-gray-500" />
+              <Phone className="h-4 w-4 text-site-text-dim" />
               {formatPhone(businessInfo.phone)}
             </a>
           </div>
