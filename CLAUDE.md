@@ -263,6 +263,20 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - `ShippingSettingsRow` interface added to `src/lib/supabase/types.ts`, `Order` interface updated with shipping columns, `Product` interface updated with dimension columns
 - Bug fixes: `(customer-auth)/layout.tsx` — added CartProviderWrapper + CartDrawer (was causing build failure on /signin). `checkout/confirmation/page.tsx` + `checkout/page.tsx` — wrapped `useSearchParams()` in Suspense boundary (Next.js 16 prerender requirement)
 
+#### Session 4 — Admin Order Management + Customer Order History (Done)
+- Database: `order_events` table (migration `20260217000005`) with event_type CHECK constraint, FK to orders CASCADE, FK to employees SET NULL, index on order_id, RLS policies. Permissions fix migration (`20260217000006`) for `orders.view` + `orders.manage` across 4 system roles.
+- Types: `OrderEventType` union, `OrderEvent` interface, `Order` extended with optional `events?` and `customer?` join fields in `types.ts`
+- Admin API routes: `GET /api/admin/orders` (list with stats, search, payment/fulfillment/date filters, pagination), `GET/PATCH /api/admin/orders/[id]` (detail with items+events+customer, update fulfillment/tracking/notes), `POST /api/admin/orders/[id]/refund` (Stripe refund, stock restore, event logging)
+- Admin orders list page (`/admin/orders`): 4 stat cards (Total Orders, Revenue, Pending Fulfillment, Orders Today), search + payment/fulfillment/date filters, DataTable with order#/customer/items/total/badges/date, pagination
+- Admin order detail page (`/admin/orders/[id]`): two-column layout — left: order items with images, payment card (Stripe PI link), fulfillment card (status dropdown + tracking inputs + Save), activity timeline; right: customer card, order summary, notes card. Refund dialog (full/partial, amount input, reason)
+- Email notifications (`src/lib/utils/order-emails.ts`): `sendFulfillmentEmail()` router, `sendReadyForPickupEmail()`, `sendShippedEmail()` (with tracking link), `sendDeliveredEmail()`, `sendRefundEmail()`. Dark-mode HTML templates matching order confirmation style.
+- Customer account API: `GET /api/account/orders` (paginated, customer_id scoped), `GET /api/account/orders/[id]` (ownership check)
+- Customer account pages: orders list (`/account/orders`) with status badges + empty state, order detail (`/account/orders/[id]`) with items, totals, fulfillment info + tracking
+- Sidebar: "Orders" nav item (ShoppingCart icon) between Customers and Messaging in `roles.ts` + `admin-shell.tsx`
+- Account portal: "Orders" tab added after Appointments in `account-shell.tsx`
+- Dashboard widget: Online Orders section with 3 stat boxes (Orders Today, Revenue Today, Pending) + recent 5 orders mini-list
+- Permissions: `orders.view` (all roles), `orders.manage` (super_admin + admin only). Uses `requirePermission()` server-side enforcement.
+
 ---
 
 ## Testing Checklist
@@ -430,6 +444,11 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Feature flag categories**: Core POS, Marketing, Communication, Booking, Integrations, Operations, Future. "Future" flags are placeholders for upcoming phases — visually distinct on the Feature Toggles page with "Coming Soon" badge.
 - **inventory_management flag**: Gates inventory section visibility in admin sidebar. When disabled, hides Stock Overview and Vendors nav items.
 - **online_store flag**: Phase 9 placeholder. Will gate shopping cart/checkout when built.
+- **Order management permissions**: `orders.view` (all roles can view), `orders.manage` (super_admin + admin can update fulfillment, process refunds). Enforced server-side via `requirePermission()`.
+- **Order events**: `order_events` table tracks full order lifecycle (created, paid, fulfillment_updated, shipped, delivered, ready_for_pickup, refunded, partially_refunded, note_added, tracking_updated, cancelled). Always insert an event when changing order status.
+- **Order money in cents**: `orders.total`, `orders.subtotal`, `orders.tax_amount`, `orders.discount_amount`, `orders.shipping_amount` are all stored in cents. Display via `(amount / 100).toFixed(2)` or `formatCurrency(amount / 100)`.
+- **Fulfillment emails**: On status change, fire-and-forget via `sendFulfillmentEmail()` from `src/lib/utils/order-emails.ts`. Never block the API response for email delivery.
+- **Refund flow**: `POST /api/admin/orders/[id]/refund` → Stripe refund → update `payment_status` → insert order_event → restore stock (increment `quantity_on_hand` per item) → send refund email. Supports full and partial refunds.
 - **referral_program removed**: Dead flag with no code or roadmap. Deleted in Session 4 cleanup.
 - **loyalty_rewards flag**: Gates points accumulation (POS earn route + transaction completion), redemption (POS redeem route), POS loyalty panel, quote loyalty panel, customer portal loyalty page, and portal loyalty API. Existing points preserved when disabled. Server-side: `isFeatureEnabled()` in earn/redeem/transaction routes + customer loyalty API. Client-side: `useFeatureFlag()` in loyalty-panel, quote-loyalty-panel, portal loyalty page.
 - **cancellation_fee flag**: Gates the fee input field in cancel-appointment-dialog and fee processing in cancel API route. The cancel action itself still works — just without a fee. Server-side: cancel route sets fee to null when disabled. Client-side: `useFeatureFlag()` hides fee input. Booking flow disclaimer conditionally shows "$50 fee" text only when enabled.
@@ -468,7 +487,18 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-17 (Session R — Fix Holiday Seasonal Themes)
+## Last Session: 2026-02-17 (Phase 9 Session 4 — Admin Order Management)
+
+### Phase 9 Session 4 — Admin Order Management + Customer Order History
+- **Admin order management**: Full order lifecycle — list page with stats/filters/search/pagination, detail page with fulfillment controls (status dropdown, tracking number/URL/carrier), refund dialog (full/partial via Stripe), activity timeline from `order_events` table.
+- **Customer order history**: Portal orders list + detail pages with items, totals, fulfillment info, tracking links. Scoped by `customer_id` with ownership verification.
+- **Email notifications**: `sendFulfillmentEmail()` routes to status-specific emails (ready for pickup, shipped with tracking, delivered, refunded). Dark-mode HTML templates.
+- **Dashboard widget**: Online Orders section with Orders Today, Revenue Today, Pending Fulfillment stats + recent 5 orders mini-list.
+- **Database**: `order_events` table (event_type CHECK, FK cascade), `orders.view` + `orders.manage` permissions for 4 system roles.
+- **Nav**: "Orders" sidebar item (ShoppingCart icon), "Orders" tab in customer portal.
+- **Files created (11)**: 2 migrations, 3 admin API routes, 2 account API routes, 2 admin pages, 2 account pages, 1 email utility.
+- **Files modified (5)**: `types.ts`, `roles.ts`, `admin-shell.tsx`, `account-shell.tsx`, `admin/page.tsx`.
+- TypeScript clean, migrations applied, committed and pushed.
 
 ### Session R — Fix Holiday Seasonal Themes
 - **Full pipeline audit**: Database records, feature flags, data layer, public layout, ThemeProvider, CSS variable indirection, Tailwind v4 compilation, admin pages, API routes, sidebar links, cron scheduler — all verified present and correct.

@@ -1,6 +1,8 @@
 import { SiteHeader } from '@/components/public/site-header';
 import { SiteFooter } from '@/components/public/site-footer';
 import { ThemeProvider } from '@/components/public/cms/theme-provider';
+import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrapper';
+import { CartDrawer } from '@/components/public/cart/cart-drawer';
 import { CustomerAuthProvider } from '@/lib/auth/customer-auth-provider';
 import { getActiveTheme, getCmsToggles, getSiteThemeSettings } from '@/lib/data/cms';
 
@@ -25,13 +27,16 @@ export default async function AccountLayout({
       theme={showTheme ? activeTheme : null}
       siteTheme={hasSiteTheme ? siteTheme : null}
     >
-      <div className="bg-brand-black text-site-text min-h-screen">
-        <SiteHeader />
-        <main className="min-h-[calc(100vh-4rem)]">
-          <CustomerAuthProvider>{children}</CustomerAuthProvider>
-        </main>
-        <SiteFooter />
-      </div>
+      <CartProviderWrapper>
+        <div className="bg-brand-black text-site-text min-h-screen">
+          <SiteHeader />
+          <main className="min-h-[calc(100vh-4rem)]">
+            <CustomerAuthProvider>{children}</CustomerAuthProvider>
+          </main>
+          <SiteFooter />
+          <CartDrawer />
+        </div>
+      </CartProviderWrapper>
     </ThemeProvider>
   );
 }

@@ -224,10 +224,8 @@ export default function ShippingSettingsPage() {
   // Test connection
   async function handleTestConnection() {
     const apiKey = form.shippo_mode === 'live' ? form.shippo_api_key_live : form.shippo_api_key_test;
-    if (!apiKey || apiKey.includes('••••')) {
-      toast.error('Enter a valid API key first');
-      return;
-    }
+    // Send the key if it's a real (non-masked) value, otherwise let the server resolve from DB/env
+    const isMaskedOrEmpty = !apiKey || apiKey.includes('••••');
 
     setTestingConnection(true);
     setConnectionStatus('untested');
@@ -235,17 +233,17 @@ export default function ShippingSettingsPage() {
       const res = await adminFetch('/api/admin/settings/shipping/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify(isMaskedOrEmpty ? { mode: form.shippo_mode } : { apiKey, mode: form.shippo_mode }),
       });
-      const { data } = await res.json();
-      if (data?.success) {
+      const json = await res.json();
+      if (json.data?.success) {
         setConnectionStatus('success');
         setConnectionError('');
         toast.success('Connection successful');
       } else {
         setConnectionStatus('error');
-        setConnectionError(data?.error || 'Connection failed');
-        toast.error(data?.error || 'Connection failed');
+        setConnectionError(json.data?.error || json.error || 'Connection failed');
+        toast.error(json.data?.error || json.error || 'Connection failed');
       }
     } catch {
       setConnectionStatus('error');

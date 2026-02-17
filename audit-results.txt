@@ -1,0 +1,32 @@
++ set -e
++ RED='\033[0;31m'
++ GREEN='\033[0;32m'
++ YELLOW='\033[1;33m'
++ CYAN='\033[0;36m'
++ NC='\033[0m'
++ PASS=0
++ FAIL=0
++ WARN=0
++ section '1. DATABASE MIGRATIONS — Do the tables exist?'
++ echo -e '\n\033[0;36m═══════════════════════════════════════════════════════════════\033[0m'
+
+[0;36m═══════════════════════════════════════════════════════════════[0m
++ echo -e '\033[0;36m  1. DATABASE MIGRATIONS — Do the tables exist?\033[0m'
+[0;36m  1. DATABASE MIGRATIONS — Do the tables exist?[0m
++ echo -e '\033[0;36m═══════════════════════════════════════════════════════════════\033[0m'
+[0;36m═══════════════════════════════════════════════════════════════[0m
++ echo ''
+
++ echo 'Checking migration files...'
+Checking migration files...
++ MIGRATIONS=("cms_hero_carousel" "cms_tickers" "cms_ads" "cms_themes" "cms_catalog_controls" "cms_feature_flags" "cms_storage" "cms_permissions" "seo_engine" "page_content_blocks")
++ for m in '"${MIGRATIONS[@]}"'
+++ find supabase/migrations -name '*cms_hero_carousel*'
+++ head -1
++ found=supabase/migrations/20260214000001_cms_hero_carousel.sql
++ '[' -n supabase/migrations/20260214000001_cms_hero_carousel.sql ']'
+++ basename supabase/migrations/20260214000001_cms_hero_carousel.sql
++ pass 'Migration exists: cms_hero_carousel → 20260214000001_cms_hero_carousel.sql'
++ echo -e '\033[0;32m✅ PASS\033[0m: Migration exists: cms_hero_carousel → 20260214000001_cms_hero_carousel.sql'
+[0;32m✅ PASS[0m: Migration exists: cms_hero_carousel → 20260214000001_cms_hero_carousel.sql
++ (( PASS++ ))
