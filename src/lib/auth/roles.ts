@@ -33,6 +33,11 @@ export const SIDEBAR_NAV: NavItem[] = [
     icon: 'Users',
   },
   {
+    label: 'Orders',
+    href: '/admin/orders',
+    icon: 'ShoppingCart',
+  },
+  {
     label: 'Messaging',
     href: '/admin/messaging',
     icon: 'MessageSquare',

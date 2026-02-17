@@ -13,6 +13,7 @@ const ACCOUNT_TABS = [
   { label: 'Dashboard', href: '/account' },
   { label: 'Appointments', href: '/account/appointments' },
   { label: 'Vehicles', href: '/account/vehicles' },
+  { label: 'Orders', href: '/account/orders' },
   { label: 'Transactions', href: '/account/transactions' },
   { label: 'Service History', href: '/account/services' },
   { label: 'Loyalty', href: '/account/loyalty' },

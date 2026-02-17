@@ -17,6 +17,8 @@ import {
   FileText,
   UserPlus,
   TrendingUp,
+  ShoppingCart,
+  DollarSign,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/auth-provider';
@@ -59,6 +61,7 @@ export default function AdminDashboard() {
   const [quoteStats, setQuoteStats] = useState({ draft: 0, sent: 0, viewed: 0, accepted: 0 });
   const [customerStats, setCustomerStats] = useState({ total: 0, newThisWeek: 0, newThisMonth: 0 });
   const [stockAlerts, setStockAlerts] = useState({ lowStock: 0, outOfStock: 0 });
+  const [orderStats, setOrderStats] = useState({ ordersToday: 0, revenueToday: 0, pendingFulfillment: 0, recentOrders: [] as Array<{ id: string; order_number: string; first_name: string; last_name: string; total: number; fulfillment_status: string; created_at: string }> });
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const fetchData = useCallback(async () => {
@@ -68,7 +71,7 @@ export default function AdminDashboard() {
     const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const monthStart = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
 
-    const [todayRes, weekRes, quotesRes, custTotalRes, custWeekRes, custMonthRes, stockRes] = await Promise.all([
+    const [todayRes, weekRes, quotesRes, custTotalRes, custWeekRes, custMonthRes, stockRes, ordersTodayRes, ordersPendingRes, recentOrdersRes] = await Promise.all([
       // Today's appointments
       supabase
         .from('appointments')
@@ -127,6 +130,31 @@ export default function AdminDashboard() {
         .from('products')
         .select('quantity_on_hand, reorder_threshold')
         .eq('is_active', true),
+
+      // Orders today (PST)
+      (() => {
+        const now = new Date();
+        const pst = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        const todayStart = new Date(pst.getFullYear(), pst.getMonth(), pst.getDate());
+        return supabase
+          .from('orders')
+          .select('id, total, payment_status')
+          .gte('created_at', todayStart.toISOString());
+      })(),
+
+      // Pending fulfillment orders
+      supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('fulfillment_status', 'unfulfilled')
+        .eq('payment_status', 'paid'),
+
+      // Recent 5 orders
+      supabase
+        .from('orders')
+        .select('id, order_number, first_name, last_name, total, fulfillment_status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5),
     ]);
 
     if (todayRes.data) {
@@ -164,6 +192,16 @@ export default function AdminDashboard() {
       }
       setStockAlerts({ lowStock, outOfStock });
     }
+
+    // Compute order stats
+    const todayOrders = ordersTodayRes.data || [];
+    const paidTodayOrders = todayOrders.filter((o: { payment_status: string }) => o.payment_status === 'paid');
+    setOrderStats({
+      ordersToday: todayOrders.length,
+      revenueToday: paidTodayOrders.reduce((sum: number, o: { total: number }) => sum + o.total, 0),
+      pendingFulfillment: ordersPendingRes.count ?? 0,
+      recentOrders: (recentOrdersRes.data || []) as typeof orderStats.recentOrders,
+    });
 
     setLoading(false);
   }, [supabase, today]);
@@ -391,6 +429,77 @@ export default function AdminDashboard() {
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Online Orders Widget */}
+      {canViewReports && (orderStats.ordersToday > 0 || orderStats.pendingFulfillment > 0 || orderStats.recentOrders.length > 0) && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              Online Orders
+            </h3>
+            <Link
+              href="/admin/orders"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              View All Orders
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-4">
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900">{loading ? '-' : orderStats.ordersToday}</p>
+              <p className="text-xs text-gray-500">Orders Today</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-2xl font-bold text-green-600">{loading ? '-' : formatCurrency(orderStats.revenueToday / 100)}</p>
+              <p className="text-xs text-gray-500">Revenue Today</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-2xl font-bold text-amber-600">{loading ? '-' : orderStats.pendingFulfillment}</p>
+              <p className="text-xs text-gray-500">Pending Fulfillment</p>
+            </div>
+          </div>
+
+          {orderStats.recentOrders.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-medium text-gray-500 mb-2">Recent Orders</p>
+              <div className="space-y-1.5">
+                {orderStats.recentOrders.map((order) => (
+                  <Link
+                    key={order.id}
+                    href={`/admin/orders/${order.id}`}
+                    className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-medium text-blue-600">{order.order_number}</span>
+                      <span className="truncate text-xs text-gray-500">{order.first_name} {order.last_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-medium text-gray-700">{formatCurrency(order.total / 100)}</span>
+                      <Badge
+                        variant={
+                          order.fulfillment_status === 'delivered' ? 'success' :
+                          order.fulfillment_status === 'unfulfilled' ? 'warning' :
+                          'info'
+                        }
+                        className="text-[10px]"
+                      >
+                        {order.fulfillment_status === 'unfulfilled' ? 'Unfulfilled' :
+                         order.fulfillment_status === 'delivered' ? 'Delivered' :
+                         order.fulfillment_status === 'shipped' ? 'Shipped' :
+                         order.fulfillment_status === 'ready_for_pickup' ? 'Ready' :
+                         order.fulfillment_status}
+                      </Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -1334,6 +1334,8 @@ export interface Order {
   updated_at: string;
   // Joined relations
   items?: OrderItem[];
+  events?: OrderEvent[];
+  customer?: Customer;
 }
 
 export interface OrderItem {
@@ -1348,6 +1350,29 @@ export interface OrderItem {
   quantity: number;
   line_total: number;
   discount_amount: number;
+  created_at: string;
+}
+
+export type OrderEventType =
+  | 'created'
+  | 'paid'
+  | 'fulfillment_updated'
+  | 'shipped'
+  | 'delivered'
+  | 'ready_for_pickup'
+  | 'refunded'
+  | 'partially_refunded'
+  | 'note_added'
+  | 'tracking_updated'
+  | 'cancelled';
+
+export interface OrderEvent {
+  id: string;
+  order_id: string;
+  event_type: OrderEventType;
+  description: string;
+  metadata: Record<string, unknown> | null;
+  created_by: string | null;
   created_at: string;
 }
 
