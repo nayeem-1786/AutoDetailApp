@@ -50,13 +50,13 @@ export default async function ServicesPage() {
   return (
     <>
       {/* Page Hero */}
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-          <Breadcrumbs items={[{ label: 'Services' }]} variant="light" />
+      <section className="bg-black py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Breadcrumbs items={[{ label: 'Services' }]} />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Our Detailing Services
+            Our Detailing <span className="text-gradient-lime">Services</span>
           </h1>
-          <p className="mt-4 max-w-3xl text-lg text-blue-100/60">
+          <p className="mt-4 max-w-3xl text-lg text-gray-400">
             From express washes to multi-year ceramic coating packages, our trained technicians
             deliver results you can see and feel.
           </p>

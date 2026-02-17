@@ -151,25 +151,27 @@ export default async function GalleryPage() {
       />
 
       {/* Hero */}
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 text-center">
+      <section className="bg-black py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            Our Work
+            Our <span className="text-gradient-lime">Work</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-blue-100/60">
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-400">
             See the difference professional detailing makes. Browse our before and after gallery
             featuring ceramic coatings, paint corrections, and premium detail services.
           </p>
           {pairs.length > 0 && (
-            <p className="mt-2 text-sm text-blue-100/40">{pairs.length} featured transformations</p>
+            <p className="mt-2 text-sm text-gray-500">{pairs.length} featured transformations</p>
           )}
         </div>
       </section>
 
       {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="below_hero" pagePath="/gallery" /></Suspense>}
 
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-        <GalleryClient initialPairs={pairs} serviceOptions={serviceOptions} />
+      <div className="bg-brand-dark">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+          <GalleryClient initialPairs={pairs} serviceOptions={serviceOptions} />
+        </div>
       </div>
     </>
   );

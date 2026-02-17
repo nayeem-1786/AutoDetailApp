@@ -11,10 +11,10 @@ interface ProductCategoryCardProps {
 export function ProductCategoryCard({ category, productCount }: ProductCategoryCardProps) {
   return (
     <Link href={`/products/${category.slug}`} className="group block">
-      <div className="h-full rounded-2xl bg-brand-surface p-6 shadow-sm border border-white/10 transition-shadow hover:shadow-md">
+      <div className="h-full rounded-2xl bg-brand-surface p-6 border border-white/10 transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-display text-lg font-semibold text-white group-hover:text-lime transition-colors">
+            <h3 className="font-display text-lg font-bold text-white group-hover:text-lime transition-colors">
               {category.name}
             </h3>
             {category.description && (

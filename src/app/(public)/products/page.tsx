@@ -50,13 +50,13 @@ export default async function ProductsPage() {
   return (
     <>
       {/* Page Hero */}
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-          <Breadcrumbs items={[{ label: 'Products' }]} variant="light" />
+      <section className="bg-black py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Breadcrumbs items={[{ label: 'Products' }]} />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Car Care Products &amp; Supplies
+            Our <span className="text-gradient-lime">Products</span>
           </h1>
-          <p className="mt-4 max-w-3xl text-lg text-blue-100/60">
+          <p className="mt-4 max-w-3xl text-lg text-gray-400">
             Professional-grade products for every need. The same products our
             technicians trust and recommend.
           </p>

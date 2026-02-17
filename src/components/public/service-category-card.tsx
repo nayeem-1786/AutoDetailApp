@@ -11,10 +11,10 @@ interface ServiceCategoryCardProps {
 export function ServiceCategoryCard({ category, featured }: ServiceCategoryCardProps) {
   return (
     <Link href={`/services/${category.slug}`} className="group block h-full">
-      <div className="relative h-full overflow-hidden rounded-2xl bg-brand-surface p-7 border border-white/10 transition-all duration-300 hover:border-lime/30 hover:shadow-lg hover:shadow-lime/5">
+      <div className="relative h-full overflow-hidden rounded-2xl bg-brand-surface p-7 border border-white/10 transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className={`font-display font-semibold text-white ${featured ? 'text-xl' : 'text-lg'}`}>
+            <h3 className={`font-display font-bold text-white group-hover:text-lime transition-colors ${featured ? 'text-xl' : 'text-lg'}`}>
               {category.name}
             </h3>
             {category.description && (

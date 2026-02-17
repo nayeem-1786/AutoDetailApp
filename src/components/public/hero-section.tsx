@@ -11,7 +11,7 @@ export async function HeroSection() {
   ]);
 
   return (
-    <section className="relative bg-gradient-hero overflow-hidden">
+    <section className="relative bg-black overflow-hidden">
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
           {/* Left — Text */}
@@ -23,21 +23,21 @@ export async function HeroSection() {
             </h1>
 
             {/* Inline review stats */}
-            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-blue-100/70">
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-400">
               <span className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                <Star className="h-4 w-4 fill-lime text-lime" />
                 <span className="font-semibold text-white">{reviews.google.rating}</span>
                 <span>&middot; {reviews.google.count} Google Reviews</span>
               </span>
               <span className="hidden sm:inline text-white/30">|</span>
               <span className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                <Star className="h-4 w-4 fill-lime text-lime" />
                 <span className="font-semibold text-white">{reviews.yelp.rating}</span>
                 <span>&middot; {reviews.yelp.count} Yelp Reviews</span>
               </span>
             </div>
 
-            <p className="mt-6 max-w-lg text-lg leading-relaxed text-blue-100/60">
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-gray-400">
               Expert ceramic coatings, paint correction, and premium detailing.
               We bring showroom results directly to your doorstep.
             </p>

@@ -11,6 +11,22 @@ interface HeroCarouselProps {
   config: HeroCarouselConfig;
 }
 
+/**
+ * Splits the title so the LAST word gets a lime gradient highlight.
+ * Returns JSX with the last word wrapped in a span.
+ */
+function renderTitle(title: string) {
+  const words = title.trim().split(/\s+/);
+  if (words.length < 2) return title;
+  const lastWord = words.pop()!;
+  return (
+    <>
+      {words.join(' ')}{' '}
+      <span className="text-gradient-lime">{lastWord}</span>
+    </>
+  );
+}
+
 export function HeroCarousel({ slides, config }: HeroCarouselProps) {
   const [current, setCurrent] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -62,7 +78,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
 
   return (
     <section
-      className="relative overflow-hidden bg-black min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]"
+      className="relative overflow-hidden bg-black min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh]"
       onMouseEnter={() => config.pause_on_hover && setIsPaused(true)}
       onMouseLeave={() => config.pause_on_hover && setIsPaused(false)}
     >
@@ -115,7 +131,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
               <img
                 src={slide.image_url}
                 alt={slide.image_alt || slide.title || ''}
-                className="absolute inset-0 w-full h-full object-cover scale-105"
+                className="absolute inset-0 w-full h-full object-cover"
                 loading={current === 0 ? 'eager' : 'lazy'}
               />
             </picture>
@@ -123,9 +139,20 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
             <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />
           )}
 
+          {/* Slow zoom effect on image slides */}
+          {slide.content_type !== 'before_after' && slide.image_url && (
+            <motion.div
+              className="absolute inset-0"
+              initial={{ scale: 1 }}
+              animate={{ scale: 1.05 }}
+              transition={{ duration: 8, ease: 'linear' }}
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+
           {/* Overlay gradients */}
           <div
-            className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"
+            className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20"
             style={{ opacity: (overlayPct / 100) + 0.3 }}
           />
           <div
@@ -136,7 +163,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
       </AnimatePresence>
 
       {/* Content overlay */}
-      <div className="relative z-10 h-full min-h-[400px] sm:min-h-[500px] lg:min-h-[600px] flex items-end pb-16 sm:pb-24 lg:pb-32">
+      <div className="relative z-10 h-full min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh] flex items-end pb-16 sm:pb-24 lg:pb-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
           <AnimatePresence mode="wait">
             <motion.div
@@ -149,28 +176,40 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
             >
               {slide.title && (
                 current === 0 ? (
-                  <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-[0.95] tracking-tight uppercase">
-                    {slide.title}
+                  <h1 className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.9] tracking-tight uppercase">
+                    {renderTitle(slide.title)}
                   </h1>
                 ) : (
-                  <p className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-[0.95] tracking-tight uppercase">
-                    {slide.title}
+                  <p className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.9] tracking-tight uppercase">
+                    {renderTitle(slide.title)}
                   </p>
                 )
               )}
               {slide.subtitle && (
-                <p className="mt-4 sm:mt-6 text-base sm:text-lg text-gray-300 max-w-lg leading-relaxed">
+                <motion.p
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.35 }}
+                  className="mt-4 sm:mt-6 text-base sm:text-lg lg:text-xl text-gray-300 max-w-lg leading-relaxed"
+                >
                   {slide.subtitle}
-                </p>
+                </motion.p>
               )}
               {slide.cta_text && slide.cta_url && (
-                <Link
-                  href={slide.cta_url}
-                  className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-3.5 bg-lime text-black font-bold text-sm uppercase tracking-wider rounded-full hover:bg-lime-200 transition-all duration-300 shadow-xl shadow-lime/30 hover:shadow-lime/50 hover:scale-[1.03] btn-lime-glow"
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
                 >
-                  {slide.content_type === 'video' && <Play className="w-4 h-4" />}
-                  {slide.cta_text}
-                </Link>
+                  <Link
+                    href={slide.cta_url}
+                    className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-4 bg-lime text-black font-bold text-sm uppercase tracking-wider rounded-full hover:shadow-lime-lg hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
+                  >
+                    {slide.content_type === 'video' && <Play className="w-4 h-4" />}
+                    {slide.cta_text}
+                    <span aria-hidden="true">&rarr;</span>
+                  </Link>
+                </motion.div>
               )}
             </motion.div>
           </AnimatePresence>
@@ -183,7 +222,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
           <button
             type="button"
             onClick={prev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:border-lime/30 transition-all"
             aria-label="Previous slide"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -191,7 +230,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
           <button
             type="button"
             onClick={next}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:border-lime/30 transition-all"
             aria-label="Next slide"
           >
             <ChevronRight className="w-5 h-5" />
@@ -284,13 +323,13 @@ function HeroBeforeAfter({
         className="absolute top-0 bottom-0 z-10 pointer-events-none"
         style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
       >
-        <div className="w-[3px] h-full bg-white shadow-lg" />
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white shadow-2xl flex items-center justify-center">
+        <div className="w-[3px] h-full bg-lime shadow-[0_0_8px_rgba(204,255,0,0.4)]" />
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-black border-2 border-lime shadow-2xl flex items-center justify-center">
           <div className="flex items-center gap-0.5">
-            <svg className="w-3 h-3 text-gray-700 rotate-180" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-lime rotate-180" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
             </svg>
-            <svg className="w-3 h-3 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-lime" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
             </svg>
           </div>

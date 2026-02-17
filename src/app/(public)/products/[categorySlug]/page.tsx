@@ -52,20 +52,19 @@ export default async function ProductCategoryPage({ params }: PageProps) {
   return (
     <>
       {/* Category Hero */}
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
+      <section className="bg-black py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
               { label: 'Products', href: '/products' },
               { label: category.name },
             ]}
-            variant="light"
           />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
             {category.name}
           </h1>
           {category.description && (
-            <p className="mt-4 max-w-3xl text-lg text-blue-100/60">
+            <p className="mt-4 max-w-3xl text-lg text-gray-400">
               {category.description}
             </p>
           )}

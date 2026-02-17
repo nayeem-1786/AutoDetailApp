@@ -130,23 +130,22 @@ export default async function CityLandingPage({
       <JsonLd data={breadcrumbSchema} />
 
       {/* Hero Section */}
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <section className="bg-black py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
               { label: 'Service Areas', href: '/areas' },
               { label: city.city_name },
             ]}
-            variant="light"
           />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
             {heading}
           </h1>
-          <p className="mt-4 max-w-3xl text-lg text-blue-100/60">
+          <p className="mt-4 max-w-3xl text-lg text-gray-400">
             {introText}
           </p>
           {city.distance_miles != null && (
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-blue-200/50">
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-500">
               <MapPin className="h-4 w-4" />
               {city.distance_miles} miles from our shop in {businessInfo.city},{' '}
               {businessInfo.state}

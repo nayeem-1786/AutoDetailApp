@@ -72,7 +72,72 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - `src/components/public/mobile-menu.tsx` — old mobile menu
 - `src/components/public/nav-dropdown.tsx` — old nav dropdown
 
-### Session J (continued) — Design Foundation, Lime Accent & Dark Theme Pass
+### Session J (continued — Session 2) — Hero/Card/Page Polish & Animations
+
+#### HeroCarousel Enhancements
+- Taller hero: `min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh]`
+- Slow image zoom effect via `motion.div` scale animation (1.0 → 1.05 over 6s)
+- `renderTitle()` splits last word with `text-gradient-lime` highlight
+- Staggered content animations (subtitle 0.35s, CTA 0.5s delay)
+- Arrow hover: `hover:border-lime/30`
+- Before/after divider: white → lime with glow shadow
+- CTA arrow appended: `<span aria-hidden="true">&rarr;</span>`
+
+#### TrustBar — Server/Client Split + CountUp Animations
+- **`trust-bar.tsx`** refactored to thin server wrapper (fetches data, passes to client)
+- **`trust-bar-client.tsx`** (NEW): Client component with `CountUp` animations for review counts and vehicle count (6000+), larger stat numbers (`text-xl sm:text-2xl font-bold`), vertical dividers
+
+#### Card Components — Hover Lift Effects
+- **ServiceCard**: Added optional image display (`h-48 sm:h-56 object-cover`), hover lift (`hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm`), border-t footer divider
+- **ServiceCategoryCard**: Added hover lift + `font-bold` title
+- **ProductCard**: Added hover lift, "View Details" pseudo-button (`group-hover:bg-lime group-hover:text-black`)
+- **ProductCategoryCard**: Added hover lift + `font-bold` title
+
+#### Page Dark Theme Pass
+- **Services** (3 files): `bg-gradient-hero` → `bg-black`, "Our Detailing `<span class="text-gradient-lime">Services</span>`", lime accents
+- **Products** (3 files): Same dark hero treatment, "Our `<span class="text-gradient-lime">Products</span>`"
+- **Gallery**: Dark hero, "Our `<span class="text-gradient-lime">Work</span>`", rounded-full filter pills (active: `bg-lime text-black`), "Before / After" lime badge on cards
+- **Areas** (2 files): Fixed `bg-gradient-hero`, blue text → `text-gray-400`
+- **Terms**: Fixed `bg-gradient-hero`, blue text → `text-gray-400`
+- **Hero Section**: `bg-gradient-hero` → `bg-black`, amber stars → lime stars
+
+#### CTA Section + Breadcrumbs
+- **CTA section**: Gradient bg (`bg-gradient-to-br from-brand-grey to-black`), radial lime glow (`bg-lime/5 rounded-full blur-3xl`), larger CTA button (`text-lg h-14 px-10`)
+- **Breadcrumbs**: Simplified to single dark variant, removed `variant` logic, unified `hover:text-lime hover:decoration-lime`
+
+#### Homepage Review Section
+- Decorative quote mark: `text-6xl font-serif text-lime/20`
+- Review text: italic, larger (`text-base sm:text-lg`)
+- Google platform badge: `bg-white/5 border border-white/10 rounded-full`
+
+#### Files Created
+- `src/components/public/trust-bar-client.tsx` — CountUp animations client component
+
+#### Files Modified
+- `src/components/public/cms/hero-carousel.tsx` — zoom, gradient title, taller hero
+- `src/components/public/trust-bar.tsx` — server wrapper delegation
+- `src/components/public/service-card.tsx` — image support, hover lift
+- `src/components/public/service-category-card.tsx` — hover lift
+- `src/components/public/product-card.tsx` — hover lift, View Details button
+- `src/components/public/product-category-card.tsx` — hover lift
+- `src/app/(public)/services/page.tsx` — dark hero
+- `src/app/(public)/services/[categorySlug]/page.tsx` — dark hero
+- `src/app/(public)/services/[categorySlug]/[serviceSlug]/page.tsx` — dark hero + lime CTA
+- `src/app/(public)/products/page.tsx` — dark hero
+- `src/app/(public)/products/[categorySlug]/page.tsx` — dark hero
+- `src/app/(public)/gallery/page.tsx` — dark hero, lime badge
+- `src/app/(public)/gallery/gallery-client.tsx` — rounded pills, hover effects
+- `src/app/(public)/page.tsx` — review section polish
+- `src/components/public/cta-section.tsx` — gradient bg, radial glow
+- `src/components/public/breadcrumbs.tsx` — single dark variant
+- `src/components/public/hero-section.tsx` — bg-black, lime stars
+- `src/app/(public)/areas/page.tsx` — dark theme fixes
+- `src/app/(public)/areas/[citySlug]/page.tsx` — dark theme fixes
+- `src/app/(public)/terms/page.tsx` — dark theme fixes
+
+---
+
+### Session J (first half) — Design Foundation, Lime Accent & Dark Theme Pass
 
 #### Design System Foundation
 - **Lime brand tokens** added to `globals.css` `@theme inline`: `--color-lime: #CCFF00`, lime-50 through lime-900, `--color-brand-dark: #0A0A0A`, `--color-brand-surface: #1A1A1A`

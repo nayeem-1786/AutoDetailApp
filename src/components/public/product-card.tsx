@@ -8,24 +8,18 @@ interface ProductCardProps {
   categorySlug: string;
 }
 
-function truncateDescription(text: string, maxLength: number = 120): string {
-  if (text.length <= maxLength) return text;
-  const truncated = text.slice(0, maxLength);
-  const lastSpace = truncated.lastIndexOf(' ');
-  return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
-}
-
 export function ProductCard({ product, categorySlug }: ProductCardProps) {
   return (
     <Link href={`/products/${categorySlug}/${product.slug}`} className="group block">
-      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-white/10 transition-shadow hover:shadow-md">
-        {/* Image or Placeholder */}
+      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-white/10 transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
+        {/* Image */}
         <div className="relative aspect-[4/3] w-full bg-brand-surface overflow-hidden">
           {product.image_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={product.image_url}
               alt={product.name}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
@@ -40,15 +34,20 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
           </div>
         </div>
 
-        <div className="p-4">
-          <h3 className="font-display text-base font-semibold text-white group-hover:text-lime transition-colors">
+        <div className="p-5">
+          <h3 className="font-display text-base font-bold text-white group-hover:text-lime transition-colors">
             {product.name}
           </h3>
           {product.description && (
             <p className="mt-1.5 text-sm text-gray-400 line-clamp-2">
-              {truncateDescription(product.description)}
+              {product.description}
             </p>
           )}
+          <div className="mt-4">
+            <span className="block w-full text-center py-2.5 bg-white/5 border border-white/10 text-white text-sm font-medium rounded-xl group-hover:bg-lime group-hover:text-black group-hover:border-lime transition-all duration-300">
+              View Details
+            </span>
+          </div>
         </div>
       </div>
     </Link>

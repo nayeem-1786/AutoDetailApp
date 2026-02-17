@@ -425,7 +425,9 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session J — Public Frontend Reskin + Dark Theme + Lime Accent)
+## Last Session: 2026-02-16 (Session J — Public Frontend Reskin, 2 sessions)
+
+### Session J — Part 1: Layout Shell, Animations, Dark Theme Foundation
 - **Complete visual overhaul** of all public-facing components with premium dark automotive aesthetic + framer-motion animations
 - **New dependency**: `framer-motion` for AnimatePresence, motion.div slide/fade transitions, animated labels
 - **AnnouncementTicker**: Replaced marquee with framer-motion y-axis slide rotation, 4s auto-rotate, session storage dismissal, dot indicators
@@ -436,12 +438,22 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Dark theme scoping**: `bg-black text-white min-h-screen` wrapper on 3 layouts (public, customer-auth, account)
 - **CMS cache revalidation**: Added `revalidateTag()` calls to all CMS admin API routes for instant public page updates
 - **Orphaned files** (not deleted): `header-shell.tsx`, `mobile-menu.tsx`, `nav-dropdown.tsx` — no longer imported by site-header
-- **Design Foundation (Session J continued)**:
+- **Design Foundation**:
   - Lime brand tokens in `@theme inline`: `--color-lime: #CCFF00`, full lime palette, brand-dark (#0A0A0A), brand-surface (#1A1A1A)
   - Brand CSS utilities: `.btn-lime-glow`, `.bg-gradient-hero`, `.text-gradient-lime`, `.section-spacing`, `.animate-lime-pulse`
   - Animations library (`src/lib/animations.ts`): Framer Motion variants (fadeIn, fadeInUp, slideIn, scaleIn, stagger)
   - **Accent color**: All red accents → lime (#CCFF00) across header, footer, ticker, hero, before-after slider
   - **Dark theme pass on ALL public pages**: Removed every `dark:` prefixed class. Replaced with permanent dark values (bg-brand-dark, bg-brand-surface, border-white/10, text-white/gray-400). Pages: homepage, services (3), products (4), gallery (2), areas (2), terms, booking, quotes (2), custom pages. Components: trust-bar, cta-section, service-category-card, product-category-card, service-card, service-pricing-display, content-block-renderer, breadcrumbs
+
+### Session J — Part 2: Hero/Card/Page Polish & Animations
+- **HeroCarousel enhancements**: 85vh height, slow image zoom (scale 1.0→1.05), `text-gradient-lime` on last title word, staggered content animations, lime before/after divider with glow
+- **TrustBar refactored**: Server/client split, CountUp animations for review counts and vehicle count (6000+), larger stat numbers
+- **Card hover lift effects**: ServiceCard (image support + lift), ProductCard (View Details button + lift), ServiceCategoryCard + ProductCategoryCard (lift effects)
+- **Page dark theme completion**: Services (3), Products (3), Gallery (rounded-full pills, B/A badge), Areas (2), Terms — all `bg-gradient-hero` → `bg-black`, all blue text → gray
+- **CTA section**: Gradient bg with radial lime glow, larger CTA button
+- **Breadcrumbs**: Simplified to single dark variant
+- **Homepage reviews**: Decorative quote marks, platform badges, italic text
+- **New file**: `trust-bar-client.tsx` (client component with CountUp)
 - TypeScript clean, build clean (zero errors)
 
 ### Session I — 2026-02-14 (AI Content Writer for City Pages)
@@ -1023,7 +1035,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - TypeScript clean, committed and pushed
 
 ### Next Session Priorities
-1. Session 2 of frontend reskin — add Framer Motion scroll-reveal animations to page sections, refine responsive behavior, polish micro-interactions
+1. Session 3 of frontend reskin — add Framer Motion scroll-reveal animations to page sections, refine responsive behavior, polish micro-interactions
 2. Phase 9 — Native Online Store (cart, checkout, orders within Next.js app)
 3. Post-launch review (2-4 weeks after deployment) — see `docs/POST_LAUNCH_ROADMAP.md`
 

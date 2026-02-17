@@ -15,8 +15,13 @@ export async function CtaSection({
   const biz = await getBusinessInfo();
 
   return (
-    <section className="bg-brand-dark section-spacing">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="bg-gradient-to-br from-brand-grey to-black section-spacing relative overflow-hidden">
+      {/* Subtle radial glow behind CTA */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+        <div className="w-96 h-96 bg-lime/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
             {title}
@@ -27,10 +32,10 @@ export async function CtaSection({
           <div className="mt-10">
             <Link
               href="/book"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-bold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-bold text-lg h-14 px-10 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
             >
               Book Your Detail
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-5 w-5" />
             </Link>
           </div>
           <a

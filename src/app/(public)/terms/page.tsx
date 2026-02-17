@@ -111,14 +111,14 @@ export default async function TermsPage() {
 
   return (
     <>
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
-          <Breadcrumbs items={[{ label: 'Terms & Conditions' }]} variant="light" />
+      <section className="bg-black py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Breadcrumbs items={[{ label: 'Terms & Conditions' }]} />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Terms &amp; Conditions
           </h1>
           {effectiveDate && (
-            <p className="mt-3 text-sm text-blue-100/60">
+            <p className="mt-3 text-sm text-gray-400">
               Effective Date: {new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           )}

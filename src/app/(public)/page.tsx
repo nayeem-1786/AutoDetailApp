@@ -278,21 +278,27 @@ export default async function HomePage() {
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
                 <div
                   key={i}
-                  className="rounded-2xl bg-brand-surface p-7 border border-white/10 hover:border-lime/30 transition-colors"
+                  className="relative rounded-2xl bg-brand-surface p-7 sm:p-8 border border-white/10 hover:border-lime/30 transition-all duration-300"
                 >
+                  {/* Decorative quote mark */}
+                  <span className="absolute -top-2 -left-1 text-6xl font-serif text-lime/20 leading-none select-none" aria-hidden="true">
+                    &ldquo;
+                  </span>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: review.rating }).map((_, j) => (
                       <Star key={j} className="h-4 w-4 fill-lime text-lime" />
                     ))}
                   </div>
-                  <p className="mt-4 text-sm leading-relaxed text-gray-300 line-clamp-4">
+                  <p className="mt-4 text-base sm:text-lg leading-relaxed text-gray-300 italic line-clamp-4">
                     &ldquo;{review.text}&rdquo;
                   </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">
+                  <div className="mt-6 flex items-center justify-between">
+                    <span className="text-sm font-bold text-white">
                       {review.author}
                     </span>
-                    <span className="text-xs text-gray-500">{review.relativeTime}</span>
+                    <span className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1 text-gray-400">
+                      Google
+                    </span>
                   </div>
                 </div>
               ))}

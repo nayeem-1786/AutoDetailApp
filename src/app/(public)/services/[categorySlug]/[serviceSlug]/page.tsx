@@ -95,21 +95,20 @@ export default async function ServiceDetailPage({ params }: PageProps) {
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
       {/* Service Header */}
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
+      <section className="bg-black py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
               { label: 'Services', href: '/services' },
               { label: category.name, href: `/services/${category.slug}` },
               { label: service.name },
             ]}
-            variant="light"
           />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
             {service.name}
           </h1>
           {service.description && (
-            <p className="mt-4 max-w-3xl text-lg leading-relaxed text-blue-100/60">
+            <p className="mt-4 max-w-3xl text-lg leading-relaxed text-gray-400">
               {service.description}
             </p>
           )}
@@ -201,7 +200,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <div className="border-t border-white/10 pt-4">
                       <Link
                         href={`/book?service=${service.slug}`}
-                        className="flex w-full items-center justify-center gap-2 rounded-full bg-lime px-4 py-3 text-sm font-semibold text-black shadow-sm hover:bg-lime-400 transition-colors btn-lime-glow"
+                        className="flex w-full items-center justify-center gap-2 rounded-full bg-lime px-4 py-3 text-sm font-bold text-black shadow-sm hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
                       >
                         <CalendarDays className="h-4 w-4" />
                         Book This Service
@@ -243,7 +242,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <Link
                       key={suggestion.id}
                       href={addonHref}
-                      className="group flex items-center justify-between rounded-2xl bg-brand-surface p-4 border border-white/10 transition-shadow hover:shadow-md"
+                      className="group flex items-center justify-between rounded-2xl bg-brand-surface p-4 border border-white/10 transition-all duration-300 hover:border-lime/30 hover:-translate-y-0.5"
                     >
                       <div className="min-w-0 flex-1">
                         <h3 className="text-sm font-semibold text-white group-hover:text-lime transition-colors">

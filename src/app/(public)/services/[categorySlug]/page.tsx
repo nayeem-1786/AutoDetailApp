@@ -64,20 +64,19 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
   return (
     <>
       {/* Category Hero */}
-      <section className="bg-gradient-hero">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
+      <section className="bg-black py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
               { label: 'Services', href: '/services' },
               { label: category.name },
             ]}
-            variant="light"
           />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
             {category.name}
           </h1>
           {category.description && (
-            <p className="mt-4 max-w-3xl text-lg text-blue-100/60">
+            <p className="mt-4 max-w-3xl text-lg text-gray-400">
               {category.description}
             </p>
           )}
@@ -126,7 +125,7 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
                 <Link
                   key={cat.id}
                   href={`/services/${cat.slug}`}
-                  className="group flex items-center justify-between rounded-2xl bg-brand-surface p-5 transition-colors hover:bg-white/5"
+                  className="group flex items-center justify-between rounded-2xl bg-brand-dark p-5 border border-white/10 transition-all duration-300 hover:border-lime/30 hover:bg-white/5"
                 >
                   <div>
                     <h3 className="font-display text-base font-semibold text-white group-hover:text-lime transition-colors">
