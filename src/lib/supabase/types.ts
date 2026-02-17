@@ -1110,6 +1110,80 @@ export interface SeasonalTheme {
   updated_at: string;
 }
 
+export interface SiteThemeSettings {
+  id: string;
+  name: string;
+  is_active: boolean;
+  mode: 'dark' | 'light';
+  // Colors - Backgrounds
+  color_page_bg: string | null;
+  color_card_bg: string | null;
+  color_header_bg: string | null;
+  color_footer_bg: string | null;
+  color_section_alt_bg: string | null;
+  // Colors - Text
+  color_text_primary: string | null;
+  color_text_secondary: string | null;
+  color_text_muted: string | null;
+  color_text_on_primary: string | null;
+  // Colors - Brand
+  color_primary: string | null;
+  color_primary_hover: string | null;
+  color_accent: string | null;
+  color_accent_hover: string | null;
+  // Colors - Links
+  color_link: string | null;
+  color_link_hover: string | null;
+  // Colors - Borders
+  color_border: string | null;
+  color_border_light: string | null;
+  color_divider: string | null;
+  // Colors - Status
+  color_success: string | null;
+  color_warning: string | null;
+  color_error: string | null;
+  // Typography
+  font_family: string | null;
+  font_heading_family: string | null;
+  font_base_size: string | null;
+  font_h1_size: string | null;
+  font_h2_size: string | null;
+  font_h3_size: string | null;
+  font_body_size: string | null;
+  font_small_size: string | null;
+  font_line_height: string | null;
+  font_heading_weight: string | null;
+  font_body_weight: string | null;
+  // Buttons - Primary
+  btn_primary_bg: string | null;
+  btn_primary_text: string | null;
+  btn_primary_hover_bg: string | null;
+  btn_primary_radius: string | null;
+  btn_primary_padding: string | null;
+  // Buttons - Secondary
+  btn_secondary_bg: string | null;
+  btn_secondary_text: string | null;
+  btn_secondary_border: string | null;
+  btn_secondary_radius: string | null;
+  // Buttons - CTA
+  btn_cta_bg: string | null;
+  btn_cta_text: string | null;
+  btn_cta_hover_bg: string | null;
+  btn_cta_radius: string | null;
+  // Borders & Shapes
+  border_radius: string | null;
+  border_card_radius: string | null;
+  border_width: string | null;
+  // Spacing
+  spacing_section_padding: string | null;
+  spacing_card_padding: string | null;
+  spacing_header_height: string | null;
+  // Metadata
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PageSeo {
   id: string;
   page_path: string;

@@ -2,7 +2,7 @@ import { SiteHeader } from '@/components/public/site-header';
 import { SiteFooter } from '@/components/public/site-footer';
 import { ThemeProvider } from '@/components/public/cms/theme-provider';
 import { TopBarTicker } from '@/components/public/cms/announcement-ticker';
-import { getCmsToggles, getActiveTheme, getTopBarTickers } from '@/lib/data/cms';
+import { getCmsToggles, getActiveTheme, getTopBarTickers, getSiteThemeSettings } from '@/lib/data/cms';
 import { getNavigationItems } from '@/lib/data/website-pages';
 
 export default async function PublicLayout({
@@ -10,9 +10,10 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [cmsToggles, activeTheme, topBarTickers, headerNav, footerNav] = await Promise.all([
+  const [cmsToggles, activeTheme, siteTheme, topBarTickers, headerNav, footerNav] = await Promise.all([
     getCmsToggles(),
     getActiveTheme(),
+    getSiteThemeSettings(),
     getTopBarTickers(),
     getNavigationItems('header'),
     getNavigationItems('footer_quick_links'),
@@ -20,6 +21,7 @@ export default async function PublicLayout({
 
   const showTickers = cmsToggles.announcementTickers && cmsToggles.tickerEnabled && topBarTickers.length > 0;
   const showTheme = cmsToggles.seasonalThemes && activeTheme !== null;
+  const hasSiteTheme = siteTheme !== null && siteTheme.is_active;
 
   const content = (
     <div className="public-theme bg-brand-black text-white min-h-screen antialiased">
@@ -30,8 +32,16 @@ export default async function PublicLayout({
     </div>
   );
 
-  if (showTheme) {
-    return <ThemeProvider theme={activeTheme}>{content}</ThemeProvider>;
+  // Wrap in ThemeProvider if either a seasonal theme or site theme is active
+  if (showTheme || hasSiteTheme) {
+    return (
+      <ThemeProvider
+        theme={showTheme ? activeTheme : null}
+        siteTheme={hasSiteTheme ? siteTheme : null}
+      >
+        {content}
+      </ThemeProvider>
+    );
   }
 
   return content;

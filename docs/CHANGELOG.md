@@ -4,6 +4,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session L — 2026-02-16 (Theme & Style Settings Admin Page)
+
+### Database
+- Created `site_theme_settings` table (migration `20260216000003`) with 50+ customizable fields: colors (backgrounds, text, brand, links, borders, status), typography (fonts, sizes, weights, line height), buttons (primary, secondary, CTA), borders & spacing
+- Default row inserted with all NULL fields (NULL = use CSS defaults from globals.css)
+- Unique index enforces single active custom theme
+- RLS: public read, authenticated write
+
+### API Routes
+- `GET/PUT/POST /api/admin/cms/site-theme` — CRUD for site theme settings (permission: `cms.themes.manage`)
+- `POST /api/admin/cms/site-theme/reset` — Reset all fields to NULL (defaults)
+- `GET /api/public/cms/site-theme` — Public endpoint with cache headers
+
+### Data Layer
+- Added `getSiteThemeSettings()` to `src/lib/data/cms.ts` — cached with 60s revalidate, `site-theme` tag
+- Added `SiteThemeSettings` interface to `src/lib/supabase/types.ts`
+
+### ThemeProvider Update
+- Accepts both `theme` (seasonal) and `siteTheme` (persistent) props
+- Merges CSS variables: site theme settings first, then seasonal overrides on top
+- Maps site theme fields to CSS custom properties (--color-*, --font-*, --site-*)
+- Public layout updated to fetch and pass site theme settings
+
+### Admin Page: Theme & Style Settings
+- New page at `/admin/website/theme-settings` with tabbed UI:
+  - **Colors**: Mode toggle, background/text/brand/link/border/status color pickers with per-field reset and default badges
+  - **Typography**: Font family dropdowns (9 options), font size inputs, weight selectors, line height slider
+  - **Buttons**: Primary/secondary/CTA button customization with live inline previews
+  - **Borders & Spacing**: Border radius, width, section/card padding, header height
+- **Live Preview Panel**: Right sidebar showing mini header, hero, card, links — updates in real-time
+- **Quick Presets**: 5 built-in presets (Default Dark, Clean Light, Midnight Blue, Warm Dark, Professional)
+- **Reset to Default**: Confirmation dialog, resets all fields to NULL
+- **Per-field Reset**: Individual reset icons on each color picker
+
+### Sidebar
+- Added "Theme & Styles" entry with Paintbrush icon under Website section
+- Renamed existing "Themes" to "Seasonal Themes" for clarity
+- Added Paintbrush icon to admin-shell.tsx icon map
+
+---
+
 ## Session K — 2026-02-16 (Theme System Audit + Fix Seasonal Themes)
 
 ### Theme System Audit (Parts 1A-1F)

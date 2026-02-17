@@ -5,6 +5,7 @@ import type {
   HeroCarouselConfig,
   AnnouncementTicker,
   SeasonalTheme,
+  SiteThemeSettings,
 } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -116,6 +117,36 @@ export const getActiveTheme = unstable_cache(
   },
   ['active-theme'],
   { revalidate: 60, tags: ['cms-theme'] }
+);
+
+// ---------------------------------------------------------------------------
+// Site Theme Settings
+// ---------------------------------------------------------------------------
+
+export const getSiteThemeSettings = unstable_cache(
+  async (): Promise<SiteThemeSettings | null> => {
+    const supabase = createAdminClient();
+
+    // Try active custom theme first
+    const { data: active } = await supabase
+      .from('site_theme_settings')
+      .select('*')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (active) return active as SiteThemeSettings;
+
+    // Fall back to default
+    const { data: defaultTheme } = await supabase
+      .from('site_theme_settings')
+      .select('*')
+      .eq('is_default', true)
+      .maybeSingle();
+
+    return (defaultTheme as SiteThemeSettings) ?? null;
+  },
+  ['site-theme-settings'],
+  { revalidate: 60, tags: ['site-theme'] }
 );
 
 // ---------------------------------------------------------------------------

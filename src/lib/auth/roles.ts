@@ -154,7 +154,12 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'RectangleHorizontal',
       },
       {
-        label: 'Themes',
+        label: 'Theme & Styles',
+        href: '/admin/website/theme-settings',
+        icon: 'Paintbrush',
+      },
+      {
+        label: 'Seasonal Themes',
         href: '/admin/website/themes',
         icon: 'Palette',
       },

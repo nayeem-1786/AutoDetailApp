@@ -425,7 +425,16 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session K — Theme System Audit + Fix Seasonal Themes)
+## Last Session: 2026-02-16 (Session L — Theme & Style Settings Admin Page)
+
+### Session L — Theme & Style Settings Admin Page
+- **New table**: `site_theme_settings` — persistent site theme customization (50+ fields for colors, typography, buttons, borders, spacing). NULL fields = use CSS defaults. Separate from seasonal themes (which are temporary overlays).
+- **Admin page**: `/admin/website/theme-settings` — tabbed editor (Colors, Typography, Buttons, Borders & Spacing) with live preview panel, 5 quick presets (Default Dark, Clean Light, Midnight Blue, Warm Dark, Professional), per-field reset, reset-all-to-default
+- **API routes**: `GET/PUT/POST /api/admin/cms/site-theme`, `POST /api/admin/cms/site-theme/reset`, `GET /api/public/cms/site-theme`
+- **ThemeProvider updated**: Now accepts both `siteTheme` (persistent) and `theme` (seasonal) props. Merges: CSS defaults → site theme → seasonal overrides
+- **Public layout**: Fetches site theme settings alongside seasonal theme, wraps in ThemeProvider when either is active
+- **Sidebar**: Added "Theme & Styles" (Paintbrush icon), renamed "Themes" → "Seasonal Themes"
+- Files: migration `20260216000003`, API routes (4), data layer, types, ThemeProvider, admin page (3 components), sidebar updates
 
 ### Session K — Theme System Audit + Fix Seasonal Themes
 - **Full audit** of seasonal theme pipeline: DB layer, data flow, CSS variables, particle canvas, theme cron — identified root cause: ThemeProvider was setting old `brand-500/600/700` vars that nothing reads, plus `.public-theme` CSS block was blocking overrides
