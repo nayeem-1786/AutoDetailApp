@@ -167,6 +167,12 @@ export interface Product {
   show_on_website: boolean;
   is_featured: boolean;
   website_sort_order: number;
+  weight: number | null;
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  weight_unit: string | null;
+  dimension_unit: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations
@@ -1314,6 +1320,14 @@ export interface Order {
   shipping_city: string | null;
   shipping_state: string | null;
   shipping_zip: string | null;
+  shipping_country: string | null;
+  shipping_carrier: string | null;
+  shipping_service: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  label_url: string | null;
+  shippo_rate_id: string | null;
+  shipping_label_created_at: string | null;
   customer_notes: string | null;
   internal_notes: string | null;
   created_at: string;
@@ -1335,6 +1349,49 @@ export interface OrderItem {
   line_total: number;
   discount_amount: number;
   created_at: string;
+}
+
+export type ShippoMode = 'test' | 'live';
+export type HandlingFeeType = 'none' | 'flat' | 'percent';
+export type ShippingRateSortBy = 'price' | 'speed';
+
+export interface ShippingSettingsRow {
+  id: string;
+  shippo_api_key_live: string | null;
+  shippo_api_key_test: string | null;
+  shippo_mode: ShippoMode;
+  ship_from_name: string;
+  ship_from_company: string | null;
+  ship_from_street1: string;
+  ship_from_street2: string | null;
+  ship_from_city: string;
+  ship_from_state: string;
+  ship_from_zip: string;
+  ship_from_country: string;
+  ship_from_phone: string | null;
+  ship_from_email: string | null;
+  default_parcel_length: number;
+  default_parcel_width: number;
+  default_parcel_height: number;
+  default_parcel_distance_unit: string;
+  default_parcel_weight: number;
+  default_parcel_mass_unit: string;
+  offer_free_shipping: boolean;
+  free_shipping_threshold: number;
+  flat_rate_enabled: boolean;
+  flat_rate_amount: number;
+  enabled_carriers: string[];
+  enabled_service_levels: string[];
+  handling_fee_type: HandlingFeeType;
+  handling_fee_amount: number;
+  show_estimated_delivery: boolean;
+  show_carrier_logo: boolean;
+  sort_rates_by: ShippingRateSortBy;
+  local_pickup_enabled: boolean;
+  local_pickup_address: string | null;
+  local_pickup_instructions: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // Generic action result pattern

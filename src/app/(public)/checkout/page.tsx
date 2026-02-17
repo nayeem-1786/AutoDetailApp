@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -145,7 +145,7 @@ function PaymentForm({
 // Main Checkout Page
 // ---------------------------------------------------------------------------
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { items, subtotal, clearCart } = useCart();
@@ -565,5 +565,26 @@ export default function CheckoutPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="bg-brand-dark py-16 sm:py-24">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6 text-center">
+            <div className="flex items-center justify-center">
+              <svg className="h-8 w-8 animate-spin text-lime" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+          </div>
+        </section>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }

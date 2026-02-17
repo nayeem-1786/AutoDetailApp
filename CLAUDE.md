@@ -250,6 +250,19 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - Tax: 10.25% on taxable products only (`TAX_RATE` from constants), proportional discount adjustment
 - Stock: decremented in Stripe webhook on successful payment
 
+#### Session 3 — Shippo Shipping Integration (Done)
+- Shippo SDK installed (`shippo` npm package) — official TypeScript SDK, 85+ carriers
+- Database: `shipping_settings` singleton table (migration `20260217000002`), product shipping dimensions (`weight`, `length`, `width`, `height`, `weight_unit`, `dimension_unit` on `products` — migration `20260217000003`), order shipping columns (`shipping_carrier`, `tracking_number`, `tracking_url`, `label_url`, `shippo_rate_id`, `shipping_label_created_at`, `shipping_country` — migration `20260217000004`)
+- Shippo service library (`src/lib/services/shippo.ts`): `getShippingSettings()`, `getShippingRates()`, `createShippingLabel()`, `trackShipment()`, `validateAddress()`, `listCarrierAccounts()`, `testShippoConnection()`
+- Types: `ShippingRate`, `ShippingAddress`, `ShippingParcel`, `ShippingSettings`, `CarrierAccountInfo`, `AddressValidationResult`, `ShippingLabelResult`, `TrackingResult` in `src/lib/utils/shipping-types.ts`
+- Admin settings page (`/admin/settings/shipping`): 7 sections — Shippo API config (test/live mode toggle, key inputs with show/hide, test connection, status indicator), Ship-From address (with Shippo address validation), Default package dimensions (L/W/H/weight with unit selectors), Carrier preferences (load from Shippo, checkbox selection), Pricing & fees (free shipping threshold, flat rate toggle, handling fee), Display preferences (estimated delivery, carrier logos, sort by price/speed), Local pickup (toggle, address, instructions)
+- API routes: `GET/PUT /api/admin/settings/shipping` (masked API keys), `POST /api/admin/settings/shipping/test-connection`, `GET /api/admin/settings/shipping/carriers`, `POST /api/admin/settings/shipping/validate-address`
+- Checkout shipping rates API (`POST /api/checkout/shipping-rates`): accepts address + cart items, builds parcels from product dimensions (falls back to defaults), returns Shippo rates filtered by enabled carriers, adds free shipping option when threshold met, includes local pickup
+- API key security: keys stored in DB, masked in GET responses (first 8 + last 4 chars), masked values skipped on PUT
+- Settings nav: Shipping card with Truck icon added to Business group
+- `ShippingSettingsRow` interface added to `src/lib/supabase/types.ts`, `Order` interface updated with shipping columns, `Product` interface updated with dimension columns
+- Bug fixes: `(customer-auth)/layout.tsx` — added CartProviderWrapper + CartDrawer (was causing build failure on /signin). `checkout/confirmation/page.tsx` + `checkout/page.tsx` — wrapped `useSearchParams()` in Suspense boundary (Next.js 16 prerender requirement)
+
 ---
 
 ## Testing Checklist

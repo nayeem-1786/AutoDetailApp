@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf, Plug, Bell } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf, Plug, Bell, Truck } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -42,6 +42,13 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Manage service zones, distance ranges, and mobile surcharges.',
         href: '/admin/settings/mobile-zones',
         icon: MapPin,
+        roles: ['super_admin'],
+      },
+      {
+        title: 'Shipping',
+        description: 'Configure Shippo integration, carriers, rates, and shipping options.',
+        href: '/admin/settings/shipping',
+        icon: Truck,
         roles: ['super_admin'],
       },
     ],
