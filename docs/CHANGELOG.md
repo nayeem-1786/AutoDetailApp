@@ -4,6 +4,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session N — 2026-02-16 (Theme System Pipeline Fix)
+
+### Root Cause: Two Critical Bugs
+1. **`@theme inline` prevented CSS variable overrides**: Tailwind v4's `@theme inline` inlines values directly into utility classes (e.g., `bg-lime { background-color: #cf0 }`). ThemeProvider's CSS variable overrides on its wrapper div had zero effect because utilities didn't reference variables.
+2. **Wrong color_overrides keys in database**: Admin theme editor had hardcoded `COLOR_KEYS = ['brand-500', 'brand-600', 'brand-700', 'accent-500']` — admin palette keys that public pages don't use. Valentine's Day theme was saved with these wrong keys instead of the correct `lime-*`, `brand-dark`, `brand-surface` keys.
+
+### Fix: CSS Variable Indirection Pattern
+- **globals.css**: Moved all public-theme-overridable tokens from hardcoded values in `@theme inline` to raw CSS custom properties in `:root` (e.g., `--lime: #CCFF00`), then reference via `var()` in `@theme inline` (e.g., `--color-lime: var(--lime)`). Now `bg-lime` compiles to `var(--lime)` which cascades properly.
+- **ThemeProvider**: Updated `buildSeasonalCssVars()` and `buildSiteThemeVars()` to set raw variable names (`--lime`, `--brand-dark`) instead of `--color-*` names, matching the new `:root` indirection.
+- **Database**: Updated Valentine's Day theme `color_overrides` to use correct preset keys (`lime`, `lime-50`...`lime-600`, `brand-dark`, `brand-surface`, `accent-glow-rgb`).
+- **Admin theme editor**: Fixed `COLOR_KEYS` from wrong admin palette keys to correct public theme keys with human-friendly labels (Primary Accent, Accent Hover, Section BG, Card BG, etc.). Added `accent-glow-rgb` text input.
+
+### Tokens now overridable via ThemeProvider
+`--lime`, `--lime-50` through `--lime-600`, `--brand-black`, `--brand-dark`, `--brand-darker`, `--brand-grey`, `--brand-grey-light`, `--brand-surface`, `--site-text`, `--site-text-secondary`, `--site-text-muted`, `--site-text-dim`, `--site-text-faint`, `--site-border`, `--site-border-light`, `--site-border-medium`, `--site-header-bg`, `--site-footer-bg`, `--theme-accent-glow-rgb`
+
+### Files Changed
+- `src/app/globals.css` — raw vars in `:root`, `var()` refs in `@theme inline`
+- `src/components/public/cms/theme-provider.tsx` — set raw var names
+- `src/app/admin/website/themes/[id]/page.tsx` — fixed COLOR_KEYS
+
+---
+
 ## Session M — 2026-02-16 (Complete Theme Variable Migration)
 
 ### Complete Component Migration

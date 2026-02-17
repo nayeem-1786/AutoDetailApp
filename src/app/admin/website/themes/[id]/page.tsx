@@ -23,7 +23,14 @@ const PARTICLE_EFFECTS: { value: ParticleEffect | ''; label: string }[] = [
   { value: 'sparkles', label: 'Sparkles' },
 ];
 
-const COLOR_KEYS = ['brand-500', 'brand-600', 'brand-700', 'accent-500'];
+const COLOR_KEYS: { key: string; label: string }[] = [
+  { key: 'lime', label: 'Primary Accent' },
+  { key: 'lime-200', label: 'Accent Hover' },
+  { key: 'lime-400', label: 'Accent Mid' },
+  { key: 'lime-500', label: 'Accent Dark' },
+  { key: 'brand-dark', label: 'Section BG' },
+  { key: 'brand-surface', label: 'Card BG' },
+];
 
 export default function ThemeEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -157,11 +164,11 @@ export default function ThemeEditorPage() {
       {/* Colors */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Color Overrides</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {COLOR_KEYS.map((key) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {COLOR_KEYS.map(({ key, label }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                --{key}
+                {label}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -179,6 +186,17 @@ export default function ThemeEditorPage() {
               </div>
             </div>
           ))}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Accent Glow RGB (for shadows/glows)
+          </label>
+          <Input
+            value={theme.color_overrides?.['accent-glow-rgb'] ?? ''}
+            onChange={(e) => updateColorOverride('accent-glow-rgb', e.target.value)}
+            className="w-60 font-mono text-xs"
+            placeholder="204, 255, 0"
+          />
         </div>
 
         <div>

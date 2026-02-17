@@ -425,7 +425,15 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-16 (Session M — Complete Theme Variable Migration)
+## Last Session: 2026-02-16 (Session N — Theme System Pipeline Fix)
+
+### Session N — Theme System Pipeline Fix
+- **Root cause found**: Two bugs prevented themes from applying: (1) Tailwind v4's `@theme inline` inlined values directly into utility classes (`bg-lime { background-color: #cf0 }`) so ThemeProvider's CSS variable overrides had no effect; (2) Valentine's Day theme in DB had wrong `color_overrides` keys (`brand-500`/`brand-600`/`brand-700`/`accent-500`) from admin editor's stale `COLOR_KEYS`.
+- **Fix: CSS variable indirection** — Moved all overridable tokens from hardcoded values in `@theme inline` to raw `:root` custom properties (e.g., `--lime: #CCFF00`), then referenced via `var()` in `@theme inline` (e.g., `--color-lime: var(--lime)`). Now `bg-lime` compiles to `var(--lime)` and cascades properly.
+- **ThemeProvider updated**: `buildSeasonalCssVars()` and `buildSiteThemeVars()` now set raw variable names (`--lime`, `--brand-dark`) instead of `--color-*` names.
+- **Admin editor fixed**: `COLOR_KEYS` updated from wrong admin palette keys to correct public theme keys with labels (Primary Accent, Accent Hover, Section BG, Card BG, etc.). Added `accent-glow-rgb` text input.
+- **DB fixed**: Valentine's Day `color_overrides` updated to correct preset keys.
+- **Verified**: Valentine's Day theme renders pink accent, rose-tinted surfaces, hearts particles, gradient override — all working end-to-end.
 
 ### Session M — Complete Theme Variable Migration
 - **Complete migration**: All remaining hardcoded Tailwind colors in public-facing pages migrated to CSS theme variables. Zero remaining `text-white`, `text-gray-*`, `border-white/*`, `bg-gray-*`, `hover:text-white`, `hover:bg-white/*` across `(public)`, `(customer-auth)`, `(account)`, and `components/public` directories.

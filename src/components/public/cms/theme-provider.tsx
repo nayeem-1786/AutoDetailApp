@@ -23,35 +23,37 @@ interface ThemeProviderProps {
 
 /**
  * Maps site_theme_settings fields to CSS custom property names.
+ * Sets raw :root vars (e.g. --brand-black, --lime) so Tailwind utilities
+ * that reference them via var() in @theme inline cascade correctly.
  * Only non-null fields produce variables.
  */
 function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
   const vars: Record<string, string> = {};
 
-  // Background colors — map to Tailwind token vars for utility class support
-  if (st.color_page_bg) vars['--color-brand-black'] = st.color_page_bg;
-  if (st.color_card_bg) vars['--color-brand-surface'] = st.color_card_bg;
-  if (st.color_section_alt_bg) vars['--color-brand-dark'] = st.color_section_alt_bg;
-  if (st.color_header_bg) vars['--color-site-header-bg'] = st.color_header_bg;
-  if (st.color_footer_bg) vars['--color-site-footer-bg'] = st.color_footer_bg;
+  // Background colors — raw :root vars referenced by @theme inline
+  if (st.color_page_bg) vars['--brand-black'] = st.color_page_bg;
+  if (st.color_card_bg) vars['--brand-surface'] = st.color_card_bg;
+  if (st.color_section_alt_bg) vars['--brand-dark'] = st.color_section_alt_bg;
+  if (st.color_header_bg) vars['--site-header-bg'] = st.color_header_bg;
+  if (st.color_footer_bg) vars['--site-footer-bg'] = st.color_footer_bg;
 
-  // Text colors — map to --color-site-text-* for Tailwind utility class support
-  if (st.color_text_primary) vars['--color-site-text'] = st.color_text_primary;
-  if (st.color_text_secondary) vars['--color-site-text-secondary'] = st.color_text_secondary;
-  if (st.color_text_muted) vars['--color-site-text-muted'] = st.color_text_muted;
+  // Text colors — raw :root vars
+  if (st.color_text_primary) vars['--site-text'] = st.color_text_primary;
+  if (st.color_text_secondary) vars['--site-text-secondary'] = st.color_text_secondary;
+  if (st.color_text_muted) vars['--site-text-muted'] = st.color_text_muted;
 
-  // Brand / accent colors — map to lime palette for Tailwind token override
+  // Brand / accent colors — raw lime vars
   if (st.color_primary) {
-    vars['--color-lime'] = st.color_primary;
-    vars['--color-lime-300'] = st.color_primary;
+    vars['--lime'] = st.color_primary;
+    vars['--lime-300'] = st.color_primary;
   }
-  if (st.color_primary_hover) vars['--color-lime-200'] = st.color_primary_hover;
-  if (st.color_accent) vars['--color-lime-400'] = st.color_accent;
-  if (st.color_accent_hover) vars['--color-lime-500'] = st.color_accent_hover;
+  if (st.color_primary_hover) vars['--lime-200'] = st.color_primary_hover;
+  if (st.color_accent) vars['--lime-400'] = st.color_accent;
+  if (st.color_accent_hover) vars['--lime-500'] = st.color_accent_hover;
 
-  // Border colors — map to --color-site-border-* for Tailwind utility class support
-  if (st.color_border) vars['--color-site-border'] = st.color_border;
-  if (st.color_border_light) vars['--color-site-border-light'] = st.color_border_light;
+  // Border colors — raw :root vars
+  if (st.color_border) vars['--site-border'] = st.color_border;
+  if (st.color_border_light) vars['--site-border-light'] = st.color_border_light;
 
   // Typography
   if (st.font_family) vars['--font-body'] = st.font_family;
@@ -71,9 +73,9 @@ function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
 }
 
 /**
- * Maps seasonal theme colorOverrides keys to CSS custom property names.
+ * Maps seasonal theme colorOverrides keys to raw CSS custom property names.
  * Keys that start with 'accent-glow-rgb' map to --theme-accent-glow-rgb.
- * All other keys map to --color-{key} for Tailwind token override.
+ * All other keys map to --{key} (raw :root vars that @theme inline references).
  */
 function buildSeasonalCssVars(theme: SeasonalTheme): Record<string, string> {
   const vars: Record<string, string> = {};
@@ -83,13 +85,13 @@ function buildSeasonalCssVars(theme: SeasonalTheme): Record<string, string> {
       if (key === 'accent-glow-rgb') {
         vars['--theme-accent-glow-rgb'] = value;
       } else {
-        vars[`--color-${key}`] = value;
+        vars[`--${key}`] = value;
       }
     }
   }
 
   if (theme.body_bg_color) {
-    vars['--color-brand-black'] = theme.body_bg_color;
+    vars['--brand-black'] = theme.body_bg_color;
   }
 
   return vars;

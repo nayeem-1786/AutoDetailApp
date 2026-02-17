@@ -22,6 +22,45 @@
   /* Seasonal theme accent RGB — used by shadows, glows, animations.
      ThemeProvider overrides this when a seasonal theme is active. */
   --theme-accent-glow-rgb: 204, 255, 0;
+
+  /* ── Theme-overridable raw tokens ──────────────────────────────────────
+     ThemeProvider sets these on a wrapper <div> to override defaults.
+     @theme inline references them via var() so Tailwind utilities cascade.
+     ──────────────────────────────────────────────────────────────────── */
+
+  /* Lime accent palette */
+  --lime: #CCFF00;
+  --lime-50: #F5FFD6;
+  --lime-100: #ECFF99;
+  --lime-200: #DDFF4D;
+  --lime-300: #CCFF00;
+  --lime-400: #B8E600;
+  --lime-500: #A3CC00;
+  --lime-600: #7A9900;
+
+  /* Dark brand surfaces */
+  --brand-black: #000000;
+  --brand-dark: #0A0A0A;
+  --brand-darker: #111111;
+  --brand-grey: #1F2937;
+  --brand-grey-light: #374151;
+  --brand-surface: #1A1A1A;
+
+  /* Site text colors */
+  --site-text: #ffffff;
+  --site-text-secondary: #D1D5DB;
+  --site-text-muted: #9CA3AF;
+  --site-text-dim: #6B7280;
+  --site-text-faint: #4B5563;
+
+  /* Site border colors */
+  --site-border: rgba(255, 255, 255, 0.1);
+  --site-border-light: rgba(255, 255, 255, 0.05);
+  --site-border-medium: rgba(255, 255, 255, 0.2);
+
+  /* Site header / footer backgrounds */
+  --site-header-bg: #000000;
+  --site-footer-bg: #0A0A0A;
 }
 
 @theme inline {
@@ -45,40 +84,39 @@
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
 
-  /* Lime accent palette — seasonal themes override via ThemeProvider
-     which sets --color-lime, --color-lime-200, etc. on a wrapper div. */
-  --color-lime: #CCFF00;
-  --color-lime-50: #F5FFD6;
-  --color-lime-100: #ECFF99;
-  --color-lime-200: #DDFF4D;
-  --color-lime-300: #CCFF00;
-  --color-lime-400: #B8E600;
-  --color-lime-500: #A3CC00;
-  --color-lime-600: #7A9900;
+  /* Lime accent palette — ThemeProvider overrides --lime, --lime-200, etc. */
+  --color-lime: var(--lime);
+  --color-lime-50: var(--lime-50);
+  --color-lime-100: var(--lime-100);
+  --color-lime-200: var(--lime-200);
+  --color-lime-300: var(--lime-300);
+  --color-lime-400: var(--lime-400);
+  --color-lime-500: var(--lime-500);
+  --color-lime-600: var(--lime-600);
 
-  /* Dark brand surfaces — seasonal themes can tint these */
-  --color-brand-black: #000000;
-  --color-brand-dark: #0A0A0A;
-  --color-brand-darker: #111111;
-  --color-brand-grey: #1F2937;
-  --color-brand-grey-light: #374151;
-  --color-brand-surface: #1A1A1A;
+  /* Dark brand surfaces — ThemeProvider overrides --brand-black, etc. */
+  --color-brand-black: var(--brand-black);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-darker: var(--brand-darker);
+  --color-brand-grey: var(--brand-grey);
+  --color-brand-grey-light: var(--brand-grey-light);
+  --color-brand-surface: var(--brand-surface);
 
-  /* Site text colors — overridable via ThemeProvider / admin theme settings */
-  --color-site-text: #ffffff;
-  --color-site-text-secondary: #D1D5DB;
-  --color-site-text-muted: #9CA3AF;
-  --color-site-text-dim: #6B7280;
-  --color-site-text-faint: #4B5563;
+  /* Site text colors — ThemeProvider overrides --site-text, etc. */
+  --color-site-text: var(--site-text);
+  --color-site-text-secondary: var(--site-text-secondary);
+  --color-site-text-muted: var(--site-text-muted);
+  --color-site-text-dim: var(--site-text-dim);
+  --color-site-text-faint: var(--site-text-faint);
 
   /* Site border colors */
-  --color-site-border: rgba(255, 255, 255, 0.1);
-  --color-site-border-light: rgba(255, 255, 255, 0.05);
-  --color-site-border-medium: rgba(255, 255, 255, 0.2);
+  --color-site-border: var(--site-border);
+  --color-site-border-light: var(--site-border-light);
+  --color-site-border-medium: var(--site-border-medium);
 
   /* Site header / footer backgrounds */
-  --color-site-header-bg: #000000;
-  --color-site-footer-bg: #0A0A0A;
+  --color-site-header-bg: var(--site-header-bg);
+  --color-site-footer-bg: var(--site-footer-bg);
 
   /* Accent glow shadows — use the RGB var so seasonal themes auto-update */
   --shadow-lime-sm: 0 0 10px rgba(var(--theme-accent-glow-rgb), 0.1);
