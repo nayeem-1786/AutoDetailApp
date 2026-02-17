@@ -177,7 +177,7 @@ function CtaBlock({ block }: { block: PageContentBlock }) {
         <div className="mt-8">
           <Link
             href={data.button_url || '/book'}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black btn-lime-glow font-semibold text-base h-13 px-8 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+            className="inline-flex items-center justify-center gap-2 site-btn-cta btn-lime-glow font-semibold text-base h-13 px-8 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
           >
             {data.button_text || 'Book Now'}
             <ArrowRight className="h-4 w-4" />

@@ -51,7 +51,7 @@ export function FooterClient({
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-brand-dark border-t border-site-border-light">
+    <footer className="bg-site-footer-bg border-t border-site-border-light">
       {/* Trust badges strip */}
       <div className="border-b border-site-border">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -82,7 +82,7 @@ export function FooterClient({
             ) : (
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
-                  <span className="text-black font-black text-lg">S</span>
+                  <span className="text-site-text-on-primary font-black text-lg">S</span>
                 </div>
                 <span className="text-site-text font-bold text-lg">{businessName}</span>
               </div>

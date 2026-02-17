@@ -4,6 +4,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session P — 2026-02-16 (Theme Variable Pipeline Fix)
+
+### Fix: Complete theme variable pipeline — all public components respond to theme changes
+
+#### Root Cause
+Multiple broken links in the theme variable chain between admin Theme & Styles settings and public components:
+1. **Header/Footer mismatch**: Header used `bg-brand-black` instead of `bg-site-header-bg`; footer used `bg-brand-dark` instead of `bg-site-footer-bg`. Admin "Header Background" and "Footer Background" settings had no effect.
+2. **Buttons dead code**: ThemeProvider set `--site-btn-*` CSS variables but no component consumed them — all buttons hardcoded `bg-lime text-black rounded-full`.
+3. **Missing ThemeProvider mappings**: `color_link`, `color_link_hover`, `color_text_on_primary`, `color_divider` fields from DB were not mapped to CSS variables.
+4. **Hardcoded `text-black`**: Button text and badge text used `text-black` instead of theme-aware `text-site-text-on-primary`.
+
+#### Changes
+- **globals.css**: Added 12 new CSS variables (`--site-link`, `--site-link-hover`, `--site-text-on-primary`, `--site-divider`, `--site-btn-primary-bg/text/hover/radius`, `--site-btn-cta-bg/text/hover/radius`) with defaults referencing existing theme tokens. Added `@theme inline` entries for `site-link`, `site-link-hover`, `site-text-on-primary`, `site-divider`. Added `.site-btn-primary` and `.site-btn-cta` CSS classes.
+- **theme-provider.tsx**: Added mappings for `color_link` → `--site-link`, `color_link_hover` → `--site-link-hover`, `color_text_on_primary` → `--site-text-on-primary`, `color_divider` → `--site-divider`.
+- **header-client.tsx**: `bg-brand-black` → `bg-site-header-bg`, CTA buttons → `site-btn-cta`, logo text → `text-site-text-on-primary`.
+- **footer-client.tsx**: `bg-brand-dark` → `bg-site-footer-bg`, logo text → `text-site-text-on-primary`.
+- **9 CTA button instances** across hero-section, cta-section, content-block-renderer, hero-carousel, gallery, areas, services pages → replaced `bg-lime text-black rounded-full` with `site-btn-cta`.
+- **product-card.tsx**: Hover text → `text-site-text-on-primary`.
+- **gallery-client.tsx**: Filter pills active state → `text-site-text-on-primary`, badge → `site-btn-primary`.
+
+#### Final Variable Chain (All Properties)
+| Property | Admin Field → ThemeProvider → CSS Var → Component | Status |
+|---|---|---|
+| Page Background | `color_page_bg` → `--brand-black` → `bg-brand-black` | MATCH |
+| Card Background | `color_card_bg` → `--brand-surface` → `bg-brand-surface` | MATCH |
+| Header Background | `color_header_bg` → `--site-header-bg` → `bg-site-header-bg` | FIXED |
+| Footer Background | `color_footer_bg` → `--site-footer-bg` → `bg-site-footer-bg` | FIXED |
+| Text Primary | `color_text_primary` → `--site-text` → `text-site-text` | MATCH |
+| Text Secondary | `color_text_secondary` → `--site-text-secondary` → `text-site-text-secondary` | MATCH |
+| Text Muted | `color_text_muted` → `--site-text-muted` → `text-site-text-muted` | MATCH |
+| Text on Primary | `color_text_on_primary` → `--site-text-on-primary` → `text-site-text-on-primary` | FIXED |
+| Primary Color | `color_primary` → `--lime` → `bg-lime` / `text-lime` | MATCH |
+| Link Color | `color_link` → `--site-link` → `text-site-link` | FIXED |
+| Border Color | `color_border` → `--site-border` → `border-site-border` | MATCH |
+| CTA Button BG | `btn_cta_bg` → `--site-btn-cta-bg` → `.site-btn-cta` | FIXED |
+| Primary Button BG | `btn_primary_bg` → `--site-btn-primary-bg` → `.site-btn-primary` | FIXED |
+
+---
+
 ## Session O — 2026-02-16 (Hero Image Upload)
 
 ### Feature: Image Upload for Hero Carousel Admin

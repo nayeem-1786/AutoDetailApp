@@ -32,7 +32,7 @@ export async function CtaSection({
           <div className="mt-10">
             <Link
               href="/book"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-bold text-lg h-14 px-10 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
+              className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-lg h-14 px-10 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
             >
               Book Your Detail
               <ArrowRight className="h-5 w-5" />

@@ -200,7 +200,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <div className="border-t border-site-border pt-4">
                       <Link
                         href={`/book?service=${service.slug}`}
-                        className="flex w-full items-center justify-center gap-2 rounded-full bg-lime px-4 py-3 text-sm font-bold text-black shadow-sm hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
+                        className="flex w-full items-center justify-center gap-2 site-btn-cta px-4 py-3 text-sm font-bold shadow-sm hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
                       >
                         <CalendarDays className="h-4 w-4" />
                         Book This Service

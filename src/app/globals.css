@@ -61,6 +61,27 @@
   /* Site header / footer backgrounds */
   --site-header-bg: #000000;
   --site-footer-bg: #0A0A0A;
+
+  /* Site link colors */
+  --site-link: var(--lime);
+  --site-link-hover: var(--lime-200);
+
+  /* Text on primary (for button text on primary-colored backgrounds) */
+  --site-text-on-primary: #000000;
+
+  /* Site divider color (defaults to border color) */
+  --site-divider: rgba(255, 255, 255, 0.1);
+
+  /* Site button tokens — ThemeProvider overrides these from admin settings.
+     Fallbacks match the default lime/dark design. */
+  --site-btn-primary-bg: var(--lime);
+  --site-btn-primary-text: var(--site-text-on-primary);
+  --site-btn-primary-hover-bg: var(--lime-200);
+  --site-btn-primary-radius: 9999px;
+  --site-btn-cta-bg: var(--lime);
+  --site-btn-cta-text: var(--site-text-on-primary);
+  --site-btn-cta-hover-bg: var(--lime-200);
+  --site-btn-cta-radius: 9999px;
 }
 
 @theme inline {
@@ -117,6 +138,16 @@
   /* Site header / footer backgrounds */
   --color-site-header-bg: var(--site-header-bg);
   --color-site-footer-bg: var(--site-footer-bg);
+
+  /* Site link colors */
+  --color-site-link: var(--site-link);
+  --color-site-link-hover: var(--site-link-hover);
+
+  /* Text on primary */
+  --color-site-text-on-primary: var(--site-text-on-primary);
+
+  /* Site divider */
+  --color-site-divider: var(--site-divider);
 
   /* Accent glow shadows — use the RGB var so seasonal themes auto-update */
   --shadow-lime-sm: 0 0 10px rgba(var(--theme-accent-glow-rgb), 0.1);
@@ -357,3 +388,25 @@ h1, h2, h3 {
   50% { box-shadow: 0 0 0 8px rgba(var(--theme-accent-glow-rgb), 0); }
 }
 .animate-lime-pulse { animation: lime-pulse 2s ease-in-out infinite; }
+
+/* ── Site Button Classes ──────────────────────────────────────────────────
+   Theme-aware button styles. Uses CSS vars from ThemeProvider so admin
+   Theme & Styles settings override these at runtime.
+   ──────────────────────────────────────────────────────────────────────── */
+.site-btn-primary {
+  background-color: var(--site-btn-primary-bg);
+  color: var(--site-btn-primary-text);
+  border-radius: var(--site-btn-primary-radius);
+}
+.site-btn-primary:hover {
+  background-color: var(--site-btn-primary-hover-bg);
+}
+
+.site-btn-cta {
+  background-color: var(--site-btn-cta-bg);
+  color: var(--site-btn-cta-text);
+  border-radius: var(--site-btn-cta-radius);
+}
+.site-btn-cta:hover {
+  background-color: var(--site-btn-cta-hover-bg);
+}

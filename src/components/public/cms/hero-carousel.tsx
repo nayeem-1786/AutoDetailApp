@@ -203,7 +203,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
                 >
                   <Link
                     href={slide.cta_url}
-                    className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-4 bg-lime text-black font-bold text-sm uppercase tracking-wider rounded-full hover:shadow-lime-lg hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
+                    className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-4 site-btn-cta font-bold text-sm uppercase tracking-wider hover:shadow-lime-lg hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
                   >
                     {slide.content_type === 'video' && <Play className="w-4 h-4" />}
                     {slide.cta_text}
@@ -349,7 +349,7 @@ function HeroBeforeAfter({
         className="pointer-events-none absolute top-4 right-4 z-20 transition-opacity duration-200"
         style={{ opacity: position < 90 ? 1 : 0 }}
       >
-        <span className="bg-lime/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-black text-xs font-bold uppercase tracking-wider">
+        <span className="bg-lime/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-site-text-on-primary text-xs font-bold uppercase tracking-wider">
           {afterLabel}
         </span>
       </div>

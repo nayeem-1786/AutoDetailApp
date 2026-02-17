@@ -171,7 +171,7 @@ export default async function CityLandingPage({
             <div className="mt-8">
               <Link
                 href="/book"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-lime text-black font-bold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
+                className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
               >
                 Book Your Detail
                 <ArrowRight className="h-4 w-4" />

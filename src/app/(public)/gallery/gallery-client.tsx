@@ -55,7 +55,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
             className={cn(
               'px-4 py-2 text-sm font-medium rounded-full border transition-all duration-300',
               !serviceFilter
-                ? 'bg-lime text-black border-lime'
+                ? 'bg-lime text-site-text-on-primary border-lime'
                 : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-lime/30 hover:text-lime'
             )}
           >
@@ -68,7 +68,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
               className={cn(
                 'px-4 py-2 text-sm font-medium rounded-full border transition-all duration-300',
                 serviceFilter === s
-                  ? 'bg-lime text-black border-lime'
+                  ? 'bg-lime text-site-text-on-primary border-lime'
                   : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-lime/30 hover:text-lime'
               )}
             >
@@ -103,7 +103,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
                   />
                   {/* Before / After badge */}
                   <div className="absolute top-3 left-3 z-10 pointer-events-none">
-                    <span className="bg-lime text-black text-xs font-bold rounded-full px-3 py-1">
+                    <span className="site-btn-primary text-xs font-bold px-3 py-1">
                       Before / After
                     </span>
                   </div>
@@ -128,7 +128,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
         <div className="mt-12 text-center">
           <button
             onClick={() => setVisibleCount((prev) => prev + ITEMS_PER_PAGE)}
-            className="rounded-full bg-lime px-8 py-3 text-sm font-bold text-black hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
+            className="site-btn-cta px-8 py-3 text-sm font-bold hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
           >
             Load More
           </button>

@@ -36,8 +36,8 @@ export function HeaderClient({
     <header
       className={`sticky top-0 z-50 transition-all duration-500 ${
         scrolled
-          ? 'bg-brand-black/95 backdrop-blur-xl shadow-2xl shadow-black/20'
-          : 'bg-brand-black'
+          ? 'bg-site-header-bg/95 backdrop-blur-xl shadow-2xl shadow-black/20'
+          : 'bg-site-header-bg'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -68,7 +68,7 @@ export function HeaderClient({
             ) : (
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-lime flex items-center justify-center">
-                  <span className="text-black font-black text-lg lg:text-xl">S</span>
+                  <span className="text-site-text-on-primary font-black text-lg lg:text-xl">S</span>
                 </div>
                 <div className="hidden sm:block">
                   <div className="text-site-text font-bold text-sm lg:text-base tracking-tight leading-none">
@@ -154,7 +154,7 @@ export function HeaderClient({
             {/* CTA */}
             <Link
               href="/book"
-              className="hidden sm:inline-flex items-center gap-2 px-6 py-2.5 bg-lime text-black text-sm font-bold rounded-full hover:bg-lime-200 transition-all duration-300 shadow-lg shadow-lime/25 hover:shadow-lime/40 hover:scale-[1.02] btn-lime-glow"
+              className="hidden sm:inline-flex items-center gap-2 px-6 py-2.5 site-btn-cta text-sm font-bold transition-all duration-300 shadow-lg shadow-lime/25 hover:shadow-lime/40 hover:scale-[1.02] btn-lime-glow"
             >
               Book Now
             </Link>
@@ -233,7 +233,7 @@ export function HeaderClient({
               <div className="pt-3">
                 <Link
                   href="/book"
-                  className="block w-full text-center py-3 bg-lime text-black font-bold rounded-xl"
+                  className="block w-full text-center py-3 site-btn-cta font-bold"
                   onClick={() => setMobileOpen(false)}
                 >
                   Book Now

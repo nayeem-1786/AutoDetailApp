@@ -44,7 +44,7 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
             </p>
           )}
           <div className="mt-4">
-            <span className="block w-full text-center py-2.5 bg-site-border-light border border-site-border text-site-text text-sm font-medium rounded-xl group-hover:bg-lime group-hover:text-black group-hover:border-lime transition-all duration-300">
+            <span className="block w-full text-center py-2.5 bg-site-border-light border border-site-border text-site-text text-sm font-medium rounded-xl group-hover:bg-lime group-hover:text-site-text-on-primary group-hover:border-lime transition-all duration-300">
               View Details
             </span>
           </div>

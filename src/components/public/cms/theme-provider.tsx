@@ -51,9 +51,17 @@ function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
   if (st.color_accent) vars['--lime-400'] = st.color_accent;
   if (st.color_accent_hover) vars['--lime-500'] = st.color_accent_hover;
 
+  // Link colors — raw :root vars
+  if (st.color_link) vars['--site-link'] = st.color_link;
+  if (st.color_link_hover) vars['--site-link-hover'] = st.color_link_hover;
+
+  // Text on primary (button text on primary-colored backgrounds)
+  if (st.color_text_on_primary) vars['--site-text-on-primary'] = st.color_text_on_primary;
+
   // Border colors — raw :root vars
   if (st.color_border) vars['--site-border'] = st.color_border;
   if (st.color_border_light) vars['--site-border-light'] = st.color_border_light;
+  if (st.color_divider) vars['--site-divider'] = st.color_divider;
 
   // Typography
   if (st.font_family) vars['--font-body'] = st.font_family;
