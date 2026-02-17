@@ -487,7 +487,22 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-17 (Phase 9 Session 4 — Admin Order Management)
+## Last Session: 2026-02-17 (Phase 9 Session 5 — Cart/Checkout Bug Fixes)
+
+### Phase 9 Session 5 — Cart & Checkout Bug Fixes + Dark Theme
+- **11 bug fixes** across cart, checkout, shipping, tax, and account portal
+- **Bug 1 (Dark theme)**: Migrated ~17 account portal files from hardcoded light-theme classes to theme-aware tokens. 4 parallel agents, grep-verified zero remaining hardcoded classes.
+- **Bug 2-3 (Cart display)**: Removed premature tax/shipping calculations from cart page. Shows "Calculated at checkout" for both.
+- **Bug 4 (Auto-populate)**: New `GET /api/checkout/customer-info` endpoint. Checkout pre-fills logged-in customer's contact + address.
+- **Bug 5 (Order summary)**: Tax/shipping show "—" until address entered. Client-side CA estimate with `~` prefix.
+- **Bug 6-7 (Shipping rates)**: Auto-fetch rates on valid address (500ms debounce). CTA shows descriptive disabled states.
+- **Bug 8 (Carrier filtering)**: Fixed `shippo.ts` to match on `r.provider` (case-insensitive), not just token prefix. Added rate logging.
+- **Bug 9 (CA-only tax)**: Destination-based tax in `create-payment-intent`. Only applies 10.25% when state is CA.
+- **Bug 10 (Step navigation)**: 3-step breadcrumb with clickable completed steps. All state in sessionStorage.
+- **Bug 11 (Payment review)**: Full review section in step 3 with contact info, fulfillment, address + [Edit] buttons.
+- **New file**: `src/app/api/checkout/customer-info/route.ts`
+- **Modified files**: `cart/page.tsx`, `checkout/page.tsx` (rewrite), `create-payment-intent/route.ts`, `shippo.ts`, `shipping/page.tsx`, plus ~17 account portal files
+- TypeScript clean, build passes.
 
 ### Phase 9 Session 4 — Admin Order Management + Customer Order History
 - **Admin order management**: Full order lifecycle — list page with stats/filters/search/pagination, detail page with fulfillment controls (status dropdown, tracking number/URL/carrier), refund dialog (full/partial via Stripe), activity timeline from `order_events` table.

@@ -144,7 +144,7 @@ export default function AccountDashboardPage() {
       {/* Welcome Banner + Book Button */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-site-text">
             Welcome back, {customer.first_name}
           </h1>
           <p className="mt-1 text-sm text-site-text-faint">
@@ -158,9 +158,9 @@ export default function AccountDashboardPage() {
 
       {/* Loyalty Points */}
       <Link href="/account/loyalty" className="block">
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 transition-colors hover:bg-gray-100">
+        <div className="rounded-lg border border-site-border bg-brand-surface p-5 transition-colors hover:bg-brand-dark">
           <p className="text-sm font-medium text-site-text-faint">Loyalty Points</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
+          <p className="mt-1 text-2xl font-bold text-site-text">
             {formatPoints(customer.loyalty_points_balance)}
           </p>
           <p className="mt-1 text-sm text-site-text-faint">
@@ -176,7 +176,7 @@ export default function AccountDashboardPage() {
       {lastService && (
         <div>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-site-text">
               Your Last Service
             </h2>
             <Link href="/account/services">
@@ -186,9 +186,9 @@ export default function AccountDashboardPage() {
             </Link>
           </div>
 
-          <div className="mt-3 rounded-lg border border-gray-200 p-4">
+          <div className="mt-3 rounded-lg border border-site-border p-4">
             <div className="mb-3">
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium text-site-text">
                 {new Date(lastService.date).toLocaleDateString('en-US', {
                   timeZone: 'America/Los_Angeles',
                   year: 'numeric',
@@ -213,7 +213,7 @@ export default function AccountDashboardPage() {
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
+              <div className="flex items-center gap-3 rounded-lg bg-brand-surface p-4">
                 <Camera className="h-8 w-8 text-site-text-secondary" />
                 <p className="text-sm text-site-text-dim">
                   No before/after photos available for this service
@@ -227,7 +227,7 @@ export default function AccountDashboardPage() {
       {/* Active Coupons */}
       {coupons.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-site-text">
             Your Coupons
           </h2>
           <p className="mt-1 text-sm text-site-text-dim">
@@ -244,7 +244,7 @@ export default function AccountDashboardPage() {
       {/* Upcoming Appointments */}
       <div>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-site-text">
             Upcoming Appointments
           </h2>
           <Link href="/account/appointments">

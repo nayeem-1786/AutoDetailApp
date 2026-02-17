@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ShoppingBag, Trash2, ArrowRight, Package, Tag, X } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
 import { formatCurrency } from '@/lib/utils/format';
-import { TAX_RATE } from '@/lib/utils/constants';
 import { QuantitySelector } from '@/components/public/cart/quantity-selector';
 import { toast } from 'sonner';
 
@@ -20,13 +19,9 @@ export default function CartPage() {
   } | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  // Calculate totals
+  // Calculate totals (tax & shipping calculated at checkout)
   const discountAmount = appliedCoupon?.discount ?? 0;
-  const taxableSubtotal = subtotal; // All products are taxable
-  const discountRatio = subtotal > 0 ? discountAmount / subtotal : 0;
-  const taxableAfterDiscount = taxableSubtotal * (1 - discountRatio);
-  const taxAmount = Math.round(taxableAfterDiscount * TAX_RATE * 100) / 100;
-  const total = subtotal - discountAmount + taxAmount;
+  const total = subtotal - discountAmount;
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -267,24 +262,28 @@ export default function CartPage() {
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-site-text-muted">
-                    Tax ({(TAX_RATE * 100).toFixed(2)}%)
-                  </span>
-                  <span className="text-site-text tabular-nums">
-                    {formatCurrency(taxAmount)}
+                  <span className="text-site-text-muted">Tax</span>
+                  <span className="text-site-text-faint text-xs italic">
+                    Calculated at checkout
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-site-text-muted">Shipping</span>
-                  <span className="text-lime font-medium">FREE</span>
+                  <span className="text-site-text-faint text-xs italic">
+                    Calculated at checkout
+                  </span>
                 </div>
                 <div className="border-t border-site-border pt-3 flex justify-between">
-                  <span className="text-base font-bold text-site-text">Total</span>
+                  <span className="text-base font-bold text-site-text">Estimated Total</span>
                   <span className="text-base font-bold text-site-text tabular-nums">
-                    {formatCurrency(total)}
+                    {formatCurrency(total)}+
                   </span>
                 </div>
               </div>
+
+              <p className="text-center text-xs text-site-text-faint">
+                Tax &amp; shipping calculated at checkout
+              </p>
 
               {/* Checkout CTA */}
               <Link
@@ -294,10 +293,6 @@ export default function CartPage() {
                 Proceed to Checkout
                 <ArrowRight className="h-4 w-4" />
               </Link>
-
-              <p className="text-center text-xs text-site-text-faint">
-                Taxes calculated at checkout
-              </p>
             </div>
           </div>
         </div>

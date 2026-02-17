@@ -68,24 +68,24 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
   if (!customer) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 sm:px-6 lg:px-8">
-        <div className="rounded-2xl bg-white p-8 shadow-lg text-center">
+        <div className="rounded-2xl bg-brand-surface p-8 shadow-lg text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
             <AlertTriangle className="h-8 w-8 text-amber-600" />
           </div>
-          <h1 className="mt-6 text-2xl font-bold text-gray-900">
+          <h1 className="mt-6 text-2xl font-bold text-site-text">
             Account Access Unavailable
           </h1>
-          <p className="mt-3 text-gray-600">
+          <p className="mt-3 text-site-text-muted">
             Your portal access has been temporarily deactivated. This may be due to an account update or administrative action.
           </p>
-          <p className="mt-4 text-gray-600">
+          <p className="mt-4 text-site-text-muted">
             Please contact us to restore access to your account.
           </p>
           <div className="mt-8 space-y-3">
             {businessPhone && (
               <a
                 href={`tel:${businessPhone.replace(/\D/g, '')}`}
-                className="flex items-center justify-center gap-2 rounded-full bg-gray-900 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+                className="flex items-center justify-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-site-text-on-primary hover:bg-lime-200 transition-colors"
               >
                 <Phone className="h-4 w-4" />
                 Call {formatPhone(businessPhone)}
@@ -107,7 +107,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Tab Navigation */}
-      <nav className="mb-8 flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+      <nav className="mb-8 flex gap-1 overflow-x-auto rounded-lg bg-brand-surface p-1">
         {ACCOUNT_TABS.map((tab) => {
           const isActive =
             tab.href === '/account'
@@ -121,8 +121,8 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
               className={cn(
                 'flex-shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-all',
                 isActive
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-brand-surface text-site-text shadow-sm'
+                  : 'text-site-text-muted hover:text-site-text'
               )}
             >
               {tab.label}

@@ -80,7 +80,7 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
     <div className="space-y-4">
       {/* Vehicle */}
       {vehicleLabel && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-site-text-faint">
           Vehicle: {vehicle?.color ? `${vehicle.color} ` : ''}{vehicleLabel}
         </p>
       )}
@@ -88,20 +88,20 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
       {/* Items */}
       {data.transaction_items.length > 0 && (
         <div>
-          <h4 className="mb-2 text-xs font-medium uppercase text-gray-500">Items</h4>
+          <h4 className="mb-2 text-xs font-medium uppercase text-site-text-faint">Items</h4>
           <div className="space-y-1.5">
             {data.transaction_items.map((item) => (
               <div key={item.id} className="flex items-start justify-between text-sm">
                 <div className="min-w-0 flex-1">
-                  <span className="text-gray-900">{item.item_name}</span>
+                  <span className="text-site-text">{item.item_name}</span>
                   {item.quantity > 1 && (
-                    <span className="ml-1 text-gray-500">x{item.quantity}</span>
+                    <span className="ml-1 text-site-text-faint">x{item.quantity}</span>
                   )}
                   {item.tier_name && (
-                    <span className="ml-1 text-xs text-gray-400">({item.tier_name})</span>
+                    <span className="ml-1 text-xs text-site-text-faint">({item.tier_name})</span>
                   )}
                 </div>
-                <span className="ml-3 text-gray-700">{formatCurrency(item.total_price)}</span>
+                <span className="ml-3 text-site-text-muted">{formatCurrency(item.total_price)}</span>
               </div>
             ))}
           </div>
@@ -109,14 +109,14 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
       )}
 
       {/* Totals */}
-      <div className="border-t border-gray-100 pt-3">
+      <div className="border-t border-site-border pt-3">
         <div className="space-y-1 text-sm">
-          <div className="flex justify-between text-gray-600">
+          <div className="flex justify-between text-site-text-muted">
             <span>Subtotal</span>
             <span>{formatCurrency(data.subtotal)}</span>
           </div>
           {data.tax_amount > 0 && (
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-site-text-muted">
               <span>Tax</span>
               <span>{formatCurrency(data.tax_amount)}</span>
             </div>
@@ -134,12 +134,12 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
             </div>
           )}
           {data.tip_amount > 0 && (
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-site-text-muted">
               <span>Tip</span>
               <span>{formatCurrency(data.tip_amount)}</span>
             </div>
           )}
-          <div className="flex justify-between font-semibold text-gray-900">
+          <div className="flex justify-between font-semibold text-site-text">
             <span>Total</span>
             <span>{formatCurrency(data.total_amount)}</span>
           </div>
@@ -148,11 +148,11 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
 
       {/* Payments */}
       {data.payments.length > 0 && (
-        <div className="border-t border-gray-100 pt-3">
-          <h4 className="mb-2 text-xs font-medium uppercase text-gray-500">Payments</h4>
+        <div className="border-t border-site-border pt-3">
+          <h4 className="mb-2 text-xs font-medium uppercase text-site-text-faint">Payments</h4>
           <div className="space-y-1 text-sm">
             {data.payments.map((payment) => (
-              <div key={payment.id} className="flex justify-between text-gray-600">
+              <div key={payment.id} className="flex justify-between text-site-text-muted">
                 <span className="capitalize">
                   {payment.method}
                   {payment.card_brand && payment.card_last_four

@@ -47,14 +47,14 @@ function rewardLabel(reward: CouponRewardSummary): string {
 
 export function CouponCard({ coupon }: CouponCardProps) {
   return (
-    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+    <div className="rounded-lg border border-dashed border-site-border bg-brand-surface p-4">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-sm font-bold text-gray-900">
+          <span className="font-mono text-sm font-bold text-site-text">
             {coupon.code}
           </span>
           {coupon.name && (
-            <span className="text-sm text-gray-600">{coupon.name}</span>
+            <span className="text-sm text-site-text-muted">{coupon.name}</span>
           )}
         </div>
 
@@ -66,7 +66,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
           </div>
         )}
 
-        <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+        <div className="mt-1.5 space-y-0.5 text-xs text-site-text-faint">
           {coupon.min_purchase != null && coupon.min_purchase > 0 && (
             <p>Min. purchase: {formatCurrency(coupon.min_purchase)}</p>
           )}

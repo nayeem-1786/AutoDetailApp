@@ -101,38 +101,38 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
 
   return (
     <>
-      <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <div className="rounded-lg border border-site-border bg-brand-surface p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-gray-900 truncate">
+              <h3 className="text-sm font-semibold text-site-text truncate">
                 {serviceName}
               </h3>
               <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
             </div>
 
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-site-text-muted">
               {formatDate(appointment.scheduled_date)} &middot;{' '}
               {formatTime(appointment.scheduled_start_time)} &ndash;{' '}
               {formatTime(appointment.scheduled_end_time)}
             </p>
 
             {vehicleLabel && (
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-site-text-faint">
                 {vehicle?.color ? `${vehicle.color} ` : ''}
                 {vehicleLabel}
               </p>
             )}
 
             {appointment.is_mobile && appointment.mobile_address && (
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-site-text-faint">
                 Mobile &middot; {appointment.mobile_address}
               </p>
             )}
           </div>
 
           <div className="text-right flex-shrink-0">
-            <p className="text-sm font-semibold text-gray-900">
+            <p className="text-sm font-semibold text-site-text">
               {formatCurrency(appointment.total_amount)}
             </p>
             <div className="mt-2 flex flex-col gap-1.5">
@@ -150,7 +150,7 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
                   variant="outline"
                   size="sm"
                   onClick={() => setCancelOpen(true)}
-                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  className="text-red-600 border-red-500/20 hover:bg-red-500/10"
                 >
                   Cancel
                 </Button>

@@ -230,7 +230,7 @@ export default function AccountTransactionsPage() {
       id: 'total',
       header: () => <div className="text-right">Total</div>,
       cell: ({ row }) => (
-        <div className="text-right text-sm font-medium text-gray-900">
+        <div className="text-right text-sm font-medium text-site-text">
           {formatCurrency(row.original.total_amount)}
         </div>
       ),
@@ -241,7 +241,7 @@ export default function AccountTransactionsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Transaction History</h1>
+      <h1 className="text-2xl font-bold text-site-text">Transaction History</h1>
       <p className="mt-1 text-sm text-site-text-faint">
         View your past purchases and receipts. Click any receipt number to view or print.
       </p>
@@ -261,7 +261,7 @@ export default function AccountTransactionsPage() {
                     <CalendarDays className="h-4 w-4" />
                     Member Since
                   </div>
-                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                  <p className="mt-1 text-2xl font-bold text-site-text">
                     {stats.member_since ? formatDate(stats.member_since) : 'N/A'}
                   </p>
                 </CardContent>
@@ -272,7 +272,7 @@ export default function AccountTransactionsPage() {
                     <ShoppingCart className="h-4 w-4" />
                     Total Visits
                   </div>
-                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                  <p className="mt-1 text-2xl font-bold text-site-text">
                     {stats.total_visits}
                   </p>
                 </CardContent>
@@ -283,7 +283,7 @@ export default function AccountTransactionsPage() {
                     <DollarSign className="h-4 w-4" />
                     Lifetime Spend
                   </div>
-                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                  <p className="mt-1 text-2xl font-bold text-site-text">
                     {formatCurrency(stats.lifetime_spend)}
                   </p>
                 </CardContent>
@@ -294,7 +294,7 @@ export default function AccountTransactionsPage() {
                     <Award className="h-4 w-4" />
                     Loyalty Points
                   </div>
-                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                  <p className="mt-1 text-2xl font-bold text-site-text">
                     {formatPoints(stats.loyalty_balance)}
                   </p>
                 </CardContent>
@@ -332,7 +332,7 @@ export default function AccountTransactionsPage() {
             </div>
           ) : (
             <div
-              className="rounded border border-gray-200 bg-gray-50 p-2"
+              className="rounded border border-site-border bg-brand-surface p-2"
               dangerouslySetInnerHTML={{ __html: receiptHtml }}
             />
           )}

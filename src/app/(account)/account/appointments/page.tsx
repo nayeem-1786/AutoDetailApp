@@ -54,7 +54,7 @@ export default function AccountAppointmentsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
+      <h1 className="text-2xl font-bold text-site-text">Appointments</h1>
       <p className="mt-1 text-sm text-site-text-faint">
         View your upcoming and past appointments.
       </p>

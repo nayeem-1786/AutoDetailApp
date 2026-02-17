@@ -23,7 +23,7 @@ export function TransactionCard({
   children,
 }: TransactionCardProps) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white">
+    <div className="rounded-lg border border-site-border bg-brand-surface">
       <button
         type="button"
         onClick={onToggle}
@@ -31,7 +31,7 @@ export function TransactionCard({
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">
+            <span className="text-sm font-semibold text-site-text">
               #{transaction.receipt_number || '—'}
             </span>
             <Badge
@@ -40,10 +40,10 @@ export function TransactionCard({
               {transaction.status === 'refunded' ? 'Refunded' : 'Completed'}
             </Badge>
           </div>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-site-text-muted">
             {formatDate(transaction.transaction_date)}
           </p>
-          <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
+          <div className="mt-1 flex items-center gap-3 text-xs text-site-text-faint">
             {transaction.payment_method && (
               <span className="capitalize">{transaction.payment_method}</span>
             )}
@@ -53,11 +53,11 @@ export function TransactionCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-900">
+          <span className="text-sm font-semibold text-site-text">
             {formatCurrency(transaction.total_amount)}
           </span>
           <svg
-            className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            className={`h-4 w-4 text-site-text-faint transition-transform ${expanded ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -69,7 +69,7 @@ export function TransactionCard({
       </button>
 
       {expanded && children && (
-        <div className="border-t border-gray-100 p-5 pt-4">{children}</div>
+        <div className="border-t border-site-border p-5 pt-4">{children}</div>
       )}
     </div>
   );

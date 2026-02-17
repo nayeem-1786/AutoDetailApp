@@ -807,6 +807,18 @@ export default function ShippingSettingsPage() {
           )}
           {carriers.length > 0 && (
             <div className="space-y-3">
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                <strong>Note:</strong> UPS and FedEx require you to connect your own carrier accounts in the{' '}
+                <a
+                  href="https://apps.goshippo.com/settings/carriers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-amber-900"
+                >
+                  Shippo dashboard
+                </a>
+                . USPS and DHL Express are available by default through Shippo.
+              </div>
               {carriers.map((carrier) => (
                 <label
                   key={carrier.objectId}

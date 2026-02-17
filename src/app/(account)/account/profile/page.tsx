@@ -148,7 +148,7 @@ export default function AccountProfilePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+      <h1 className="text-2xl font-bold text-site-text">Profile</h1>
       <p className="mt-1 text-sm text-site-text-faint">
         Manage your account settings and preferences.
       </p>
@@ -175,7 +175,7 @@ export default function AccountProfilePage() {
 
             <FormField label="Email" htmlFor="email">
               <div className="relative">
-                <Input id="email" value={customer.email ?? ''} disabled className="bg-gray-50 pr-10" />
+                <Input id="email" value={customer.email ?? ''} disabled className="bg-brand-dark pr-10" />
                 <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-site-text-muted" />
               </div>
               <p className="mt-1 text-xs text-site-text-dim">
@@ -221,16 +221,16 @@ export default function AccountProfilePage() {
               </div>
               <div className="group relative">
                 <Info className="h-5 w-5 text-site-text-muted cursor-help" />
-                <div className="absolute right-0 top-6 z-10 hidden w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs text-site-text-faint shadow-lg group-hover:block">
+                <div className="absolute right-0 top-6 z-10 hidden w-64 rounded-lg border border-site-border bg-brand-surface p-3 text-xs text-site-text-faint shadow-lg group-hover:block">
                   Turning off a channel means you won&apos;t receive any messages through it, including important appointment reminders.
                 </div>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-site-border p-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">Text Messages (SMS)</p>
+                <p className="text-sm font-medium text-site-text">Text Messages (SMS)</p>
                 <p className="text-xs text-site-text-dim">
                   Get appointment reminders and updates via text
                 </p>
@@ -241,9 +241,9 @@ export default function AccountProfilePage() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-site-border p-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">Email</p>
+                <p className="text-sm font-medium text-site-text">Email</p>
                 <p className="text-xs text-site-text-dim">
                   Get receipts, confirmations, and updates via email
                 </p>
@@ -268,7 +268,7 @@ export default function AccountProfilePage() {
               </div>
               <div className="group relative">
                 <Info className="h-5 w-5 text-site-text-muted cursor-help" />
-                <div className="absolute right-0 top-6 z-10 hidden w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs text-site-text-faint shadow-lg group-hover:block">
+                <div className="absolute right-0 top-6 z-10 hidden w-64 rounded-lg border border-site-border bg-brand-surface p-3 text-xs text-site-text-faint shadow-lg group-hover:block">
                   Some notifications are required to keep you informed about your appointments. Optional notifications can be turned off anytime.
                 </div>
               </div>
@@ -276,36 +276,36 @@ export default function AccountProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Required notifications */}
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-site-border bg-brand-surface p-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">Appointment Reminders</p>
+                <p className="text-sm font-medium text-site-text">Appointment Reminders</p>
                 <p className="text-xs text-site-text-dim">
                   Booking confirmations and upcoming appointment reminders
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-site-text-faint">Required</span>
+                <span className="rounded-full bg-site-border px-2 py-0.5 text-xs text-site-text-faint">Required</span>
                 <Switch checked disabled className="opacity-60" onCheckedChange={() => {}} />
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-site-border bg-brand-surface p-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">Service Updates</p>
+                <p className="text-sm font-medium text-site-text">Service Updates</p>
                 <p className="text-xs text-site-text-dim">
                   Status updates when your vehicle is being serviced
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-site-text-faint">Required</span>
+                <span className="rounded-full bg-site-border px-2 py-0.5 text-xs text-site-text-faint">Required</span>
                 <Switch checked disabled className="opacity-60" onCheckedChange={() => {}} />
               </div>
             </div>
 
             {/* Optional notifications */}
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-site-border p-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">Promotions & Special Offers</p>
+                <p className="text-sm font-medium text-site-text">Promotions & Special Offers</p>
                 <p className="text-xs text-site-text-dim">
                   Exclusive discounts and seasonal deals just for you
                 </p>
@@ -316,9 +316,9 @@ export default function AccountProfilePage() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-site-border p-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">Loyalty Rewards</p>
+                <p className="text-sm font-medium text-site-text">Loyalty Rewards</p>
                 <p className="text-xs text-site-text-dim">
                   Points earned, reward milestones, and bonus opportunities
                 </p>
@@ -354,7 +354,7 @@ export default function AccountProfilePage() {
             </Button>
             <Button
               variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50"
+              className="text-red-400 border-red-500/30 hover:bg-red-500/10"
               onClick={() => setConfirmSignOut(true)}
             >
               Sign Out All Devices

@@ -194,7 +194,7 @@ export function AppointmentEditDialog({
           <div className="space-y-6">
             {/* Date & Time */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">New Date & Time</h3>
+              <h3 className="mb-3 text-sm font-semibold text-site-text-muted">New Date & Time</h3>
               <div className="grid gap-4 sm:grid-cols-3">
                 <FormField label="Date" required htmlFor="edit-date">
                   <Input
@@ -226,7 +226,7 @@ export function AppointmentEditDialog({
 
             {/* Vehicle */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Vehicle</h3>
+              <h3 className="mb-3 text-sm font-semibold text-site-text-muted">Vehicle</h3>
               <FormField label="Select Vehicle" htmlFor="edit-vehicle">
                 <Select
                   id="edit-vehicle"
@@ -245,23 +245,23 @@ export function AppointmentEditDialog({
 
             {/* Current Services (Read-only) */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Booked Services</h3>
-              <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <h3 className="mb-3 text-sm font-semibold text-site-text-muted">Booked Services</h3>
+              <div className="space-y-2 rounded-lg border border-site-border bg-brand-surface p-3">
                 {bookedServices.map((as) => (
                   <div
                     key={as.service_id}
                     className="flex items-center justify-between text-sm"
                   >
-                    <span className="text-gray-700">{as.services?.name}</span>
-                    <span className="text-gray-600">
+                    <span className="text-site-text-muted">{as.services?.name}</span>
+                    <span className="text-site-text-muted">
                       {formatCurrency(as.price_at_booking)}
                     </span>
                   </div>
                 ))}
-                <div className="mt-2 border-t border-gray-200 pt-2">
+                <div className="mt-2 border-t border-site-border pt-2">
                   <div className="flex items-center justify-between font-medium">
-                    <span className="text-gray-700">Total</span>
-                    <span className="text-gray-900">{formatCurrency(totalAmount)}</span>
+                    <span className="text-site-text-muted">Total</span>
+                    <span className="text-site-text">{formatCurrency(totalAmount)}</span>
                   </div>
                 </div>
               </div>
@@ -269,14 +269,14 @@ export function AppointmentEditDialog({
 
             {/* Service Change Notice */}
             {businessPhone && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
                 <div className="flex items-start gap-3">
                   <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
                   <div>
-                    <p className="text-sm font-medium text-blue-900">
+                    <p className="text-sm font-medium text-blue-300">
                       Need to change services?
                     </p>
-                    <p className="mt-1 text-sm text-blue-700">
+                    <p className="mt-1 text-sm text-blue-400">
                       Please call us at{' '}
                       <a href={`tel:${businessPhone}`} className="font-medium underline">
                         {formatPhone(businessPhone)}

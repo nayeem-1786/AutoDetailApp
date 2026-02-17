@@ -71,7 +71,7 @@ export default function AccountOrderDetailPage() {
   if (!order) {
     return (
       <div className="py-16 text-center">
-        <p className="text-gray-400">Order not found</p>
+        <p className="text-site-text-faint">Order not found</p>
         <button onClick={() => router.push('/account/orders')} className="mt-4 text-sm text-lime hover:underline">
           Back to Orders
         </button>
@@ -98,7 +98,7 @@ export default function AccountOrderDetailPage() {
             <Badge variant={payment.variant}>{payment.label}</Badge>
             <Badge variant={fulfillment.variant}>{fulfillment.label}</Badge>
           </div>
-          <p className="text-sm text-gray-400">{formatDate(order.created_at)}</p>
+          <p className="text-sm text-site-text-faint">{formatDate(order.created_at)}</p>
         </div>
       </div>
 
@@ -119,7 +119,7 @@ export default function AccountOrderDetailPage() {
                 />
               ) : (
                 <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/5">
-                  <Package className="h-6 w-6 text-gray-500" />
+                  <Package className="h-6 w-6 text-site-text-faint" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
@@ -133,7 +133,7 @@ export default function AccountOrderDetailPage() {
                 ) : (
                   <p className="font-medium text-site-text">{item.product_name}</p>
                 )}
-                <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
+                <p className="text-xs text-site-text-faint">Qty: {item.quantity}</p>
               </div>
               <p className="font-medium text-site-text">{formatCurrency(item.line_total / 100)}</p>
             </div>
@@ -145,22 +145,22 @@ export default function AccountOrderDetailPage() {
       <div className="rounded-xl border border-site-border bg-brand-surface p-4 mb-4">
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-400">Subtotal</span>
+            <span className="text-site-text-faint">Subtotal</span>
             <span className="text-site-text">{formatCurrency(order.subtotal / 100)}</span>
           </div>
           {order.discount_amount > 0 && (
             <div className="flex justify-between">
-              <span className="text-gray-400">Discount{order.coupon_code ? ` (${order.coupon_code})` : ''}</span>
+              <span className="text-site-text-faint">Discount{order.coupon_code ? ` (${order.coupon_code})` : ''}</span>
               <span className="text-green-400">-{formatCurrency(order.discount_amount / 100)}</span>
             </div>
           )}
           <div className="flex justify-between">
-            <span className="text-gray-400">Tax</span>
+            <span className="text-site-text-faint">Tax</span>
             <span className="text-site-text">{formatCurrency(order.tax_amount / 100)}</span>
           </div>
           {order.shipping_amount > 0 && (
             <div className="flex justify-between">
-              <span className="text-gray-400">Shipping</span>
+              <span className="text-site-text-faint">Shipping</span>
               <span className="text-site-text">{formatCurrency(order.shipping_amount / 100)}</span>
             </div>
           )}
@@ -182,7 +182,7 @@ export default function AccountOrderDetailPage() {
         </h2>
 
         {order.fulfillment_method === 'pickup' ? (
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-site-text-faint">
             {order.fulfillment_status === 'ready_for_pickup'
               ? 'Your order is ready for pickup!'
               : order.fulfillment_status === 'delivered'
@@ -192,7 +192,7 @@ export default function AccountOrderDetailPage() {
         ) : (
           <div className="space-y-2">
             {order.shipping_address_line1 && (
-              <div className="text-sm text-gray-400">
+              <div className="text-sm text-site-text-faint">
                 <p>{order.shipping_address_line1}</p>
                 {order.shipping_address_line2 && <p>{order.shipping_address_line2}</p>}
                 <p>{order.shipping_city}, {order.shipping_state} {order.shipping_zip}</p>
@@ -203,17 +203,17 @@ export default function AccountOrderDetailPage() {
                 href={order.tracking_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block mt-2 rounded-lg bg-lime px-4 py-2 text-sm font-medium text-black hover:opacity-90"
+                className="inline-block mt-2 rounded-lg bg-lime px-4 py-2 text-sm font-medium text-site-text-on-primary hover:opacity-90"
               >
                 Track Package
               </a>
             ) : order.tracking_number ? (
-              <p className="text-sm text-gray-400 mt-2">
+              <p className="text-sm text-site-text-faint mt-2">
                 Tracking: <span className="text-site-text font-medium">{order.tracking_number}</span>
                 {order.shipping_carrier && ` (${order.shipping_carrier})`}
               </p>
             ) : order.fulfillment_status === 'shipped' ? (
-              <p className="text-sm text-gray-400">Your order has shipped. Tracking info will be available soon.</p>
+              <p className="text-sm text-site-text-faint">Your order has shipped. Tracking info will be available soon.</p>
             ) : null}
           </div>
         )}

@@ -23,13 +23,13 @@ export function VehicleCard({ vehicle, onEdit, onDelete }: VehicleCardProps) {
     .join(' ');
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-site-border bg-brand-surface p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-gray-900">
+          <h3 className="text-sm font-semibold text-site-text">
             {label || 'Unknown Vehicle'}
           </h3>
-          <div className="mt-2 space-y-1 text-sm text-gray-600">
+          <div className="mt-2 space-y-1 text-sm text-site-text-muted">
             {vehicle.color && <p>Color: {vehicle.color}</p>}
             <p>Type: {VEHICLE_TYPE_LABELS[vehicle.vehicle_type]}</p>
             {vehicle.size_class && (

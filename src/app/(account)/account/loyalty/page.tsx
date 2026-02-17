@@ -77,7 +77,7 @@ export default function AccountLoyaltyPage() {
   if (!loyaltyEnabled) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Loyalty Rewards</h1>
+        <h1 className="text-2xl font-bold text-site-text">Loyalty Rewards</h1>
         <p className="mt-4 text-sm text-site-text-dim">
           The loyalty rewards program is not currently available.
         </p>
@@ -133,7 +133,7 @@ export default function AccountLoyaltyPage() {
       header: 'Balance',
       size: 80,
       cell: ({ row }) => (
-        <span className="text-sm text-gray-900 whitespace-nowrap">
+        <span className="text-sm text-site-text whitespace-nowrap">
           {formatPoints(row.original.points_balance)}
         </span>
       ),
@@ -151,7 +151,7 @@ export default function AccountLoyaltyPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Loyalty Rewards</h1>
+      <h1 className="text-2xl font-bold text-site-text">Loyalty Rewards</h1>
       <p className="mt-1 text-sm text-site-text-faint">
         Earn points on every purchase and redeem them for discounts.
       </p>
@@ -168,7 +168,7 @@ export default function AccountLoyaltyPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-site-text-dim">Current Balance</p>
-                  <p className="text-4xl font-bold text-gray-900">
+                  <p className="text-4xl font-bold text-site-text">
                     {formatPoints(balance)}
                   </p>
                   <p className="mt-1 text-sm text-site-text-dim">
@@ -183,11 +183,11 @@ export default function AccountLoyaltyPage() {
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-site-text-faint">Progress to next reward</span>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-site-text">
                       {formatPoints(balance)} / {formatPoints(LOYALTY.REDEEM_MINIMUM)}
                     </span>
                   </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-200">
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-site-border">
                     <div
                       className="h-full rounded-full bg-amber-500 transition-all"
                       style={{ width: `${Math.min(100, (balance / LOYALTY.REDEEM_MINIMUM) * 100)}%` }}
@@ -222,30 +222,30 @@ export default function AccountLoyaltyPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
+                <div className="flex items-start gap-3 rounded-lg border border-site-border p-4">
                   <TrendingUp className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-500" />
                   <div>
-                    <p className="font-medium text-gray-900">Earn Points</p>
+                    <p className="font-medium text-site-text">Earn Points</p>
                     <p className="mt-1 text-sm text-site-text-faint">
                       Get {LOYALTY.EARN_RATE} point for every ${(1 / LOYALTY.EARN_RATE).toFixed(0)} you spend
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
+                <div className="flex items-start gap-3 rounded-lg border border-site-border p-4">
                   <Gift className="mt-0.5 h-5 w-5 flex-shrink-0 text-purple-500" />
                   <div>
-                    <p className="font-medium text-gray-900">Redeem Rewards</p>
+                    <p className="font-medium text-site-text">Redeem Rewards</p>
                     <p className="mt-1 text-sm text-site-text-faint">
                       {formatPoints(LOYALTY.REDEEM_MINIMUM)} points = {formatCurrency(LOYALTY.REDEEM_MINIMUM * LOYALTY.REDEEM_RATE)} off
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
+                <div className="flex items-start gap-3 rounded-lg border border-site-border p-4">
                   <Award className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
                   <div>
-                    <p className="font-medium text-gray-900">Auto-Applied</p>
+                    <p className="font-medium text-site-text">Auto-Applied</p>
                     <p className="mt-1 text-sm text-site-text-faint">
                       Your points are used automatically when you check out
                     </p>

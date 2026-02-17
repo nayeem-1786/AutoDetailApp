@@ -92,7 +92,7 @@ export default function ServiceHistoryPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Service History</h1>
+          <h1 className="text-2xl font-bold text-site-text">Service History</h1>
           <p className="mt-1 text-sm text-site-text-dim">
             Your completed service visits
           </p>
@@ -102,7 +102,7 @@ export default function ServiceHistoryPage() {
           <select
             value={selectedVehicle}
             onChange={(e) => setSelectedVehicle(e.target.value)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-md border border-site-border bg-brand-surface px-3 py-2 text-sm text-site-text-muted focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">All Vehicles</option>
             {vehicles.map((v) => (
@@ -116,9 +116,9 @@ export default function ServiceHistoryPage() {
 
       {/* Empty state */}
       {visits.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+        <div className="rounded-lg border border-site-border bg-brand-surface p-12 text-center">
           <ClipboardList className="mx-auto h-12 w-12 text-site-text-secondary" />
-          <h3 className="mt-4 text-lg font-semibold text-gray-900">No service records yet</h3>
+          <h3 className="mt-4 text-lg font-semibold text-site-text">No service records yet</h3>
           <p className="mt-2 text-sm text-site-text-dim">
             Completed services will appear here after your next visit.
           </p>
@@ -141,20 +141,20 @@ export default function ServiceHistoryPage() {
 
               const statusLabel = visit.status === 'completed' ? 'Completed' : 'Closed';
               const statusColor = visit.status === 'completed'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-slate-100 text-slate-600';
+                ? 'bg-green-500/10 text-green-400'
+                : 'bg-slate-500/10 text-slate-400';
 
               return (
                 <button
                   key={visit.job_id}
                   onClick={() => router.push(`/account/services/${visit.job_id}`)}
-                  className="flex w-full items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50"
+                  className="flex w-full items-center gap-4 rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:bg-brand-dark"
                 >
                   {/* Main content */}
                   <div className="min-w-0 flex-1">
                     {/* Date + Status */}
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">{dateStr}</span>
+                      <span className="text-sm font-semibold text-site-text">{dateStr}</span>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${statusColor}`}>
                         {statusLabel}
                       </span>
@@ -162,7 +162,7 @@ export default function ServiceHistoryPage() {
 
                     {/* Vehicle */}
                     {vehicleStr && (
-                      <p className="mt-0.5 text-sm text-gray-700">{vehicleStr}</p>
+                      <p className="mt-0.5 text-sm text-site-text-muted">{vehicleStr}</p>
                     )}
 
                     {/* Services */}

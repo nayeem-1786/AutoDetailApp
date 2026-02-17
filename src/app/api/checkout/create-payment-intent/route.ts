@@ -9,6 +9,7 @@ import {
   type CartItem as CouponCartItem,
   type CouponRow,
 } from '@/lib/utils/coupon-helpers';
+import { getShippingSettings } from '@/lib/services/shippo';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -212,18 +213,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Tax (on taxable items only, after proportional discount)
-    const taxableSubtotalCents = validatedItems
-      .filter((i) => i.isTaxable)
-      .reduce((sum, i) => sum + i.lineTotalCents, 0);
+    // 4. Tax — destination-based (CA only)
+    // Determine tax state: for shipping use shipping address, for pickup use business state
+    let taxState: string | null = null;
+    if (fulfillmentMethod === 'shipping' && shippingAddress?.state) {
+      taxState = shippingAddress.state.toUpperCase().trim();
+    } else if (fulfillmentMethod === 'pickup') {
+      // Use business state (ship-from state from shipping settings)
+      const shippingSettings = await getShippingSettings();
+      taxState = shippingSettings?.ship_from_state?.toUpperCase().trim() ?? 'CA';
+    }
 
-    // Proportional discount on taxable portion
-    const discountRatio =
-      subtotalCents > 0 ? discountCents / subtotalCents : 0;
-    const taxableAfterDiscountCents = Math.round(
-      taxableSubtotalCents * (1 - discountRatio)
-    );
-    const taxCents = Math.round(taxableAfterDiscountCents * TAX_RATE);
+    let taxCents = 0;
+    if (taxState === 'CA') {
+      const taxableSubtotalCents = validatedItems
+        .filter((i) => i.isTaxable)
+        .reduce((sum, i) => sum + i.lineTotalCents, 0);
+
+      const discountRatio =
+        subtotalCents > 0 ? discountCents / subtotalCents : 0;
+      const taxableAfterDiscountCents = Math.round(
+        taxableSubtotalCents * (1 - discountRatio)
+      );
+      taxCents = Math.round(taxableAfterDiscountCents * TAX_RATE);
+    }
 
     // 5. Shipping
     let shippingCents = 0;

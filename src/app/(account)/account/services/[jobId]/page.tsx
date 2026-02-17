@@ -103,7 +103,7 @@ export default function ServiceDetailPage() {
   if (notFound || !job) {
     return (
       <div className="py-16 text-center">
-        <h2 className="text-xl font-semibold text-gray-900">Service not found</h2>
+        <h2 className="text-xl font-semibold text-site-text">Service not found</h2>
         <p className="mt-2 text-sm text-site-text-dim">
           This service record doesn&apos;t exist or isn&apos;t available.
         </p>
@@ -150,7 +150,7 @@ export default function ServiceDetailPage() {
       {/* Back button */}
       <button
         onClick={() => router.push('/account/services')}
-        className="flex items-center gap-1 text-sm text-site-text-dim hover:text-gray-700"
+        className="flex items-center gap-1 text-sm text-site-text-dim hover:text-site-text-muted"
       >
         <ArrowLeft className="h-4 w-4" />
         Service History
@@ -158,25 +158,25 @@ export default function ServiceDetailPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{dateFormatted}</h1>
+        <h1 className="text-2xl font-bold text-site-text">{dateFormatted}</h1>
         {vehicleStr && (
           <p className="mt-1 text-site-text-faint">{vehicleStr}</p>
         )}
       </div>
 
       {/* Service Summary Card */}
-      <div className="rounded-lg border border-gray-200 bg-white">
+      <div className="rounded-lg border border-site-border bg-brand-surface">
         {/* Services Performed */}
-        <div className="border-b border-gray-100 p-5">
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-900">
+        <div className="border-b border-site-border p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-site-text">
             <Wrench className="h-4 w-4 text-site-text-muted" />
             Services Performed
           </div>
           <ul className="space-y-1.5">
             {job.services.map((s, i) => (
               <li key={i} className="flex items-center justify-between text-sm">
-                <span className="text-gray-700">{s.name}</span>
-                <span className="font-medium text-gray-900">${s.price.toFixed(2)}</span>
+                <span className="text-site-text-muted">{s.name}</span>
+                <span className="font-medium text-site-text">${s.price.toFixed(2)}</span>
               </li>
             ))}
           </ul>
@@ -184,15 +184,15 @@ export default function ServiceDetailPage() {
 
         {/* Add-ons */}
         {job.addons.length > 0 && (
-          <div className="border-b border-gray-100 p-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-900">
+          <div className="border-b border-site-border p-5">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-site-text">
               <Plus className="h-4 w-4 text-site-text-muted" />
               Additional Services
             </div>
             <p className="mb-2 text-xs text-site-text-muted">Added during your visit</p>
             <ul className="space-y-1.5">
               {job.addons.map((a, i) => (
-                <li key={i} className="text-sm text-gray-700">{a.name}</li>
+                <li key={i} className="text-sm text-site-text-muted">{a.name}</li>
               ))}
             </ul>
           </div>
@@ -228,14 +228,14 @@ export default function ServiceDetailPage() {
 
       {/* Photos Section */}
       {job.photo_count > 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white">
+        <div className="rounded-lg border border-site-border bg-brand-surface">
           <button
             onClick={() => setShowPhotos(!showPhotos)}
             className="flex w-full items-center justify-between p-5 text-left"
           >
             <div className="flex items-center gap-2">
               <Camera className="h-5 w-5 text-site-text-muted" />
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-site-text">
                 Before &amp; After Photos ({job.photo_count})
               </span>
             </div>
@@ -247,7 +247,7 @@ export default function ServiceDetailPage() {
           </button>
 
           {showPhotos && (
-            <div className="border-t border-gray-100 p-5">
+            <div className="border-t border-site-border p-5">
               <div className="space-y-6">
                 {sortedZones.map((zoneKey) => {
                   const zoneData = zoneMap.get(zoneKey)!;
@@ -255,7 +255,7 @@ export default function ServiceDetailPage() {
 
                   return (
                     <div key={zoneKey}>
-                      <h4 className="mb-2 text-sm font-medium text-gray-700">
+                      <h4 className="mb-2 text-sm font-medium text-site-text-muted">
                         {getZoneLabel(zoneKey)}
                       </h4>
                       {hasBeforeAfter ? (
@@ -270,7 +270,7 @@ export default function ServiceDetailPage() {
                           {[zoneData.intake, zoneData.completion].filter(Boolean).map((photo) => (
                             <div
                               key={photo!.id}
-                              className="relative aspect-square overflow-hidden rounded-lg bg-gray-200"
+                              className="relative aspect-square overflow-hidden rounded-lg bg-brand-dark"
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
@@ -293,7 +293,7 @@ export default function ServiceDetailPage() {
 
               {/* Link to full gallery */}
               {job.gallery_token && (
-                <div className="mt-6 border-t border-gray-100 pt-4">
+                <div className="mt-6 border-t border-site-border pt-4">
                   <Link
                     href={`/jobs/${job.gallery_token}/photos`}
                     className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"

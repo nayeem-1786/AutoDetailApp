@@ -177,12 +177,31 @@ export async function getShippingRates(params: {
 
   let rates = shipment.rates || [];
 
+  // Log all raw rates for debugging
+  if (rates.length > 0) {
+    console.log(
+      '[shippo] Raw rates returned:',
+      rates.map((r) => ({
+        provider: r.provider,
+        serviceLevelToken: r.servicelevel?.token,
+        serviceLevelName: r.servicelevel?.name,
+        amount: r.amount,
+      }))
+    );
+  }
+
   // Filter to enabled carriers if any are set
+  // Match on provider name (case-insensitive) — "USPS", "UPS", "FedEx", etc.
   if (settings.enabled_carriers.length > 0) {
+    const enabledLower = settings.enabled_carriers.map((c) => c.toLowerCase());
     rates = rates.filter((r) => {
-      const carrierToken = r.servicelevel?.token?.split('_')[0] || r.provider?.toLowerCase() || '';
-      return settings.enabled_carriers.some(
-        (c) => carrierToken.startsWith(c.toLowerCase()) || r.provider?.toLowerCase().includes(c.toLowerCase())
+      const providerLower = (r.provider || '').toLowerCase();
+      const tokenPrefix = (r.servicelevel?.token || '').split('_')[0].toLowerCase();
+      return enabledLower.some(
+        (c) =>
+          providerLower === c ||
+          providerLower.includes(c) ||
+          tokenPrefix === c
       );
     });
   }

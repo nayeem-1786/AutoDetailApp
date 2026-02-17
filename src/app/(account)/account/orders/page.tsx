@@ -81,12 +81,12 @@ export default function AccountOrdersPage() {
   if (orders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <ShoppingCart className="h-12 w-12 text-gray-300" />
+        <ShoppingCart className="h-12 w-12 text-site-text-dim" />
         <h2 className="mt-4 text-lg font-semibold text-site-text">No orders yet</h2>
-        <p className="mt-1 text-sm text-gray-400">Browse our products to get started.</p>
+        <p className="mt-1 text-sm text-site-text-faint">Browse our products to get started.</p>
         <Link
           href="/products"
-          className="mt-6 rounded-lg bg-lime px-6 py-2 text-sm font-medium text-black hover:opacity-90"
+          className="mt-6 rounded-lg bg-lime px-6 py-2 text-sm font-medium text-site-text-on-primary hover:opacity-90"
         >
           Shop Products
         </Link>
@@ -97,7 +97,7 @@ export default function AccountOrdersPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-site-text">Orders</h1>
-      <p className="mt-1 text-sm text-gray-400">{total} order{total !== 1 ? 's' : ''}</p>
+      <p className="mt-1 text-sm text-site-text-faint">{total} order{total !== 1 ? 's' : ''}</p>
 
       <div className="mt-6 space-y-3">
         {orders.map((order) => {
@@ -116,14 +116,14 @@ export default function AccountOrdersPage() {
                   <Badge variant={payment.variant}>{payment.label}</Badge>
                   <Badge variant={fulfillment.variant}>{fulfillment.label}</Badge>
                 </div>
-                <p className="mt-1 text-sm text-gray-400">
+                <p className="mt-1 text-sm text-site-text-faint">
                   {formatDate(order.created_at)} · {order.item_count} item{order.item_count !== 1 ? 's' : ''}
                 </p>
               </div>
               <span className="text-lg font-semibold text-site-text">
                 {formatCurrency(order.total / 100)}
               </span>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
+              <ChevronRight className="h-4 w-4 text-site-text-faint" />
             </Link>
           );
         })}

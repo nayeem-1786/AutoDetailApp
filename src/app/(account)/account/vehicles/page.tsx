@@ -114,7 +114,7 @@ export default function AccountVehiclesPage() {
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Your Vehicles</h1>
+          <h1 className="text-2xl font-bold text-site-text">Your Vehicles</h1>
           <p className="mt-1 text-sm text-site-text-faint">
             Add all your vehicles here so we can track their service history and provide personalized recommendations.
           </p>
@@ -134,7 +134,7 @@ export default function AccountVehiclesPage() {
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <Car className="mx-auto h-12 w-12 text-site-text-secondary" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900">No vehicles yet</h3>
+              <h3 className="mt-4 text-lg font-medium text-site-text">No vehicles yet</h3>
               <p className="mt-2 text-sm text-site-text-dim">
                 Add your first vehicle to get started. We&apos;ll keep track of its service history for you.
               </p>
@@ -173,10 +173,10 @@ export default function AccountVehiclesPage() {
                       return (
                         <div
                           key={vehicle.id}
-                          className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-5"
+                          className="flex items-start justify-between gap-4 rounded-lg border border-site-border bg-brand-surface p-5"
                         >
                           <div className="min-w-0 flex-1">
-                            <h4 className="font-medium text-gray-900">{label}</h4>
+                            <h4 className="font-medium text-site-text">{label}</h4>
                             <div className="mt-1 flex flex-wrap gap-2">
                               {vehicle.color && (
                                 <Badge variant="secondary">{vehicle.color}</Badge>

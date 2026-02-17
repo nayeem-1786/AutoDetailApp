@@ -4,6 +4,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 9, Session 5 — 2026-02-17 (Cart/Checkout Bug Fixes + Dark Theme)
+
+### fix: 11 bug fixes — dark theme, auto-populate, tax by state, auto-fetch rates, step navigation, session memory
+
+#### Bug 1: Account pages dark theme
+- Migrated ~17 account portal files from hardcoded `text-gray-*`, `bg-white`, `bg-gray-*`, `border-gray-*` to theme-aware classes (`text-site-text`, `text-site-text-muted`, `bg-brand-surface`, `border-site-border`, etc.)
+- Files: `account-shell.tsx`, `account/page.tsx`, `profile/page.tsx`, `orders/page.tsx`, `orders/[id]/page.tsx`, `appointments/page.tsx`, `services/page.tsx`, `services/[jobId]/page.tsx`, `loyalty/page.tsx`, `transactions/page.tsx`, `vehicles/page.tsx`, `appointment-card.tsx`, `coupon-card.tsx`, `vehicle-card.tsx`, `transaction-card.tsx`, `transaction-detail.tsx`, `appointment-edit-dialog.tsx`
+
+#### Bug 2: Cart tax display contradiction
+- Removed inline tax calculation from cart page. Now shows "Calculated at checkout" for both tax and shipping. Changed "Total" to "Estimated Total".
+
+#### Bug 3: Cart "Shipping: Free" removed
+- Cart page no longer shows a shipping line — fulfillment method is chosen at checkout, not cart.
+
+#### Bug 4: Checkout auto-populate logged-in user
+- New API endpoint `GET /api/checkout/customer-info` returns logged-in customer's contact info + address
+- Checkout page fetches on mount and pre-fills contact form + shipping address
+
+#### Bug 5: Checkout order summary premature tax/shipping
+- Tax and shipping show as "—" until address is entered. Client-side CA tax estimate shows `~$X.XX` prefix.
+
+#### Bug 6 & 7: Shipping rate UX
+- Removed manual "Get Shipping Rates" button. Rates auto-fetch via useEffect with 500ms debounce when shipping address fields are valid.
+- CTA button shows descriptive disabled states: "Enter shipping address", "Fetching rates...", "Select a shipping rate"
+
+#### Bug 8: Only USPS showing despite enabled carriers
+- Fixed carrier filtering in `shippo.ts` to match on `r.provider` (case-insensitive) instead of only `servicelevel.token` prefix
+- Added raw rate logging for debugging
+- Added amber info box on shipping settings page about UPS/FedEx requiring connected carrier accounts
+
+#### Bug 9: Tax should be CA-only
+- `create-payment-intent` route now uses destination-based tax: shipping orders use `shippingAddress.state`, pickup orders use `ship_from_state` from shipping settings
+- Tax only applied when state is `CA` (10.25%)
+
+#### Bug 10: Checkout step navigation + session memory
+- 3-step breadcrumb navigation (Information → Fulfillment → Payment) with clickable completed steps
+- Back button from Payment returns to Fulfillment (resets Stripe state)
+- All checkout state persisted to `sessionStorage` (key: `smart-details-checkout`), survives browser back/forward
+
+#### Bug 11: Payment step review
+- Step 3 shows full review section: contact info, fulfillment method, shipping address (when applicable) with [Edit] buttons to jump back to relevant step
+
+#### New File (1)
+- `src/app/api/checkout/customer-info/route.ts` — GET endpoint for checkout auto-populate
+
+#### Modified Files (5)
+- `src/app/(public)/cart/page.tsx` — Removed tax calc, updated summary display
+- `src/app/(public)/checkout/page.tsx` — Complete rewrite with 3-step flow, session persistence, auto-populate, auto-fetch rates
+- `src/app/api/checkout/create-payment-intent/route.ts` — Destination-based CA tax
+- `src/lib/services/shippo.ts` — Fixed carrier filtering, added rate logging
+- `src/app/admin/settings/shipping/page.tsx` — Added carrier account info box
+
+---
+
 ## Phase 9, Session 2 — 2026-02-17 (Cart Page + Checkout + Orders + Shipping)
 
 ### feat: Cart page, Stripe checkout, orders database, confirmation page, stock management, shipping integration
