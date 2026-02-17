@@ -55,6 +55,11 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/google-reviews', 'google-reviews');
   });
 
+  // Abandoned order cleanup — every 6 hours
+  cron.schedule('0 */6 * * *', () => {
+    callCronEndpoint('/api/cron/cleanup-orders', 'cleanup-orders');
+  });
+
   console.log('[CRON] Scheduled jobs:');
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
@@ -62,4 +67,5 @@ export function setupCronJobs() {
   console.log('  - qbo-sync: every 30 minutes');
   console.log('  - theme-activation: every 15 minutes');
   console.log('  - google-reviews: daily at 6:00 AM PST');
+  console.log('  - cleanup-orders: every 6 hours');
 }

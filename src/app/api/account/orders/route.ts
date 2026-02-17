@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       .from('orders')
       .select('*, order_items(id, product_name, quantity, line_total)', { count: 'exact' })
       .eq('customer_id', customer.id)
+      .in('payment_status', ['paid', 'refunded', 'partially_refunded'])
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
 

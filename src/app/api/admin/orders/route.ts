@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
 
     if (paymentStatus) {
       query = query.eq('payment_status', paymentStatus);
+    } else {
+      // Default: exclude cancelled and pending orders (abandoned checkouts)
+      query = query.not('payment_status', 'in', '("cancelled","pending")');
     }
     if (fulfillmentStatus) {
       query = query.eq('fulfillment_status', fulfillmentStatus);
@@ -65,9 +68,12 @@ export async function GET(request: NextRequest) {
     const { data: orders, count, error } = await query;
     if (error) throw error;
 
-    // Compute stats (separate queries for accuracy)
+    // Compute stats (separate queries for accuracy — exclude cancelled/pending)
     const [totalResult, revenueResult, pendingResult, todayResult] = await Promise.all([
-      admin.from('orders').select('id', { count: 'exact', head: true }),
+      admin
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .not('payment_status', 'in', '("cancelled","pending")'),
       admin
         .from('orders')
         .select('total')
@@ -85,7 +91,8 @@ export async function GET(request: NextRequest) {
         return admin
           .from('orders')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', todayStart.toISOString());
+          .gte('created_at', todayStart.toISOString())
+          .not('payment_status', 'in', '("cancelled","pending")');
       })(),
     ]);
 

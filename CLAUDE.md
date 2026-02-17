@@ -487,7 +487,21 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-17 (Phase 9 Session 5 — Cart/Checkout Bug Fixes)
+## Last Session: 2026-02-17 (Phase 9 Session 6 — Fix Order & PaymentIntent Duplication)
+
+### Phase 9 Session 6 — Fix Order & PaymentIntent Duplication
+- **Root cause**: Every "Continue to Payment" click created NEW order + NEW Stripe PI. Back navigation wiped state, making reuse impossible.
+- **Fix 1 (API update path)**: `create-payment-intent` accepts optional `orderId` — updates existing order + PI instead of creating new. Order number = NULL until payment succeeds.
+- **Fix 2 (sessionStorage)**: Checkout persists `{ orderId, clientSecret, totals, cartHash }` in sessionStorage. Cart hash detects changes. Skips API if unchanged.
+- **Fix 3 (Cleanup cron)**: `GET /api/cron/cleanup-orders` cancels pending orders > 24h old + their Stripe PIs. Runs every 6 hours.
+- **Fix 4 (Order number in webhook)**: `generateOrderNumber()` called in `payment_intent.succeeded` handler only. No wasted WO-XXXXX numbers. `payment_intent.canceled` handler marks order as cancelled.
+- **Fix 5 (Admin filter)**: Default order list excludes cancelled/pending. Stats exclude cancelled/pending.
+- **Fix 6 (Account filter)**: Customer order history shows only paid/refunded/partially_refunded.
+- **Fix 7 (Confirmation page)**: Uses `?orderId=xxx` param. Retries 3x with 2s delay for webhook timing. Handles null order_number. Clears sessionStorage.
+- **DB migration**: `order_number` nullable, `cancelled` added to payment_status CHECK.
+- **Files created**: `20260217000008_order_checkout_fixes.sql`, `api/cron/cleanup-orders/route.ts`
+- **Files modified**: `create-payment-intent/route.ts`, `checkout/page.tsx`, `order-number.ts`, `webhooks/stripe/route.ts`, `checkout/order/route.ts`, `checkout/confirmation/page.tsx`, `admin/orders/route.ts`, `account/orders/route.ts`, `scheduler.ts`
+- TypeScript clean, build passes.
 
 ### Phase 9 Session 5 — Cart & Checkout Bug Fixes + Dark Theme
 - **11 bug fixes** across cart, checkout, shipping, tax, and account portal

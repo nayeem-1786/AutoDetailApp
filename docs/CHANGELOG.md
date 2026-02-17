@@ -4,6 +4,66 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 9, Session 6 — 2026-02-17 (Fix Order & PaymentIntent Duplication)
+
+### fix: prevent duplicate orders and PaymentIntents in checkout flow
+
+**Root cause**: Every click of "Continue to Payment" created a NEW order + NEW Stripe PaymentIntent. Clicking "Back"/"Edit" wiped orderId/clientSecret state, making the old order unreusable. Result: orphaned orders, wasted order numbers (WO-XXXXX), dozens of "Incomplete" PaymentIntents in Stripe.
+
+#### Fix 1: API accepts existing orderId for updates
+- `create-payment-intent` route now accepts optional `orderId` in request body
+- UPDATE path: verifies order is still pending, updates fields, replaces order_items, calls `stripe.paymentIntents.update()` on existing PI
+- CREATE path: creates order with `order_number = NULL` (assigned after payment), creates PI with `idempotencyKey: order-${order.id}`
+
+#### Fix 2: Checkout page persists order references in sessionStorage
+- New `CHECKOUT_ORDER_KEY` sessionStorage stores `{ orderId, clientSecret, totals, cartHash }`
+- `computeCartHash()` detects cart changes (sorted item IDs + quantities + coupon code)
+- `handleBackFromPayment` no longer clears orderId/clientSecret — only changes step
+- If cart hash unchanged and orderId exists, skips API call entirely (reuses existing PI)
+- Cart empty redirect checks sessionStorage before redirecting (prevents premature redirect)
+
+#### Fix 3: Abandoned order cleanup cron
+- New `GET /api/cron/cleanup-orders` with CRON_API_KEY auth
+- Finds pending orders older than 24 hours, cancels their Stripe PIs, marks as 'cancelled'
+- Registered in scheduler: every 6 hours
+
+#### Fix 4: Order number assigned AFTER payment (webhook)
+- Order numbers (`WO-XXXXX`) no longer assigned at checkout — only after `payment_intent.succeeded` webhook fires
+- `order_number` column is now nullable (migration: `ALTER TABLE orders ALTER COLUMN order_number DROP NOT NULL`)
+- `generateOrderNumber()` filters out NULL order_numbers to prevent incorrect sequence
+- Added `payment_intent.canceled` webhook handler: marks order as 'cancelled'
+
+#### Fix 5: Admin orders page excludes abandoned orders
+- Default list query excludes `cancelled` and `pending` orders (unless filtered explicitly)
+- Stats cards (Total Orders, Revenue, Orders Today) exclude cancelled/pending
+
+#### Fix 6: Customer order history shows only completed orders
+- Account orders API filters to `paid`, `refunded`, `partially_refunded` only
+
+#### Fix 7: Confirmation page uses orderId
+- Redirects to `/checkout/confirmation?orderId=xxx` (was `?order=WO-XXXXX`)
+- Retries up to 3 times with 2s delay if order_number not yet assigned (webhook timing)
+- Handles null order_number gracefully: "Your order number will appear shortly"
+- Clears both checkout sessionStorage keys on mount
+- Legacy `?order=` parameter still supported
+
+**Files created (2):**
+- `supabase/migrations/20260217000008_order_checkout_fixes.sql`
+- `src/app/api/cron/cleanup-orders/route.ts`
+
+**Files modified (8):**
+- `src/app/api/checkout/create-payment-intent/route.ts` — UPDATE/CREATE paths
+- `src/app/(public)/checkout/page.tsx` — sessionStorage, cart hash, back navigation
+- `src/lib/utils/order-number.ts` — NULL filter
+- `src/app/api/webhooks/stripe/route.ts` — order number in webhook, canceled handler
+- `src/app/api/checkout/order/route.ts` — support `?id=` lookup
+- `src/app/(public)/checkout/confirmation/page.tsx` — orderId param, retry, clear session
+- `src/app/api/admin/orders/route.ts` — exclude cancelled/pending
+- `src/app/api/account/orders/route.ts` — filter to paid/refunded
+- `src/lib/cron/scheduler.ts` — register cleanup-orders cron
+
+---
+
 ## Phase 9, Session 5 — 2026-02-17 (Cart/Checkout Bug Fixes + Dark Theme)
 
 ### fix: 11 bug fixes — dark theme, auto-populate, tax by state, auto-fetch rates, step navigation, session memory

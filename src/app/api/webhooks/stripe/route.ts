@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { generateOrderNumber } from '@/lib/utils/order-number';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
@@ -36,17 +37,21 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      // 1. Update order payment status
+      // 1. Generate permanent order number
+      const orderNumber = await generateOrderNumber(admin);
+
+      // 2. Update order: assign number + mark paid
       await admin
         .from('orders')
         .update({
+          order_number: orderNumber,
           payment_status: 'paid',
           paid_at: new Date().toISOString(),
           stripe_charge_id: pi.latest_charge as string | null,
         })
         .eq('id', orderId);
 
-      // 2. Fetch order + items for stock decrement and email
+      // 3. Fetch order + items for stock decrement and email
       const { data: order } = await admin
         .from('orders')
         .select('*, order_items:order_items(*)')
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
 
       if (!order) break;
 
-      // 3. Decrement stock for each item
+      // 4. Decrement stock for each item
       const orderItems = (order as { order_items: Array<{ product_id: string; quantity: number }> }).order_items;
       for (const item of orderItems) {
         if (item.product_id) {
@@ -75,7 +80,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 4. Increment coupon usage
+      // 5. Increment coupon usage
       if (order.coupon_id) {
         const { data: coupon } = await admin
           .from('coupons')
@@ -91,7 +96,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. Update customer lifetime spend
+      // 6. Update customer lifetime spend
       if (order.customer_id) {
         const { data: customer } = await admin
           .from('customers')
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 6. Send confirmation email (fire-and-forget)
+      // 7. Send confirmation email (fire-and-forget)
       sendOrderConfirmationEmail(order).catch((err) =>
         console.error('Order confirmation email failed:', err)
       );
@@ -127,6 +132,19 @@ export async function POST(request: NextRequest) {
         await admin
           .from('orders')
           .update({ payment_status: 'failed' })
+          .eq('id', orderId);
+      }
+      break;
+    }
+
+    case 'payment_intent.canceled': {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      const orderId = pi.metadata.order_id;
+
+      if (orderId) {
+        await admin
+          .from('orders')
+          .update({ payment_status: 'cancelled' })
           .eq('id', orderId);
       }
       break;

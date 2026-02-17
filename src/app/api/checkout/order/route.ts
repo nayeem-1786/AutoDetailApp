@@ -1,20 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+const ORDER_SELECT =
+  'order_number, email, first_name, subtotal, discount_amount, tax_amount, shipping_amount, total, coupon_code, fulfillment_method, payment_status, shipping_address_line1, shipping_address_line2, shipping_city, shipping_state, shipping_zip, shipping_carrier, shipping_service, order_items:order_items(product_name, quantity, unit_price, line_total, product_image_url)';
+
 export async function GET(request: NextRequest) {
   const orderNumber = request.nextUrl.searchParams.get('number');
+  const orderId = request.nextUrl.searchParams.get('id');
 
-  if (!orderNumber) {
-    return NextResponse.json({ error: 'Order number required' }, { status: 400 });
+  if (!orderNumber && !orderId) {
+    return NextResponse.json(
+      { error: 'Order number or id required' },
+      { status: 400 }
+    );
   }
 
   const admin = createAdminClient();
 
-  const { data: order, error } = await admin
-    .from('orders')
-    .select('order_number, email, first_name, subtotal, discount_amount, tax_amount, shipping_amount, total, coupon_code, fulfillment_method, payment_status, shipping_address_line1, shipping_address_line2, shipping_city, shipping_state, shipping_zip, shipping_carrier, shipping_service, order_items:order_items(product_name, quantity, unit_price, line_total, product_image_url)')
-    .eq('order_number', orderNumber)
-    .single();
+  let query = admin.from('orders').select(ORDER_SELECT);
+
+  if (orderId) {
+    query = query.eq('id', orderId);
+  } else {
+    query = query.eq('order_number', orderNumber!);
+  }
+
+  const { data: order, error } = await query.single();
 
   if (error || !order) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 });

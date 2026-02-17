@@ -3,12 +3,15 @@
 import { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle, Package, ShoppingBag, ArrowRight } from 'lucide-react';
+import { CheckCircle, Package, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
 import { formatCurrency } from '@/lib/utils/format';
 
+const CHECKOUT_ORDER_KEY = 'smart-details-checkout-order';
+const CHECKOUT_SESSION_KEY = 'smart-details-checkout-session';
+
 interface OrderData {
-  order_number: string;
+  order_number: string | null;
   email: string;
   first_name: string;
   subtotal: number;
@@ -37,6 +40,8 @@ interface OrderData {
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
+  // Legacy support: also check ?order= for old links
   const orderNumber = searchParams.get('order');
   const { clearCart } = useCart();
   const clearedRef = useRef(false);
@@ -45,59 +50,70 @@ function ConfirmationContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Clear cart once on mount
+  // Clear cart and sessionStorage once on mount
   useEffect(() => {
     if (!clearedRef.current) {
       clearedRef.current = true;
       clearCart();
+      try {
+        sessionStorage.removeItem(CHECKOUT_ORDER_KEY);
+        sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
+      } catch {
+        // sessionStorage not available
+      }
     }
   }, [clearCart]);
 
-  // Fetch order details
+  // Fetch order details with retry for webhook timing
   useEffect(() => {
-    if (!orderNumber) {
-      setError('No order number provided');
+    if (!orderId && !orderNumber) {
+      setError('No order identifier provided');
       setLoading(false);
       return;
     }
 
-    fetch(`/api/checkout/order?number=${encodeURIComponent(orderNumber)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) {
-          setError(data.error);
-        } else {
-          setOrder(data);
-        }
-      })
-      .catch(() => setError('Failed to load order'))
-      .finally(() => setLoading(false));
-  }, [orderNumber]);
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2s between retries
+
+    function fetchOrder() {
+      const param = orderId
+        ? `id=${encodeURIComponent(orderId)}`
+        : `number=${encodeURIComponent(orderNumber!)}`;
+
+      fetch(`/api/checkout/order?${param}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.error) {
+            setError(data.error);
+            setLoading(false);
+          } else if (!data.order_number && retryCount < maxRetries) {
+            // Order found but order_number not yet assigned (webhook hasn't fired)
+            retryCount++;
+            setTimeout(fetchOrder, retryDelay);
+          } else {
+            setOrder(data);
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          setError('Failed to load order');
+          setLoading(false);
+        });
+    }
+
+    fetchOrder();
+  }, [orderId, orderNumber]);
 
   if (loading) {
     return (
       <section className="bg-brand-dark py-16 sm:py-24">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 text-center">
-          <div className="flex items-center justify-center">
-            <svg
-              className="h-8 w-8 animate-spin text-lime"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-lime" />
+            <p className="text-sm text-site-text-muted">
+              Confirming your payment...
+            </p>
           </div>
         </div>
       </section>
@@ -141,9 +157,15 @@ function ConfirmationContent() {
           <h1 className="font-display text-2xl font-bold text-site-text sm:text-3xl">
             Order Confirmed!
           </h1>
-          <p className="mt-2 text-lg font-bold text-lime">
-            {order.order_number}
-          </p>
+          {order.order_number ? (
+            <p className="mt-2 text-lg font-bold text-lime">
+              {order.order_number}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-site-text-muted">
+              Your order number will appear shortly
+            </p>
+          )}
           <p className="mt-2 text-sm text-site-text-muted">
             A confirmation email has been sent to{' '}
             <span className="text-site-text">{order.email}</span>
@@ -296,25 +318,7 @@ export default function ConfirmationPage() {
         <section className="bg-brand-dark py-16 sm:py-24">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 text-center">
             <div className="flex items-center justify-center">
-              <svg
-                className="h-8 w-8 animate-spin text-lime"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
+              <Loader2 className="h-8 w-8 animate-spin text-lime" />
             </div>
           </div>
         </section>

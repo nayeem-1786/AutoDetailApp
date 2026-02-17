@@ -33,10 +33,11 @@ const stripePromise = loadStripe(
 );
 
 // ---------------------------------------------------------------------------
-// Session storage key
+// Session storage keys
 // ---------------------------------------------------------------------------
 
 const CHECKOUT_SESSION_KEY = 'smart-details-checkout';
+const CHECKOUT_ORDER_KEY = 'smart-details-checkout-order';
 
 interface CheckoutSessionData {
   email: string;
@@ -52,6 +53,19 @@ interface CheckoutSessionData {
   shipZip: string;
   selectedRateId: string | null;
   couponCode: string | undefined;
+}
+
+interface CheckoutOrderData {
+  orderId: string;
+  clientSecret: string;
+  totals: {
+    subtotal: number;
+    discount: number;
+    tax: number;
+    shipping: number;
+    total: number;
+  };
+  cartHash: string;
 }
 
 function saveCheckoutSession(data: CheckoutSessionData) {
@@ -75,9 +89,39 @@ function loadCheckoutSession(): CheckoutSessionData | null {
 function clearCheckoutSession() {
   try {
     sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
+    sessionStorage.removeItem(CHECKOUT_ORDER_KEY);
   } catch {
     // Ignore
   }
+}
+
+function saveCheckoutOrder(data: CheckoutOrderData) {
+  try {
+    sessionStorage.setItem(CHECKOUT_ORDER_KEY, JSON.stringify(data));
+  } catch {
+    // Quota exceeded
+  }
+}
+
+function loadCheckoutOrder(): CheckoutOrderData | null {
+  try {
+    const raw = sessionStorage.getItem(CHECKOUT_ORDER_KEY);
+    if (raw) return JSON.parse(raw) as CheckoutOrderData;
+  } catch {
+    // Parse error
+  }
+  return null;
+}
+
+/** Simple hash of cart items + coupon for change detection */
+function computeCartHash(
+  items: Array<{ id: string; quantity: number }>,
+  couponCode?: string
+): string {
+  const sorted = [...items]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((i) => `${i.id}:${i.quantity}`);
+  return JSON.stringify({ items: sorted, coupon: couponCode || '' });
 }
 
 // ---------------------------------------------------------------------------
@@ -173,13 +217,12 @@ function StepIndicator({
 interface PaymentFormProps {
   totalCents: number;
   orderId: string;
-  orderNumber: string;
   onSuccess: () => void;
 }
 
 function PaymentForm({
   totalCents,
-  orderNumber,
+  orderId,
   onSuccess,
 }: PaymentFormProps) {
   const stripe = useStripe();
@@ -198,7 +241,7 @@ function PaymentForm({
       await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/checkout/confirmation?order=${orderNumber}`,
+          return_url: `${window.location.origin}/checkout/confirmation?orderId=${orderId}`,
         },
         redirect: 'if_required',
       });
@@ -311,10 +354,9 @@ function CheckoutContent() {
   const [addressWarning, setAddressWarning] = useState<string | null>(null);
   const [addressValidating, setAddressValidating] = useState(false);
 
-  // Checkout state
+  // Checkout state — persisted in sessionStorage
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [totals, setTotals] = useState<{
     subtotal: number;
     discount: number;
@@ -374,9 +416,8 @@ function CheckoutContent() {
       ? selectedRate.totalAmount
       : 0);
 
-  // ----- Auto-populate for logged-in users (Bug 4) -----
+  // ----- Auto-populate for logged-in users -----
   useEffect(() => {
-    // Only auto-populate if fields are empty (no session restore)
     if (sessionRestored.current) return;
 
     fetch('/api/checkout/customer-info')
@@ -388,7 +429,6 @@ function CheckoutContent() {
           if (!firstName && c.first_name) setFirstName(c.first_name);
           if (!lastName && c.last_name) setLastName(c.last_name);
           if (!phone && c.phone) {
-            // Format E.164 phone for display
             const digits = c.phone.replace(/\D/g, '');
             const national = digits.startsWith('1') ? digits.slice(1) : digits;
             if (national.length === 10) {
@@ -399,7 +439,6 @@ function CheckoutContent() {
               setPhone(c.phone);
             }
           }
-          // Pre-fill address
           if (!shipStreet1 && c.address_line_1) setShipStreet1(c.address_line_1);
           if (!shipStreet2 && c.address_line_2) setShipStreet2(c.address_line_2);
           if (!shipCity && c.city) setShipCity(c.city);
@@ -414,7 +453,7 @@ function CheckoutContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ----- Restore session from sessionStorage (Bug 10) -----
+  // ----- Restore form session from sessionStorage -----
   useEffect(() => {
     const saved = loadCheckoutSession();
     if (saved) {
@@ -433,9 +472,18 @@ function CheckoutContent() {
     }
   }, []);
 
-  // ----- Save to sessionStorage on state changes -----
+  // ----- Restore order data from sessionStorage -----
   useEffect(() => {
-    // Don't save until we have at least email
+    const savedOrder = loadCheckoutOrder();
+    if (savedOrder) {
+      setOrderId(savedOrder.orderId);
+      setClientSecret(savedOrder.clientSecret);
+      setTotals(savedOrder.totals);
+    }
+  }, []);
+
+  // ----- Save form to sessionStorage on state changes -----
+  useEffect(() => {
     if (!email) return;
     saveCheckoutSession({
       email,
@@ -471,11 +519,14 @@ function CheckoutContent() {
   // Redirect if cart is empty (and we haven't started checkout)
   useEffect(() => {
     if (items.length === 0 && !clientSecret) {
+      // Also check sessionStorage before redirecting (cart may not be hydrated yet)
+      const savedOrder = loadCheckoutOrder();
+      if (savedOrder?.clientSecret) return;
       router.replace('/cart');
     }
   }, [items.length, clientSecret, router]);
 
-  // Clear shipping state when fulfillment method changes (Bug 1 — prevents flash)
+  // Clear shipping state when fulfillment method changes
   useEffect(() => {
     setShippingRates([]);
     setSelectedRateId(null);
@@ -524,7 +575,6 @@ function CheckoutContent() {
     setSelectedRateId(null);
     setRatesFetched(false);
 
-    // Fire address validation in parallel (non-blocking)
     validateShippingAddress();
 
     try {
@@ -557,7 +607,6 @@ function CheckoutContent() {
         return;
       }
 
-      // Read display preferences
       if (data.data?.showCarrierLogo !== undefined) {
         setShowCarrierLogo(data.data.showCarrierLogo);
       }
@@ -566,7 +615,6 @@ function CheckoutContent() {
       setShippingRates(rates);
       setRatesFetched(true);
 
-      // Auto-select cheapest rate
       if (rates.length > 0) {
         setSelectedRateId(rates[0].id);
       }
@@ -590,11 +638,10 @@ function CheckoutContent() {
     validateShippingAddress,
   ]);
 
-  // ----- Auto-fetch shipping rates when address becomes complete (Bug 6 & 7) -----
+  // Auto-fetch shipping rates when address becomes complete
   useEffect(() => {
     if (fulfillmentMethod !== 'shipping' || !shippingAddressValid) return;
 
-    // Debounce 500ms
     if (autoFetchDebounce.current) clearTimeout(autoFetchDebounce.current);
     autoFetchDebounce.current = setTimeout(() => {
       handleFetchRates();
@@ -605,9 +652,29 @@ function CheckoutContent() {
     };
   }, [fulfillmentMethod, shippingAddressValid, shipStreet1, shipCity, shipState, shipZip, handleFetchRates]);
 
-  // Create payment intent
+  // Create or update payment intent
   const handleCreatePaymentIntent = useCallback(async () => {
     if (!contactValid || !fulfillmentValid || items.length === 0) return;
+
+    // Compute cart hash to detect changes
+    const currentHash = computeCartHash(
+      items.map((i) => ({ id: i.id, quantity: i.quantity })),
+      couponCode
+    );
+
+    // If we already have an order and cart hasn't changed, skip API — go to step 3
+    const savedOrder = loadCheckoutOrder();
+    if (
+      savedOrder?.clientSecret &&
+      savedOrder?.orderId &&
+      savedOrder.cartHash === currentHash &&
+      orderId === savedOrder.orderId
+    ) {
+      setClientSecret(savedOrder.clientSecret);
+      setTotals(savedOrder.totals);
+      setCurrentStep(3);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -640,6 +707,11 @@ function CheckoutContent() {
         payload.shippingService = selectedRate?.serviceName;
       }
 
+      // Pass existing orderId for update (if we have one)
+      if (orderId) {
+        payload.orderId = orderId;
+      }
+
       const res = await fetch('/api/checkout/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -661,9 +733,16 @@ function CheckoutContent() {
 
       setClientSecret(data.clientSecret);
       setOrderId(data.orderId);
-      setOrderNumber(data.orderNumber);
       setTotals(data.totals);
       setCurrentStep(3);
+
+      // Persist order data to sessionStorage
+      saveCheckoutOrder({
+        orderId: data.orderId,
+        clientSecret: data.clientSecret,
+        totals: data.totals,
+        cartHash: currentHash,
+      });
     } catch {
       setError('Failed to initialize checkout');
     } finally {
@@ -687,19 +766,22 @@ function CheckoutContent() {
     shipZip,
     selectedRateId,
     selectedRate,
+    orderId,
   ]);
 
   const handlePaymentSuccess = () => {
     clearCart();
     clearCheckoutSession();
-    router.push(`/checkout/confirmation?order=${orderNumber}`);
+    router.push(`/checkout/confirmation?orderId=${orderId}`);
   };
 
   if (items.length === 0 && !clientSecret) {
-    return null; // Will redirect
+    // Check sessionStorage before returning null (cart may not be hydrated yet)
+    const savedOrder = loadCheckoutOrder();
+    if (!savedOrder?.clientSecret) return null;
   }
 
-  // ----- Button state helpers (Bug 7) -----
+  // ----- Button state helpers -----
   const getButtonState = (): { disabled: boolean; label: string } => {
     if (!contactValid) {
       return { disabled: true, label: 'Complete contact information' };
@@ -722,17 +804,14 @@ function CheckoutContent() {
 
   // ----- Step navigation handler -----
   const handleStepClick = (step: number) => {
-    if (step < currentStep && !clientSecret) {
+    if (step < currentStep) {
       setCurrentStep(step);
     }
   };
 
-  // Go back from step 3 (payment) - reset payment intent
+  // Go back from step 3 (payment) — keep order references
   const handleBackFromPayment = () => {
-    setClientSecret(null);
-    setOrderId(null);
-    setOrderNumber(null);
-    setTotals(null);
+    // Keep orderId, clientSecret, totals — they'll be reused
     setCurrentStep(2);
     setError(null);
   };
@@ -824,7 +903,6 @@ function CheckoutContent() {
                   </h2>
 
                   <div className="space-y-3">
-                    {/* Pickup option */}
                     <label
                       className={`flex items-start gap-3 cursor-pointer rounded-xl border p-4 transition-colors ${
                         fulfillmentMethod === 'pickup'
@@ -857,7 +935,6 @@ function CheckoutContent() {
                       </div>
                     </label>
 
-                    {/* Shipping option */}
                     <label
                       className={`flex items-start gap-3 cursor-pointer rounded-xl border p-4 transition-colors ${
                         fulfillmentMethod === 'shipping'
@@ -992,7 +1069,6 @@ function CheckoutContent() {
                         </div>
                       </div>
 
-                      {/* Loading state for auto-fetch */}
                       {ratesLoading && (
                         <div className="flex items-center gap-2 text-sm text-site-text-muted py-2">
                           <Loader2 className="h-4 w-4 animate-spin text-lime" />
@@ -1013,7 +1089,6 @@ function CheckoutContent() {
                         </div>
                       )}
 
-                      {/* Address validation warning */}
                       {addressWarning && !addressValidating && (
                         <div className="rounded-xl bg-yellow-950/50 border border-yellow-700/40 p-3 text-sm text-yellow-300">
                           <p className="font-medium">
@@ -1025,7 +1100,6 @@ function CheckoutContent() {
                         </div>
                       )}
 
-                      {/* Rate options */}
                       {shippingRates.length > 0 && (
                         <div className="space-y-2">
                           <h4 className="text-xs font-medium text-site-text-muted uppercase tracking-wide">
@@ -1159,7 +1233,7 @@ function CheckoutContent() {
               </>
             )}
 
-            {/* Step 3: Review & Payment (Bug 11) */}
+            {/* Step 3: Review & Payment */}
             {currentStep === 3 && clientSecret && (
               <>
                 {/* Review section */}
@@ -1272,7 +1346,6 @@ function CheckoutContent() {
                   <PaymentForm
                     totalCents={totals?.total ?? 0}
                     orderId={orderId ?? ''}
-                    orderNumber={orderNumber ?? ''}
                     onSuccess={handlePaymentSuccess}
                   />
                 </Elements>
@@ -1345,7 +1418,7 @@ function CheckoutContent() {
                 ))}
               </div>
 
-              {/* Totals — reactive based on checkout state (Bug 5) */}
+              {/* Totals */}
               <div className="border-t border-site-border pt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-site-text-muted">Subtotal</span>
@@ -1365,7 +1438,6 @@ function CheckoutContent() {
                   </div>
                 )}
 
-                {/* Shipping */}
                 <div className="flex justify-between">
                   <span className="text-site-text-muted">Shipping</span>
                   {totals ? (
@@ -1395,7 +1467,6 @@ function CheckoutContent() {
                   )}
                 </div>
 
-                {/* Tax */}
                 <div className="flex justify-between">
                   <span className="text-site-text-muted">Tax</span>
                   {totals ? (
