@@ -168,26 +168,33 @@ export function StepCustomerInfo({
   const hasSavedVehicles = savedVehicles.length > 0;
   const showVehicleForm = isAddingNew || !hasSavedVehicles;
 
+  // Theme-aware overrides for dark booking background
+  const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim';
+  const selectCls = 'border-site-border bg-brand-surface text-site-text focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text';
+  const labelCls = 'text-site-text-secondary dark:text-site-text-secondary';
+
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <h2 className="text-xl font-semibold text-gray-900">Your Information</h2>
-      <p className="mt-1 text-sm text-gray-600">
+      <h2 className="text-xl font-semibold text-site-text">Your Information</h2>
+      <p className="mt-1 text-sm text-site-text-secondary">
         Tell us about yourself and your vehicle.
       </p>
 
       {/* Contact Info */}
       <div className="mt-6">
-        <h3 className="text-sm font-semibold text-gray-700">Contact Details</h3>
+        <h3 className="text-sm font-semibold text-site-text-secondary">Contact Details</h3>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <FormField
             label="First Name"
             required
             error={errors.customer?.first_name?.message}
             htmlFor="first_name"
+            labelClassName={labelCls}
           >
             <Input
               id="first_name"
               placeholder="John"
+              className={inputCls}
               {...register('customer.first_name')}
             />
           </FormField>
@@ -197,10 +204,12 @@ export function StepCustomerInfo({
             required
             error={errors.customer?.last_name?.message}
             htmlFor="last_name"
+            labelClassName={labelCls}
           >
             <Input
               id="last_name"
               placeholder="Doe"
+              className={inputCls}
               {...register('customer.last_name')}
             />
           </FormField>
@@ -210,10 +219,12 @@ export function StepCustomerInfo({
             required
             error={errors.customer?.phone?.message}
             htmlFor="phone"
+            labelClassName={labelCls}
           >
             <Input
               id="phone"
               placeholder="(310) 555-1234"
+              className={inputCls}
               {...register('customer.phone', {
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                   const formatted = formatPhoneInput(e.target.value);
@@ -231,11 +242,13 @@ export function StepCustomerInfo({
             required
             error={errors.customer?.email?.message}
             htmlFor="email"
+            labelClassName={labelCls}
           >
             <Input
               id="email"
               type="email"
               placeholder="john@example.com"
+              className={inputCls}
               {...register('customer.email')}
             />
           </FormField>
@@ -246,10 +259,10 @@ export function StepCustomerInfo({
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
               {...register('customer.sms_consent')}
             />
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-site-text-secondary">
               I agree to receive text messages from {businessName} including appointment reminders and updates. Msg &amp; data rates may apply. Reply STOP to opt out.
             </span>
           </label>
@@ -257,10 +270,10 @@ export function StepCustomerInfo({
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
               {...register('customer.email_consent')}
             />
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-site-text-secondary">
               I agree to receive emails from {businessName} including appointment confirmations and promotional offers.
             </span>
           </label>
@@ -270,13 +283,13 @@ export function StepCustomerInfo({
       {/* Vehicle Info */}
       <div className="mt-8">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">Vehicle Details</h3>
+          <h3 className="text-sm font-semibold text-site-text-secondary">Vehicle Details</h3>
           <span className="text-sm text-red-500">*Required</span>
         </div>
 
         {/* Vehicle error message */}
         {vehicleError && (
-          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+          <div className="mt-2 rounded-md bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">
             {vehicleError}
           </div>
         )}
@@ -284,7 +297,7 @@ export function StepCustomerInfo({
         {/* Saved Vehicle Picker for logged-in customers */}
         {hasSavedVehicles && (
           <div className="mt-3 mb-4">
-            <p className="text-sm text-gray-600 mb-2">Select a saved vehicle:</p>
+            <p className="text-sm text-site-text-secondary mb-2">Select a saved vehicle:</p>
             <div className="flex flex-wrap gap-2">
               {savedVehicles.map((v) => {
                 const isSelected = selectedSavedVehicleId === v.id;
@@ -295,8 +308,8 @@ export function StepCustomerInfo({
                     onClick={() => handleSelectSavedVehicle(v)}
                     className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                       isSelected
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                        ? 'border-lime bg-brand-surface text-lime'
+                        : 'border-site-border bg-brand-surface text-site-text-secondary hover:bg-brand-surface'
                     }`}
                   >
                     {isSelected && <Check className="h-4 w-4" />}
@@ -309,8 +322,8 @@ export function StepCustomerInfo({
                 onClick={handleAddNewVehicle}
                 className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                   isAddingNew
-                    ? 'border-green-600 bg-green-50 text-green-700'
-                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    ? 'border-lime bg-brand-surface text-lime'
+                    : 'border-site-border bg-brand-surface text-site-text-secondary hover:bg-brand-surface'
                 }`}
               >
                 <Plus className="h-4 w-4" />
@@ -323,9 +336,10 @@ export function StepCustomerInfo({
         {/* Vehicle form fields - shown when adding new or no saved vehicles */}
         {showVehicleForm && (
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <FormField label="Vehicle Type" htmlFor="vehicle_type">
+            <FormField label="Vehicle Type" htmlFor="vehicle_type" labelClassName={labelCls}>
               <Select
                 id="vehicle_type"
+                className={selectCls}
                 {...register('vehicle.vehicle_type')}
               >
                 {Object.entries(VEHICLE_TYPE_LABELS).map(([val, label]) => (
@@ -342,9 +356,11 @@ export function StepCustomerInfo({
                 htmlFor="size_class"
                 required={requireSizeClass}
                 error={errors.vehicle?.size_class?.message}
+                labelClassName={labelCls}
               >
                 <Select
                   id="size_class"
+                  className={selectCls}
                   {...register('vehicle.size_class')}
                 >
                   <option value="">Select size...</option>
@@ -357,35 +373,39 @@ export function StepCustomerInfo({
               </FormField>
             )}
 
-            <FormField label="Year" htmlFor="year">
+            <FormField label="Year" htmlFor="year" labelClassName={labelCls}>
               <Input
                 id="year"
                 type="number"
                 placeholder="2024"
+                className={inputCls}
                 {...register('vehicle.year')}
               />
             </FormField>
 
-            <FormField label="Make" htmlFor="make">
+            <FormField label="Make" htmlFor="make" labelClassName={labelCls}>
               <Input
                 id="make"
                 placeholder="Toyota"
+                className={inputCls}
                 {...register('vehicle.make')}
               />
             </FormField>
 
-            <FormField label="Model" htmlFor="model">
+            <FormField label="Model" htmlFor="model" labelClassName={labelCls}>
               <Input
                 id="model"
                 placeholder="Camry"
+                className={inputCls}
                 {...register('vehicle.model')}
               />
             </FormField>
 
-            <FormField label="Color" htmlFor="color">
+            <FormField label="Color" htmlFor="color" labelClassName={labelCls}>
               <Input
                 id="color"
                 placeholder="White"
+                className={inputCls}
                 {...register('vehicle.color')}
               />
             </FormField>
@@ -395,10 +415,10 @@ export function StepCustomerInfo({
 
       {/* Navigation */}
       <div className="mt-8 flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack}>
+        <Button type="button" variant="outline" onClick={onBack} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
           Back
         </Button>
-        <Button type="submit">Continue</Button>
+        <Button type="submit" className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">Continue</Button>
       </div>
     </form>
   );

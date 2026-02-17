@@ -15,16 +15,16 @@ function TrustBadges() {
   return (
     <div className="mt-6 space-y-4">
       {/* Security Badge */}
-      <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+      <div className="flex items-center justify-center gap-2 text-sm text-site-text-secondary">
         <Lock className="h-4 w-4 text-green-600" />
         <span>256-bit SSL Encrypted</span>
-        <span className="text-gray-300">|</span>
+        <span className="text-site-text-dim">|</span>
         <ShieldCheck className="h-4 w-4 text-blue-600" />
         <span>PCI DSS Compliant</span>
       </div>
 
       {/* Powered by Stripe */}
-      <div className="border-t pt-4 flex items-center justify-center">
+      <div className="border-t border-site-border pt-4 flex items-center justify-center">
         <img
           src="/images/powered-by-stripe.svg"
           alt="Powered by Stripe"
@@ -78,38 +78,38 @@ function PaymentForm({ amount, totalAmount, remainingAmount, isDeposit, onPaymen
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <Card className="p-6">
+      <Card className="p-6 border-site-border bg-brand-surface dark:border-site-border dark:bg-brand-surface">
         {/* Header row with title and total */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">
+          <h3 className="text-lg font-semibold text-site-text">
             {isDeposit ? 'Deposit Payment' : 'Payment Details'}
           </h3>
           {!isDeposit && (
-            <span className="text-lg font-semibold">Amount Due: {formatCurrency(amount)}</span>
+            <span className="text-lg font-semibold text-site-text">Amount Due: {formatCurrency(amount)}</span>
           )}
         </div>
 
         {isDeposit && totalAmount && remainingAmount !== undefined && (
-          <div className="mb-4 rounded-lg bg-blue-50 p-4 text-sm">
-            <div className="flex justify-between text-gray-600">
+          <div className="mb-4 rounded-lg bg-brand-surface p-4 text-sm">
+            <div className="flex justify-between text-site-text-secondary">
               <span>Service Total</span>
-              <span className="font-medium text-gray-900">{formatCurrency(totalAmount)}</span>
+              <span className="font-medium text-site-text">{formatCurrency(totalAmount)}</span>
             </div>
-            <div className="flex justify-between mt-1 text-blue-700 font-medium">
+            <div className="flex justify-between mt-1 text-lime font-medium">
               <span>Deposit Now</span>
               <span>{formatCurrency(amount)}</span>
             </div>
-            <div className="flex justify-between mt-1 text-gray-500">
+            <div className="flex justify-between mt-1 text-site-text-muted">
               <span>Due at Service</span>
               <span>{formatCurrency(remainingAmount)}</span>
             </div>
-            <p className="mt-3 text-xs text-gray-600">
+            <p className="mt-3 text-xs text-site-text-secondary">
               Your deposit secures your appointment. The remaining balance will be collected when the service is completed.
             </p>
           </div>
         )}
 
-        <p className="text-xs text-gray-500 mb-2">ZIP code refers to your billing address ZIP code.</p>
+        <p className="text-xs text-site-text-muted mb-2">ZIP code refers to your billing address ZIP code.</p>
         <PaymentElement />
         {error && (
           <p className="mt-4 text-sm text-red-600">{error}</p>
@@ -118,10 +118,10 @@ function PaymentForm({ amount, totalAmount, remainingAmount, isDeposit, onPaymen
         <TrustBadges />
       </Card>
       <div className="flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack} disabled={processing}>
+        <Button type="button" variant="outline" onClick={onBack} disabled={processing} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
           Back
         </Button>
-        <Button type="submit" disabled={!stripe || processing}>
+        <Button type="submit" disabled={!stripe || processing} className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
           {processing ? (
             <Spinner className="h-4 w-4" />
           ) : isDeposit ? (
@@ -176,9 +176,9 @@ export function StepPayment({ amount, totalAmount, remainingAmount, isDeposit, o
 
   if (error || !clientSecret) {
     return (
-      <Card className="p-6">
-        <p className="text-red-600">{error || 'Payment initialization failed'}</p>
-        <Button variant="outline" onClick={onBack} className="mt-4">Back</Button>
+      <Card className="p-6 border-site-border bg-brand-surface dark:border-site-border dark:bg-brand-surface">
+        <p className="text-red-400">{error || 'Payment initialization failed'}</p>
+        <Button variant="outline" onClick={onBack} className="mt-4 border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">Back</Button>
       </Card>
     );
   }
@@ -189,10 +189,15 @@ export function StepPayment({ amount, totalAmount, remainingAmount, isDeposit, o
       options={{
         clientSecret,
         appearance: {
-          theme: 'stripe',
+          theme: 'night',
           variables: {
             fontFamily: 'system-ui, sans-serif',
             borderRadius: '6px',
+            colorPrimary: '#CCFF00',
+            colorBackground: '#1A1A1A',
+            colorText: '#FFFFFF',
+            colorTextSecondary: '#9CA3AF',
+            colorDanger: '#EF4444',
           },
           rules: {
             '.Label': {

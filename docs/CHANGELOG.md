@@ -4,6 +4,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session Q — 2026-02-16 (Booking Module Theme Fix)
+
+### Fix: Booking module now follows site dark theme — proper contrast, readable inputs and text
+
+#### Root Cause
+The booking page uses the site's always-dark background (`bg-brand-dark`) but shared UI components (Input, Select, Textarea, Card, Button, Tabs) used hardcoded light-theme colors (`bg-white`, `border-gray-300`, `text-gray-900`) that only adapt via `dark:` media query — not via the site's CSS-variable-based theme. Users with light OS mode saw white inputs, cards, and buttons on a dark background.
+
+#### Changes
+- **UI Components (bug fixes)**:
+  - `select.tsx`: Added missing `dark:` variants (had none — bg-white with no dark mode)
+  - `textarea.tsx`: Added missing `dark:` variants (same issue)
+  - `tabs.tsx`: Added `dark:` variants to TabsList/TabsTrigger, added `data-state` attribute for per-instance overrides
+  - `form-field.tsx`: Added `labelClassName` prop for per-instance label color overrides
+- **Booking Components (theme overrides via className)**:
+  - All Input/Select/Textarea → `bg-brand-surface border-site-border text-site-text` with dark: variants
+  - All primary Buttons → `bg-lime text-site-text-on-primary hover:bg-lime-200`
+  - All outline Buttons → `border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface`
+  - All Card → `border-site-border bg-brand-surface`
+  - FormField labels → `text-site-text-secondary`
+  - TabsList → `bg-brand-surface`, TabsTrigger → `data-[state=active]:bg-brand-grey text-site-text-muted`
+- **Semantic alert colors (dark-friendly)**:
+  - Green alerts: `bg-green-50 border-green-200 text-green-800` → `bg-green-500/10 border-green-500/30 text-green-400`
+  - Amber warnings: `bg-amber-50 border-amber-200 text-amber-800` → `bg-amber-500/10 border-amber-500/30 text-amber-400`
+  - Red errors: `bg-red-50 border-red-200 text-red-700` → `bg-red-500/10 border-red-500/30 text-red-400`
+  - N/A badge: `bg-amber-100 text-amber-700` → `bg-amber-500/10 text-amber-400`
+  - Tooltips: `bg-gray-900` → `bg-brand-grey text-site-text`
+- **step-payment.tsx**: Added `border-site-border` to Stripe divider, added `text-site-text` to payment header/amount
+
+#### Files Modified (14)
+- `src/components/ui/select.tsx` — dark mode variants
+- `src/components/ui/textarea.tsx` — dark mode variants
+- `src/components/ui/tabs.tsx` — dark mode variants + data-state attribute
+- `src/components/ui/form-field.tsx` — labelClassName prop
+- `src/components/booking/booking-wizard.tsx` — button + alert theme fixes
+- `src/components/booking/booking-confirmation.tsx` — button theme fix
+- `src/components/booking/step-service-select.tsx` — TabsList/TabsTrigger theme overrides
+- `src/components/booking/step-configure.tsx` — input/select/button theme overrides
+- `src/components/booking/step-schedule.tsx` — select/textarea/card/label/button theme overrides
+- `src/components/booking/step-customer-info.tsx` — input/select/button/error theme overrides
+- `src/components/booking/step-review.tsx` — input/button + all semantic alert colors
+- `src/components/booking/step-payment.tsx` — card/button/border/text theme overrides
+- `src/app/(public)/book/page.tsx` — no changes needed (already theme-aware)
+- `src/components/booking/step-indicator.tsx` — no changes needed (already theme-aware)
+
+---
+
 ## Session P — 2026-02-16 (Theme Variable Pipeline Fix)
 
 ### Fix: Complete theme variable pipeline — all public components respond to theme changes

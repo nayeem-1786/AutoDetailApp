@@ -33,10 +33,10 @@ export function StepServiceSelect({
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-gray-900">
+      <h2 className="text-xl font-semibold text-site-text">
         Select a Service
       </h2>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-site-text-secondary">
         Choose the detailing service you&apos;d like to book.
       </p>
 
@@ -45,9 +45,13 @@ export function StepServiceSelect({
         onValueChange={setActiveCategory}
         className="mt-6"
       >
-        <TabsList className="flex-wrap">
+        <TabsList className="flex-wrap bg-brand-surface dark:bg-brand-surface">
           {categories.map((cat) => (
-            <TabsTrigger key={cat.category.id} value={cat.category.id}>
+            <TabsTrigger
+              key={cat.category.id}
+              value={cat.category.id}
+              className="data-[state=active]:bg-brand-grey data-[state=active]:text-site-text data-[state=active]:shadow-none text-site-text-muted hover:text-site-text dark:data-[state=active]:bg-brand-grey dark:data-[state=active]:text-site-text dark:text-site-text-muted dark:hover:text-site-text"
+            >
               {cat.category.name}
             </TabsTrigger>
           ))}
@@ -90,18 +94,18 @@ function ServiceCard({
       className={cn(
         'flex items-center justify-between rounded-lg border p-4 text-left transition-all hover:shadow-sm',
         isSelected
-          ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900'
-          : 'border-gray-200 hover:border-gray-300'
+          ? 'border-lime bg-brand-surface ring-1 ring-lime'
+          : 'border-site-border hover:border-site-border-medium'
       )}
     >
       <div className="min-w-0 flex-1">
-        <h3 className="text-sm font-semibold text-gray-900">{service.name}</h3>
+        <h3 className="text-sm font-semibold text-site-text">{service.name}</h3>
         {service.description && (
-          <p className="mt-1 text-xs text-gray-500 line-clamp-2">
+          <p className="mt-1 text-xs text-site-text-muted line-clamp-2">
             {service.description}
           </p>
         )}
-        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
+        <div className="mt-2 flex items-center gap-3 text-xs text-site-text-muted">
           {service.base_duration_minutes > 0 && (
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
@@ -118,12 +122,12 @@ function ServiceCard({
           )}
         </div>
         {priceLabel && (
-          <p className="mt-1.5 text-sm font-medium text-gray-900">
+          <p className="mt-1.5 text-sm font-medium text-site-text">
             {priceLabel}
           </p>
         )}
       </div>
-      <ChevronRight className="ml-3 h-5 w-5 flex-shrink-0 text-gray-400" />
+      <ChevronRight className="ml-3 h-5 w-5 flex-shrink-0 text-site-text-muted" />
     </button>
   );
 }

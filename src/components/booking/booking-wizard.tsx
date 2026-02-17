@@ -603,18 +603,18 @@ export function BookingWizard({
           if (grandTotal < STRIPE_MINIMUM) {
             return (
               <div className="space-y-4">
-                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                  <p className="text-sm font-medium text-green-800">
+                <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+                  <p className="text-sm font-medium text-green-400">
                     {grandTotal <= 0
                       ? 'Your discounts cover the full amount - no payment required!'
                       : `Remaining balance of $${grandTotal.toFixed(2)} is below minimum - no payment required!`}
                   </p>
                 </div>
                 <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setStep(5)}>
+                  <Button variant="outline" onClick={() => setStep(5)} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
                     Back
                   </Button>
-                  <Button onClick={() => handleConfirm()}>
+                  <Button onClick={() => handleConfirm()} className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
                     Complete Booking
                   </Button>
                 </div>

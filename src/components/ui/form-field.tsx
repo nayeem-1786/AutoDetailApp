@@ -8,14 +8,15 @@ interface FormFieldProps {
   description?: string;
   required?: boolean;
   className?: string;
+  labelClassName?: string;
   children: React.ReactNode;
   htmlFor?: string;
 }
 
-function FormField({ label, error, description, required, className, children, htmlFor }: FormFieldProps) {
+function FormField({ label, error, description, required, className, labelClassName, children, htmlFor }: FormFieldProps) {
   return (
     <div className={cn('space-y-1.5', className)}>
-      <Label htmlFor={htmlFor}>
+      <Label htmlFor={htmlFor} className={labelClassName}>
         {label}
         {required && <span className="ml-1 text-red-500">*</span>}
       </Label>

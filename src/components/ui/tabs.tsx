@@ -27,7 +27,7 @@ function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivElement>)
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-1 rounded-lg bg-gray-100 p-1',
+        'inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1',
         className
       )}
       {...props}
@@ -45,11 +45,12 @@ function TabsTrigger({ value, className, ...props }: TabsTriggerProps) {
 
   return (
     <button
+      data-state={isActive ? 'active' : 'inactive'}
       className={cn(
         'inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-all',
         isActive
-          ? 'bg-white text-gray-900 shadow-sm'
-          : 'text-gray-600 hover:text-gray-900',
+          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-none'
+          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100',
         className
       )}
       onClick={() => context.onValueChange(value)}

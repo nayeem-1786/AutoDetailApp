@@ -41,9 +41,9 @@ export function StepIndicator({ currentStep, requirePayment = false }: StepIndic
                 <div
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
-                    isCompleted && 'bg-gray-900 text-white',
-                    isCurrent && 'bg-gray-900 text-white ring-2 ring-gray-900 ring-offset-2',
-                    !isCompleted && !isCurrent && 'bg-gray-200 text-gray-500'
+                    isCompleted && 'bg-lime text-site-text-on-primary',
+                    isCurrent && 'bg-lime text-site-text-on-primary ring-2 ring-lime ring-offset-2 ring-offset-brand-dark',
+                    !isCompleted && !isCurrent && 'bg-brand-surface text-site-text-muted'
                   )}
                 >
                   {isCompleted ? (
@@ -55,7 +55,7 @@ export function StepIndicator({ currentStep, requirePayment = false }: StepIndic
                 <span
                   className={cn(
                     'text-xs font-medium',
-                    isCurrent || isCompleted ? 'text-gray-900' : 'text-gray-400'
+                    isCurrent || isCompleted ? 'text-site-text' : 'text-site-text-muted'
                   )}
                 >
                   {step.label}
@@ -65,7 +65,7 @@ export function StepIndicator({ currentStep, requirePayment = false }: StepIndic
                 <div
                   className={cn(
                     'mx-2 h-0.5 flex-1',
-                    isCompleted ? 'bg-gray-900' : 'bg-gray-200'
+                    isCompleted ? 'bg-lime' : 'bg-brand-surface'
                   )}
                 />
               )}

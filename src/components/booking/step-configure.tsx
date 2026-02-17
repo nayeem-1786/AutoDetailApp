@@ -117,10 +117,10 @@ export function StepConfigure({
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-gray-900">
+      <h2 className="text-xl font-semibold text-site-text">
         Configure Your Service
       </h2>
-      <p className="mt-1 text-sm text-gray-600">{service.name}</p>
+      <p className="mt-1 text-sm text-site-text-secondary">{service.name}</p>
 
       {/* Pricing selector based on model */}
       <div className="mt-6 space-y-6">
@@ -137,15 +137,15 @@ export function StepConfigure({
 
         {/* Mobile toggle — hidden when no zones available (mobile_service flag off) */}
         {service.mobile_eligible && mobileZones.length > 0 && (
-          <div className="rounded-lg border border-gray-200 p-4">
+          <div className="rounded-lg border border-site-border p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Truck className="h-5 w-5 text-gray-500" />
+                <Truck className="h-5 w-5 text-site-text-muted" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-site-text">
                     Mobile Service
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-site-text-muted">
                     We come to your location
                   </p>
                 </div>
@@ -155,20 +155,22 @@ export function StepConfigure({
 
             {isMobile && (
               <div className="mt-4 space-y-3">
-                <FormField label="Service Address" required htmlFor="mobile-address">
+                <FormField label="Service Address" required htmlFor="mobile-address" labelClassName="text-site-text-secondary dark:text-site-text-secondary">
                   <Input
                     id="mobile-address"
                     placeholder="123 Main St, City, CA 90000"
                     value={mobileAddress}
                     onChange={(e) => setMobileAddress(e.target.value)}
+                    className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim"
                   />
                 </FormField>
 
-                <FormField label="Zone" required htmlFor="mobile-zone">
+                <FormField label="Zone" required htmlFor="mobile-zone" labelClassName="text-site-text-secondary dark:text-site-text-secondary">
                   <Select
                     id="mobile-zone"
                     value={mobileZoneId ?? ''}
                     onChange={(e) => setMobileZoneId(e.target.value || null)}
+                    className="border-site-border bg-brand-surface text-site-text focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text"
                   >
                     <option value="">Select zone...</option>
                     {mobileZones.map((z) => (
@@ -180,7 +182,7 @@ export function StepConfigure({
                 </FormField>
 
                 {zone && (
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-site-text-secondary">
                     Mobile surcharge:{' '}
                     <span className="font-medium">
                       +{formatCurrency(Number(zone.surcharge))}
@@ -195,10 +197,10 @@ export function StepConfigure({
         {/* Addon suggestions */}
         {service.service_addon_suggestions.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">
+            <h3 className="text-sm font-semibold text-site-text">
               Enhance Your Service
             </h3>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-site-text-muted">
               Add popular extras to your appointment.
             </p>
             <div className="mt-3 space-y-2">
@@ -231,30 +233,30 @@ export function StepConfigure({
                     className={cn(
                       'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-all',
                       isSelected
-                        ? 'border-gray-900 bg-gray-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-lime bg-brand-surface'
+                        : 'border-site-border hover:border-site-border-medium'
                     )}
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-site-text">
                         {addonSvc.name}
                       </p>
                       {addonSvc.description && (
-                        <p className="text-xs text-gray-500 line-clamp-1">
+                        <p className="text-xs text-site-text-muted line-clamp-1">
                           {addonSvc.description}
                         </p>
                       )}
                     </div>
                     <div className="ml-3 flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-site-text">
                         +{formatCurrency(addonPrice)}
                       </span>
                       <div
                         className={cn(
                           'h-5 w-5 rounded border flex items-center justify-center transition-colors',
                           isSelected
-                            ? 'border-gray-900 bg-gray-900 text-white'
-                            : 'border-gray-300'
+                            ? 'border-lime bg-lime text-site-text-on-primary'
+                            : 'border-site-border'
                         )}
                       >
                         {isSelected && (
@@ -272,31 +274,31 @@ export function StepConfigure({
         )}
 
         {/* Price summary */}
-        <div className="rounded-lg bg-gray-50 p-4">
+        <div className="rounded-lg bg-brand-surface p-4">
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">{service.name}</span>
-              <span className="font-medium text-gray-900">
+              <span className="text-site-text-secondary">{service.name}</span>
+              <span className="font-medium text-site-text">
                 {formatCurrency(price)}
               </span>
             </div>
             {selectedAddons.map((addon) => (
               <div key={addon.service_id} className="flex justify-between">
-                <span className="text-gray-600">{addon.name}</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-site-text-secondary">{addon.name}</span>
+                <span className="font-medium text-site-text">
                   {formatCurrency(addon.price)}
                 </span>
               </div>
             ))}
             {mobileSurcharge > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-600">Mobile surcharge</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-site-text-secondary">Mobile surcharge</span>
+                <span className="font-medium text-site-text">
                   {formatCurrency(mobileSurcharge)}
                 </span>
               </div>
             )}
-            <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold">
+            <div className="flex justify-between border-t border-site-border pt-2 text-base font-semibold">
               <span>Total</span>
               <span>
                 {formatCurrency(
@@ -311,10 +313,10 @@ export function StepConfigure({
 
         {/* Navigation */}
         <div className="flex justify-between">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
             Back
           </Button>
-          <Button onClick={handleContinue} disabled={!canContinue}>
+          <Button onClick={handleContinue} disabled={!canContinue} className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
             Continue
           </Button>
         </div>
@@ -349,9 +351,9 @@ function PricingSelector({
   switch (service.pricing_model) {
     case 'flat':
       return (
-        <div className="rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600">Flat Rate</p>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="rounded-lg border border-site-border p-4">
+          <p className="text-sm text-site-text-secondary">Flat Rate</p>
+          <p className="text-2xl font-bold text-site-text">
             {service.flat_price != null
               ? formatCurrency(service.flat_price)
               : '--'}
@@ -362,7 +364,7 @@ function PricingSelector({
     case 'vehicle_size':
       return (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700">
+          <h3 className="text-sm font-semibold text-site-text-secondary">
             Select Vehicle Size
           </h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -382,7 +384,7 @@ function PricingSelector({
       return (
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">
+            <h3 className="text-sm font-semibold text-site-text-secondary">
               Select Option
             </h3>
             <div className="mt-2 grid gap-2">
@@ -404,7 +406,7 @@ function PricingSelector({
             if (!current?.is_vehicle_size_aware) return null;
             return (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700">
+                <h3 className="text-sm font-semibold text-site-text-secondary">
                   Select Vehicle Size
                 </h3>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -419,14 +421,14 @@ function PricingSelector({
                         className={cn(
                           'rounded-lg border p-3 text-left transition-all',
                           sizeClass === sc
-                            ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-lime bg-brand-surface ring-1 ring-lime'
+                            : 'border-site-border hover:border-site-border-medium'
                         )}
                       >
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-site-text">
                           {VEHICLE_SIZE_LABELS[sc]}
                         </p>
-                        <p className="text-lg font-bold text-gray-900">
+                        <p className="text-lg font-bold text-site-text">
                           {formatCurrency(p)}
                         </p>
                       </button>
@@ -442,7 +444,7 @@ function PricingSelector({
     case 'specialty':
       return (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700">
+          <h3 className="text-sm font-semibold text-site-text-secondary">
             Select Option
           </h3>
           <div className="mt-2 grid gap-2">
@@ -461,8 +463,8 @@ function PricingSelector({
 
     case 'per_unit':
       return (
-        <div className="rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600">
+        <div className="rounded-lg border border-site-border p-4">
+          <p className="text-sm text-site-text-secondary">
             {formatCurrency(service.per_unit_price ?? 0)} per{' '}
             {service.per_unit_label || 'unit'}
           </p>
@@ -470,7 +472,7 @@ function PricingSelector({
             <button
               type="button"
               onClick={() => onSetQty(Math.max(1, perUnitQty - 1))}
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 hover:bg-gray-50"
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-site-border hover:bg-brand-surface"
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -487,12 +489,12 @@ function PricingSelector({
                   )
                 )
               }
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 hover:bg-gray-50"
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-site-border hover:bg-brand-surface"
             >
               <Plus className="h-4 w-4" />
             </button>
           </div>
-          <p className="mt-2 text-xl font-bold text-gray-900">
+          <p className="mt-2 text-xl font-bold text-site-text">
             {formatCurrency((service.per_unit_price ?? 0) * perUnitQty)}
           </p>
         </div>
@@ -525,17 +527,17 @@ function TierCard({
       className={cn(
         'rounded-lg border p-3 text-left transition-all',
         isSelected
-          ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900'
-          : 'border-gray-200 hover:border-gray-300',
+          ? 'border-lime bg-brand-surface ring-1 ring-lime'
+          : 'border-site-border hover:border-site-border-medium',
         wide && 'flex items-center justify-between'
       )}
     >
       <div>
-        <p className="text-sm font-medium text-gray-900">
+        <p className="text-sm font-medium text-site-text">
           {tier.tier_label ?? tier.tier_name}
         </p>
       </div>
-      <p className={cn('font-bold text-gray-900', wide ? 'text-base' : 'mt-1 text-lg')}>
+      <p className={cn('font-bold text-site-text', wide ? 'text-base' : 'mt-1 text-lg')}>
         {tier.is_vehicle_size_aware
           ? `From ${formatCurrency(Math.min(
               tier.vehicle_size_sedan_price ?? Infinity,

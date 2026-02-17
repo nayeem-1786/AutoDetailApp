@@ -243,21 +243,21 @@ export function StepReview({
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-gray-900">
+      <h2 className="text-xl font-semibold text-site-text">
         Review Your Booking
       </h2>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-site-text-secondary">
         Please confirm everything looks correct before booking.
       </p>
 
       <div className="mt-6 space-y-6">
         {/* Service */}
-        <div className="rounded-lg border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-700">Service</h3>
-          <p className="mt-1 text-base font-medium text-gray-900">
+        <div className="rounded-lg border border-site-border p-4">
+          <h3 className="text-sm font-semibold text-site-text-secondary">Service</h3>
+          <p className="mt-1 text-base font-medium text-site-text">
             {serviceName}
             {tierName && (
-              <span className="ml-2 text-sm font-normal text-gray-500">
+              <span className="ml-2 text-sm font-normal text-site-text-muted">
                 ({tierName})
               </span>
             )}
@@ -265,25 +265,25 @@ export function StepReview({
         </div>
 
         {/* Schedule */}
-        <div className="rounded-lg border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-700">Schedule</h3>
+        <div className="rounded-lg border border-site-border p-4">
+          <h3 className="text-sm font-semibold text-site-text-secondary">Schedule</h3>
           <div className="mt-2 space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-900">
-              <CalendarDays className="h-4 w-4 text-gray-400" />
+            <div className="flex items-center gap-2 text-sm text-site-text">
+              <CalendarDays className="h-4 w-4 text-site-text-muted" />
               {formatDate(date + 'T12:00:00')}
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-900">
-              <Clock className="h-4 w-4 text-gray-400" />
+            <div className="flex items-center gap-2 text-sm text-site-text">
+              <Clock className="h-4 w-4 text-site-text-muted" />
               {formatTime(time)}
-              <span className="text-gray-500">
+              <span className="text-site-text-muted">
                 ({durationMinutes >= 60
                   ? `${Math.floor(durationMinutes / 60)}h${durationMinutes % 60 > 0 ? ` ${durationMinutes % 60}m` : ''}`
                   : `${durationMinutes}m`})
               </span>
             </div>
             {isMobile && mobileAddress && (
-              <div className="flex items-start gap-2 text-sm text-gray-900">
-                <Truck className="mt-0.5 h-4 w-4 text-gray-400" />
+              <div className="flex items-start gap-2 text-sm text-site-text">
+                <Truck className="mt-0.5 h-4 w-4 text-site-text-muted" />
                 <span>Mobile: {mobileAddress}</span>
               </div>
             )}
@@ -292,11 +292,11 @@ export function StepReview({
 
         {/* Customer - only show for guest bookings */}
         {!isPortal && (
-          <div className="rounded-lg border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700">Your Info</h3>
-            <div className="mt-2 space-y-1.5 text-sm text-gray-900">
+          <div className="rounded-lg border border-site-border p-4">
+            <h3 className="text-sm font-semibold text-site-text-secondary">Your Info</h3>
+            <div className="mt-2 space-y-1.5 text-sm text-site-text">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-400" />
+                <User className="h-4 w-4 text-site-text-muted" />
                 {customer.first_name} {customer.last_name}
               </div>
               <p className="pl-6">{customer.phone}</p>
@@ -306,10 +306,10 @@ export function StepReview({
         )}
 
         {/* Vehicle */}
-        <div className="rounded-lg border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-700">Vehicle</h3>
-          <div className="mt-2 flex items-center gap-2 text-sm text-gray-900">
-            <Car className="h-4 w-4 text-gray-400" />
+        <div className="rounded-lg border border-site-border p-4">
+          <h3 className="text-sm font-semibold text-site-text-secondary">Vehicle</h3>
+          <div className="mt-2 flex items-center gap-2 text-sm text-site-text">
+            <Car className="h-4 w-4 text-site-text-muted" />
             <span>
               {[
                 vehicle.year,
@@ -320,7 +320,7 @@ export function StepReview({
                 .filter(Boolean)
                 .join(' ') || VEHICLE_TYPE_LABELS[vehicle.vehicle_type] || 'Vehicle'}
               {vehicle.size_class && (
-                <span className="text-gray-500">
+                <span className="text-site-text-muted">
                   {' '}
                   &middot; {VEHICLE_SIZE_LABELS[vehicle.size_class]}
                 </span>
@@ -330,25 +330,25 @@ export function StepReview({
         </div>
 
         {/* Coupons & Discounts */}
-        <div className="rounded-lg border border-gray-200 p-4">
+        <div className="rounded-lg border border-site-border p-4">
           <div className="flex items-center gap-2">
             <Gift className="h-4 w-4 text-purple-500" />
-            <h3 className="text-sm font-semibold text-gray-700">Save with a Coupon</h3>
+            <h3 className="text-sm font-semibold text-site-text-secondary">Save with a Coupon</h3>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-site-text-muted">
             Apply a coupon code to get a discount on your booking. The discount will be reflected in your total below.
           </p>
 
           {/* Applied coupon */}
           {appliedCoupon && (
-            <div className="mt-3 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3">
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600" />
+                <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-400" />
                 <div>
-                  <p className="text-sm font-medium text-green-900">
+                  <p className="text-sm font-medium text-green-300">
                     Saving {formatCurrency(appliedCoupon.discount)} with <span className="font-mono font-bold">{appliedCoupon.code}</span>
                   </p>
-                  <p className="text-xs text-green-700">{appliedCoupon.description}</p>
+                  <p className="text-xs text-green-400">{appliedCoupon.description}</p>
                 </div>
               </div>
               <Button
@@ -356,7 +356,7 @@ export function StepReview({
                 variant="ghost"
                 size="sm"
                 onClick={handleRemoveCoupon}
-                className="text-green-700 hover:text-green-900"
+                className="text-green-400 hover:text-green-300 hover:bg-green-500/10 dark:text-green-400 dark:hover:text-green-300"
               >
                 Remove
               </Button>
@@ -367,10 +367,10 @@ export function StepReview({
           {!appliedCoupon && availableCoupons.length > 0 && (
             <div className="mt-3">
               <div className="flex items-center gap-1.5 mb-2">
-                <p className="text-xs font-medium text-gray-700">Your Available Coupons</p>
+                <p className="text-xs font-medium text-site-text-secondary">Your Available Coupons</p>
                 <div className="group relative">
-                  <Info className="h-3.5 w-3.5 text-gray-400 cursor-help" />
-                  <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  <Info className="h-3.5 w-3.5 text-site-text-muted cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block w-48 p-2 bg-brand-grey text-site-text text-xs rounded shadow-lg z-10">
                     These coupons are assigned to your account. Click &quot;Apply&quot; to use one.
                   </div>
                 </div>
@@ -384,30 +384,30 @@ export function StepReview({
                       key={coupon.id}
                       className={`rounded-lg border border-dashed p-3 ${
                         isEligible
-                          ? 'border-purple-200 bg-purple-50/50'
-                          : 'border-gray-200 bg-gray-50/50 opacity-75'
+                          ? 'border-purple-500/30 bg-purple-500/10'
+                          : 'border-site-border bg-brand-surface/50 opacity-75'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <Tag className={`h-4 w-4 flex-shrink-0 ${isEligible ? 'text-purple-500' : 'text-gray-400'}`} />
-                            <span className={`font-mono text-sm font-bold ${isEligible ? 'text-gray-900' : 'text-gray-500'}`}>
+                            <Tag className={`h-4 w-4 flex-shrink-0 ${isEligible ? 'text-purple-500' : 'text-site-text-muted'}`} />
+                            <span className={`font-mono text-sm font-bold ${isEligible ? 'text-site-text' : 'text-site-text-muted'}`}>
                               {coupon.code}
                             </span>
                             {!isEligible && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200">
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-400 border-amber-500/30">
                                 Not applicable
                               </Badge>
                             )}
                           </div>
                           {coupon.name && (
-                            <p className={`mt-0.5 text-sm ${isEligible ? 'text-gray-700' : 'text-gray-500'}`}>{coupon.name}</p>
+                            <p className={`mt-0.5 text-sm ${isEligible ? 'text-site-text-secondary' : 'text-site-text-muted'}`}>{coupon.name}</p>
                           )}
 
                           {/* Ineligibility reason */}
                           {!isEligible && coupon.ineligibility_reason && (
-                            <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                            <p className="mt-1 text-xs text-amber-400 flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" />
                               {coupon.ineligibility_reason}
                             </p>
@@ -416,8 +416,8 @@ export function StepReview({
                           {/* Detailed description */}
                           <ul className="mt-2 space-y-0.5">
                             {details.map((detail, i) => (
-                              <li key={i} className={`text-xs flex items-start gap-1.5 ${isEligible ? 'text-gray-600' : 'text-gray-400'}`}>
-                                <span className={`mt-0.5 ${isEligible ? 'text-purple-400' : 'text-gray-300'}`}>•</span>
+                              <li key={i} className={`text-xs flex items-start gap-1.5 ${isEligible ? 'text-site-text-secondary' : 'text-site-text-muted'}`}>
+                                <span className={`mt-0.5 ${isEligible ? 'text-purple-400' : 'text-site-text-dim'}`}>•</span>
                                 {detail}
                               </li>
                             ))}
@@ -429,7 +429,7 @@ export function StepReview({
                           size="sm"
                           onClick={() => handleApplyCoupon(coupon.code)}
                           disabled={couponLoading || !isEligible}
-                          className="flex-shrink-0"
+                          className="flex-shrink-0 border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
                           title={!isEligible ? coupon.ineligibility_reason || 'Not applicable to selected services' : undefined}
                         >
                           {couponLoading ? <Spinner size="sm" /> : isEligible ? 'Apply' : 'N/A'}
@@ -446,12 +446,12 @@ export function StepReview({
           {!appliedCoupon && (
             <div className="mt-4">
               <div className="flex items-center gap-1.5 mb-2">
-                <p className="text-xs font-medium text-gray-700">
+                <p className="text-xs font-medium text-site-text-secondary">
                   {availableCoupons.length > 0 ? 'Or enter a different code' : 'Enter a coupon code'}
                 </p>
                 <div className="group relative">
-                  <Info className="h-3.5 w-3.5 text-gray-400 cursor-help" />
-                  <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block w-52 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  <Info className="h-3.5 w-3.5 text-site-text-muted cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block w-52 p-2 bg-brand-grey text-site-text text-xs rounded shadow-lg z-10">
                     Enter a coupon code you received via email, SMS, or from our team. Some coupons may require specific services or minimum purchase.
                   </div>
                 </div>
@@ -462,19 +462,20 @@ export function StepReview({
                   placeholder="e.g., SAVE20"
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                  className="flex-1 font-mono"
+                  className="flex-1 font-mono border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => handleApplyCoupon(couponInput)}
                   disabled={couponLoading || !couponInput.trim()}
+                  className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
                 >
                   {couponLoading ? <Spinner size="sm" /> : 'Apply'}
                 </Button>
               </div>
               {couponError && (
-                <p className="mt-1.5 text-xs text-red-600 flex items-start gap-1">
+                <p className="mt-1.5 text-xs text-red-400 flex items-start gap-1">
                   <Info className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
                   {couponError}
                 </p>
@@ -484,7 +485,7 @@ export function StepReview({
 
           {/* No coupons message for empty state */}
           {!appliedCoupon && availableCoupons.length === 0 && !couponInput && (
-            <p className="mt-2 text-xs text-gray-400 italic">
+            <p className="mt-2 text-xs text-site-text-muted italic">
               Don&apos;t have a code? No problem — you can still complete your booking without one.
             </p>
           )}
@@ -492,21 +493,21 @@ export function StepReview({
 
         {/* Loyalty Points - only for portal users with points */}
         {isPortal && loyaltyPointsBalance >= REDEEM_MINIMUM && (
-          <div className="rounded-lg border border-gray-200 p-4">
+          <div className="rounded-lg border border-site-border p-4">
             <div className="flex items-center gap-2">
               <Coins className="h-4 w-4 text-amber-500" />
-              <h3 className="text-sm font-semibold text-gray-700">Use Your Loyalty Points</h3>
+              <h3 className="text-sm font-semibold text-site-text-secondary">Use Your Loyalty Points</h3>
             </div>
-            <p className="mt-1 text-xs text-gray-500">
-              You have <span className="font-semibold text-amber-600">{loyaltyPointsBalance.toLocaleString()} points</span> worth{' '}
-              <span className="font-semibold text-green-600">{formatCurrency(loyaltyPointsValue)}</span>.
+            <p className="mt-1 text-xs text-site-text-muted">
+              You have <span className="font-semibold text-amber-400">{loyaltyPointsBalance.toLocaleString()} points</span> worth{' '}
+              <span className="font-semibold text-green-400">{formatCurrency(loyaltyPointsValue)}</span>.
               {maxLoyaltyPointsUsable > 0 ? ' Apply them to reduce your total.' : ''}
             </p>
 
             {maxLoyaltyPointsUsable > 0 ? (
               <div className="mt-3">
                 <div className="flex items-center gap-3">
-                  <label className="text-sm text-gray-700">Points to use:</label>
+                  <label className="text-sm text-site-text-secondary">Points to use:</label>
                   <input
                     type="range"
                     min={0}
@@ -514,33 +515,33 @@ export function StepReview({
                     step={REDEEM_MINIMUM}
                     value={loyaltyPointsToUse}
                     onChange={(e) => onLoyaltyPointsChange(Number(e.target.value))}
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    className="flex-1 h-2 bg-brand-surface rounded-lg appearance-none cursor-pointer accent-amber-500"
                   />
-                  <span className="text-sm font-medium text-gray-900 w-20 text-right">
+                  <span className="text-sm font-medium text-site-text w-20 text-right">
                     {loyaltyPointsToUse.toLocaleString()} pts
                   </span>
                 </div>
 
                 {loyaltyPointsToUse > 0 && (
-                  <div className="mt-2 flex items-center justify-between rounded-lg bg-amber-50 border border-amber-200 p-2">
-                    <span className="text-sm text-amber-800">Points discount:</span>
-                    <span className="text-sm font-semibold text-amber-800">-{formatCurrency(loyaltyDiscount)}</span>
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 p-2">
+                    <span className="text-sm text-amber-300">Points discount:</span>
+                    <span className="text-sm font-semibold text-amber-300">-{formatCurrency(loyaltyDiscount)}</span>
                   </div>
                 )}
 
                 {maxLoyaltyPointsUsable < loyaltyPointsBalance && (
-                  <p className="mt-2 text-xs text-amber-600">
+                  <p className="mt-2 text-xs text-amber-400">
                     Only {maxLoyaltyPointsUsable.toLocaleString()} points needed to cover remaining balance.
                   </p>
                 )}
 
-                <p className="mt-2 text-xs text-gray-400">
+                <p className="mt-2 text-xs text-site-text-muted">
                   Points are redeemed in increments of {REDEEM_MINIMUM}. Each {REDEEM_MINIMUM} points = {formatCurrency(REDEEM_MINIMUM * REDEEM_RATE)} off.
                 </p>
               </div>
             ) : (
-              <div className="mt-3 rounded-lg bg-green-50 border border-green-200 p-2">
-                <p className="text-xs text-green-700">
+              <div className="mt-3 rounded-lg bg-green-500/10 border border-green-500/30 p-2">
+                <p className="text-xs text-green-400">
                   Your coupon already covers the remaining balance — no points needed! Your points will be saved for a future visit.
                 </p>
               </div>
@@ -550,10 +551,10 @@ export function StepReview({
 
         {/* Loyalty Points - message for users without enough points */}
         {isPortal && loyaltyPointsBalance > 0 && loyaltyPointsBalance < REDEEM_MINIMUM && (
-          <div className="rounded-lg border border-dashed border-amber-200 bg-amber-50/50 p-4">
+          <div className="rounded-lg border border-dashed border-amber-500/30 bg-amber-500/10 p-4">
             <div className="flex items-center gap-2">
               <Coins className="h-4 w-4 text-amber-500" />
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-amber-400">
                 You have <span className="font-semibold">{loyaltyPointsBalance} points</span>. Earn {REDEEM_MINIMUM - loyaltyPointsBalance} more to redeem for{' '}
                 {formatCurrency(REDEEM_MINIMUM * REDEEM_RATE)} off!
               </p>
@@ -563,16 +564,16 @@ export function StepReview({
 
         {/* Payment Options */}
         {requirePayment && (
-          <div className="rounded-lg border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700">Payment Options</h3>
+          <div className="rounded-lg border border-site-border p-4">
+            <h3 className="text-sm font-semibold text-site-text-secondary">Payment Options</h3>
             <div className="mt-3 space-y-3">
               {/* Full payment required for services under $100 */}
               {isFullPaymentRequired ? (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                  <p className="text-sm font-medium text-blue-900">
+                <div className="rounded-lg border border-lime/30 bg-brand-surface p-3">
+                  <p className="text-sm font-medium text-lime">
                     Full Payment Required: {formatCurrency(grandTotal)}
                   </p>
-                  <p className="text-xs text-blue-700 mt-1">
+                  <p className="text-xs text-lime/80 mt-1">
                     For services under $100, full payment is required to secure your appointment.
                   </p>
                 </div>
@@ -582,8 +583,8 @@ export function StepReview({
                   <label
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                       paymentOption === 'deposit'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-lime bg-brand-surface'
+                        : 'border-site-border hover:border-site-border-medium'
                     }`}
                   >
                     <input
@@ -592,16 +593,16 @@ export function StepReview({
                       value="deposit"
                       checked={paymentOption === 'deposit'}
                       onChange={() => onPaymentOptionChange('deposit')}
-                      className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500"
+                      className="mt-0.5 h-4 w-4 text-lime focus:ring-lime"
                     />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-site-text">
                         {formatCurrency(paymentAmount)} Deposit
                         {paymentOption !== 'deposit' && (
-                          <span className="ml-2 text-xs font-normal text-blue-600">Recommended</span>
+                          <span className="ml-2 text-xs font-normal text-lime">Recommended</span>
                         )}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-site-text-muted">
                         Pay {formatCurrency(paymentAmount)} now to reserve your spot, remaining {formatCurrency(remainingAmount)} at service
                       </p>
                     </div>
@@ -612,8 +613,8 @@ export function StepReview({
                     <label
                       className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                         paymentOption === 'pay_on_site'
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-lime bg-brand-surface'
+                          : 'border-site-border hover:border-site-border-medium'
                       }`}
                     >
                       <input
@@ -622,11 +623,11 @@ export function StepReview({
                         value="pay_on_site"
                         checked={paymentOption === 'pay_on_site'}
                         onChange={() => onPaymentOptionChange('pay_on_site')}
-                        className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500"
+                        className="mt-0.5 h-4 w-4 text-lime focus:ring-lime"
                       />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">Pay on Site</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-medium text-site-text">Pay on Site</p>
+                        <p className="text-xs text-site-text-muted">
                           No payment now, pay the full amount when we&apos;re done
                         </p>
                       </div>
@@ -635,7 +636,7 @@ export function StepReview({
 
                   {/* Message for new customers */}
                   {!isExistingCustomer && (
-                    <p className="text-xs text-gray-500 italic">
+                    <p className="text-xs text-site-text-muted italic">
                       A deposit is required for first-time customers. Pay on Site option becomes available after your first visit.
                     </p>
                   )}
@@ -644,12 +645,12 @@ export function StepReview({
             </div>
 
             {/* Cancellation Disclaimer */}
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600 mt-0.5" />
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-400 mt-0.5" />
                 <div>
-                  <p className="text-xs font-medium text-amber-800">Cancellation & No-Show Policy</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
+                  <p className="text-xs font-medium text-amber-300">Cancellation & No-Show Policy</p>
+                  <p className="text-xs text-amber-400 mt-0.5">
                     {cancellationFeeEnabled
                       ? <>Cancellations must be made at least 24 hours before your appointment. Late cancellations or no-shows will be charged a <span className="font-semibold">$50 fee</span>.</>
                       : 'Cancellations must be made at least 24 hours before your appointment.'}
@@ -661,46 +662,46 @@ export function StepReview({
         )}
 
         {/* Price Breakdown */}
-        <div className="rounded-lg bg-gray-50 p-4">
-          <h3 className="text-sm font-semibold text-gray-700">
+        <div className="rounded-lg bg-brand-surface p-4">
+          <h3 className="text-sm font-semibold text-site-text-secondary">
             Price Summary
           </h3>
           <div className="mt-2 space-y-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">{serviceName}</span>
-              <span className="font-medium text-gray-900">
+              <span className="text-site-text-secondary">{serviceName}</span>
+              <span className="font-medium text-site-text">
                 {formatCurrency(price)}
               </span>
             </div>
             {addons.map((addon) => (
               <div key={addon.service_id} className="flex justify-between">
-                <span className="text-gray-600">{addon.name}</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-site-text-secondary">{addon.name}</span>
+                <span className="font-medium text-site-text">
                   {formatCurrency(addon.price)}
                 </span>
               </div>
             ))}
             {mobileSurcharge > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-600">Mobile surcharge</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-site-text-secondary">Mobile surcharge</span>
+                <span className="font-medium text-site-text">
                   {formatCurrency(mobileSurcharge)}
                 </span>
               </div>
             )}
             {appliedCoupon && appliedCoupon.discount > 0 && (
-              <div className="flex justify-between text-green-700">
+              <div className="flex justify-between text-green-400">
                 <span>Coupon ({appliedCoupon.code})</span>
                 <span className="font-medium">-{formatCurrency(appliedCoupon.discount)}</span>
               </div>
             )}
             {loyaltyPointsToUse > 0 && (
-              <div className="flex justify-between text-amber-700">
+              <div className="flex justify-between text-amber-400">
                 <span>Loyalty Points ({loyaltyPointsToUse.toLocaleString()} pts)</span>
                 <span className="font-medium">-{formatCurrency(loyaltyDiscount)}</span>
               </div>
             )}
-            <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
+            <div className="flex justify-between border-t border-site-border pt-2 text-base font-semibold text-site-text">
               <span>Total</span>
               <span>{formatCurrency(grandTotal)}</span>
             </div>
@@ -708,12 +709,12 @@ export function StepReview({
             {/* Payment breakdown */}
             {requirePayment && paymentOption !== 'pay_on_site' && (
               <>
-                <div className="flex justify-between pt-1 text-blue-700">
+                <div className="flex justify-between pt-1 text-lime">
                   <span>{isFullPaymentRequired ? 'Amount Due' : 'Deposit now'}</span>
                   <span className="font-medium">{formatCurrency(paymentAmount)}</span>
                 </div>
                 {!isFullPaymentRequired && (
-                  <div className="flex justify-between text-gray-500">
+                  <div className="flex justify-between text-site-text-muted">
                     <span>Due at service</span>
                     <span className="font-medium">{formatCurrency(remainingAmount)}</span>
                   </div>
@@ -725,27 +726,27 @@ export function StepReview({
 
         {/* Error */}
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+            <p className="text-sm text-red-400">{error}</p>
           </div>
         )}
 
         {/* Terms & Conditions Agreement */}
-        <div className="rounded-lg border border-gray-200 p-4">
+        <div className="rounded-lg border border-site-border p-4">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={agreedToTerms}
               onChange={(e) => setAgreedToTerms(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+              className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
             />
-            <span className="text-sm text-gray-700">
+            <span className="text-sm text-site-text-secondary">
               I agree to the{' '}
               <a
                 href="/terms"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-600 hover:text-brand-700 underline"
+                className="text-lime hover:text-lime-200 underline"
                 onClick={(e) => e.stopPropagation()}
               >
                 Terms &amp; Conditions
@@ -761,10 +762,11 @@ export function StepReview({
             variant="outline"
             onClick={onBack}
             disabled={submitting}
+            className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
           >
             Back
           </Button>
-          <Button onClick={handleConfirm} disabled={submitting || !agreedToTerms}>
+          <Button onClick={handleConfirm} disabled={submitting || !agreedToTerms} className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
             {submitting ? (
               <>
                 <Spinner size="sm" className="text-white" />
