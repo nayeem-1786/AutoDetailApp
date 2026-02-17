@@ -36,6 +36,24 @@ const US_STATES = [
   'DC',
 ] as const;
 
+// Common service levels offered by major carriers
+const COMMON_SERVICE_LEVELS = [
+  { token: 'usps_ground_advantage', label: 'USPS Ground Advantage' },
+  { token: 'usps_priority', label: 'USPS Priority Mail' },
+  { token: 'usps_priority_express', label: 'USPS Priority Mail Express' },
+  { token: 'ups_ground', label: 'UPS Ground' },
+  { token: 'ups_3_day_select', label: 'UPS 3 Day Select' },
+  { token: 'ups_second_day_air', label: 'UPS 2nd Day Air' },
+  { token: 'ups_next_day_air_saver', label: 'UPS Next Day Air Saver' },
+  { token: 'ups_next_day_air', label: 'UPS Next Day Air' },
+  { token: 'fedex_ground', label: 'FedEx Ground' },
+  { token: 'fedex_home_delivery', label: 'FedEx Home Delivery' },
+  { token: 'fedex_express_saver', label: 'FedEx Express Saver' },
+  { token: 'fedex_2_day', label: 'FedEx 2Day' },
+  { token: 'fedex_standard_overnight', label: 'FedEx Standard Overnight' },
+  { token: 'fedex_priority_overnight', label: 'FedEx Priority Overnight' },
+] as const;
+
 interface ShippingFormData {
   shippo_api_key_live: string;
   shippo_api_key_test: string;
@@ -61,6 +79,7 @@ interface ShippingFormData {
   flat_rate_enabled: boolean;
   flat_rate_amount: string;
   enabled_carriers: string[];
+  enabled_service_levels: string[];
   handling_fee_type: 'none' | 'flat' | 'percent';
   handling_fee_amount: string;
   show_estimated_delivery: boolean;
@@ -96,6 +115,7 @@ const DEFAULTS: ShippingFormData = {
   flat_rate_enabled: false,
   flat_rate_amount: '0',
   enabled_carriers: [],
+  enabled_service_levels: [],
   handling_fee_type: 'none',
   handling_fee_amount: '0',
   show_estimated_delivery: true,
@@ -172,6 +192,7 @@ export default function ShippingSettingsPage() {
           flat_rate_enabled: data.flat_rate_enabled ?? false,
           flat_rate_amount: String((data.flat_rate_amount ?? 0) / 100), // cents to dollars
           enabled_carriers: Array.isArray(data.enabled_carriers) ? data.enabled_carriers : [],
+          enabled_service_levels: Array.isArray(data.enabled_service_levels) ? data.enabled_service_levels : [],
           handling_fee_type: data.handling_fee_type || 'none',
           handling_fee_amount: String(data.handling_fee_amount ?? '0'),
           show_estimated_delivery: data.show_estimated_delivery ?? true,
@@ -298,6 +319,17 @@ export default function ShippingSettingsPage() {
         ? current.filter((c) => c !== carrier)
         : [...current, carrier];
       return { ...prev, enabled_carriers: next };
+    });
+  }
+
+  // Toggle service level
+  function toggleServiceLevel(token: string) {
+    setForm((prev) => {
+      const current = prev.enabled_service_levels;
+      const next = current.includes(token)
+        ? current.filter((t) => t !== token)
+        : [...current, token];
+      return { ...prev, enabled_service_levels: next };
     });
   }
 
@@ -803,6 +835,47 @@ export default function ShippingSettingsPage() {
                   </div>
                 </label>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 4b: Service Level Filter */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Level Filter</CardTitle>
+          <p className="text-sm text-gray-500 mt-1">
+            Select which service levels to show at checkout. Leave empty to show all available levels.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {COMMON_SERVICE_LEVELS.map((level) => (
+              <label
+                key={level.token}
+                className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <Checkbox
+                  checked={form.enabled_service_levels.includes(level.token)}
+                  onChange={() => toggleServiceLevel(level.token)}
+                />
+                <span className="text-sm font-medium text-gray-900">
+                  {level.label}
+                </span>
+                <span className="text-xs text-gray-500">{level.token}</span>
+              </label>
+            ))}
+          </div>
+          {form.enabled_service_levels.length > 0 && (
+            <div className="mt-3 flex items-center gap-2">
+              <Badge variant="info">{form.enabled_service_levels.length} selected</Badge>
+              <button
+                type="button"
+                onClick={() => updateField('enabled_service_levels', [])}
+                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                Clear all
+              </button>
             </div>
           )}
         </CardContent>

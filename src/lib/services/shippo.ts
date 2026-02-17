@@ -46,14 +46,23 @@ export async function getShippingSettings(): Promise<ShippingSettings | null> {
 
 async function getShippoClient(): Promise<Shippo> {
   const settings = await getShippingSettings();
-  if (!settings) throw new Error('Shipping settings not configured');
 
-  const apiKey = settings.shippo_mode === 'live'
-    ? settings.shippo_api_key_live
-    : settings.shippo_api_key_test;
+  // Determine mode — DB settings first, then env var, default to 'test'
+  const mode = settings?.shippo_mode || (process.env.SHIPPO_MODE as 'test' | 'live') || 'test';
+
+  // Try DB key first, then fall back to env var
+  let apiKey = mode === 'live'
+    ? settings?.shippo_api_key_live
+    : settings?.shippo_api_key_test;
 
   if (!apiKey) {
-    throw new Error(`Shippo ${settings.shippo_mode} API key not configured`);
+    apiKey = mode === 'live'
+      ? process.env.SHIPPO_API_KEY_LIVE
+      : process.env.SHIPPO_API_KEY_TEST;
+  }
+
+  if (!apiKey) {
+    throw new Error(`Shippo ${mode} API key not configured (check Settings > Shipping or env vars)`);
   }
 
   return new Shippo({ apiKeyHeader: apiKey });
@@ -205,6 +214,7 @@ export async function getShippingRates(params: {
       amount: amountCents,
       currency: r.currency || 'USD',
       estimatedDays: r.estimatedDays ?? null,
+      estimatedDeliveryDate: r.arrivesBy || undefined,
       handlingFee,
       totalAmount: amountCents + handlingFee,
     };

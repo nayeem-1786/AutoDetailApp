@@ -35,11 +35,13 @@ interface ShippingRate {
   id: string;
   carrier: string;
   carrierName: string;
+  carrierLogo?: string;
   service: string;
   serviceName: string;
   amount: number;
   totalAmount: number;
   estimatedDays: number | null;
+  estimatedDeliveryDate?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +185,13 @@ function CheckoutContent() {
   const [ratesError, setRatesError] = useState<string | null>(null);
   const [ratesFetched, setRatesFetched] = useState(false);
 
+  // Display preferences from settings
+  const [showCarrierLogo, setShowCarrierLogo] = useState(true);
+
+  // Address validation (non-blocking)
+  const [addressWarning, setAddressWarning] = useState<string | null>(null);
+  const [addressValidating, setAddressValidating] = useState(false);
+
   // Checkout state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -231,6 +240,36 @@ function CheckoutContent() {
     fulfillmentMethod === 'pickup' ||
     (shippingAddressValid && !!selectedRateId);
 
+  // Validate address via Shippo (non-blocking)
+  const validateShippingAddress = useCallback(async () => {
+    setAddressValidating(true);
+    setAddressWarning(null);
+    try {
+      const res = await fetch('/api/checkout/validate-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          street1: shipStreet1.trim(),
+          street2: shipStreet2.trim() || undefined,
+          city: shipCity.trim(),
+          state: shipState.trim().toUpperCase(),
+          zip: shipZip.trim(),
+          country: 'US',
+        }),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        if (data && !data.isValid && data.messages?.length > 0) {
+          setAddressWarning(data.messages.join('. '));
+        }
+      }
+    } catch {
+      // Validation failure is non-blocking — silently ignore
+    } finally {
+      setAddressValidating(false);
+    }
+  }, [shipStreet1, shipStreet2, shipCity, shipState, shipZip]);
+
   // Fetch shipping rates
   const handleFetchRates = useCallback(async () => {
     if (!shippingAddressValid || items.length === 0) return;
@@ -240,6 +279,9 @@ function CheckoutContent() {
     setShippingRates([]);
     setSelectedRateId(null);
     setRatesFetched(false);
+
+    // Fire address validation in parallel (non-blocking)
+    validateShippingAddress();
 
     try {
       const res = await fetch('/api/checkout/shipping-rates', {
@@ -271,6 +313,11 @@ function CheckoutContent() {
         return;
       }
 
+      // Read display preferences
+      if (data.data?.showCarrierLogo !== undefined) {
+        setShowCarrierLogo(data.data.showCarrierLogo);
+      }
+
       const rates = (data.data?.rates || []) as ShippingRate[];
       setShippingRates(rates);
       setRatesFetched(true);
@@ -296,6 +343,7 @@ function CheckoutContent() {
     shipZip,
     phone,
     email,
+    validateShippingAddress,
   ]);
 
   // Create payment intent
@@ -637,6 +685,14 @@ function CheckoutContent() {
                     <p className="text-sm text-red-400">{ratesError}</p>
                   )}
 
+                  {/* Address validation warning (non-blocking) */}
+                  {addressWarning && !addressValidating && (
+                    <div className="rounded-xl bg-yellow-950/50 border border-yellow-700/40 p-3 text-sm text-yellow-300">
+                      <p className="font-medium">Address may have issues</p>
+                      <p className="text-yellow-400 mt-0.5">{addressWarning}</p>
+                    </div>
+                  )}
+
                   {/* Rate options */}
                   {shippingRates.length > 0 && (
                     <div className="space-y-2">
@@ -661,6 +717,14 @@ function CheckoutContent() {
                               onChange={() => setSelectedRateId(rate.id)}
                               className="accent-lime"
                             />
+                            {showCarrierLogo && rate.carrierLogo && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={rate.carrierLogo}
+                                alt={rate.carrierName}
+                                className="h-6 w-6 object-contain shrink-0"
+                              />
+                            )}
                             <div>
                               <span className="text-sm font-medium text-site-text">
                                 {rate.carrierName} — {rate.serviceName}
