@@ -163,9 +163,9 @@ function DataTable<TData>({
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-ui-border bg-ui-bg shadow-ui">
         {exportFilename && (
-          <div className="flex justify-end border-b border-gray-200 px-4 py-3">
+          <div className="flex justify-end border-b border-ui-border px-4 py-3">
             <Button variant="outline" size="sm" onClick={handleExportCsv}>
               <Download className="h-4 w-4" />
               Export
@@ -190,7 +190,7 @@ function DataTable<TData>({
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {header.column.getCanSort() && (
-                          <ArrowUpDown className="h-4 w-4 text-gray-400" />
+                          <ArrowUpDown className="h-4 w-4 text-ui-text-dim" />
                         )}
                       </div>
                     )}
@@ -216,7 +216,7 @@ function DataTable<TData>({
           </TableBody>
         </Table>
         {table.getPageCount() > 1 && (
-          <div className="border-t border-gray-200 px-4 py-3">
+          <div className="border-t border-ui-border px-4 py-3">
             <Pagination
               currentPage={table.getState().pagination.pageIndex + 1}
               totalPages={table.getPageCount()}
@@ -237,7 +237,7 @@ function DataTable<TData>({
                 variant={action.variant === 'destructive' ? 'destructive' : 'default'}
                 size="sm"
                 onClick={() => action.onClick(selectedRows)}
-                className={action.variant !== 'destructive' ? 'bg-white text-gray-900 hover:bg-gray-100' : undefined}
+                className={action.variant !== 'destructive' ? 'bg-ui-bg text-ui-text hover:bg-ui-bg-hover' : undefined}
               >
                 {action.label}
               </Button>

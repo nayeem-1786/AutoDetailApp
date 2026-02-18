@@ -58,7 +58,7 @@ function DropdownMenuContent({ className, align = 'end', children, ...props }: D
   return (
     <div
       className={cn(
-        'absolute z-50 mt-2 min-w-[8rem] overflow-hidden rounded-md border border-gray-200 bg-white p-1 shadow-md',
+        'absolute z-50 mt-2 min-w-[8rem] overflow-hidden rounded-md border border-ui-dropdown-border bg-ui-dropdown-bg p-1 shadow-md',
         align === 'end' && 'right-0',
         align === 'start' && 'left-0',
         align === 'center' && 'left-1/2 -translate-x-1/2',
@@ -77,8 +77,8 @@ function DropdownMenuItem({ className, destructive, ...props }: DropdownMenuItem
   return (
     <button
       className={cn(
-        'relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100',
-        destructive && 'text-red-600 hover:bg-red-50 focus:bg-red-50',
+        'relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-ui-dropdown-hover focus:bg-ui-dropdown-hover',
+        destructive && 'text-red-600 hover:bg-red-500/10 focus:bg-red-500/10',
         className
       )}
       onClick={(e) => {
@@ -91,11 +91,11 @@ function DropdownMenuItem({ className, destructive, ...props }: DropdownMenuItem
 }
 
 function DropdownMenuSeparator({ className }: { className?: string }) {
-  return <div className={cn('-mx-1 my-1 h-px bg-gray-200', className)} />;
+  return <div className={cn('-mx-1 my-1 h-px bg-ui-border', className)} />;
 }
 
 function DropdownMenuLabel({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('px-2 py-1.5 text-sm font-semibold text-gray-900', className)} {...props} />;
+  return <div className={cn('px-2 py-1.5 text-sm font-semibold text-ui-text', className)} {...props} />;
 }
 
 export {

@@ -82,6 +82,159 @@
   --site-btn-cta-text: var(--site-text-on-primary);
   --site-btn-cta-hover-bg: var(--lime-200);
   --site-btn-cta-radius: 9999px;
+
+
+  /* ============================================
+     Contextual UI Variables
+     Three layers:
+     1. :root — light defaults (admin uses these)
+     2. .public-theme — dark overrides (public default)
+     3. .public-theme[data-user-theme="light"] — user toggle back to light
+     ============================================ */
+  --ui-bg: #ffffff;
+  --ui-bg-hover: #f9fafb;
+  --ui-bg-alt: #f8fafc;
+  --ui-bg-muted: #f3f4f6;
+  --ui-text: #0f172a;
+  --ui-text-secondary: #374151;
+  --ui-text-muted: #6b7280;
+  --ui-text-dim: #9ca3af;
+  --ui-text-faint: #d1d5db;
+  --ui-border: #e5e7eb;
+  --ui-border-light: #f3f4f6;
+  --ui-ring: #9ca3af;
+  --ui-placeholder: #9ca3af;
+  --ui-shadow: rgba(0, 0, 0, 0.1);
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #d1d5db;
+  --ui-skeleton: #e5e7eb;
+  --ui-switch-off: #e5e7eb;
+  --ui-switch-thumb: #ffffff;
+  --ui-badge-default-bg: #f3f4f6;
+  --ui-badge-default-text: #374151;
+  --ui-tab-list-bg: #f3f4f6;
+  --ui-tab-active-bg: #ffffff;
+  --ui-tab-active-text: #0f172a;
+  --ui-dropdown-bg: #ffffff;
+  --ui-dropdown-hover: #f3f4f6;
+  --ui-dropdown-border: #e5e7eb;
+  --ui-page-bg: #ffffff;
+  --ui-page-text: #0f172a;
+  --ui-page-text-secondary: #374151;
+  --ui-page-text-muted: #6b7280;
+  --ui-page-border: #e5e7eb;
+  --ui-page-section-bg: #f8fafc;
+  --ui-page-card-bg: #ffffff;
+  --ui-page-header-bg: #ffffff;
+  --ui-page-footer-bg: #f8fafc;
+}
+
+/* Layer 2: Dark mode for public/account/auth pages (DEFAULT) */
+.public-theme {
+  --ui-bg: var(--brand-surface);
+  --ui-bg-hover: var(--brand-dark);
+  --ui-bg-alt: var(--brand-dark);
+  --ui-bg-muted: rgba(255, 255, 255, 0.05);
+  --ui-text: var(--site-text);
+  --ui-text-secondary: var(--site-text-secondary);
+  --ui-text-muted: var(--site-text-muted);
+  --ui-text-dim: var(--site-text-dim);
+  --ui-text-faint: var(--site-text-faint);
+  --ui-border: var(--site-border);
+  --ui-border-light: var(--site-border-light);
+  --ui-ring: var(--lime);
+  --ui-placeholder: var(--site-text-dim);
+  --ui-shadow: rgba(0, 0, 0, 0.3);
+  --ui-input-bg: var(--brand-dark);
+  --ui-input-border: var(--site-border);
+  --ui-skeleton: rgba(255, 255, 255, 0.08);
+  --ui-switch-off: rgba(255, 255, 255, 0.1);
+  --ui-switch-thumb: #ffffff;
+  --ui-badge-default-bg: rgba(255, 255, 255, 0.05);
+  --ui-badge-default-text: var(--site-text-muted);
+  --ui-tab-list-bg: rgba(255, 255, 255, 0.05);
+  --ui-tab-active-bg: var(--brand-surface);
+  --ui-tab-active-text: var(--site-text);
+  --ui-dropdown-bg: var(--brand-surface);
+  --ui-dropdown-hover: var(--brand-dark);
+  --ui-dropdown-border: var(--site-border);
+  --ui-page-bg: var(--brand-black);
+  --ui-page-text: var(--site-text);
+  --ui-page-text-secondary: var(--site-text-secondary);
+  --ui-page-text-muted: var(--site-text-muted);
+  --ui-page-border: var(--site-border);
+  --ui-page-section-bg: var(--brand-dark);
+  --ui-page-card-bg: var(--brand-surface);
+  --ui-page-header-bg: var(--site-header-bg);
+  --ui-page-footer-bg: var(--site-footer-bg);
+}
+
+/* Layer 3: User toggles to light mode on public pages */
+.public-theme[data-user-theme="light"] {
+  --ui-bg: #ffffff;
+  --ui-bg-hover: #f9fafb;
+  --ui-bg-alt: #f8fafc;
+  --ui-bg-muted: #f3f4f6;
+  --ui-text: #0f172a;
+  --ui-text-secondary: #374151;
+  --ui-text-muted: #6b7280;
+  --ui-text-dim: #9ca3af;
+  --ui-text-faint: #d1d5db;
+  --ui-border: #e5e7eb;
+  --ui-border-light: #f3f4f6;
+  --ui-ring: var(--lime-600, #65a30d);
+  --ui-placeholder: #9ca3af;
+  --ui-shadow: rgba(0, 0, 0, 0.1);
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #d1d5db;
+  --ui-skeleton: #e5e7eb;
+  --ui-switch-off: #e5e7eb;
+  --ui-switch-thumb: #ffffff;
+  --ui-badge-default-bg: #f3f4f6;
+  --ui-badge-default-text: #374151;
+  --ui-tab-list-bg: #f3f4f6;
+  --ui-tab-active-bg: #ffffff;
+  --ui-tab-active-text: #0f172a;
+  --ui-dropdown-bg: #ffffff;
+  --ui-dropdown-hover: #f3f4f6;
+  --ui-dropdown-border: #e5e7eb;
+  --ui-page-bg: #ffffff;
+  --ui-page-text: #0f172a;
+  --ui-page-text-secondary: #374151;
+  --ui-page-text-muted: #6b7280;
+  --ui-page-border: #e5e7eb;
+  --ui-page-section-bg: #f8fafc;
+  --ui-page-card-bg: #ffffff;
+  --ui-page-header-bg: #ffffff;
+  --ui-page-footer-bg: #f8fafc;
+  /* Override site-level theme vars so existing pages also go light */
+  --brand-black: #ffffff;
+  --brand-dark: #f8fafc;
+  --brand-darker: #f1f5f9;
+  --brand-surface: #ffffff;
+  --brand-grey: #e5e7eb;
+  --brand-grey-light: #f3f4f6;
+  --site-text: #0f172a;
+  --site-text-secondary: #374151;
+  --site-text-muted: #6b7280;
+  --site-text-dim: #9ca3af;
+  --site-text-faint: #d1d5db;
+  --site-border: #e5e7eb;
+  --site-border-light: #f3f4f6;
+  --site-border-medium: #d1d5db;
+  --site-header-bg: #ffffff;
+  --site-footer-bg: #f8fafc;
+  --site-text-on-primary: #000000;
+  --site-divider: #e5e7eb;
+  --site-link: var(--lime-600, #65a30d);
+  --site-link-hover: var(--lime-500, #84cc16);
+  --site-btn-primary-bg: var(--lime-600, #65a30d);
+  --site-btn-primary-text: #ffffff;
+  --site-btn-primary-hover-bg: var(--lime-500, #84cc16);
+  --site-btn-cta-bg: var(--lime-600, #65a30d);
+  --site-btn-cta-text: #ffffff;
+  --site-btn-cta-hover-bg: var(--lime-500, #84cc16);
+  --theme-accent-glow-rgb: 101, 163, 13;
 }
 
 @theme inline {
@@ -154,6 +307,45 @@
   --shadow-lime: 0 0 20px rgba(var(--theme-accent-glow-rgb), 0.15);
   --shadow-lime-lg: 0 0 40px rgba(var(--theme-accent-glow-rgb), 0.25);
   --shadow-lime-glow: 0 0 60px rgba(var(--theme-accent-glow-rgb), 0.3);
+
+  /* Contextual UI tokens */
+  --color-ui-bg: var(--ui-bg);
+  --color-ui-bg-hover: var(--ui-bg-hover);
+  --color-ui-bg-alt: var(--ui-bg-alt);
+  --color-ui-bg-muted: var(--ui-bg-muted);
+  --color-ui-text: var(--ui-text);
+  --color-ui-text-secondary: var(--ui-text-secondary);
+  --color-ui-text-muted: var(--ui-text-muted);
+  --color-ui-text-dim: var(--ui-text-dim);
+  --color-ui-text-faint: var(--ui-text-faint);
+  --color-ui-border: var(--ui-border);
+  --color-ui-border-light: var(--ui-border-light);
+  --color-ui-ring: var(--ui-ring);
+  --color-ui-placeholder: var(--ui-placeholder);
+  --color-ui-input-bg: var(--ui-input-bg);
+  --color-ui-input-border: var(--ui-input-border);
+  --color-ui-skeleton: var(--ui-skeleton);
+  --color-ui-switch-off: var(--ui-switch-off);
+  --color-ui-switch-thumb: var(--ui-switch-thumb);
+  --color-ui-badge-default-bg: var(--ui-badge-default-bg);
+  --color-ui-badge-default-text: var(--ui-badge-default-text);
+  --color-ui-tab-list-bg: var(--ui-tab-list-bg);
+  --color-ui-tab-active-bg: var(--ui-tab-active-bg);
+  --color-ui-tab-active-text: var(--ui-tab-active-text);
+  --color-ui-dropdown-bg: var(--ui-dropdown-bg);
+  --color-ui-dropdown-hover: var(--ui-dropdown-hover);
+  --color-ui-dropdown-border: var(--ui-dropdown-border);
+  --color-ui-page-bg: var(--ui-page-bg);
+  --color-ui-page-text: var(--ui-page-text);
+  --color-ui-page-text-secondary: var(--ui-page-text-secondary);
+  --color-ui-page-text-muted: var(--ui-page-text-muted);
+  --color-ui-page-border: var(--ui-page-border);
+  --color-ui-page-section-bg: var(--ui-page-section-bg);
+  --color-ui-page-card-bg: var(--ui-page-card-bg);
+  --color-ui-page-header-bg: var(--ui-page-header-bg);
+  --color-ui-page-footer-bg: var(--ui-page-footer-bg);
+  --shadow-ui: 0 1px 3px var(--ui-shadow);
+  --shadow-ui-lg: 0 10px 15px var(--ui-shadow);
 }
 
 @media (prefers-color-scheme: dark) {

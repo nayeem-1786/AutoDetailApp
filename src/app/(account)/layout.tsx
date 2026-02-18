@@ -3,6 +3,7 @@ import { SiteFooter } from '@/components/public/site-footer';
 import { ThemeProvider } from '@/components/public/cms/theme-provider';
 import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrapper';
 import { CartDrawer } from '@/components/public/cart/cart-drawer';
+import { ThemeToggleInitializer } from '@/components/public/theme-toggle-initializer';
 import { CustomerAuthProvider } from '@/lib/auth/customer-auth-provider';
 import { getActiveTheme, getCmsToggles, getSiteThemeSettings } from '@/lib/data/cms';
 
@@ -29,6 +30,7 @@ export default async function AccountLayout({
     >
       <CartProviderWrapper>
         <div className="public-theme bg-brand-black text-site-text min-h-screen">
+          <ThemeToggleInitializer />
           <SiteHeader />
           <main className="min-h-[calc(100vh-4rem)]">
             <CustomerAuthProvider>{children}</CustomerAuthProvider>

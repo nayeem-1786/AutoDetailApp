@@ -57,10 +57,10 @@ export function SendMethodDialog({
       </DialogHeader>
       <DialogContent className="space-y-4">
         {description && (
-          <p className="text-sm text-gray-600">{description}</p>
+          <p className="text-sm text-ui-text-secondary">{description}</p>
         )}
         <div className="space-y-2">
-          <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${success ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
+          <label className={`flex items-center gap-3 rounded-md border border-ui-border p-3 ${success ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-ui-bg-hover'}`}>
             <input
               type="radio"
               name="sendMethod"
@@ -69,15 +69,15 @@ export function SendMethodDialog({
               onChange={() => setMethod('email')}
               disabled={success}
             />
-            <Mail className="h-5 w-5 text-gray-500" />
+            <Mail className="h-5 w-5 text-ui-text-muted" />
             <div>
               <div className="text-sm font-medium">Email</div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-ui-text-muted">
                 {customerEmail || 'No email on file'}
               </div>
             </div>
           </label>
-          <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${success ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
+          <label className={`flex items-center gap-3 rounded-md border border-ui-border p-3 ${success ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-ui-bg-hover'}`}>
             <input
               type="radio"
               name="sendMethod"
@@ -86,15 +86,15 @@ export function SendMethodDialog({
               onChange={() => setMethod('sms')}
               disabled={success}
             />
-            <MessageSquare className="h-5 w-5 text-gray-500" />
+            <MessageSquare className="h-5 w-5 text-ui-text-muted" />
             <div>
               <div className="text-sm font-medium">SMS (with PDF)</div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-ui-text-muted">
                 {customerPhone || 'No phone on file'}
               </div>
             </div>
           </label>
-          <label className={`flex items-center gap-3 rounded-md border border-gray-200 p-3 ${success ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
+          <label className={`flex items-center gap-3 rounded-md border border-ui-border p-3 ${success ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-ui-bg-hover'}`}>
             <input
               type="radio"
               name="sendMethod"
@@ -103,10 +103,10 @@ export function SendMethodDialog({
               onChange={() => setMethod('both')}
               disabled={success}
             />
-            <Send className="h-5 w-5 text-gray-500" />
+            <Send className="h-5 w-5 text-ui-text-muted" />
             <div>
               <div className="text-sm font-medium">Both Email & SMS</div>
-              <div className="text-xs text-gray-500">Send via all available channels</div>
+              <div className="text-xs text-ui-text-muted">Send via all available channels</div>
             </div>
           </label>
         </div>

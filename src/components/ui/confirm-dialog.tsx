@@ -48,7 +48,7 @@ function ConfirmDialog({
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
       <DialogContent>
-        <div className="text-sm text-gray-500">{description}</div>
+        <div className="text-sm text-ui-text-muted">{description}</div>
         {requireConfirmText && (
           <div className="mt-4">
             <Input

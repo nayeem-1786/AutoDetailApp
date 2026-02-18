@@ -13,12 +13,12 @@ function EmptyState({ icon: Icon, title, description, action, className }: Empty
   return (
     <div className={cn('flex flex-col items-center justify-center py-12 text-center', className)}>
       {Icon && (
-        <div className="mb-4 rounded-full bg-gray-100 p-4">
-          <Icon className="h-14 w-14 text-gray-300" />
+        <div className="mb-4 rounded-full bg-ui-bg-muted p-4">
+          <Icon className="h-14 w-14 text-ui-text-dim" />
         </div>
       )}
-      <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-      {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+      <h3 className="text-lg font-medium text-ui-text">{title}</h3>
+      {description && <p className="mt-1 text-sm text-ui-text-muted">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

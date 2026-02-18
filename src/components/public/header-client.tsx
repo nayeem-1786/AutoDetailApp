@@ -6,6 +6,7 @@ import { Menu, X, ChevronDown, Phone, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import type { WebsiteNavItem } from '@/lib/supabase/types';
 import { CartIconButton } from './cart/cart-icon-button';
+import { ThemeToggle } from './theme-toggle';
 
 interface HeaderClientProps {
   navItems: WebsiteNavItem[];
@@ -151,6 +152,9 @@ export function HeaderClient({
             >
               {customerName ? `Hi, ${customerName}` : 'Sign In'}
             </Link>
+
+            {/* Theme toggle */}
+            <ThemeToggle />
 
             {/* Cart icon — always visible */}
             <CartIconButton />

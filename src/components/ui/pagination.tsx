@@ -35,7 +35,7 @@ function Pagination({ currentPage, totalPages, onPageChange, className }: Pagina
       </Button>
       {pages.map((page, i) =>
         page === 'ellipsis' ? (
-          <span key={`e-${i}`} className="px-2 text-gray-400">...</span>
+          <span key={`e-${i}`} className="px-2 text-ui-text-dim">...</span>
         ) : (
           <Button
             key={page}

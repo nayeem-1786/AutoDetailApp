@@ -22,9 +22,9 @@ function FormField({ label, error, description, required, className, labelClassN
       </Label>
       {children}
       {description && !error && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+        <p className="text-xs text-ui-text-muted">{description}</p>
       )}
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
   );
 }

@@ -21,7 +21,7 @@ export function TogglePill({
       onClick={onClick}
       className={cn(
         'rounded-full px-4 py-1.5 text-sm font-medium cursor-pointer transition-colors',
-        active ? activeClassName : 'bg-gray-100 text-gray-500'
+        active ? activeClassName : 'bg-ui-bg-muted text-ui-text-muted'
       )}
     >
       {label}

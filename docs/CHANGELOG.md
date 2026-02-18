@@ -4,6 +4,37 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Contextual UI Theme System — 2026-02-17
+
+### feat: contextual UI theme system with dark/light user toggle
+
+**Step 1 — Contextual CSS variables in globals.css**
+- Added ~35 `--ui-*` variables in `:root` as light defaults (admin pages)
+- Added `.public-theme` block overriding UI vars to dark values via existing site vars
+- Added `.public-theme[data-user-theme="light"]` block resetting UI vars to light + overriding site-level vars
+- Added `@theme inline` mappings for all ui-* tokens plus `--shadow-ui` and `--shadow-ui-lg`
+
+**Step 2 — Theme toggle components**
+- Created `theme-toggle.tsx` — client component with sun/moon icon, localStorage persistence (`sd-user-theme`)
+- Created `theme-toggle-initializer.tsx` — inline `<script>` to prevent flash of wrong theme
+
+**Step 3 — Wired into layouts and headers**
+- Added ThemeToggle to header-client.tsx (between Sign In and Cart icon)
+- Added ThemeToggleInitializer to all 3 public layouts
+- Fixed customer-auth layout missing `public-theme` class
+
+**Step 4 — Migrated all 25 UI components to contextual tokens**
+- card, dialog, input, textarea, select, table, button (6 variants), badge, tabs, dropdown-menu, checkbox, switch, skeleton, spinner, label, form-field, page-header, empty-state, search-input, data-table, pagination, slide-over, confirm-dialog, send-method-dialog, toggle-pill
+- Replaced all `dark:`, `bg-white`, `bg-gray-*`, `text-gray-*`, `border-gray-*` with `ui-*` tokens
+- Straggler scan: zero remaining hardcoded classes in `src/components/ui/`
+
+**Step 5 — Verification**
+- TypeScript: zero errors
+- Build: passes clean
+- Grep straggler scan: zero matches
+
+---
+
 ## Theme Consistency Fix — 2026-02-17
 
 ### fix: theme consistency — login buttons, active tab, hardcoded classes, dead admin fields

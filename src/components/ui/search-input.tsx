@@ -13,13 +13,13 @@ interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
 function SearchInput({ value, onChange, onClear, className, placeholder = 'Search...', ...props }: SearchInputProps) {
   return (
     <div className={cn('relative', className)}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ui-text-dim" />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-8 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
+        className="h-9 w-full rounded-md border border-ui-input-border bg-ui-input-bg pl-9 pr-8 text-sm text-ui-text shadow-sm placeholder:text-ui-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring focus-visible:ring-offset-1"
         {...props}
       />
       {value && (
@@ -29,7 +29,7 @@ function SearchInput({ value, onChange, onClear, className, placeholder = 'Searc
             onChange('');
             onClear?.();
           }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ui-text-dim hover:text-ui-text-muted"
         >
           <X className="h-3.5 w-3.5" />
         </button>

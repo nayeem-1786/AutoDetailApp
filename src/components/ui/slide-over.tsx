@@ -74,17 +74,17 @@ export function SlideOver({ open, onClose, title, children, width = 'lg' }: Slid
       {/* Panel */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-xl transition-transform duration-300 ease-in-out',
+          'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-ui-bg shadow-xl transition-transform duration-300 ease-in-out',
           WIDTH_MAP[width],
           visible ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <div className="flex items-center justify-between border-b border-ui-border px-6 py-4">
+          <h2 className="text-lg font-semibold text-ui-text">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-md p-1 text-ui-text-dim hover:bg-ui-bg-hover hover:text-ui-text-muted"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
