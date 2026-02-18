@@ -108,7 +108,7 @@ export default function AccountOrderDetailPage() {
           <Package className="h-4 w-4" />
           Items
         </h2>
-        <div className="divide-y divide-white/5">
+        <div className="divide-y divide-site-border-light">
           {order.order_items.map((item) => (
             <div key={item.id} className="flex items-center gap-4 py-3">
               {item.product_image_url ? (
@@ -164,7 +164,7 @@ export default function AccountOrderDetailPage() {
               <span className="text-site-text">{formatCurrency(order.shipping_amount / 100)}</span>
             </div>
           )}
-          <div className="flex justify-between border-t border-white/10 pt-2 font-semibold">
+          <div className="flex justify-between border-t border-site-border pt-2 font-semibold">
             <span className="text-site-text">Total</span>
             <span className="text-lime">{formatCurrency(order.total / 100)}</span>
           </div>

@@ -108,7 +108,7 @@ export default function AccountOrdersPage() {
             <Link
               key={order.id}
               href={`/account/orders/${order.id}`}
-              className="flex items-center gap-4 rounded-xl border border-site-border bg-brand-surface p-4 transition-colors hover:border-white/20"
+              className="flex items-center gap-4 rounded-xl border border-site-border bg-brand-surface p-4 transition-colors hover:border-site-border-medium"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

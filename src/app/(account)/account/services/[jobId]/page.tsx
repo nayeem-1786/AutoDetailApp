@@ -296,7 +296,7 @@ export default function ServiceDetailPage() {
                 <div className="mt-6 border-t border-site-border pt-4">
                   <Link
                     href={`/jobs/${job.gallery_token}/photos`}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    className="text-sm font-medium text-site-link hover:text-site-link-hover hover:underline"
                   >
                     View full gallery page &rarr;
                   </Link>

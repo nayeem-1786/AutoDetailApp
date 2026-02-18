@@ -200,8 +200,8 @@ export default function AccountLoyaltyPage() {
               )}
 
               {canRedeem && (
-                <div className="mt-4 rounded-lg bg-green-50 p-3">
-                  <p className="text-sm font-medium text-green-800">
+                <div className="mt-4 rounded-lg bg-green-500/10 p-3">
+                  <p className="text-sm font-medium text-green-400">
                     You have enough points for a reward! Your points will be applied automatically at checkout.
                   </p>
                 </div>

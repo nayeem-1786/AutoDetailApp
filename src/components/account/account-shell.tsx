@@ -121,7 +121,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
               className={cn(
                 'flex-shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-all',
                 isActive
-                  ? 'bg-brand-surface text-site-text shadow-sm'
+                  ? 'bg-lime/10 text-lime border border-lime/20'
                   : 'text-site-text-muted hover:text-site-text'
               )}
             >

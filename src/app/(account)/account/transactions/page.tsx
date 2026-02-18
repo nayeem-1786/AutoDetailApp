@@ -194,7 +194,7 @@ export default function AccountTransactionsPage() {
             <button
               type="button"
               onClick={() => openReceiptDialog(row.original.id)}
-              className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline"
+              className="text-sm font-mono text-site-link hover:text-site-link-hover hover:underline"
             >
               {receiptNum}
             </button>

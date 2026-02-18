@@ -487,7 +487,17 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-17 (Phase 9 Session 6 — Fix Order & PaymentIntent Duplication)
+## Last Session: 2026-02-17 (Theme Consistency Fix)
+
+### Theme Consistency Fix
+- **Fix 1**: Removed 27 non-functional fields from admin Theme & Style Settings UI (mode toggle, status colors, font sizes/weights/line-height, secondary button, primary button padding, entire Borders & Spacing tab). DB columns preserved.
+- **Fix 2**: Login buttons (signin, signup, reset-password) now use `.site-btn-primary` CSS class instead of inline `bg-lime text-black` — responds to admin Theme Settings button overrides.
+- **Fix 3**: Account shell active tab changed from invisible `bg-brand-surface` to visible `bg-lime/10 text-lime border border-lime/20` — updates with seasonal themes.
+- **Fix 4**: Migrated 11 hardcoded color classes across 6 account pages (blue→lime focus rings, blue→site-link for links, white/→site-border for borders, green-50→green-500/10 for dark mode).
+- **Fix 5**: Added `public-theme` class to account layout wrapper for custom scrollbar styles.
+- TypeScript clean, build passes.
+
+### Previous Session: 2026-02-17 (Phase 9 Session 6 — Fix Order & PaymentIntent Duplication)
 
 ### Phase 9 Session 6 — Fix Order & PaymentIntent Duplication
 - **Root cause**: Every "Continue to Payment" click created NEW order + NEW Stripe PI. Back navigation wiped state, making reuse impossible.

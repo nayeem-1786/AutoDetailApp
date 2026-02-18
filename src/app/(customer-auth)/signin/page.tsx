@@ -353,7 +353,7 @@ export default function CustomerSignInPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
+                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
                 {loading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
@@ -408,7 +408,7 @@ export default function CustomerSignInPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
+                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
                 {loading ? <Spinner size="sm" /> : 'Verify'}
               </Button>
@@ -473,7 +473,7 @@ export default function CustomerSignInPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
+                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
                 {loading ? <Spinner size="sm" /> : 'Sign In'}
               </Button>
@@ -550,7 +550,7 @@ export default function CustomerSignInPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
+                    className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
                   >
                     {loading ? <Spinner size="sm" /> : 'Send Reset Link'}
                   </Button>

@@ -96,7 +96,7 @@ export default function CustomerResetPasswordPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-lime text-black font-bold hover:shadow-lg hover:shadow-lime/25 transition-all"
+              className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
             >
               {loading ? 'Updating...' : 'Update Password'}
             </Button>

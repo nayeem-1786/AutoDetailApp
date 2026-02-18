@@ -4,6 +4,50 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Theme Consistency Fix — 2026-02-17
+
+### fix: theme consistency — login buttons, active tab, hardcoded classes, dead admin fields
+
+**Fix 1 — Remove dead theme settings fields from admin UI**
+- Removed Mode toggle (dark/light), Status Colors card (success/warning/error), Font Sizes card (h1-h3/body/small/base), Font Weights card, Line Height card, Primary Button Padding field, Secondary Button card, and entire Borders & Spacing tab
+- These 27 fields are saved to DB but never injected by ThemeProvider — admin changes had zero effect
+- DB columns preserved; only UI inputs removed. Comments document which fields to re-add when wired
+
+**Fix 2 — Login buttons use `.site-btn-primary`**
+- Replaced inline `bg-lime text-black rounded-full` on signin, signup, and reset-password pages with `.site-btn-primary` CSS class
+- Buttons now respond to admin Theme Settings button color/radius overrides
+
+**Fix 3 — Account shell active tab visibility**
+- Changed active tab from `bg-brand-surface` (invisible against same-color container) to `bg-lime/10 text-lime border border-lime/20`
+- Active state now uses accent color, updates with seasonal themes
+
+**Fix 4 — Migrate 11 hardcoded color classes**
+- `focus:border-blue-500 focus:ring-blue-500` → `focus:border-lime focus:ring-lime` (services page vehicle filter)
+- `text-blue-600 hover:text-blue-800` → `text-site-link hover:text-site-link-hover` (transactions receipt link, service detail gallery link)
+- `hover:border-white/20` → `hover:border-site-border-medium` (orders list)
+- `divide-white/5` → `divide-site-border-light` (order detail items)
+- `border-white/10` → `border-site-border` (order detail total)
+- `bg-green-50 text-green-800` → `bg-green-500/10 text-green-400` (loyalty redeem message)
+
+**Fix 5 — Add `public-theme` class to account layout**
+- Added `public-theme` to wrapper div for custom scrollbar styles (matches public layout)
+
+**Files modified (10):**
+- `src/app/admin/website/theme-settings/page.tsx`
+- `src/app/(customer-auth)/signin/page.tsx`
+- `src/app/(customer-auth)/signup/page.tsx`
+- `src/app/(customer-auth)/signin/reset-password/page.tsx`
+- `src/components/account/account-shell.tsx`
+- `src/app/(account)/layout.tsx`
+- `src/app/(account)/account/services/page.tsx`
+- `src/app/(account)/account/transactions/page.tsx`
+- `src/app/(account)/account/services/[jobId]/page.tsx`
+- `src/app/(account)/account/orders/page.tsx`
+- `src/app/(account)/account/orders/[id]/page.tsx`
+- `src/app/(account)/account/loyalty/page.tsx`
+
+---
+
 ## Phase 9, Session 6 — 2026-02-17 (Fix Order & PaymentIntent Duplication)
 
 ### fix: prevent duplicate orders and PaymentIntents in checkout flow

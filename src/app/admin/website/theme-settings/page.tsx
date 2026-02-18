@@ -7,15 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Select } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   RotateCcw, Save, Palette, Type, RectangleHorizontal,
-  Square, Sparkles, ChevronDown,
+  Sparkles, ChevronDown,
 } from 'lucide-react';
 import type { SiteThemeSettings } from '@/lib/supabase/types';
 import { ColorField } from './_components/color-field';
@@ -23,9 +21,7 @@ import { ThemePreview } from './_components/theme-preview';
 import {
   THEME_DEFAULTS,
   FONT_OPTIONS,
-  WEIGHT_OPTIONS,
   RADIUS_OPTIONS,
-  PADDING_OPTIONS,
   SITE_THEME_PRESETS,
 } from './_components/theme-defaults';
 
@@ -197,31 +193,14 @@ export default function ThemeSettingsPage() {
               <TabsTrigger value="buttons">
                 <RectangleHorizontal className="mr-1.5 h-4 w-4" /> Buttons
               </TabsTrigger>
-              <TabsTrigger value="borders">
-                <Square className="mr-1.5 h-4 w-4" /> Borders & Spacing
-              </TabsTrigger>
+              {/* Borders & Spacing tab removed — fields exist in DB but are not yet wired to ThemeProvider */}
             </TabsList>
 
             {/* ─── COLORS TAB ─── */}
+            {/* These fields exist in DB but are not yet wired to ThemeProvider. Re-add UI when implemented:
+                mode (dark/light toggle), color_success, color_warning, color_error */}
             <TabsContent value="colors">
               <div className="space-y-6">
-                {/* Mode */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Mode</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-3">
-                      <Label htmlFor="mode-toggle" className="text-sm">Dark Mode</Label>
-                      <Switch
-                        id="mode-toggle"
-                        checked={formData.mode !== 'light'}
-                        onCheckedChange={(checked) => updateField('mode', checked ? 'dark' : 'light')}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
                 {/* Background Colors */}
                 <Card>
                   <CardHeader>
@@ -295,23 +274,13 @@ export default function ThemeSettingsPage() {
                   </CardContent>
                 </Card>
 
-                {/* Status Colors */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Status Colors</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <ColorField label="Success" value={getVal('color_success')} defaultValue={THEME_DEFAULTS.color_success} onChange={(v) => updateField('color_success', v)} />
-                      <ColorField label="Warning" value={getVal('color_warning')} defaultValue={THEME_DEFAULTS.color_warning} onChange={(v) => updateField('color_warning', v)} />
-                      <ColorField label="Error" value={getVal('color_error')} defaultValue={THEME_DEFAULTS.color_error} onChange={(v) => updateField('color_error', v)} />
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
 
             {/* ─── TYPOGRAPHY TAB ─── */}
+            {/* These fields exist in DB but are not yet wired to ThemeProvider. Re-add UI when implemented:
+                font_base_size, font_h1_size, font_h2_size, font_h3_size, font_body_size, font_small_size,
+                font_line_height, font_heading_weight, font_body_weight */}
             <TabsContent value="typography">
               <div className="space-y-6">
                 {/* Font Families */}
@@ -352,107 +321,12 @@ export default function ThemeSettingsPage() {
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Font Sizes */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Font Sizes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {[
-                        { key: 'font_h1_size', label: 'H1 Size' },
-                        { key: 'font_h2_size', label: 'H2 Size' },
-                        { key: 'font_h3_size', label: 'H3 Size' },
-                        { key: 'font_body_size', label: 'Body Size' },
-                        { key: 'font_small_size', label: 'Small Text' },
-                        { key: 'font_base_size', label: 'Base Font Size' },
-                      ].map(({ key, label }) => (
-                        <div key={key}>
-                          <Label className="text-sm mb-1.5 block">{label}</Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={getVal(key as keyof typeof THEME_DEFAULTS) ?? THEME_DEFAULTS[key as keyof typeof THEME_DEFAULTS]}
-                              onChange={(e) => updateField(key, e.target.value || null)}
-                              className="w-28"
-                              placeholder={THEME_DEFAULTS[key as keyof typeof THEME_DEFAULTS]}
-                            />
-                            {getVal(key as keyof typeof THEME_DEFAULTS) !== null && (
-                              <button
-                                type="button"
-                                onClick={() => updateField(key, null)}
-                                className="p-1 text-gray-400 hover:text-gray-600"
-                                title="Reset to default"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Font Weights */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Font Weights</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Heading Weight</Label>
-                        <Select
-                          value={getVal('font_heading_weight') ?? THEME_DEFAULTS.font_heading_weight}
-                          onChange={(e) => updateField('font_heading_weight', e.target.value === THEME_DEFAULTS.font_heading_weight ? null : e.target.value)}
-                        >
-                          {WEIGHT_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Body Weight</Label>
-                        <Select
-                          value={getVal('font_body_weight') ?? THEME_DEFAULTS.font_body_weight}
-                          onChange={(e) => updateField('font_body_weight', e.target.value === THEME_DEFAULTS.font_body_weight ? null : e.target.value)}
-                        >
-                          {WEIGHT_OPTIONS.filter((o) => ['300', '400', '500'].includes(o.value)).map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Line Height */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Line Height</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min="1.0"
-                        max="2.5"
-                        step="0.1"
-                        value={getVal('font_line_height') ?? THEME_DEFAULTS.font_line_height}
-                        onChange={(e) => updateField('font_line_height', e.target.value === THEME_DEFAULTS.font_line_height ? null : e.target.value)}
-                        className="flex-1"
-                      />
-                      <span className="text-sm font-mono text-gray-600 w-10 text-right">
-                        {getVal('font_line_height') ?? THEME_DEFAULTS.font_line_height}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
 
             {/* ─── BUTTONS TAB ─── */}
+            {/* These fields exist in DB but are not yet wired to ThemeProvider. Re-add UI when implemented:
+                btn_primary_padding, btn_secondary_bg, btn_secondary_text, btn_secondary_border, btn_secondary_radius */}
             <TabsContent value="buttons">
               <div className="space-y-6">
                 {/* Primary Button */}
@@ -476,17 +350,6 @@ export default function ThemeSettingsPage() {
                           ))}
                         </Select>
                       </div>
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Padding</Label>
-                        <Select
-                          value={getVal('btn_primary_padding') ?? THEME_DEFAULTS.btn_primary_padding}
-                          onChange={(e) => updateField('btn_primary_padding', e.target.value === THEME_DEFAULTS.btn_primary_padding ? null : e.target.value)}
-                        >
-                          {PADDING_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                      </div>
                     </div>
                     {/* Preview */}
                     <div className="mt-4 pt-4 border-t border-gray-100">
@@ -497,50 +360,9 @@ export default function ThemeSettingsPage() {
                           backgroundColor: getVal('btn_primary_bg') ?? THEME_DEFAULTS.btn_primary_bg,
                           color: getVal('btn_primary_text') ?? THEME_DEFAULTS.btn_primary_text,
                           borderRadius: getVal('btn_primary_radius') ?? THEME_DEFAULTS.btn_primary_radius,
-                          padding: getVal('btn_primary_padding') ?? THEME_DEFAULTS.btn_primary_padding,
                         }}
                       >
                         Primary Button
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Secondary Button */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Secondary / Ghost Button</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <ColorField label="Background" value={getVal('btn_secondary_bg')} defaultValue={THEME_DEFAULTS.btn_secondary_bg} onChange={(v) => updateField('btn_secondary_bg', v)} />
-                      <ColorField label="Text Color" value={getVal('btn_secondary_text')} defaultValue={THEME_DEFAULTS.btn_secondary_text} onChange={(v) => updateField('btn_secondary_text', v)} />
-                      <ColorField label="Border Color" value={getVal('btn_secondary_border')} defaultValue={THEME_DEFAULTS.btn_secondary_border} onChange={(v) => updateField('btn_secondary_border', v)} />
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Border Radius</Label>
-                        <Select
-                          value={getVal('btn_secondary_radius') ?? THEME_DEFAULTS.btn_secondary_radius}
-                          onChange={(e) => updateField('btn_secondary_radius', e.target.value === THEME_DEFAULTS.btn_secondary_radius ? null : e.target.value)}
-                        >
-                          {RADIUS_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                      </div>
-                    </div>
-                    {/* Preview */}
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <p className="text-xs text-gray-500 mb-2">Preview:</p>
-                      <button
-                        className="text-sm px-6 py-2 font-medium transition-colors"
-                        style={{
-                          backgroundColor: getVal('btn_secondary_bg') ?? THEME_DEFAULTS.btn_secondary_bg,
-                          color: getVal('btn_secondary_text') ?? THEME_DEFAULTS.btn_secondary_text,
-                          border: `1px solid ${getVal('btn_secondary_border') ?? THEME_DEFAULTS.btn_secondary_border}`,
-                          borderRadius: getVal('btn_secondary_radius') ?? THEME_DEFAULTS.btn_secondary_radius,
-                        }}
-                      >
-                        Secondary Button
                       </button>
                     </div>
                   </CardContent>
@@ -587,112 +409,9 @@ export default function ThemeSettingsPage() {
               </div>
             </TabsContent>
 
-            {/* ─── BORDERS & SPACING TAB ─── */}
-            <TabsContent value="borders">
-              <div className="space-y-6">
-                {/* Border Radius */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Border Radius</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Default Radius</Label>
-                        <Select
-                          value={getVal('border_radius') ?? THEME_DEFAULTS.border_radius}
-                          onChange={(e) => updateField('border_radius', e.target.value === THEME_DEFAULTS.border_radius ? null : e.target.value)}
-                        >
-                          {RADIUS_OPTIONS.filter((o) => o.value !== '9999px').map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                        <div
-                          className="mt-2 h-12 w-20 border-2 border-gray-300"
-                          style={{ borderRadius: getVal('border_radius') ?? THEME_DEFAULTS.border_radius }}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Card Radius</Label>
-                        <Select
-                          value={getVal('border_card_radius') ?? THEME_DEFAULTS.border_card_radius}
-                          onChange={(e) => updateField('border_card_radius', e.target.value === THEME_DEFAULTS.border_card_radius ? null : e.target.value)}
-                        >
-                          {RADIUS_OPTIONS.filter((o) => o.value !== '9999px').map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                        <div
-                          className="mt-2 h-12 w-20 border-2 border-gray-300"
-                          style={{ borderRadius: getVal('border_card_radius') ?? THEME_DEFAULTS.border_card_radius }}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Border Width */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Border Width</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Select
-                      value={getVal('border_width') ?? THEME_DEFAULTS.border_width}
-                      onChange={(e) => updateField('border_width', e.target.value === THEME_DEFAULTS.border_width ? null : e.target.value)}
-                      className="w-full sm:w-48"
-                    >
-                      <option value="0">None</option>
-                      <option value="1px">Thin (1px)</option>
-                      <option value="2px">Medium (2px)</option>
-                      <option value="3px">Thick (3px)</option>
-                    </Select>
-                  </CardContent>
-                </Card>
-
-                {/* Spacing */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Spacing</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Section Padding</Label>
-                        <Select
-                          value={getVal('spacing_section_padding') ?? THEME_DEFAULTS.spacing_section_padding}
-                          onChange={(e) => updateField('spacing_section_padding', e.target.value === THEME_DEFAULTS.spacing_section_padding ? null : e.target.value)}
-                        >
-                          <option value="3rem">Compact (3rem)</option>
-                          <option value="6rem">Normal (6rem)</option>
-                          <option value="8rem">Spacious (8rem)</option>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Card Padding</Label>
-                        <Select
-                          value={getVal('spacing_card_padding') ?? THEME_DEFAULTS.spacing_card_padding}
-                          onChange={(e) => updateField('spacing_card_padding', e.target.value === THEME_DEFAULTS.spacing_card_padding ? null : e.target.value)}
-                        >
-                          <option value="1rem">Tight (1rem)</option>
-                          <option value="1.5rem">Normal (1.5rem)</option>
-                          <option value="2rem">Roomy (2rem)</option>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-sm mb-1.5 block">Header Height</Label>
-                        <Input
-                          value={getVal('spacing_header_height') ?? THEME_DEFAULTS.spacing_header_height}
-                          onChange={(e) => updateField('spacing_header_height', e.target.value || null)}
-                          placeholder={THEME_DEFAULTS.spacing_header_height}
-                          className="w-28"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+            {/* Borders & Spacing tab content removed — fields exist in DB but are not yet wired to ThemeProvider.
+                Re-add UI when implemented: border_radius, border_card_radius, border_width,
+                spacing_section_padding, spacing_card_padding, spacing_header_height */}
           </Tabs>
         </div>
 
