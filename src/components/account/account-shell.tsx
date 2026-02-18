@@ -69,8 +69,8 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 sm:px-6 lg:px-8">
         <div className="rounded-2xl bg-brand-surface p-8 shadow-lg text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
-            <AlertTriangle className="h-8 w-8 text-amber-600" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
+            <AlertTriangle className="h-8 w-8 text-amber-400" />
           </div>
           <h1 className="mt-6 text-2xl font-bold text-site-text">
             Account Access Unavailable

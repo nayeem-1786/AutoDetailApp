@@ -188,7 +188,7 @@ export function AppointmentEditDialog({
         ) : error ? (
           <div className="py-8 text-center">
             <AlertTriangle className="mx-auto h-8 w-8 text-red-500" />
-            <p className="mt-2 text-sm text-red-600">{error}</p>
+            <p className="mt-2 text-sm text-red-400">{error}</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -271,7 +271,7 @@ export function AppointmentEditDialog({
             {businessPhone && (
               <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
                 <div className="flex items-start gap-3">
-                  <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+                  <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-400" />
                   <div>
                     <p className="text-sm font-medium text-blue-300">
                       Need to change services?

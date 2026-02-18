@@ -4,6 +4,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Account & Public Component Dark-Safe Colors — 2026-02-17
+
+### fix: migrate remaining hardcoded colors in account pages and public components to dark-safe theme tokens
+
+**Account pages (3 files)**
+- `loyalty/page.tsx`: Points change colors `text-green-600`/`text-red-600` → `-400` variants
+- `account-shell.tsx`: Deactivated account icon `bg-amber-100`/`text-amber-600` → `bg-amber-500/10`/`text-amber-400`
+- `transaction-detail.tsx`: Error text `text-red-600` → `-400`, discount/loyalty rows `text-green-600` → `-400`, loyalty earned text → `-400`
+
+**Account components (2 files)**
+- `appointment-edit-dialog.tsx`: Error text `text-red-600` → `-400`, phone icon `text-blue-600` → `-400`
+- `appointment-card.tsx`: Cancel button `text-red-600` → `text-red-400`
+
+**Public components (3 files)**
+- `mobile-menu.tsx`: Backdrop `bg-navy/95` → `bg-brand-black/95`, nav hover `text-brand-200` → `text-lime`, CTA button → `site-btn-cta`
+- `hero-client.tsx`: Service name accent `text-brand-200` → `text-lime`
+- `cta-section.tsx`: Gradient endpoint `to-black` → `to-brand-black`
+
+**Verification**: Zero hardcoded matches in account/public scans, `tsc` + `build` pass clean.
+
+---
+
 ## Contextual UI Theme System — 2026-02-17
 
 ### feat: contextual UI theme system with dark/light user toggle

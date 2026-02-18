@@ -122,7 +122,7 @@ export default function AccountLoyaltyPage() {
       cell: ({ row }) => {
         const change = row.original.points_change;
         return (
-          <span className={`text-sm font-medium whitespace-nowrap ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <span className={`text-sm font-medium whitespace-nowrap ${change > 0 ? 'text-green-400' : 'text-red-400'}`}>
             {change > 0 ? '+' : ''}{formatPoints(change)}
           </span>
         );

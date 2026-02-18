@@ -68,7 +68,7 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
   }
 
   if (error || !data) {
-    return <p className="text-sm text-red-600">{error || 'Failed to load details'}</p>;
+    return <p className="text-sm text-red-400">{error || 'Failed to load details'}</p>;
   }
 
   const vehicle = data.vehicles;
@@ -122,13 +122,13 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
             </div>
           )}
           {data.discount_amount > 0 && (
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between text-green-400">
               <span>Discount</span>
               <span>-{formatCurrency(data.discount_amount)}</span>
             </div>
           )}
           {data.loyalty_discount > 0 && (
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between text-green-400">
               <span>Loyalty Discount ({data.loyalty_points_redeemed} pts)</span>
               <span>-{formatCurrency(data.loyalty_discount)}</span>
             </div>
@@ -168,7 +168,7 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
 
       {/* Loyalty earned */}
       {data.loyalty_points_earned > 0 && (
-        <p className="text-xs text-green-600">
+        <p className="text-xs text-green-400">
           +{data.loyalty_points_earned} loyalty points earned
         </p>
       )}

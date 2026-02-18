@@ -38,7 +38,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
         <div className="fixed inset-0 z-[100] md:hidden">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-navy/95 backdrop-blur-sm"
+            className="absolute inset-0 bg-brand-black/95 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
 
@@ -61,7 +61,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
                   <Link
                     href={item.url}
                     target={item.target}
-                    className="font-display text-3xl font-semibold text-site-text hover:text-brand-200 transition-colors"
+                    className="font-display text-3xl font-semibold text-site-text hover:text-lime transition-colors"
                     onClick={() => setOpen(false)}
                   >
                     {item.label}
@@ -94,7 +94,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
               </Link>
               <Link
                 href="/book"
-                className="mt-4 inline-flex items-center justify-center rounded-full bg-white text-navy font-semibold text-lg h-14 px-10 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+                className="mt-4 inline-flex items-center justify-center rounded-full site-btn-cta font-semibold text-lg h-14 px-10 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
                 onClick={() => setOpen(false)}
               >
                 Book Now

@@ -15,7 +15,7 @@ export async function CtaSection({
   const biz = await getBusinessInfo();
 
   return (
-    <section className="bg-gradient-to-br from-brand-grey to-black section-spacing relative overflow-hidden">
+    <section className="bg-gradient-to-br from-brand-grey to-brand-black section-spacing relative overflow-hidden">
       {/* Subtle radial glow behind CTA */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
         <div className="w-96 h-96 bg-lime/5 rounded-full blur-3xl" />

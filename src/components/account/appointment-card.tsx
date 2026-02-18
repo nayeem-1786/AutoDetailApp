@@ -150,7 +150,7 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
                   variant="outline"
                   size="sm"
                   onClick={() => setCancelOpen(true)}
-                  className="text-red-600 border-red-500/20 hover:bg-red-500/10"
+                  className="text-red-400 border-red-500/20 hover:bg-red-500/10"
                 >
                   Cancel
                 </Button>
