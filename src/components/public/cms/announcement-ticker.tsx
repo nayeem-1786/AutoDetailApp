@@ -32,19 +32,22 @@ function getSpeedValue(ticker: AnnouncementTicker): number {
 const SPACER_REM = 5; // 5rem = 80px
 
 // ---------------------------------------------------------------------------
-// Custom hook: 3-phase marquee — hidden → entering (scroll-in) → looping
+// Custom hook: 4-phase marquee
 //
 // Phase 1 (hidden):   Content is invisible while we measure its width.
-// Phase 2 (entering): Content scrolls in from the right edge of the viewport
-//                     at the configured speed. One-time animation.
-// Phase 3 (looping):  Seamless infinite marquee loop at the configured speed.
+// Phase 2 (ready):    Content is positioned off-screen right. No transition
+//                     yet — browser must paint this position first.
+// Phase 3 (entering): CSS transition slides content from right to position 0.
+//                     Uses transition (not @keyframes) for mobile reliability.
+// Phase 4 (looping):  Seamless infinite marquee loop via CSS animation.
 // ---------------------------------------------------------------------------
-type MarqueePhase = 'hidden' | 'entering' | 'looping';
+type MarqueePhase = 'hidden' | 'ready' | 'entering' | 'looping';
 
 function useMarquee(speedValue: number) {
   const ref = useRef<HTMLSpanElement>(null);
   const [loopDuration, setLoopDuration] = useState(20);
   const [enterDuration, setEnterDuration] = useState(3);
+  const [enterOffset, setEnterOffset] = useState(0);
   const [phase, setPhase] = useState<MarqueePhase>('hidden');
 
   const measure = useCallback(() => {
@@ -58,12 +61,13 @@ function useMarquee(speedValue: number) {
     const halfWidth = totalWidth / 2;
     setLoopDuration(Math.max(3, halfWidth / pxPerSec));
 
-    // Enter duration: viewport width / px-per-sec (distance from right edge)
+    // Enter: viewport width in pixels / px-per-sec
     const vw = window.innerWidth;
     setEnterDuration(Math.max(1, vw / pxPerSec));
+    setEnterOffset(vw);
 
-    // Kick off enter phase once measured
-    setPhase((prev) => (prev === 'hidden' ? 'entering' : prev));
+    // Move to ready phase (positioned off-screen, waiting for paint)
+    setPhase((prev) => (prev === 'hidden' ? 'ready' : prev));
   }, [speedValue]);
 
   useEffect(() => {
@@ -72,17 +76,29 @@ function useMarquee(speedValue: number) {
     return () => window.removeEventListener('resize', measure);
   }, [measure]);
 
-  // Timer-based transition from entering → looping.
-  // onAnimationEnd is unreliable on mobile Safari, so use a timer instead.
+  // ready → entering: double-rAF ensures browser has painted the off-screen
+  // position before we apply the CSS transition to slide it in.
+  useEffect(() => {
+    if (phase !== 'ready') return;
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setPhase('entering');
+      });
+    });
+    return () => { cancelled = true; };
+  }, [phase]);
+
+  // entering → looping: timer-based (CSS transitionend is unreliable on mobile)
   useEffect(() => {
     if (phase !== 'entering') return;
     const timer = setTimeout(() => {
       setPhase((prev) => (prev === 'entering' ? 'looping' : prev));
-    }, enterDuration * 1000 + 50); // +50ms buffer
+    }, enterDuration * 1000 + 100);
     return () => clearTimeout(timer);
   }, [phase, enterDuration]);
 
-  return { ref, loopDuration, enterDuration, phase };
+  return { ref, loopDuration, enterDuration, enterOffset, phase };
 }
 
 // ---------------------------------------------------------------------------
@@ -134,29 +150,48 @@ function marqueeProps(
   phase: MarqueePhase,
   enterDuration: number,
   loopDuration: number,
-) {
-  const className =
-    phase === 'entering'
-      ? 'inline-block animate-marquee-enter'
-      : phase === 'looping'
-        ? 'inline-block animate-marquee'
-        : 'inline-block';
+  enterOffset: number,
+): { className: string; style: React.CSSProperties } {
+  switch (phase) {
+    case 'hidden':
+      return {
+        className: 'inline-block',
+        style: { opacity: 0 },
+      };
 
-  const style: React.CSSProperties = {
-    animationDuration:
-      phase === 'entering'
-        ? `${enterDuration.toFixed(1)}s`
-        : `${loopDuration.toFixed(1)}s`,
-    opacity: phase === 'hidden' ? 0 : 1,
-    willChange: 'transform',
-    WebkitAnimation: phase === 'entering'
-      ? `marquee-enter ${enterDuration.toFixed(1)}s linear forwards`
-      : phase === 'looping'
-        ? `marquee ${loopDuration.toFixed(1)}s linear infinite`
-        : 'none',
-  };
+    case 'ready':
+      // Positioned off-screen right, visible, NO transition — browser must
+      // paint this position before we add the transition in the next phase.
+      return {
+        className: 'inline-block',
+        style: {
+          transform: `translateX(${enterOffset}px)`,
+          willChange: 'transform',
+        },
+      };
 
-  return { className, style };
+    case 'entering':
+      // CSS transition slides from the off-screen position to 0.
+      // This is more reliable on mobile than CSS @keyframes animations.
+      return {
+        className: 'inline-block',
+        style: {
+          transform: 'translateX(0)',
+          transition: `transform ${enterDuration.toFixed(1)}s linear`,
+          willChange: 'transform',
+        },
+      };
+
+    case 'looping':
+      // Infinite seamless marquee loop via CSS animation.
+      return {
+        className: 'inline-block animate-marquee',
+        style: {
+          animationDuration: `${loopDuration.toFixed(1)}s`,
+          willChange: 'transform',
+        },
+      };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +202,7 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = tickers[currentIndex];
   const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, loopDuration, enterDuration, phase } =
+  const { ref, loopDuration, enterDuration, enterOffset, phase } =
     useMarquee(speedValue);
 
   // Auto-rotate through tickers (when multiple)
@@ -182,7 +217,7 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   if (tickers.length === 0) return null;
 
   const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
-  const mp = marqueeProps(phase, enterDuration, loopDuration);
+  const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
 
   return (
     <div
@@ -222,7 +257,7 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = tickers[currentIndex];
   const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, loopDuration, enterDuration, phase } =
+  const { ref, loopDuration, enterDuration, enterOffset, phase } =
     useMarquee(speedValue);
 
   useEffect(() => {
@@ -236,7 +271,7 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   if (tickers.length === 0) return null;
 
   const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
-  const mp = marqueeProps(phase, enterDuration, loopDuration);
+  const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
 
   return (
     <div

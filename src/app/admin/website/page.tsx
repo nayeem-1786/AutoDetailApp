@@ -14,6 +14,7 @@ import {
   MapPin,
   FileText,
   PanelTop,
+  Rows3,
   ArrowRight,
 } from 'lucide-react';
 
@@ -29,6 +30,12 @@ const sections = [
     description: 'Manage header and footer navigation links.',
     icon: PanelTop,
     href: '/admin/website/navigation',
+  },
+  {
+    title: 'Footer',
+    description: 'Configure footer sections, columns, and links.',
+    icon: Rows3,
+    href: '/admin/website/footer',
   },
   {
     title: 'Hero',

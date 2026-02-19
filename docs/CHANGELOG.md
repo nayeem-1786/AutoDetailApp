@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Configurable Footer — Admin UI — 2026-02-19
+
+### Session 3: Admin page for managing footer sections, columns, and links
+
+**Admin page (`/admin/website/footer/page.tsx`):**
+- 3 collapsible section cards (Main Footer, Service Areas, Bottom Bar) with enable/disable toggles
+- **Main Footer**: Column manager with add/edit/delete, drag-and-drop reorder, content type badges (Links/HTML/Business Info)
+  - Links editor: add/edit/delete/reorder links within a column, toggle active state, open-in-new-tab
+  - HTML editor: textarea with save/preview, approximate dark-background preview
+  - Business Info: read-only info panel linking to business settings
+  - Max 4 columns enforced (button disabled at limit)
+  - Delete confirmation mentions link count when applicable
+- **Service Areas**: Prefix text editor with save button, link to city pages management
+- **Bottom Bar**: Custom copyright text override (optional), bottom link CRUD with edit/delete/toggle
+
+**Website index page (`/admin/website/page.tsx`):**
+- Added "Footer" card with Rows3 icon linking to `/admin/website/footer`
+
+**Patterns matched:**
+- Same drag-and-drop pattern as navigation admin
+- Same Card/Switch/Badge/Button/Spinner components
+- Same adminFetch + toast pattern for all API calls
+- Optimistic UI updates with rollback on failure
+- All mutations use Session 1 API routes (no new routes created)
+
+---
+
 ## Configurable Footer — Frontend Component — 2026-02-19
 
 ### Session 2: Dynamic footer rendering from database
