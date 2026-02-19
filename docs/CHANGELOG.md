@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Ticker Scroll, Section Tickers, Particle Rendering — 2026-02-19
+
+### fix: ticker marquee scroll, section placement, particle flag reliability
+
+**Bug 1 — Tickers Not Scrolling (FIXED)**
+- Root cause: `TopBarTicker` used Framer Motion vertical fade transition instead of horizontal marquee scroll. Hardcoded `text-sm` — ignored `font_size` DB field. Ignored `scroll_speed` DB field.
+- Fix: Rewrote `TopBarTicker` with CSS marquee animation (duplicated content, `animate-marquee` from globals.css). Scroll speed mapped: slow=35s, normal=20s, fast=10s. Font size mapped: xs/sm/base/lg → Tailwind text classes. Multiple tickers rotate every 8s.
+- Also removed dismiss X button and sessionStorage logic — ticker no longer has a close button that permanently hides it for the session.
+
+**Bug 2 — Section Tickers Not Appearing (FIXED)**
+- Root cause: `SectionTicker` component existed but was NEVER rendered anywhere. `getSectionTickers()` data function existed but was never called from any public page.
+- Fix: Homepage now fetches `getSectionTickers('/')` and renders `SectionTicker` between Services and "Why Choose Us" sections when placement is set to "Between Sections".
+
+**Bug 3 — Particle Effects Still Not Rendering (IMPROVED)**
+- Root cause: Previous `setFeatureFlag()` used `.update().select('id')` which may return ambiguous results from Supabase PostgREST.
+- Fix: Changed to explicit check-then-update/insert pattern: `.select().maybeSingle()` to check existence, then `.update()` if exists or `.insert()` if not. More reliable than the previous update+select approach.
+
+**Files modified (3):**
+- `src/components/public/cms/announcement-ticker.tsx` — Complete rewrite: CSS marquee scroll, scroll_speed/font_size support, removed dismiss button, SectionTicker also uses marquee
+- `src/app/(public)/page.tsx` — Added section ticker fetch + rendering between homepage sections
+- `src/lib/utils/feature-flags.ts` — Changed to check-then-update/insert pattern for reliability
+
+**Verification**: TypeScript clean (`tsc --noEmit`), build passes (`npm run build`).
+
+---
+
 ## Verified Bug Fixes: Tickers + Particle Rendering — 2026-02-19
 
 ### fix: tickers "Failed to Update" error + desktop particle rendering

@@ -1,111 +1,120 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
-// TopBarTicker — renders above the site header with animated rotation
+// Speed → CSS animation-duration mapping
+// ---------------------------------------------------------------------------
+const SPEED_DURATION: Record<string, string> = {
+  slow: '35s',
+  normal: '20s',
+  fast: '10s',
+};
+
+// ---------------------------------------------------------------------------
+// Font size → Tailwind class mapping
+// ---------------------------------------------------------------------------
+const FONT_SIZE_CLASS: Record<string, string> = {
+  xs: 'text-xs',
+  sm: 'text-sm',
+  base: 'text-base',
+  lg: 'text-lg',
+};
+
+// ---------------------------------------------------------------------------
+// TopBarTicker — renders above the site header with horizontal marquee scroll
 // ---------------------------------------------------------------------------
 export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [dismissed, setDismissed] = useState(false);
 
-  // Persist dismissal per session
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (sessionStorage.getItem('ticker_dismissed') === '1') {
-        setDismissed(true);
-      }
-    }
-  }, []);
-
-  // Auto-rotate through tickers
+  // Auto-rotate through tickers (when multiple)
   useEffect(() => {
     if (tickers.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % tickers.length);
-    }, 4000);
+    }, 8000);
     return () => clearInterval(timer);
   }, [tickers.length]);
 
-  const dismiss = () => {
-    setDismissed(true);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('ticker_dismissed', '1');
-    }
-  };
-
-  if (dismissed || tickers.length === 0) return null;
+  if (tickers.length === 0) return null;
 
   const current = tickers[currentIndex];
+  const speed = SPEED_DURATION[current.scroll_speed] || SPEED_DURATION.normal;
+  const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
+
+  const tickerContent = (
+    <>
+      <span>{current.message}</span>
+      {current.link_url ? (
+        <a
+          href={current.link_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity ml-2"
+        >
+          {current.link_text && (
+            <span className="underline">{current.link_text}</span>
+          )}
+          <ChevronRight className="w-3.5 h-3.5 opacity-70 inline-block" />
+        </a>
+      ) : current.link_text ? (
+        <span className="ml-2 underline">{current.link_text}</span>
+      ) : null}
+    </>
+  );
 
   return (
     <div
-      className="relative overflow-hidden py-2.5 px-4"
+      key={currentIndex}
+      className="relative overflow-hidden py-2.5"
       style={{
         backgroundColor: current.bg_color || '#CCFF00',
         color: current.text_color || '#000000',
       }}
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentIndex}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -20, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center justify-center gap-2 text-sm font-medium tracking-wide uppercase"
-          >
-            {current.link_url ? (
-              <a
-                href={current.link_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-              >
-                <span>{current.message}</span>
-                {current.link_text && (
-                  <span className="underline">{current.link_text}</span>
-                )}
-                <ChevronRight className="w-4 h-4 opacity-70" />
-              </a>
-            ) : (
-              <span>{current.message}</span>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      <button
-        type="button"
-        onClick={dismiss}
-        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-black/10 transition-colors"
-        aria-label="Dismiss announcements"
+      <div
+        className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}
+        style={{ animationDuration: speed }}
       >
-        <X className="w-3.5 h-3.5" />
-      </button>
-
-      {tickers.length > 1 && (
-        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-1">
-          {tickers.map((_, i) => (
-            <div
-              key={i}
-              className={`w-1 h-1 rounded-full transition-all duration-300 ${
-                i === currentIndex ? 'bg-black w-3' : 'bg-black/30'
-              }`}
-            />
-          ))}
-        </div>
-      )}
+        {/*
+          Marquee trick: duplicate the content so the first copy scrolls off-screen
+          while the second copy seamlessly takes over. The animation moves translateX
+          from 0 to -50% (the first copy's width).
+        */}
+        <span
+          className="inline-block animate-marquee"
+          style={{ animationDuration: speed }}
+        >
+          <span className="inline-flex items-center gap-8 px-4">
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+          </span>
+          <span className="inline-flex items-center gap-8 px-4" aria-hidden="true">
+            {tickerContent}
+            <span className="inline-block w-16" />
+            {tickerContent}
+            <span className="inline-block w-16" />
+            {tickerContent}
+            <span className="inline-block w-16" />
+            {tickerContent}
+            <span className="inline-block w-16" />
+          </span>
+        </span>
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// SectionTicker — renders inline between page sections
+// SectionTicker — renders inline between page sections with marquee scroll
 // ---------------------------------------------------------------------------
 export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -114,45 +123,67 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
     if (tickers.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % tickers.length);
-    }, 4000);
+    }, 8000);
     return () => clearInterval(timer);
   }, [tickers.length]);
 
   if (tickers.length === 0) return null;
 
   const current = tickers[currentIndex];
+  const speed = SPEED_DURATION[current.scroll_speed] || SPEED_DURATION.normal;
+  const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
+
+  const tickerContent = (
+    <>
+      <span>{current.message}</span>
+      {current.link_url && current.link_text && (
+        <a
+          href={current.link_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:no-underline ml-2"
+        >
+          {current.link_text}
+        </a>
+      )}
+    </>
+  );
 
   return (
     <div
-      className="overflow-hidden py-2.5 px-4"
+      key={currentIndex}
+      className="overflow-hidden py-2.5"
       style={{
         backgroundColor: current.bg_color || '#CCFF00',
         color: current.text_color || '#000000',
       }}
     >
-      <div className="max-w-7xl mx-auto">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentIndex}
-            initial={{ y: 16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -16, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center justify-center gap-2 text-sm font-medium tracking-wide uppercase"
-          >
-            <span>{current.message}</span>
-            {current.link_url && current.link_text && (
-              <a
-                href={current.link_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:no-underline ml-1"
-              >
-                {current.link_text}
-              </a>
-            )}
-          </motion.div>
-        </AnimatePresence>
+      <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
+        <span
+          className="inline-block animate-marquee"
+          style={{ animationDuration: speed }}
+        >
+          <span className="inline-flex items-center gap-8 px-4">
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+            {tickerContent}
+            <span className="inline-block w-16" aria-hidden="true" />
+          </span>
+          <span className="inline-flex items-center gap-8 px-4" aria-hidden="true">
+            {tickerContent}
+            <span className="inline-block w-16" />
+            {tickerContent}
+            <span className="inline-block w-16" />
+            {tickerContent}
+            <span className="inline-block w-16" />
+            {tickerContent}
+            <span className="inline-block w-16" />
+          </span>
+        </span>
       </div>
     </div>
   );

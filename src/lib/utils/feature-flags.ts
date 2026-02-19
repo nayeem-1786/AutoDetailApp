@@ -19,20 +19,26 @@ export async function isFeatureEnabled(key: string): Promise<boolean> {
 /**
  * Set a feature flag to enabled or disabled.
  * Used by CMS routes to auto-enable/disable flags when content is activated.
- * Uses update + fallback insert to handle both existing and missing rows.
+ * Uses upsert for reliability — handles both existing and missing rows.
  */
 export async function setFeatureFlag(key: string, enabled: boolean): Promise<void> {
   const supabase = createAdminClient();
 
-  // Try update first (common path — flag row exists from migration seed)
-  const { data } = await supabase
+  // Check if the flag exists first
+  const { data: existing } = await supabase
     .from('feature_flags')
-    .update({ enabled, updated_at: new Date().toISOString() })
+    .select('id')
     .eq('key', key)
-    .select('id');
+    .maybeSingle();
 
-  // If no row was updated, the flag doesn't exist — create it
-  if (!data || data.length === 0) {
+  if (existing) {
+    // Flag exists — update it
+    await supabase
+      .from('feature_flags')
+      .update({ enabled, updated_at: new Date().toISOString() })
+      .eq('key', key);
+  } else {
+    // Flag doesn't exist — create it
     await supabase
       .from('feature_flags')
       .insert({

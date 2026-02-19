@@ -9,10 +9,11 @@ import { getReviewData } from '@/lib/data/reviews';
 import { getTeamData } from '@/lib/data/team';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
-import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles } from '@/lib/data/cms';
+import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles, getSectionTickers } from '@/lib/data/cms';
 import { HeroCarousel } from '@/components/public/cms/hero-carousel';
 import { HeroSection } from '@/components/public/hero-section';
 import { AdZone } from '@/components/public/cms/ad-zone';
+import { SectionTicker } from '@/components/public/cms/announcement-ticker';
 import { TrustBar } from '@/components/public/trust-bar';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
 import { CtaSection } from '@/components/public/cta-section';
@@ -67,7 +68,7 @@ const differentiators = [
 ] as const;
 
 export default async function HomePage() {
-  const [categories, businessInfo, reviews, teamData, heroSlides, heroConfig, cmsToggles] = await Promise.all([
+  const [categories, businessInfo, reviews, teamData, heroSlides, heroConfig, cmsToggles, sectionTickers] = await Promise.all([
     getServiceCategories(),
     getBusinessInfo(),
     getReviewData(),
@@ -75,9 +76,11 @@ export default async function HomePage() {
     getActiveHeroSlides(),
     getHeroCarouselConfig(),
     getCmsToggles(),
+    getSectionTickers('/'),
   ]);
 
   const useCarousel = cmsToggles.heroCarousel && heroSlides.length > 0;
+  const showSectionTickers = cmsToggles.announcementTickers && cmsToggles.tickerEnabled && sectionTickers.length > 0;
 
   return (
     <>
@@ -136,6 +139,8 @@ export default async function HomePage() {
           </HomeAnimations>
         </div>
       </section>
+
+      {showSectionTickers && <SectionTicker tickers={sectionTickers} />}
 
       {/* Why Choose Us — 3 items with dividers */}
       <section className="bg-brand-dark section-spacing">
