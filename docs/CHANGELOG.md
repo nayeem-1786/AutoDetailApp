@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Verified Bug Fixes: Tickers + Particle Rendering — 2026-02-19
+
+### fix: tickers "Failed to Update" error + desktop particle rendering
+
+**Bug 1 — Tickers "Failed to Update" (ACTUAL ROOT CAUSE FOUND)**
+- Previous session's "fix" only added a warning banner — never fixed the actual API call
+- Root cause: Admin page (`/admin/website/tickers/page.tsx:67`) calls `PATCH /api/admin/settings/business` which **DID NOT EXIST**. Next.js returns 404 → catch block fires → "Failed to update" toast
+- Also affects: Ads admin page (`/admin/website/ads/page.tsx:121`) — same missing endpoint
+- Fix: Created `/api/admin/settings/business/route.ts` with GET (read by key) and PATCH (upsert by key) handlers. Uses `getEmployeeFromSession()` auth + `createAdminClient()` for DB. Upserts into `business_settings` table with `onConflict: 'key'`. Revalidates `cms-toggles` cache tag.
+- Verified: Full chain traced — toggle click → `adminFetch('/api/admin/settings/business', { method: 'PATCH', body: { key: 'ticker_enabled', value: true } })` → new API route → `business_settings.upsert()` → `revalidateTag('cms-toggles')` → layout re-reads toggles
+
+**Bug 2 — Desktop Particle Effects Not Rendering (ACTUAL ROOT CAUSE FOUND)**
+- Previous session assumed hydration fix would resolve particles — it didn't
+- Root cause: `setFeatureFlag()` in `src/lib/utils/feature-flags.ts` used `.update()` which silently does nothing if the flag row doesn't exist in the DB. When admin activates a seasonal theme → `setFeatureFlag('seasonal_themes', true)` → update affects 0 rows → flag stays `false` → `getCmsToggles()` returns `seasonalThemes: false` → layout passes `theme={null}` to ThemeProvider → ParticleCanvas never renders
+- Fix: Changed `setFeatureFlag()` to check update result count. If 0 rows updated, falls back to INSERT with auto-generated name/description/category. Ensures flag is always set regardless of DB state.
+- Additional fix: Changed ParticleCanvas z-index from `z-50` to `z-30` — particles now render above page content but below sticky header (z-50) and modal overlays (z-90+). Previous z-50 caused particles to compete with header's z-50.
+- Verified: No desktop-blocking code in ParticleCanvas. Canvas sizes correctly to `window.innerWidth/Height`. Animation loop starts via `requestAnimationFrame`. Mobile check only reduces particle count (not blocks). Feature flag now reliably sets.
+
+**Files modified (3 created/modified):**
+- `src/app/api/admin/settings/business/route.ts` — **NEW** — GET + PATCH for business settings
+- `src/lib/utils/feature-flags.ts` — `setFeatureFlag()` update → update+insert fallback
+- `src/components/public/cms/particle-canvas.tsx` — z-index: z-50 → z-30
+
+**Verification**: TypeScript clean (`tsc --noEmit`), build passes (`npm run build`).
+
+---
+
 ## Theme System Bug Fixes — 2026-02-19
 
 ### fix: hydration error, dark/light toggle, seasonal indicator, tickers, desktop particles

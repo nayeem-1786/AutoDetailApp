@@ -304,7 +304,7 @@ export function ParticleCanvas({ effect, intensity = 50, color }: ParticleCanvas
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-50"
+      className="pointer-events-none fixed inset-0 z-30"
       aria-hidden="true"
     />
   );
