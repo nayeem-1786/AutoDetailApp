@@ -204,7 +204,7 @@ export default function ThemeManagerPage() {
                     </p>
                     {theme.is_active && (
                       <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                        Active
+                        Currently Active
                       </Badge>
                     )}
                     {theme.particle_effect && (

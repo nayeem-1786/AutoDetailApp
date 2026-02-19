@@ -13,7 +13,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   RotateCcw, Save, Palette, Type, RectangleHorizontal,
-  Sparkles, ChevronDown,
+  Sparkles, ChevronDown, AlertTriangle,
 } from 'lucide-react';
 import type { SiteThemeSettings } from '@/lib/supabase/types';
 import { ColorField } from './_components/color-field';
@@ -35,15 +35,25 @@ export default function ThemeSettingsPage() {
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [themeId, setThemeId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({});
+  const [activeSeasonalTheme, setActiveSeasonalTheme] = useState<{ name: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await adminFetch('/api/admin/cms/site-theme');
-      if (!res.ok) throw new Error('Failed');
-      const { data } = await res.json();
-      if (data) {
-        setThemeId(data.id);
-        setFormData(data);
+      const [themeRes, seasonalRes] = await Promise.all([
+        adminFetch('/api/admin/cms/site-theme'),
+        adminFetch('/api/admin/cms/themes'),
+      ]);
+      if (themeRes.ok) {
+        const { data } = await themeRes.json();
+        if (data) {
+          setThemeId(data.id);
+          setFormData(data);
+        }
+      }
+      if (seasonalRes.ok) {
+        const { data: themes } = await seasonalRes.json();
+        const active = (themes ?? []).find((t: { is_active: boolean }) => t.is_active);
+        setActiveSeasonalTheme(active ?? null);
       }
     } catch {
       toast.error('Failed to load theme settings');
@@ -140,7 +150,7 @@ export default function ThemeSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Theme & Style Settings"
-        description="Customize your site's appearance — colors, typography, buttons, and more"
+        description="These settings control your site's base theme. Active seasonal themes may override some colors."
         action={
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setResetOpen(true)}>
@@ -154,6 +164,27 @@ export default function ThemeSettingsPage() {
           </div>
         }
       />
+
+      {/* Seasonal Theme Override Warning */}
+      {activeSeasonalTheme && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800">
+              Seasonal theme active: &ldquo;{activeSeasonalTheme.name}&rdquo;
+            </p>
+            <p className="text-sm text-amber-600 mt-1">
+              This seasonal theme is overriding some of the colors below. Changes you make here will take effect after the seasonal theme is deactivated.
+            </p>
+          </div>
+          <a
+            href="/admin/website/themes"
+            className="text-sm font-medium text-amber-700 hover:text-amber-900 underline whitespace-nowrap"
+          >
+            Manage Seasonal Themes
+          </a>
+        </div>
+      )}
 
       {/* Presets Dropdown */}
       <div className="relative">

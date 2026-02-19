@@ -28,9 +28,9 @@ export default async function AccountLayout({
       theme={showTheme ? activeTheme : null}
       siteTheme={hasSiteTheme ? siteTheme : null}
     >
+      <ThemeToggleInitializer />
       <CartProviderWrapper>
         <div className="public-theme bg-brand-black text-site-text min-h-screen">
-          <ThemeToggleInitializer />
           <SiteHeader />
           <main className="min-h-[calc(100vh-4rem)]">
             <CustomerAuthProvider>{children}</CustomerAuthProvider>

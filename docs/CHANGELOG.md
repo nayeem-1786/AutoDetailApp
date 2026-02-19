@@ -4,6 +4,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Theme System Bug Fixes — 2026-02-19
+
+### fix: hydration error, dark/light toggle, seasonal indicator, tickers, desktop particles
+
+**Bug 1 — Hydration Error (ThemeToggleInitializer)**
+- Root cause: bare `<script>` tag inside the React component tree caused SSR/client DOM mismatch
+- Fix: Replaced with Next.js `<Script strategy="beforeInteractive">` which hoists to `<head>`
+- Moved `<ThemeToggleInitializer>` outside the `.public-theme` div in all 3 layouts (public, account, customer-auth)
+
+**Bug 2 — Dark/Light Toggle Not Working**
+- Root cause: ThemeProvider sets CSS variables via inline `style` on a parent div; the toggle only set a `data-user-theme` attribute on the child `.public-theme` div, relying on CSS selectors that couldn't reliably override inherited inline styles
+- Fix: Toggle now uses `style.setProperty()` to apply all light mode CSS variable overrides directly on the `.public-theme` element, and `style.removeProperty()` to revert to dark mode
+- ThemeToggleInitializer script also applies inline styles for flash-free light mode on page load
+
+**Bug 3 — Seasonal Theme Override Without Indication**
+- Added amber warning banner on Theme & Style Settings page when a seasonal theme is active
+- Banner explains that seasonal theme overrides some colors, links to Manage Seasonal Themes
+- Updated page description: "These settings control your site's base theme. Active seasonal themes may override some colors."
+- Seasonal Themes list page badge text updated from "Active" to "Currently Active"
+
+**Bug 5 — Tickers "Tickers Enabled" Toggle Doesn't Work**
+- Root cause: Layout checks TWO conditions — `announcement_tickers` feature flag AND `ticker_enabled` business setting. Admin's toggle only controls `ticker_enabled`. The `announcement_tickers` flag defaults to `false` and must be enabled separately on Feature Toggles page.
+- Fix: Added amber warning banner on Tickers admin page when `announcement_tickers` feature flag is disabled, with link to Feature Toggles page
+
+**Bug 6 — Particles Not Rendering on Desktop**
+- No code-level desktop bug found in `particle-canvas.tsx` — canvas sizes correctly, has more particles on desktop, no screen-size gating
+- Most likely caused by Bug 1 hydration error preventing ParticleCanvas from properly mounting on client
+- Expected to be resolved by Bug 1 fix
+
+**Files modified (7):**
+- `src/components/public/theme-toggle-initializer.tsx` — rewritten with Next.js Script
+- `src/components/public/theme-toggle.tsx` — rewritten with style.setProperty()
+- `src/app/(public)/layout.tsx` — moved ThemeToggleInitializer outside .public-theme
+- `src/app/(account)/layout.tsx` — same
+- `src/app/(customer-auth)/layout.tsx` — same
+- `src/app/admin/website/theme-settings/page.tsx` — seasonal theme warning banner
+- `src/app/admin/website/tickers/page.tsx` — feature flag warning banner
+- `src/app/admin/website/themes/page.tsx` — "Currently Active" badge text
+
+**Verification**: TypeScript clean, build passes.
+
+---
+
 ## Account & Public Component Dark-Safe Colors — 2026-02-17
 
 ### fix: migrate remaining hardcoded colors in account pages and public components to dark-safe theme tokens

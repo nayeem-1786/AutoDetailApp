@@ -9,13 +9,15 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { Plus, Trash2, Megaphone, ArrowUpRight } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { Plus, Trash2, Megaphone, ArrowUpRight, AlertTriangle } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 
 export default function TickerManagerPage() {
   const router = useRouter();
   const [tickers, setTickers] = useState<AnnouncementTicker[]>([]);
   const [masterEnabled, setMasterEnabled] = useState(false);
+  const [featureFlagEnabled, setFeatureFlagEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -31,14 +33,24 @@ export default function TickerManagerPage() {
     }
   }, []);
 
-  // Load master toggle
+  // Load master toggle + feature flag
   const loadMaster = useCallback(async () => {
     try {
-      const res = await adminFetch('/api/admin/settings/business?key=ticker_enabled');
-      if (res.ok) {
-        const { value } = await res.json();
+      const [settingRes] = await Promise.all([
+        adminFetch('/api/admin/settings/business?key=ticker_enabled'),
+      ]);
+      if (settingRes.ok) {
+        const { value } = await settingRes.json();
         setMasterEnabled(value === true || value === 'true');
       }
+      // Check announcement_tickers feature flag directly
+      const supabase = createClient();
+      const { data: flag } = await supabase
+        .from('feature_flags')
+        .select('enabled')
+        .eq('key', 'announcement_tickers')
+        .maybeSingle();
+      setFeatureFlagEnabled(flag?.enabled ?? false);
     } catch {
       // ignore
     }
@@ -131,6 +143,27 @@ export default function TickerManagerPage() {
           </Button>
         }
       />
+
+      {/* Feature Flag Warning */}
+      {!featureFlagEnabled && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800">
+              Announcement Tickers feature is disabled
+            </p>
+            <p className="text-sm text-amber-600 mt-1">
+              The &ldquo;Announcement Tickers&rdquo; feature flag must be enabled in Feature Toggles for tickers to appear on the website, even when the master toggle below is on.
+            </p>
+          </div>
+          <a
+            href="/admin/settings/feature-toggles"
+            className="text-sm font-medium text-amber-700 hover:text-amber-900 underline whitespace-nowrap"
+          >
+            Feature Toggles
+          </a>
+        </div>
+      )}
 
       {/* Master Toggle */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 flex items-center justify-between">
