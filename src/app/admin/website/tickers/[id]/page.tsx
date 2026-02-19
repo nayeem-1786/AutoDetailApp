@@ -163,28 +163,18 @@ export default function TickerEditorPage() {
             className="inline-block animate-marquee"
             style={{ animationDuration: `${previewDuration.toFixed(1)}s` }}
           >
-            <span className="inline-flex items-center gap-8 px-4">
-              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
-              {ticker.link_text && (
-                <span className="underline">{ticker.link_text}</span>
-              )}
-              <span className="inline-block w-16" />
-              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
-              {ticker.link_text && (
-                <span className="underline">{ticker.link_text}</span>
-              )}
-            </span>
-            <span className="inline-flex items-center gap-8 px-4" aria-hidden="true">
-              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
-              {ticker.link_text && (
-                <span className="underline">{ticker.link_text}</span>
-              )}
-              <span className="inline-block w-16" />
-              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
-              {ticker.link_text && (
-                <span className="underline">{ticker.link_text}</span>
-              )}
-            </span>
+            {/* Two identical halves — each message followed by same spacer */}
+            {[0, 1].map((half) =>
+              Array.from({ length: 4 }, (_, i) => (
+                <span key={`${half}-${i}`} className="inline-flex items-center">
+                  <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
+                  {ticker.link_text && (
+                    <span className="underline ml-2">{ticker.link_text}</span>
+                  )}
+                  <span className="inline-block" style={{ width: '5rem' }} />
+                </span>
+              ))
+            )}
           </span>
         </div>
       </div>

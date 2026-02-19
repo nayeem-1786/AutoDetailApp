@@ -26,6 +26,12 @@ function getSpeedValue(ticker: AnnouncementTicker): number {
 }
 
 // ---------------------------------------------------------------------------
+// Spacing constant — gap between each message repetition (in rem).
+// Every message is followed by the same spacer so the loop is seamless.
+// ---------------------------------------------------------------------------
+const SPACER_REM = 5; // 5rem = 80px
+
+// ---------------------------------------------------------------------------
 // Custom hook: measure content width and compute duration for constant px/s
 // ---------------------------------------------------------------------------
 function useMarqueeDuration(speedValue: number) {
@@ -63,6 +69,38 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Single message unit — message + optional link + fixed-width spacer
+// Every unit is structurally identical so spacing is perfectly even.
+// ---------------------------------------------------------------------------
+function MessageUnit({ ticker }: { ticker: AnnouncementTicker }) {
+  return (
+    <span className="inline-flex items-center">
+      <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
+      {ticker.link_url ? (
+        <a
+          href={ticker.link_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity ml-2"
+        >
+          {ticker.link_text && (
+            <span className="underline">{ticker.link_text}</span>
+          )}
+          <ChevronRight className="w-3.5 h-3.5 opacity-70 inline-block" />
+        </a>
+      ) : ticker.link_text ? (
+        <span className="ml-2 underline">{ticker.link_text}</span>
+      ) : null}
+      {/* Fixed spacer after EVERY message — ensures even distribution */}
+      <span className="inline-block" style={{ width: `${SPACER_REM}rem` }} />
+    </span>
+  );
+}
+
+// How many copies per half — enough to fill wide screens for short messages
+const REPEAT_COUNT = 6;
+
+// ---------------------------------------------------------------------------
 // TopBarTicker — renders above the site header with horizontal marquee scroll
 // Supports inline HTML in messages (e.g., <span style="color:red;">TEXT</span>)
 // ---------------------------------------------------------------------------
@@ -98,17 +136,24 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
         className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}
       >
         {/*
-          Marquee trick: duplicate the content so the first copy scrolls off-screen
-          while the second copy seamlessly takes over. The animation moves translateX
-          from 0 to -50% (the first copy's width).
+          Marquee: two identical halves. The animation scrolls translateX from
+          0 to -50%. When it resets, the second half is in the exact position
+          the first half started — seamless loop. Every message unit has the
+          same trailing spacer, so there are no gaps at the seam.
         */}
         <span
           ref={ref}
           className="inline-block animate-marquee"
           style={{ animationDuration: `${duration.toFixed(1)}s` }}
         >
-          <TickerContent ticker={current} count={4} />
-          <TickerContent ticker={current} count={4} aria-hidden />
+          {/* First half */}
+          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
+            <MessageUnit key={`a-${i}`} ticker={current} />
+          ))}
+          {/* Second half — identical duplicate for seamless loop */}
+          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
+            <MessageUnit key={`b-${i}`} ticker={current} />
+          ))}
         </span>
       </div>
     </div>
@@ -151,75 +196,16 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
           className="inline-block animate-marquee"
           style={{ animationDuration: `${duration.toFixed(1)}s` }}
         >
-          <SectionTickerContent ticker={current} count={4} />
-          <SectionTickerContent ticker={current} count={4} aria-hidden />
+          {/* First half */}
+          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
+            <MessageUnit key={`a-${i}`} ticker={current} />
+          ))}
+          {/* Second half — identical duplicate for seamless loop */}
+          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
+            <MessageUnit key={`b-${i}`} ticker={current} />
+          ))}
         </span>
       </div>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Shared content helpers — renders repeated ticker message with HTML support
-// ---------------------------------------------------------------------------
-
-function TickerContent({ ticker, count, 'aria-hidden': ariaHidden }: {
-  ticker: AnnouncementTicker;
-  count: number;
-  'aria-hidden'?: boolean;
-}) {
-  const items = Array.from({ length: count });
-  return (
-    <span className="inline-flex items-center gap-8 px-4" aria-hidden={ariaHidden || undefined}>
-      {items.map((_, i) => (
-        <span key={i} className="inline-flex items-center">
-          <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
-          {ticker.link_url ? (
-            <a
-              href={ticker.link_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity ml-2"
-            >
-              {ticker.link_text && (
-                <span className="underline">{ticker.link_text}</span>
-              )}
-              <ChevronRight className="w-3.5 h-3.5 opacity-70 inline-block" />
-            </a>
-          ) : ticker.link_text ? (
-            <span className="ml-2 underline">{ticker.link_text}</span>
-          ) : null}
-          {i < count - 1 && <span className="inline-block w-16" />}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function SectionTickerContent({ ticker, count, 'aria-hidden': ariaHidden }: {
-  ticker: AnnouncementTicker;
-  count: number;
-  'aria-hidden'?: boolean;
-}) {
-  const items = Array.from({ length: count });
-  return (
-    <span className="inline-flex items-center gap-8 px-4" aria-hidden={ariaHidden || undefined}>
-      {items.map((_, i) => (
-        <span key={i} className="inline-flex items-center">
-          <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
-          {ticker.link_url && ticker.link_text && (
-            <a
-              href={ticker.link_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:no-underline ml-2"
-            >
-              {ticker.link_text}
-            </a>
-          )}
-          {i < count - 1 && <span className="inline-block w-16" />}
-        </span>
-      ))}
-    </span>
   );
 }
