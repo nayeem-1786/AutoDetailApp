@@ -4,6 +4,57 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Multi-Ticker Ordering + Rotation System — 2026-02-19
+
+### Admin: Ticker reorder + global rotation options
+
+**New file: `src/app/api/admin/cms/tickers/reorder/route.ts`**
+- PATCH endpoint for batch `sort_order` updates on `announcement_tickers`
+- Auth: session + `cms.tickers.manage` permission
+- Revalidates `cms-tickers` cache tag
+
+**Modified: `src/app/admin/website/tickers/page.tsx`**
+- Tickers grouped by placement (Top Bar, Between Sections) with section headers
+- Up/down arrow reorder (ChevronUp/ChevronDown + GripVertical) per card — works on mobile touch
+- Boundary checks: first item disables up, last disables down
+- Optimistic UI with revert on API error
+- **Global Options card** appears per placement when 2+ active tickers:
+  - Text Entry: Scroll (continuous marquee), R to L, L to R, Top to Bottom, Bottom to Top, Fade In
+  - Background Transition: Crossfade, Slide Down, None (instant)
+  - Hold Duration: 1-30 seconds
+  - Saved to `business_settings` as `ticker_top_bar_options` / `ticker_section_options` JSON
+
+### Public: Per-ticker rotation with configurable animations
+
+**Modified: `src/components/public/cms/announcement-ticker.tsx`**
+- **Single ticker** (1 active): Continuous marquee loop (unchanged from original behavior). Full bar in that ticker's colors/font, height determined by `font_size` Tailwind class.
+- **Multiple tickers** (2+ active): Configurable rotation via `TickerPlacementOptions`:
+  - Each ticker displays one at a time, full-width bar with its own `bg_color`, `text_color`, `font_size`
+  - Background transition between tickers (crossfade / slide_down / none)
+  - Text entry animation (scroll / ltr / rtl / ttb / btt / fade_in)
+  - Hold duration before cycling to next ticker
+  - When `text_entry = 'scroll'`: each ticker does a continuous marquee loop for `hold_duration` seconds, then transitions to next
+  - When any other `text_entry`: message enters with animation, holds centered, then transitions
+- Removed broken multi-message train approach (mixed bg colors/heights per message in a single scroll)
+- Phase machine: bg-in -> show content -> hold -> hide content -> bg-out -> next index
+
+**Modified: `src/lib/data/cms.ts`**
+- New `TickerPlacementOptions` interface and `DEFAULT_TICKER_OPTIONS` constant
+- New `getTickerOptions()` cached function — reads `ticker_top_bar_options` and `ticker_section_options` from `business_settings`, merges with defaults. Tagged `cms-tickers`, 60s TTL.
+
+**Modified: `src/app/(public)/layout.tsx`**
+- Fetches `getTickerOptions()` in parallel with other CMS data
+- Passes `options={tickerOptions.top_bar}` to `<TopBarTicker>`
+
+**Modified: `src/app/(public)/page.tsx`**
+- Fetches `getTickerOptions()` in parallel
+- Passes `options={tickerOptions.section}` to `<SectionTicker>`
+
+**Modified: `src/app/api/admin/settings/business/route.ts`**
+- PATCH now also revalidates `cms-tickers` tag when key starts with `ticker_`
+
+---
+
 ## Configurable Footer — Admin UI — 2026-02-19
 
 ### Session 3: Admin page for managing footer sections, columns, and links

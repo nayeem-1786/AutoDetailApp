@@ -490,7 +490,19 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-19 (Configurable Footer — Admin UI)
+## Last Session: 2026-02-19 (Multi-Ticker Ordering + Rotation)
+
+### Multi-Ticker Ordering + Rotation System
+- **Reorder API**: `PATCH /api/admin/cms/tickers/reorder` — batch `sort_order` updates, `cms.tickers.manage` permission
+- **Admin page rewrite**: Tickers grouped by placement (Top Bar / Between Sections), up/down arrow reorder per card (mobile-friendly), optimistic UI
+- **Global Options card**: Appears per placement when 2+ active tickers. Settings: Text Entry (scroll/ltr/rtl/ttb/btt/fade_in), Background Transition (crossfade/slide_down/none), Hold Duration (1-30s). Stored as `ticker_top_bar_options` / `ticker_section_options` in `business_settings`
+- **Public ticker rotation**: Single ticker = continuous marquee (unchanged). Multiple tickers = configurable rotation — each displays one at a time, full bar with its own colors/font. Background transitions between tickers, text enters with chosen animation, holds for duration, then cycles to next
+- **Data layer**: `getTickerOptions()` cached function in `cms.ts`, `TickerPlacementOptions` interface
+- **Public layout + homepage**: Both fetch `getTickerOptions()` and pass to `TopBarTicker` / `SectionTicker`
+- **Cache busting**: Business settings PATCH now also revalidates `cms-tickers` for ticker-prefixed keys
+- TypeScript clean
+
+### Previous Session: 2026-02-19 (Configurable Footer — Admin UI)
 
 ### Configurable Footer System — Session 3 (Admin UI)
 - **Admin page** (`/admin/website/footer/page.tsx`): Full footer management UI with 3 collapsible section cards (Main Footer, Service Areas, Bottom Bar).

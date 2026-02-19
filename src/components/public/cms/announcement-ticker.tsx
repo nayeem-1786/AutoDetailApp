@@ -3,18 +3,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
+import type { TickerPlacementOptions } from '@/lib/data/cms';
 
 // ---------------------------------------------------------------------------
-// Speed → consistent px/s rate (content-width-aware)
+// Speed -> consistent px/s rate
 // ---------------------------------------------------------------------------
 
-/** Map slider value (1-100) to pixels-per-second scroll rate */
 function speedToPxPerSec(speed: number): number {
-  // speed 1 → 30 px/s (very slow), speed 100 → 300 px/s (very fast)
   return 30 + (speed / 100) * 270;
 }
 
-/** Fallback: enum → slider value (for tickers without scroll_speed_value) */
 const ENUM_TO_VALUE: Record<string, number> = {
   slow: 25,
   normal: 50,
@@ -26,20 +24,22 @@ function getSpeedValue(ticker: AnnouncementTicker): number {
 }
 
 // ---------------------------------------------------------------------------
-// Spacing constant — gap between each message repetition (in rem).
-// Every message is followed by the same spacer so the loop is seamless.
+// Font size -> Tailwind class mapping
 // ---------------------------------------------------------------------------
-const SPACER_REM = 5; // 5rem = 80px
+const FONT_SIZE_CLASS: Record<string, string> = {
+  xs: 'text-xs',
+  sm: 'text-sm',
+  base: 'text-base',
+  lg: 'text-lg',
+};
 
 // ---------------------------------------------------------------------------
-// Custom hook: 4-phase marquee
-//
-// Phase 1 (hidden):   Content is invisible while we measure its width.
-// Phase 2 (ready):    Content is positioned off-screen right. No transition
-//                     yet — browser must paint this position first.
-// Phase 3 (entering): CSS transition slides content from right to position 0.
-//                     Uses transition (not @keyframes) for mobile reliability.
-// Phase 4 (looping):  Seamless infinite marquee loop via CSS animation.
+// Spacing constant
+// ---------------------------------------------------------------------------
+const SPACER_REM = 5;
+
+// ---------------------------------------------------------------------------
+// 4-phase marquee hook (unchanged — used for single-ticker and "scroll" mode)
 // ---------------------------------------------------------------------------
 type MarqueePhase = 'hidden' | 'ready' | 'entering' | 'looping';
 
@@ -53,20 +53,13 @@ function useMarquee(speedValue: number) {
   const measure = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-
     const pxPerSec = speedToPxPerSec(speedValue);
-
-    // Loop duration: half content width / px-per-sec
     const totalWidth = el.scrollWidth;
     const halfWidth = totalWidth / 2;
     setLoopDuration(Math.max(3, halfWidth / pxPerSec));
-
-    // Enter: viewport width in pixels / px-per-sec
     const vw = window.innerWidth;
     setEnterDuration(Math.max(1, vw / pxPerSec));
     setEnterOffset(vw);
-
-    // Move to ready phase (positioned off-screen, waiting for paint)
     setPhase((prev) => (prev === 'hidden' ? 'ready' : prev));
   }, [speedValue]);
 
@@ -76,8 +69,6 @@ function useMarquee(speedValue: number) {
     return () => window.removeEventListener('resize', measure);
   }, [measure]);
 
-  // ready → entering: double-rAF ensures browser has painted the off-screen
-  // position before we apply the CSS transition to slide it in.
   useEffect(() => {
     if (phase !== 'ready') return;
     let cancelled = false;
@@ -89,7 +80,6 @@ function useMarquee(speedValue: number) {
     return () => { cancelled = true; };
   }, [phase]);
 
-  // entering → looping: timer-based (CSS transitionend is unreliable on mobile)
   useEffect(() => {
     if (phase !== 'entering') return;
     const timer = setTimeout(() => {
@@ -101,19 +91,39 @@ function useMarquee(speedValue: number) {
   return { ref, loopDuration, enterDuration, enterOffset, phase };
 }
 
-// ---------------------------------------------------------------------------
-// Font size → Tailwind class mapping
-// ---------------------------------------------------------------------------
-const FONT_SIZE_CLASS: Record<string, string> = {
-  xs: 'text-xs',
-  sm: 'text-sm',
-  base: 'text-base',
-  lg: 'text-lg',
-};
+function marqueeProps(
+  phase: MarqueePhase,
+  enterDuration: number,
+  loopDuration: number,
+  enterOffset: number,
+): { className: string; style: React.CSSProperties } {
+  switch (phase) {
+    case 'hidden':
+      return { className: 'inline-block', style: { opacity: 0 } };
+    case 'ready':
+      return {
+        className: 'inline-block',
+        style: { transform: `translateX(${enterOffset}px)`, willChange: 'transform' },
+      };
+    case 'entering':
+      return {
+        className: 'inline-block',
+        style: {
+          transform: 'translateX(0)',
+          transition: `transform ${enterDuration.toFixed(1)}s linear`,
+          willChange: 'transform',
+        },
+      };
+    case 'looping':
+      return {
+        className: 'inline-block animate-marquee',
+        style: { animationDuration: `${loopDuration.toFixed(1)}s`, willChange: 'transform' },
+      };
+  }
+}
 
 // ---------------------------------------------------------------------------
-// Single message unit — message + optional link + fixed-width spacer
-// Every unit is structurally identical so spacing is perfectly even.
+// MessageUnit — message text + optional link + spacer
 // ---------------------------------------------------------------------------
 function MessageUnit({ ticker }: { ticker: AnnouncementTicker }) {
   return (
@@ -134,170 +144,308 @@ function MessageUnit({ ticker }: { ticker: AnnouncementTicker }) {
       ) : ticker.link_text ? (
         <span className="ml-2 underline">{ticker.link_text}</span>
       ) : null}
-      {/* Fixed spacer after EVERY message — ensures even distribution */}
       <span className="inline-block" style={{ width: `${SPACER_REM}rem` }} />
     </span>
   );
 }
 
-// How many copies per half — enough to fill wide screens for short messages
 const REPEAT_COUNT = 6;
 
 // ---------------------------------------------------------------------------
-// Helper: build className and style for the marquee span based on phase
+// SingleTickerMarquee — continuous marquee for a single ticker (or one ticker
+// in rotation "scroll" mode). Full bar in that ticker's colors/font.
 // ---------------------------------------------------------------------------
-function marqueeProps(
-  phase: MarqueePhase,
-  enterDuration: number,
-  loopDuration: number,
-  enterOffset: number,
-): { className: string; style: React.CSSProperties } {
-  switch (phase) {
-    case 'hidden':
-      return {
-        className: 'inline-block',
-        style: { opacity: 0 },
-      };
+function SingleTickerMarquee({ ticker }: { ticker: AnnouncementTicker }) {
+  const speedValue = getSpeedValue(ticker);
+  const { ref, loopDuration, enterDuration, enterOffset, phase } = useMarquee(speedValue);
+  const fontSize = FONT_SIZE_CLASS[ticker.font_size] || FONT_SIZE_CLASS.sm;
+  const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
 
-    case 'ready':
-      // Positioned off-screen right, visible, NO transition — browser must
-      // paint this position before we add the transition in the next phase.
-      return {
-        className: 'inline-block',
-        style: {
-          transform: `translateX(${enterOffset}px)`,
-          willChange: 'transform',
-        },
-      };
+  return (
+    <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
+      <span ref={ref} className={mp.className} style={mp.style}>
+        {Array.from({ length: REPEAT_COUNT }, (_, i) => (
+          <MessageUnit key={`a-${i}`} ticker={ticker} />
+        ))}
+        {Array.from({ length: REPEAT_COUNT }, (_, i) => (
+          <MessageUnit key={`b-${i}`} ticker={ticker} />
+        ))}
+      </span>
+    </div>
+  );
+}
 
-    case 'entering':
-      // CSS transition slides from the off-screen position to 0.
-      // This is more reliable on mobile than CSS @keyframes animations.
-      return {
-        className: 'inline-block',
-        style: {
-          transform: 'translateX(0)',
-          transition: `transform ${enterDuration.toFixed(1)}s linear`,
-          willChange: 'transform',
-        },
-      };
+// ---------------------------------------------------------------------------
+// StaticMessage — for non-scroll text entries (ltr, rtl, ttb, btt, fade_in).
+// Shows the message centered with its own animation.
+// ---------------------------------------------------------------------------
+function StaticMessage({
+  ticker,
+  textEntry,
+}: {
+  ticker: AnnouncementTicker;
+  textEntry: string;
+}) {
+  const fontSize = FONT_SIZE_CLASS[ticker.font_size] || FONT_SIZE_CLASS.sm;
+  const [visible, setVisible] = useState(false);
 
-    case 'looping':
-      // Infinite seamless marquee loop via CSS animation.
-      return {
-        className: 'inline-block animate-marquee',
-        style: {
-          animationDuration: `${loopDuration.toFixed(1)}s`,
-          willChange: 'transform',
-        },
-      };
+  useEffect(() => {
+    // Trigger entrance animation on next frame
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const entryStyles = getTextEntryStyles(textEntry, visible);
+
+  return (
+    <div
+      className={`font-medium tracking-wide uppercase ${fontSize} text-center px-4 overflow-hidden`}
+    >
+      <span
+        className="inline-flex items-center transition-all duration-700 ease-out"
+        style={entryStyles}
+      >
+        <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
+        {ticker.link_url ? (
+          <a
+            href={ticker.link_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity ml-2"
+          >
+            {ticker.link_text && (
+              <span className="underline">{ticker.link_text}</span>
+            )}
+            <ChevronRight className="w-3.5 h-3.5 opacity-70 inline-block" />
+          </a>
+        ) : ticker.link_text ? (
+          <span className="ml-2 underline">{ticker.link_text}</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function getTextEntryStyles(
+  textEntry: string,
+  visible: boolean,
+): React.CSSProperties {
+  if (visible) {
+    return { opacity: 1, transform: 'translate(0, 0)' };
+  }
+  switch (textEntry) {
+    case 'ltr':
+      return { opacity: 0, transform: 'translateX(-100%)' };
+    case 'rtl':
+      return { opacity: 0, transform: 'translateX(100%)' };
+    case 'ttb':
+      return { opacity: 0, transform: 'translateY(-100%)' };
+    case 'btt':
+      return { opacity: 0, transform: 'translateY(100%)' };
+    case 'fade_in':
+      return { opacity: 0, transform: 'translate(0, 0)' };
+    default:
+      return { opacity: 0, transform: 'translateX(100%)' };
   }
 }
 
 // ---------------------------------------------------------------------------
-// TopBarTicker — renders above the site header with horizontal marquee scroll
-// Supports inline HTML in messages (e.g., <span style="color:red;">TEXT</span>)
+// Default options (matches data layer defaults)
 // ---------------------------------------------------------------------------
-export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const current = tickers[currentIndex];
-  const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, loopDuration, enterDuration, enterOffset, phase } =
-    useMarquee(speedValue);
+const DEFAULT_OPTIONS: TickerPlacementOptions = {
+  hold_duration: 5,
+  bg_transition: 'crossfade',
+  text_entry: 'rtl',
+};
 
-  // Auto-rotate through tickers (when multiple)
+// ---------------------------------------------------------------------------
+// MultiTickerRotation — cycles through tickers one at a time with
+// configurable background transition and text entry animation.
+// ---------------------------------------------------------------------------
+function MultiTickerRotation({
+  tickers,
+  options,
+}: {
+  tickers: AnnouncementTicker[];
+  options: TickerPlacementOptions;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [bgPhase, setBgPhase] = useState<'in' | 'visible' | 'out'>('in');
+  const [showContent, setShowContent] = useState(false);
+  const current = tickers[currentIndex];
+
+  const holdDuration = options.hold_duration * 1000;
+  const bgTransition = options.bg_transition;
+  const textEntry = options.text_entry;
+  const isScrollMode = textEntry === 'scroll';
+
   useEffect(() => {
-    if (tickers.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % tickers.length);
-    }, 8000);
-    return () => clearInterval(timer);
+    // Phase machine: bg in -> show content -> hold -> hide content -> bg out -> next
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (bgPhase === 'in') {
+      // Background is entering — wait for transition, then show content
+      const bgDuration = bgTransition === 'none' ? 50 : 400;
+      timer = setTimeout(() => {
+        setShowContent(true);
+        setBgPhase('visible');
+      }, bgDuration);
+    } else if (bgPhase === 'visible') {
+      // Content visible — hold for duration, then transition to next
+      timer = setTimeout(() => {
+        setShowContent(false);
+        setBgPhase('out');
+      }, holdDuration);
+    } else if (bgPhase === 'out') {
+      // Content hidden — transition bg out, then move to next ticker
+      const bgDuration = bgTransition === 'none' ? 50 : 400;
+      timer = setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % tickers.length);
+        setBgPhase('in');
+      }, bgDuration);
+    }
+
+    return () => clearTimeout(timer);
+  }, [bgPhase, holdDuration, bgTransition, tickers.length]);
+
+  // Reset phases when ticker list changes
+  useEffect(() => {
+    setCurrentIndex(0);
+    setBgPhase('in');
+    setShowContent(false);
   }, [tickers.length]);
 
-  if (tickers.length === 0) return null;
-
-  const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
-  const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
+  const bgStyles = getBgTransitionStyles(bgTransition, bgPhase, current);
 
   return (
-    <div
-      key={currentIndex}
-      className="relative overflow-hidden py-2.5"
-      style={{
-        backgroundColor: current.bg_color || '#CCFF00',
-        color: current.text_color || '#000000',
-      }}
-    >
+    <div className="relative overflow-hidden">
       <div
-        className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}
+        className="py-2.5 transition-all"
+        style={{
+          ...bgStyles,
+          color: current.text_color || '#ffffff',
+        }}
       >
-        <span
-          ref={ref}
-          className={mp.className}
-          style={mp.style}
-        >
-          {/* First half */}
-          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
-            <MessageUnit key={`a-${i}`} ticker={current} />
-          ))}
-          {/* Second half — identical duplicate for seamless loop */}
-          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
-            <MessageUnit key={`b-${i}`} ticker={current} />
-          ))}
-        </span>
+        {showContent ? (
+          isScrollMode ? (
+            <SingleTickerMarquee key={currentIndex} ticker={current} />
+          ) : (
+            <StaticMessage
+              key={currentIndex}
+              ticker={current}
+              textEntry={textEntry}
+            />
+          )
+        ) : (
+          // Invisible placeholder to maintain height based on font_size
+          <div
+            className={`font-medium tracking-wide uppercase ${
+              FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm
+            } text-center invisible`}
+          >
+            &nbsp;
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// SectionTicker — renders inline between page sections with marquee scroll
-// ---------------------------------------------------------------------------
-export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const current = tickers[currentIndex];
-  const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, loopDuration, enterDuration, enterOffset, phase } =
-    useMarquee(speedValue);
+function getBgTransitionStyles(
+  transition: string,
+  phase: 'in' | 'visible' | 'out',
+  ticker: AnnouncementTicker,
+): React.CSSProperties {
+  const bg = ticker.bg_color || '#CCFF00';
 
-  useEffect(() => {
-    if (tickers.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % tickers.length);
-    }, 8000);
-    return () => clearInterval(timer);
-  }, [tickers.length]);
+  switch (transition) {
+    case 'slide_down':
+      return {
+        backgroundColor: bg,
+        transitionProperty: 'transform, opacity',
+        transitionDuration: '0.4s',
+        transitionTimingFunction: 'ease-out',
+        transform:
+          phase === 'in'
+            ? 'translateY(-100%)'
+            : phase === 'out'
+              ? 'translateY(100%)'
+              : 'translateY(0)',
+        opacity: phase === 'visible' ? 1 : 0,
+      };
+    case 'crossfade':
+      return {
+        backgroundColor: bg,
+        transitionProperty: 'opacity',
+        transitionDuration: '0.4s',
+        transitionTimingFunction: 'ease-in-out',
+        opacity: phase === 'visible' ? 1 : phase === 'in' ? 0 : 0,
+      };
+    case 'none':
+    default:
+      return { backgroundColor: bg };
+  }
+}
 
+// ---------------------------------------------------------------------------
+// TopBarTicker
+// ---------------------------------------------------------------------------
+export function TopBarTicker({
+  tickers,
+  options,
+}: {
+  tickers: AnnouncementTicker[];
+  options?: TickerPlacementOptions;
+}) {
   if (tickers.length === 0) return null;
 
-  const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
-  const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
-
-  return (
-    <div
-      key={currentIndex}
-      className="overflow-hidden py-2.5"
-      style={{
-        backgroundColor: current.bg_color || '#CCFF00',
-        color: current.text_color || '#000000',
-      }}
-    >
-      <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
-        <span
-          ref={ref}
-          className={mp.className}
-          style={mp.style}
-        >
-          {/* First half */}
-          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
-            <MessageUnit key={`a-${i}`} ticker={current} />
-          ))}
-          {/* Second half — identical duplicate for seamless loop */}
-          {Array.from({ length: REPEAT_COUNT }, (_, i) => (
-            <MessageUnit key={`b-${i}`} ticker={current} />
-          ))}
-        </span>
+  // Single ticker — always continuous marquee
+  if (tickers.length === 1) {
+    const ticker = tickers[0];
+    return (
+      <div
+        className="relative overflow-hidden py-2.5"
+        style={{
+          backgroundColor: ticker.bg_color || '#CCFF00',
+          color: ticker.text_color || '#000000',
+        }}
+      >
+        <SingleTickerMarquee ticker={ticker} />
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Multiple tickers — use configurable rotation
+  return <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} />;
+}
+
+// ---------------------------------------------------------------------------
+// SectionTicker
+// ---------------------------------------------------------------------------
+export function SectionTicker({
+  tickers,
+  options,
+}: {
+  tickers: AnnouncementTicker[];
+  options?: TickerPlacementOptions;
+}) {
+  if (tickers.length === 0) return null;
+
+  // Single ticker — always continuous marquee
+  if (tickers.length === 1) {
+    const ticker = tickers[0];
+    return (
+      <div
+        className="overflow-hidden py-2.5"
+        style={{
+          backgroundColor: ticker.bg_color || '#CCFF00',
+          color: ticker.text_color || '#000000',
+        }}
+      >
+        <SingleTickerMarquee ticker={ticker} />
+      </div>
+    );
+  }
+
+  return <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} />;
 }

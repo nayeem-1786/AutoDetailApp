@@ -66,5 +66,10 @@ export async function PATCH(request: NextRequest) {
   // Revalidate CMS toggles cache so public layout picks up changes immediately
   revalidateTag('cms-toggles');
 
+  // Revalidate ticker cache when ticker options change
+  if (key.startsWith('ticker_')) {
+    revalidateTag('cms-tickers');
+  }
+
   return NextResponse.json({ success: true });
 }

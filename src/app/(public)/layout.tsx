@@ -5,7 +5,7 @@ import { TopBarTicker } from '@/components/public/cms/announcement-ticker';
 import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrapper';
 import { CartDrawer } from '@/components/public/cart/cart-drawer';
 import { ThemeToggleInitializer } from '@/components/public/theme-toggle-initializer';
-import { getCmsToggles, getActiveTheme, getTopBarTickers, getSiteThemeSettings } from '@/lib/data/cms';
+import { getCmsToggles, getActiveTheme, getTopBarTickers, getSiteThemeSettings, getTickerOptions } from '@/lib/data/cms';
 import { getNavigationItems, getFooterData } from '@/lib/data/website-pages';
 
 export default async function PublicLayout({
@@ -13,11 +13,12 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [cmsToggles, activeTheme, siteTheme, topBarTickers, headerNav, footerData] = await Promise.all([
+  const [cmsToggles, activeTheme, siteTheme, topBarTickers, tickerOptions, headerNav, footerData] = await Promise.all([
     getCmsToggles(),
     getActiveTheme(),
     getSiteThemeSettings(),
     getTopBarTickers(),
+    getTickerOptions(),
     getNavigationItems('header'),
     getFooterData(),
   ]);
@@ -34,7 +35,7 @@ export default async function PublicLayout({
       <ThemeToggleInitializer />
       <CartProviderWrapper>
         <div className="public-theme bg-brand-black text-site-text min-h-screen antialiased">
-          {showTickers && <TopBarTicker tickers={topBarTickers} />}
+          {showTickers && <TopBarTicker tickers={topBarTickers} options={tickerOptions.top_bar} />}
           <SiteHeader navItems={headerNav} />
           <main className="min-h-[calc(100vh-4rem)]">{children}</main>
           <SiteFooter footerData={footerData} />

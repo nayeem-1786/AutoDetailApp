@@ -201,6 +201,47 @@ export const getCmsToggles = unstable_cache(
 );
 
 // ---------------------------------------------------------------------------
+// Ticker Placement Options (multi-ticker rotation settings)
+// ---------------------------------------------------------------------------
+
+export interface TickerPlacementOptions {
+  hold_duration: number;   // seconds, default 5
+  bg_transition: 'slide_down' | 'crossfade' | 'none'; // default 'crossfade'
+  text_entry: 'scroll' | 'ltr' | 'rtl' | 'ttb' | 'btt' | 'fade_in'; // default 'rtl'
+}
+
+const DEFAULT_TICKER_OPTIONS: TickerPlacementOptions = {
+  hold_duration: 5,
+  bg_transition: 'crossfade',
+  text_entry: 'rtl',
+};
+
+export const getTickerOptions = unstable_cache(
+  async (): Promise<{
+    top_bar: TickerPlacementOptions;
+    section: TickerPlacementOptions;
+  }> => {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['ticker_top_bar_options', 'ticker_section_options']);
+
+    const map: Record<string, unknown> = {};
+    for (const s of data ?? []) {
+      map[s.key] = s.value;
+    }
+
+    return {
+      top_bar: { ...DEFAULT_TICKER_OPTIONS, ...(map.ticker_top_bar_options as Partial<TickerPlacementOptions> | null) },
+      section: { ...DEFAULT_TICKER_OPTIONS, ...(map.ticker_section_options as Partial<TickerPlacementOptions> | null) },
+    };
+  },
+  ['ticker-options'],
+  { revalidate: 60, tags: ['cms-tickers'] }
+);
+
+// ---------------------------------------------------------------------------
 // Ads
 // ---------------------------------------------------------------------------
 
