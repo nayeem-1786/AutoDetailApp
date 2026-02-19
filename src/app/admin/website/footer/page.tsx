@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import {
@@ -16,6 +17,32 @@ import {
   Info,
   ImageIcon,
   AlertTriangle,
+  Bold,
+  Italic,
+  Link2,
+  SmilePlus,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  Globe,
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Star,
+  Heart,
+  Shield,
+  Award,
+  Zap,
+  Calendar,
+  CreditCard,
+  Truck,
+  Wrench,
+  MessageCircle,
+  ThumbsUp,
+  Navigation,
+  type LucideIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,18 +67,8 @@ interface ColumnWithLinks extends FooterColumn {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — distribute 12-unit grid spans evenly
+// Helpers — span calculation
 // ---------------------------------------------------------------------------
-
-function distributeSpans(columns: ColumnWithLinks[]): ColumnWithLinks[] {
-  if (columns.length === 0) return columns;
-  const base = Math.floor(12 / columns.length);
-  let remainder = 12 - base * columns.length;
-  return columns.map((col, i) => {
-    const span = base + (i < remainder ? 1 : 0);
-    return { ...col, config: { ...col.config, col_span: span } };
-  });
-}
 
 function getSpanTotal(columns: ColumnWithLinks[]): number {
   return columns.reduce((sum, c) => sum + ((c.config?.col_span as number) || 0), 0);
@@ -348,13 +365,10 @@ function MainFooterPanel({
       return;
     }
 
-    // Calculate default span for the new column
-    const newCount = columns.length + 1;
-    const newSpans = distributeSpans([
-      ...columns,
-      { id: 'temp', config: {} } as ColumnWithLinks,
-    ]);
-    const newColSpan = (newSpans[newSpans.length - 1].config.col_span as number) || Math.floor(12 / newCount);
+    // Calculate remaining span from enabled columns
+    const activeSpan = getSpanTotal(columns.filter((c) => c.is_enabled));
+    const remainingSpan = 12 - activeSpan;
+    const newColSpan = Math.max(2, Math.min(remainingSpan, 4)); // default 4, min 2, max remaining
 
     const res = await adminFetch('/api/admin/footer/columns', {
       method: 'POST',
@@ -370,22 +384,10 @@ function MainFooterPanel({
     if (res.ok) {
       const { data } = await res.json();
       const newCol: ColumnWithLinks = { ...data, config: data.config || {}, links: [] };
-      // Redistribute spans across all columns
-      const updatedAll = distributeSpans([...columns, newCol]);
       setColumns((prev) => {
         const otherCols = prev.filter((c) => c.section_id !== sectionId);
-        return [...otherCols, ...updatedAll];
+        return [...otherCols, ...columns, newCol];
       });
-      // Save new spans to server
-      for (const col of updatedAll) {
-        if (col.id !== data.id) {
-          adminFetch('/api/admin/footer/columns', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: col.id, config: col.config }),
-          });
-        }
-      }
       setNewColumnTitle('');
       setNewColumnType('links');
       setShowAddColumn(false);
@@ -420,21 +422,8 @@ function MainFooterPanel({
     });
 
     if (res.ok) {
-      // Redistribute spans across remaining columns
-      const remaining = columns.filter((c) => c.id !== col.id);
-      const rebalanced = distributeSpans(remaining);
-      setColumns((prev) => {
-        const otherCols = prev.filter((c) => c.section_id !== sectionId);
-        return [...otherCols, ...rebalanced];
-      });
-      // Save new spans to server
-      for (const c of rebalanced) {
-        adminFetch('/api/admin/footer/columns', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: c.id, config: c.config }),
-        });
-      }
+      // Remove column — do NOT redistribute spans (freed space stays available)
+      setColumns((prev) => prev.filter((c) => c.id !== col.id));
       toast.success('Column deleted');
     } else {
       toast.error('Failed to delete column');
@@ -443,6 +432,19 @@ function MainFooterPanel({
 
   const toggleColumnEnabled = async (col: ColumnWithLinks) => {
     const newVal = !col.is_enabled;
+
+    // When enabling, check if adding this column's span would exceed 12
+    if (newVal) {
+      const currentActiveSpan = getSpanTotal(columns.filter((c) => c.is_enabled));
+      const colSpan = (col.config?.col_span as number) || 3;
+      if (currentActiveSpan + colSpan > 12) {
+        toast.error(
+          `Enabling this column would use ${currentActiveSpan + colSpan} of 12 grid units. Shrink or disable other columns first.`
+        );
+        return;
+      }
+    }
+
     setColumns((prev) =>
       prev.map((c) => (c.id === col.id ? { ...c, is_enabled: newVal } : c))
     );
@@ -540,17 +542,39 @@ function MainFooterPanel({
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          {columns.length} column{columns.length !== 1 ? 's' : ''}
+          {(() => {
+            const enabledCols = columns.filter((c) => c.is_enabled);
+            const disabledCount = columns.length - enabledCols.length;
+            const spanUsed = getSpanTotal(enabledCols);
+            return (
+              <>
+                {enabledCols.length} active column{enabledCols.length !== 1 ? 's' : ''}
+                {' \u00b7 '}
+                {spanUsed} of 12 grid units used
+                {disabledCount > 0 && (
+                  <span className="text-gray-400">
+                    {' \u00b7 '}{disabledCount} disabled
+                  </span>
+                )}
+              </>
+            );
+          })()}
         </p>
-        <Button
-          size="sm"
-          onClick={() => setShowAddColumn(true)}
-          disabled={columns.length >= 4}
-          title={columns.length >= 4 ? 'Maximum 4 columns' : undefined}
-        >
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Add Column
-        </Button>
+        {(() => {
+          const activeSpan = getSpanTotal(columns.filter((c) => c.is_enabled));
+          const canAdd = activeSpan <= 10; // room for at least a span-2 column
+          return (
+            <Button
+              size="sm"
+              onClick={() => setShowAddColumn(true)}
+              disabled={!canAdd}
+              title={!canAdd ? 'Disable or shrink an existing column to make room' : undefined}
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Add Column
+            </Button>
+          );
+        })()}
       </div>
 
       {/* Add column form */}
@@ -1252,6 +1276,181 @@ function LinksEditor({
 // HTML Editor — textarea for custom HTML content
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Icon Picker — curated Lucide icons for footer HTML editor
+// ---------------------------------------------------------------------------
+
+const FOOTER_ICONS: { name: string; icon: LucideIcon; category: string }[] = [
+  // Contact
+  { name: 'Phone', icon: Phone, category: 'Contact' },
+  { name: 'Mail', icon: Mail, category: 'Contact' },
+  { name: 'MapPin', icon: MapPin, category: 'Contact' },
+  { name: 'Clock', icon: Clock, category: 'Contact' },
+  { name: 'Globe', icon: Globe, category: 'Contact' },
+  { name: 'MessageCircle', icon: MessageCircle, category: 'Contact' },
+  { name: 'Navigation', icon: Navigation, category: 'Contact' },
+  // Social
+  { name: 'Facebook', icon: Facebook, category: 'Social' },
+  { name: 'Instagram', icon: Instagram, category: 'Social' },
+  { name: 'Twitter', icon: Twitter, category: 'Social' },
+  { name: 'Youtube', icon: Youtube, category: 'Social' },
+  // Trust & Badges
+  { name: 'Star', icon: Star, category: 'Trust' },
+  { name: 'Heart', icon: Heart, category: 'Trust' },
+  { name: 'Shield', icon: Shield, category: 'Trust' },
+  { name: 'Award', icon: Award, category: 'Trust' },
+  { name: 'ThumbsUp', icon: ThumbsUp, category: 'Trust' },
+  // Services
+  { name: 'Calendar', icon: Calendar, category: 'Services' },
+  { name: 'CreditCard', icon: CreditCard, category: 'Services' },
+  { name: 'Truck', icon: Truck, category: 'Services' },
+  { name: 'Wrench', icon: Wrench, category: 'Services' },
+  { name: 'Zap', icon: Zap, category: 'Services' },
+];
+
+const ICON_SIZES = [16, 20, 24, 32] as const;
+const ICON_COLORS = [
+  { label: 'Current', value: 'currentColor' },
+  { label: 'White', value: '#ffffff' },
+  { label: 'Lime', value: '#CCFF00' },
+] as const;
+
+function IconPicker({
+  onInsert,
+  onClose,
+}: {
+  onInsert: (svg: string) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [selectedSize, setSelectedSize] = useState<number>(20);
+  const [selectedColor, setSelectedColor] = useState('currentColor');
+
+  const filtered = search
+    ? FOOTER_ICONS.filter((i) =>
+        i.name.toLowerCase().includes(search.toLowerCase()) ||
+        i.category.toLowerCase().includes(search.toLowerCase())
+      )
+    : FOOTER_ICONS;
+
+  const categories = [...new Set(filtered.map((i) => i.category))];
+
+  const generateSvg = (iconDef: (typeof FOOTER_ICONS)[number]) => {
+    const svgString = renderToStaticMarkup(
+      createElement(iconDef.icon, {
+        size: selectedSize,
+        color: selectedColor,
+        strokeWidth: 2,
+      })
+    );
+    // Add inline style for vertical alignment
+    return svgString.replace(
+      '<svg ',
+      `<svg style="display:inline-block;vertical-align:middle" `
+    );
+  };
+
+  return (
+    <div className="absolute z-20 top-full left-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg">
+      <div className="p-3 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Insert Icon</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search icons..."
+          className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          autoFocus
+        />
+      </div>
+
+      {/* Size + Color selectors */}
+      <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-4">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-500">Size</span>
+          <div className="flex gap-0.5">
+            {ICON_SIZES.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSelectedSize(s)}
+                className={`px-1.5 py-0.5 text-xs rounded ${
+                  selectedSize === s
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-500">Color</span>
+          <div className="flex gap-1">
+            {ICON_COLORS.map((c) => (
+              <button
+                key={c.value}
+                onClick={() => setSelectedColor(c.value)}
+                title={c.label}
+                className={`h-5 w-5 rounded-full border-2 ${
+                  selectedColor === c.value ? 'border-brand-600' : 'border-gray-300'
+                }`}
+                style={{
+                  backgroundColor:
+                    c.value === 'currentColor' ? '#6b7280' : c.value,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Icon grid */}
+      <div className="max-h-48 overflow-y-auto p-2">
+        {categories.map((cat) => (
+          <div key={cat} className="mb-2">
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-1 mb-1">
+              {cat}
+            </p>
+            <div className="grid grid-cols-7 gap-0.5">
+              {filtered
+                .filter((i) => i.category === cat)
+                .map((iconDef) => {
+                  const IconComp = iconDef.icon;
+                  return (
+                    <button
+                      key={iconDef.name}
+                      title={iconDef.name}
+                      onClick={() => {
+                        onInsert(generateSvg(iconDef));
+                        onClose();
+                      }}
+                      className="flex items-center justify-center h-9 w-9 rounded hover:bg-gray-100 transition-colors"
+                    >
+                      <IconComp className="h-5 w-5 text-gray-600" />
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-4">No icons found</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HTML Editor — textarea with toolbar (Bold, Italic, Link, Icon)
+// ---------------------------------------------------------------------------
+
 function HtmlEditor({
   column,
   setColumns,
@@ -1262,7 +1461,47 @@ function HtmlEditor({
   const [value, setValue] = useState(column.html_content || '');
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDirty = value !== (column.html_content || '');
+
+  const insertAtCursor = (text: string) => {
+    const ta = textareaRef.current;
+    if (!ta) {
+      setValue((prev) => prev + text);
+      return;
+    }
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const newValue = value.substring(0, start) + text + value.substring(end);
+    setValue(newValue);
+    // Restore cursor after the inserted text
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = start + text.length;
+    });
+  };
+
+  const wrapSelection = (before: string, after: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = value.substring(start, end);
+    const replacement = before + (selected || 'text') + after;
+    const newValue = value.substring(0, start) + replacement + value.substring(end);
+    setValue(newValue);
+    requestAnimationFrame(() => {
+      ta.focus();
+      if (selected) {
+        ta.selectionStart = start + before.length;
+        ta.selectionEnd = start + before.length + selected.length;
+      } else {
+        ta.selectionStart = start + before.length;
+        ta.selectionEnd = start + before.length + 4; // select "text"
+      }
+    });
+  };
 
   const save = async () => {
     setSaving(true);
@@ -1288,11 +1527,60 @@ function HtmlEditor({
       <p className="text-xs text-gray-500">
         Use HTML for custom content like business hours, embedded widgets, or formatted text.
       </p>
+
+      {/* Toolbar */}
+      <div className="relative flex items-center gap-0.5 border border-gray-300 rounded-t-md bg-gray-50 px-1.5 py-1">
+        <button
+          type="button"
+          title="Bold"
+          onClick={() => wrapSelection('<strong>', '</strong>')}
+          className="flex items-center justify-center h-7 w-7 rounded hover:bg-gray-200 text-gray-600 transition-colors"
+        >
+          <Bold className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          title="Italic"
+          onClick={() => wrapSelection('<em>', '</em>')}
+          className="flex items-center justify-center h-7 w-7 rounded hover:bg-gray-200 text-gray-600 transition-colors"
+        >
+          <Italic className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          title="Insert Link"
+          onClick={() => wrapSelection('<a href="#">', '</a>')}
+          className="flex items-center justify-center h-7 w-7 rounded hover:bg-gray-200 text-gray-600 transition-colors"
+        >
+          <Link2 className="h-4 w-4" />
+        </button>
+        <div className="w-px h-5 bg-gray-300 mx-0.5" />
+        <button
+          type="button"
+          title="Insert Icon"
+          onClick={() => setShowIconPicker(!showIconPicker)}
+          className={`flex items-center justify-center h-7 w-7 rounded transition-colors ${
+            showIconPicker
+              ? 'bg-brand-100 text-brand-700'
+              : 'hover:bg-gray-200 text-gray-600'
+          }`}
+        >
+          <SmilePlus className="h-4 w-4" />
+        </button>
+        {showIconPicker && (
+          <IconPicker
+            onInsert={insertAtCursor}
+            onClose={() => setShowIconPicker(false)}
+          />
+        )}
+      </div>
+
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         rows={6}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+        className="w-full rounded-b-md border border-t-0 border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
         placeholder="<p>Your HTML here...</p>"
       />
       <div className="flex items-center justify-between">
