@@ -36,7 +36,8 @@ const SPACER_REM = 5; // 5rem = 80px
 // ---------------------------------------------------------------------------
 function useMarqueeDuration(speedValue: number) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [duration, setDuration] = useState(20); // reasonable fallback
+  const [duration, setDuration] = useState<number | null>(null); // null = not yet measured
+  const [ready, setReady] = useState(false);
 
   const measure = useCallback(() => {
     const el = ref.current;
@@ -46,6 +47,7 @@ function useMarqueeDuration(speedValue: number) {
     const pxPerSec = speedToPxPerSec(speedValue);
     const dur = Math.max(3, halfWidth / pxPerSec);
     setDuration(dur);
+    setReady(true);
   }, [speedValue]);
 
   useEffect(() => {
@@ -55,7 +57,7 @@ function useMarqueeDuration(speedValue: number) {
     return () => window.removeEventListener('resize', measure);
   }, [measure]);
 
-  return { ref, duration };
+  return { ref, duration: duration ?? 20, ready };
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +110,7 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = tickers[currentIndex];
   const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, duration } = useMarqueeDuration(speedValue);
+  const { ref, duration, ready } = useMarqueeDuration(speedValue);
 
   // Auto-rotate through tickers (when multiple)
   useEffect(() => {
@@ -140,11 +142,17 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
           0 to -50%. When it resets, the second half is in the exact position
           the first half started — seamless loop. Every message unit has the
           same trailing spacer, so there are no gaps at the seam.
+
+          The span is invisible until measurement is done to prevent a flash
+          of incorrect speed on first render.
         */}
         <span
           ref={ref}
-          className="inline-block animate-marquee"
-          style={{ animationDuration: `${duration.toFixed(1)}s` }}
+          className={`inline-block ${ready ? 'animate-marquee' : ''}`}
+          style={{
+            animationDuration: `${duration.toFixed(1)}s`,
+            opacity: ready ? 1 : 0,
+          }}
         >
           {/* First half */}
           {Array.from({ length: REPEAT_COUNT }, (_, i) => (
@@ -167,7 +175,7 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = tickers[currentIndex];
   const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, duration } = useMarqueeDuration(speedValue);
+  const { ref, duration, ready } = useMarqueeDuration(speedValue);
 
   useEffect(() => {
     if (tickers.length <= 1) return;
@@ -193,8 +201,11 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
       <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
         <span
           ref={ref}
-          className="inline-block animate-marquee"
-          style={{ animationDuration: `${duration.toFixed(1)}s` }}
+          className={`inline-block ${ready ? 'animate-marquee' : ''}`}
+          style={{
+            animationDuration: `${duration.toFixed(1)}s`,
+            opacity: ready ? 1 : 0,
+          }}
         >
           {/* First half */}
           {Array.from({ length: REPEAT_COUNT }, (_, i) => (
