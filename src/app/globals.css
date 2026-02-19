@@ -450,6 +450,18 @@ h1, h2, h3 {
 
 .animate-marquee {
   animation: marquee 20s linear infinite;
+  -webkit-animation: marquee 20s linear infinite;
+}
+
+/* One-time enter: scroll in from right viewport edge to natural position */
+@keyframes marquee-enter {
+  from { transform: translateX(100vw); }
+  to { transform: translateX(0); }
+}
+
+.animate-marquee-enter {
+  animation: marquee-enter linear forwards;
+  -webkit-animation: marquee-enter linear forwards;
 }
 
 /* Gradient text utility */

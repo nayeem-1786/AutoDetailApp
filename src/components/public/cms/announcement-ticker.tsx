@@ -32,32 +32,57 @@ function getSpeedValue(ticker: AnnouncementTicker): number {
 const SPACER_REM = 5; // 5rem = 80px
 
 // ---------------------------------------------------------------------------
-// Custom hook: measure content width and compute duration for constant px/s
+// Custom hook: 3-phase marquee — hidden → entering (scroll-in) → looping
+//
+// Phase 1 (hidden):   Content is invisible while we measure its width.
+// Phase 2 (entering): Content scrolls in from the right edge of the viewport
+//                     at the configured speed. One-time animation.
+// Phase 3 (looping):  Seamless infinite marquee loop at the configured speed.
 // ---------------------------------------------------------------------------
-function useMarqueeDuration(speedValue: number) {
+type MarqueePhase = 'hidden' | 'entering' | 'looping';
+
+function useMarquee(speedValue: number) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [duration, setDuration] = useState<number | null>(null); // null = not yet measured
-  const [ready, setReady] = useState(false);
+  const [loopDuration, setLoopDuration] = useState(20);
+  const [enterDuration, setEnterDuration] = useState(3);
+  const [phase, setPhase] = useState<MarqueePhase>('hidden');
 
   const measure = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    const totalWidth = el.scrollWidth;
-    const halfWidth = totalWidth / 2; // animation moves -50%
+
     const pxPerSec = speedToPxPerSec(speedValue);
-    const dur = Math.max(3, halfWidth / pxPerSec);
-    setDuration(dur);
-    setReady(true);
+
+    // Loop duration: half content width / px-per-sec
+    const totalWidth = el.scrollWidth;
+    const halfWidth = totalWidth / 2;
+    setLoopDuration(Math.max(3, halfWidth / pxPerSec));
+
+    // Enter duration: viewport width / px-per-sec (distance from right edge)
+    const vw = window.innerWidth;
+    setEnterDuration(Math.max(1, vw / pxPerSec));
+
+    // Kick off enter phase once measured
+    setPhase((prev) => (prev === 'hidden' ? 'entering' : prev));
   }, [speedValue]);
 
   useEffect(() => {
-    // Measure after first paint so content is laid out
     requestAnimationFrame(measure);
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, [measure]);
 
-  return { ref, duration: duration ?? 20, ready };
+  // Timer-based transition from entering → looping.
+  // onAnimationEnd is unreliable on mobile Safari, so use a timer instead.
+  useEffect(() => {
+    if (phase !== 'entering') return;
+    const timer = setTimeout(() => {
+      setPhase((prev) => (prev === 'entering' ? 'looping' : prev));
+    }, enterDuration * 1000 + 50); // +50ms buffer
+    return () => clearTimeout(timer);
+  }, [phase, enterDuration]);
+
+  return { ref, loopDuration, enterDuration, phase };
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +128,38 @@ function MessageUnit({ ticker }: { ticker: AnnouncementTicker }) {
 const REPEAT_COUNT = 6;
 
 // ---------------------------------------------------------------------------
+// Helper: build className and style for the marquee span based on phase
+// ---------------------------------------------------------------------------
+function marqueeProps(
+  phase: MarqueePhase,
+  enterDuration: number,
+  loopDuration: number,
+) {
+  const className =
+    phase === 'entering'
+      ? 'inline-block animate-marquee-enter'
+      : phase === 'looping'
+        ? 'inline-block animate-marquee'
+        : 'inline-block';
+
+  const style: React.CSSProperties = {
+    animationDuration:
+      phase === 'entering'
+        ? `${enterDuration.toFixed(1)}s`
+        : `${loopDuration.toFixed(1)}s`,
+    opacity: phase === 'hidden' ? 0 : 1,
+    willChange: 'transform',
+    WebkitAnimation: phase === 'entering'
+      ? `marquee-enter ${enterDuration.toFixed(1)}s linear forwards`
+      : phase === 'looping'
+        ? `marquee ${loopDuration.toFixed(1)}s linear infinite`
+        : 'none',
+  };
+
+  return { className, style };
+}
+
+// ---------------------------------------------------------------------------
 // TopBarTicker — renders above the site header with horizontal marquee scroll
 // Supports inline HTML in messages (e.g., <span style="color:red;">TEXT</span>)
 // ---------------------------------------------------------------------------
@@ -110,7 +167,8 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = tickers[currentIndex];
   const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, duration, ready } = useMarqueeDuration(speedValue);
+  const { ref, loopDuration, enterDuration, phase } =
+    useMarquee(speedValue);
 
   // Auto-rotate through tickers (when multiple)
   useEffect(() => {
@@ -124,6 +182,7 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   if (tickers.length === 0) return null;
 
   const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
+  const mp = marqueeProps(phase, enterDuration, loopDuration);
 
   return (
     <div
@@ -137,22 +196,10 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
       <div
         className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}
       >
-        {/*
-          Marquee: two identical halves. The animation scrolls translateX from
-          0 to -50%. When it resets, the second half is in the exact position
-          the first half started — seamless loop. Every message unit has the
-          same trailing spacer, so there are no gaps at the seam.
-
-          The span is invisible until measurement is done to prevent a flash
-          of incorrect speed on first render.
-        */}
         <span
           ref={ref}
-          className={`inline-block ${ready ? 'animate-marquee' : ''}`}
-          style={{
-            animationDuration: `${duration.toFixed(1)}s`,
-            opacity: ready ? 1 : 0,
-          }}
+          className={mp.className}
+          style={mp.style}
         >
           {/* First half */}
           {Array.from({ length: REPEAT_COUNT }, (_, i) => (
@@ -175,7 +222,8 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = tickers[currentIndex];
   const speedValue = current ? getSpeedValue(current) : 50;
-  const { ref, duration, ready } = useMarqueeDuration(speedValue);
+  const { ref, loopDuration, enterDuration, phase } =
+    useMarquee(speedValue);
 
   useEffect(() => {
     if (tickers.length <= 1) return;
@@ -188,6 +236,7 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   if (tickers.length === 0) return null;
 
   const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
+  const mp = marqueeProps(phase, enterDuration, loopDuration);
 
   return (
     <div
@@ -201,11 +250,8 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
       <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
         <span
           ref={ref}
-          className={`inline-block ${ready ? 'animate-marquee' : ''}`}
-          style={{
-            animationDuration: `${duration.toFixed(1)}s`,
-            opacity: ready ? 1 : 0,
-          }}
+          className={mp.className}
+          style={mp.style}
         >
           {/* First half */}
           {Array.from({ length: REPEAT_COUNT }, (_, i) => (
