@@ -22,11 +22,6 @@ export default async function PublicLayout({
     getFooterData(),
   ]);
 
-  // Extract Quick Links column links for backward-compatible navItems prop
-  const footerNav = footerData.columns
-    .find((col) => col.content_type === 'links')
-    ?.links ?? [];
-
   const showTickers = cmsToggles.announcementTickers && cmsToggles.tickerEnabled && topBarTickers.length > 0;
   const showTheme = cmsToggles.seasonalThemes && activeTheme !== null;
   const hasSiteTheme = siteTheme !== null && siteTheme.is_active;
@@ -42,7 +37,7 @@ export default async function PublicLayout({
           {showTickers && <TopBarTicker tickers={topBarTickers} />}
           <SiteHeader navItems={headerNav} />
           <main className="min-h-[calc(100vh-4rem)]">{children}</main>
-          <SiteFooter navItems={footerNav} />
+          <SiteFooter footerData={footerData} />
           <CartDrawer />
         </div>
       </CartProviderWrapper>

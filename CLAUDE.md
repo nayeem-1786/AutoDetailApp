@@ -490,16 +490,27 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-19 (Configurable Footer System — DB + API)
+## Last Session: 2026-02-19 (Configurable Footer — Frontend Component)
 
-### Configurable Footer System — Session 1
+### Configurable Footer System — Session 2 (Frontend)
+- **New content type**: Migration `20260219000003_footer_business_info_type.sql` adds `business_info` to `footer_columns.content_type` CHECK. Contact column updated to `business_info`.
+- **Server component rewrite** (`site-footer.tsx`): Now accepts `footerData: FooterData` prop (was `navItems`). Fetches review data separately, passes `footerData` + `phone` + `reviews` to client.
+- **Client component rewrite** (`footer-client.tsx`): Fully dynamic rendering from `FooterData`:
+  - `MainFooterSection`: Brand column (logo/contact/reviews) + dynamic nav columns (responsive grid)
+  - `FooterColumn`: Renders `links` (from website_navigation), `html` (dangerouslySetInnerHTML), or `business_info` (auto-renders contact from BusinessInfo)
+  - `ServiceAreasSection`: Configurable `prefix_text` and `show_dividers` from section config JSONB
+  - `BottomBarSection`: Dynamic links from `footer_bottom_links` table
+  - Trust badges preserved as hardcoded const
+  - All sections gated by `is_enabled` toggle
+- **Layout updates**: All 3 layouts (public, account, customer-auth) pass `footerData` directly to `<SiteFooter>`. Removed intermediate `footerNav` extraction.
+- TypeScript clean, build passes. Admin UI editor deferred to Session 3.
+
+### Configurable Footer System — Session 1 (DB + API)
 - **Database migration** (`20260219000002_footer_sections.sql`): `footer_sections` (3 seeded: main/service_areas/bottom_bar), `footer_columns` (2 seeded: Quick Links + Contact), `footer_bottom_links` (1 seeded: Terms & Conditions — dead Unsubscribe removed), `footer_column_id` FK on `website_navigation` (6 items migrated), RLS policies, updated_at triggers.
 - **Types**: `FooterSection`, `FooterColumn`, `FooterBottomLink`, `FooterData` in `types.ts`. `footer_column_id` added to `WebsiteNavItem`.
 - **Data layer**: `getFooterData()` in `website-pages.ts` — cached with `footer-data` tag, fetches sections + columns with links + bottom links + cities + business info.
 - **API routes** (5 files under `/api/admin/footer/`): sections (GET/PATCH), columns (GET/POST/PATCH/DELETE), columns/[columnId]/links (CRUD), bottom-links (CRUD), columns/reorder (PATCH). All use `createAdminClient()` + `cms.pages.manage` permission.
-- **Layout updates**: All 3 layouts (public, account, customer-auth) now use `getFooterData()`. Account + customer-auth layouts now pass `navItems` to SiteFooter (were not passing any before).
 - **Cache revalidation**: Added `revalidateTag('footer-data')` to all existing navigation CMS routes.
-- TypeScript clean, build passes. No frontend component changes (Session 2). No admin UI changes (Session 3).
 
 ### Previous Session: 2026-02-17 (Theme Consistency Fix)
 

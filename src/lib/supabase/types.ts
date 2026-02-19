@@ -1309,7 +1309,7 @@ export interface FooterColumn {
   id: string;
   section_id: string;
   title: string;
-  content_type: 'links' | 'html';
+  content_type: 'links' | 'html' | 'business_info';
   html_content: string;
   sort_order: number;
   is_enabled: boolean;

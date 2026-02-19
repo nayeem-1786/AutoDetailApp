@@ -4,6 +4,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Configurable Footer — Frontend Component — 2026-02-19
+
+### Session 2: Dynamic footer rendering from database
+
+**Migration (`20260219000003_footer_business_info_type.sql`):**
+- Added `business_info` to `footer_columns.content_type` CHECK constraint
+- Updated Contact column from `html` to `business_info` type
+
+**Server component (`site-footer.tsx`):**
+- Rewritten to accept `footerData: FooterData` prop instead of `navItems`
+- Fetches review data internally (not part of FooterData — separate data source)
+- Passes `footerData`, formatted `phone`, and `reviews` to client
+
+**Client component (`footer-client.tsx`):**
+- Full rewrite. All 3 sections render conditionally from `footer_sections.is_enabled`
+- **Main Footer**: Brand column (logo, tagline, contact, reviews) + dynamic nav columns from `footer_columns`. Grid adapts to column count (1-4). Three column content types:
+  - `links` — nav items from `website_navigation` via `footer_column_id`
+  - `business_info` — auto-renders phone/email + Book Appointment/Get a Quote CTAs from BusinessInfo
+  - `html` — dangerouslySetInnerHTML with styled link classes
+- **Service Areas**: Configurable prefix text from `footer_sections.config.prefix_text`. Configurable dividers from `config.show_dividers`.
+- **Bottom Bar**: Dynamic links from `footer_bottom_links`. Dead Unsubscribe link removed (was 404).
+- **Trust badges**: Preserved as-is (hardcoded, not part of configurable system)
+- All existing CSS classes preserved exactly — visual output identical with default data
+
+**Layout updates:**
+- All 3 layouts (public, account, customer-auth) now pass `footerData` prop directly to `SiteFooter`
+- Removed intermediate `footerNav` extraction from Session 1
+
+**Types:**
+- `FooterColumn.content_type` updated: `'links' | 'html' | 'business_info'`
+
+**Files modified (6):** `site-footer.tsx`, `footer-client.tsx`, 3 layouts, `types.ts`
+**Files created (1):** migration `20260219000003`
+
+**Verification:** TypeScript clean, build passes, Contact column confirmed as `business_info` in DB.
+
+---
+
 ## Configurable Footer System — Database + API Routes — 2026-02-19
 
 ### Session 1: Database schema, API routes, and data layer for admin-configurable footer

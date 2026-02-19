@@ -2,11 +2,8 @@
 
 import { Phone, Mail, MapPin, Clock, Star, Shield, Award, Leaf } from 'lucide-react';
 import Link from 'next/link';
-
-interface FooterNavColumn {
-  title: string;
-  links: Array<{ label: string; url: string; target?: string }>;
-}
+import type { FooterData, FooterColumn as FooterColumnType, FooterBottomLink } from '@/lib/supabase/types';
+import type { BusinessInfo } from '@/lib/data/business';
 
 interface ReviewBadge {
   platform: string;
@@ -14,21 +11,10 @@ interface ReviewBadge {
   count: string;
 }
 
-interface CityLink {
-  id: string;
-  slug: string;
-  city_name: string;
-}
-
 interface FooterClientProps {
-  businessName: string;
-  logoUrl: string | null;
-  phone: string;
-  email: string | null;
-  address: string;
-  navColumns: FooterNavColumn[];
+  footerData: FooterData;
+  phone: string; // Pre-formatted phone number
   reviews: ReviewBadge[];
-  cities: CityLink[];
 }
 
 const trustBadges = [
@@ -38,17 +24,12 @@ const trustBadges = [
   { icon: Clock, label: '100% Satisfaction' },
 ] as const;
 
-export function FooterClient({
-  businessName,
-  logoUrl,
-  phone,
-  email,
-  address,
-  navColumns,
-  reviews,
-  cities,
-}: FooterClientProps) {
-  const year = new Date().getFullYear();
+export function FooterClient({ footerData, phone, reviews }: FooterClientProps) {
+  const { sections, columns, bottomLinks, cities, businessInfo } = footerData;
+
+  const mainSection = sections.find((s) => s.section_key === 'main');
+  const serviceAreasSection = sections.find((s) => s.section_key === 'service_areas');
+  const bottomBarSection = sections.find((s) => s.section_key === 'bottom_bar');
 
   return (
     <footer className="bg-site-footer-bg border-t border-site-border-light">
@@ -72,141 +53,325 @@ export function FooterClient({
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
-          {/* Brand column */}
-          <div className="lg:col-span-4">
-            {logoUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={logoUrl} alt={businessName} className="h-12 w-auto mb-4" />
-            ) : (
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
-                  <span className="text-site-text-on-primary font-black text-lg">S</span>
-                </div>
-                <span className="text-site-text font-bold text-lg">{businessName}</span>
+      {/* Main Footer */}
+      {mainSection?.is_enabled !== false && (
+        <MainFooterSection
+          columns={columns}
+          businessInfo={businessInfo}
+          phone={phone}
+          reviews={reviews}
+        />
+      )}
+
+      {/* Service Areas */}
+      {serviceAreasSection?.is_enabled !== false && cities.length > 0 && (
+        <ServiceAreasSection
+          cities={cities}
+          config={serviceAreasSection?.config ?? {}}
+        />
+      )}
+
+      {/* Bottom Bar */}
+      {bottomBarSection?.is_enabled !== false && (
+        <BottomBarSection
+          links={bottomLinks}
+          businessName={businessInfo.name}
+        />
+      )}
+    </footer>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Footer Section — Brand column + dynamic nav columns
+// ---------------------------------------------------------------------------
+
+function MainFooterSection({
+  columns,
+  businessInfo,
+  phone,
+  reviews,
+}: {
+  columns: FooterColumnType[];
+  businessInfo: BusinessInfo;
+  phone: string;
+  reviews: ReviewBadge[];
+}) {
+  const enabledColumns = columns.filter((c) => c.is_enabled);
+
+  // Responsive grid: adapt to column count
+  const gridCols =
+    enabledColumns.length >= 3
+      ? 'grid-cols-2 sm:grid-cols-3'
+      : enabledColumns.length === 2
+        ? 'grid-cols-2'
+        : 'grid-cols-1';
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
+        {/* Brand column */}
+        <div className="lg:col-span-4">
+          {businessInfo.logo_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={businessInfo.logo_url}
+              alt={businessInfo.name}
+              className="h-12 w-auto mb-4"
+            />
+          ) : (
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
+                <span className="text-site-text-on-primary font-black text-lg">S</span>
               </div>
-            )}
+              <span className="text-site-text font-bold text-lg">
+                {businessInfo.name}
+              </span>
+            </div>
+          )}
 
-            <p className="text-site-text-muted text-sm leading-relaxed max-w-xs">
-              Professional auto detailing and ceramic coating specialists serving
-              the South Bay area. We bring premium car care directly to you.
-            </p>
+          <p className="text-site-text-muted text-sm leading-relaxed max-w-xs">
+            Professional auto detailing and ceramic coating specialists serving
+            the South Bay area. We bring premium car care directly to you.
+          </p>
 
-            {/* Contact info */}
-            <div className="mt-6 space-y-3">
+          {/* Contact info */}
+          <div className="mt-6 space-y-3">
+            <a
+              href={`tel:${businessInfo.phone}`}
+              className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
+            >
+              <Phone className="w-4 h-4 text-lime shrink-0" />
+              {phone}
+            </a>
+            {businessInfo.email && (
               <a
-                href={`tel:${phone}`}
+                href={`mailto:${businessInfo.email}`}
                 className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
               >
-                <Phone className="w-4 h-4 text-lime shrink-0" />
-                {phone}
+                <Mail className="w-4 h-4 text-lime shrink-0" />
+                {businessInfo.email}
               </a>
-              {email && (
-                <a
-                  href={`mailto:${email}`}
-                  className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
-                >
-                  <Mail className="w-4 h-4 text-lime shrink-0" />
-                  {email}
-                </a>
-              )}
-              <div className="flex items-start gap-3 text-sm text-site-text-muted">
-                <MapPin className="w-4 h-4 text-lime shrink-0 mt-0.5" />
-                {address}
-              </div>
-            </div>
-
-            {/* Review badges */}
-            {reviews.length > 0 && (
-              <div className="mt-6 flex flex-wrap items-center gap-4">
-                {reviews.map((r) => (
-                  <div
-                    key={r.platform}
-                    className="flex items-center gap-1.5 text-sm text-site-text-secondary"
-                  >
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    <span className="font-semibold">{r.rating}</span>
-                    <span className="text-site-text-dim">on {r.platform}</span>
-                    <span className="text-site-text-faint">&middot;</span>
-                    <span className="text-site-text-dim">{r.count} reviews</span>
-                  </div>
-                ))}
-              </div>
             )}
+            <div className="flex items-start gap-3 text-sm text-site-text-muted">
+              <MapPin className="w-4 h-4 text-lime shrink-0 mt-0.5" />
+              {businessInfo.address}
+            </div>
           </div>
 
-          {/* Nav columns */}
-          <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
-            {navColumns.map((col, i) => (
-              <div key={i}>
-                <h4 className="text-site-text font-bold text-sm uppercase tracking-wider mb-4">
-                  {col.title}
-                </h4>
-                <ul className="space-y-2.5">
-                  {col.links.map((link, j) => (
-                    <li key={j}>
-                      <Link
-                        href={link.url}
-                        target={link.target || '_self'}
-                        className="text-sm text-site-text-muted hover:text-lime transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+          {/* Review badges */}
+          {reviews.length > 0 && (
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              {reviews.map((r) => (
+                <div
+                  key={r.platform}
+                  className="flex items-center gap-1.5 text-sm text-site-text-secondary"
+                >
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span className="font-semibold">{r.rating}</span>
+                  <span className="text-site-text-dim">on {r.platform}</span>
+                  <span className="text-site-text-faint">&middot;</span>
+                  <span className="text-site-text-dim">{r.count} reviews</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Service Areas */}
-        {cities.length > 0 && (
-          <div className="mt-10 border-t border-site-border pt-8">
-            <h4 className="text-sm font-semibold uppercase tracking-wider text-site-text-muted">
-              Service Areas
-            </h4>
-            <p className="mt-3 text-sm text-site-text-muted">
-              Mobile Detailing in{' '}
-              {cities.map((city, i) => (
-                <span key={city.id}>
-                  {i > 0 && <span className="text-site-text-faint"> | </span>}
-                  <Link
-                    href={`/areas/${city.slug}`}
-                    className="text-site-text-secondary hover:text-site-text transition-colors"
-                  >
-                    {city.city_name}
-                  </Link>
-                </span>
-              ))}
-            </p>
+        {/* Dynamic nav columns */}
+        {enabledColumns.length > 0 && (
+          <div className={`lg:col-span-8 grid ${gridCols} gap-8`}>
+            {enabledColumns.map((column) => (
+              <FooterColumn
+                key={column.id}
+                column={column}
+                businessInfo={businessInfo}
+                phone={phone}
+              />
+            ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
 
-      {/* Bottom bar */}
-      <div className="border-t border-site-border-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-site-text-dim">
-            &copy; {year} {businessName}. All rights reserved.
-          </p>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/terms"
-              className="text-xs text-site-text-dim hover:text-site-text transition-colors"
-            >
-              Terms &amp; Conditions
-            </Link>
-            <Link
-              href="/unsubscribe"
-              className="text-xs text-site-text-dim hover:text-site-text transition-colors"
-            >
-              Unsubscribe
-            </Link>
-          </div>
-        </div>
+// ---------------------------------------------------------------------------
+// Individual Footer Column — renders links, html, or business_info
+// ---------------------------------------------------------------------------
+
+function FooterColumn({
+  column,
+  businessInfo,
+  phone,
+}: {
+  column: FooterColumnType;
+  businessInfo: BusinessInfo;
+  phone: string;
+}) {
+  return (
+    <div>
+      {column.title && (
+        <h4 className="text-site-text font-bold text-sm uppercase tracking-wider mb-4">
+          {column.title}
+        </h4>
+      )}
+
+      {column.content_type === 'links' && (
+        <ul className="space-y-2.5">
+          {column.links?.map((link) => (
+            <li key={link.id}>
+              <Link
+                href={link.url}
+                target={link.target || '_self'}
+                className="text-sm text-site-text-muted hover:text-lime transition-colors"
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {column.content_type === 'business_info' && (
+        <BusinessInfoColumn businessInfo={businessInfo} phone={phone} />
+      )}
+
+      {column.content_type === 'html' && column.html_content && (
+        <div
+          className="text-sm text-site-text-muted space-y-2 [&_a]:text-lime [&_a]:hover:underline"
+          dangerouslySetInnerHTML={{ __html: column.html_content }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Business Info Column — auto-renders contact details + CTA buttons
+// ---------------------------------------------------------------------------
+
+function BusinessInfoColumn({
+  businessInfo,
+  phone,
+}: {
+  businessInfo: BusinessInfo;
+  phone: string;
+}) {
+  return (
+    <div className="space-y-2.5">
+      <Link
+        href="/book"
+        className="text-sm text-site-text-muted hover:text-lime transition-colors"
+      >
+        Book Appointment
+      </Link>
+      <br />
+      <Link
+        href="/book"
+        className="text-sm text-site-text-muted hover:text-lime transition-colors"
+      >
+        Get a Quote
+      </Link>
+      <div className="mt-4 space-y-2">
+        <a
+          href={`tel:${businessInfo.phone}`}
+          className="flex items-center gap-2 text-sm text-site-text-muted hover:text-site-text transition-colors"
+        >
+          <Phone className="w-3.5 h-3.5 text-lime shrink-0" />
+          {phone}
+        </a>
+        {businessInfo.email && (
+          <a
+            href={`mailto:${businessInfo.email}`}
+            className="flex items-center gap-2 text-sm text-site-text-muted hover:text-site-text transition-colors"
+          >
+            <Mail className="w-3.5 h-3.5 text-lime shrink-0" />
+            {businessInfo.email}
+          </a>
+        )}
       </div>
-    </footer>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Service Areas Section
+// ---------------------------------------------------------------------------
+
+function ServiceAreasSection({
+  cities,
+  config,
+}: {
+  cities: FooterData['cities'];
+  config: Record<string, unknown>;
+}) {
+  const prefixText = (config?.prefix_text as string) || 'Mobile Detailing in';
+  const showDividers = config?.show_dividers !== false;
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="border-t border-site-border pt-8 pb-10">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-site-text-muted">
+          Service Areas
+        </h4>
+        <p className="mt-3 text-sm text-site-text-muted">
+          {prefixText}{' '}
+          {cities.map((city, i) => (
+            <span key={city.id}>
+              {i > 0 && showDividers && (
+                <span className="text-site-text-faint"> | </span>
+              )}
+              {i > 0 && !showDividers && ' '}
+              <Link
+                href={`/areas/${city.slug}`}
+                className="text-site-text-secondary hover:text-site-text transition-colors"
+              >
+                {city.city_name}
+              </Link>
+            </span>
+          ))}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bottom Bar Section
+// ---------------------------------------------------------------------------
+
+function BottomBarSection({
+  links,
+  businessName,
+}: {
+  links: FooterBottomLink[];
+  businessName: string;
+}) {
+  const year = new Date().getFullYear();
+
+  return (
+    <div className="border-t border-site-border-light">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p className="text-xs text-site-text-dim">
+          &copy; {year} {businessName}. All rights reserved.
+        </p>
+        {links.length > 0 && (
+          <div className="flex items-center gap-4">
+            {links.map((link) => (
+              <Link
+                key={link.id}
+                href={link.url}
+                target={link.open_in_new_tab ? '_blank' : undefined}
+                rel={link.open_in_new_tab ? 'noopener noreferrer' : undefined}
+                className="text-xs text-site-text-dim hover:text-site-text transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

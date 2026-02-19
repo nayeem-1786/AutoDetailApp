@@ -20,10 +20,6 @@ export default async function CustomerAuthLayout({
     getFooterData(),
   ]);
 
-  const footerNav = footerData.columns
-    .find((col) => col.content_type === 'links')
-    ?.links ?? [];
-
   const showTheme = cmsToggles.seasonalThemes && activeTheme !== null;
   const hasSiteTheme = siteTheme !== null && siteTheme.is_active;
 
@@ -39,7 +35,7 @@ export default async function CustomerAuthLayout({
           <main className="min-h-[calc(100vh-4rem)]">
             <Suspense>{children}</Suspense>
           </main>
-          <SiteFooter navItems={footerNav} />
+          <SiteFooter footerData={footerData} />
           <CartDrawer />
         </div>
       </CartProviderWrapper>
