@@ -53,6 +53,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   revalidateTag('cms-navigation');
+  revalidateTag('footer-data');
 
   return NextResponse.json({ data });
 }
@@ -79,6 +80,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   }
 
   revalidateTag('cms-navigation');
+  revalidateTag('footer-data');
 
   return NextResponse.json({ success: true });
 }

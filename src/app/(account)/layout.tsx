@@ -6,6 +6,7 @@ import { CartDrawer } from '@/components/public/cart/cart-drawer';
 import { ThemeToggleInitializer } from '@/components/public/theme-toggle-initializer';
 import { CustomerAuthProvider } from '@/lib/auth/customer-auth-provider';
 import { getActiveTheme, getCmsToggles, getSiteThemeSettings } from '@/lib/data/cms';
+import { getFooterData } from '@/lib/data/website-pages';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,11 +15,16 @@ export default async function AccountLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [cmsToggles, activeTheme, siteTheme] = await Promise.all([
+  const [cmsToggles, activeTheme, siteTheme, footerData] = await Promise.all([
     getCmsToggles(),
     getActiveTheme(),
     getSiteThemeSettings(),
+    getFooterData(),
   ]);
+
+  const footerNav = footerData.columns
+    .find((col) => col.content_type === 'links')
+    ?.links ?? [];
 
   const showTheme = cmsToggles.seasonalThemes && activeTheme !== null;
   const hasSiteTheme = siteTheme !== null && siteTheme.is_active;
@@ -35,7 +41,7 @@ export default async function AccountLayout({
           <main className="min-h-[calc(100vh-4rem)]">
             <CustomerAuthProvider>{children}</CustomerAuthProvider>
           </main>
-          <SiteFooter />
+          <SiteFooter navItems={footerNav} />
           <CartDrawer />
         </div>
       </CartProviderWrapper>

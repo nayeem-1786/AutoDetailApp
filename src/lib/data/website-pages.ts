@@ -1,6 +1,16 @@
 import { unstable_cache } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { WebsitePage, WebsiteNavItem, NavPlacement } from '@/lib/supabase/types';
+import { getBusinessInfo } from '@/lib/data/business';
+import { getActiveCities } from '@/lib/data/cities';
+import type {
+  WebsitePage,
+  WebsiteNavItem,
+  NavPlacement,
+  FooterSection,
+  FooterColumn,
+  FooterBottomLink,
+  FooterData,
+} from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
 // Navigation — Public (cached across requests, revalidated on admin write)
@@ -118,6 +128,71 @@ export async function getAllPages(): Promise<WebsitePage[]> {
 
   return data as WebsitePage[];
 }
+
+// ---------------------------------------------------------------------------
+// Footer — Public (cached, revalidated on admin write)
+// ---------------------------------------------------------------------------
+
+export const getFooterData = unstable_cache(
+  async (): Promise<FooterData> => {
+    const supabase = createAdminClient();
+
+    // Fetch all 3 sections
+    const { data: sections } = await supabase
+      .from('footer_sections')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    // Fetch enabled columns for main footer
+    const { data: columns } = await supabase
+      .from('footer_columns')
+      .select('*')
+      .eq('is_enabled', true)
+      .order('sort_order', { ascending: true });
+
+    // Fetch nav links assigned to footer columns
+    const { data: navLinks } = await supabase
+      .from('website_navigation')
+      .select('*')
+      .not('footer_column_id', 'is', null)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    // Attach links to their columns
+    const columnsWithLinks: FooterColumn[] = (columns ?? []).map((col) => ({
+      ...(col as FooterColumn),
+      links:
+        col.content_type === 'links'
+          ? ((navLinks ?? []) as WebsiteNavItem[]).filter(
+              (link) => link.footer_column_id === col.id
+            )
+          : [],
+    }));
+
+    // Fetch bottom bar links
+    const { data: bottomLinks } = await supabase
+      .from('footer_bottom_links')
+      .select('*')
+      .eq('is_enabled', true)
+      .order('sort_order', { ascending: true });
+
+    // Reuse existing data functions
+    const [cities, businessInfo] = await Promise.all([
+      getActiveCities(),
+      getBusinessInfo(),
+    ]);
+
+    return {
+      sections: (sections ?? []) as FooterSection[],
+      columns: columnsWithLinks,
+      bottomLinks: (bottomLinks ?? []) as FooterBottomLink[],
+      cities: cities.map((c) => ({ id: c.id, slug: c.slug, city_name: c.city_name })),
+      businessInfo,
+    };
+  },
+  ['footer-data'],
+  { revalidate: 60, tags: ['footer-data'] }
+);
 
 // ---------------------------------------------------------------------------
 // Helpers

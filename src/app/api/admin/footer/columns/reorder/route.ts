@@ -5,8 +5,8 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
 // ---------------------------------------------------------------------------
-// PATCH /api/admin/cms/navigation/reorder  — Reorder nav items
-// Body: { placement: string, orderedIds: string[] }
+// PATCH /api/admin/footer/columns/reorder — Batch reorder columns
+// Body: { items: [{ id: string, sort_order: number }] }
 // ---------------------------------------------------------------------------
 
 export async function PATCH(request: NextRequest) {
@@ -19,30 +19,32 @@ export async function PATCH(request: NextRequest) {
   if (denied) return denied;
 
   const body = await request.json();
-  const { placement, orderedIds } = body;
+  const { items } = body;
 
-  if (!placement || !Array.isArray(orderedIds)) {
+  if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json(
-      { error: 'placement and orderedIds are required' },
+      { error: 'items array is required' },
       { status: 400 }
     );
   }
 
   const admin = createAdminClient();
 
-  for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await admin
-      .from('website_navigation')
-      .update({ sort_order: i })
-      .eq('id', orderedIds[i])
-      .eq('placement', placement);
+  // Update each column's sort_order
+  const results = await Promise.all(
+    items.map((item: { id: string; sort_order: number }) =>
+      admin
+        .from('footer_columns')
+        .update({ sort_order: item.sort_order })
+        .eq('id', item.id)
+    )
+  );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    return NextResponse.json({ error: failed.error.message }, { status: 500 });
   }
 
-  revalidateTag('cms-navigation');
   revalidateTag('footer-data');
 
   return NextResponse.json({ success: true });

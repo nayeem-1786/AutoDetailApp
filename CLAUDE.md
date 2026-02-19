@@ -490,7 +490,18 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ---
 
-## Last Session: 2026-02-17 (Theme Consistency Fix)
+## Last Session: 2026-02-19 (Configurable Footer System — DB + API)
+
+### Configurable Footer System — Session 1
+- **Database migration** (`20260219000002_footer_sections.sql`): `footer_sections` (3 seeded: main/service_areas/bottom_bar), `footer_columns` (2 seeded: Quick Links + Contact), `footer_bottom_links` (1 seeded: Terms & Conditions — dead Unsubscribe removed), `footer_column_id` FK on `website_navigation` (6 items migrated), RLS policies, updated_at triggers.
+- **Types**: `FooterSection`, `FooterColumn`, `FooterBottomLink`, `FooterData` in `types.ts`. `footer_column_id` added to `WebsiteNavItem`.
+- **Data layer**: `getFooterData()` in `website-pages.ts` — cached with `footer-data` tag, fetches sections + columns with links + bottom links + cities + business info.
+- **API routes** (5 files under `/api/admin/footer/`): sections (GET/PATCH), columns (GET/POST/PATCH/DELETE), columns/[columnId]/links (CRUD), bottom-links (CRUD), columns/reorder (PATCH). All use `createAdminClient()` + `cms.pages.manage` permission.
+- **Layout updates**: All 3 layouts (public, account, customer-auth) now use `getFooterData()`. Account + customer-auth layouts now pass `navItems` to SiteFooter (were not passing any before).
+- **Cache revalidation**: Added `revalidateTag('footer-data')` to all existing navigation CMS routes.
+- TypeScript clean, build passes. No frontend component changes (Session 2). No admin UI changes (Session 3).
+
+### Previous Session: 2026-02-17 (Theme Consistency Fix)
 
 ### Theme Consistency Fix
 - **Fix 1**: Removed 27 non-functional fields from admin Theme & Style Settings UI (mode toggle, status colors, font sizes/weights/line-height, secondary button, primary button padding, entire Borders & Spacing tab). DB columns preserved.

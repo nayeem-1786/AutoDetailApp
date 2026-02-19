@@ -1285,8 +1285,56 @@ export interface WebsiteNavItem {
   is_active: boolean;
   sort_order: number;
   created_at: string;
+  footer_column_id?: string | null;
   // Runtime: nested children built by data layer
   children?: WebsiteNavItem[];
+}
+
+// ─── Footer ──────────────────────────────────────────────────
+
+export type FooterSectionKey = 'main' | 'service_areas' | 'bottom_bar';
+
+export interface FooterSection {
+  id: string;
+  section_key: FooterSectionKey;
+  label: string;
+  is_enabled: boolean;
+  sort_order: number;
+  config: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FooterColumn {
+  id: string;
+  section_id: string;
+  title: string;
+  content_type: 'links' | 'html';
+  html_content: string;
+  sort_order: number;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  links?: WebsiteNavItem[];
+}
+
+export interface FooterBottomLink {
+  id: string;
+  label: string;
+  url: string;
+  sort_order: number;
+  is_enabled: boolean;
+  open_in_new_tab: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FooterData {
+  sections: FooterSection[];
+  columns: FooterColumn[];
+  bottomLinks: FooterBottomLink[];
+  cities: { id: string; slug: string; city_name: string }[];
+  businessInfo: import('@/lib/data/business').BusinessInfo;
 }
 
 // ─── Orders ──────────────────────────────────────────────────

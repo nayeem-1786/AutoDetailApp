@@ -6,17 +6,23 @@ import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrap
 import { CartDrawer } from '@/components/public/cart/cart-drawer';
 import { ThemeToggleInitializer } from '@/components/public/theme-toggle-initializer';
 import { getActiveTheme, getCmsToggles, getSiteThemeSettings } from '@/lib/data/cms';
+import { getFooterData } from '@/lib/data/website-pages';
 
 export default async function CustomerAuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [cmsToggles, activeTheme, siteTheme] = await Promise.all([
+  const [cmsToggles, activeTheme, siteTheme, footerData] = await Promise.all([
     getCmsToggles(),
     getActiveTheme(),
     getSiteThemeSettings(),
+    getFooterData(),
   ]);
+
+  const footerNav = footerData.columns
+    .find((col) => col.content_type === 'links')
+    ?.links ?? [];
 
   const showTheme = cmsToggles.seasonalThemes && activeTheme !== null;
   const hasSiteTheme = siteTheme !== null && siteTheme.is_active;
@@ -33,7 +39,7 @@ export default async function CustomerAuthLayout({
           <main className="min-h-[calc(100vh-4rem)]">
             <Suspense>{children}</Suspense>
           </main>
-          <SiteFooter />
+          <SiteFooter navItems={footerNav} />
           <CartDrawer />
         </div>
       </CartProviderWrapper>

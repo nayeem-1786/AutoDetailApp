@@ -6,21 +6,26 @@ import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrap
 import { CartDrawer } from '@/components/public/cart/cart-drawer';
 import { ThemeToggleInitializer } from '@/components/public/theme-toggle-initializer';
 import { getCmsToggles, getActiveTheme, getTopBarTickers, getSiteThemeSettings } from '@/lib/data/cms';
-import { getNavigationItems } from '@/lib/data/website-pages';
+import { getNavigationItems, getFooterData } from '@/lib/data/website-pages';
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [cmsToggles, activeTheme, siteTheme, topBarTickers, headerNav, footerNav] = await Promise.all([
+  const [cmsToggles, activeTheme, siteTheme, topBarTickers, headerNav, footerData] = await Promise.all([
     getCmsToggles(),
     getActiveTheme(),
     getSiteThemeSettings(),
     getTopBarTickers(),
     getNavigationItems('header'),
-    getNavigationItems('footer_quick_links'),
+    getFooterData(),
   ]);
+
+  // Extract Quick Links column links for backward-compatible navItems prop
+  const footerNav = footerData.columns
+    .find((col) => col.content_type === 'links')
+    ?.links ?? [];
 
   const showTickers = cmsToggles.announcementTickers && cmsToggles.tickerEnabled && topBarTickers.length > 0;
   const showTheme = cmsToggles.seasonalThemes && activeTheme !== null;

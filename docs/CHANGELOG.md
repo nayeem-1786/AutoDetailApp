@@ -4,6 +4,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Configurable Footer System — Database + API Routes — 2026-02-19
+
+### Session 1: Database schema, API routes, and data layer for admin-configurable footer
+
+**Database (migration `20260219000002_footer_sections.sql`):**
+- `footer_sections` table — 3 seeded sections (main, service_areas, bottom_bar) with enable/disable, sort_order, JSONB config
+- `footer_columns` table — configurable columns for main footer section (max 4 per section). 2 seeded: Quick Links (links type) + Contact (html type)
+- `footer_bottom_links` table — legal/utility links in bottom bar. Seeded: Terms & Conditions only (dead Unsubscribe link removed)
+- `footer_column_id` FK added to `website_navigation` — existing 6 footer_quick_links nav items migrated to Quick Links column
+- RLS policies: public read, authenticated write (matches website_navigation pattern)
+- `updated_at` triggers on all 3 new tables
+
+**TypeScript types (`types.ts`):**
+- `FooterSection`, `FooterColumn`, `FooterBottomLink`, `FooterData` interfaces
+- `FooterSectionKey` type union
+- `footer_column_id` added to `WebsiteNavItem`
+
+**Data layer (`website-pages.ts`):**
+- `getFooterData()` — cached with `unstable_cache`, `footer-data` tag, 60s revalidation. Fetches sections, enabled columns with attached links, bottom links, cities, and business info in parallel.
+
+**API routes (5 new files under `/api/admin/footer/`):**
+- `sections/route.ts` — GET (list), PATCH (update section enable/config)
+- `columns/route.ts` — GET (list), POST (create, max 4 limit), PATCH (update), DELETE
+- `columns/[columnId]/links/route.ts` — GET, POST, PATCH, DELETE for column links
+- `columns/reorder/route.ts` — PATCH (batch reorder)
+- `bottom-links/route.ts` — GET, POST, PATCH, DELETE
+- All routes use `createAdminClient()`, `cms.pages.manage` permission, `revalidateTag('footer-data')`
+
+**Layout updates:**
+- `(public)/layout.tsx` — replaced `getNavigationItems('footer_quick_links')` with `getFooterData()`, extracts Quick Links for backward-compatible `navItems` prop
+- `(account)/layout.tsx` — added `getFooterData()` fetch, passes `navItems` to SiteFooter (was not passing any before)
+- `(customer-auth)/layout.tsx` — same as account layout
+
+**Cache revalidation:**
+- Added `revalidateTag('footer-data')` to all 3 existing navigation CMS routes (create, update, delete, reorder)
+
+**Files created (6):** migration, 5 API route files
+**Files modified (7):** `types.ts`, `website-pages.ts`, 3 layouts, `navigation/route.ts`, `navigation/[id]/route.ts`, `navigation/reorder/route.ts`
+
+**Verification:** TypeScript clean, build passes, 3 sections + 2 columns + 1 bottom link + 6 migrated nav items confirmed in DB.
+
+---
+
 ## Fix: Ticker Scroll, Section Tickers, Particle Rendering — 2026-02-19
 
 ### fix: ticker marquee scroll, section placement, particle flag reliability
