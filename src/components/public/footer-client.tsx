@@ -83,7 +83,7 @@ export function FooterClient({ footerData, phone, reviews }: FooterClientProps) 
 }
 
 // ---------------------------------------------------------------------------
-// Main Footer Section — Brand column + dynamic nav columns
+// Main Footer Section — All columns from DB (brand, links, html, business_info)
 // ---------------------------------------------------------------------------
 
 function MainFooterSection({
@@ -99,116 +99,54 @@ function MainFooterSection({
 }) {
   const enabledColumns = columns.filter((c) => c.is_enabled);
 
-  // Responsive grid: adapt to column count
-  const gridCols =
-    enabledColumns.length >= 3
-      ? 'grid-cols-2 sm:grid-cols-3'
-      : enabledColumns.length === 2
-        ? 'grid-cols-2'
-        : 'grid-cols-1';
+  if (enabledColumns.length === 0) return null;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
-        {/* Brand column */}
-        <div className="lg:col-span-4">
-          {businessInfo.logo_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={businessInfo.logo_url}
-              alt={businessInfo.name}
-              className="h-12 w-auto mb-4"
-            />
-          ) : (
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
-                <span className="text-site-text-on-primary font-black text-lg">S</span>
-              </div>
-              <span className="text-site-text font-bold text-lg">
-                {businessInfo.name}
-              </span>
-            </div>
-          )}
-
-          <p className="text-site-text-muted text-sm leading-relaxed max-w-xs">
-            Professional auto detailing and ceramic coating specialists serving
-            the South Bay area. We bring premium car care directly to you.
-          </p>
-
-          {/* Contact info */}
-          <div className="mt-6 space-y-3">
-            <a
-              href={`tel:${businessInfo.phone}`}
-              className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">
+        {enabledColumns.map((column) => {
+          const span = (column.config?.col_span as number) || Math.floor(12 / enabledColumns.length);
+          return (
+            <div
+              key={column.id}
+              className="footer-col"
+              style={{ '--footer-col-span': String(span) } as React.CSSProperties}
             >
-              <Phone className="w-4 h-4 text-lime shrink-0" />
-              {phone}
-            </a>
-            {businessInfo.email && (
-              <a
-                href={`mailto:${businessInfo.email}`}
-                className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
-              >
-                <Mail className="w-4 h-4 text-lime shrink-0" />
-                {businessInfo.email}
-              </a>
-            )}
-            <div className="flex items-start gap-3 text-sm text-site-text-muted">
-              <MapPin className="w-4 h-4 text-lime shrink-0 mt-0.5" />
-              {businessInfo.address}
-            </div>
-          </div>
-
-          {/* Review badges */}
-          {reviews.length > 0 && (
-            <div className="mt-6 flex flex-wrap items-center gap-4">
-              {reviews.map((r) => (
-                <div
-                  key={r.platform}
-                  className="flex items-center gap-1.5 text-sm text-site-text-secondary"
-                >
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span className="font-semibold">{r.rating}</span>
-                  <span className="text-site-text-dim">on {r.platform}</span>
-                  <span className="text-site-text-faint">&middot;</span>
-                  <span className="text-site-text-dim">{r.count} reviews</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Dynamic nav columns */}
-        {enabledColumns.length > 0 && (
-          <div className={`lg:col-span-8 grid ${gridCols} gap-8`}>
-            {enabledColumns.map((column) => (
-              <FooterColumn
-                key={column.id}
+              <FooterColumnRenderer
                 column={column}
                 businessInfo={businessInfo}
                 phone={phone}
+                reviews={reviews}
               />
-            ))}
-          </div>
-        )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Individual Footer Column — renders links, html, or business_info
+// Footer Column Renderer — dispatches to brand, links, html, or business_info
 // ---------------------------------------------------------------------------
 
-function FooterColumn({
+function FooterColumnRenderer({
   column,
   businessInfo,
   phone,
+  reviews,
 }: {
   column: FooterColumnType;
   businessInfo: BusinessInfo;
   phone: string;
+  reviews: ReviewBadge[];
 }) {
+  if (column.content_type === 'brand') {
+    return (
+      <BrandColumn column={column} businessInfo={businessInfo} phone={phone} reviews={reviews} />
+    );
+  }
+
   return (
     <div>
       {column.title && (
@@ -242,6 +180,109 @@ function FooterColumn({
           className="text-sm text-site-text-muted space-y-2 [&_a]:text-lime [&_a]:hover:underline"
           dangerouslySetInnerHTML={{ __html: column.html_content }}
         />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Brand Column — logo, tagline, contact info, review badges
+// ---------------------------------------------------------------------------
+
+function BrandColumn({
+  column,
+  businessInfo,
+  phone,
+  reviews,
+}: {
+  column: FooterColumnType;
+  businessInfo: BusinessInfo;
+  phone: string;
+  reviews: ReviewBadge[];
+}) {
+  const config = column.config || {};
+  const logoWidth = (config.logo_width as number) || 160;
+  const showPhone = config.show_phone !== false;
+  const showEmail = config.show_email !== false;
+  const showAddress = config.show_address !== false;
+  const showReviews = config.show_reviews !== false;
+  const tagline = (config.tagline as string) || '';
+
+  return (
+    <div>
+      {/* Logo */}
+      {businessInfo.logo_url ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={businessInfo.logo_url}
+          alt={businessInfo.name}
+          style={{ width: logoWidth, height: 'auto' }}
+          className="mb-4"
+        />
+      ) : (
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
+            <span className="text-site-text-on-primary font-black text-lg">S</span>
+          </div>
+          <span className="text-site-text font-bold text-lg">
+            {businessInfo.name}
+          </span>
+        </div>
+      )}
+
+      {/* Tagline */}
+      {tagline && (
+        <p className="text-site-text-muted text-sm leading-relaxed max-w-xs">
+          {tagline}
+        </p>
+      )}
+
+      {/* Contact info */}
+      {(showPhone || showEmail || showAddress) && (
+        <div className="mt-6 space-y-3">
+          {showPhone && (
+            <a
+              href={`tel:${businessInfo.phone}`}
+              className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
+            >
+              <Phone className="w-4 h-4 text-lime shrink-0" />
+              {phone}
+            </a>
+          )}
+          {showEmail && businessInfo.email && (
+            <a
+              href={`mailto:${businessInfo.email}`}
+              className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
+            >
+              <Mail className="w-4 h-4 text-lime shrink-0" />
+              {businessInfo.email}
+            </a>
+          )}
+          {showAddress && businessInfo.address && (
+            <div className="flex items-start gap-3 text-sm text-site-text-muted">
+              <MapPin className="w-4 h-4 text-lime shrink-0 mt-0.5" />
+              {businessInfo.address}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Review badges */}
+      {showReviews && reviews.length > 0 && (
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          {reviews.map((r) => (
+            <div
+              key={r.platform}
+              className="flex items-center gap-1.5 text-sm text-site-text-secondary"
+            >
+              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+              <span className="font-semibold">{r.rating}</span>
+              <span className="text-site-text-dim">on {r.platform}</span>
+              <span className="text-site-text-faint">&middot;</span>
+              <span className="text-site-text-dim">{r.count} reviews</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

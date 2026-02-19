@@ -1309,10 +1309,11 @@ export interface FooterColumn {
   id: string;
   section_id: string;
   title: string;
-  content_type: 'links' | 'html' | 'business_info';
+  content_type: 'links' | 'html' | 'business_info' | 'brand';
   html_content: string;
   sort_order: number;
   is_enabled: boolean;
+  config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   links?: WebsiteNavItem[];

@@ -4,6 +4,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Footer Admin — Brand Column, Width Controls, Sidebar Link — 2026-02-19
+
+### Fix 1: Admin Sidebar
+- Added "Footer" link under Website section in `SIDEBAR_NAV` (`roles.ts`)
+- Added `Rows3` icon to admin-shell icon map
+
+### Fix 2: Brand Column Type
+- New `'brand'` content type for `footer_columns` — replaces hardcoded logo/contact column
+- Migration `20260219000004_footer_brand_column.sql`: adds `config` JSONB column, expands CHECK constraint, seeds brand column as first in main footer
+- Brand column config: `logo_width`, `tagline`, `show_phone`, `show_email`, `show_address`, `show_reviews`, `col_span`
+- Frontend `BrandColumn` component in `footer-client.tsx` — exact same styling as old hardcoded section
+
+### Fix 3: Per-Column Width (12-Unit Grid)
+- Each column has `col_span` (1-12) stored in `config` JSONB
+- Frontend uses `grid-cols-12` at md+ with CSS custom property `--footer-col-span`
+- Mobile stacks to full width via `.footer-col { grid-column: span 1 }` in globals.css
+- Auto-rebalance: adding/removing columns redistributes spans to total 12
+
+### Fix 4: Admin UI
+- Column Width Preview bar — proportional colored bars showing span values per column
+- Span input (1-12) on each column card header
+- Total validation indicator (12 = green check, other = amber warning)
+- Brand Column Editor: logo width input, tagline textarea, show/hide toggles
+- Delete warning for brand columns
+- Column count display simplified (no "of 4" — just count)
+
+### Files Modified
+- `src/lib/auth/roles.ts` — Footer nav item
+- `src/app/admin/admin-shell.tsx` — Rows3 icon
+- `src/lib/supabase/types.ts` — `config` field + `'brand'` content type on `FooterColumn`
+- `src/app/api/admin/footer/columns/route.ts` — `config` in PATCH/POST
+- `src/components/public/footer-client.tsx` — Brand column renderer, 12-col grid
+- `src/app/admin/website/footer/page.tsx` — Brand editor, width preview, span controls
+- `src/app/globals.css` — `.footer-col` span rule
+
+---
+
 ## Multi-Ticker Ordering + Rotation System — 2026-02-19
 
 ### Admin: Ticker reorder + global rotation options

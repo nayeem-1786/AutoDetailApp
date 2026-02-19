@@ -52,6 +52,7 @@ import {
   PanelTop,
   Paintbrush,
   ShoppingCart,
+  Rows3,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -96,6 +97,7 @@ const iconMap: Record<string, LucideIcon> = {
   PanelTop,
   Paintbrush,
   ShoppingCart,
+  Rows3,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments

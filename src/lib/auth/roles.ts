@@ -144,6 +144,11 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'PanelTop',
       },
       {
+        label: 'Footer',
+        href: '/admin/website/footer',
+        icon: 'Rows3',
+      },
+      {
         label: 'Hero',
         href: '/admin/website/hero',
         icon: 'Image',

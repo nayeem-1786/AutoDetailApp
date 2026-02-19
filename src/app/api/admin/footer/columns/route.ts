@@ -53,11 +53,11 @@ export async function POST(request: NextRequest) {
   if (denied) return denied;
 
   const body = await request.json();
-  const { section_id, title, content_type, html_content } = body;
+  const { section_id, title, content_type, html_content, config } = body;
 
-  if (!section_id || !title) {
+  if (!section_id) {
     return NextResponse.json(
-      { error: 'section_id and title are required' },
+      { error: 'section_id is required' },
       { status: 400 }
     );
   }
@@ -91,10 +91,11 @@ export async function POST(request: NextRequest) {
     .from('footer_columns')
     .insert({
       section_id,
-      title,
+      title: title || '',
       content_type: content_type || 'links',
       html_content: html_content || '',
       sort_order: sortOrder,
+      ...(config ? { config } : {}),
     })
     .select()
     .single();
@@ -118,7 +119,7 @@ export async function PATCH(request: NextRequest) {
   if (denied) return denied;
 
   const body = await request.json();
-  const { id, title, content_type, html_content, sort_order, is_enabled } = body;
+  const { id, title, content_type, html_content, sort_order, is_enabled, config } = body;
 
   if (!id) {
     return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -130,6 +131,7 @@ export async function PATCH(request: NextRequest) {
   if (html_content !== undefined) updates.html_content = html_content;
   if (typeof sort_order === 'number') updates.sort_order = sort_order;
   if (typeof is_enabled === 'boolean') updates.is_enabled = is_enabled;
+  if (config !== undefined && typeof config === 'object') updates.config = config;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });

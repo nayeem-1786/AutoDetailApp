@@ -13,9 +13,9 @@ import {
   X,
   Check,
   ExternalLink,
-  Phone,
-  Mail,
   Info,
+  ImageIcon,
+  AlertTriangle,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,6 +37,24 @@ import type {
 
 interface ColumnWithLinks extends FooterColumn {
   links: WebsiteNavItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Helpers — distribute 12-unit grid spans evenly
+// ---------------------------------------------------------------------------
+
+function distributeSpans(columns: ColumnWithLinks[]): ColumnWithLinks[] {
+  if (columns.length === 0) return columns;
+  const base = Math.floor(12 / columns.length);
+  let remainder = 12 - base * columns.length;
+  return columns.map((col, i) => {
+    const span = base + (i < remainder ? 1 : 0);
+    return { ...col, config: { ...col.config, col_span: span } };
+  });
+}
+
+function getSpanTotal(columns: ColumnWithLinks[]): number {
+  return columns.reduce((sum, c) => sum + ((c.config?.col_span as number) || 0), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +87,7 @@ export default function FooterAdminPage() {
       if (sectionsRes.ok) setSections(sectionsJson.data ?? []);
       if (columnsRes.ok) {
         const cols: ColumnWithLinks[] = (columnsJson.data ?? []).map(
-          (c: FooterColumn) => ({ ...c, links: [] })
+          (c: FooterColumn) => ({ ...c, config: c.config || {}, links: [] })
         );
         // Load links for each links-type column
         const linkCols = cols.filter((c) => c.content_type === 'links');
@@ -252,7 +270,62 @@ function SectionCard({
 }
 
 // ---------------------------------------------------------------------------
-// Main Footer Panel — Column management
+// Column Width Preview — visual bar showing proportional widths
+// ---------------------------------------------------------------------------
+
+function ColumnWidthPreview({ columns }: { columns: ColumnWithLinks[] }) {
+  const enabledCols = columns.filter((c) => c.is_enabled);
+  const total = getSpanTotal(enabledCols);
+  const isValid = total === 12;
+
+  if (enabledCols.length === 0) return null;
+
+  return (
+    <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+          Column Width Preview
+        </h4>
+        <span className={`text-xs font-medium ${isValid ? 'text-green-600' : 'text-amber-600'}`}>
+          Total: {total} / 12 {isValid ? '\u2713' : '\u2717'}
+        </span>
+      </div>
+
+      {/* Visual bars */}
+      <div className="flex gap-1 h-10 rounded overflow-hidden">
+        {enabledCols.map((col) => {
+          const span = (col.config?.col_span as number) || 1;
+          const pct = (span / 12) * 100;
+          const label =
+            col.content_type === 'brand'
+              ? 'Brand'
+              : col.title || col.content_type;
+          return (
+            <div
+              key={col.id}
+              className="bg-brand-100 border border-brand-200 rounded flex items-center justify-center overflow-hidden"
+              style={{ width: `${pct}%` }}
+            >
+              <span className="text-[10px] font-medium text-brand-700 truncate px-1">
+                {label} ({span})
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {!isValid && (
+        <p className="text-xs text-amber-600 flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          Column widths must total 12. Adjust the spans below.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Footer Panel — Column management with width controls
 // ---------------------------------------------------------------------------
 
 function MainFooterPanel({
@@ -275,6 +348,14 @@ function MainFooterPanel({
       return;
     }
 
+    // Calculate default span for the new column
+    const newCount = columns.length + 1;
+    const newSpans = distributeSpans([
+      ...columns,
+      { id: 'temp', config: {} } as ColumnWithLinks,
+    ]);
+    const newColSpan = (newSpans[newSpans.length - 1].config.col_span as number) || Math.floor(12 / newCount);
+
     const res = await adminFetch('/api/admin/footer/columns', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -282,12 +363,29 @@ function MainFooterPanel({
         section_id: sectionId,
         title: newColumnTitle.trim(),
         content_type: newColumnType,
+        config: { col_span: newColSpan },
       }),
     });
 
     if (res.ok) {
       const { data } = await res.json();
-      setColumns((prev) => [...prev, { ...data, links: [] }]);
+      const newCol: ColumnWithLinks = { ...data, config: data.config || {}, links: [] };
+      // Redistribute spans across all columns
+      const updatedAll = distributeSpans([...columns, newCol]);
+      setColumns((prev) => {
+        const otherCols = prev.filter((c) => c.section_id !== sectionId);
+        return [...otherCols, ...updatedAll];
+      });
+      // Save new spans to server
+      for (const col of updatedAll) {
+        if (col.id !== data.id) {
+          adminFetch('/api/admin/footer/columns', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: col.id, config: col.config }),
+          });
+        }
+      }
       setNewColumnTitle('');
       setNewColumnType('links');
       setShowAddColumn(false);
@@ -299,12 +397,21 @@ function MainFooterPanel({
   };
 
   const deleteColumn = async (col: ColumnWithLinks) => {
-    const linkCount = col.links?.length ?? 0;
-    const msg =
-      linkCount > 0
-        ? `This will remove the "${col.title}" column and unassign ${linkCount} link${linkCount > 1 ? 's' : ''}. The links won't be deleted but will no longer appear in the footer.`
-        : `Delete the "${col.title}" column?`;
-    if (!confirm(msg)) return;
+    if (col.content_type === 'brand') {
+      if (
+        !confirm(
+          'The brand column contains your logo and business info. Are you sure you want to remove it?'
+        )
+      )
+        return;
+    } else {
+      const linkCount = col.links?.length ?? 0;
+      const msg =
+        linkCount > 0
+          ? `This will remove the "${col.title}" column and unassign ${linkCount} link${linkCount > 1 ? 's' : ''}. The links won't be deleted but will no longer appear in the footer.`
+          : `Delete the "${col.title}" column?`;
+      if (!confirm(msg)) return;
+    }
 
     const res = await adminFetch('/api/admin/footer/columns', {
       method: 'DELETE',
@@ -313,7 +420,21 @@ function MainFooterPanel({
     });
 
     if (res.ok) {
-      setColumns((prev) => prev.filter((c) => c.id !== col.id));
+      // Redistribute spans across remaining columns
+      const remaining = columns.filter((c) => c.id !== col.id);
+      const rebalanced = distributeSpans(remaining);
+      setColumns((prev) => {
+        const otherCols = prev.filter((c) => c.section_id !== sectionId);
+        return [...otherCols, ...rebalanced];
+      });
+      // Save new spans to server
+      for (const c of rebalanced) {
+        adminFetch('/api/admin/footer/columns', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: c.id, config: c.config }),
+        });
+      }
       toast.success('Column deleted');
     } else {
       toast.error('Failed to delete column');
@@ -337,6 +458,26 @@ function MainFooterPanel({
         prev.map((c) => (c.id === col.id ? { ...c, is_enabled: !newVal } : c))
       );
       toast.error('Failed to update column');
+    }
+  };
+
+  const updateColumnConfig = async (col: ColumnWithLinks, newConfig: Record<string, unknown>) => {
+    const mergedConfig = { ...col.config, ...newConfig };
+    setColumns((prev) =>
+      prev.map((c) => (c.id === col.id ? { ...c, config: mergedConfig } : c))
+    );
+
+    const res = await adminFetch('/api/admin/footer/columns', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: col.id, config: mergedConfig }),
+    });
+
+    if (!res.ok) {
+      setColumns((prev) =>
+        prev.map((c) => (c.id === col.id ? { ...c, config: col.config } : c))
+      );
+      toast.error('Failed to save config');
     }
   };
 
@@ -385,13 +526,21 @@ function MainFooterPanel({
     }
   };
 
-  const enabledCount = columns.filter((c) => c.is_enabled).length;
+  // Content type options for new columns — exclude 'brand' if one already exists
+  const contentTypeOptions: { value: 'links' | 'html' | 'business_info'; label: string }[] = [
+    { value: 'links', label: 'Links' },
+    { value: 'html', label: 'HTML' },
+    { value: 'business_info', label: 'Business Info' },
+  ];
 
   return (
     <div className="space-y-4">
+      {/* Width preview */}
+      <ColumnWidthPreview columns={columns} />
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          {columns.length} of 4 columns
+          {columns.length} column{columns.length !== 1 ? 's' : ''}
         </p>
         <Button
           size="sm"
@@ -425,13 +574,7 @@ function MainFooterPanel({
               Content Type
             </label>
             <div className="flex gap-2">
-              {(
-                [
-                  { value: 'links', label: 'Links' },
-                  { value: 'html', label: 'HTML' },
-                  { value: 'business_info', label: 'Business Info' },
-                ] as const
-              ).map((opt) => (
+              {contentTypeOptions.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
@@ -482,6 +625,7 @@ function MainFooterPanel({
                 setColumns={setColumns}
                 onDelete={() => deleteColumn(col)}
                 onToggleEnabled={() => toggleColumnEnabled(col)}
+                onUpdateConfig={(newConfig) => updateColumnConfig(col, newConfig)}
                 onDragStart={(e) => handleColDragStart(e, col.id)}
                 onDragOver={handleColDragOver}
                 onDrop={(e) => handleColDrop(e, col.id)}
@@ -497,10 +641,11 @@ function MainFooterPanel({
 // Column Card — individual column with its content editor
 // ---------------------------------------------------------------------------
 
-const CONTENT_TYPE_BADGE: Record<string, { label: string; variant: 'default' | 'info' | 'success' }> = {
+const CONTENT_TYPE_BADGE: Record<string, { label: string; variant: 'default' | 'info' | 'success' | 'warning' | 'secondary' | 'destructive' }> = {
   links: { label: 'Links', variant: 'info' },
   html: { label: 'HTML', variant: 'default' },
   business_info: { label: 'Business Info', variant: 'success' },
+  brand: { label: 'Brand', variant: 'warning' },
 };
 
 function ColumnCard({
@@ -508,6 +653,7 @@ function ColumnCard({
   setColumns,
   onDelete,
   onToggleEnabled,
+  onUpdateConfig,
   onDragStart,
   onDragOver,
   onDrop,
@@ -516,6 +662,7 @@ function ColumnCard({
   setColumns: React.Dispatch<React.SetStateAction<ColumnWithLinks[]>>;
   onDelete: () => void;
   onToggleEnabled: () => void;
+  onUpdateConfig: (config: Record<string, unknown>) => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
@@ -523,6 +670,8 @@ function ColumnCard({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(column.title);
   const badge = CONTENT_TYPE_BADGE[column.content_type] ?? CONTENT_TYPE_BADGE.links;
+  const isBrand = column.content_type === 'brand';
+  const colSpan = (column.config?.col_span as number) || 4;
 
   const saveTitle = async () => {
     if (!titleValue.trim()) {
@@ -561,7 +710,7 @@ function ColumnCard({
       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
         <GripVertical className="h-4 w-4 text-gray-300 cursor-grab flex-shrink-0" />
 
-        {editingTitle ? (
+        {editingTitle && !isBrand ? (
           <div className="flex items-center gap-2 flex-1">
             <input
               type="text"
@@ -593,7 +742,7 @@ function ColumnCard({
         ) : (
           <>
             <span className="text-sm font-medium text-gray-900 flex-1">
-              {column.title}
+              {isBrand ? 'Brand / Logo' : column.title}
             </span>
             <Badge variant={badge.variant}>{badge.label}</Badge>
           </>
@@ -601,20 +750,37 @@ function ColumnCard({
 
         {!editingTitle && (
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Column width span control */}
+            <div className="flex items-center gap-1">
+              <label className="text-[10px] text-gray-400 uppercase">Span</label>
+              <input
+                type="number"
+                value={colSpan}
+                onChange={(e) => {
+                  const val = Math.max(1, Math.min(12, parseInt(e.target.value) || 1));
+                  onUpdateConfig({ col_span: val });
+                }}
+                className="w-12 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-brand-500"
+                min={1}
+                max={12}
+              />
+            </div>
             <Switch
               checked={column.is_enabled}
               onCheckedChange={onToggleEnabled}
             />
-            <button
-              onClick={() => {
-                setEditingTitle(true);
-                setTitleValue(column.title);
-              }}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-              title="Edit title"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
+            {!isBrand && (
+              <button
+                onClick={() => {
+                  setEditingTitle(true);
+                  setTitleValue(column.title);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Edit title"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
             <button
               onClick={onDelete}
               className="text-gray-400 hover:text-red-600 transition-colors"
@@ -628,6 +794,9 @@ function ColumnCard({
 
       {/* Column content */}
       <div className="p-4">
+        {column.content_type === 'brand' && (
+          <BrandColumnEditor column={column} onUpdateConfig={onUpdateConfig} />
+        )}
         {column.content_type === 'links' && (
           <LinksEditor column={column} setColumns={setColumns} />
         )}
@@ -636,6 +805,131 @@ function ColumnCard({
         )}
         {column.content_type === 'business_info' && <BusinessInfoPreview />}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Brand Column Editor — logo size, tagline, toggle checkboxes
+// ---------------------------------------------------------------------------
+
+function BrandColumnEditor({
+  column,
+  onUpdateConfig,
+}: {
+  column: ColumnWithLinks;
+  onUpdateConfig: (config: Record<string, unknown>) => void;
+}) {
+  const config = column.config || {};
+  const [logoWidth, setLogoWidth] = useState((config.logo_width as number) || 160);
+  const [tagline, setTagline] = useState((config.tagline as string) || '');
+  const [showPhone, setShowPhone] = useState(config.show_phone !== false);
+  const [showEmail, setShowEmail] = useState(config.show_email !== false);
+  const [showAddress, setShowAddress] = useState(config.show_address !== false);
+  const [showReviews, setShowReviews] = useState(config.show_reviews !== false);
+  const [saving, setSaving] = useState(false);
+
+  const isDirty =
+    logoWidth !== ((config.logo_width as number) || 160) ||
+    tagline !== ((config.tagline as string) || '') ||
+    showPhone !== (config.show_phone !== false) ||
+    showEmail !== (config.show_email !== false) ||
+    showAddress !== (config.show_address !== false) ||
+    showReviews !== (config.show_reviews !== false);
+
+  const save = () => {
+    setSaving(true);
+    onUpdateConfig({
+      logo_width: logoWidth,
+      tagline,
+      show_phone: showPhone,
+      show_email: showEmail,
+      show_address: showAddress,
+      show_reviews: showReviews,
+    });
+    setSaving(false);
+    toast.success('Brand settings saved');
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+        <Info className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-blue-700">
+          Logo and business info are pulled from your{' '}
+          <Link
+            href="/admin/settings"
+            className="font-medium underline hover:text-blue-800"
+          >
+            business settings
+          </Link>
+          .
+        </p>
+      </div>
+
+      {/* Logo width */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          <ImageIcon className="h-3.5 w-3.5 inline mr-1" />
+          Logo Width (px)
+        </label>
+        <input
+          type="number"
+          value={logoWidth}
+          onChange={(e) => setLogoWidth(Math.max(40, Math.min(400, parseInt(e.target.value) || 160)))}
+          className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          min={40}
+          max={400}
+        />
+        <p className="mt-1 text-xs text-gray-500">Height scales automatically.</p>
+      </div>
+
+      {/* Tagline */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Tagline
+        </label>
+        <textarea
+          value={tagline}
+          onChange={(e) => setTagline(e.target.value)}
+          rows={2}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          placeholder="Professional auto detailing..."
+        />
+      </div>
+
+      {/* Toggle checkboxes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Show / Hide
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { key: 'phone', label: 'Phone', value: showPhone, setter: setShowPhone },
+            { key: 'email', label: 'Email', value: showEmail, setter: setShowEmail },
+            { key: 'address', label: 'Address', value: showAddress, setter: setShowAddress },
+            { key: 'reviews', label: 'Review Badges', value: showReviews, setter: setShowReviews },
+          ].map((item) => (
+            <label key={item.key} className="flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={item.value}
+                onChange={(e) => item.setter(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              {item.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {isDirty && (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={save} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Brand Settings'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1113,7 +1407,7 @@ function ServiceAreasPanel({
             href="/admin/website/seo/cities"
             className="text-brand-600 hover:text-brand-700 font-medium"
           >
-            Manage service areas →
+            Manage service areas &rarr;
           </Link>
         </div>
         <Button size="sm" onClick={save} disabled={!isDirty || saving}>

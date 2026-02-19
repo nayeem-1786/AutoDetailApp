@@ -602,3 +602,13 @@ h1, h2, h3 {
 .site-btn-cta:hover {
   background-color: var(--site-btn-cta-hover-bg);
 }
+
+/* Footer 12-column grid — col_span via CSS custom property; mobile stacks full-width */
+.footer-col {
+  grid-column: span 1;
+}
+@media (min-width: 768px) {
+  .footer-col {
+    grid-column: span var(--footer-col-span, 4);
+  }
+}

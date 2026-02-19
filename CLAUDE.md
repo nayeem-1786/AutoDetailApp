@@ -504,6 +504,17 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ### Previous Session: 2026-02-19 (Configurable Footer — Admin UI)
 
+### Configurable Footer System — Session 4 (Brand Column + Width Control)
+- **Brand column type**: New `content_type='brand'` in `footer_columns` — managed logo, tagline, contact toggles, review badges (replaces hardcoded brand section in `footer-client.tsx`)
+- **Config JSONB column**: `footer_columns.config` stores per-column settings: `col_span` (1-12), `logo_width`, `tagline`, `show_phone/email/address/reviews`
+- **12-unit grid system**: Public footer uses `grid-cols-12` on md+ with CSS custom property `--footer-col-span`. Mobile stays single column. CSS rule `.footer-col` in `globals.css`
+- **Admin width controls**: Span input (1-12) per column header, `ColumnWidthPreview` proportional bar visualization, `distributeSpans()` auto-rebalance on add/remove, total validation (green/red)
+- **BrandColumnEditor**: Logo width slider (40-400px), tagline textarea, show/hide checkboxes
+- **Sidebar nav**: Added "Footer" entry (Rows3 icon) to Website section in `roles.ts` + `admin-shell.tsx`
+- **Migration**: `20260219000004_footer_brand_column.sql` — adds config column, expands CHECK constraint, seeds brand column at position 0 with default config, distributes col_span across existing columns
+- **API changes**: POST accepts optional `config`, `title` optional (brand has no title). PATCH handles `config` updates.
+- TypeScript clean, build passes, migration applied.
+
 ### Configurable Footer System — Session 3 (Admin UI)
 - **Admin page** (`/admin/website/footer/page.tsx`): Full footer management UI with 3 collapsible section cards (Main Footer, Service Areas, Bottom Bar).
   - Section enable/disable toggles update `footer_sections.is_enabled` via PATCH API
