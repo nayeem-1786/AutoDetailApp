@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { getPageBySlug } from '@/lib/data/website-pages';
+import { getPageBySlug, getPublishedPages } from '@/lib/data/website-pages';
 import { getPageContentBlocks } from '@/lib/data/page-content';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { ContentBlocks } from '@/components/public/content-block-renderer';
@@ -15,6 +15,13 @@ export const revalidate = 300;
 type PageProps = {
   params: Promise<{ slug: string[] }>;
 };
+
+export async function generateStaticParams() {
+  const pages = await getPublishedPages();
+  return pages.map((page) => ({
+    slug: page.slug.split('/'),
+  }));
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;

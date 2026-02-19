@@ -654,6 +654,7 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **BeforeAfterSlider**: Framer-motion animated labels (slide-in), improved drag handle, lime divider/handle, `rounded-2xl` container, lime "After" badge, keyboard a11y
 - **Dark theme scoping**: `bg-black text-white min-h-screen` wrapper on 3 layouts (public, customer-auth, account)
 - **CMS cache revalidation**: Added `revalidateTag()` calls to all CMS admin API routes for instant public page updates
+- **CMS page rendering**: `/p/[...slug]` route with 3 templates (content/landing/blank), markdown→HTML, content blocks, SEO metadata. `@tailwindcss/typography` plugin installed for `prose` classes. `generateStaticParams` for SSG.
 - **Orphaned files** (not deleted): `header-shell.tsx`, `mobile-menu.tsx`, `nav-dropdown.tsx` — no longer imported by site-header
 - **Design Foundation**:
   - Lime brand tokens in `@theme inline`: `--color-lime: #CCFF00`, full lime palette, brand-dark (#0A0A0A), brand-surface (#1A1A1A)

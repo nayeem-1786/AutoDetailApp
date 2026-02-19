@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Page Route Fix — Typography & Static Params — 2026-02-19
+
+- Installed `@tailwindcss/typography` plugin — `prose`/`prose-invert` classes on CMS pages and content blocks were non-functional without it
+- Added `@plugin "@tailwindcss/typography"` to `globals.css`
+- Added `generateStaticParams` to `/p/[...slug]` route for SSG pre-rendering of published pages
+- Route already existed with full implementation: 3 templates (content/landing/blank), markdown→HTML, content blocks, SEO metadata with overrides
+- Sitemap already includes `/p/{slug}` entries
+
+---
+
 ## Footer Admin — Brand Column, Width Controls, Sidebar Link — 2026-02-19
 
 ### Fix 1: Admin Sidebar
