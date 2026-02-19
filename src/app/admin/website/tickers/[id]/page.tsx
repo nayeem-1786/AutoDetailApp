@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
@@ -11,10 +11,25 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { ArrowLeft, Save } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 
-// Map slider value (1-100) to CSS animation duration in seconds
-function speedToDuration(speed: number): number {
-  // speed 1 → 60s (very slow), speed 100 → 5s (very fast)
-  return Math.max(5, Math.round(60 - (speed / 100) * 55));
+// ---------------------------------------------------------------------------
+// Speed → consistent px/s rate (content-width-aware)
+// ---------------------------------------------------------------------------
+/** Map slider value (1-100) to pixels-per-second scroll rate */
+function speedToPxPerSec(speed: number): number {
+  // speed 1 → 30 px/s (very slow), speed 100 → 300 px/s (very fast)
+  return 30 + (speed / 100) * 270;
+}
+
+/** Convert ISO string to datetime-local format (YYYY-MM-DDThh:mm) */
+function isoToLocal(iso: string | null): string {
+  if (!iso) return '';
+  return iso.slice(0, 16);
+}
+
+/** Convert datetime-local string to ISO, or null if empty */
+function localToIso(local: string): string | null {
+  if (!local) return null;
+  return new Date(local).toISOString();
 }
 
 export default function TickerEditorPage() {
@@ -24,12 +39,22 @@ export default function TickerEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Separate local state for date fields — avoids ISO conversion on every keystroke
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Ref for measuring preview content width
+  const previewRef = useRef<HTMLSpanElement>(null);
+  const [previewDuration, setPreviewDuration] = useState(20);
+
   const load = useCallback(async () => {
     try {
       const res = await adminFetch(`/api/admin/cms/tickers/${id}`);
       if (!res.ok) throw new Error('Not found');
       const { data } = await res.json();
       setTicker(data);
+      setStartDate(isoToLocal(data.starts_at));
+      setEndDate(isoToLocal(data.ends_at));
     } catch {
       toast.error('Failed to load ticker');
       router.push('/admin/website/tickers');
@@ -43,6 +68,23 @@ export default function TickerEditorPage() {
   const update = (field: keyof AnnouncementTicker, value: unknown) => {
     setTicker((prev) => prev ? { ...prev, [field]: value } : null);
   };
+
+  // Measure preview content width and calculate duration based on px/s
+  const speedValue = ticker?.scroll_speed_value ?? 50;
+  useEffect(() => {
+    function measure() {
+      const el = previewRef.current;
+      if (!el) return;
+      const totalWidth = el.scrollWidth;
+      const halfWidth = totalWidth / 2;
+      const pxPerSec = speedToPxPerSec(speedValue);
+      const dur = Math.max(3, halfWidth / pxPerSec);
+      setPreviewDuration(dur);
+    }
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [speedValue, ticker?.message, ticker?.link_text]);
 
   const save = async () => {
     if (!ticker) return;
@@ -63,8 +105,8 @@ export default function TickerEditorPage() {
           scroll_speed_value: ticker.scroll_speed_value,
           font_size: ticker.font_size,
           target_pages: ticker.target_pages,
-          starts_at: ticker.starts_at,
-          ends_at: ticker.ends_at,
+          starts_at: localToIso(startDate),
+          ends_at: localToIso(endDate),
           is_active: ticker.is_active,
         }),
       });
@@ -85,8 +127,7 @@ export default function TickerEditorPage() {
     );
   }
 
-  const speedValue = ticker.scroll_speed_value ?? 50;
-  const previewDuration = speedToDuration(speedValue);
+  const pxPerSec = speedToPxPerSec(speedValue);
   const previewFontSize = ticker.font_size === 'xs' ? '0.75rem' : ticker.font_size === 'sm' ? '0.875rem' : ticker.font_size === 'lg' ? '1.125rem' : '1rem';
 
   return (
@@ -118,8 +159,9 @@ export default function TickerEditorPage() {
           }}
         >
           <span
+            ref={previewRef}
             className="inline-block animate-marquee"
-            style={{ animationDuration: `${previewDuration}s` }}
+            style={{ animationDuration: `${previewDuration.toFixed(1)}s` }}
           >
             <span className="inline-flex items-center gap-8 px-4">
               <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
@@ -263,7 +305,7 @@ export default function TickerEditorPage() {
             <div className="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <span>Slower</span>
               <span className="font-medium text-gray-700 dark:text-gray-300">
-                {speedValue} &mdash; {previewDuration}s per cycle
+                {speedValue} &mdash; {Math.round(pxPerSec)} px/s
               </span>
               <span>Faster</span>
             </div>
@@ -321,8 +363,8 @@ export default function TickerEditorPage() {
             </label>
             <Input
               type="datetime-local"
-              value={ticker.starts_at ? ticker.starts_at.slice(0, 16) : ''}
-              onChange={(e) => update('starts_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
               className="mt-1"
             />
           </div>
@@ -332,8 +374,8 @@ export default function TickerEditorPage() {
             </label>
             <Input
               type="datetime-local"
-              value={ticker.ends_at ? ticker.ends_at.slice(0, 16) : ''}
-              onChange={(e) => update('ends_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="mt-1"
             />
           </div>

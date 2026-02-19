@@ -36,6 +36,18 @@ const COLOR_KEYS: { key: string; label: string }[] = [
   { key: 'brand-surface', label: 'Card BG' },
 ];
 
+/** Convert ISO string to datetime-local format (YYYY-MM-DDThh:mm) */
+function isoToLocal(iso: string | null): string {
+  if (!iso) return '';
+  return iso.slice(0, 16);
+}
+
+/** Convert datetime-local string to ISO, or null if empty */
+function localToIso(local: string): string | null {
+  if (!local) return null;
+  return new Date(local).toISOString();
+}
+
 export default function ThemeEditorPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -43,12 +55,18 @@ export default function ThemeEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Separate local state for date fields — avoids ISO conversion on every keystroke
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const load = useCallback(async () => {
     try {
       const res = await adminFetch(`/api/admin/cms/themes/${id}`);
       if (!res.ok) throw new Error('Not found');
       const { data } = await res.json();
       setTheme(data);
+      setStartDate(isoToLocal(data.starts_at));
+      setEndDate(isoToLocal(data.ends_at));
     } catch {
       toast.error('Failed to load theme');
       router.push('/admin/website/themes');
@@ -94,8 +112,8 @@ export default function ThemeEditorPage() {
           ticker_text_color: theme.ticker_text_color,
           hero_bg_image_url: theme.hero_bg_image_url,
           body_bg_color: theme.body_bg_color,
-          starts_at: theme.starts_at,
-          ends_at: theme.ends_at,
+          starts_at: localToIso(startDate),
+          ends_at: localToIso(endDate),
           auto_activate: theme.auto_activate,
         }),
       });
@@ -358,8 +376,8 @@ export default function ThemeEditorPage() {
             </label>
             <Input
               type="datetime-local"
-              value={theme.starts_at ? theme.starts_at.slice(0, 16) : ''}
-              onChange={(e) => update('starts_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
               className="mt-1"
             />
           </div>
@@ -369,8 +387,8 @@ export default function ThemeEditorPage() {
             </label>
             <Input
               type="datetime-local"
-              value={theme.ends_at ? theme.ends_at.slice(0, 16) : ''}
-              onChange={(e) => update('ends_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="mt-1"
             />
           </div>

@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
-// Speed → CSS animation-duration mapping
+// Speed → consistent px/s rate (content-width-aware)
 // ---------------------------------------------------------------------------
 
-/** Convert slider value (1-100) to animation duration in seconds */
-function speedToDuration(speed: number): number {
-  return Math.max(5, Math.round(60 - (speed / 100) * 55));
+/** Map slider value (1-100) to pixels-per-second scroll rate */
+function speedToPxPerSec(speed: number): number {
+  // speed 1 → 30 px/s (very slow), speed 100 → 300 px/s (very fast)
+  return 30 + (speed / 100) * 270;
 }
 
 /** Fallback: enum → slider value (for tickers without scroll_speed_value) */
@@ -20,9 +21,35 @@ const ENUM_TO_VALUE: Record<string, number> = {
   fast: 75,
 };
 
-function getDuration(ticker: AnnouncementTicker): string {
-  const value = ticker.scroll_speed_value ?? ENUM_TO_VALUE[ticker.scroll_speed] ?? 50;
-  return `${speedToDuration(value)}s`;
+function getSpeedValue(ticker: AnnouncementTicker): number {
+  return ticker.scroll_speed_value ?? ENUM_TO_VALUE[ticker.scroll_speed] ?? 50;
+}
+
+// ---------------------------------------------------------------------------
+// Custom hook: measure content width and compute duration for constant px/s
+// ---------------------------------------------------------------------------
+function useMarqueeDuration(speedValue: number) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [duration, setDuration] = useState(20); // reasonable fallback
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const totalWidth = el.scrollWidth;
+    const halfWidth = totalWidth / 2; // animation moves -50%
+    const pxPerSec = speedToPxPerSec(speedValue);
+    const dur = Math.max(3, halfWidth / pxPerSec);
+    setDuration(dur);
+  }, [speedValue]);
+
+  useEffect(() => {
+    // Measure after first paint so content is laid out
+    requestAnimationFrame(measure);
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+
+  return { ref, duration };
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +68,9 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const current = tickers[currentIndex];
+  const speedValue = current ? getSpeedValue(current) : 50;
+  const { ref, duration } = useMarqueeDuration(speedValue);
 
   // Auto-rotate through tickers (when multiple)
   useEffect(() => {
@@ -53,8 +83,6 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
 
   if (tickers.length === 0) return null;
 
-  const current = tickers[currentIndex];
-  const duration = getDuration(current);
   const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
 
   return (
@@ -75,8 +103,9 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
           from 0 to -50% (the first copy's width).
         */}
         <span
+          ref={ref}
           className="inline-block animate-marquee"
-          style={{ animationDuration: duration }}
+          style={{ animationDuration: `${duration.toFixed(1)}s` }}
         >
           <TickerContent ticker={current} count={4} />
           <TickerContent ticker={current} count={4} aria-hidden />
@@ -91,6 +120,9 @@ export function TopBarTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
 // ---------------------------------------------------------------------------
 export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const current = tickers[currentIndex];
+  const speedValue = current ? getSpeedValue(current) : 50;
+  const { ref, duration } = useMarqueeDuration(speedValue);
 
   useEffect(() => {
     if (tickers.length <= 1) return;
@@ -102,8 +134,6 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
 
   if (tickers.length === 0) return null;
 
-  const current = tickers[currentIndex];
-  const duration = getDuration(current);
   const fontSize = FONT_SIZE_CLASS[current.font_size] || FONT_SIZE_CLASS.sm;
 
   return (
@@ -117,8 +147,9 @@ export function SectionTicker({ tickers }: { tickers: AnnouncementTicker[] }) {
     >
       <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
         <span
+          ref={ref}
           className="inline-block animate-marquee"
-          style={{ animationDuration: duration }}
+          style={{ animationDuration: `${duration.toFixed(1)}s` }}
         >
           <SectionTickerContent ticker={current} count={4} />
           <SectionTickerContent ticker={current} count={4} aria-hidden />
