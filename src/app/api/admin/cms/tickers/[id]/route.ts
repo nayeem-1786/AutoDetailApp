@@ -52,8 +52,8 @@ export async function PATCH(
 
   const allowedFields = [
     'message', 'link_url', 'link_text', 'placement', 'section_position',
-    'bg_color', 'text_color', 'scroll_speed', 'font_size', 'target_pages',
-    'starts_at', 'ends_at', 'is_active', 'sort_order',
+    'bg_color', 'text_color', 'scroll_speed', 'scroll_speed_value', 'font_size',
+    'target_pages', 'starts_at', 'ends_at', 'is_active', 'sort_order',
   ];
 
   const updates: Record<string, unknown> = {};

@@ -8,8 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { ArrowLeft, Save, Megaphone } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
+
+// Map slider value (1-100) to CSS animation duration in seconds
+function speedToDuration(speed: number): number {
+  // speed 1 → 60s (very slow), speed 100 → 5s (very fast)
+  return Math.max(5, Math.round(60 - (speed / 100) * 55));
+}
 
 export default function TickerEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +60,7 @@ export default function TickerEditorPage() {
           bg_color: ticker.bg_color,
           text_color: ticker.text_color,
           scroll_speed: ticker.scroll_speed,
+          scroll_speed_value: ticker.scroll_speed_value,
           font_size: ticker.font_size,
           target_pages: ticker.target_pages,
           starts_at: ticker.starts_at,
@@ -78,11 +85,15 @@ export default function TickerEditorPage() {
     );
   }
 
+  const speedValue = ticker.scroll_speed_value ?? 50;
+  const previewDuration = speedToDuration(speedValue);
+  const previewFontSize = ticker.font_size === 'xs' ? '0.75rem' : ticker.font_size === 'sm' ? '0.875rem' : ticker.font_size === 'lg' ? '1.125rem' : '1rem';
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Edit Ticker"
-        description={ticker.message || 'Untitled'}
+        description={ticker.message?.replace(/<[^>]*>/g, '').slice(0, 60) || 'Untitled'}
         action={
           <div className="flex items-center gap-3">
             <Button variant="outline" onClick={() => router.push('/admin/website/tickers')}>
@@ -99,18 +110,39 @@ export default function TickerEditorPage() {
       {/* Live Preview */}
       <div className="overflow-hidden rounded-lg">
         <div
-          className="px-4 py-2 text-center overflow-hidden whitespace-nowrap"
+          className="px-4 py-2 overflow-hidden whitespace-nowrap"
           style={{
             backgroundColor: ticker.bg_color,
             color: ticker.text_color,
-            fontSize: ticker.font_size === 'xs' ? '0.75rem' : ticker.font_size === 'sm' ? '0.875rem' : ticker.font_size === 'lg' ? '1.125rem' : '1rem',
+            fontSize: previewFontSize,
           }}
         >
-          <span className="inline-block animate-marquee">
-            {ticker.message}
-            {ticker.link_text && (
-              <span className="ml-2 underline">{ticker.link_text}</span>
-            )}
+          <span
+            className="inline-block animate-marquee"
+            style={{ animationDuration: `${previewDuration}s` }}
+          >
+            <span className="inline-flex items-center gap-8 px-4">
+              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
+              {ticker.link_text && (
+                <span className="underline">{ticker.link_text}</span>
+              )}
+              <span className="inline-block w-16" />
+              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
+              {ticker.link_text && (
+                <span className="underline">{ticker.link_text}</span>
+              )}
+            </span>
+            <span className="inline-flex items-center gap-8 px-4" aria-hidden="true">
+              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
+              {ticker.link_text && (
+                <span className="underline">{ticker.link_text}</span>
+              )}
+              <span className="inline-block w-16" />
+              <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
+              {ticker.link_text && (
+                <span className="underline">{ticker.link_text}</span>
+              )}
+            </span>
           </span>
         </div>
       </div>
@@ -126,10 +158,17 @@ export default function TickerEditorPage() {
           <textarea
             value={ticker.message || ''}
             onChange={(e) => update('message', e.target.value)}
-            rows={2}
-            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            rows={3}
+            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-mono dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
             placeholder="Your announcement..."
           />
+          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            Supports inline HTML for colored text. Use{' '}
+            <code className="rounded bg-gray-100 px-1 py-0.5 text-[10px] dark:bg-gray-600">
+              {'<span style="color:red;">TEXT</span>'}
+            </code>{' '}
+            to colorize specific words.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -191,21 +230,6 @@ export default function TickerEditorPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Scroll Speed
-            </label>
-            <select
-              value={ticker.scroll_speed}
-              onChange={(e) => update('scroll_speed', e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-            >
-              <option value="slow">Slow</option>
-              <option value="normal">Normal</option>
-              <option value="fast">Fast</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Font Size
             </label>
             <select
@@ -218,6 +242,31 @@ export default function TickerEditorPage() {
               <option value="base">Normal</option>
               <option value="lg">Large</option>
             </select>
+          </div>
+        </div>
+
+        {/* Scroll Speed Slider */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Scroll Speed
+          </label>
+          <div className="mt-2">
+            <input
+              type="range"
+              min={1}
+              max={100}
+              step={1}
+              value={speedValue}
+              onChange={(e) => update('scroll_speed_value', parseInt(e.target.value, 10))}
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-brand-500 bg-gray-200 dark:bg-gray-600"
+            />
+            <div className="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>Slower</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                {speedValue} &mdash; {previewDuration}s per cycle
+              </span>
+              <span>Faster</span>
+            </div>
           </div>
         </div>
 

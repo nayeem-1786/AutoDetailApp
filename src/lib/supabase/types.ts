@@ -1040,6 +1040,7 @@ export interface AnnouncementTicker {
   bg_color: string;
   text_color: string;
   scroll_speed: TickerScrollSpeed;
+  scroll_speed_value: number | null;
   font_size: TickerFontSize;
   target_pages: string[];
   starts_at: string | null;
