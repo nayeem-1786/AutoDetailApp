@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type RefObject } from 'react';
 import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
@@ -474,7 +474,37 @@ function tickerMatchesPage(ticker: AnnouncementTicker, pathname: string): boolea
 }
 
 // ---------------------------------------------------------------------------
-// TopBarTickerFiltered — client wrapper that filters tickers by pathname
+// Hook to set --ticker-height CSS variable on :root
+// ---------------------------------------------------------------------------
+function useTickerHeight(ref: RefObject<HTMLDivElement | null>, active: boolean) {
+  useEffect(() => {
+    if (!active) {
+      document.documentElement.style.setProperty('--ticker-height', '0px');
+      return;
+    }
+
+    const el = ref.current;
+    if (!el) return;
+
+    const updateHeight = () => {
+      document.documentElement.style.setProperty(
+        '--ticker-height',
+        `${el.offsetHeight}px`,
+      );
+    };
+
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(el);
+    updateHeight();
+
+    return () => observer.disconnect();
+  }, [ref, active]);
+}
+
+// ---------------------------------------------------------------------------
+// TopBarTickerFiltered — client wrapper that filters tickers by pathname.
+// Renders sticky at top-0 and sets --ticker-height CSS variable so the
+// header can stick directly below.
 // ---------------------------------------------------------------------------
 
 export function TopBarTickerFiltered({
@@ -486,7 +516,17 @@ export function TopBarTickerFiltered({
 }) {
   const pathname = usePathname();
   const filtered = tickers.filter((t) => tickerMatchesPage(t, pathname));
-  return <TopBarTicker tickers={filtered} options={options} />;
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useTickerHeight(wrapperRef, filtered.length > 0);
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div ref={wrapperRef} className="sticky top-0 z-50">
+      <TopBarTicker tickers={filtered} options={options} />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------

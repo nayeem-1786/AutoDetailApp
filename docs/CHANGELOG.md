@@ -4,17 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Sticky Ticker Below Header — 2026-02-19
+## Ticker Above Header + Sticky with CSS Variable Offset — 2026-02-19
 
-- Ticker was scrolling away with page content — now sticks below header while scrolling
-- Wrapped header + ticker in a single `sticky top-0 z-50` container in public layout
-- Moved ticker render order: now renders BELOW header (was above)
-- Removed `sticky top-0 z-50` from `<header>` element — wrapper handles stickiness
-- Scroll-dependent header background effects (blur, shadow) still work via `window.scrollY` detection
+- Restored ticker to the very top of the page (ABOVE the header) — the first thing visitors see
+- Ticker is independently `sticky top-0 z-50`; header is `sticky z-40` with `top: var(--ticker-height, 0px)`
+- `useTickerHeight` hook uses `ResizeObserver` to set `--ticker-height` CSS variable on `:root` — header dynamically offsets itself below the ticker
+- When no tickers are active (filtered out by page or disabled), `--ticker-height` is set to `0px` and header sticks at `top-0`
+- z-index layering: ticker z-50 > header z-40 > page content (dropdowns/menus still work within header stacking context)
+
+### Previous version (reverted)
+- Had header + ticker in a single `sticky top-0 z-50` wrapper with header first, ticker below — wrong visual order
 
 ### Files Modified
-- `src/app/(public)/layout.tsx` — sticky wrapper, swapped header/ticker order
-- `src/components/public/header-client.tsx` — removed `sticky top-0 z-50` from `<header>`
+- `src/app/(public)/layout.tsx` — removed sticky wrapper, ticker before header
+- `src/components/public/cms/announcement-ticker.tsx` — `TopBarTickerFiltered` now wraps in sticky div + sets `--ticker-height` via ResizeObserver
+- `src/components/public/header-client.tsx` — added `sticky z-40` + `top: var(--ticker-height, 0px)`
 
 ---
 

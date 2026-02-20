@@ -36,11 +36,12 @@ export function HeaderClient({
 
   return (
     <header
-      className={`transition-all duration-500 ${
+      className={`sticky z-40 transition-all duration-500 ${
         scrolled
           ? 'bg-site-header-bg/95 backdrop-blur-xl shadow-2xl shadow-black/20'
           : 'bg-site-header-bg'
       }`}
+      style={{ top: 'var(--ticker-height, 0px)' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Top utility bar */}
