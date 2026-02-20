@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Booking Flow Audit — 2026-02-20
+
+Complete audit of the entire Book Your Appointment flow. Read all 12 booking files (3,500+ lines), traced every step, documented every UI element and interaction.
+
+- **Flow**: 5 or 6 steps (Service → Configure → Schedule → Info → Review → Payment)
+- **Files audited**: book/page.tsx, booking-wizard.tsx, 6 step components, booking-confirmation.tsx, booking.ts data layer, 5 API routes
+- **10 findings documented** — no critical bugs, mostly UX/info-level notes (no clickable stepper, no URL state/persistence, waitlist props not wired, confirmation footnote inaccurate after deposit)
+- Full audit at `docs/audits/booking-flow.md`
+
+---
+
 ## Before/After Image Slider in Homepage CTA Section — 2026-02-20
 
 - Split the "Ready to Transform Your Vehicle?" CTA section into two-column layout: text/button on left, before/after image comparison slider on right
