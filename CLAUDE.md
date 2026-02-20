@@ -510,11 +510,20 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 
 ### Previous Session: 2026-02-19 (Configurable Footer — Admin UI)
 
+### Footer Column Limit Fix + Icon Picker Extraction
+- **Column limit**: Removed `MAX_COLUMNS_PER_SECTION = 4` count cap. New: max 6 active columns, min span 2, span-based validation
+- **API**: Checks active (enabled) column count and span total before allowing new columns. Auto-calculates span for new columns from remaining space.
+- **Admin UI**: `canAdd` checks both count and span. Enable toggle validates both limits. Span input min=2.
+- **ColumnWidthPreview**: 3-state (green/amber/red), narrow columns show just span number
+- **IconPicker**: Extracted from footer admin to `src/components/admin/icon-picker.tsx`. Added to CMS page editor toolbar.
+- **Tablet grid**: Footer wraps 2 per row on 640-767px (span 6), custom spans on 768px+
+- TypeScript clean, build passes.
+
 ### Configurable Footer System — Session 4 (Brand Column + Width Control)
 - **Brand column type**: New `content_type='brand'` in `footer_columns` — managed logo, tagline, contact toggles, review badges (replaces hardcoded brand section in `footer-client.tsx`)
-- **Config JSONB column**: `footer_columns.config` stores per-column settings: `col_span` (1-12), `logo_width`, `tagline`, `show_phone/email/address/reviews`
-- **12-unit grid system**: Public footer uses `grid-cols-12` on md+ with CSS custom property `--footer-col-span`. Mobile stays single column. CSS rule `.footer-col` in `globals.css`
-- **Admin width controls**: Span input (1-12) per column header, `ColumnWidthPreview` proportional bar visualization, `distributeSpans()` auto-rebalance on add/remove, total validation (green/red)
+- **Config JSONB column**: `footer_columns.config` stores per-column settings: `col_span` (2-12), `logo_width`, `tagline`, `show_phone/email/address/reviews`
+- **12-unit grid system**: Public footer uses `sm:grid-cols-12` with CSS custom property `--footer-col-span`. Mobile stacks, tablet 2-per-row, desktop custom spans.
+- **Admin width controls**: Span input (2-12) per column header, `ColumnWidthPreview` proportional bar visualization, total validation (green/amber/red)
 - **BrandColumnEditor**: Logo width slider (40-400px), tagline textarea, show/hide checkboxes
 - **Sidebar nav**: Added "Footer" entry (Rows3 icon) to Website section in `roles.ts` + `admin-shell.tsx`
 - **Migration**: `20260219000004_footer_brand_column.sql` — adds config column, expands CHECK constraint, seeds brand column at position 0 with default config, distributes col_span across existing columns

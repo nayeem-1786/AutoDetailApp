@@ -607,9 +607,15 @@ h1, h2, h3 {
   background-color: var(--site-btn-cta-hover-bg);
 }
 
-/* Footer 12-column grid — col_span via CSS custom property; mobile stacks full-width */
+/* Footer 12-column grid — col_span via CSS custom property */
+/* Mobile: stacks full-width, Tablet (sm): 2 per row, Desktop (md+): 12-unit grid */
 .footer-col {
   grid-column: span 1;
+}
+@media (min-width: 640px) and (max-width: 767px) {
+  .footer-col {
+    grid-column: span 6;
+  }
 }
 @media (min-width: 768px) {
   .footer-col {

@@ -4,7 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
-const MAX_COLUMNS_PER_SECTION = 4;
+const MAX_ACTIVE_COLUMNS = 6;
+const GRID_UNITS = 12;
+const MIN_SPAN = 2;
 
 // ---------------------------------------------------------------------------
 // GET    /api/admin/footer/columns?section_id=xxx — List columns for a section
@@ -64,15 +66,29 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Check column limit
-  const { count } = await admin
+  // Check column limits (span-based, active columns only)
+  const { data: existingColumns } = await admin
     .from('footer_columns')
-    .select('id', { count: 'exact', head: true })
+    .select('id, is_enabled, config')
     .eq('section_id', section_id);
 
-  if ((count ?? 0) >= MAX_COLUMNS_PER_SECTION) {
+  const activeColumns = (existingColumns ?? []).filter((c) => c.is_enabled);
+
+  if (activeColumns.length >= MAX_ACTIVE_COLUMNS) {
     return NextResponse.json(
-      { error: `Maximum ${MAX_COLUMNS_PER_SECTION} columns per section` },
+      { error: `Maximum ${MAX_ACTIVE_COLUMNS} active columns allowed` },
+      { status: 400 }
+    );
+  }
+
+  const activeSpanTotal = activeColumns.reduce(
+    (sum, c) => sum + ((c.config as Record<string, unknown>)?.col_span as number || MIN_SPAN),
+    0
+  );
+
+  if (activeSpanTotal > GRID_UNITS - MIN_SPAN) {
+    return NextResponse.json(
+      { error: 'No grid space available. Disable or shrink existing columns first.' },
       { status: 400 }
     );
   }
@@ -87,6 +103,14 @@ export async function POST(request: NextRequest) {
 
   const sortOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
 
+  // Auto-calculate span if not explicitly provided
+  const remainingSpan = GRID_UNITS - activeSpanTotal;
+  const defaultSpan = Math.max(MIN_SPAN, Math.min(remainingSpan, 4));
+  const finalConfig = {
+    ...(config || {}),
+    col_span: (config?.col_span as number) || defaultSpan,
+  };
+
   const { data, error } = await admin
     .from('footer_columns')
     .insert({
@@ -95,7 +119,7 @@ export async function POST(request: NextRequest) {
       content_type: content_type || 'links',
       html_content: html_content || '',
       sort_order: sortOrder,
-      ...(config ? { config } : {}),
+      config: finalConfig,
     })
     .select()
     .single();

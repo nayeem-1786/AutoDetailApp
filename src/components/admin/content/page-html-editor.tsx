@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { IconPicker } from '@/components/admin/icon-picker';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 
@@ -189,6 +190,11 @@ export function PageHtmlEditor({
           icon={Minus}
           title="Horizontal Rule"
           onClick={() => insertBlock('\n<hr class="border-site-border my-8" />\n')}
+        />
+        <Divider />
+        <IconPicker
+          onInsert={insertBlock}
+          triggerClassName="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
         />
 
         <div className="flex-1" />

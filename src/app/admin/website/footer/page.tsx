@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import {
@@ -20,29 +19,6 @@ import {
   Bold,
   Italic,
   Link2,
-  SmilePlus,
-  Phone,
-  Mail,
-  MapPin,
-  Clock,
-  Globe,
-  Facebook,
-  Instagram,
-  Twitter,
-  Youtube,
-  Star,
-  Heart,
-  Shield,
-  Award,
-  Zap,
-  Calendar,
-  CreditCard,
-  Truck,
-  Wrench,
-  MessageCircle,
-  ThumbsUp,
-  Navigation,
-  type LucideIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -51,6 +27,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { IconPicker } from '@/components/admin/icon-picker';
 import type {
   FooterSection,
   FooterColumn,
@@ -67,11 +44,19 @@ interface ColumnWithLinks extends FooterColumn {
 }
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MAX_ACTIVE_COLUMNS = 6;
+const GRID_UNITS = 12;
+const MIN_SPAN = 2;
+
+// ---------------------------------------------------------------------------
 // Helpers — span calculation
 // ---------------------------------------------------------------------------
 
 function getSpanTotal(columns: ColumnWithLinks[]): number {
-  return columns.reduce((sum, c) => sum + ((c.config?.col_span as number) || 0), 0);
+  return columns.reduce((sum, c) => sum + ((c.config?.col_span as number) || MIN_SPAN), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +278,6 @@ function SectionCard({
 function ColumnWidthPreview({ columns }: { columns: ColumnWithLinks[] }) {
   const enabledCols = columns.filter((c) => c.is_enabled);
   const total = getSpanTotal(enabledCols);
-  const isValid = total === 12;
 
   if (enabledCols.length === 0) return null;
 
@@ -303,16 +287,26 @@ function ColumnWidthPreview({ columns }: { columns: ColumnWithLinks[] }) {
         <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
           Column Width Preview
         </h4>
-        <span className={`text-xs font-medium ${isValid ? 'text-green-600' : 'text-amber-600'}`}>
-          Total: {total} / 12 {isValid ? '\u2713' : '\u2717'}
-        </span>
+        {total === GRID_UNITS ? (
+          <span className="text-xs font-medium text-green-600">
+            Grid complete ({GRID_UNITS}/{GRID_UNITS}) &#10003;
+          </span>
+        ) : total < GRID_UNITS ? (
+          <span className="text-xs font-medium text-amber-600">
+            {GRID_UNITS - total} units unused ({total}/{GRID_UNITS})
+          </span>
+        ) : (
+          <span className="text-xs font-medium text-red-600">
+            {total - GRID_UNITS} units over ({total}/{GRID_UNITS})
+          </span>
+        )}
       </div>
 
       {/* Visual bars */}
       <div className="flex gap-1 h-10 rounded overflow-hidden">
         {enabledCols.map((col) => {
-          const span = (col.config?.col_span as number) || 1;
-          const pct = (span / 12) * 100;
+          const span = (col.config?.col_span as number) || MIN_SPAN;
+          const pct = (span / Math.max(total, GRID_UNITS)) * 100;
           const label =
             col.content_type === 'brand'
               ? 'Brand'
@@ -324,17 +318,19 @@ function ColumnWidthPreview({ columns }: { columns: ColumnWithLinks[] }) {
               style={{ width: `${pct}%` }}
             >
               <span className="text-[10px] font-medium text-brand-700 truncate px-1">
-                {label} ({span})
+                {span <= 2 ? String(span) : `${label} (${span})`}
               </span>
             </div>
           );
         })}
       </div>
 
-      {!isValid && (
-        <p className="text-xs text-amber-600 flex items-center gap-1">
+      {total !== GRID_UNITS && (
+        <p className={`text-xs flex items-center gap-1 ${total > GRID_UNITS ? 'text-red-600' : 'text-amber-600'}`}>
           <AlertTriangle className="h-3 w-3" />
-          Column widths must total 12. Adjust the spans below.
+          {total > GRID_UNITS
+            ? `Column widths exceed ${GRID_UNITS}. Reduce column spans.`
+            : `Column widths must total ${GRID_UNITS}. Columns won't fill full width.`}
         </p>
       )}
     </div>
@@ -433,13 +429,18 @@ function MainFooterPanel({
   const toggleColumnEnabled = async (col: ColumnWithLinks) => {
     const newVal = !col.is_enabled;
 
-    // When enabling, check if adding this column's span would exceed 12
+    // When enabling, check count limit and span room
     if (newVal) {
-      const currentActiveSpan = getSpanTotal(columns.filter((c) => c.is_enabled));
-      const colSpan = (col.config?.col_span as number) || 3;
-      if (currentActiveSpan + colSpan > 12) {
+      const activeColumns = columns.filter((c) => c.is_enabled);
+      if (activeColumns.length >= MAX_ACTIVE_COLUMNS) {
+        toast.error(`Maximum ${MAX_ACTIVE_COLUMNS} active columns. Disable another column first.`);
+        return;
+      }
+      const currentActiveSpan = getSpanTotal(activeColumns);
+      const colSpan = (col.config?.col_span as number) || MIN_SPAN;
+      if (currentActiveSpan + colSpan > GRID_UNITS) {
         toast.error(
-          `Enabling this column would use ${currentActiveSpan + colSpan} of 12 grid units. Shrink or disable other columns first.`
+          `Enabling this column (span ${colSpan}) would exceed ${GRID_UNITS} grid units. Current: ${currentActiveSpan}. Shrink other columns first.`
         );
         return;
       }
@@ -550,7 +551,7 @@ function MainFooterPanel({
               <>
                 {enabledCols.length} active column{enabledCols.length !== 1 ? 's' : ''}
                 {' \u00b7 '}
-                {spanUsed} of 12 grid units used
+                {spanUsed} of {GRID_UNITS} grid units used
                 {disabledCount > 0 && (
                   <span className="text-gray-400">
                     {' \u00b7 '}{disabledCount} disabled
@@ -561,14 +562,23 @@ function MainFooterPanel({
           })()}
         </p>
         {(() => {
-          const activeSpan = getSpanTotal(columns.filter((c) => c.is_enabled));
-          const canAdd = activeSpan <= 10; // room for at least a span-2 column
+          const enabledCols = columns.filter((c) => c.is_enabled);
+          const activeSpan = getSpanTotal(enabledCols);
+          const hasSpanRoom = activeSpan <= GRID_UNITS - MIN_SPAN;
+          const underMaxCount = enabledCols.length < MAX_ACTIVE_COLUMNS;
+          const canAdd = hasSpanRoom && underMaxCount;
           return (
             <Button
               size="sm"
               onClick={() => setShowAddColumn(true)}
               disabled={!canAdd}
-              title={!canAdd ? 'Disable or shrink an existing column to make room' : undefined}
+              title={
+                !underMaxCount
+                  ? `Maximum ${MAX_ACTIVE_COLUMNS} active columns`
+                  : !hasSpanRoom
+                    ? 'No grid space. Shrink or disable existing columns.'
+                    : undefined
+              }
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Add Column
@@ -695,7 +705,7 @@ function ColumnCard({
   const [titleValue, setTitleValue] = useState(column.title);
   const badge = CONTENT_TYPE_BADGE[column.content_type] ?? CONTENT_TYPE_BADGE.links;
   const isBrand = column.content_type === 'brand';
-  const colSpan = (column.config?.col_span as number) || 4;
+  const colSpan = (column.config?.col_span as number) || MIN_SPAN;
 
   const saveTitle = async () => {
     if (!titleValue.trim()) {
@@ -781,12 +791,12 @@ function ColumnCard({
                 type="number"
                 value={colSpan}
                 onChange={(e) => {
-                  const val = Math.max(1, Math.min(12, parseInt(e.target.value) || 1));
+                  const val = Math.max(MIN_SPAN, Math.min(GRID_UNITS, parseInt(e.target.value) || MIN_SPAN));
                   onUpdateConfig({ col_span: val });
                 }}
                 className="w-12 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-brand-500"
-                min={1}
-                max={12}
+                min={MIN_SPAN}
+                max={GRID_UNITS}
               />
             </div>
             <Switch
@@ -1276,176 +1286,7 @@ function LinksEditor({
 // HTML Editor — textarea for custom HTML content
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Icon Picker — curated Lucide icons for footer HTML editor
-// ---------------------------------------------------------------------------
-
-const FOOTER_ICONS: { name: string; icon: LucideIcon; category: string }[] = [
-  // Contact
-  { name: 'Phone', icon: Phone, category: 'Contact' },
-  { name: 'Mail', icon: Mail, category: 'Contact' },
-  { name: 'MapPin', icon: MapPin, category: 'Contact' },
-  { name: 'Clock', icon: Clock, category: 'Contact' },
-  { name: 'Globe', icon: Globe, category: 'Contact' },
-  { name: 'MessageCircle', icon: MessageCircle, category: 'Contact' },
-  { name: 'Navigation', icon: Navigation, category: 'Contact' },
-  // Social
-  { name: 'Facebook', icon: Facebook, category: 'Social' },
-  { name: 'Instagram', icon: Instagram, category: 'Social' },
-  { name: 'Twitter', icon: Twitter, category: 'Social' },
-  { name: 'Youtube', icon: Youtube, category: 'Social' },
-  // Trust & Badges
-  { name: 'Star', icon: Star, category: 'Trust' },
-  { name: 'Heart', icon: Heart, category: 'Trust' },
-  { name: 'Shield', icon: Shield, category: 'Trust' },
-  { name: 'Award', icon: Award, category: 'Trust' },
-  { name: 'ThumbsUp', icon: ThumbsUp, category: 'Trust' },
-  // Services
-  { name: 'Calendar', icon: Calendar, category: 'Services' },
-  { name: 'CreditCard', icon: CreditCard, category: 'Services' },
-  { name: 'Truck', icon: Truck, category: 'Services' },
-  { name: 'Wrench', icon: Wrench, category: 'Services' },
-  { name: 'Zap', icon: Zap, category: 'Services' },
-];
-
-const ICON_SIZES = [16, 20, 24, 32] as const;
-const ICON_COLORS = [
-  { label: 'Current', value: 'currentColor' },
-  { label: 'White', value: '#ffffff' },
-  { label: 'Lime', value: '#CCFF00' },
-] as const;
-
-function IconPicker({
-  onInsert,
-  onClose,
-}: {
-  onInsert: (svg: string) => void;
-  onClose: () => void;
-}) {
-  const [search, setSearch] = useState('');
-  const [selectedSize, setSelectedSize] = useState<number>(20);
-  const [selectedColor, setSelectedColor] = useState('currentColor');
-
-  const filtered = search
-    ? FOOTER_ICONS.filter((i) =>
-        i.name.toLowerCase().includes(search.toLowerCase()) ||
-        i.category.toLowerCase().includes(search.toLowerCase())
-      )
-    : FOOTER_ICONS;
-
-  const categories = [...new Set(filtered.map((i) => i.category))];
-
-  const generateSvg = (iconDef: (typeof FOOTER_ICONS)[number]) => {
-    const svgString = renderToStaticMarkup(
-      createElement(iconDef.icon, {
-        size: selectedSize,
-        color: selectedColor,
-        strokeWidth: 2,
-      })
-    );
-    // Add inline style for vertical alignment
-    return svgString.replace(
-      '<svg ',
-      `<svg style="display:inline-block;vertical-align:middle" `
-    );
-  };
-
-  return (
-    <div className="absolute z-20 top-full left-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg">
-      <div className="p-3 border-b border-gray-100">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">Insert Icon</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search icons..."
-          className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          autoFocus
-        />
-      </div>
-
-      {/* Size + Color selectors */}
-      <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-4">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Size</span>
-          <div className="flex gap-0.5">
-            {ICON_SIZES.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSelectedSize(s)}
-                className={`px-1.5 py-0.5 text-xs rounded ${
-                  selectedSize === s
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Color</span>
-          <div className="flex gap-1">
-            {ICON_COLORS.map((c) => (
-              <button
-                key={c.value}
-                onClick={() => setSelectedColor(c.value)}
-                title={c.label}
-                className={`h-5 w-5 rounded-full border-2 ${
-                  selectedColor === c.value ? 'border-brand-600' : 'border-gray-300'
-                }`}
-                style={{
-                  backgroundColor:
-                    c.value === 'currentColor' ? '#6b7280' : c.value,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Icon grid */}
-      <div className="max-h-48 overflow-y-auto p-2">
-        {categories.map((cat) => (
-          <div key={cat} className="mb-2">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-1 mb-1">
-              {cat}
-            </p>
-            <div className="grid grid-cols-7 gap-0.5">
-              {filtered
-                .filter((i) => i.category === cat)
-                .map((iconDef) => {
-                  const IconComp = iconDef.icon;
-                  return (
-                    <button
-                      key={iconDef.name}
-                      title={iconDef.name}
-                      onClick={() => {
-                        onInsert(generateSvg(iconDef));
-                        onClose();
-                      }}
-                      className="flex items-center justify-center h-9 w-9 rounded hover:bg-gray-100 transition-colors"
-                    >
-                      <IconComp className="h-5 w-5 text-gray-600" />
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
-        ))}
-        {filtered.length === 0 && (
-          <p className="text-xs text-gray-400 text-center py-4">No icons found</p>
-        )}
-      </div>
-    </div>
-  );
-}
+// IconPicker imported from shared component: @/components/admin/icon-picker
 
 // ---------------------------------------------------------------------------
 // HTML Editor — textarea with toolbar (Bold, Italic, Link, Icon)
@@ -1461,7 +1302,6 @@ function HtmlEditor({
   const [value, setValue] = useState(column.html_content || '');
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [showIconPicker, setShowIconPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDirty = value !== (column.html_content || '');
 
@@ -1555,24 +1395,7 @@ function HtmlEditor({
           <Link2 className="h-4 w-4" />
         </button>
         <div className="w-px h-5 bg-gray-300 mx-0.5" />
-        <button
-          type="button"
-          title="Insert Icon"
-          onClick={() => setShowIconPicker(!showIconPicker)}
-          className={`flex items-center justify-center h-7 w-7 rounded transition-colors ${
-            showIconPicker
-              ? 'bg-brand-100 text-brand-700'
-              : 'hover:bg-gray-200 text-gray-600'
-          }`}
-        >
-          <SmilePlus className="h-4 w-4" />
-        </button>
-        {showIconPicker && (
-          <IconPicker
-            onInsert={insertAtCursor}
-            onClose={() => setShowIconPicker(false)}
-          />
-        )}
+        <IconPicker onInsert={insertAtCursor} />
       </div>
 
       <textarea

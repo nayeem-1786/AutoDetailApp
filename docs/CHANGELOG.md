@@ -4,6 +4,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Footer Column Limit Fix + Icon Picker Extraction — 2026-02-19
+
+### Column Limit — Span-Based Validation
+- **API**: Removed hardcoded `MAX_COLUMNS_PER_SECTION = 4` count cap
+- **New logic**: Max 6 active (enabled) columns, each minimum span 2, total active span must fit within 12-unit grid
+- **API auto-calculates** new column span from remaining grid space (default 4, min 2, max remaining)
+- **Admin UI**: `canAdd` checks both `activeColumns.length < 6` and `activeSpanTotal <= 10` (room for span-2)
+- **Enable/disable toggle**: Validates both count limit and span overflow before enabling a disabled column
+- **Span input**: Min changed from 1 to 2 (a 1-unit column is too narrow to be useful)
+- **ColumnWidthPreview**: 3-state status (green "Grid complete", amber "N units unused", red "N units over"). Narrow columns (span ≤ 2) show just the span number instead of truncated label.
+- **Disabled columns** don't count toward limits (neither span nor count)
+
+### Icon Picker — Extracted to Shared Component
+- Moved `IconPicker` (~170 lines) from `footer/page.tsx` to `src/components/admin/icon-picker.tsx`
+- Footer admin HTML editor imports from shared component (removed inline code + ~20 unused Lucide imports)
+- Added `IconPicker` to `PageHtmlEditor` toolbar (CMS page editor) — after Horizontal Rule, before AI Draft
+- Both locations produce identical SVG markup with size/color selectors
+
+### Footer Grid — Tablet Breakpoint
+- Added `sm:grid-cols-12` to footer grid (was `grid-cols-1 md:grid-cols-12`)
+- CSS: Mobile stacks full-width, tablet (640-767px) wraps 2 per row (span 6), desktop uses custom spans
+- 5-6 columns at span 2 each render correctly on desktop
+
+### Files Changed
+- `src/app/api/admin/footer/columns/route.ts` — span-based validation
+- `src/app/admin/website/footer/page.tsx` — constants, canAdd logic, toggle validation, preview, icon picker removal
+- `src/components/admin/icon-picker.tsx` — new shared component
+- `src/components/admin/content/page-html-editor.tsx` — added icon picker to toolbar
+- `src/components/public/footer-client.tsx` — tablet grid breakpoint
+- `src/app/globals.css` — tablet footer-col span 6 media query
+
+---
+
 ## Ticker Above Header + Sticky with CSS Variable Offset — 2026-02-19
 
 - Restored ticker to the very top of the page (ABOVE the header) — the first thing visitors see
