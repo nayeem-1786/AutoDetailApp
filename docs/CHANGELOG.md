@@ -4,6 +4,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Booking Flow UX Overhaul (Steps 4-6 + Edit Links + Coupons + Confirmation) — 2026-02-20
+
+Continuation of booking flow overhaul. Handles Steps 4 (Info), 5 (Review), 6 (Payment), and the confirmation page.
+
+### Step 4: Customer Info
+- **Form validation on blur**: Changed react-hook-form mode to `onTouched` — errors show per-field on blur, not only on submit
+- **Auto-focus**: First name field auto-focuses when entering step
+- **Mobile keyboard hints**: `type="tel"` on phone, `inputMode="numeric"` on year for proper mobile keyboards
+
+### Step 5: Review — Edit Links
+- **Edit links on each section**: Service, Schedule, and Your Information sections have pencil edit links
+- **Return-to-review flow**: Clicking Edit navigates to that step with all data preserved; Continue returns to Review (not next sequential step)
+- **Smart service re-selection**: Re-selecting the same service returns to review immediately without requiring reconfiguration
+- **Combined Info section**: Customer contact + vehicle info displayed in one card with single edit link
+
+### Step 5: Review — Coupon Auto-Apply
+- **URL coupon auto-applies**: `?coupon=CODE` now auto-validates and applies when reaching Step 5
+- **One-time trigger**: Tracked in wizard state to prevent re-application after removal
+- **Invalid coupons**: Show error message but don't block booking
+
+### Confirmation Page
+- **Conditional payment footnote**: Shows deposit charged + remaining balance, full payment processed, pay on site, or fully covered by discounts — based on actual payment state (was hardcoded "Payment collected at time of service")
+- **Portal link**: Logged-in customers see "View My Appointments" button linking to `/account`
+- **Book Another Service**: All customers see button to start a new booking
+- **Confirmation email text**: Shows "A confirmation email has been sent to [email]"
+
+### Files Modified
+- `src/components/booking/booking-wizard.tsx` — returnToReview flow, edit callbacks, payment state in confirmation data
+- `src/components/booking/step-customer-info.tsx` — form mode, autoFocus, input types
+- `src/components/booking/step-review.tsx` — edit links, auto-apply coupon, combined info+vehicle section
+- `src/components/booking/booking-confirmation.tsx` — conditional footnote, portal link, book another
+
+---
+
 ## Booking Flow UX Overhaul (Steps 1-3 + Stepper) — 2026-02-20
 
 Major UX improvements to the first 3 steps of the booking wizard and the step indicator.

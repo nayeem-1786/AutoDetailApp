@@ -79,6 +79,7 @@ export function StepCustomerInfo({
     formState: { errors },
   } = useForm<CustomerInfoFormData>({
     resolver: formResolver(customerInfoSchema),
+    mode: 'onTouched',
     defaultValues: {
       customer: {
         first_name: initialCustomer.first_name ?? '',
@@ -193,6 +194,7 @@ export function StepCustomerInfo({
           >
             <Input
               id="first_name"
+              autoFocus
               placeholder="John"
               className={inputCls}
               {...register('customer.first_name')}
@@ -223,6 +225,7 @@ export function StepCustomerInfo({
           >
             <Input
               id="phone"
+              type="tel"
               placeholder="(310) 555-1234"
               className={inputCls}
               {...register('customer.phone', {
@@ -377,6 +380,7 @@ export function StepCustomerInfo({
               <Input
                 id="year"
                 type="number"
+                inputMode="numeric"
                 placeholder="2024"
                 className={inputCls}
                 {...register('vehicle.year')}

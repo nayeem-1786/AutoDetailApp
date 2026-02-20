@@ -289,17 +289,17 @@ The booking API (`/api/book/route.ts`) performs independent price validation:
 
 3. **[Info] Step indicator mobile cramping** — ~~With 6 steps (payment flow), the stepper bar may get cramped on very narrow screens.~~ **FIXED 2026-02-20**: Mobile uses compact format "Step X of Y: Label" with small dot indicators instead of full stepper.
 
-4. **[Info] No edit capability in Review step** — The Review step shows all booking details but individual sections are not clickable/editable. To change the service, user must click Back 4 times. **Partially addressed**: Clickable stepper now allows jumping back to any completed step.
+4. **[Info] No edit capability in Review step** — ~~The Review step shows all booking details but individual sections are not clickable/editable. To change the service, user must click Back 4 times.~~ **FIXED 2026-02-20**: Edit links (pencil icon) on Service, Schedule, and Your Information sections. Clicking Edit navigates to that step with all data preserved. Continue returns to Review (returnToReview flow). Same-service re-selection skips reconfiguration.
 
 5. **[Info] Waitlist feature partially wired** — ~~`step-schedule.tsx` accepts `waitlistEnabled` and `onJoinWaitlist` props, but `booking-wizard.tsx` does not pass these props.~~ **FIXED 2026-02-20**: All waitlist code removed from booking flow. Business accepts all requests — staff confirms by calling. Info note added instead.
 
-6. **[Info] Confirmation page has no portal link** — For logged-in customers, the confirmation only shows "Back to Home". No link to customer portal to view the appointment. *(Session 2)*
+6. **[Info] Confirmation page has no portal link** — ~~For logged-in customers, the confirmation only shows "Back to Home". No link to customer portal to view the appointment.~~ **FIXED 2026-02-20**: Portal customers see "View My Appointments" button. All customers see "Book Another Service" button. Confirmation email address shown.
 
-7. **[Info] Confirmation shows "Payment collected at time of service"** — Even when a deposit was already charged via Stripe, the footnote says "Payment collected at time of service." This may confuse customers who just paid a deposit. *(Session 2)*
+7. **[Info] Confirmation shows "Payment collected at time of service"** — ~~Even when a deposit was already charged via Stripe, the footnote says "Payment collected at time of service." This may confuse customers who just paid a deposit.~~ **FIXED 2026-02-20**: Footnote is now conditional — shows deposit charged + remaining balance, full payment processed, pay on site, or fully covered by discounts based on actual payment state.
 
 8. **[Low] No image shown for services** — ~~Service cards in Step 1 show name, description, duration, price, and mobile badge, but no service image.~~ **FIXED 2026-02-20**: Service cards now show thumbnails (from `image_url` field) with category-based fallback icons when no image exists.
 
-9. **[Info] Coupon auto-apply from URL** — The `couponCode` prop is passed from the URL `?coupon=CODE` through to the wizard, but it's only passed to `StepReview` as `couponCode` prop. The auto-apply logic would need the user to reach Step 5 for the coupon to be visible. It is not auto-validated or auto-applied on entry. *(Session 2)*
+9. **[Info] Coupon auto-apply from URL** — ~~The `couponCode` prop is passed from the URL `?coupon=CODE` through to the wizard, but it's only passed to `StepReview` as `couponCode` prop. The auto-apply logic would need the user to reach Step 5 for the coupon to be visible. It is not auto-validated or auto-applied on entry.~~ **FIXED 2026-02-20**: URL coupon auto-applies when reaching Step 5. Uses `autoApplyCouponOnMount` flag tracked in wizard to prevent re-application. Invalid coupons show error but don't block booking.
 
 10. **[Info] Email consent defaults** — `sms_consent` checkbox is checked by default in the customer info form. `email_consent` defaults to false. This matches TCPA compliance requirements (SMS consent is upgrade-only for existing customers). *(No action needed — correct behavior)*
 

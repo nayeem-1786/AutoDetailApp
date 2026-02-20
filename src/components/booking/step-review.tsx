@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { CalendarDays, Clock, Truck, User, Car, Tag, CheckCircle2, Info, Gift, Coins, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { CalendarDays, Clock, Truck, User, Car, Tag, CheckCircle2, Info, Gift, Coins, AlertTriangle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
@@ -65,6 +65,13 @@ interface StepReviewProps {
   loyaltyPointsBalance: number;
   loyaltyPointsToUse: number;
   onLoyaltyPointsChange: (points: number) => void;
+  // Edit from review
+  onEditService?: () => void;
+  onEditSchedule?: () => void;
+  onEditInfo?: () => void;
+  // URL coupon auto-apply
+  autoApplyCouponOnMount?: boolean;
+  onCouponAutoApplyAttempted?: () => void;
 }
 
 export function StepReview({
@@ -96,6 +103,11 @@ export function StepReview({
   loyaltyPointsBalance,
   loyaltyPointsToUse,
   onLoyaltyPointsChange,
+  onEditService,
+  onEditSchedule,
+  onEditInfo,
+  autoApplyCouponOnMount,
+  onCouponAutoApplyAttempted,
 }: StepReviewProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +116,17 @@ export function StepReview({
   const [couponError, setCouponError] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { enabled: cancellationFeeEnabled } = useFeatureFlag(FEATURE_FLAGS.CANCELLATION_FEE);
+
+  // Auto-apply coupon from URL on mount
+  const couponAutoApplyRef = useRef(false);
+  useEffect(() => {
+    if (autoApplyCouponOnMount && couponCode && !appliedCoupon && !couponAutoApplyRef.current) {
+      couponAutoApplyRef.current = true;
+      onCouponAutoApplyAttempted?.();
+      handleApplyCoupon(couponCode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Loyalty points constants
   const REDEEM_RATE = 0.05; // $0.05 per point
@@ -253,7 +276,19 @@ export function StepReview({
       <div className="mt-6 space-y-6">
         {/* Service */}
         <div className="rounded-lg border border-site-border p-4">
-          <h3 className="text-sm font-semibold text-site-text-secondary">Service</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-site-text-secondary">Service</h3>
+            {onEditService && (
+              <button
+                type="button"
+                onClick={onEditService}
+                className="flex items-center gap-1 text-xs text-lime hover:text-lime-200 transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </button>
+            )}
+          </div>
           <p className="mt-1 text-base font-medium text-site-text">
             {serviceName}
             {tierName && (
@@ -262,11 +297,36 @@ export function StepReview({
               </span>
             )}
           </p>
+          {addons.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs text-site-text-muted">Add-ons:</p>
+              <ul className="mt-0.5 space-y-0.5">
+                {addons.map((addon) => (
+                  <li key={addon.service_id} className="text-sm text-site-text-secondary flex items-center gap-1.5">
+                    <span className="text-site-text-dim">&bull;</span>
+                    {addon.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Schedule */}
         <div className="rounded-lg border border-site-border p-4">
-          <h3 className="text-sm font-semibold text-site-text-secondary">Schedule</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-site-text-secondary">Schedule</h3>
+            {onEditSchedule && (
+              <button
+                type="button"
+                onClick={onEditSchedule}
+                className="flex items-center gap-1 text-xs text-lime hover:text-lime-200 transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </button>
+            )}
+          </div>
           <div className="mt-2 space-y-2">
             <div className="flex items-center gap-2 text-sm text-site-text">
               <CalendarDays className="h-4 w-4 text-site-text-muted" />
@@ -290,35 +350,45 @@ export function StepReview({
           </div>
         </div>
 
-        {/* Customer - only show for guest bookings */}
-        {!isPortal && (
-          <div className="rounded-lg border border-site-border p-4">
-            <h3 className="text-sm font-semibold text-site-text-secondary">Your Info</h3>
+        {/* Your Information (Customer + Vehicle combined) */}
+        <div className="rounded-lg border border-site-border p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-site-text-secondary">Your Information</h3>
+            {onEditInfo && (
+              <button
+                type="button"
+                onClick={onEditInfo}
+                className="flex items-center gap-1 text-xs text-lime hover:text-lime-200 transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </button>
+            )}
+          </div>
+
+          {/* Contact info - only show for guest bookings */}
+          {!isPortal && (
             <div className="mt-2 space-y-1.5 text-sm text-site-text">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-site-text-muted" />
                 {customer.first_name} {customer.last_name}
               </div>
-              <p className="pl-6">{customer.phone}</p>
-              <p className="pl-6">{customer.email}</p>
+              <p className="pl-6">{customer.email} &middot; {customer.phone}</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Vehicle */}
-        <div className="rounded-lg border border-site-border p-4">
-          <h3 className="text-sm font-semibold text-site-text-secondary">Vehicle</h3>
-          <div className="mt-2 flex items-center gap-2 text-sm text-site-text">
+          {/* Vehicle */}
+          <div className={`${!isPortal ? 'mt-3 pt-3 border-t border-site-border' : 'mt-2'} flex items-center gap-2 text-sm text-site-text`}>
             <Car className="h-4 w-4 text-site-text-muted" />
             <span>
               {[
                 vehicle.year,
                 vehicle.make,
                 vehicle.model,
-                vehicle.color,
               ]
                 .filter(Boolean)
                 .join(' ') || VEHICLE_TYPE_LABELS[vehicle.vehicle_type] || 'Vehicle'}
+              {vehicle.color && <span className="text-site-text-muted">, {vehicle.color}</span>}
               {vehicle.size_class && (
                 <span className="text-site-text-muted">
                   {' '}

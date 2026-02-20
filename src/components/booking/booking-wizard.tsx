@@ -92,6 +92,10 @@ interface ConfirmationData {
   serviceName: string;
   isMobile: boolean;
   mobileAddress: string | null;
+  paymentOption: 'deposit' | 'pay_on_site' | 'full' | null;
+  amountCharged: number;
+  grandTotal: number;
+  customerEmail: string | null;
 }
 
 export function BookingWizard({
@@ -329,6 +333,8 @@ export function BookingWizard({
   const [step, setStep] = useState(initial.step);
   const [state, setState] = useState<BookingState>(initial.state);
   const [confirmation, setConfirmation] = useState<ConfirmationData | null>(null);
+  const [editEntryStep, setEditEntryStep] = useState<number | null>(null);
+  const [urlCouponAttempted, setUrlCouponAttempted] = useState(false);
 
   // --- URL state sync ---
   const updateUrl = useCallback((newStep: number, newState: BookingState) => {
@@ -400,6 +406,12 @@ export function BookingWizard({
     goToStep(targetStep);
   }
 
+  // --- Edit from Review step ---
+  function handleEditFromReview(targetStep: number) {
+    setEditEntryStep(targetStep);
+    goToStep(targetStep);
+  }
+
   // If booking confirmed, show confirmation screen
   if (confirmation) {
     return (
@@ -408,19 +420,32 @@ export function BookingWizard({
         serviceName={confirmation.serviceName}
         isMobile={confirmation.isMobile}
         mobileAddress={confirmation.mobileAddress}
-        couponCode={couponCode ?? null}
+        couponCode={state.appliedCoupon ? state.appliedCoupon.code : (couponCode ?? null)}
+        paymentOption={confirmation.paymentOption}
+        amountCharged={confirmation.amountCharged}
+        grandTotal={confirmation.grandTotal}
+        customerEmail={confirmation.customerEmail}
+        isPortal={isPortal}
       />
     );
   }
 
   // Step 1: Select service
   function handleServiceSelect(service: BookableService) {
+    // If editing from review and same service selected, go back to review
+    if (editEntryStep !== null && service.id === state.service?.id) {
+      setEditEntryStep(null);
+      goToStep(5);
+      return;
+    }
+
     const newState: BookingState = {
       ...state,
       service,
       config: null,
-      date: null,
-      time: null,
+      // Preserve date/time when editing from review (API validates slot on submit)
+      date: editEntryStep !== null ? state.date : null,
+      time: editEntryStep !== null ? state.time : null,
     };
     setState(newState);
     goToStep(2, newState);
@@ -430,14 +455,24 @@ export function BookingWizard({
   function handleConfigureContinue(result: ConfigureResult) {
     const newState = { ...state, config: result };
     setState(newState);
-    goToStep(3, newState);
+    if (editEntryStep !== null) {
+      setEditEntryStep(null);
+      goToStep(5, newState);
+    } else {
+      goToStep(3, newState);
+    }
   }
 
   // Step 3: Schedule
   function handleScheduleContinue(date: string, time: string) {
     const newState = { ...state, date, time };
     setState(newState);
-    goToStep(4, newState);
+    if (editEntryStep !== null) {
+      setEditEntryStep(null);
+      goToStep(5, newState);
+    } else {
+      goToStep(4, newState);
+    }
   }
 
   // Step 4: Customer info
@@ -506,6 +541,7 @@ export function BookingWizard({
       }
     }
 
+    setEditEntryStep(null);
     goToStep(5, { ...state, customer, vehicle, date: state.date, time: state.time });
   }
 
@@ -640,11 +676,30 @@ export function BookingWizard({
       throw new Error(result.error || 'Booking failed');
     }
 
+    // Determine effective payment option and amount charged
+    const confirmPaymentOption = discountsCoverAmount
+      ? 'full' as const
+      : effectivePaymentOption === 'full'
+        ? 'full' as const
+        : effectivePaymentOption === 'deposit'
+          ? 'deposit' as const
+          : effectivePaymentOption === 'pay_on_site'
+            ? 'pay_on_site' as const
+            : null;
+
+    const amountCharged = paymentIntentId
+      ? (isFullPayment || discountsCoverAmount ? grandTotal : 50)
+      : 0;
+
     setConfirmation({
       appointment: result.appointment,
       serviceName: service.name,
       isMobile: config.is_mobile,
       mobileAddress: config.mobile_address || null,
+      paymentOption: confirmPaymentOption,
+      amountCharged,
+      grandTotal,
+      customerEmail: customer.email,
     });
   }
 
@@ -678,11 +733,24 @@ export function BookingWizard({
       />
 
       {step === 1 && (
-        <StepServiceSelect
-          categories={categories}
-          selectedServiceId={state.service?.id ?? null}
-          onSelect={handleServiceSelect}
-        />
+        <>
+          <StepServiceSelect
+            categories={categories}
+            selectedServiceId={state.service?.id ?? null}
+            onSelect={handleServiceSelect}
+          />
+          {editEntryStep === 1 && (
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                onClick={() => { setEditEntryStep(null); goToStep(5); }}
+                className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
+              >
+                Back to Review
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {step === 2 && state.service && (
@@ -703,7 +771,7 @@ export function BookingWizard({
           initialDate={state.date}
           initialTime={state.time}
           onContinue={handleScheduleContinue}
-          onBack={() => goToStep(2)}
+          onBack={() => editEntryStep === 3 ? (setEditEntryStep(null), goToStep(5)) : goToStep(2)}
         />
       )}
 
@@ -749,7 +817,7 @@ export function BookingWizard({
           initialSizeClass={state.config?.size_class ?? null}
           savedVehicles={customerData?.vehicles ?? []}
           onContinue={handleCustomerContinue}
-          onBack={() => goToStep(3)}
+          onBack={() => editEntryStep === 4 ? (setEditEntryStep(null), goToStep(5)) : goToStep(3)}
         />
       )}
 
@@ -795,6 +863,11 @@ export function BookingWizard({
             loyaltyPointsBalance={state.loyaltyPointsBalance}
             loyaltyPointsToUse={state.loyaltyPointsToUse}
             onLoyaltyPointsChange={handleLoyaltyPointsChange}
+            onEditService={() => handleEditFromReview(1)}
+            onEditSchedule={() => handleEditFromReview(3)}
+            onEditInfo={() => handleEditFromReview(4)}
+            autoApplyCouponOnMount={!!couponCode && !urlCouponAttempted}
+            onCouponAutoApplyAttempted={() => setUrlCouponAttempted(true)}
           />
         )}
 
