@@ -201,6 +201,7 @@ function BrandColumn({
   reviews: ReviewBadge[];
 }) {
   const config = column.config || {};
+  const showLogo = config.show_logo !== false;
   const logoWidth = (config.logo_width as number) || 160;
   const showPhone = config.show_phone !== false;
   const showEmail = config.show_email !== false;
@@ -211,7 +212,7 @@ function BrandColumn({
   return (
     <div>
       {/* Logo */}
-      {businessInfo.logo_url ? (
+      {showLogo && (businessInfo.logo_url ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
           src={businessInfo.logo_url}
@@ -228,7 +229,7 @@ function BrandColumn({
             {businessInfo.name}
           </span>
         </div>
-      )}
+      ))}
 
       {/* Tagline */}
       {tagline && (

@@ -886,7 +886,8 @@ function BrandColumnEditor({
   disabled?: boolean;
 }) {
   const config = column.config || {};
-  const [logoWidth, setLogoWidth] = useState((config.logo_width as number) || 160);
+  const [showLogo, setShowLogo] = useState(config.show_logo !== false);
+  const [logoWidthStr, setLogoWidthStr] = useState(String((config.logo_width as number) || 160));
   const [tagline, setTagline] = useState((config.tagline as string) || '');
   const [showPhone, setShowPhone] = useState(config.show_phone !== false);
   const [showEmail, setShowEmail] = useState(config.show_email !== false);
@@ -894,8 +895,11 @@ function BrandColumnEditor({
   const [showReviews, setShowReviews] = useState(config.show_reviews !== false);
   const [saving, setSaving] = useState(false);
 
+  const parsedLogoWidth = Math.max(0, Math.min(9999, parseInt(logoWidthStr, 10) || 0));
+
   const isDirty =
-    logoWidth !== ((config.logo_width as number) || 160) ||
+    showLogo !== (config.show_logo !== false) ||
+    parsedLogoWidth !== ((config.logo_width as number) || 160) ||
     tagline !== ((config.tagline as string) || '') ||
     showPhone !== (config.show_phone !== false) ||
     showEmail !== (config.show_email !== false) ||
@@ -905,7 +909,8 @@ function BrandColumnEditor({
   const save = () => {
     setSaving(true);
     onUpdateConfig({
-      logo_width: logoWidth,
+      show_logo: showLogo,
+      logo_width: parsedLogoWidth || 160,
       tagline,
       show_phone: showPhone,
       show_email: showEmail,
@@ -932,17 +937,33 @@ function BrandColumnEditor({
         </p>
       </div>
 
+      {/* Show Logo toggle */}
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input
+          type="checkbox"
+          checked={showLogo}
+          onChange={(e) => setShowLogo(e.target.checked)}
+          className="rounded border-gray-300"
+        />
+        <ImageIcon className="h-3.5 w-3.5" />
+        Show Logo
+      </label>
+
       {/* Logo width */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          <ImageIcon className="h-3.5 w-3.5 inline mr-1" />
           Logo Width (px)
         </label>
         <input
           type="number"
-          value={logoWidth}
-          onChange={(e) => setLogoWidth(Math.max(40, Math.min(400, parseInt(e.target.value) || 160)))}
-          className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          value={logoWidthStr}
+          onChange={(e) => setLogoWidthStr(e.target.value)}
+          onBlur={() => {
+            const clamped = Math.max(40, Math.min(400, parseInt(logoWidthStr, 10) || 160));
+            setLogoWidthStr(String(clamped));
+          }}
+          disabled={!showLogo}
+          className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50 disabled:bg-gray-100"
           min={40}
           max={400}
         />

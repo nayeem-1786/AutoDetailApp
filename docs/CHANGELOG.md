@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Footer Brand Column Fixes — 2026-02-19
+
+### Logo Width Input
+- **Bug**: Number input didn't allow manual typing — `onChange` clamped on every keystroke (`Math.max(40, parseInt(...) || 160)`), so clearing the field to type a new value snapped to 160 immediately
+- **Fix**: Store raw string state (`logoWidthStr`), only clamp on `onBlur` (40–400, default 160). Free keyboard entry while typing.
+
+### Show/Hide Logo Toggle
+- Added `show_logo` boolean to brand column config (defaults `true` for backward compat)
+- Admin: checkbox toggle above Logo Width input; disables/grays width input when logo hidden
+- Frontend (`footer-client.tsx`): checks `config.show_logo !== false` before rendering logo/fallback
+
+---
+
 ## Icon Picker Fix — 2026-02-19
 
 ### Bug Fix
