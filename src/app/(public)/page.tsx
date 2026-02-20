@@ -9,7 +9,7 @@ import { getReviewData } from '@/lib/data/reviews';
 import { getTeamData } from '@/lib/data/team';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
-import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles, getSectionTickers, getTickerOptions } from '@/lib/data/cms';
+import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles, getAllSectionTickers, getTickerOptions } from '@/lib/data/cms';
 import { HeroCarousel } from '@/components/public/cms/hero-carousel';
 import { HeroSection } from '@/components/public/hero-section';
 import { AdZone } from '@/components/public/cms/ad-zone';
@@ -76,7 +76,7 @@ export default async function HomePage() {
     getActiveHeroSlides(),
     getHeroCarouselConfig(),
     getCmsToggles(),
-    getSectionTickers('/'),
+    getAllSectionTickers(),
     getTickerOptions(),
   ]);
 

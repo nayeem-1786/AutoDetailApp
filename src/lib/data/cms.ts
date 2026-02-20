@@ -100,6 +100,31 @@ export const getSectionTickers = unstable_cache(
   { revalidate: 60, tags: ['cms-tickers'] }
 );
 
+/**
+ * Fetch ALL active section tickers without page filtering.
+ * Page filtering is handled client-side by SectionTickerFiltered / LayoutSectionTickers.
+ */
+export const getAllSectionTickers = unstable_cache(
+  async (): Promise<AnnouncementTicker[]> => {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('announcement_tickers')
+      .select('*')
+      .eq('is_active', true)
+      .eq('placement', 'section')
+      .order('sort_order', { ascending: true });
+
+    const now = Date.now();
+    return ((data ?? []) as AnnouncementTicker[]).filter((ticker) => {
+      if (ticker.starts_at && new Date(ticker.starts_at).getTime() > now) return false;
+      if (ticker.ends_at && new Date(ticker.ends_at).getTime() < now) return false;
+      return true;
+    });
+  },
+  ['all-section-tickers'],
+  { revalidate: 60, tags: ['cms-tickers'] }
+);
+
 // ---------------------------------------------------------------------------
 // Seasonal Themes
 // ---------------------------------------------------------------------------

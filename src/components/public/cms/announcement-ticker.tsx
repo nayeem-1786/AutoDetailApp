@@ -544,3 +544,26 @@ export function SectionTickerFiltered({
   const filtered = tickers.filter((t) => tickerMatchesPage(t, pathname));
   return <SectionTicker tickers={filtered} options={options} />;
 }
+
+// ---------------------------------------------------------------------------
+// LayoutSectionTickers — renders section tickers before the footer on all
+// non-homepage pages. The homepage handles its own inline section tickers.
+// ---------------------------------------------------------------------------
+
+export function LayoutSectionTickers({
+  tickers,
+  options,
+}: {
+  tickers: AnnouncementTicker[];
+  options?: TickerPlacementOptions;
+}) {
+  const pathname = usePathname();
+
+  // Homepage renders section tickers inline — skip here to avoid duplicates
+  if (pathname === '/') return null;
+
+  const filtered = tickers.filter((t) => tickerMatchesPage(t, pathname));
+  if (filtered.length === 0) return null;
+
+  return <SectionTicker tickers={filtered} options={options} />;
+}

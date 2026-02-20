@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Section Tickers on All Pages + Admin Position Warnings — 2026-02-19
+
+### Section tickers now render on Products, Cart, Checkout, Services, CMS, and Account pages
+- Previously, section (mid-page) tickers only rendered on the homepage
+- Added `getAllSectionTickers()` data function in `cms.ts` — fetches all active section tickers without page filtering
+- Added `LayoutSectionTickers` client component in `announcement-ticker.tsx` — renders section tickers before the footer on non-homepage pages, with client-side page type filtering via `tickerMatchesPage()`
+- Layout (`(public)/layout.tsx`) now fetches section tickers and renders them before the footer
+- Homepage continues to render section tickers inline (between Services and Why Choose Us sections)
+- Fixed homepage using `getSectionTickers('/')` which had a page filtering bug (compared path '/' against page type strings like 'home')
+
+### Admin ticker editor improvements
+- Changed Section Position from freeform text input to a dropdown with predefined options: After Hero, After Services, Before Footer
+- Added `PositionAvailabilityWarning` component — shows amber note when a section ticker's position (e.g., "After Hero") is only available on the Homepage but the ticker targets other page types
+- Warning explains the ticker will fall back to "Before Footer" on those pages
+
+---
+
 ## Trust Bar + Hero Rating Fixes — 2026-02-19
 
 ### Rating formatting

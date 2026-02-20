@@ -251,13 +251,23 @@ export default function TickerEditorPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Section Position
               </label>
-              <Input
-                value={ticker.section_position || ''}
-                onChange={(e) => update('section_position', e.target.value || null)}
-                className="mt-1"
-                placeholder="e.g., after_services"
-              />
+              <select
+                value={ticker.section_position || 'before_footer'}
+                onChange={(e) => update('section_position', e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              >
+                {SECTION_POSITION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
+          )}
+
+          {ticker.placement === 'section' && (
+            <PositionAvailabilityWarning
+              position={ticker.section_position || 'before_footer'}
+              targetPages={ticker.target_pages || ['all']}
+            />
           )}
 
           <div>
@@ -386,6 +396,63 @@ export default function TickerEditorPage() {
           Leave blank to show indefinitely. Tickers will only display within the specified date range.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section Position options & availability map
+// ---------------------------------------------------------------------------
+
+const SECTION_POSITION_OPTIONS = [
+  { value: 'after_hero', label: 'After Hero' },
+  { value: 'after_services', label: 'After Services' },
+  { value: 'before_footer', label: 'Before Footer' },
+] as const;
+
+/** Which page types support each section position */
+const POSITION_AVAILABILITY: Record<string, string[]> = {
+  after_hero: ['home'],
+  after_services: ['home'],
+  before_footer: ['all', 'home', 'cms_pages', 'products', 'services', 'cart', 'checkout', 'account'],
+};
+
+/** Human-readable page type labels */
+const PAGE_TYPE_LABELS: Record<string, string> = {
+  home: 'Homepage',
+  cms_pages: 'CMS Pages',
+  products: 'Products',
+  services: 'Services',
+  cart: 'Cart',
+  checkout: 'Checkout',
+  account: 'Account',
+};
+
+function PositionAvailabilityWarning({
+  position,
+  targetPages,
+}: {
+  position: string;
+  targetPages: string[];
+}) {
+  const availableOn = POSITION_AVAILABILITY[position];
+  if (!availableOn || availableOn.includes('all')) return null;
+
+  // Expand 'all' in target pages to all specific page types
+  const effectivePages = targetPages.includes('all') || targetPages.length === 0
+    ? Object.keys(PAGE_TYPE_LABELS)
+    : targetPages.filter((p) => p !== 'all');
+
+  const unavailablePages = effectivePages.filter((p) => !availableOn.includes(p));
+  if (unavailablePages.length === 0) return null;
+
+  const posLabel = SECTION_POSITION_OPTIONS.find((o) => o.value === position)?.label || position;
+  const pageLabels = unavailablePages.map((p) => PAGE_TYPE_LABELS[p] || p).join(', ');
+
+  return (
+    <div className="sm:col-span-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:border-amber-700/50 dark:text-amber-300">
+      <span className="font-medium">Note:</span> Position &ldquo;{posLabel}&rdquo; is only available on the Homepage.
+      This ticker will render at &ldquo;Before Footer&rdquo; on: {pageLabels}.
     </div>
   );
 }
