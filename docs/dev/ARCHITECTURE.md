@@ -565,3 +565,47 @@ export async function GET(request: NextRequest) {
 | Needs Node.js utilities (sendSms, templates)? | No | Yes |
 | Pure SQL data cleanup/updates? | Yes | Overkill |
 | Failure visibility | Postgres logs only | Console logs + HTTP response |
+
+---
+
+## 13. Footer System
+
+3 DB tables: `footer_sections` (main/service_areas/bottom_bar), `footer_columns` (max 6 active per section, min span 2), `footer_bottom_links`.
+
+**Column content types**: `links`, `html`, `business_info`, `brand`. Brand column stores config in `footer_columns.config` JSONB: `logo_width`, `tagline`, `show_phone/email/address/reviews`, `col_span`.
+
+**Grid**: 12-unit system. Each column has `config.col_span` (2-12). Public footer uses `--footer-col-span` CSS custom property with `sm:grid-cols-12`. Mobile stacks, tablet 2-per-row, desktop custom spans.
+
+**Data flow**: `getFooterData()` in `website-pages.ts` (cached `footer-data` tag) → layouts pass `footerData` prop → `site-footer.tsx` (server) → `footer-client.tsx` (client).
+
+**API**: Under `/api/admin/footer/` — sections, columns, columns/[columnId]/links, bottom-links, columns/reorder. Permission: `cms.pages.manage`.
+
+---
+
+## 14. Announcement Ticker System
+
+**Multi-ticker rotation**: 2+ active tickers per placement rotate one at a time (not continuous train).
+
+**Per-placement options**: `ticker_top_bar_options` / `ticker_section_options` in `business_settings` (JSON). Fields: `hold_duration` (seconds), `bg_transition` (slide_down/crossfade/none), `text_entry` (scroll/ltr/rtl/ttb/btt/fade_in).
+
+**Single ticker**: Always continuous marquee.
+
+**Positioning**: Ticker renders ABOVE header. Ticker is `sticky top-0 z-50`, header is `sticky z-40` with `top: var(--ticker-height, 0px)`. `useTickerHeight` hook sets `--ticker-height` on `:root` via `ResizeObserver`.
+
+**Font size determines height**: Each ticker's `font_size` sets the Tailwind class on its container — height is NOT hardcoded.
+
+**Data flow**: `getTickerOptions()` in `cms.ts` (cached `cms-tickers` tag) → public layout passes `options` prop to `TopBarTicker`/`SectionTicker`.
+
+---
+
+## 15. Order System (E-commerce)
+
+**Money in cents**: `orders.total`, `subtotal`, `tax_amount`, `discount_amount`, `shipping_amount` stored in cents. Display via `(amount / 100).toFixed(2)`.
+
+**Order number**: Generated in Stripe `payment_intent.succeeded` webhook only (no wasted numbers). Format: `SD-10001`.
+
+**Fulfillment emails**: Fire-and-forget via `sendFulfillmentEmail()` from `src/lib/utils/order-emails.ts`. Status-specific: ready for pickup, shipped (with tracking), delivered, refunded.
+
+**Refund flow**: `POST /api/admin/orders/[id]/refund` → Stripe refund → update status → insert event → restore stock → send email.
+
+**Cleanup cron**: `GET /api/cron/cleanup-orders` cancels pending orders > 24h old + their Stripe PIs. Runs every 6 hours.

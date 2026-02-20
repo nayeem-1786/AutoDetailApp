@@ -1,3 +1,11 @@
+<!--
+  STATUS: Needs updating. This was originally written before the footer system,
+  CMS editor toolbar, ticker positioning, theme overrides, and other recent
+  features were built. It will be fully rewritten during the post-Phase 9
+  documentation pass. For now it serves as the seed/outline for the website
+  section of the user manual.
+-->
+
 # Smart Details Auto Spa — Website System Manual
 
 ## How the System Is Built & How to Use It

@@ -511,3 +511,52 @@ These will be REJECTED in code review:
 | `margin-top: 20px` between sections | `space-y-6` on parent |
 | Random icon sizes per page | Follow icon size table above |
 | Missing dark mode variants on public pages | Always add `dark:` equivalents |
+
+---
+
+## 11. Public Site Theme System
+
+### CSS Variable Indirection (CRITICAL)
+
+Tailwind v4 `@theme inline` inlines values into utilities. To allow runtime CSS variable overrides:
+
+1. **Raw vars in `:root`**: `--lime: #CCFF00`
+2. **Referenced in `@theme inline`**: `--color-lime: var(--lime)`
+3. **ThemeProvider sets raw vars**: `--lime`, `--brand-dark`, etc. (NOT `--color-lime`)
+
+Without this indirection, CSS variable overrides from ThemeProvider don't cascade.
+
+### Theme Priority Chain
+
+```
+1. CSS :root defaults (globals.css)
+2. .public-theme overrides (globals.css)
+3. Site Theme Settings (DB: site_theme_settings → buildSiteThemeVars())
+4. Seasonal Theme Overrides (DB: seasonal_themes → buildSeasonalCssVars())
+5. User Theme Toggle (localStorage → LIGHT_VARS via style.setProperty())
+```
+
+Each layer overrides the one above. Seasonal presets override site theme for accent colors but NOT text colors.
+
+### Key CSS Variable Groups
+
+| Group | Variables | Overridable By |
+|-------|-----------|----------------|
+| Lime accent | `--lime`, `--lime-50` through `--lime-600` | Site theme, seasonal |
+| Brand surfaces | `--brand-black`, `--brand-dark`, `--brand-surface` | Site theme, seasonal |
+| Text hierarchy | `--site-text`, `--site-text-secondary`, `--site-text-muted` | Site theme, light toggle |
+| Buttons | `--site-btn-primary-*`, `--site-btn-cta-*` | Site theme, light toggle |
+| Borders | `--site-border`, `--site-border-light`, `--site-border-medium` | Site theme |
+| Accent glow | `--theme-accent-glow-rgb` | Seasonal |
+
+### Seasonal Theme Presets
+
+8 presets in `src/lib/utils/cms-theme-presets.ts`. Each overrides `lime`, `brand-dark`, `brand-surface`, `accent-glow-rgb`, full lime palette, and optional hero gradient. Stored in `cms_themes` table with `color_overrides` JSONB.
+
+### Per-Slide Hero Color Overrides
+
+6 nullable columns on `hero_slides`: `text_color`, `subtitle_color`, `accent_color`, `overlay_color`, `cta_bg_color`, `cta_text_color`. Admin editor has collapsible Color Overrides section with hex input + color picker + reset. Applied via inline CSS vars on the frontend.
+
+---
+
+*See also: `docs/audits/hero-theme.md` (full hero + theme color readability audit), `docs/audits/theme-system.md` (ThemeProvider coverage + gap analysis)*
