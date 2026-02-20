@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Service Thumbnail Visibility Fix + Phone Pre-fill on Login — 2026-02-20
+
+### Service Selection (Step 1) — Thumbnail Visibility Fix
+- **Root cause**: `hidden xs:block` used a non-existent `xs` breakpoint in Tailwind v4, causing the entire thumbnail container to be permanently hidden
+- **Fix**: Removed the invalid responsive class — thumbnails now always visible on all screen sizes
+- **Fallback icons**: Updated from invisible `bg-brand-surface` (blended with card) to vibrant colored backgrounds with white icons:
+  - Exterior/wash → Car icon on blue (`bg-blue-600`)
+  - Interior → Sparkles icon on purple (`bg-purple-600`)
+  - Ceramic/coating/full detail → Shield icon on lime-green (`bg-lime-600`)
+  - Paint/correction/specialty → Paintbrush icon on amber (`bg-amber-600`)
+
+### Phone Pre-fill on Login from Booking
+- **Problem**: Clicking "Log In to Continue" from booking Step 4 navigated to `/signin` without the phone number — customer had to re-enter it
+- **Fix**: `handleLoginClick()` now appends `&phone=` param to the signin URL
+- **Signin page**: Reads `phone` from URL search params, pre-fills the phone form field
+- **UX**: When phone is pre-filled, auto-focuses the "Continue" button instead of the phone input so the user can submit immediately
+
+---
+
 ## Service Thumbnails + Phone Lookup for Returning Customers — 2026-02-20
 
 ### Service Selection (Step 1) — Thumbnails with Fallback Icons

@@ -212,7 +212,10 @@ export function StepCustomerInfo({
     // Build redirect URL preserving current booking URL state
     const currentUrl = window.location.href;
     const redirectUrl = encodeURIComponent(currentUrl);
-    window.location.href = `/signin?redirect=${redirectUrl}`;
+    // Pass phone number so the signin page can pre-fill it
+    const phone = watch('customer.phone');
+    const phoneParam = phone ? `&phone=${encodeURIComponent(phone)}` : '';
+    window.location.href = `/signin?redirect=${redirectUrl}${phoneParam}`;
   }
 
   function handleSelectSavedVehicle(v: SavedVehicle) {

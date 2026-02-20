@@ -140,7 +140,7 @@ function ServiceCard({
       )}
     >
       {/* Thumbnail */}
-      <div className="hidden xs:block flex-shrink-0">
+      <div className="flex-shrink-0">
         {service.image_url ? (
           <img
             src={service.image_url}
@@ -219,17 +219,22 @@ function ServiceFallbackIcon({ categoryName, serviceName }: { categoryName: stri
   const lowerName = serviceName.toLowerCase();
 
   let Icon = Sparkles;
+  let bgClass = 'bg-purple-600';
+
   if (lowerCat.includes('exterior') || lowerName.includes('wash') || lowerName.includes('exterior')) {
     Icon = Car;
-  } else if (lowerCat.includes('ceramic') || lowerCat.includes('coating') || lowerName.includes('ceramic') || lowerName.includes('coating')) {
+    bgClass = 'bg-blue-600';
+  } else if (lowerCat.includes('ceramic') || lowerCat.includes('coating') || lowerName.includes('ceramic') || lowerName.includes('coating') || lowerCat.includes('full') || lowerName.includes('detail')) {
     Icon = Shield;
-  } else if (lowerCat.includes('paint') || lowerName.includes('paint') || lowerName.includes('correction')) {
+    bgClass = 'bg-lime-600';
+  } else if (lowerCat.includes('paint') || lowerName.includes('paint') || lowerName.includes('correction') || lowerCat.includes('special')) {
     Icon = Paintbrush;
+    bgClass = 'bg-amber-600';
   }
 
   return (
-    <div className="flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-lg bg-brand-surface">
-      <Icon className="h-7 w-7 sm:h-8 sm:w-8 text-site-text-muted" />
+    <div className={`flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-lg ${bgClass}`}>
+      <Icon className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
     </div>
   );
 }

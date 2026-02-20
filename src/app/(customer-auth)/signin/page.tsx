@@ -29,6 +29,7 @@ export default function CustomerSignInPage() {
   const redirectTo = searchParams.get('redirect') || '/account';
   const reason = searchParams.get('reason');
   const sessionExpired = reason === 'session_expired';
+  const prefillPhone = searchParams.get('phone') || '';
   const { info: businessInfo } = useBusinessInfo();
   const [mode, setMode] = useState<AuthMode>('phone');
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export default function CustomerSignInPage() {
   // Phone form
   const phoneForm = useForm<PhoneOtpSendInput>({
     resolver: formResolver(phoneOtpSendSchema),
+    defaultValues: { phone: prefillPhone },
   });
 
   // OTP form
@@ -337,6 +339,7 @@ export default function CustomerSignInPage() {
                   id="phone"
                   type="tel"
                   autoComplete="tel"
+                  autoFocus={!prefillPhone}
                   placeholder="(310) 555-1234"
                   {...phoneForm.register('phone', {
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -353,6 +356,7 @@ export default function CustomerSignInPage() {
               <Button
                 type="submit"
                 disabled={loading}
+                autoFocus={!!prefillPhone}
                 className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
                 {loading ? <Spinner size="sm" /> : 'Continue'}
