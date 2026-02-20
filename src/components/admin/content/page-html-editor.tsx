@@ -1,29 +1,15 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import {
-  Bold,
-  Italic,
-  Heading2,
-  Heading3,
-  Link as LinkIcon,
-  List,
-  ListOrdered,
-  Image as ImageIcon,
-  Minus,
-  Eye,
-  EyeOff,
-  Wand2,
-  Sparkles,
-} from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Wand2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { IconPicker } from '@/components/admin/icon-picker';
+import { HtmlEditorToolbar } from '@/components/admin/html-editor-toolbar';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 
 // ---------------------------------------------------------------------------
-// PageHtmlEditor — HTML editor with toolbar, AI draft, and preview
+// PageHtmlEditor — HTML editor with shared toolbar, AI draft, and preview
 // ---------------------------------------------------------------------------
 
 interface PageHtmlEditorProps {
@@ -47,66 +33,6 @@ export function PageHtmlEditor({
   const [aiTone, setAiTone] = useState<'professional' | 'casual' | 'friendly'>('professional');
   const [aiLoading, setAiLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const insertHtml = useCallback(
-    (before: string, after: string = '') => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const selected = value.substring(start, end);
-      const insertion = selected || 'text';
-      const newText =
-        value.substring(0, start) + before + insertion + after + value.substring(end);
-      onChange(newText);
-
-      requestAnimationFrame(() => {
-        textarea.focus();
-        const newPos = start + before.length + insertion.length;
-        textarea.setSelectionRange(newPos, newPos);
-      });
-    },
-    [value, onChange]
-  );
-
-  const insertBlock = useCallback(
-    (html: string) => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const start = textarea.selectionStart;
-      const newText = value.substring(0, start) + html + value.substring(start);
-      onChange(newText);
-
-      requestAnimationFrame(() => {
-        textarea.focus();
-        const newPos = start + html.length;
-        textarea.setSelectionRange(newPos, newPos);
-      });
-    },
-    [value, onChange]
-  );
-
-  const handleLink = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = value.substring(start, end) || 'Link text';
-    const url = prompt('Enter URL:', 'https://');
-    if (!url) return;
-    const html = `<a href="${url}" class="text-lime hover:underline">${selected}</a>`;
-    const newText = value.substring(0, start) + html + value.substring(end);
-    onChange(newText);
-  }, [value, onChange]);
-
-  const handleImage = useCallback(() => {
-    const url = prompt('Image URL:', 'https://');
-    if (!url) return;
-    const alt = prompt('Alt text:', '') || '';
-    insertBlock(`\n<img src="${url}" alt="${alt}" class="rounded-lg my-6" />\n`);
-  }, [insertBlock]);
 
   const handleAiDraft = async () => {
     if (!aiPrompt.trim()) {
@@ -154,70 +80,29 @@ export function PageHtmlEditor({
 
   return (
     <div className="rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-2 py-1.5">
-        <ToolbarButton icon={Bold} title="Bold" onClick={() => insertHtml('<strong>', '</strong>')} />
-        <ToolbarButton icon={Italic} title="Italic" onClick={() => insertHtml('<em>', '</em>')} />
-        <Divider />
-        <ToolbarButton
-          icon={Heading2}
-          title="Heading 2"
-          onClick={() => insertHtml('\n<h2 class="text-2xl font-semibold mb-3">', '</h2>\n')}
+      {/* Shared toolbar + AI Draft button */}
+      <div className="relative">
+        <HtmlEditorToolbar
+          textareaRef={textareaRef}
+          value={value}
+          onChange={onChange}
+          onTogglePreview={() => setShowPreview(!showPreview)}
+          isPreviewMode={showPreview}
+          context="cms"
         />
-        <ToolbarButton
-          icon={Heading3}
-          title="Heading 3"
-          onClick={() => insertHtml('\n<h3 class="text-xl font-semibold mb-2">', '</h3>\n')}
-        />
-        <Divider />
-        <ToolbarButton icon={LinkIcon} title="Link" onClick={handleLink} />
-        <ToolbarButton
-          icon={List}
-          title="Unordered List"
-          onClick={() =>
-            insertBlock('\n<ul class="list-disc pl-6 space-y-1">\n  <li>Item</li>\n</ul>\n')
-          }
-        />
-        <ToolbarButton
-          icon={ListOrdered}
-          title="Ordered List"
-          onClick={() =>
-            insertBlock('\n<ol class="list-decimal pl-6 space-y-1">\n  <li>Item</li>\n</ol>\n')
-          }
-        />
-        <ToolbarButton icon={ImageIcon} title="Image" onClick={handleImage} />
-        <ToolbarButton
-          icon={Minus}
-          title="Horizontal Rule"
-          onClick={() => insertBlock('\n<hr class="border-site-border my-8" />\n')}
-        />
-        <Divider />
-        <IconPicker
-          onInsert={insertBlock}
-          triggerClassName="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
-        />
-
-        <div className="flex-1" />
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setShowAiDialog(!showAiDialog)}
-          className="h-7 text-xs"
-        >
-          <Sparkles className="mr-1 h-3 w-3" />
-          AI Draft
-        </Button>
-
-        <button
-          type="button"
-          onClick={() => setShowPreview(!showPreview)}
-          className="p-1.5 rounded text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          title={showPreview ? 'Edit' : 'Preview'}
-        >
-          {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
+        {/* AI Draft button — overlaid at right side of toolbar */}
+        <div className="absolute right-10 top-1/2 -translate-y-1/2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAiDialog(!showAiDialog)}
+            className="h-7 text-xs"
+          >
+            <Sparkles className="mr-1 h-3 w-3" />
+            AI Draft
+          </Button>
+        </div>
       </div>
 
       {/* AI Draft Dialog */}
@@ -316,33 +201,4 @@ export function PageHtmlEditor({
       </div>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Toolbar helpers
-// ---------------------------------------------------------------------------
-
-function ToolbarButton({
-  icon: Icon,
-  title,
-  onClick,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  );
-}
-
-function Divider() {
-  return <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />;
 }

@@ -4,6 +4,55 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Full HTML Editor Toolbar — Images, Media, Layout & Embeds — 2026-02-19
+
+### Shared Toolbar Component
+- Created `src/components/admin/html-editor-toolbar.tsx` — unified toolbar used by both footer HTML editor and CMS page editor
+- Context-aware filtering (`context='footer'` hides CMS-only items: Video, Columns, Callout, Accordion)
+- 4 toolbar groups: Text (Bold, Italic, Heading H2/H3/H4, Link), Media (Image, Video, Icon), Layout (Button, Divider, Spacer, Table, Columns), Blocks (Callout, Accordion, Social Links, Map, Embed, List)
+
+### Image Manager
+- `src/components/admin/html-image-manager.tsx` — dialog with Upload tab (drag & drop, 5MB max, JPEG/PNG/WebP/SVG/GIF) and Browse Library tab (gallery grid with search)
+- Resize controls: width input, quick presets (Thumb 80px, Small 150px, Medium 250px, Large 400px, Full 100%), alignment (left/center/right), rounded corners, border options, alt text
+- All images include `max-width:100%;height:auto;` for mobile responsiveness
+- Upload API: `POST /api/admin/upload/content-image` — stores in `cms-assets/content-images/` bucket. GET lists images, DELETE removes from storage.
+
+### 12 Toolbar Dialog Components (`src/components/admin/toolbar-items/`)
+- **link-dialog** — URL, text, new tab checkbox. Theme-aware link classes.
+- **video-embed-dialog** — YouTube/Vimeo auto-detection, responsive 16:9 iframe (Small/Medium/Full). CMS-only.
+- **button-dialog** — Primary (site-btn-primary), Outline (lime border), Ghost (underline). Size S/M/L, auto/full width, alignment.
+- **divider-dialog** — Line/Dashed/Dotted/Fade gradient. Width full/half/third. Tight/Normal/Wide spacing.
+- **table-dialog** — Custom (configurable rows/cols/header), Business Hours template (7 days), Pricing template (accent-colored prices). Wrapped in `overflow-x:auto` for mobile.
+- **columns-dialog** — 2 equal, 3 equal, 1/3+2/3 layouts. Flexbox with `flex:1 1 250px` for automatic mobile stacking.
+- **callout-dialog** — Info (lime), Tip (green), Warning (amber), Note (gray). Border-left accent + brand-surface background.
+- **accordion-dialog** — Native `<details>/<summary>` elements. Configurable item count + questions. CMS-only.
+- **social-links-dialog** — 8 platforms (Facebook, Instagram, Twitter/X, YouTube, TikTok, LinkedIn, Yelp, Google). Icons only/with text, 3 sizes, theme/white/original colors. SVGs via renderToStaticMarkup.
+- **map-embed-dialog** — Google Maps embed. Accepts embed URL or plain address. Configurable height/width.
+- **embed-dialog** — Raw HTML/iframe paste for third-party widgets (review badges, booking forms, etc.)
+- **list-dialog** — Bulleted, Numbered, Check marks (lime SVG checkmarks). Configurable items.
+- **spacer-menu** — Dropdown: Small 16px, Medium 32px, Large 48px, XL 64px
+
+### Theme Awareness
+- All generated HTML uses CSS variables (`--site-text`, `--site-text-secondary`, `--site-border`, `--lime`, `--brand-surface`, etc.)
+- Buttons use `site-btn-primary` class for full theme integration
+- Colors adapt automatically to dark/light mode and seasonal themes
+
+### Editor Integration
+- `page-html-editor.tsx` — replaced inline toolbar with shared `HtmlEditorToolbar` (context="cms"). Kept AI Draft panel.
+- `footer/page.tsx` — replaced inline Bold/Italic/Link/IconPicker toolbar with shared `HtmlEditorToolbar` (context="footer")
+
+### Files Created
+- `src/components/admin/html-editor-toolbar.tsx`
+- `src/components/admin/html-image-manager.tsx`
+- `src/app/api/admin/upload/content-image/route.ts`
+- `src/components/admin/toolbar-items/` (12 files)
+
+### Files Modified
+- `src/components/admin/content/page-html-editor.tsx` — uses shared toolbar
+- `src/app/admin/website/footer/page.tsx` — uses shared toolbar, removed inline Bold/Italic/Link buttons
+
+---
+
 ## Footer Column Limit Fix + Icon Picker Extraction — 2026-02-19
 
 ### Column Limit — Span-Based Validation

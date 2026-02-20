@@ -519,6 +519,15 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **Tablet grid**: Footer wraps 2 per row on 640-767px (span 6), custom spans on 768px+
 - TypeScript clean, build passes.
 
+### Full HTML Editor Toolbar — Images, Media, Layout & Embeds
+- **Shared toolbar**: `src/components/admin/html-editor-toolbar.tsx` — used by both footer HTML editor and CMS page editor
+- **Context filtering**: `context='footer'` hides CMS-only items (Video, Columns, Callout, Accordion)
+- **4 groups**: Text (Bold, Italic, H2/H3/H4, Link), Media (Image, Video, Icon), Layout (Button, Divider, Spacer, Table, Columns), Blocks (Callout, Accordion, Social Links, Map, Embed, List)
+- **Image manager**: Upload/browse dialog with resize, alignment, border, alt text. Images stored in `cms-assets/content-images/` bucket via `/api/admin/upload/content-image`.
+- **12 dialog components** in `src/components/admin/toolbar-items/`: link, video-embed, button, divider, table (custom/hours/pricing), columns, callout, accordion, social-links (8 platforms), map-embed, embed, list (bulleted/numbered/checkmarks)
+- All generated HTML uses CSS variables for theme awareness
+- TypeScript clean, build passes.
+
 ### Configurable Footer System — Session 4 (Brand Column + Width Control)
 - **Brand column type**: New `content_type='brand'` in `footer_columns` — managed logo, tagline, contact toggles, review badges (replaces hardcoded brand section in `footer-client.tsx`)
 - **Config JSONB column**: `footer_columns.config` stores per-column settings: `col_span` (2-12), `logo_width`, `tagline`, `show_phone/email/address/reviews`

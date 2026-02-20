@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useAsyncAction } from '@/lib/hooks/use-async-action';
 import {
   ChevronDown,
   ChevronRight,
@@ -16,9 +17,6 @@ import {
   Info,
   ImageIcon,
   AlertTriangle,
-  Bold,
-  Italic,
-  Link2,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,7 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { IconPicker } from '@/components/admin/icon-picker';
+import { HtmlEditorToolbar } from '@/components/admin/html-editor-toolbar';
 import type {
   FooterSection,
   FooterColumn,
@@ -68,6 +66,7 @@ export default function FooterAdminPage() {
   const [columns, setColumns] = useState<ColumnWithLinks[]>([]);
   const [bottomLinks, setBottomLinks] = useState<FooterBottomLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isSubmitting: pageSubmitting, execute: pageExecute } = useAsyncAction();
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     main: true,
     service_areas: true,
@@ -120,25 +119,27 @@ export default function FooterAdminPage() {
   };
 
   const toggleSectionEnabled = async (section: FooterSection) => {
-    const newVal = !section.is_enabled;
-    setSections((prev) =>
-      prev.map((s) => (s.id === section.id ? { ...s, is_enabled: newVal } : s))
-    );
-
-    const res = await adminFetch('/api/admin/footer/sections', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: section.id, is_enabled: newVal }),
-    });
-
-    if (res.ok) {
-      toast.success(`${section.label} ${newVal ? 'enabled' : 'disabled'}`);
-    } else {
+    pageExecute(async () => {
+      const newVal = !section.is_enabled;
       setSections((prev) =>
-        prev.map((s) => (s.id === section.id ? { ...s, is_enabled: !newVal } : s))
+        prev.map((s) => (s.id === section.id ? { ...s, is_enabled: newVal } : s))
       );
-      toast.error('Failed to update section');
-    }
+
+      const res = await adminFetch('/api/admin/footer/sections', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: section.id, is_enabled: newVal }),
+      });
+
+      if (res.ok) {
+        toast.success(`${section.label} ${newVal ? 'enabled' : 'disabled'}`);
+      } else {
+        setSections((prev) =>
+          prev.map((s) => (s.id === section.id ? { ...s, is_enabled: !newVal } : s))
+        );
+        toast.error('Failed to update section');
+      }
+    });
   };
 
   const mainSection = sections.find((s) => s.section_key === 'main');
@@ -180,6 +181,7 @@ export default function FooterAdminPage() {
           expanded={expandedSections.main}
           onToggleExpand={() => toggleSection('main')}
           onToggleEnabled={() => toggleSectionEnabled(mainSection)}
+          disabled={pageSubmitting}
         >
           <MainFooterPanel
             sectionId={mainSection.id}
@@ -196,6 +198,7 @@ export default function FooterAdminPage() {
           expanded={expandedSections.service_areas}
           onToggleExpand={() => toggleSection('service_areas')}
           onToggleEnabled={() => toggleSectionEnabled(serviceAreasSection)}
+          disabled={pageSubmitting}
         >
           <ServiceAreasPanel section={serviceAreasSection} setSections={setSections} />
         </SectionCard>
@@ -208,6 +211,7 @@ export default function FooterAdminPage() {
           expanded={expandedSections.bottom_bar}
           onToggleExpand={() => toggleSection('bottom_bar')}
           onToggleEnabled={() => toggleSectionEnabled(bottomBarSection)}
+          disabled={pageSubmitting}
         >
           <BottomBarPanel
             section={bottomBarSection}
@@ -230,12 +234,14 @@ function SectionCard({
   expanded,
   onToggleExpand,
   onToggleEnabled,
+  disabled,
   children,
 }: {
   section: FooterSection;
   expanded: boolean;
   onToggleExpand: () => void;
   onToggleEnabled: () => void;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -259,6 +265,7 @@ function SectionCard({
           <Switch
             checked={section.is_enabled}
             onCheckedChange={onToggleEnabled}
+            disabled={disabled}
           />
         </div>
       </div>
@@ -354,6 +361,7 @@ function MainFooterPanel({
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [newColumnType, setNewColumnType] = useState<'links' | 'html' | 'business_info'>('links');
   const [dragColId, setDragColId] = useState<string | null>(null);
+  const { isSubmitting, execute } = useAsyncAction();
 
   const addColumn = async () => {
     if (!newColumnTitle.trim()) {
@@ -361,37 +369,39 @@ function MainFooterPanel({
       return;
     }
 
-    // Calculate remaining span from enabled columns
-    const activeSpan = getSpanTotal(columns.filter((c) => c.is_enabled));
-    const remainingSpan = 12 - activeSpan;
-    const newColSpan = Math.max(2, Math.min(remainingSpan, 4)); // default 4, min 2, max remaining
+    execute(async () => {
+      // Calculate remaining span from enabled columns
+      const activeSpan = getSpanTotal(columns.filter((c) => c.is_enabled));
+      const remainingSpan = 12 - activeSpan;
+      const newColSpan = Math.max(2, Math.min(remainingSpan, 4)); // default 4, min 2, max remaining
 
-    const res = await adminFetch('/api/admin/footer/columns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        section_id: sectionId,
-        title: newColumnTitle.trim(),
-        content_type: newColumnType,
-        config: { col_span: newColSpan },
-      }),
-    });
-
-    if (res.ok) {
-      const { data } = await res.json();
-      const newCol: ColumnWithLinks = { ...data, config: data.config || {}, links: [] };
-      setColumns((prev) => {
-        const otherCols = prev.filter((c) => c.section_id !== sectionId);
-        return [...otherCols, ...columns, newCol];
+      const res = await adminFetch('/api/admin/footer/columns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section_id: sectionId,
+          title: newColumnTitle.trim(),
+          content_type: newColumnType,
+          config: { col_span: newColSpan },
+        }),
       });
-      setNewColumnTitle('');
-      setNewColumnType('links');
-      setShowAddColumn(false);
-      toast.success('Column added');
-    } else {
-      const err = await res.json();
-      toast.error(err.error || 'Failed to add column');
-    }
+
+      if (res.ok) {
+        const { data } = await res.json();
+        const newCol: ColumnWithLinks = { ...data, config: data.config || {}, links: [] };
+        setColumns((prev) => {
+          const otherCols = prev.filter((c) => c.section_id !== sectionId);
+          return [...otherCols, ...columns, newCol];
+        });
+        setNewColumnTitle('');
+        setNewColumnType('links');
+        setShowAddColumn(false);
+        toast.success('Column added');
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to add column');
+      }
+    });
   };
 
   const deleteColumn = async (col: ColumnWithLinks) => {
@@ -411,19 +421,21 @@ function MainFooterPanel({
       if (!confirm(msg)) return;
     }
 
-    const res = await adminFetch('/api/admin/footer/columns', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: col.id }),
-    });
+    execute(async () => {
+      const res = await adminFetch('/api/admin/footer/columns', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: col.id }),
+      });
 
-    if (res.ok) {
-      // Remove column — do NOT redistribute spans (freed space stays available)
-      setColumns((prev) => prev.filter((c) => c.id !== col.id));
-      toast.success('Column deleted');
-    } else {
-      toast.error('Failed to delete column');
-    }
+      if (res.ok) {
+        // Remove column — do NOT redistribute spans (freed space stays available)
+        setColumns((prev) => prev.filter((c) => c.id !== col.id));
+        toast.success('Column deleted');
+      } else {
+        toast.error('Failed to delete column');
+      }
+    });
   };
 
   const toggleColumnEnabled = async (col: ColumnWithLinks) => {
@@ -446,42 +458,46 @@ function MainFooterPanel({
       }
     }
 
-    setColumns((prev) =>
-      prev.map((c) => (c.id === col.id ? { ...c, is_enabled: newVal } : c))
-    );
-
-    const res = await adminFetch('/api/admin/footer/columns', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: col.id, is_enabled: newVal }),
-    });
-
-    if (!res.ok) {
+    execute(async () => {
       setColumns((prev) =>
-        prev.map((c) => (c.id === col.id ? { ...c, is_enabled: !newVal } : c))
+        prev.map((c) => (c.id === col.id ? { ...c, is_enabled: newVal } : c))
       );
-      toast.error('Failed to update column');
-    }
+
+      const res = await adminFetch('/api/admin/footer/columns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: col.id, is_enabled: newVal }),
+      });
+
+      if (!res.ok) {
+        setColumns((prev) =>
+          prev.map((c) => (c.id === col.id ? { ...c, is_enabled: !newVal } : c))
+        );
+        toast.error('Failed to update column');
+      }
+    });
   };
 
   const updateColumnConfig = async (col: ColumnWithLinks, newConfig: Record<string, unknown>) => {
-    const mergedConfig = { ...col.config, ...newConfig };
-    setColumns((prev) =>
-      prev.map((c) => (c.id === col.id ? { ...c, config: mergedConfig } : c))
-    );
-
-    const res = await adminFetch('/api/admin/footer/columns', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: col.id, config: mergedConfig }),
-    });
-
-    if (!res.ok) {
+    execute(async () => {
+      const mergedConfig = { ...col.config, ...newConfig };
       setColumns((prev) =>
-        prev.map((c) => (c.id === col.id ? { ...c, config: col.config } : c))
+        prev.map((c) => (c.id === col.id ? { ...c, config: mergedConfig } : c))
       );
-      toast.error('Failed to save config');
-    }
+
+      const res = await adminFetch('/api/admin/footer/columns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: col.id, config: mergedConfig }),
+      });
+
+      if (!res.ok) {
+        setColumns((prev) =>
+          prev.map((c) => (c.id === col.id ? { ...c, config: col.config } : c))
+        );
+        toast.error('Failed to save config');
+      }
+    });
   };
 
   // Drag & drop reorder columns
@@ -499,34 +515,36 @@ function MainFooterPanel({
     e.preventDefault();
     if (!dragColId || dragColId === targetId) return;
 
-    const oldCols = [...columns];
-    const allCols = columns.filter((c) => c.section_id === sectionId);
-    const otherCols = columns.filter((c) => c.section_id !== sectionId);
+    execute(async () => {
+      const oldCols = [...columns];
+      const allCols = columns.filter((c) => c.section_id === sectionId);
+      const otherCols = columns.filter((c) => c.section_id !== sectionId);
 
-    const dragIdx = allCols.findIndex((c) => c.id === dragColId);
-    const targetIdx = allCols.findIndex((c) => c.id === targetId);
-    if (dragIdx === -1 || targetIdx === -1) return;
+      const dragIdx = allCols.findIndex((c) => c.id === dragColId);
+      const targetIdx = allCols.findIndex((c) => c.id === targetId);
+      if (dragIdx === -1 || targetIdx === -1) return;
 
-    const newCols = [...allCols];
-    const [moved] = newCols.splice(dragIdx, 1);
-    newCols.splice(targetIdx, 0, moved);
+      const newCols = [...allCols];
+      const [moved] = newCols.splice(dragIdx, 1);
+      newCols.splice(targetIdx, 0, moved);
 
-    const reorderedWithSort = newCols.map((c, i) => ({ ...c, sort_order: i }));
-    setColumns([...otherCols, ...reorderedWithSort]);
-    setDragColId(null);
+      const reorderedWithSort = newCols.map((c, i) => ({ ...c, sort_order: i }));
+      setColumns([...otherCols, ...reorderedWithSort]);
+      setDragColId(null);
 
-    const res = await adminFetch('/api/admin/footer/columns/reorder', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: reorderedWithSort.map((c) => ({ id: c.id, sort_order: c.sort_order })),
-      }),
+      const res = await adminFetch('/api/admin/footer/columns/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: reorderedWithSort.map((c) => ({ id: c.id, sort_order: c.sort_order })),
+        }),
+      });
+
+      if (!res.ok) {
+        setColumns(oldCols);
+        toast.error('Failed to reorder');
+      }
     });
-
-    if (!res.ok) {
-      setColumns(oldCols);
-      toast.error('Failed to reorder');
-    }
   };
 
   // Content type options for new columns — exclude 'brand' if one already exists
@@ -571,7 +589,7 @@ function MainFooterPanel({
             <Button
               size="sm"
               onClick={() => setShowAddColumn(true)}
-              disabled={!canAdd}
+              disabled={!canAdd || isSubmitting}
               title={
                 !underMaxCount
                   ? `Maximum ${MAX_ACTIVE_COLUMNS} active columns`
@@ -636,7 +654,7 @@ function MainFooterPanel({
             >
               Cancel
             </Button>
-            <Button size="sm" onClick={addColumn}>
+            <Button size="sm" onClick={addColumn} disabled={isSubmitting}>
               Add Column
             </Button>
           </div>
@@ -663,6 +681,7 @@ function MainFooterPanel({
                 onDragStart={(e) => handleColDragStart(e, col.id)}
                 onDragOver={handleColDragOver}
                 onDrop={(e) => handleColDrop(e, col.id)}
+                parentSubmitting={isSubmitting}
               />
             ))}
         </div>
@@ -691,6 +710,7 @@ function ColumnCard({
   onDragStart,
   onDragOver,
   onDrop,
+  parentSubmitting,
 }: {
   column: ColumnWithLinks;
   setColumns: React.Dispatch<React.SetStateAction<ColumnWithLinks[]>>;
@@ -700,9 +720,12 @@ function ColumnCard({
   onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
+  parentSubmitting?: boolean;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(column.title);
+  const { isSubmitting: localSubmitting, execute: localExecute } = useAsyncAction();
+  const busy = localSubmitting || !!parentSubmitting;
   const badge = CONTENT_TYPE_BADGE[column.content_type] ?? CONTENT_TYPE_BADGE.links;
   const isBrand = column.content_type === 'brand';
   const colSpan = (column.config?.col_span as number) || MIN_SPAN;
@@ -713,23 +736,25 @@ function ColumnCard({
       return;
     }
 
-    const res = await adminFetch('/api/admin/footer/columns', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: column.id, title: titleValue.trim() }),
-    });
+    localExecute(async () => {
+      const res = await adminFetch('/api/admin/footer/columns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: column.id, title: titleValue.trim() }),
+      });
 
-    if (res.ok) {
-      setColumns((prev) =>
-        prev.map((c) =>
-          c.id === column.id ? { ...c, title: titleValue.trim() } : c
-        )
-      );
-      setEditingTitle(false);
-      toast.success('Title updated');
-    } else {
-      toast.error('Failed to update title');
-    }
+      if (res.ok) {
+        setColumns((prev) =>
+          prev.map((c) =>
+            c.id === column.id ? { ...c, title: titleValue.trim() } : c
+          )
+        );
+        setEditingTitle(false);
+        toast.success('Title updated');
+      } else {
+        toast.error('Failed to update title');
+      }
+    });
   };
 
   return (
@@ -797,11 +822,13 @@ function ColumnCard({
                 className="w-12 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-brand-500"
                 min={MIN_SPAN}
                 max={GRID_UNITS}
+                disabled={busy}
               />
             </div>
             <Switch
               checked={column.is_enabled}
               onCheckedChange={onToggleEnabled}
+              disabled={busy}
             />
             {!isBrand && (
               <button
@@ -809,16 +836,18 @@ function ColumnCard({
                   setEditingTitle(true);
                   setTitleValue(column.title);
                 }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className={`text-gray-400 hover:text-gray-600 transition-colors ${busy ? 'opacity-50 pointer-events-none' : ''}`}
                 title="Edit title"
+                disabled={busy}
               >
                 <Pencil className="h-4 w-4" />
               </button>
             )}
             <button
               onClick={onDelete}
-              className="text-gray-400 hover:text-red-600 transition-colors"
+              className={`text-gray-400 hover:text-red-600 transition-colors ${busy ? 'opacity-50 pointer-events-none' : ''}`}
               title="Delete column"
+              disabled={busy}
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -829,10 +858,10 @@ function ColumnCard({
       {/* Column content */}
       <div className="p-4">
         {column.content_type === 'brand' && (
-          <BrandColumnEditor column={column} onUpdateConfig={onUpdateConfig} />
+          <BrandColumnEditor column={column} onUpdateConfig={onUpdateConfig} disabled={busy} />
         )}
         {column.content_type === 'links' && (
-          <LinksEditor column={column} setColumns={setColumns} />
+          <LinksEditor column={column} setColumns={setColumns} disabled={busy} />
         )}
         {column.content_type === 'html' && (
           <HtmlEditor column={column} setColumns={setColumns} />
@@ -850,9 +879,11 @@ function ColumnCard({
 function BrandColumnEditor({
   column,
   onUpdateConfig,
+  disabled,
 }: {
   column: ColumnWithLinks;
   onUpdateConfig: (config: Record<string, unknown>) => void;
+  disabled?: boolean;
 }) {
   const config = column.config || {};
   const [logoWidth, setLogoWidth] = useState((config.logo_width as number) || 160);
@@ -959,7 +990,7 @@ function BrandColumnEditor({
 
       {isDirty && (
         <div className="flex justify-end">
-          <Button size="sm" onClick={save} disabled={saving}>
+          <Button size="sm" onClick={save} disabled={disabled || saving}>
             {saving ? 'Saving...' : 'Save Brand Settings'}
           </Button>
         </div>
@@ -975,9 +1006,11 @@ function BrandColumnEditor({
 function LinksEditor({
   column,
   setColumns,
+  disabled,
 }: {
   column: ColumnWithLinks;
   setColumns: React.Dispatch<React.SetStateAction<ColumnWithLinks[]>>;
+  disabled?: boolean;
 }) {
   const [showAddLink, setShowAddLink] = useState(false);
   const [addLabel, setAddLabel] = useState('');
@@ -987,6 +1020,8 @@ function LinksEditor({
   const [editLabel, setEditLabel] = useState('');
   const [editUrl, setEditUrl] = useState('');
   const [dragLinkId, setDragLinkId] = useState<string | null>(null);
+  const { isSubmitting, execute } = useAsyncAction();
+  const busy = isSubmitting || !!disabled;
 
   const links = column.links ?? [];
 
@@ -1002,42 +1037,46 @@ function LinksEditor({
       return;
     }
 
-    const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        label: addLabel.trim(),
-        url: addUrl.trim() || '#',
-        target: addNewTab ? '_blank' : '_self',
-      }),
-    });
+    execute(async () => {
+      const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: addLabel.trim(),
+          url: addUrl.trim() || '#',
+          target: addNewTab ? '_blank' : '_self',
+        }),
+      });
 
-    if (res.ok) {
-      const { data } = await res.json();
-      updateColumnLinks([...links, data]);
-      setAddLabel('');
-      setAddUrl('');
-      setAddNewTab(false);
-      setShowAddLink(false);
-      toast.success('Link added');
-    } else {
-      toast.error('Failed to add link');
-    }
+      if (res.ok) {
+        const { data } = await res.json();
+        updateColumnLinks([...links, data]);
+        setAddLabel('');
+        setAddUrl('');
+        setAddNewTab(false);
+        setShowAddLink(false);
+        toast.success('Link added');
+      } else {
+        toast.error('Failed to add link');
+      }
+    });
   };
 
   const deleteLink = async (linkId: string) => {
-    const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: linkId }),
-    });
+    execute(async () => {
+      const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: linkId }),
+      });
 
-    if (res.ok) {
-      updateColumnLinks(links.filter((l) => l.id !== linkId));
-      toast.success('Link removed');
-    } else {
-      toast.error('Failed to delete link');
-    }
+      if (res.ok) {
+        updateColumnLinks(links.filter((l) => l.id !== linkId));
+        toast.success('Link removed');
+      } else {
+        toast.error('Failed to delete link');
+      }
+    });
   };
 
   const startEditLink = (link: WebsiteNavItem) => {
@@ -1049,49 +1088,53 @@ function LinksEditor({
   const saveEditLink = async () => {
     if (!editingLinkId || !editLabel.trim()) return;
 
-    const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: editingLinkId,
-        label: editLabel.trim(),
-        url: editUrl.trim() || '#',
-      }),
-    });
+    execute(async () => {
+      const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingLinkId,
+          label: editLabel.trim(),
+          url: editUrl.trim() || '#',
+        }),
+      });
 
-    if (res.ok) {
-      updateColumnLinks(
-        links.map((l) =>
-          l.id === editingLinkId
-            ? { ...l, label: editLabel.trim(), url: editUrl.trim() || '#' }
-            : l
-        )
-      );
-      setEditingLinkId(null);
-      toast.success('Link updated');
-    } else {
-      toast.error('Failed to update link');
-    }
+      if (res.ok) {
+        updateColumnLinks(
+          links.map((l) =>
+            l.id === editingLinkId
+              ? { ...l, label: editLabel.trim(), url: editUrl.trim() || '#' }
+              : l
+          )
+        );
+        setEditingLinkId(null);
+        toast.success('Link updated');
+      } else {
+        toast.error('Failed to update link');
+      }
+    });
   };
 
   const toggleLinkActive = async (link: WebsiteNavItem) => {
-    const newVal = !link.is_active;
-    updateColumnLinks(
-      links.map((l) => (l.id === link.id ? { ...l, is_active: newVal } : l))
-    );
-
-    const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: link.id, is_active: newVal }),
-    });
-
-    if (!res.ok) {
+    execute(async () => {
+      const newVal = !link.is_active;
       updateColumnLinks(
-        links.map((l) => (l.id === link.id ? { ...l, is_active: !newVal } : l))
+        links.map((l) => (l.id === link.id ? { ...l, is_active: newVal } : l))
       );
-      toast.error('Failed to update link');
-    }
+
+      const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: link.id, is_active: newVal }),
+      });
+
+      if (!res.ok) {
+        updateColumnLinks(
+          links.map((l) => (l.id === link.id ? { ...l, is_active: !newVal } : l))
+        );
+        toast.error('Failed to update link');
+      }
+    });
   };
 
   // Drag & drop reorder links
@@ -1109,33 +1152,35 @@ function LinksEditor({
     e.preventDefault();
     if (!dragLinkId || dragLinkId === targetId) return;
 
-    const oldLinks = [...links];
-    const dragIdx = links.findIndex((l) => l.id === dragLinkId);
-    const targetIdx = links.findIndex((l) => l.id === targetId);
-    if (dragIdx === -1 || targetIdx === -1) return;
+    execute(async () => {
+      const oldLinks = [...links];
+      const dragIdx = links.findIndex((l) => l.id === dragLinkId);
+      const targetIdx = links.findIndex((l) => l.id === targetId);
+      if (dragIdx === -1 || targetIdx === -1) return;
 
-    const newLinks = [...links];
-    const [moved] = newLinks.splice(dragIdx, 1);
-    newLinks.splice(targetIdx, 0, moved);
-    updateColumnLinks(newLinks);
-    setDragLinkId(null);
+      const newLinks = [...links];
+      const [moved] = newLinks.splice(dragIdx, 1);
+      newLinks.splice(targetIdx, 0, moved);
+      updateColumnLinks(newLinks);
+      setDragLinkId(null);
 
-    // Reorder API — use the column links PATCH with sort_order updates
-    const reorderPayload = newLinks.map((l, i) => ({ id: l.id, sort_order: i }));
-    const results = await Promise.all(
-      reorderPayload.map((item) =>
-        adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: item.id, sort_order: item.sort_order }),
-        })
-      )
-    );
+      // Reorder API — use the column links PATCH with sort_order updates
+      const reorderPayload = newLinks.map((l, i) => ({ id: l.id, sort_order: i }));
+      const results = await Promise.all(
+        reorderPayload.map((item) =>
+          adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: item.id, sort_order: item.sort_order }),
+          })
+        )
+      );
 
-    if (results.some((r) => !r.ok)) {
-      updateColumnLinks(oldLinks);
-      toast.error('Failed to reorder links');
-    }
+      if (results.some((r) => !r.ok)) {
+        updateColumnLinks(oldLinks);
+        toast.error('Failed to reorder links');
+      }
+    });
   };
 
   return (
@@ -1193,16 +1238,19 @@ function LinksEditor({
                 <Switch
                   checked={link.is_active}
                   onCheckedChange={() => toggleLinkActive(link)}
+                  disabled={busy}
                 />
                 <button
                   onClick={() => startEditLink(link)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className={`text-gray-400 hover:text-gray-600 transition-colors ${busy ? 'opacity-50 pointer-events-none' : ''}`}
+                  disabled={busy}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => deleteLink(link.id)}
-                  className="text-gray-400 hover:text-red-600 transition-colors"
+                  className={`text-gray-400 hover:text-red-600 transition-colors ${busy ? 'opacity-50 pointer-events-none' : ''}`}
+                  disabled={busy}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -1264,7 +1312,7 @@ function LinksEditor({
             >
               Cancel
             </Button>
-            <Button size="sm" onClick={addLink}>
+            <Button size="sm" onClick={addLink} disabled={busy}>
               Add Link
             </Button>
           </div>
@@ -1272,7 +1320,8 @@ function LinksEditor({
       ) : (
         <button
           onClick={() => setShowAddLink(true)}
-          className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 transition-colors mt-1"
+          className={`flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 transition-colors mt-1 ${busy ? 'opacity-50 pointer-events-none' : ''}`}
+          disabled={busy}
         >
           <Plus className="h-3.5 w-3.5" />
           Add Link
@@ -1283,13 +1332,7 @@ function LinksEditor({
 }
 
 // ---------------------------------------------------------------------------
-// HTML Editor — textarea for custom HTML content
-// ---------------------------------------------------------------------------
-
-// IconPicker imported from shared component: @/components/admin/icon-picker
-
-// ---------------------------------------------------------------------------
-// HTML Editor — textarea with toolbar (Bold, Italic, Link, Icon)
+// HTML Editor — textarea with shared toolbar
 // ---------------------------------------------------------------------------
 
 function HtmlEditor({
@@ -1304,44 +1347,6 @@ function HtmlEditor({
   const [showPreview, setShowPreview] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDirty = value !== (column.html_content || '');
-
-  const insertAtCursor = (text: string) => {
-    const ta = textareaRef.current;
-    if (!ta) {
-      setValue((prev) => prev + text);
-      return;
-    }
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const newValue = value.substring(0, start) + text + value.substring(end);
-    setValue(newValue);
-    // Restore cursor after the inserted text
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.selectionStart = ta.selectionEnd = start + text.length;
-    });
-  };
-
-  const wrapSelection = (before: string, after: string) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const selected = value.substring(start, end);
-    const replacement = before + (selected || 'text') + after;
-    const newValue = value.substring(0, start) + replacement + value.substring(end);
-    setValue(newValue);
-    requestAnimationFrame(() => {
-      ta.focus();
-      if (selected) {
-        ta.selectionStart = start + before.length;
-        ta.selectionEnd = start + before.length + selected.length;
-      } else {
-        ta.selectionStart = start + before.length;
-        ta.selectionEnd = start + before.length + 4; // select "text"
-      }
-    });
-  };
 
   const save = async () => {
     setSaving(true);
@@ -1368,64 +1373,42 @@ function HtmlEditor({
         Use HTML for custom content like business hours, embedded widgets, or formatted text.
       </p>
 
-      {/* Toolbar */}
-      <div className="relative flex items-center gap-0.5 border border-gray-300 rounded-t-md bg-gray-50 px-1.5 py-1">
-        <button
-          type="button"
-          title="Bold"
-          onClick={() => wrapSelection('<strong>', '</strong>')}
-          className="flex items-center justify-center h-7 w-7 rounded hover:bg-gray-200 text-gray-600 transition-colors"
-        >
-          <Bold className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          title="Italic"
-          onClick={() => wrapSelection('<em>', '</em>')}
-          className="flex items-center justify-center h-7 w-7 rounded hover:bg-gray-200 text-gray-600 transition-colors"
-        >
-          <Italic className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          title="Insert Link"
-          onClick={() => wrapSelection('<a href="#">', '</a>')}
-          className="flex items-center justify-center h-7 w-7 rounded hover:bg-gray-200 text-gray-600 transition-colors"
-        >
-          <Link2 className="h-4 w-4" />
-        </button>
-        <div className="w-px h-5 bg-gray-300 mx-0.5" />
-        <IconPicker onInsert={insertAtCursor} />
+      {/* Shared toolbar */}
+      <div className="rounded-t-md border border-gray-300 overflow-hidden">
+        <HtmlEditorToolbar
+          textareaRef={textareaRef}
+          value={value}
+          onChange={setValue}
+          onTogglePreview={() => setShowPreview(!showPreview)}
+          isPreviewMode={showPreview}
+          context="footer"
+        />
       </div>
 
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        rows={6}
-        className="w-full rounded-b-md border border-t-0 border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-        placeholder="<p>Your HTML here...</p>"
-      />
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setShowPreview(!showPreview)}
-          className="text-sm text-brand-600 hover:text-brand-700 transition-colors"
-        >
-          {showPreview ? 'Hide Preview' : 'Show Preview'}
-        </button>
-        <Button size="sm" onClick={save} disabled={!isDirty || saving}>
-          {saving ? 'Saving...' : 'Save'}
-        </Button>
-      </div>
-      {showPreview && (
-        <div className="bg-gray-900 rounded-lg p-4 text-sm text-gray-300">
+      {showPreview ? (
+        <div className="bg-gray-900 rounded-b-md border border-t-0 border-gray-300 p-4 text-sm text-gray-300">
           <p className="text-xs text-gray-500 mb-2">Preview (approximate styling):</p>
           <div
             className="space-y-2 [&_a]:text-green-400 [&_a]:hover:underline"
             dangerouslySetInnerHTML={{ __html: value }}
           />
         </div>
+      ) : (
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          rows={6}
+          className="w-full rounded-b-md border border-t-0 border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+          placeholder="<p>Your HTML here...</p>"
+        />
       )}
+
+      <div className="flex items-center justify-end">
+        <Button size="sm" onClick={save} disabled={!isDirty || saving}>
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1461,9 +1444,11 @@ function BusinessInfoPreview() {
 function ServiceAreasPanel({
   section,
   setSections,
+  disabled,
 }: {
   section: FooterSection;
   setSections: React.Dispatch<React.SetStateAction<FooterSection[]>>;
+  disabled?: boolean;
 }) {
   const config = section.config ?? {};
   const [prefixText, setPrefixText] = useState(
@@ -1521,7 +1506,7 @@ function ServiceAreasPanel({
             Manage service areas &rarr;
           </Link>
         </div>
-        <Button size="sm" onClick={save} disabled={!isDirty || saving}>
+        <Button size="sm" onClick={save} disabled={!isDirty || saving || disabled}>
           {saving ? 'Saving...' : 'Save'}
         </Button>
       </div>
@@ -1561,25 +1546,29 @@ function BottomBarPanel({
   const [editLabel, setEditLabel] = useState('');
   const [editUrl, setEditUrl] = useState('');
 
+  const { isSubmitting, execute } = useAsyncAction();
+
   const saveCopyright = async () => {
-    setSavingCopyright(true);
-    const newConfig = { ...config, custom_copyright: customCopyright || null };
+    execute(async () => {
+      setSavingCopyright(true);
+      const newConfig = { ...config, custom_copyright: customCopyright || null };
 
-    const res = await adminFetch('/api/admin/footer/sections', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: section.id, config: newConfig }),
+      const res = await adminFetch('/api/admin/footer/sections', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: section.id, config: newConfig }),
+      });
+
+      if (res.ok) {
+        setSections((prev) =>
+          prev.map((s) => (s.id === section.id ? { ...s, config: newConfig } : s))
+        );
+        toast.success('Copyright text saved');
+      } else {
+        toast.error('Failed to save');
+      }
+      setSavingCopyright(false);
     });
-
-    if (res.ok) {
-      setSections((prev) =>
-        prev.map((s) => (s.id === section.id ? { ...s, config: newConfig } : s))
-      );
-      toast.success('Copyright text saved');
-    } else {
-      toast.error('Failed to save');
-    }
-    setSavingCopyright(false);
   };
 
   const addBottomLink = async () => {
@@ -1588,62 +1577,68 @@ function BottomBarPanel({
       return;
     }
 
-    const res = await adminFetch('/api/admin/footer/bottom-links', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        label: addLabel.trim(),
-        url: addUrl.trim(),
-        open_in_new_tab: addNewTab,
-      }),
-    });
+    execute(async () => {
+      const res = await adminFetch('/api/admin/footer/bottom-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: addLabel.trim(),
+          url: addUrl.trim(),
+          open_in_new_tab: addNewTab,
+        }),
+      });
 
-    if (res.ok) {
-      const { data } = await res.json();
-      setBottomLinks((prev) => [...prev, data]);
-      setAddLabel('');
-      setAddUrl('');
-      setAddNewTab(false);
-      setShowAddLink(false);
-      toast.success('Link added');
-    } else {
-      toast.error('Failed to add link');
-    }
+      if (res.ok) {
+        const { data } = await res.json();
+        setBottomLinks((prev) => [...prev, data]);
+        setAddLabel('');
+        setAddUrl('');
+        setAddNewTab(false);
+        setShowAddLink(false);
+        toast.success('Link added');
+      } else {
+        toast.error('Failed to add link');
+      }
+    });
   };
 
   const deleteBottomLink = async (id: string) => {
-    const res = await adminFetch('/api/admin/footer/bottom-links', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
+    execute(async () => {
+      const res = await adminFetch('/api/admin/footer/bottom-links', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
 
-    if (res.ok) {
-      setBottomLinks((prev) => prev.filter((l) => l.id !== id));
-      toast.success('Link removed');
-    } else {
-      toast.error('Failed to delete link');
-    }
+      if (res.ok) {
+        setBottomLinks((prev) => prev.filter((l) => l.id !== id));
+        toast.success('Link removed');
+      } else {
+        toast.error('Failed to delete link');
+      }
+    });
   };
 
   const toggleBottomLinkEnabled = async (link: FooterBottomLink) => {
-    const newVal = !link.is_enabled;
-    setBottomLinks((prev) =>
-      prev.map((l) => (l.id === link.id ? { ...l, is_enabled: newVal } : l))
-    );
-
-    const res = await adminFetch('/api/admin/footer/bottom-links', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: link.id, is_enabled: newVal }),
-    });
-
-    if (!res.ok) {
+    execute(async () => {
+      const newVal = !link.is_enabled;
       setBottomLinks((prev) =>
-        prev.map((l) => (l.id === link.id ? { ...l, is_enabled: !newVal } : l))
+        prev.map((l) => (l.id === link.id ? { ...l, is_enabled: newVal } : l))
       );
-      toast.error('Failed to update link');
-    }
+
+      const res = await adminFetch('/api/admin/footer/bottom-links', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: link.id, is_enabled: newVal }),
+      });
+
+      if (!res.ok) {
+        setBottomLinks((prev) =>
+          prev.map((l) => (l.id === link.id ? { ...l, is_enabled: !newVal } : l))
+        );
+        toast.error('Failed to update link');
+      }
+    });
   };
 
   const startEditBottomLink = (link: FooterBottomLink) => {
@@ -1655,29 +1650,31 @@ function BottomBarPanel({
   const saveEditBottomLink = async () => {
     if (!editingId || !editLabel.trim()) return;
 
-    const res = await adminFetch('/api/admin/footer/bottom-links', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: editingId,
-        label: editLabel.trim(),
-        url: editUrl.trim() || '#',
-      }),
-    });
+    execute(async () => {
+      const res = await adminFetch('/api/admin/footer/bottom-links', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingId,
+          label: editLabel.trim(),
+          url: editUrl.trim() || '#',
+        }),
+      });
 
-    if (res.ok) {
-      setBottomLinks((prev) =>
-        prev.map((l) =>
-          l.id === editingId
-            ? { ...l, label: editLabel.trim(), url: editUrl.trim() || '#' }
-            : l
-        )
-      );
-      setEditingId(null);
-      toast.success('Link updated');
-    } else {
-      toast.error('Failed to update link');
-    }
+      if (res.ok) {
+        setBottomLinks((prev) =>
+          prev.map((l) =>
+            l.id === editingId
+              ? { ...l, label: editLabel.trim(), url: editUrl.trim() || '#' }
+              : l
+          )
+        );
+        setEditingId(null);
+        toast.success('Link updated');
+      } else {
+        toast.error('Failed to update link');
+      }
+    });
   };
 
   const year = new Date().getFullYear();
@@ -1707,7 +1704,7 @@ function BottomBarPanel({
             <Button
               size="sm"
               onClick={saveCopyright}
-              disabled={savingCopyright}
+              disabled={savingCopyright || isSubmitting}
             >
               {savingCopyright ? 'Saving...' : 'Save'}
             </Button>
@@ -1772,16 +1769,19 @@ function BottomBarPanel({
                       <Switch
                         checked={link.is_enabled}
                         onCheckedChange={() => toggleBottomLinkEnabled(link)}
+                        disabled={isSubmitting}
                       />
                       <button
                         onClick={() => startEditBottomLink(link)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className={`text-gray-400 hover:text-gray-600 transition-colors ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
+                        disabled={isSubmitting}
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => deleteBottomLink(link.id)}
-                        className="text-gray-400 hover:text-red-600 transition-colors"
+                        className={`text-gray-400 hover:text-red-600 transition-colors ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
+                        disabled={isSubmitting}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -1844,7 +1844,7 @@ function BottomBarPanel({
               >
                 Cancel
               </Button>
-              <Button size="sm" onClick={addBottomLink}>
+              <Button size="sm" onClick={addBottomLink} disabled={isSubmitting}>
                 Add Link
               </Button>
             </div>
@@ -1852,7 +1852,8 @@ function BottomBarPanel({
         ) : (
           <button
             onClick={() => setShowAddLink(true)}
-            className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 transition-colors mt-2"
+            className={`flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 transition-colors mt-2 ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
+            disabled={isSubmitting}
           >
             <Plus className="h-3.5 w-3.5" />
             Add Link
