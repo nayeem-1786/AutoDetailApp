@@ -109,7 +109,7 @@ function marqueeProps(
       };
     case 'entering':
       return {
-        className: 'inline-block',
+        className: 'inline-block ticker-entering',
         style: {
           transform: 'translateX(0)',
           transition: `transform ${enterDuration.toFixed(1)}s linear`,
@@ -157,20 +157,15 @@ const REPEAT_COUNT = 6;
 // SingleTickerMarquee — continuous marquee for a single ticker (or one ticker
 // in rotation "scroll" mode). Full bar in that ticker's colors/font.
 // ---------------------------------------------------------------------------
-function SingleTickerMarquee({ ticker, paused }: { ticker: AnnouncementTicker; paused?: boolean }) {
+function SingleTickerMarquee({ ticker }: { ticker: AnnouncementTicker }) {
   const speedValue = getSpeedValue(ticker);
   const { ref, loopDuration, enterDuration, enterOffset, phase } = useMarquee(speedValue);
   const fontSize = FONT_SIZE_CLASS[ticker.font_size] || FONT_SIZE_CLASS.sm;
   const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
 
-  const style = { ...mp.style };
-  if (paused) {
-    style.animationPlayState = 'paused';
-  }
-
   return (
     <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
-      <span ref={ref} className={mp.className} style={style}>
+      <span ref={ref} className={mp.className} style={mp.style}>
         {Array.from({ length: REPEAT_COUNT }, (_, i) => (
           <MessageUnit key={`a-${i}`} ticker={ticker} />
         ))}
@@ -340,7 +335,7 @@ function MultiTickerRotation({
       >
         {showContent ? (
           isScrollMode ? (
-            <SingleTickerMarquee key={currentIndex} ticker={current} paused={paused} />
+            <SingleTickerMarquee key={currentIndex} ticker={current} />
           ) : (
             <StaticMessage
               key={currentIndex}
@@ -421,6 +416,8 @@ export function TopBarTicker({
   tickers: AnnouncementTicker[];
   options?: TickerPlacementOptions;
 }) {
+  // React state only needed for multi-ticker JS timer pausing.
+  // CSS .ticker-hover-pause:hover handles animation/transition freeze instantly.
   const { paused, handlers } = useHoverPause();
 
   if (tickers.length === 0) return null;
@@ -430,21 +427,20 @@ export function TopBarTicker({
     const ticker = tickers[0];
     return (
       <div
-        className="relative overflow-hidden py-2.5 cursor-default"
+        className="ticker-hover-pause relative overflow-hidden py-2.5"
         style={{
           backgroundColor: ticker.bg_color || '#CCFF00',
           color: ticker.text_color || '#000000',
         }}
-        {...handlers}
       >
-        <SingleTickerMarquee ticker={ticker} paused={paused} />
+        <SingleTickerMarquee ticker={ticker} />
       </div>
     );
   }
 
-  // Multiple tickers — use configurable rotation
+  // Multiple tickers — CSS pauses marquee, React state pauses JS rotation timer
   return (
-    <div {...handlers} className="cursor-default">
+    <div {...handlers} className="ticker-hover-pause">
       <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} paused={paused} />
     </div>
   );
@@ -469,20 +465,19 @@ export function SectionTicker({
     const ticker = tickers[0];
     return (
       <div
-        className="overflow-hidden py-2.5 cursor-default"
+        className="ticker-hover-pause overflow-hidden py-2.5"
         style={{
           backgroundColor: ticker.bg_color || '#CCFF00',
           color: ticker.text_color || '#000000',
         }}
-        {...handlers}
       >
-        <SingleTickerMarquee ticker={ticker} paused={paused} />
+        <SingleTickerMarquee ticker={ticker} />
       </div>
     );
   }
 
   return (
-    <div {...handlers} className="cursor-default">
+    <div {...handlers} className="ticker-hover-pause">
       <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} paused={paused} />
     </div>
   );
