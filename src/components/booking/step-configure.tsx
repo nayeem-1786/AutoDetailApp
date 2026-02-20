@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { Truck, Minus, Plus } from 'lucide-react';
+import { Truck, Minus, Plus, Check, Car, Bus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
+import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -40,6 +41,13 @@ interface StepConfigureProps {
   onBack: () => void;
 }
 
+// Vehicle size icon mapping
+const VEHICLE_SIZE_ICONS: Record<string, typeof Car> = {
+  sedan: Car,
+  truck_suv_2row: Truck,
+  suv_3row_van: Bus,
+};
+
 export function StepConfigure({
   service,
   mobileZones,
@@ -48,6 +56,12 @@ export function StepConfigure({
   onBack,
 }: StepConfigureProps) {
   const tiers = service.service_pricing;
+
+  // Sale status for this service
+  const saleStatus = getSaleStatus({
+    sale_starts_at: service.sale_starts_at,
+    sale_ends_at: service.sale_ends_at,
+  });
 
   // State
   const [selectedTier, setSelectedTier] = useState<string | null>(
@@ -68,12 +82,11 @@ export function StepConfigure({
     initialConfig.addons ?? []
   );
 
-  // For flat pricing, auto-advance is handled by checking on mount
   const isFlatPrice = service.pricing_model === 'flat';
 
   // Compute the current price
   const tier = tiers.find((t) => t.tier_name === selectedTier);
-  const price = computePrice(service, tier, sizeClass, perUnitQty);
+  const price = computePrice(service, tier, sizeClass, perUnitQty, saleStatus.isOnSale);
 
   // Mobile surcharge
   const zone = mobileZones.find((z) => z.id === mobileZoneId);
@@ -89,6 +102,9 @@ export function StepConfigure({
     : true;
   const mobileReady = !isMobile || (mobileAddress.trim().length > 0 && mobileZoneId !== null);
   const canContinue = tierReady && sizeReady && mobileReady && price > 0;
+
+  // Total including addons and mobile
+  const total = price + selectedAddons.reduce((s, a) => s + a.price, 0) + mobileSurcharge;
 
   function handleContinue() {
     if (!canContinue) return;
@@ -118,11 +134,10 @@ export function StepConfigure({
   return (
     <div>
       <h2 className="text-xl font-semibold text-site-text">
-        Configure Your Service
+        Configure Your Detail
       </h2>
       <p className="mt-1 text-sm text-site-text-secondary">{service.name}</p>
 
-      {/* Pricing selector based on model */}
       <div className="mt-6 space-y-6">
         <PricingSelector
           service={service}
@@ -133,9 +148,10 @@ export function StepConfigure({
           onSelectSize={setSizeClass}
           perUnitQty={perUnitQty}
           onSetQty={setPerUnitQty}
+          saleStatus={saleStatus}
         />
 
-        {/* Mobile toggle — hidden when no zones available (mobile_service flag off) */}
+        {/* Mobile toggle */}
         {service.mobile_eligible && mobileZones.length > 0 && (
           <div className="rounded-lg border border-site-border p-4">
             <div className="flex items-center justify-between">
@@ -198,10 +214,10 @@ export function StepConfigure({
         {service.service_addon_suggestions.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-site-text">
-              Enhance Your Service
+              Add-ons <span className="font-normal text-site-text-muted">(optional)</span>
             </h3>
             <p className="mt-1 text-xs text-site-text-muted">
-              Add popular extras to your appointment.
+              Enhance your service with popular extras.
             </p>
             <div className="mt-3 space-y-2">
               {service.service_addon_suggestions.map((suggestion) => {
@@ -233,11 +249,11 @@ export function StepConfigure({
                     className={cn(
                       'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-all',
                       isSelected
-                        ? 'border-lime bg-brand-surface'
+                        ? 'border-lime bg-lime/5'
                         : 'border-site-border hover:border-site-border-medium'
                     )}
                   >
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-site-text">
                         {addonSvc.name}
                       </p>
@@ -248,21 +264,19 @@ export function StepConfigure({
                       )}
                     </div>
                     <div className="ml-3 flex items-center gap-2">
-                      <span className="text-sm font-medium text-site-text">
+                      <span className="text-sm font-medium text-site-text whitespace-nowrap">
                         +{formatCurrency(addonPrice)}
                       </span>
                       <div
                         className={cn(
-                          'h-5 w-5 rounded border flex items-center justify-center transition-colors',
+                          'h-5 w-5 rounded border flex items-center justify-center transition-colors flex-shrink-0',
                           isSelected
                             ? 'border-lime bg-lime text-site-text-on-primary'
                             : 'border-site-border'
                         )}
                       >
                         {isSelected && (
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
                         )}
                       </div>
                     </div>
@@ -273,9 +287,9 @@ export function StepConfigure({
           </div>
         )}
 
-        {/* Price summary */}
-        <div className="rounded-lg bg-brand-surface p-4">
-          <div className="space-y-1 text-sm">
+        {/* Price summary — sticky on mobile */}
+        <div className="rounded-lg bg-brand-surface p-4 sm:relative fixed bottom-0 left-0 right-0 sm:bottom-auto sm:left-auto sm:right-auto z-10 sm:z-auto sm:rounded-lg rounded-none border-t border-site-border sm:border-t-0">
+          <div className="space-y-1 text-sm max-w-3xl mx-auto">
             <div className="flex justify-between">
               <span className="text-site-text-secondary">{service.name}</span>
               <span className="font-medium text-site-text">
@@ -299,17 +313,14 @@ export function StepConfigure({
               </div>
             )}
             <div className="flex justify-between border-t border-site-border pt-2 text-base font-semibold">
-              <span>Total</span>
-              <span>
-                {formatCurrency(
-                  price +
-                    selectedAddons.reduce((s, a) => s + a.price, 0) +
-                    mobileSurcharge
-                )}
-              </span>
+              <span className="text-site-text">Total</span>
+              <span className="text-site-text">{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
+
+        {/* Spacer on mobile to avoid content hidden behind sticky summary */}
+        <div className="h-24 sm:hidden" />
 
         {/* Navigation */}
         <div className="flex justify-between">
@@ -329,6 +340,10 @@ export function StepConfigure({
 // PricingSelector: renders the right control for the pricing model
 // ---------------------------------------------------------------------------
 
+interface SaleStatusInfo {
+  isOnSale: boolean;
+}
+
 function PricingSelector({
   service,
   tiers,
@@ -338,6 +353,7 @@ function PricingSelector({
   onSelectSize,
   perUnitQty,
   onSetQty,
+  saleStatus,
 }: {
   service: BookableService;
   tiers: ServicePricing[];
@@ -347,6 +363,7 @@ function PricingSelector({
   onSelectSize: (sc: VehicleSizeClass) => void;
   perUnitQty: number;
   onSetQty: (q: number) => void;
+  saleStatus: SaleStatusInfo;
 }) {
   switch (service.pricing_model) {
     case 'flat':
@@ -365,17 +382,55 @@ function PricingSelector({
       return (
         <div>
           <h3 className="text-sm font-semibold text-site-text-secondary">
-            Select Vehicle Size
+            Vehicle Size
           </h3>
-          <div className="mt-2 grid gap-2 sm:grid-cols-3">
-            {tiers.map((tier) => (
-              <TierCard
-                key={tier.id}
-                tier={tier}
-                isSelected={selectedTier === tier.tier_name}
-                onClick={() => onSelectTier(tier.tier_name)}
-              />
-            ))}
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {tiers.map((tier) => {
+              const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+              const SizeIcon = VEHICLE_SIZE_ICONS[tier.tier_name] ?? Car;
+              const isSelected = selectedTier === tier.tier_name;
+
+              return (
+                <button
+                  key={tier.id}
+                  type="button"
+                  onClick={() => onSelectTier(tier.tier_name)}
+                  className={cn(
+                    'flex flex-col items-center rounded-lg border p-4 transition-all',
+                    isSelected
+                      ? 'border-lime bg-lime/5 ring-1 ring-lime'
+                      : 'border-site-border hover:border-lime/50'
+                  )}
+                >
+                  <SizeIcon className={cn('h-8 w-8 mb-2', isSelected ? 'text-lime' : 'text-site-text-muted')} />
+                  <p className="text-sm font-medium text-site-text">
+                    {tier.tier_label ?? VEHICLE_SIZE_LABELS[tier.tier_name] ?? tier.tier_name}
+                  </p>
+                  {saleInfo?.isDiscounted ? (
+                    <div className="mt-1 text-center">
+                      <p className="text-sm text-site-text-muted line-through">
+                        {formatCurrency(saleInfo.originalPrice)}
+                      </p>
+                      <p className="text-lg font-bold text-lime">
+                        {formatCurrency(saleInfo.currentPrice)}
+                      </p>
+                      <p className="text-xs text-lime">
+                        Save {formatCurrency(saleInfo.savings)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-lg font-bold text-site-text">
+                      {formatCurrency(saleInfo?.currentPrice ?? tier.price)}
+                    </p>
+                  )}
+                  {isSelected && (
+                    <div className="mt-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary">
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       );
@@ -388,15 +443,18 @@ function PricingSelector({
               Select Option
             </h3>
             <div className="mt-2 grid gap-2">
-              {tiers.map((tier) => (
-                <TierCard
-                  key={tier.id}
-                  tier={tier}
-                  isSelected={selectedTier === tier.tier_name}
-                  onClick={() => onSelectTier(tier.tier_name)}
-                  wide
-                />
-              ))}
+              {tiers.map((tier) => {
+                const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+                return (
+                  <ScopeTierCard
+                    key={tier.id}
+                    tier={tier}
+                    saleInfo={saleInfo}
+                    isSelected={selectedTier === tier.tier_name}
+                    onClick={() => onSelectTier(tier.tier_name)}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -407,30 +465,38 @@ function PricingSelector({
             return (
               <div>
                 <h3 className="text-sm font-semibold text-site-text-secondary">
-                  Select Vehicle Size
+                  Vehicle Size
                 </h3>
-                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {(['sedan', 'truck_suv_2row', 'suv_3row_van'] as const).map((sc) => {
                     const p = getVehicleSizePrice(current, sc);
                     if (p == null) return null;
+                    const SizeIcon = VEHICLE_SIZE_ICONS[sc] ?? Car;
+                    const isSelected = sizeClass === sc;
                     return (
                       <button
                         key={sc}
                         type="button"
                         onClick={() => onSelectSize(sc)}
                         className={cn(
-                          'rounded-lg border p-3 text-left transition-all',
-                          sizeClass === sc
-                            ? 'border-lime bg-brand-surface ring-1 ring-lime'
-                            : 'border-site-border hover:border-site-border-medium'
+                          'flex flex-col items-center rounded-lg border p-4 transition-all',
+                          isSelected
+                            ? 'border-lime bg-lime/5 ring-1 ring-lime'
+                            : 'border-site-border hover:border-lime/50'
                         )}
                       >
+                        <SizeIcon className={cn('h-8 w-8 mb-2', isSelected ? 'text-lime' : 'text-site-text-muted')} />
                         <p className="text-sm font-medium text-site-text">
                           {VEHICLE_SIZE_LABELS[sc]}
                         </p>
-                        <p className="text-lg font-bold text-site-text">
+                        <p className="mt-1 text-lg font-bold text-site-text">
                           {formatCurrency(p)}
                         </p>
+                        {isSelected && (
+                          <div className="mt-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary">
+                            <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -448,15 +514,18 @@ function PricingSelector({
             Select Option
           </h3>
           <div className="mt-2 grid gap-2">
-            {tiers.map((tier) => (
-              <TierCard
-                key={tier.id}
-                tier={tier}
-                isSelected={selectedTier === tier.tier_name}
-                onClick={() => onSelectTier(tier.tier_name)}
-                wide
-              />
-            ))}
+            {tiers.map((tier) => {
+              const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+              return (
+                <ScopeTierCard
+                  key={tier.id}
+                  tier={tier}
+                  saleInfo={saleInfo}
+                  isSelected={selectedTier === tier.tier_name}
+                  onClick={() => onSelectTier(tier.tier_name)}
+                />
+              );
+            })}
           </div>
         </div>
       );
@@ -506,46 +575,65 @@ function PricingSelector({
 }
 
 // ---------------------------------------------------------------------------
-// TierCard
+// ScopeTierCard — full-width tier card for scope/specialty pricing
 // ---------------------------------------------------------------------------
 
-function TierCard({
+import type { TierSaleInfo } from '@/lib/utils/sale-pricing';
+
+function ScopeTierCard({
   tier,
+  saleInfo,
   isSelected,
   onClick,
-  wide,
 }: {
   tier: ServicePricing;
+  saleInfo: TierSaleInfo | null;
   isSelected: boolean;
   onClick: () => void;
-  wide?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-lg border p-3 text-left transition-all',
+        'flex items-center justify-between rounded-lg border p-3 text-left transition-all',
         isSelected
-          ? 'border-lime bg-brand-surface ring-1 ring-lime'
-          : 'border-site-border hover:border-site-border-medium',
-        wide && 'flex items-center justify-between'
+          ? 'border-lime bg-lime/5 ring-1 ring-lime'
+          : 'border-site-border hover:border-lime/50'
       )}
     >
-      <div>
+      <div className="flex items-center gap-2">
+        {isSelected && (
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary flex-shrink-0">
+            <Check className="h-3.5 w-3.5" strokeWidth={3} />
+          </div>
+        )}
         <p className="text-sm font-medium text-site-text">
           {tier.tier_label ?? tier.tier_name}
         </p>
       </div>
-      <p className={cn('font-bold text-site-text', wide ? 'text-base' : 'mt-1 text-lg')}>
-        {tier.is_vehicle_size_aware
-          ? `From ${formatCurrency(Math.min(
-              tier.vehicle_size_sedan_price ?? Infinity,
-              tier.vehicle_size_truck_suv_price ?? Infinity,
-              tier.vehicle_size_suv_van_price ?? Infinity
-            ))}`
-          : formatCurrency(tier.price)}
-      </p>
+      <div className="text-right">
+        {saleInfo?.isDiscounted ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-site-text-muted line-through">
+              {formatCurrency(saleInfo.originalPrice)}
+            </span>
+            <span className="text-base font-bold text-lime">
+              {formatCurrency(saleInfo.currentPrice)}
+            </span>
+          </div>
+        ) : (
+          <span className="text-base font-bold text-site-text">
+            {tier.is_vehicle_size_aware
+              ? `From ${formatCurrency(Math.min(
+                  tier.vehicle_size_sedan_price ?? Infinity,
+                  tier.vehicle_size_truck_suv_price ?? Infinity,
+                  tier.vehicle_size_suv_van_price ?? Infinity
+                ))}`
+              : formatCurrency(saleInfo?.currentPrice ?? tier.price)}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -558,7 +646,8 @@ function computePrice(
   service: BookableService,
   tier: ServicePricing | undefined,
   sizeClass: VehicleSizeClass | null,
-  perUnitQty: number
+  perUnitQty: number,
+  isOnSale: boolean
 ): number {
   switch (service.pricing_model) {
     case 'flat':
@@ -570,6 +659,10 @@ function computePrice(
       if (!tier) return 0;
       if (tier.is_vehicle_size_aware && sizeClass) {
         return getVehicleSizePrice(tier, sizeClass) ?? 0;
+      }
+      // Apply sale price if active
+      if (isOnSale && tier.sale_price !== null && tier.sale_price < tier.price) {
+        return tier.sale_price;
       }
       return tier.price;
 

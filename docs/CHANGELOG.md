@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Booking Flow UX Overhaul (Steps 1-3 + Stepper) — 2026-02-20
+
+Major UX improvements to the first 3 steps of the booking wizard and the step indicator.
+
+### Step Indicator
+- **Clickable completed steps**: Users can click any completed step to navigate back (preserves all data)
+- **Mobile compact format**: Below `sm` breakpoint, shows "Step X of Y: Label" with dot indicators instead of cramped full stepper
+- Desktop keeps full horizontal stepper with circles, connectors, and labels
+
+### Step 1: Service Selection
+- **Horizontal card layout**: Replaced grid cards with full-width horizontal stacked cards
+- **Service thumbnails**: Shows 80x80 service images (60x60 on small screens); fallback icons by category (Car, Shield, Paintbrush, Sparkles)
+- **Sale pricing**: Services with active sales show strikethrough original price + "SALE" badge
+- **Explicit Continue button**: Service selection no longer auto-advances; users click a card to select then hit Continue
+- **Improved duration display**: Shows "~Xh Ym" format
+
+### Step 2: Configure
+- **Vehicle size cards with icons**: Each size card shows a vehicle icon (Car, Truck, Bus), size label, and price
+- **Sale pricing per tier**: Tiers with active sale prices show strikethrough original + lime sale price + "Save $XX"
+- **Scope/specialty tier cards**: Show checkmark when selected + inline sale pricing
+- **Sticky mobile price summary**: Price breakdown sticks to bottom of viewport on mobile
+- **Improved addon section**: Clearer "Add-ons (optional)" header with checkmark indicators
+
+### Step 3: Schedule
+- **Removed ALL waitlist code**: Waitlist UI, state, props, types completely removed from booking flow (waitlist API + admin page remain for standalone use)
+- **Info note added**: Friendly note below time slots — "Don't see a time that works? Pick the closest option — our team will call to confirm your exact appointment time."
+
+### URL State Preservation
+- Booking progress stored in URL params: `step`, `service` (slug), `vehicle` (size class), `date`, `time`, `addons` (comma-separated IDs)
+- Page refresh restores step and selections (reconstructs config from URL where possible)
+- Existing entry points (`?service=slug`, `?rebook=id`, `?coupon=code`) continue to work
+- `coupon` and `rebook` params preserved through step transitions
+
+### Files Modified
+- `src/components/booking/step-indicator.tsx` — clickable steps + mobile compact
+- `src/components/booking/step-service-select.tsx` — horizontal cards, thumbnails, sale pricing
+- `src/components/booking/step-configure.tsx` — vehicle icons, sale pricing, sticky summary
+- `src/components/booking/step-schedule.tsx` — removed waitlist, added info note
+- `src/components/booking/booking-wizard.tsx` — URL state, step click handler
+
+---
+
 ## Booking Flow Audit — 2026-02-20
 
 Complete audit of the entire Book Your Appointment flow. Read all 12 booking files (3,500+ lines), traced every step, documented every UI element and interaction.

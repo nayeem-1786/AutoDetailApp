@@ -17,12 +17,8 @@ import {
   subMonths,
   getDay,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Loader2, Clock, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
 import { formatTime } from '@/lib/utils/format';
 import type { BusinessHours, BookingConfig } from '@/lib/data/booking';
 
@@ -36,22 +32,6 @@ const DAY_NAMES = [
   'saturday',
 ] as const;
 
-// Generate time options in 30-minute increments for waitlist preference
-const TIME_OPTIONS: string[] = [];
-for (let h = 7; h <= 19; h++) {
-  for (const m of ['00', '30']) {
-    const hh = h.toString().padStart(2, '0');
-    TIME_OPTIONS.push(`${hh}:${m}`);
-  }
-}
-
-interface WaitlistPreference {
-  preferred_date: string;
-  preferred_time_start: string | null;
-  preferred_time_end: string | null;
-  notes: string | null;
-}
-
 interface StepScheduleProps {
   businessHours: BusinessHours;
   bookingConfig: BookingConfig;
@@ -60,8 +40,6 @@ interface StepScheduleProps {
   initialTime: string | null;
   onContinue: (date: string, time: string) => void;
   onBack: () => void;
-  waitlistEnabled?: boolean;
-  onJoinWaitlist?: (preference: WaitlistPreference) => void;
 }
 
 export function StepSchedule({
@@ -72,8 +50,6 @@ export function StepSchedule({
   initialTime,
   onContinue,
   onBack,
-  waitlistEnabled = false,
-  onJoinWaitlist,
 }: StepScheduleProps) {
   const today = new Date();
   const minDate = addDays(today, bookingConfig.advance_days_min);
@@ -91,18 +67,11 @@ export function StepSchedule({
   const [slots, setSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Waitlist state
-  const [waitlistTimeStart, setWaitlistTimeStart] = useState<string>('');
-  const [waitlistTimeEnd, setWaitlistTimeEnd] = useState<string>('');
-  const [waitlistNotes, setWaitlistNotes] = useState('');
-  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
-
   // Fetch slots when date changes
   const fetchSlots = useCallback(async (date: Date) => {
     setLoadingSlots(true);
     setSlots([]);
     setSelectedTime(null);
-    setWaitlistSubmitted(false);
 
     const dateStr = format(date, 'yyyy-MM-dd');
     try {
@@ -129,7 +98,7 @@ export function StepSchedule({
     if (isBefore(maxDate, date)) return true;
     const dayName = DAY_NAMES[getDay(date)];
     const hours = businessHours[dayName];
-    if (!hours) return true; // Closed day
+    if (!hours) return true;
     return false;
   }
 
@@ -234,107 +203,9 @@ export function StepSchedule({
             </div>
           ) : slots.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-4">
-              {waitlistEnabled && onJoinWaitlist && !waitlistSubmitted ? (
-                <Card className="w-full border-site-border bg-brand-surface dark:border-site-border dark:bg-brand-surface">
-                  <CardContent className="p-5">
-                    <div className="flex items-start gap-3">
-                      <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-site-text-muted" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-site-text">
-                          No slots available on this date
-                        </p>
-                        <p className="mt-1 text-sm text-site-text-muted">
-                          Join our waitlist and we&apos;ll notify you when a slot opens up.
-                        </p>
-
-                        <div className="mt-4 space-y-3">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label htmlFor="wl-time-start" className="text-site-text-secondary dark:text-site-text-secondary">Preferred start</Label>
-                              <Select
-                                id="wl-time-start"
-                                value={waitlistTimeStart}
-                                onChange={(e) => setWaitlistTimeStart(e.target.value)}
-                                className="mt-1 border-site-border bg-brand-surface text-site-text focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text"
-                              >
-                                <option value="">Any time</option>
-                                {TIME_OPTIONS.map((t) => (
-                                  <option key={t} value={t}>
-                                    {formatTime(t)}
-                                  </option>
-                                ))}
-                              </Select>
-                            </div>
-                            <div>
-                              <Label htmlFor="wl-time-end" className="text-site-text-secondary dark:text-site-text-secondary">Preferred end</Label>
-                              <Select
-                                id="wl-time-end"
-                                value={waitlistTimeEnd}
-                                onChange={(e) => setWaitlistTimeEnd(e.target.value)}
-                                className="mt-1 border-site-border bg-brand-surface text-site-text focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text"
-                              >
-                                <option value="">Any time</option>
-                                {TIME_OPTIONS.map((t) => (
-                                  <option key={t} value={t}>
-                                    {formatTime(t)}
-                                  </option>
-                                ))}
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div>
-                            <Label htmlFor="wl-notes" className="text-site-text-secondary dark:text-site-text-secondary">Notes (optional)</Label>
-                            <Textarea
-                              id="wl-notes"
-                              value={waitlistNotes}
-                              onChange={(e) => setWaitlistNotes(e.target.value)}
-                              placeholder="Any scheduling preferences..."
-                              rows={2}
-                              className="mt-1 border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim"
-                            />
-                          </div>
-
-                          <Button
-                            className="w-full bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
-                            onClick={() => {
-                              if (!selectedDate) return;
-                              const dateStr = format(selectedDate, 'yyyy-MM-dd');
-                              onJoinWaitlist({
-                                preferred_date: dateStr,
-                                preferred_time_start: waitlistTimeStart || null,
-                                preferred_time_end: waitlistTimeEnd || null,
-                                notes: waitlistNotes || null,
-                              });
-                              setWaitlistSubmitted(true);
-                            }}
-                          >
-                            Join Waitlist for This Date
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : waitlistSubmitted ? (
-                <Card className="w-full border-site-border bg-brand-surface dark:border-site-border dark:bg-brand-surface">
-                  <CardContent className="flex items-center gap-3 p-5">
-                    <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600" />
-                    <div>
-                      <p className="text-sm font-medium text-site-text">
-                        Added to waitlist
-                      </p>
-                      <p className="text-sm text-site-text-muted">
-                        We&apos;ll notify you when a slot opens up on this date.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <p className="text-sm text-site-text-muted">
-                  No available times on this date. Try another day.
-                </p>
-              )}
+              <p className="text-sm text-site-text-muted">
+                No available times on this date. Try another day.
+              </p>
             </div>
           ) : (
             <div>
@@ -351,7 +222,7 @@ export function StepSchedule({
                       'rounded-md border px-3 py-2 text-sm font-medium transition-colors',
                       selectedTime === slot
                         ? 'border-lime bg-lime text-site-text-on-primary'
-                        : 'border-site-border text-site-text-secondary hover:border-site-border-medium hover:bg-brand-surface'
+                        : 'border-site-border text-site-text-secondary hover:border-lime/50 hover:bg-brand-surface'
                     )}
                   >
                     {formatTime(slot)}
@@ -361,6 +232,15 @@ export function StepSchedule({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Info note */}
+      <div className="mt-6 flex gap-3 rounded-lg border-l-4 border-blue-400 bg-blue-50 p-3 dark:bg-blue-900/20">
+        <Info className="h-4 w-4 flex-shrink-0 text-blue-400 mt-0.5" />
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          Don&apos;t see a time that works? Pick the closest option — our team will
+          call to confirm your exact appointment time.
+        </p>
       </div>
 
       {/* Navigation */}

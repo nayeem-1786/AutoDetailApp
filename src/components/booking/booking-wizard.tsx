@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { StepIndicator } from './step-indicator';
 import { StepServiceSelect } from './step-service-select';
 import { StepConfigure, type ConfigureResult } from './step-configure';
@@ -72,12 +73,10 @@ interface BookingState {
   customer: BookingCustomerInput | null;
   vehicle: BookingVehicleInput | null;
   paymentIntentId: string | null;
-  // Payment options state
   isExistingCustomer: boolean | null;
   paymentOption: 'deposit' | 'pay_on_site' | null;
   appliedCoupon: AppliedCoupon | null;
   availableCoupons: AvailableCoupon[];
-  // Loyalty points
   loyaltyPointsBalance: number;
   loyaltyPointsToUse: number;
 }
@@ -105,6 +104,9 @@ export function BookingWizard({
   customerData,
   couponCode,
 }: BookingWizardProps) {
+  const searchParams = useSearchParams();
+  const initializedRef = useRef(false);
+
   // Determine initial step and pre-fill state
   const rebookService = rebookData
     ? findServiceById(rebookData.service_id)
@@ -118,53 +120,285 @@ export function BookingWizard({
     return null;
   }
 
+  function findServiceBySlug(slug: string): BookableService | null {
+    for (const cat of categories) {
+      const found = cat.services.find((s) => s.slug === slug);
+      if (found) return found;
+    }
+    return null;
+  }
+
   // Whether this is a portal booking (logged-in customer)
   const isPortal = !!customerData;
-
-  // Rebook starts at step 3 (schedule) since service/config are pre-set
-  const initialStep = rebookService ? 3 : preSelectedService ? 2 : 1;
 
   // Whether payment is required for online bookings
   const requirePayment = bookingConfig.require_payment;
 
-  const [step, setStep] = useState(initialStep);
+  // --- URL state restoration ---
+  // Try to restore state from URL params on initial render
+  function getInitialState(): { step: number; state: BookingState } {
+    const urlStep = parseInt(searchParams.get('step') ?? '', 10);
+    const urlVehicle = searchParams.get('vehicle') as VehicleSizeClass | null;
+    const urlDate = searchParams.get('date');
+    const urlTime = searchParams.get('time');
+    const urlAddons = searchParams.get('addons');
+
+    const service = rebookService ?? preSelectedService;
+
+    // Base state
+    const baseState: BookingState = {
+      service: service,
+      config: rebookData && rebookService
+        ? {
+            tier_name: rebookData.tier_name ?? null,
+            price: 0,
+            is_mobile: rebookData.is_mobile,
+            mobile_zone_id: rebookData.mobile_zone_id ?? null,
+            mobile_address: rebookData.mobile_address ?? null,
+            mobile_surcharge: rebookData.mobile_surcharge,
+            size_class: rebookData.vehicle?.size_class ?? null,
+            addons: rebookData.addons,
+          } as ConfigureResult
+        : null,
+      date: null,
+      time: null,
+      customer: null,
+      vehicle: null,
+      paymentIntentId: null,
+      isExistingCustomer: isPortal ? true : null,
+      paymentOption: null,
+      appliedCoupon: null,
+      availableCoupons: [],
+      loyaltyPointsBalance: 0,
+      loyaltyPointsToUse: 0,
+    };
+
+    // Default step without URL restoration
+    const defaultStep = rebookService ? 3 : preSelectedService ? 2 : 1;
+
+    // If no URL step param or rebook mode, use defaults
+    if (!urlStep || isNaN(urlStep) || urlStep < 1 || urlStep > 6 || rebookData) {
+      return { step: defaultStep, state: baseState };
+    }
+
+    // Try to restore from URL
+    // Step 1: No extra state needed
+    if (urlStep === 1) {
+      return { step: 1, state: baseState };
+    }
+
+    // Step 2+: Need a service
+    if (!service) {
+      return { step: 1, state: baseState };
+    }
+
+    // Step 2: Just need service — already have it
+    if (urlStep === 2) {
+      return { step: 2, state: baseState };
+    }
+
+    // Step 3+: Try to reconstruct config from URL params
+    if (urlStep >= 3 && service) {
+      const reconstructedConfig = reconstructConfig(service, urlVehicle, urlAddons);
+      if (reconstructedConfig) {
+        const restoredState = {
+          ...baseState,
+          config: reconstructedConfig,
+          date: urlStep >= 3 ? urlDate : null,
+          time: urlStep >= 3 ? urlTime : null,
+        };
+
+        // Step 3: need config — we have it
+        if (urlStep === 3) {
+          return { step: 3, state: restoredState };
+        }
+
+        // Step 4+: need config + date + time
+        if (urlDate && urlTime) {
+          return { step: Math.min(urlStep, 4), state: restoredState };
+        }
+
+        // Have config but no date/time — go to step 3
+        return { step: 3, state: restoredState };
+      }
+
+      // Couldn't reconstruct config — go to step 2
+      return { step: 2, state: baseState };
+    }
+
+    return { step: defaultStep, state: baseState };
+  }
+
+  // Reconstruct config from URL params (vehicle size + addon IDs)
+  function reconstructConfig(
+    service: BookableService,
+    vehicleSize: VehicleSizeClass | null,
+    addonIdsStr: string | null
+  ): ConfigureResult | null {
+    const tiers = service.service_pricing;
+
+    let tier_name: string | null = null;
+    let price = 0;
+    let size_class: VehicleSizeClass | null = vehicleSize;
+
+    switch (service.pricing_model) {
+      case 'flat':
+        price = service.flat_price ?? 0;
+        break;
+
+      case 'vehicle_size': {
+        // Vehicle size tiers — find the tier matching the vehicle size
+        if (vehicleSize) {
+          const tier = tiers.find((t) => t.tier_name === vehicleSize);
+          if (tier) {
+            tier_name = tier.tier_name;
+            price = tier.price;
+          }
+        }
+        if (!price && tiers.length > 0) {
+          // Fallback to first tier
+          tier_name = tiers[0].tier_name;
+          price = tiers[0].price;
+          size_class = tiers[0].tier_name as VehicleSizeClass;
+        }
+        break;
+      }
+
+      case 'scope':
+      case 'specialty': {
+        // Use first tier as default
+        if (tiers.length > 0) {
+          const tier = tiers[0];
+          tier_name = tier.tier_name;
+          if (tier.is_vehicle_size_aware && vehicleSize) {
+            const vp = vehicleSize === 'sedan' ? tier.vehicle_size_sedan_price
+              : vehicleSize === 'truck_suv_2row' ? tier.vehicle_size_truck_suv_price
+              : vehicleSize === 'suv_3row_van' ? tier.vehicle_size_suv_van_price
+              : null;
+            price = vp ?? tier.price;
+          } else {
+            price = tier.price;
+          }
+        }
+        break;
+      }
+
+      case 'per_unit':
+        price = service.per_unit_price ?? 0;
+        break;
+
+      default:
+        return null;
+    }
+
+    if (price <= 0) return null;
+
+    // Reconstruct addons from IDs
+    const addonIds = addonIdsStr ? addonIdsStr.split(',').filter(Boolean) : [];
+    const addons = addonIds
+      .map((id) => {
+        for (const suggestion of service.service_addon_suggestions) {
+          if (suggestion.addon_service?.id === id) {
+            const addonSvc = suggestion.addon_service;
+            return {
+              service_id: id,
+              name: addonSvc.name,
+              price: suggestion.combo_price ?? addonSvc.flat_price ?? 0,
+              tier_name: null,
+            };
+          }
+        }
+        return null;
+      })
+      .filter(Boolean) as ConfigureResult['addons'];
+
+    return {
+      tier_name,
+      price,
+      size_class,
+      is_mobile: false,
+      mobile_zone_id: null,
+      mobile_address: '',
+      mobile_surcharge: 0,
+      addons,
+      per_unit_quantity: 1,
+    };
+  }
+
+  const initial = getInitialState();
+  const [step, setStep] = useState(initial.step);
+  const [state, setState] = useState<BookingState>(initial.state);
+  const [confirmation, setConfirmation] = useState<ConfirmationData | null>(null);
+
+  // --- URL state sync ---
+  const updateUrl = useCallback((newStep: number, newState: BookingState) => {
+    const params = new URLSearchParams();
+
+    // Always set step
+    params.set('step', String(newStep));
+
+    // Service slug
+    if (newState.service) {
+      params.set('service', newState.service.slug);
+    }
+
+    // Vehicle size
+    if (newState.config?.size_class) {
+      params.set('vehicle', newState.config.size_class);
+    }
+
+    // Date and time
+    if (newState.date) params.set('date', newState.date);
+    if (newState.time) params.set('time', newState.time);
+
+    // Addon IDs
+    if (newState.config?.addons && newState.config.addons.length > 0) {
+      params.set('addons', newState.config.addons.map((a) => a.service_id).join(','));
+    }
+
+    // Preserve coupon param
+    if (couponCode) {
+      params.set('coupon', couponCode);
+    }
+
+    // Preserve rebook param
+    const currentRebook = searchParams.get('rebook');
+    if (currentRebook) {
+      params.set('rebook', currentRebook);
+    }
+
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, '', newUrl);
+  }, [couponCode, searchParams]);
+
+  // Update URL when step or relevant state changes
+  useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      // Set initial URL on first render
+      updateUrl(step, state);
+      return;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Custom setStep that also updates URL
+  function goToStep(newStep: number, updatedState?: BookingState) {
+    const s = updatedState ?? state;
+    setStep(newStep);
+    updateUrl(newStep, s);
+  }
 
   // Scroll to top when step changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
-  const [state, setState] = useState<BookingState>({
-    service: rebookService ?? preSelectedService,
-    config: rebookData && rebookService
-      ? {
-          tier_name: rebookData.tier_name ?? null,
-          price: 0, // Will be recalculated by StepConfigure or user must re-configure
-          is_mobile: rebookData.is_mobile,
-          mobile_zone_id: rebookData.mobile_zone_id ?? null,
-          mobile_address: rebookData.mobile_address ?? null,
-          mobile_surcharge: rebookData.mobile_surcharge,
-          size_class: rebookData.vehicle?.size_class ?? null,
-          addons: rebookData.addons,
-        } as ConfigureResult
-      : null,
-    date: null,
-    time: null,
-    customer: null,
-    vehicle: null,
-    paymentIntentId: null,
-    // Payment options - initialize as null, will be set after customer info step
-    isExistingCustomer: isPortal ? true : null, // Portal users are always existing
-    paymentOption: null,
-    appliedCoupon: null,
-    availableCoupons: [],
-    // Loyalty points
-    loyaltyPointsBalance: 0,
-    loyaltyPointsToUse: 0,
-  });
-  const [confirmation, setConfirmation] = useState<ConfirmationData | null>(
-    null
-  );
+  // --- Step click handler for stepper navigation ---
+  function handleStepClick(targetStep: number) {
+    // Only allow navigating to completed steps (before current)
+    if (targetStep >= step) return;
+    goToStep(targetStep);
+  }
 
   // If booking confirmed, show confirmation screen
   if (confirmation) {
@@ -181,26 +415,29 @@ export function BookingWizard({
 
   // Step 1: Select service
   function handleServiceSelect(service: BookableService) {
-    setState((prev) => ({
-      ...prev,
+    const newState: BookingState = {
+      ...state,
       service,
-      config: null, // reset downstream
+      config: null,
       date: null,
       time: null,
-    }));
-    setStep(2);
+    };
+    setState(newState);
+    goToStep(2, newState);
   }
 
   // Step 2: Configure
   function handleConfigureContinue(result: ConfigureResult) {
-    setState((prev) => ({ ...prev, config: result }));
-    setStep(3);
+    const newState = { ...state, config: result };
+    setState(newState);
+    goToStep(3, newState);
   }
 
   // Step 3: Schedule
   function handleScheduleContinue(date: string, time: string) {
-    setState((prev) => ({ ...prev, date, time }));
-    setStep(4);
+    const newState = { ...state, date, time };
+    setState(newState);
+    goToStep(4, newState);
   }
 
   // Step 4: Customer info
@@ -210,7 +447,6 @@ export function BookingWizard({
   ) {
     setState((prev) => ({ ...prev, customer, vehicle }));
 
-    // For guest bookings (not portal), check if customer exists to determine payment options
     if (!isPortal) {
       try {
         const res = await fetch('/api/book/check-customer', {
@@ -234,7 +470,6 @@ export function BookingWizard({
         }
       } catch (err) {
         console.error('Failed to check customer:', err);
-        // Default to new customer if check fails
         setState((prev) => ({
           ...prev,
           isExistingCustomer: false,
@@ -242,7 +477,6 @@ export function BookingWizard({
         }));
       }
     } else {
-      // For portal bookings, fetch customer's available coupons and loyalty points
       try {
         const [couponsRes, loyaltyRes] = await Promise.all([
           fetch('/api/customer/coupons'),
@@ -272,28 +506,24 @@ export function BookingWizard({
       }
     }
 
-    setStep(5);
+    goToStep(5, { ...state, customer, vehicle, date: state.date, time: state.time });
   }
 
-  // Step 5: Review complete - go to payment or confirm directly
+  // Step 5: Review
   function handleReviewContinue() {
-    // If user selected "Pay on Site", skip payment step
     if (state.paymentOption === 'pay_on_site') {
-      handleConfirm(); // Confirm directly without payment
+      handleConfirm();
     } else if (requirePayment) {
-      setStep(6); // Go to payment step for deposit
+      goToStep(6);
     } else {
-      handleConfirm(); // Confirm directly without payment
+      handleConfirm();
     }
   }
 
-  // Handler for payment option selection from review step
   function handlePaymentOptionChange(option: 'deposit' | 'pay_on_site') {
     setState((prev) => ({ ...prev, paymentOption: option }));
   }
 
-  // Handler for coupon application from review step
-  // When coupon changes, adjust loyalty points if they now exceed the remaining balance
   function handleCouponApply(coupon: AppliedCoupon | null) {
     setState((prev) => {
       const couponDiscount = coupon?.discount ?? 0;
@@ -302,14 +532,11 @@ export function BookingWizard({
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
-      // Calculate max loyalty points that can be used (can't make total negative)
       const REDEEM_RATE = 0.05;
       const REDEEM_MINIMUM = 100;
       const maxPointsForBalance = Math.floor(remainingAfterCoupon / REDEEM_RATE);
       const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
       const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
-
-      // Cap current loyalty points to the new max
       const adjustedLoyaltyPoints = Math.min(prev.loyaltyPointsToUse, maxLoyaltyPointsUsable);
 
       return {
@@ -320,8 +547,6 @@ export function BookingWizard({
     });
   }
 
-  // Handler for loyalty points usage from review step
-  // Only use what's needed - cap at remaining balance after coupon
   function handleLoyaltyPointsChange(points: number) {
     setState((prev) => {
       const couponDiscount = prev.appliedCoupon?.discount ?? 0;
@@ -330,14 +555,11 @@ export function BookingWizard({
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
-      // Calculate max loyalty points that can be used
       const REDEEM_RATE = 0.05;
       const REDEEM_MINIMUM = 100;
       const maxPointsForBalance = Math.floor(remainingAfterCoupon / REDEEM_RATE);
       const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
       const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
-
-      // Cap requested points to the max usable
       const cappedPoints = Math.min(points, maxLoyaltyPointsUsable);
 
       return { ...prev, loyaltyPointsToUse: cappedPoints };
@@ -357,26 +579,17 @@ export function BookingWizard({
       throw new Error('Missing booking data');
     }
 
-    // Calculate loyalty points discount (5 cents per point)
     const loyaltyDiscount = loyaltyPointsToUse * 0.05;
 
-    // Calculate total after all discounts
     const grandTotal = config.price +
       config.addons.reduce((sum, a) => sum + a.price, 0) +
       (config.mobile_surcharge ?? 0) -
       (appliedCoupon?.discount ?? 0) -
       loyaltyDiscount;
 
-    // Calculate deposit/payment amount if payment is being made
-    // Under $100: full payment, $100+: $50 deposit
     const isFullPayment = grandTotal < 100;
     const depositAmount = paymentIntentId ? (isFullPayment ? grandTotal : 50) : undefined;
 
-    // Determine payment option:
-    // - If discounts cover the full amount (< $0.50), treat as 'full' (paid by discounts)
-    // - If user selected an option, use that
-    // - If payment was made, use 'full' or 'deposit' based on amount
-    // - Otherwise 'pay_on_site'
     const STRIPE_MINIMUM = 0.50;
     const discountsCoverAmount = grandTotal < STRIPE_MINIMUM;
     const effectivePaymentOption = discountsCoverAmount
@@ -407,12 +620,10 @@ export function BookingWizard({
       })),
       channel: isPortal ? 'portal' as const : 'online' as const,
       payment_intent_id: paymentIntentId ?? state.paymentIntentId ?? undefined,
-      // New payment options fields
       payment_option: effectivePaymentOption,
       deposit_amount: discountsCoverAmount ? 0 : depositAmount,
       coupon_code: appliedCoupon?.code ?? undefined,
       coupon_discount: appliedCoupon?.discount ?? undefined,
-      // Loyalty points
       loyalty_points_used: loyaltyPointsToUse > 0 ? loyaltyPointsToUse : undefined,
       loyalty_discount: loyaltyDiscount > 0 ? loyaltyDiscount : undefined,
     };
@@ -441,7 +652,6 @@ export function BookingWizard({
   const totalDuration =
     (state.service?.base_duration_minutes ?? 60) +
     (state.config?.addons ?? []).reduce((sum, _a) => {
-      // Look up addon duration from categories data
       const addonService = findAddonService(_a.service_id);
       return sum + (addonService?.base_duration_minutes ?? 0);
     }, 0);
@@ -461,7 +671,11 @@ export function BookingWizard({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <StepIndicator currentStep={step} requirePayment={requirePayment} />
+      <StepIndicator
+        currentStep={step}
+        requirePayment={requirePayment}
+        onStepClick={handleStepClick}
+      />
 
       {step === 1 && (
         <StepServiceSelect
@@ -477,7 +691,7 @@ export function BookingWizard({
           mobileZones={mobileZones}
           initialConfig={state.config ?? {}}
           onContinue={handleConfigureContinue}
-          onBack={() => setStep(1)}
+          onBack={() => goToStep(1)}
         />
       )}
 
@@ -489,7 +703,7 @@ export function BookingWizard({
           initialDate={state.date}
           initialTime={state.time}
           onContinue={handleScheduleContinue}
-          onBack={() => setStep(2)}
+          onBack={() => goToStep(2)}
         />
       )}
 
@@ -535,7 +749,7 @@ export function BookingWizard({
           initialSizeClass={state.config?.size_class ?? null}
           savedVehicles={customerData?.vehicles ?? []}
           onContinue={handleCustomerContinue}
-          onBack={() => setStep(3)}
+          onBack={() => goToStep(3)}
         />
       )}
 
@@ -562,7 +776,7 @@ export function BookingWizard({
             addons={state.config.addons as BookingAddonInput[]}
             couponCode={couponCode ?? null}
             onConfirm={handleReviewContinue}
-            onBack={() => setStep(4)}
+            onBack={() => goToStep(4)}
             confirmButtonText={
               state.paymentOption === 'pay_on_site'
                 ? 'Confirm Booking'
@@ -570,7 +784,6 @@ export function BookingWizard({
                   ? 'Continue to Payment'
                   : 'Confirm Booking'
             }
-            // New payment options props
             isPortal={isPortal}
             isExistingCustomer={state.isExistingCustomer ?? false}
             paymentOption={state.paymentOption}
@@ -579,7 +792,6 @@ export function BookingWizard({
             onCouponApply={handleCouponApply}
             availableCoupons={state.availableCoupons}
             requirePayment={requirePayment}
-            // Loyalty points props
             loyaltyPointsBalance={state.loyaltyPointsBalance}
             loyaltyPointsToUse={state.loyaltyPointsToUse}
             onLoyaltyPointsChange={handleLoyaltyPointsChange}
@@ -587,7 +799,6 @@ export function BookingWizard({
         )}
 
       {step === 6 && state.config && (() => {
-          // Calculate loyalty points value (5 cents per point)
           const loyaltyDiscount = state.loyaltyPointsToUse * 0.05;
 
           const grandTotal = Math.max(0,
@@ -598,7 +809,6 @@ export function BookingWizard({
             loyaltyDiscount
           );
 
-          // Stripe minimum is $0.50 - skip payment for amounts below that
           const STRIPE_MINIMUM = 0.50;
           if (grandTotal < STRIPE_MINIMUM) {
             return (
@@ -611,7 +821,7 @@ export function BookingWizard({
                   </p>
                 </div>
                 <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setStep(5)} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
+                  <Button variant="outline" onClick={() => goToStep(5)} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
                     Back
                   </Button>
                   <Button onClick={() => handleConfirm()} className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
@@ -622,8 +832,6 @@ export function BookingWizard({
             );
           }
 
-          // Under $100: full payment required
-          // $100+: $50 deposit
           const isFullPayment = grandTotal < 100;
           const paymentAmount = isFullPayment ? grandTotal : 50;
           const remainingAmount = grandTotal - paymentAmount;
@@ -635,7 +843,7 @@ export function BookingWizard({
               remainingAmount={remainingAmount}
               isDeposit={!isFullPayment}
               onPaymentSuccess={handlePaymentSuccess}
-              onBack={() => setStep(5)}
+              onBack={() => goToStep(5)}
             />
           );
         })()}
