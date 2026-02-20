@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Icon Picker Fix — 2026-02-19
+
+### Bug Fix
+- **Icon picker was broken in HTML editor toolbar**: Clicking "Icon" caused the search bar to replace the entire toolbar, with no icons displayed and no way to dismiss
+- **Root cause**: Both parent containers (footer editor, CMS page editor) had `overflow-hidden` on the toolbar wrapper. The icon picker dropdown used `position: absolute` inside this container, and the search input's `autoFocus` triggered browser auto-scroll of the overflow-hidden container, scrolling toolbar buttons out of view
+- **Fix**: Changed `IconPickerDropdown` to render via `createPortal` to `document.body` with `position: fixed`, completely escaping the overflow-hidden ancestor
+- Added click-outside-to-close handler (deferred to prevent immediate close from trigger click)
+- Added Escape key dismiss handler
+- Added dark mode support to all dropdown elements
+- Position calculation prevents off-screen overflow (clamps to viewport edges)
+
+---
+
 ## Docs Reorganization + Lean CLAUDE.md — 2026-02-19
 
 ### CLAUDE.md Slimmed

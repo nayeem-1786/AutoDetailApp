@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, createElement } from 'react';
+import { useState, createElement, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   X,
@@ -80,13 +81,29 @@ interface IconPickerProps {
 
 export function IconPicker({ onInsert, triggerClassName }: IconPickerProps) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  const handleToggle = useCallback(() => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const left = Math.min(rect.left, window.innerWidth - 330);
+      setPosition({ top: rect.bottom + 4, left: Math.max(4, left) });
+    }
+    setOpen(true);
+  }, [open]);
 
   return (
-    <div className="relative">
+    <>
       <button
+        ref={triggerRef}
         type="button"
         title="Insert Icon"
-        onClick={() => setOpen(!open)}
+        onClick={handleToggle}
         className={
           triggerClassName ??
           `flex items-center justify-center h-7 w-7 rounded transition-colors ${
@@ -100,6 +117,7 @@ export function IconPicker({ onInsert, triggerClassName }: IconPickerProps) {
       </button>
       {open && (
         <IconPickerDropdown
+          position={position}
           onInsert={(svg) => {
             onInsert(svg);
             setOpen(false);
@@ -107,7 +125,7 @@ export function IconPicker({ onInsert, triggerClassName }: IconPickerProps) {
           onClose={() => setOpen(false)}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -116,15 +134,42 @@ export function IconPicker({ onInsert, triggerClassName }: IconPickerProps) {
 // ---------------------------------------------------------------------------
 
 function IconPickerDropdown({
+  position,
   onInsert,
   onClose,
 }: {
+  position: { top: number; left: number };
   onInsert: (svg: string) => void;
   onClose: () => void;
 }) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState('');
   const [selectedSize, setSelectedSize] = useState<number>(20);
   const [selectedColor, setSelectedColor] = useState('var(--site-icon-accent)');
+
+  // Click-outside handler
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    // Defer so the opening click doesn't immediately close
+    const timer = setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handler);
+    };
+  }, [onClose]);
+
+  // Escape key handler
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   const filtered = search
     ? ICONS.filter(
@@ -137,7 +182,6 @@ function IconPickerDropdown({
   const categories = [...new Set(filtered.map((i) => i.category))];
 
   const generateSvg = (iconDef: (typeof ICONS)[number]) => {
-    // For CSS variable colors, render with currentColor and set color via style
     const isCssVar = selectedColor.startsWith('var(');
     const svgString = renderToStaticMarkup(
       createElement(iconDef.icon, {
@@ -152,12 +196,16 @@ function IconPickerDropdown({
     return svgString.replace('<svg ', `<svg ${styleAttr} `);
   };
 
-  return (
-    <div className="absolute z-20 top-full left-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg">
-      <div className="p-3 border-b border-gray-100">
+  return createPortal(
+    <div
+      ref={dropdownRef}
+      className="fixed z-50 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+      style={{ top: position.top, left: position.left }}
+    >
+      <div className="p-3 border-b border-gray-100 dark:border-gray-700">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">Insert Icon</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Insert Icon</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -166,15 +214,15 @@ function IconPickerDropdown({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search icons..."
-          className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
           autoFocus
         />
       </div>
 
       {/* Size + Color selectors */}
-      <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-4">
+      <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 flex items-center gap-4">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Size</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">Size</span>
           <div className="flex gap-0.5">
             {ICON_SIZES.map((s) => (
               <button
@@ -183,7 +231,7 @@ function IconPickerDropdown({
                 className={`px-1.5 py-0.5 text-xs rounded ${
                   selectedSize === s
                     ? 'bg-brand-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 {s}
@@ -192,7 +240,7 @@ function IconPickerDropdown({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Color</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">Color</span>
           <div className="flex gap-1">
             {ICON_COLORS.map((c) => (
               <button
@@ -200,7 +248,7 @@ function IconPickerDropdown({
                 onClick={() => setSelectedColor(c.value)}
                 title={c.label}
                 className={`h-5 w-5 rounded-full border-2 ${
-                  selectedColor === c.value ? 'border-brand-600' : 'border-gray-300'
+                  selectedColor === c.value ? 'border-brand-600' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 style={{
                   backgroundColor: c.preview,
@@ -228,9 +276,9 @@ function IconPickerDropdown({
                       key={iconDef.name}
                       title={iconDef.name}
                       onClick={() => onInsert(generateSvg(iconDef))}
-                      className="flex items-center justify-center h-9 w-9 rounded hover:bg-gray-100 transition-colors"
+                      className="flex items-center justify-center h-9 w-9 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     >
-                      <IconComp className="h-5 w-5 text-gray-600" />
+                      <IconComp className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                     </button>
                   );
                 })}
@@ -241,6 +289,7 @@ function IconPickerDropdown({
           <p className="text-xs text-gray-400 text-center py-4">No icons found</p>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
