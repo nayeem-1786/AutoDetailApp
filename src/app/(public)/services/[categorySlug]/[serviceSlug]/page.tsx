@@ -211,8 +211,16 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     </div>
                   )}
                 </dl>
+
+                {/* Ad — last element inside sidebar */}
+                {cmsToggles.adPlacements && (
+                  <div className="mt-6 border-t border-site-border pt-4">
+                    <Suspense fallback={null}>
+                      <AdZone zoneId="sidebar" pagePath={`/services/${categorySlug}/${serviceSlug}`} className="w-full rounded-lg" />
+                    </Suspense>
+                  </div>
+                )}
               </div>
-              {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/services/${categorySlug}/${serviceSlug}`} /></Suspense>}
             </aside>
           </div>
 

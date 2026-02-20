@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Service Detail Sidebar Ad Placement — 2026-02-20
+
+- **Root cause**: `<AdZone>` was placed inside the `<aside>` but **outside** the `<div className="sticky top-24 ...">` container, so the ad scrolled behind the sticky sidebar instead of staying visible with the nav links.
+- Moved `<AdZone>` inside the sticky div as the last child, after the service details `<dl>`
+- Added `mt-6 border-t border-site-border pt-4` wrapper for visual separation from nav links
+- Added `w-full rounded-lg` to AdZone for proper sidebar width fitting
+- Product detail page verified — uses horizontal layout (`below_content`), not sidebar, so no change needed
+
+---
+
 ## Audit Ad Zone Placements — Fix Invalid Sidebar Zones — 2026-02-20
 
 Audited every public page's actual layout vs the ad zones offered in the Page Map. Found 2 zones labeled "sidebar" on pages with no sidebar:
