@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Merge Vehicle Size + Sale Pricing Cards — 2026-02-19
+
+- Merged the separate "Vehicle Size Pricing" card and "Sale Pricing" card into a single unified "Pricing" card on the service edit page
+- Vehicle size model: single table with Vehicle Type, Standard Price, and Sale Price columns side by side
+- Mobile: each tier renders as a stacked mini-card with Standard + Sale inputs in a 2-column grid
+- Sale Period date pickers, Sale Preview, and Clear button are now embedded at the bottom of the same card
+- For scope/specialty models: sale price inputs are now inline below the tier form in the same card (no separate card)
+- Deleted standalone `SalePricingCard` component
+- Sale status badge moved to the card title header
+
+---
+
 ## Sale Pricing System — 2026-02-19
 
 ### Database

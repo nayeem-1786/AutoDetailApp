@@ -1171,38 +1171,177 @@ export default function ServiceDetailPage() {
         <TabsContent value="pricing">
           <Card>
             <CardHeader>
-              <CardTitle>{PRICING_MODEL_LABELS[service.pricing_model]} Pricing</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                {PRICING_MODEL_LABELS[service.pricing_model]} Pricing
+                {(() => {
+                  const hasDbSale = hasAnySalePrice(pricing);
+                  if (!hasDbSale) return null;
+                  const ss = getSaleStatus(service);
+                  const sd = getSaleStatusDisplay(ss);
+                  const ed = getSaleEndDescription(ss.saleEndsAt);
+                  return (
+                    <Badge
+                      variant={
+                        ss.isOnSale ? 'success' :
+                        ss.isScheduled ? 'warning' :
+                        ss.isExpired ? 'destructive' : 'secondary'
+                      }
+                    >
+                      {sd.emoji} {sd.label}
+                      {ss.isOnSale && ed && ` — ${ed}`}
+                    </Badge>
+                  );
+                })()}
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ServicePricingForm
-                pricingModel={service.pricing_model}
-                value={pricingValue}
-                onChange={setPricingValue}
-              />
-              <div className="mt-6 flex justify-end">
-                <Button onClick={onSavePricing} disabled={savingPricing}>
-                  {savingPricing ? 'Saving...' : 'Save Pricing'}
-                </Button>
+            <CardContent className="space-y-6">
+              {service.pricing_model === 'vehicle_size' && pricingValue.model === 'vehicle_size' ? (
+                <VehicleSizeUnifiedPricing
+                  pricingValue={pricingValue.data}
+                  onPricingChange={(data) => setPricingValue({ model: 'vehicle_size', data })}
+                  salePrices={salePrices}
+                  setSalePrices={setSalePrices}
+                  pricing={pricing}
+                />
+              ) : (
+                <>
+                  <ServicePricingForm
+                    pricingModel={service.pricing_model}
+                    value={pricingValue}
+                    onChange={setPricingValue}
+                  />
+                  {/* Inline sale pricing for scope/specialty tiers */}
+                  {pricing.length > 0 && (
+                    <div className="border-t border-gray-200 pt-6">
+                      <p className="mb-3 text-sm font-semibold text-gray-700">Sale Prices</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Tier</th>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Standard</th>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Sale Price</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...pricing].sort((a, b) => a.display_order - b.display_order).map((tier) => {
+                              const sp = salePrices[tier.tier_name] ?? '';
+                              const hasError = sp !== '' && typeof sp === 'number' && sp >= tier.price;
+                              return (
+                                <tr key={tier.id} className="border-b border-gray-100">
+                                  <td className="px-3 py-3 font-medium text-gray-700">{tier.tier_label || tier.tier_name}</td>
+                                  <td className="px-3 py-3 text-gray-600">{formatCurrency(tier.price)}</td>
+                                  <td className="px-3 py-3">
+                                    <div className="relative max-w-[160px]">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="No sale"
+                                        className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                                        value={sp}
+                                        onChange={(e) => setSalePrices({
+                                          ...salePrices,
+                                          [tier.tier_name]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                                        })}
+                                      />
+                                      {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(tier.price)}</p>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Sale Period — shown when pricing rows exist */}
+              {pricing.length > 0 && (
+                <div className={service.pricing_model !== 'vehicle_size' ? 'border-t border-gray-200 pt-6' : ''}>
+                  <p className="mb-2 text-sm font-medium text-gray-700">Sale Period (applies to all tiers)</p>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="date"
+                      value={saleStartsAt}
+                      onChange={(e) => setSaleStartsAt(e.target.value)}
+                      className="max-w-[180px]"
+                    />
+                    <span className="text-gray-400">&rarr;</span>
+                    <Input
+                      type="date"
+                      value={saleEndsAt}
+                      onChange={(e) => setSaleEndsAt(e.target.value)}
+                      className="max-w-[180px]"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">Leave dates empty for no time limit</p>
+                </div>
+              )}
+
+              {/* Sale Preview */}
+              {pricing.length > 0 && (() => {
+                const sortedTiers = [...pricing].sort((a, b) => a.display_order - b.display_order);
+                const hasSale = sortedTiers.some((t) => salePrices[t.tier_name] !== '' && salePrices[t.tier_name] !== undefined);
+                const hasDbSale = hasAnySalePrice(pricing);
+                const endingSoon = isEndingSoon(getSaleStatus(service).saleEndsAt);
+                if (!hasSale) return null;
+                return (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <p className="mb-2 text-sm font-semibold text-gray-700">
+                      Sale Preview
+                      {hasDbSale && getSaleStatus(service).isOnSale && endingSoon && (
+                        <span className="ml-2 text-amber-600">&#9200; Ending soon!</span>
+                      )}
+                    </p>
+                    <div className="space-y-1 text-sm">
+                      {sortedTiers.map((tier) => {
+                        const sp = salePrices[tier.tier_name];
+                        if (sp === '' || sp === undefined || typeof sp !== 'number') return null;
+                        const info = getTierSaleInfo(tier.price, sp, true);
+                        if (!info || !info.isDiscounted) return null;
+                        return (
+                          <div key={tier.id} className="flex items-center gap-2 text-gray-600">
+                            <span className="font-medium min-w-[140px]">{tier.tier_label || tier.tier_name}:</span>
+                            <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+                            <span className="text-gray-400">&rarr;</span>
+                            <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+                            <span className="text-xs text-gray-400">
+                              (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-between">
+                {hasAnySalePrice(pricing) && (
+                  <Button variant="outline" size="sm" onClick={() => setShowClearSaleDialog(true)} disabled={savingSale}>
+                    <X className="h-4 w-4" />
+                    Clear All Sale Prices
+                  </Button>
+                )}
+                <div className="ml-auto flex items-center gap-3">
+                  <Button onClick={onSavePricing} disabled={savingPricing}>
+                    {savingPricing ? 'Saving...' : 'Save Pricing'}
+                  </Button>
+                  {pricing.length > 0 && (
+                    <Button onClick={onSaveSalePricing} disabled={savingSale}>
+                      {savingSale ? 'Saving...' : 'Save Sale Pricing'}
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
-
-          {/* ---- Sale Pricing Card ---- */}
-          {pricing.length > 0 && (
-            <SalePricingCard
-              pricing={pricing}
-              salePrices={salePrices}
-              setSalePrices={setSalePrices}
-              saleStartsAt={saleStartsAt}
-              setSaleStartsAt={setSaleStartsAt}
-              saleEndsAt={saleEndsAt}
-              setSaleEndsAt={setSaleEndsAt}
-              onSave={onSaveSalePricing}
-              onClear={() => setShowClearSaleDialog(true)}
-              saving={savingSale}
-              service={service}
-            />
-          )}
         </TabsContent>
 
         {/* ---- Add-Ons Tab ---- */}
@@ -1531,183 +1670,143 @@ export default function ServiceDetailPage() {
   );
 }
 
-// ─── Sale Pricing Card Component ──────────────────────────────────────────
+// ─── Vehicle Size Unified Pricing (Standard + Sale in one table) ─────────
 
-function SalePricingCard({
-  pricing,
+const VEHICLE_SIZE_TIER_KEYS: { key: 'sedan' | 'truck_suv_2row' | 'suv_3row_van'; label: string }[] = [
+  { key: 'sedan', label: 'Sedan' },
+  { key: 'truck_suv_2row', label: 'Truck/SUV (2-Row)' },
+  { key: 'suv_3row_van', label: 'SUV (3-Row) / Van' },
+];
+
+function VehicleSizeUnifiedPricing({
+  pricingValue,
+  onPricingChange,
   salePrices,
   setSalePrices,
-  saleStartsAt,
-  setSaleStartsAt,
-  saleEndsAt,
-  setSaleEndsAt,
-  onSave,
-  onClear,
-  saving,
-  service,
+  pricing,
 }: {
-  pricing: ServicePricing[];
+  pricingValue: VehicleSizePricing;
+  onPricingChange: (data: VehicleSizePricing) => void;
   salePrices: Record<string, number | ''>;
   setSalePrices: (v: Record<string, number | ''>) => void;
-  saleStartsAt: string;
-  setSaleStartsAt: (v: string) => void;
-  saleEndsAt: string;
-  setSaleEndsAt: (v: string) => void;
-  onSave: () => void;
-  onClear: () => void;
-  saving: boolean;
-  service: Service;
+  pricing: ServicePricing[];
 }) {
-  const sortedTiers = [...pricing].sort((a, b) => a.display_order - b.display_order);
-  const hasSale = sortedTiers.some((t) => salePrices[t.tier_name] !== '' && salePrices[t.tier_name] !== undefined);
-  const hasDbSale = hasAnySalePrice(pricing);
-
-  const saleStatus = getSaleStatus({
-    sale_starts_at: service.sale_starts_at,
-    sale_ends_at: service.sale_ends_at,
-  });
-  const statusDisplay = getSaleStatusDisplay(saleStatus);
-  const endDesc = getSaleEndDescription(saleStatus.saleEndsAt);
-  const endingSoon = isEndingSoon(saleStatus.saleEndsAt);
-
   return (
-    <Card className="mt-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          Sale Pricing
-          {hasDbSale && (
-            <Badge
-              variant={
-                saleStatus.isOnSale ? 'success' :
-                saleStatus.isScheduled ? 'warning' :
-                saleStatus.isExpired ? 'destructive' : 'secondary'
-              }
-            >
-              {statusDisplay.emoji} {statusDisplay.label}
-              {saleStatus.isOnSale && endDesc && ` — ${endDesc}`}
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Tier rows */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Vehicle Type</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Standard Price</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Sale Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTiers.map((tier) => {
-                const sp = salePrices[tier.tier_name] ?? '';
-                const hasError = sp !== '' && typeof sp === 'number' && sp >= tier.price;
-                return (
-                  <tr key={tier.id} className="border-b border-gray-100">
-                    <td className="px-3 py-3 font-medium text-gray-700">
-                      {tier.tier_label || tier.tier_name}
-                    </td>
-                    <td className="px-3 py-3 text-gray-600">
-                      {formatCurrency(tier.price)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="relative max-w-[160px]">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="No sale"
-                          className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
-                          value={sp}
-                          onChange={(e) => {
-                            setSalePrices({
-                              ...salePrices,
-                              [tier.tier_name]: e.target.value === '' ? '' : parseFloat(e.target.value),
-                            });
-                          }}
-                        />
-                        {hasError && (
-                          <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(tier.price)}</p>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+    <>
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Vehicle Type</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Standard Price</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Sale Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {VEHICLE_SIZE_TIER_KEYS.map(({ key, label }) => {
+              const standardVal = pricingValue[key];
+              const standardNum = typeof standardVal === 'number' ? standardVal : 0;
+              const sp = salePrices[key] ?? '';
+              const hasError = sp !== '' && typeof sp === 'number' && standardNum > 0 && sp >= standardNum;
+              return (
+                <tr key={key} className="border-b border-gray-100">
+                  <td className="px-3 py-3 font-medium text-gray-700">{label}</td>
+                  <td className="px-3 py-3">
+                    <div className="relative max-w-[160px]">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-7"
+                        value={standardVal}
+                        onChange={(e) => onPricingChange({
+                          ...pricingValue,
+                          [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                        })}
+                      />
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="relative max-w-[160px]">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="No sale"
+                        className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                        value={sp}
+                        onChange={(e) => setSalePrices({
+                          ...salePrices,
+                          [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                        })}
+                      />
+                      {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(standardNum)}</p>}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-        {/* Sale Period */}
-        <div>
-          <p className="mb-2 text-sm font-medium text-gray-700">Sale Period (applies to all tiers)</p>
-          <div className="flex items-center gap-3">
-            <Input
-              type="date"
-              value={saleStartsAt}
-              onChange={(e) => setSaleStartsAt(e.target.value)}
-              className="max-w-[180px]"
-            />
-            <span className="text-gray-400">→</span>
-            <Input
-              type="date"
-              value={saleEndsAt}
-              onChange={(e) => setSaleEndsAt(e.target.value)}
-              className="max-w-[180px]"
-            />
-          </div>
-          <p className="mt-1 text-xs text-gray-400">Leave dates empty for no time limit</p>
-        </div>
-
-        {/* Sale Preview */}
-        {hasSale && (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <p className="mb-2 text-sm font-semibold text-gray-700">
-              Sale Preview
-              {hasDbSale && saleStatus.isOnSale && endingSoon && (
-                <span className="ml-2 text-amber-600">⏰ Ending soon!</span>
-              )}
-            </p>
-            <div className="space-y-1 text-sm">
-              {sortedTiers.map((tier) => {
-                const sp = salePrices[tier.tier_name];
-                if (sp === '' || sp === undefined || typeof sp !== 'number') return null;
-                const info = getTierSaleInfo(tier.price, sp, true);
-                if (!info || !info.isDiscounted) return null;
-                return (
-                  <div key={tier.id} className="flex items-center gap-2 text-gray-600">
-                    <span className="font-medium min-w-[140px]">{tier.tier_label || tier.tier_name}:</span>
-                    <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
-                    <span className="text-xs text-gray-400">
-                      (-{info.discountPercent}%, save {formatCurrency(info.savings)})
-                    </span>
+      {/* Mobile: stacked mini-cards */}
+      <div className="sm:hidden space-y-3">
+        {VEHICLE_SIZE_TIER_KEYS.map(({ key, label }) => {
+          const standardVal = pricingValue[key];
+          const standardNum = typeof standardVal === 'number' ? standardVal : 0;
+          const sp = salePrices[key] ?? '';
+          const hasError = sp !== '' && typeof sp === 'number' && standardNum > 0 && sp >= standardNum;
+          return (
+            <div key={key} className="rounded-lg border border-gray-200 p-4">
+              <p className="text-sm font-medium text-gray-700 mb-3">{label}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Standard</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      className="pl-7"
+                      value={standardVal}
+                      onChange={(e) => onPricingChange({
+                        ...pricingValue,
+                        [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                      })}
+                    />
                   </div>
-                );
-              })}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Sale</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="No sale"
+                      className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                      value={sp}
+                      onChange={(e) => setSalePrices({
+                        ...salePrices,
+                        [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                      })}
+                    />
+                    {hasError && <p className="mt-1 text-xs text-red-500">Must be &lt; standard</p>}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          {hasDbSale && (
-            <Button variant="outline" size="sm" onClick={onClear} disabled={saving}>
-              <X className="h-4 w-4" />
-              Clear All Sale Prices
-            </Button>
-          )}
-          <div className="ml-auto">
-            <Button onClick={onSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Sale Pricing'}
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          );
+        })}
+      </div>
+    </>
   );
 }
