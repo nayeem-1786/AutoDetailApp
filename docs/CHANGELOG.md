@@ -4,6 +4,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Site Performance Audit & Optimization — 2026-02-20
+
+### Image Optimization
+- **Configured `next/image`** with `remotePatterns` for Supabase storage in `next.config.ts`
+- **Converted ALL public-facing `<img>` to `<Image>`** across 13 files: header logo, footer logo, hero carousel, before/after sliders, service cards, product cards, ad zones, cart/checkout/confirmation thumbnails
+- Adds automatic WebP conversion, lazy loading, responsive `sizes`, and `priority` for above-fold images
+- **Compressed before/after PNGs to WebP**: 1.26 MB → 129 KB (90% reduction)
+
+### Bundle Optimization
+- **Removed framer-motion from header** (`header-client.tsx`): replaced `motion.div` / `AnimatePresence` with CSS transitions (`opacity`, `translate`, `grid-rows`)
+- framer-motion (~110KB) no longer ships on every page — only loaded on pages with animations (homepage, services, products)
+- **Dynamic-imported `ParticleCanvas`** in theme-provider: only loaded when seasonal particles are active
+
+### Middleware Optimization
+- **Skip `supabase.auth.getUser()` for anonymous visitors** on public routes: checks for `sb-*` cookie first
+- Logged-in users on public routes still get session refresh
+- Eliminates 50-200ms Supabase auth round-trip for all anonymous traffic
+
+### Audit
+- Full audit documented in `docs/audits/performance.md`
+
+---
+
 ## User Dropdown Menu in Header — 2026-02-20
 
 ### Desktop

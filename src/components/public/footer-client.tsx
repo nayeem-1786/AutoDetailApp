@@ -2,6 +2,7 @@
 
 import { Phone, Mail, MapPin, Clock, Star, Shield, Award, Leaf } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { FooterData, FooterColumn as FooterColumnType, FooterBottomLink } from '@/lib/supabase/types';
 import type { BusinessInfo } from '@/lib/data/business';
 
@@ -213,10 +214,11 @@ function BrandColumn({
     <div>
       {/* Logo */}
       {showLogo && (businessInfo.logo_url ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
+        <Image
           src={businessInfo.logo_url}
           alt={businessInfo.name}
+          width={logoWidth}
+          height={Math.round(logoWidth / 3)}
           style={{ width: logoWidth, height: 'auto' }}
           className="mb-4"
         />

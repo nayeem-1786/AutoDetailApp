@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Truck, Shield, Leaf, ArrowRight, Star } from 'lucide-react';
 import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
@@ -205,9 +206,11 @@ export default async function HomePage() {
                   <div key={i} className="text-center">
                     <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-brand-surface border border-site-border flex items-center justify-center">
                       {member.photoUrl ? (
-                        <img
+                        <Image
                           src={member.photoUrl}
                           alt={member.name}
+                          width={128}
+                          height={128}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -239,9 +242,11 @@ export default async function HomePage() {
                     {teamData.credentials.map((cred, i) => (
                       <div key={i} className="flex items-center gap-3 text-center">
                         {cred.imageUrl && (
-                          <img
+                          <Image
                             src={cred.imageUrl}
                             alt={cred.title}
+                            width={80}
+                            height={48}
                             className="h-12 w-auto object-contain"
                           />
                         )}
@@ -330,8 +335,8 @@ export default async function HomePage() {
       <SectionTickerSlot position="before_cta" pageType="home" />
 
       <CtaSection
-        beforeImage="/images/before-after-old.png"
-        afterImage="/images/before-after-new.png"
+        beforeImage="/images/before-after-old.webp"
+        afterImage="/images/before-after-new.webp"
       />
     </>
   );

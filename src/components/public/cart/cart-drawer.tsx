@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { X, ShoppingBag, Trash2, Package } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
@@ -155,10 +156,11 @@ export function CartDrawer() {
                 >
                   <div className="h-16 w-16 rounded-lg bg-brand-dark overflow-hidden border border-site-border">
                     {item.imageUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
+                      <Image
                         src={item.imageUrl}
                         alt={item.name}
+                        width={64}
+                        height={64}
                         className="h-full w-full object-cover"
                       />
                     ) : (

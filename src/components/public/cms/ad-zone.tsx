@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 
 // ---------------------------------------------------------------------------
 // AdZone — renders an ad for a specific zone on a page
@@ -138,19 +139,14 @@ export function AdZone({ zoneId, pagePath, className, ad: preloaded }: AdZonePro
         role={ad.creative.link_url ? 'link' : undefined}
         style={{ maxWidth: width }}
       >
-        <picture>
-          {ad.creative.image_url_mobile && (
-            <source media="(max-width: 639px)" srcSet={ad.creative.image_url_mobile} />
-          )}
-          <img
-            src={ad.creative.image_url}
-            alt={ad.creative.alt_text || 'Advertisement'}
-            width={width}
-            height={height}
-            className="h-auto w-full"
-            loading="lazy"
-          />
-        </picture>
+        <Image
+          src={ad.creative.image_url}
+          alt={ad.creative.alt_text || 'Advertisement'}
+          width={width}
+          height={height}
+          className="h-auto w-full"
+          loading="lazy"
+        />
       </div>
     </div>
   );

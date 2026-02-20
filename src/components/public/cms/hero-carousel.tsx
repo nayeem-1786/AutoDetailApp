@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeroSlide, HeroCarouselConfig } from '@/lib/supabase/types';
 
 interface HeroCarouselProps {
@@ -124,11 +125,12 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
           {slide.content_type === 'video' && slide.video_url ? (
             <>
               {slide.video_thumbnail_url && (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
+                <Image
                   src={slide.video_thumbnail_url}
                   alt={slide.title || ''}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  fill
+                  sizes="100vw"
+                  className="object-cover"
                 />
               )}
               <video
@@ -150,18 +152,14 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
               afterLabel={slide.after_label ?? 'After'}
             />
           ) : slide.image_url ? (
-            <picture>
-              {slide.image_url_mobile && (
-                <source media="(max-width: 639px)" srcSet={slide.image_url_mobile} />
-              )}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={slide.image_url}
-                alt={slide.image_alt || slide.title || ''}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading={current === 0 ? 'eager' : 'lazy'}
-              />
-            </picture>
+            <Image
+              src={slide.image_url}
+              alt={slide.image_alt || slide.title || ''}
+              fill
+              sizes="100vw"
+              className="object-cover"
+              priority={current === 0}
+            />
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-brand-grey to-brand-black" />
           )}
@@ -348,20 +346,22 @@ function HeroBeforeAfter({
       }}
     >
       {/* After image (full, behind) */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={afterSrc}
         alt={afterLabel}
-        className="absolute inset-0 w-full h-full object-cover"
+        fill
+        sizes="100vw"
+        className="object-cover"
         draggable={false}
       />
 
       {/* Before image (clipped) */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={beforeSrc}
         alt={beforeLabel}
-        className="absolute inset-0 w-full h-full object-cover"
+        fill
+        sizes="100vw"
+        className="object-cover"
         style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
         draggable={false}
       />

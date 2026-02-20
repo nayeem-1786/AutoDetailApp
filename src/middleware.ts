@@ -104,8 +104,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Allow public routes (including homepage) — still refresh session tokens
+  // Public routes: skip auth entirely for anonymous visitors (no Supabase cookie).
+  // Logged-in users still get their session refreshed.
   if (pathname === '/' || PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+    const hasAuthCookie = request.cookies.getAll().some((c) => c.name.startsWith('sb-'));
+    if (!hasAuthCookie) {
+      return NextResponse.next({ request });
+    }
     const { supabaseResponse } = await updateSession(request);
     return supabaseResponse;
   }

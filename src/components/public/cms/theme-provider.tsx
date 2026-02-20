@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import type { SeasonalTheme, SiteThemeSettings } from '@/lib/supabase/types';
-import { ParticleCanvas } from './particle-canvas';
+
+const ParticleCanvas = dynamic(() => import('./particle-canvas').then(m => ({ default: m.ParticleCanvas })), { ssr: false });
 
 // ---------------------------------------------------------------------------
 // ThemeProvider — Wraps public layout children

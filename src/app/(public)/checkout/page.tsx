@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -273,10 +274,11 @@ function PaymentForm({
             <span>PCI DSS Compliant</span>
           </div>
           <div className="border-t border-site-border pt-3 flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src="/images/powered-by-stripe.svg"
               alt="Powered by Stripe"
+              width={120}
+              height={36}
               className="h-9 w-auto opacity-60"
             />
           </div>
@@ -1122,11 +1124,13 @@ function CheckoutContent() {
                                   className="accent-lime"
                                 />
                                 {showCarrierLogo && rate.carrierLogo && (
-                                  /* eslint-disable-next-line @next/next/no-img-element */
-                                  <img
+                                  <Image
                                     src={rate.carrierLogo}
                                     alt={rate.carrierName}
-                                    className="h-6 w-6 object-contain shrink-0"
+                                    width={24}
+                                    height={24}
+                                    className="object-contain shrink-0"
+                                    unoptimized
                                   />
                                 )}
                                 <div>
@@ -1395,10 +1399,11 @@ function CheckoutContent() {
                   <div key={item.id} className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-brand-dark overflow-hidden border border-site-border shrink-0">
                       {item.imageUrl ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
+                        <Image
                           src={item.imageUrl}
                           alt={item.name}
+                          width={64}
+                          height={64}
                           className="h-full w-full object-cover"
                         />
                       ) : (

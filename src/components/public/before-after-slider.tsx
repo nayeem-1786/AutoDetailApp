@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface BeforeAfterSliderProps {
@@ -64,18 +65,22 @@ export function BeforeAfterSlider({
       onPointerUp={handlePointerUp}
     >
       {/* After image (full background) */}
-      <img
+      <Image
         src={afterImage}
         alt={afterLabel}
-        className="absolute inset-0 h-full w-full object-cover"
+        fill
+        sizes="(max-width: 1024px) 100vw, 50vw"
+        className="object-cover"
         draggable={false}
       />
 
       {/* Before image (clipped from the right) */}
-      <img
+      <Image
         src={beforeImage}
         alt={beforeLabel}
-        className="absolute inset-0 h-full w-full object-cover"
+        fill
+        sizes="(max-width: 1024px) 100vw, 50vw"
+        className="object-cover"
         style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
         draggable={false}
       />

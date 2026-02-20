@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
@@ -22,11 +23,12 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
       <Link href={href} className="block">
         <div className="relative aspect-[4/3] w-full bg-brand-surface overflow-hidden">
           {product.image_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
+            <Image
               src={product.image_url}
               alt={product.name}
-              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-cover group-hover:scale-105 transition-transform duration-500"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">

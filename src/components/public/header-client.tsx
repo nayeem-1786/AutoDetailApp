@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ChevronDown, Phone, MapPin, LayoutDashboard, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import type { WebsiteNavItem } from '@/lib/supabase/types';
 import { CartIconButton } from './cart/cart-icon-button';
@@ -90,8 +90,7 @@ export function HeaderClient({
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 shrink-0">
             {logoUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={logoUrl} alt={businessName} className="h-10 lg:h-12 w-auto" />
+              <Image src={logoUrl} alt={businessName} width={160} height={48} className="h-10 lg:h-12 w-auto" priority />
             ) : (
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-lime flex items-center justify-center">
@@ -137,33 +136,29 @@ export function HeaderClient({
                   )}
                 </Link>
 
-                {/* Dropdown */}
-                <AnimatePresence>
-                  {item.children &&
-                    item.children.length > 0 &&
-                    activeDropdown === i && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                        transition={{ duration: 0.2 }}
-                        className="absolute top-full left-0 mt-1 w-72 bg-brand-surface border border-site-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden p-2"
+                {/* Dropdown — CSS transition */}
+                {item.children && item.children.length > 0 && (
+                  <div
+                    className={`absolute top-full left-0 mt-1 w-72 bg-brand-surface border border-site-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden p-2 transition-all duration-200 ${
+                      activeDropdown === i
+                        ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+                        : 'opacity-0 translate-y-2 scale-[0.96] pointer-events-none'
+                    }`}
+                  >
+                    {item.children.map((child) => (
+                      <Link
+                        key={child.id}
+                        href={child.url}
+                        target={child.target || '_self'}
+                        className="flex items-start gap-3 p-3 rounded-xl hover:bg-site-border-light transition-colors group"
                       >
-                        {item.children.map((child) => (
-                          <Link
-                            key={child.id}
-                            href={child.url}
-                            target={child.target || '_self'}
-                            className="flex items-start gap-3 p-3 rounded-xl hover:bg-site-border-light transition-colors group"
-                          >
-                            <div className="text-sm font-medium text-site-text group-hover:text-lime transition-colors">
-                              {child.label}
-                            </div>
-                          </Link>
-                        ))}
-                      </motion.div>
-                    )}
-                </AnimatePresence>
+                        <div className="text-sm font-medium text-site-text group-hover:text-lime transition-colors">
+                          {child.label}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </nav>
@@ -188,33 +183,29 @@ export function HeaderClient({
                     }`}
                   />
                 </button>
-                <AnimatePresence>
-                  {userDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute top-full right-0 mt-1 w-44 bg-brand-surface border border-site-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden p-1.5"
-                    >
-                      <Link
-                        href="/account"
-                        className="flex items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-lime/10 rounded-lg transition-colors"
-                      >
-                        <LayoutDashboard className="w-4 h-4 text-site-text-muted" />
-                        Dashboard
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={handleSignOut}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-colors"
-                      >
-                        <LogOut className="w-4 h-4 text-site-text-muted" />
-                        Log Out
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div
+                  className={`absolute top-full right-0 mt-1 w-44 bg-brand-surface border border-site-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden p-1.5 transition-all duration-200 ${
+                    userDropdownOpen
+                      ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+                      : 'opacity-0 translate-y-2 scale-[0.96] pointer-events-none'
+                  }`}
+                >
+                  <Link
+                    href="/account"
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-lime/10 rounded-lg transition-colors"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-site-text-muted" />
+                    Dashboard
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-colors"
+                  >
+                    <LogOut className="w-4 h-4 text-site-text-muted" />
+                    Log Out
+                  </button>
+                </div>
               </div>
             ) : (
               <Link
@@ -256,97 +247,93 @@ export function HeaderClient({
         </div>
       </div>
 
-      {/* Mobile menu */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="lg:hidden overflow-hidden border-t border-site-border bg-brand-dark"
-          >
-            <div className="px-4 py-4 space-y-1">
-              {navItems.map((item) => (
-                <div key={item.id}>
-                  <Link
-                    href={item.url}
-                    className="flex items-center justify-between py-3 px-3 text-site-text-secondary hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors"
-                    onClick={() =>
-                      !(item.children && item.children.length > 0) &&
-                      setMobileOpen(false)
-                    }
-                  >
-                    <span className="font-medium">{item.label}</span>
-                    {item.children && item.children.length > 0 && (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </Link>
+      {/* Mobile menu — CSS transition via grid row trick */}
+      <div
+        className={`lg:hidden grid transition-[grid-template-rows] duration-300 border-t border-site-border bg-brand-dark ${
+          mobileOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="px-4 py-4 space-y-1">
+            {navItems.map((item) => (
+              <div key={item.id}>
+                <Link
+                  href={item.url}
+                  className="flex items-center justify-between py-3 px-3 text-site-text-secondary hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors"
+                  onClick={() =>
+                    !(item.children && item.children.length > 0) &&
+                    setMobileOpen(false)
+                  }
+                >
+                  <span className="font-medium">{item.label}</span>
                   {item.children && item.children.length > 0 && (
-                    <div className="ml-4 space-y-1 mt-1">
-                      {item.children.map((child) => (
-                        <Link
-                          key={child.id}
-                          href={child.url}
-                          className="block py-2 px-3 text-sm text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-lg transition-colors"
-                          onClick={() => setMobileOpen(false)}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
-                    </div>
+                    <ChevronDown className="w-4 h-4" />
                   )}
-                </div>
-              ))}
-
-              {/* Account — mobile */}
-              <div className="pt-2 border-t border-site-border space-y-1">
-                {customerName ? (
-                  <>
-                    <p className="px-3 pt-1 text-xs font-medium text-site-text-dim">
-                      Hi, {customerName}
-                    </p>
-                    <Link
-                      href="/account"
-                      className="flex items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      <LayoutDashboard className="w-4 h-4" />
-                      Dashboard
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => { setMobileOpen(false); handleSignOut(); }}
-                      className="flex w-full items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Log Out
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    href="/signin"
-                    className="block py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    Sign In
-                  </Link>
+                </Link>
+                {item.children && item.children.length > 0 && (
+                  <div className="ml-4 space-y-1 mt-1">
+                    {item.children.map((child) => (
+                      <Link
+                        key={child.id}
+                        href={child.url}
+                        className="block py-2 px-3 text-sm text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-lg transition-colors"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        {child.label}
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </div>
+            ))}
 
-              <div className="pt-3">
+            {/* Account — mobile */}
+            <div className="pt-2 border-t border-site-border space-y-1">
+              {customerName ? (
+                <>
+                  <p className="px-3 pt-1 text-xs font-medium text-site-text-dim">
+                    Hi, {customerName}
+                  </p>
+                  <Link
+                    href="/account"
+                    className="flex items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Dashboard
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => { setMobileOpen(false); handleSignOut(); }}
+                    className="flex w-full items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Log Out
+                  </button>
+                </>
+              ) : (
                 <Link
-                  href="/book"
-                  className="block w-full text-center py-3 site-btn-cta font-bold"
+                  href="/signin"
+                  className="block py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
                   onClick={() => setMobileOpen(false)}
                 >
-                  Book Now
+                  Sign In
                 </Link>
-              </div>
+              )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            <div className="pt-3">
+              <Link
+                href="/book"
+                className="block w-full text-center py-3 site-btn-cta font-bold"
+                onClick={() => setMobileOpen(false)}
+              >
+                Book Now
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </header>
   );
 }

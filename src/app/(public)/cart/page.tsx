@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ShoppingBag, Trash2, ArrowRight, Package, Tag, X } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
 import { formatCurrency } from '@/lib/utils/format';
@@ -125,10 +126,11 @@ export default function CartPage() {
                 >
                   <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl bg-brand-dark overflow-hidden border border-site-border">
                     {item.imageUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
+                      <Image
                         src={item.imageUrl}
                         alt={item.name}
+                        width={96}
+                        height={96}
                         className="h-full w-full object-cover"
                       />
                     ) : (

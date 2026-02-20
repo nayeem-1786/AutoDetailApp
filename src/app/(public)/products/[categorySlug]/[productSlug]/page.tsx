@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import Image from 'next/image';
 import { Package, Clock } from 'lucide-react';
 import { getProductBySlug, getAllProductsForSitemap } from '@/lib/data/products';
 import { getBusinessInfo } from '@/lib/data/business';
@@ -95,10 +96,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
             {/* Left column: product image */}
             <div className="relative aspect-square overflow-hidden rounded-2xl bg-brand-surface border border-site-border">
               {product.image_url ? (
-                <img
+                <Image
                   src={product.image_url}
                   alt={product.image_alt ?? `${product.name} - ${businessInfo.name}`}
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                  priority
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">

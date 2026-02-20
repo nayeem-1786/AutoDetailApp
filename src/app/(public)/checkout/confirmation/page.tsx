@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { CheckCircle, Package, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
 import { formatCurrency } from '@/lib/utils/format';
@@ -184,10 +185,11 @@ function ConfirmationContent() {
                 <div key={idx} className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-lg bg-brand-dark overflow-hidden border border-site-border shrink-0">
                     {item.product_image_url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
+                      <Image
                         src={item.product_image_url}
                         alt={item.product_name}
+                        width={64}
+                        height={64}
                         className="h-full w-full object-cover"
                       />
                     ) : (
