@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Ticker Hover UX Polish — 2026-02-19
+
+- Added `cursor: default` and `user-select: none` to `.ticker-track` container to prevent text I-beam cursor and accidental text selection on hover
+
+---
+
 ## Ticker Instant Hover Pause — 2026-02-19
 
 ### Removed two-phase marquee system, replaced with single CSS animation

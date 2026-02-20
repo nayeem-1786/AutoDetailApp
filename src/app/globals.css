@@ -463,6 +463,12 @@ h1, h2, h3 {
   animation: marquee 20s linear infinite;
 }
 
+/* Ticker container — prevent text cursor and text selection */
+.ticker-track {
+  cursor: default;
+  user-select: none;
+}
+
 /* Freeze ticker marquee instantly on hover — pure CSS, zero latency */
 .ticker-track:hover .animate-marquee {
   animation-play-state: paused !important;
