@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { BookingWizard } from '@/components/booking/booking-wizard';
 import {
@@ -14,6 +15,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { getCmsToggles } from '@/lib/data/cms';
+import { AdZone } from '@/components/public/cms/ad-zone';
 
 export async function generateMetadata(): Promise<Metadata> {
   const [businessInfo, seoOverrides] = await Promise.all([
@@ -41,12 +44,13 @@ interface BookPageProps {
 export default async function BookPage({ searchParams }: BookPageProps) {
   const params = await searchParams;
 
-  const [categories, mobileZones, businessHours, bookingConfig] =
+  const [categories, mobileZones, businessHours, bookingConfig, cmsToggles] =
     await Promise.all([
       getBookableServices(),
       getMobileZones(),
       getBusinessHours(),
       getBookingConfig(),
+      getCmsToggles(),
     ]);
 
   // Pre-select service if ?service=slug is provided
@@ -128,31 +132,40 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   }
 
   return (
-    <section className="bg-brand-dark py-12 sm:py-16">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
-            Book Your Appointment
-          </h1>
-          <p className="mt-3 text-lg text-site-text-muted">
-            Select a service, configure your options, and pick a time that works
-            for you.
-          </p>
-        </div>
+    <>
+      <section className="bg-brand-dark py-12 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <h1 className="text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
+              Book Your Appointment
+            </h1>
+            <p className="mt-3 text-lg text-site-text-muted">
+              Select a service, configure your options, and pick a time that works
+              for you.
+            </p>
+          </div>
 
-        <div className="mt-12">
-          <BookingWizard
-            categories={categories}
-            mobileZones={mobileZones}
-            businessHours={businessHours}
-            bookingConfig={bookingConfig}
-            preSelectedService={preSelectedService}
-            rebookData={rebookData}
-            customerData={customerData ?? campaignCustomerData}
-            couponCode={params.coupon ?? null}
-          />
+          <div className="mt-12">
+            <BookingWizard
+              categories={categories}
+              mobileZones={mobileZones}
+              businessHours={businessHours}
+              bookingConfig={bookingConfig}
+              preSelectedService={preSelectedService}
+              rebookData={rebookData}
+              customerData={customerData ?? campaignCustomerData}
+              couponCode={params.coupon ?? null}
+            />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      {/* Desktop-only sidebar ad — zone has no mobile sizes */}
+      {cmsToggles.adPlacements && (
+        <div className="hidden sm:block">
+          <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath="/book" /></Suspense>
+        </div>
+      )}
+    </>
   );
 }

@@ -176,6 +176,8 @@ export default async function GalleryPage() {
           <GalleryClient initialPairs={pairs} serviceOptions={serviceOptions} />
         </div>
       </div>
+
+      {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="between_rows" pagePath="/gallery" /></Suspense>}
     </>
   );
 }

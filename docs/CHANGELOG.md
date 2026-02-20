@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Ad Zones — Dynamic Route Resolution + Full Zone Wiring — 2026-02-20
+
+**Critical fix**: Ads on all dynamic routes (service category, service detail, product detail) never rendered because `getAdsForZone()` compared actual paths (e.g., `/services/ceramic-coatings/ceramic-coating`) against template paths stored in DB (e.g., `/services/:categorySlug/:serviceSlug`) — exact match always failed. Added `resolveTemplatePath()` to convert actual paths back to template paths before querying. This unblocked 5 zones across 3 pages.
+
+- **`resolveTemplatePath()`**: New function in `src/lib/data/cms.ts` — tries exact match first, then regex-matches `PAGE_ZONES` patterns for dynamic routes
+- **Gallery `between_rows` zone wired**: Was defined in `PAGE_ZONES` but never placed in gallery page
+- **Booking `sidebar` zone wired**: Was defined in `PAGE_ZONES` but never placed in booking page (desktop only)
+- All 14 zones across 8 pages verified end-to-end
+- Updated `docs/audits/ad-management.md` with complete zone verification table
+
+---
+
 ## Fix Ad Management System — Functional Audit + Fixes — 2026-02-20
 
 Full code-traced audit of the ad management system. Found and fixed 5 issues:

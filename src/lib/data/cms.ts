@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PAGE_ZONES } from '@/lib/utils/cms-zones';
 import type {
   HeroSlide,
   HeroCarouselConfig,
@@ -270,14 +271,36 @@ export const getTickerOptions = unstable_cache(
 // Ads
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolve an actual page path to its template path from PAGE_ZONES.
+ * e.g., "/services/ceramic-coatings/ceramic-coating" → "/services/:categorySlug/:serviceSlug"
+ * Static paths like "/" or "/services" return unchanged.
+ */
+function resolveTemplatePath(actualPath: string): string {
+  // Exact match first (static pages like /, /services, /products, /gallery)
+  const exact = PAGE_ZONES.find((p) => p.pagePath === actualPath);
+  if (exact) return actualPath;
+
+  // Pattern match for dynamic routes
+  for (const page of PAGE_ZONES) {
+    if (!page.pagePath.includes(':')) continue;
+    const pattern = page.pagePath.replace(/:[^/]+/g, '[^/]+');
+    const regex = new RegExp(`^${pattern}$`);
+    if (regex.test(actualPath)) return page.pagePath;
+  }
+
+  return actualPath;
+}
+
 export const getAdsForZone = unstable_cache(
   async (pagePath: string, zoneId: string) => {
     const supabase = createAdminClient();
+    const queryPath = resolveTemplatePath(pagePath);
 
     const { data } = await supabase
       .from('ad_placements')
       .select('*, ad_creative:ad_creatives(*)')
-      .eq('page_path', pagePath)
+      .eq('page_path', queryPath)
       .eq('zone_id', zoneId)
       .eq('is_active', true)
       .order('priority', { ascending: false })
