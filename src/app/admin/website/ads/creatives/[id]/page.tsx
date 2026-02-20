@@ -31,7 +31,7 @@ import { AD_SIZE_LABELS } from '@/lib/utils/cms-zones';
 
 const BUCKET = 'cms-assets';
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
 const AD_SIZE_OPTIONS: { value: AdSize; label: string }[] = [
   { value: '728x90', label: 'Leaderboard (728x90)' },
@@ -241,7 +241,7 @@ export default function AdCreativeEditorPage() {
       return;
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      toast.error('Image must be under 5MB');
+      toast.error('Image must be under 10MB');
       return;
     }
 
@@ -495,7 +495,7 @@ export default function AdCreativeEditorPage() {
                     {uploading ? 'Uploading...' : 'Click or drag to upload'}
                   </p>
                   <p className="text-[10px] text-gray-300 dark:text-gray-600">
-                    JPEG, PNG, WebP, or GIF. Max 5MB.
+                    JPEG, PNG, WebP, or GIF. Max 10MB.
                   </p>
                 </button>
               )}
