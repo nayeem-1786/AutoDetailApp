@@ -53,7 +53,15 @@ import {
   type SpecialtyTier,
 } from '@/components/service-pricing-form';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, X } from 'lucide-react';
+import {
+  getSaleStatus,
+  getTierSaleInfo,
+  getSaleStatusDisplay,
+  getSaleEndDescription,
+  isEndingSoon,
+  hasAnySalePrice,
+} from '@/lib/utils/sale-pricing';
 import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
 
 type ServiceWithRelations = Service & {
@@ -114,6 +122,13 @@ export default function ServiceDetailPage() {
   const [savingPricing, setSavingPricing] = useState(false);
   // Track original pricing row IDs so we can detect deletions on save
   const [originalPricingIds, setOriginalPricingIds] = useState<string[]>([]);
+
+  // Sale pricing state
+  const [salePrices, setSalePrices] = useState<Record<string, number | ''>>({});
+  const [saleStartsAt, setSaleStartsAt] = useState('');
+  const [saleEndsAt, setSaleEndsAt] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
+  const [showClearSaleDialog, setShowClearSaleDialog] = useState(false);
 
   // Add-on dialog state
   const [addonDialogOpen, setAddonDialogOpen] = useState(false);
@@ -237,6 +252,17 @@ export default function ServiceDetailPage() {
 
     // Build pricing value from existing rows
     buildPricingValue(svc.pricing_model, pricingRes.data || [], svc);
+
+    // Populate sale pricing state
+    const sp: Record<string, number | ''> = {};
+    (pricingRes.data || []).forEach((r: ServicePricing) => {
+      sp[r.tier_name] = r.sale_price ?? '';
+    });
+    setSalePrices(sp);
+    // Convert ISO timestamps to local date strings for date inputs
+    setSaleStartsAt(svc.sale_starts_at ? new Date(svc.sale_starts_at).toISOString().split('T')[0] : '');
+    setSaleEndsAt(svc.sale_ends_at ? new Date(svc.sale_ends_at).toISOString().split('T')[0] : '');
+
     setLoading(false);
   }, [serviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -781,6 +807,89 @@ export default function ServiceDetailPage() {
     }
   }
 
+  // ---- Save Sale Pricing ----
+  async function onSaveSalePricing() {
+    if (!service) return;
+    setSavingSale(true);
+    try {
+      // Validate: each sale price must be less than its standard price
+      for (const row of pricing) {
+        const sp = salePrices[row.tier_name];
+        if (sp !== '' && sp !== undefined && typeof sp === 'number') {
+          if (sp >= row.price) {
+            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be less than standard price (${formatCurrency(row.price)})`);
+            setSavingSale(false);
+            return;
+          }
+          if (sp <= 0) {
+            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be greater than $0`);
+            setSavingSale(false);
+            return;
+          }
+        }
+      }
+
+      // Update sale_price on each pricing row
+      for (const row of pricing) {
+        const sp = salePrices[row.tier_name];
+        const salePrice = (sp !== '' && typeof sp === 'number') ? sp : null;
+        const { error } = await supabase
+          .from('service_pricing')
+          .update({ sale_price: salePrice })
+          .eq('id', row.id);
+        if (error) throw error;
+      }
+
+      // Update sale dates on service
+      const startTs = saleStartsAt ? new Date(saleStartsAt + 'T00:00:00-08:00').toISOString() : null;
+      const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
+      const { error: svcError } = await supabase
+        .from('services')
+        .update({ sale_starts_at: startTs, sale_ends_at: endTs })
+        .eq('id', serviceId);
+      if (svcError) throw svcError;
+
+      toast.success('Sale pricing updated');
+      loadData();
+    } catch (err) {
+      console.error('Failed to update sale pricing:', err);
+      toast.error('Failed to update sale pricing');
+    } finally {
+      setSavingSale(false);
+    }
+  }
+
+  // ---- Clear All Sale Prices ----
+  async function clearAllSalePrices() {
+    setSavingSale(true);
+    try {
+      // Clear sale_price on all pricing rows
+      for (const row of pricing) {
+        const { error } = await supabase
+          .from('service_pricing')
+          .update({ sale_price: null })
+          .eq('id', row.id);
+        if (error) throw error;
+      }
+
+      // Clear sale dates on service
+      const { error: svcError } = await supabase
+        .from('services')
+        .update({ sale_starts_at: null, sale_ends_at: null })
+        .eq('id', serviceId);
+      if (svcError) throw svcError;
+
+      toast.success('Sale pricing cleared');
+      setShowClearSaleDialog(false);
+      loadData();
+    } catch (err) {
+      console.error('Failed to clear sale pricing:', err);
+      toast.error('Failed to clear sale pricing');
+    } finally {
+      setSavingSale(false);
+    }
+  }
+
   // ---- Rendering ----
   if (loading) {
     return (
@@ -1077,6 +1186,23 @@ export default function ServiceDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* ---- Sale Pricing Card ---- */}
+          {pricing.length > 0 && (
+            <SalePricingCard
+              pricing={pricing}
+              salePrices={salePrices}
+              setSalePrices={setSalePrices}
+              saleStartsAt={saleStartsAt}
+              setSaleStartsAt={setSaleStartsAt}
+              saleEndsAt={saleEndsAt}
+              setSaleEndsAt={setSaleEndsAt}
+              onSave={onSaveSalePricing}
+              onClear={() => setShowClearSaleDialog(true)}
+              saving={savingSale}
+              service={service}
+            />
+          )}
         </TabsContent>
 
         {/* ---- Add-Ons Tab ---- */}
@@ -1389,6 +1515,199 @@ export default function ServiceDetailPage() {
         loading={deleting}
         onConfirm={handleDelete}
       />
+
+      {/* ---- Clear Sale Pricing Confirmation ---- */}
+      <ConfirmDialog
+        open={showClearSaleDialog}
+        onOpenChange={setShowClearSaleDialog}
+        title="Clear All Sale Prices"
+        description="This will remove all sale prices and date ranges for this service. The standard prices will remain unchanged."
+        confirmLabel="Clear Sale"
+        variant="destructive"
+        loading={savingSale}
+        onConfirm={clearAllSalePrices}
+      />
     </div>
+  );
+}
+
+// ─── Sale Pricing Card Component ──────────────────────────────────────────
+
+function SalePricingCard({
+  pricing,
+  salePrices,
+  setSalePrices,
+  saleStartsAt,
+  setSaleStartsAt,
+  saleEndsAt,
+  setSaleEndsAt,
+  onSave,
+  onClear,
+  saving,
+  service,
+}: {
+  pricing: ServicePricing[];
+  salePrices: Record<string, number | ''>;
+  setSalePrices: (v: Record<string, number | ''>) => void;
+  saleStartsAt: string;
+  setSaleStartsAt: (v: string) => void;
+  saleEndsAt: string;
+  setSaleEndsAt: (v: string) => void;
+  onSave: () => void;
+  onClear: () => void;
+  saving: boolean;
+  service: Service;
+}) {
+  const sortedTiers = [...pricing].sort((a, b) => a.display_order - b.display_order);
+  const hasSale = sortedTiers.some((t) => salePrices[t.tier_name] !== '' && salePrices[t.tier_name] !== undefined);
+  const hasDbSale = hasAnySalePrice(pricing);
+
+  const saleStatus = getSaleStatus({
+    sale_starts_at: service.sale_starts_at,
+    sale_ends_at: service.sale_ends_at,
+  });
+  const statusDisplay = getSaleStatusDisplay(saleStatus);
+  const endDesc = getSaleEndDescription(saleStatus.saleEndsAt);
+  const endingSoon = isEndingSoon(saleStatus.saleEndsAt);
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Sale Pricing
+          {hasDbSale && (
+            <Badge
+              variant={
+                saleStatus.isOnSale ? 'success' :
+                saleStatus.isScheduled ? 'warning' :
+                saleStatus.isExpired ? 'destructive' : 'secondary'
+              }
+            >
+              {statusDisplay.emoji} {statusDisplay.label}
+              {saleStatus.isOnSale && endDesc && ` — ${endDesc}`}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Tier rows */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Vehicle Type</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Standard Price</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Sale Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTiers.map((tier) => {
+                const sp = salePrices[tier.tier_name] ?? '';
+                const hasError = sp !== '' && typeof sp === 'number' && sp >= tier.price;
+                return (
+                  <tr key={tier.id} className="border-b border-gray-100">
+                    <td className="px-3 py-3 font-medium text-gray-700">
+                      {tier.tier_label || tier.tier_name}
+                    </td>
+                    <td className="px-3 py-3 text-gray-600">
+                      {formatCurrency(tier.price)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="relative max-w-[160px]">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="No sale"
+                          className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                          value={sp}
+                          onChange={(e) => {
+                            setSalePrices({
+                              ...salePrices,
+                              [tier.tier_name]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                            });
+                          }}
+                        />
+                        {hasError && (
+                          <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(tier.price)}</p>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Sale Period */}
+        <div>
+          <p className="mb-2 text-sm font-medium text-gray-700">Sale Period (applies to all tiers)</p>
+          <div className="flex items-center gap-3">
+            <Input
+              type="date"
+              value={saleStartsAt}
+              onChange={(e) => setSaleStartsAt(e.target.value)}
+              className="max-w-[180px]"
+            />
+            <span className="text-gray-400">→</span>
+            <Input
+              type="date"
+              value={saleEndsAt}
+              onChange={(e) => setSaleEndsAt(e.target.value)}
+              className="max-w-[180px]"
+            />
+          </div>
+          <p className="mt-1 text-xs text-gray-400">Leave dates empty for no time limit</p>
+        </div>
+
+        {/* Sale Preview */}
+        {hasSale && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="mb-2 text-sm font-semibold text-gray-700">
+              Sale Preview
+              {hasDbSale && saleStatus.isOnSale && endingSoon && (
+                <span className="ml-2 text-amber-600">⏰ Ending soon!</span>
+              )}
+            </p>
+            <div className="space-y-1 text-sm">
+              {sortedTiers.map((tier) => {
+                const sp = salePrices[tier.tier_name];
+                if (sp === '' || sp === undefined || typeof sp !== 'number') return null;
+                const info = getTierSaleInfo(tier.price, sp, true);
+                if (!info || !info.isDiscounted) return null;
+                return (
+                  <div key={tier.id} className="flex items-center gap-2 text-gray-600">
+                    <span className="font-medium min-w-[140px]">{tier.tier_label || tier.tier_name}:</span>
+                    <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+                    <span className="text-gray-400">→</span>
+                    <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+                    <span className="text-xs text-gray-400">
+                      (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          {hasDbSale && (
+            <Button variant="outline" size="sm" onClick={onClear} disabled={saving}>
+              <X className="h-4 w-4" />
+              Clear All Sale Prices
+            </Button>
+          )}
+          <div className="ml-auto">
+            <Button onClick={onSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Sale Pricing'}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

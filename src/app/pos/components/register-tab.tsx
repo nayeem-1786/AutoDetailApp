@@ -167,6 +167,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
             tier_name: 'default',
             tier_label: null,
             price: service.flat_price,
+            sale_price: null,
             display_order: 0,
             is_vehicle_size_aware: false,
             vehicle_size_sedan_price: null,

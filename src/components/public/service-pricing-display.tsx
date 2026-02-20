@@ -1,5 +1,6 @@
 import { formatCurrency } from '@/lib/utils/format';
-import { MessageSquare } from 'lucide-react';
+import { getSaleStatus, getTierSaleInfo, hasAnySalePrice, getSaleEndDescription, isEndingSoon } from '@/lib/utils/sale-pricing';
+import { MessageSquare, Clock } from 'lucide-react';
 import type { Service, ServicePricing } from '@/lib/supabase/types';
 
 interface ServicePricingDisplayProps {
@@ -29,6 +30,27 @@ export function ServicePricingDisplay({ service }: ServicePricingDisplayProps) {
   }
 }
 
+function SaleBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white uppercase tracking-wide">
+      Sale
+    </span>
+  );
+}
+
+function SaleCountdown({ endsAt }: { endsAt: Date | null }) {
+  const desc = getSaleEndDescription(endsAt);
+  if (!desc) return null;
+  const urgent = isEndingSoon(endsAt);
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${urgent ? 'text-red-400' : 'text-site-text-muted'}`}>
+      <Clock className="h-3 w-3" />
+      {desc}
+    </span>
+  );
+}
+
 function VehicleSizePricing({ service }: { service: Service }) {
   const tiers = service.pricing
     ? [...service.pricing].sort((a, b) => a.display_order - b.display_order)
@@ -38,28 +60,54 @@ function VehicleSizePricing({ service }: { service: Service }) {
     return <p className="text-sm text-site-text-muted">Contact us for pricing.</p>;
   }
 
+  const saleStatus = getSaleStatus(service);
+  const showSale = saleStatus.isOnSale && hasAnySalePrice(tiers);
+
   return (
-    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-site-border">
-            {tiers.map((tier) => (
-              <th key={tier.id} className="px-4 py-3 text-left font-display font-semibold text-site-text">
-                {tier.tier_label ?? tier.tier_name}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            {tiers.map((tier) => (
-              <td key={tier.id} className="px-4 py-4 font-bold text-lime text-base">
-                {formatCurrency(tier.price)}
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
+    <div className="space-y-2">
+      {showSale && (
+        <div className="flex items-center gap-3">
+          <SaleBadge />
+          <SaleCountdown endsAt={saleStatus.saleEndsAt} />
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-site-border">
+              {tiers.map((tier) => (
+                <th key={tier.id} className="px-4 py-3 text-left font-display font-semibold text-site-text">
+                  {tier.tier_label ?? tier.tier_name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {tiers.map((tier) => {
+                const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+                if (saleInfo?.isDiscounted) {
+                  return (
+                    <td key={tier.id} className="px-4 py-4">
+                      <span className="text-sm text-site-text-muted line-through">
+                        {formatCurrency(saleInfo.originalPrice)}
+                      </span>
+                      <span className="ml-2 font-bold text-lime text-base">
+                        {formatCurrency(saleInfo.currentPrice)}
+                      </span>
+                    </td>
+                  );
+                }
+                return (
+                  <td key={tier.id} className="px-4 py-4 font-bold text-lime text-base">
+                    {formatCurrency(tier.price)}
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -73,31 +121,43 @@ function ScopePricing({ service }: { service: Service }) {
     return <p className="text-sm text-site-text-muted">Contact us for pricing.</p>;
   }
 
+  const saleStatus = getSaleStatus(service);
+  const showSale = saleStatus.isOnSale && hasAnySalePrice(tiers);
+
   return (
-    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-site-border">
-            <th className="px-4 py-3 text-left font-display font-semibold text-site-text">
-              Option
-            </th>
-            <th className="px-4 py-3 text-right font-display font-semibold text-site-text">
-              Price
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {tiers.map((tier, index) => (
-            <ScopeTierRow key={tier.id} tier={tier} index={index} />
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-2">
+      {showSale && (
+        <div className="flex items-center gap-3">
+          <SaleBadge />
+          <SaleCountdown endsAt={saleStatus.saleEndsAt} />
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-site-border">
+              <th className="px-4 py-3 text-left font-display font-semibold text-site-text">
+                Option
+              </th>
+              <th className="px-4 py-3 text-right font-display font-semibold text-site-text">
+                Price
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {tiers.map((tier, index) => (
+              <ScopeTierRow key={tier.id} tier={tier} index={index} isOnSale={saleStatus.isOnSale} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-function ScopeTierRow({ tier, index }: { tier: ServicePricing; index: number }) {
+function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: number; isOnSale: boolean }) {
   const rowBg = index % 2 === 1 ? 'bg-white/[0.02]' : '';
+  const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, isOnSale);
 
   if (tier.is_vehicle_size_aware) {
     return (
@@ -143,8 +203,21 @@ function ScopeTierRow({ tier, index }: { tier: ServicePricing; index: number }) 
       <td className="px-4 py-3 text-site-text-secondary">
         {tier.tier_label ?? tier.tier_name}
       </td>
-      <td className="px-4 py-3 text-right font-bold text-lime">
-        {formatCurrency(tier.price)}
+      <td className="px-4 py-3 text-right">
+        {saleInfo?.isDiscounted ? (
+          <>
+            <span className="text-sm text-site-text-muted line-through mr-2">
+              {formatCurrency(saleInfo.originalPrice)}
+            </span>
+            <span className="font-bold text-lime">
+              {formatCurrency(saleInfo.currentPrice)}
+            </span>
+          </>
+        ) : (
+          <span className="font-bold text-lime">
+            {formatCurrency(tier.price)}
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -179,32 +252,59 @@ function SpecialtyPricing({ service }: { service: Service }) {
     return <p className="text-sm text-site-text-muted">Contact us for pricing.</p>;
   }
 
+  const saleStatus = getSaleStatus(service);
+  const showSale = saleStatus.isOnSale && hasAnySalePrice(tiers);
+
   return (
-    <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-site-border">
-            <th className="px-4 py-3 text-left font-display font-semibold text-site-text">
-              Option
-            </th>
-            <th className="px-4 py-3 text-right font-display font-semibold text-site-text">
-              Price
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {tiers.map((tier, index) => (
-            <tr key={tier.id} className={index % 2 === 1 ? 'bg-white/[0.02]' : ''}>
-              <td className="px-4 py-3 text-site-text-secondary">
-                {tier.tier_label ?? tier.tier_name}
-              </td>
-              <td className="px-4 py-3 text-right font-bold text-lime">
-                {formatCurrency(tier.price)}
-              </td>
+    <div className="space-y-2">
+      {showSale && (
+        <div className="flex items-center gap-3">
+          <SaleBadge />
+          <SaleCountdown endsAt={saleStatus.saleEndsAt} />
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-2xl bg-brand-surface shadow-sm border border-site-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-site-border">
+              <th className="px-4 py-3 text-left font-display font-semibold text-site-text">
+                Option
+              </th>
+              <th className="px-4 py-3 text-right font-display font-semibold text-site-text">
+                Price
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {tiers.map((tier, index) => {
+              const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+              return (
+                <tr key={tier.id} className={index % 2 === 1 ? 'bg-white/[0.02]' : ''}>
+                  <td className="px-4 py-3 text-site-text-secondary">
+                    {tier.tier_label ?? tier.tier_name}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {saleInfo?.isDiscounted ? (
+                      <>
+                        <span className="text-sm text-site-text-muted line-through mr-2">
+                          {formatCurrency(saleInfo.originalPrice)}
+                        </span>
+                        <span className="font-bold text-lime">
+                          {formatCurrency(saleInfo.currentPrice)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="font-bold text-lime">
+                        {formatCurrency(tier.price)}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

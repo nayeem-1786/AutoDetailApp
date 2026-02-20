@@ -4,6 +4,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Sale Pricing System — 2026-02-19
+
+### Database
+- Added `sale_price` column to `service_pricing` table (per-tier sale prices)
+- Added `sale_starts_at` / `sale_ends_at` to `services` table (shared date window across tiers)
+- Added `sale_price`, `sale_starts_at`, `sale_ends_at` to `products` table
+- Added `combinable_with_sales` boolean to `coupons` table
+- Check constraints: sale_price must be less than standard price
+
+### Shared Utility
+- Created `src/lib/utils/sale-pricing.ts` — single source of truth for sale status, tier info, countdown, and display helpers
+
+### Admin — Service & Product Edit Pages
+- Sale Pricing card on service edit page: per-tier sale price inputs, shared date range, live preview with status badge, clear all button
+- Sale Pricing card on product edit page: sale price input, date range, preview, clear button
+
+### Admin — Promotions Dashboard (`/admin/marketing/promotions`)
+- Search, type filter (services/products), status filter (active/scheduled/expired/no sale)
+- Summary stat cards with counts per status
+- Grouped collapsible table with row actions (edit, end sale)
+- Quick Sale dialog: multi-item selection, percentage/fixed discount, per-tier checkboxes, date range, real-time preview, batch apply
+
+### API Routes
+- `GET /api/admin/marketing/promotions` — combined services + products with computed sale status
+- `POST /api/admin/marketing/promotions/batch` — bulk apply sale pricing
+- `POST /api/admin/marketing/promotions/clear` — clear sale pricing from items
+
+### Frontend Display
+- `ServicePricingDisplay`: Was/Now pricing with strikethrough for vehicle_size, scope, and specialty models; Sale badge + urgency countdown
+- `ServiceCard`: Sale badge overlay on image, Was/Now price display on listing cards
+- `ProductCard`: Sale badge, Was/Now price in overlay, effective sale price flows to cart
+- Product detail page: Sale badge, save percentage, Was/Now pricing, urgency countdown, sale price flows to Add to Cart
+
+### Navigation
+- Added "Promotions" as first item under Marketing in admin sidebar
+
+---
+
 ## Ticker Marquee Starts Off-Screen — 2026-02-19
 
 - Changed `@keyframes marquee` from `translateX(0) → translateX(-50%)` to `translateX(100vw) → translateX(-100%)` so text enters from fully off-screen right and exits fully off-screen left

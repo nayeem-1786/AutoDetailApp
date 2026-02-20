@@ -173,6 +173,9 @@ export interface Product {
   height: number | null;
   weight_unit: string | null;
   dimension_unit: string | null;
+  sale_price: number | null;
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations
@@ -218,6 +221,8 @@ export interface Service {
   show_on_website: boolean;
   is_featured: boolean;
   display_order: number;
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations
@@ -233,6 +238,7 @@ export interface ServicePricing {
   tier_name: string;
   tier_label: string | null;
   price: number;
+  sale_price: number | null;
   display_order: number;
   is_vehicle_size_aware: boolean;
   vehicle_size_sedan_price: number | null;
@@ -484,6 +490,7 @@ export interface Coupon {
   max_uses: number | null;
   expires_at: string | null;
   target_customer_type: CustomerType | null;
+  combinable_with_sales: boolean;
   campaign_id: string | null;
   created_at: string;
   updated_at: string;

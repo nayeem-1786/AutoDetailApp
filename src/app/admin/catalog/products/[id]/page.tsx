@@ -24,8 +24,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, DollarSign, Trash2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Trash2, X } from 'lucide-react';
 import { MultiImageUpload } from '@/app/admin/catalog/components/multi-image-upload';
+import {
+  getSaleStatus,
+  getTierSaleInfo,
+  getSaleStatusDisplay,
+  getSaleEndDescription,
+  isEndingSoon,
+} from '@/lib/utils/sale-pricing';
 
 type ProductWithRelations = Product & {
   product_categories: Pick<ProductCategory, 'id' | 'name'> | null;
@@ -57,6 +64,13 @@ export default function ProductDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
+
+  // Sale pricing state
+  const [salePrice, setSalePrice] = useState<number | ''>('');
+  const [saleStartsAt, setSaleStartsAt] = useState('');
+  const [saleEndsAt, setSaleEndsAt] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
+  const [showClearSaleDialog, setShowClearSaleDialog] = useState(false);
 
   const {
     register,
@@ -161,6 +175,11 @@ export default function ProductDetailPage() {
         is_active: p.is_active,
         barcode: p.barcode || '',
       });
+
+      // Populate sale pricing
+      setSalePrice(p.sale_price ?? '');
+      setSaleStartsAt(p.sale_starts_at ? new Date(p.sale_starts_at).toISOString().split('T')[0] : '');
+      setSaleEndsAt(p.sale_ends_at ? new Date(p.sale_ends_at).toISOString().split('T')[0] : '');
 
       setLoading(false);
     }
@@ -372,6 +391,83 @@ export default function ProductDetailPage() {
     } finally {
       setDeleting(false);
       setShowDeleteDialog(false);
+    }
+  }
+
+  async function onSaveSalePricing() {
+    if (!product) return;
+    setSavingSale(true);
+    try {
+      if (salePrice !== '' && typeof salePrice === 'number') {
+        if (salePrice >= product.retail_price) {
+          toast.error(`Sale price must be less than retail price (${formatCurrency(product.retail_price)})`);
+          setSavingSale(false);
+          return;
+        }
+        if (salePrice <= 0) {
+          toast.error('Sale price must be greater than $0');
+          setSavingSale(false);
+          return;
+        }
+      }
+
+      const startTs = saleStartsAt ? new Date(saleStartsAt + 'T00:00:00-08:00').toISOString() : null;
+      const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
+      const sp = (salePrice !== '' && typeof salePrice === 'number') ? salePrice : null;
+
+      const { error } = await supabase
+        .from('products')
+        .update({
+          sale_price: sp,
+          sale_starts_at: startTs,
+          sale_ends_at: endTs,
+        })
+        .eq('id', productId);
+
+      if (error) throw error;
+      toast.success('Sale pricing updated');
+
+      // Refresh product data
+      const { data: updated } = await supabase
+        .from('products')
+        .select('*, product_categories(id, name), vendors(id, name)')
+        .eq('id', productId)
+        .single();
+      if (updated) {
+        setProduct(updated as ProductWithRelations);
+        setSalePrice(updated.sale_price ?? '');
+        setSaleStartsAt(updated.sale_starts_at ? new Date(updated.sale_starts_at).toISOString().split('T')[0] : '');
+        setSaleEndsAt(updated.sale_ends_at ? new Date(updated.sale_ends_at).toISOString().split('T')[0] : '');
+      }
+    } catch (err) {
+      console.error('Failed to update sale pricing:', err);
+      toast.error('Failed to update sale pricing');
+    } finally {
+      setSavingSale(false);
+    }
+  }
+
+  async function clearSalePricing() {
+    setSavingSale(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ sale_price: null, sale_starts_at: null, sale_ends_at: null })
+        .eq('id', productId);
+      if (error) throw error;
+      toast.success('Sale pricing cleared');
+      setSalePrice('');
+      setSaleStartsAt('');
+      setSaleEndsAt('');
+      setShowClearSaleDialog(false);
+      if (product) {
+        setProduct({ ...product, sale_price: null, sale_starts_at: null, sale_ends_at: null });
+      }
+    } catch (err) {
+      console.error('Failed to clear sale pricing:', err);
+      toast.error('Failed to clear sale pricing');
+    } finally {
+      setSavingSale(false);
     }
   }
 
@@ -613,6 +709,20 @@ export default function ProductDetailPage() {
         </div>
       </form>
 
+      {/* ---- Sale Pricing Card ---- */}
+      <ProductSalePricingCard
+        product={product}
+        salePrice={salePrice}
+        setSalePrice={setSalePrice}
+        saleStartsAt={saleStartsAt}
+        setSaleStartsAt={setSaleStartsAt}
+        saleEndsAt={saleEndsAt}
+        setSaleEndsAt={setSaleEndsAt}
+        onSave={onSaveSalePricing}
+        onClear={() => setShowClearSaleDialog(true)}
+        saving={savingSale}
+      />
+
       {/* Cost & Margin Card — permission-gated */}
       {canViewCost && product && (
         <CostMarginCard product={product} costHistory={costHistory} />
@@ -628,7 +738,154 @@ export default function ProductDetailPage() {
         loading={deleting}
         onConfirm={handleDelete}
       />
+
+      <ConfirmDialog
+        open={showClearSaleDialog}
+        onOpenChange={setShowClearSaleDialog}
+        title="Clear Sale Pricing"
+        description="This will remove the sale price and date range for this product."
+        confirmLabel="Clear Sale"
+        variant="destructive"
+        loading={savingSale}
+        onConfirm={clearSalePricing}
+      />
     </div>
+  );
+}
+
+// ─── Product Sale Pricing Card ─────────────────────────────────────
+
+function ProductSalePricingCard({
+  product,
+  salePrice,
+  setSalePrice,
+  saleStartsAt,
+  setSaleStartsAt,
+  saleEndsAt,
+  setSaleEndsAt,
+  onSave,
+  onClear,
+  saving,
+}: {
+  product: ProductWithRelations;
+  salePrice: number | '';
+  setSalePrice: (v: number | '') => void;
+  saleStartsAt: string;
+  setSaleStartsAt: (v: string) => void;
+  saleEndsAt: string;
+  setSaleEndsAt: (v: string) => void;
+  onSave: () => void;
+  onClear: () => void;
+  saving: boolean;
+}) {
+  const hasDbSale = product.sale_price !== null;
+  const hasSaleInput = salePrice !== '' && typeof salePrice === 'number';
+  const hasError = hasSaleInput && salePrice >= product.retail_price;
+
+  const saleStatus = getSaleStatus({
+    sale_starts_at: product.sale_starts_at,
+    sale_ends_at: product.sale_ends_at,
+  });
+  const statusDisplay = getSaleStatusDisplay(saleStatus);
+  const endDesc = getSaleEndDescription(saleStatus.saleEndsAt);
+  const endingSoon = isEndingSoon(saleStatus.saleEndsAt);
+
+  const info = hasSaleInput
+    ? getTierSaleInfo(product.retail_price, salePrice, true)
+    : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          Sale Pricing
+          {hasDbSale && (
+            <Badge
+              variant={
+                saleStatus.isOnSale ? 'success' :
+                saleStatus.isScheduled ? 'warning' :
+                saleStatus.isExpired ? 'destructive' : 'secondary'
+              }
+            >
+              {statusDisplay.emoji} {statusDisplay.label}
+              {saleStatus.isOnSale && endDesc && ` — ${endDesc}`}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-4">
+          <div>
+            <p className="mb-1 text-xs font-medium text-gray-500">Standard Price</p>
+            <p className="text-sm font-semibold text-gray-900">
+              {formatCurrency(product.retail_price)}
+            </p>
+          </div>
+          <FormField label="Sale Price">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="No sale"
+                className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                value={salePrice}
+                onChange={(e) => setSalePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+              />
+              {hasError && (
+                <p className="mt-1 text-xs text-red-500">
+                  Must be less than {formatCurrency(product.retail_price)}
+                </p>
+              )}
+            </div>
+          </FormField>
+          <FormField label="Start Date">
+            <Input
+              type="date"
+              value={saleStartsAt}
+              onChange={(e) => setSaleStartsAt(e.target.value)}
+            />
+          </FormField>
+          <FormField label="End Date">
+            <Input
+              type="date"
+              value={saleEndsAt}
+              onChange={(e) => setSaleEndsAt(e.target.value)}
+            />
+          </FormField>
+        </div>
+
+        {/* Sale Preview */}
+        {info && info.isDiscounted && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p className="text-sm text-gray-600">
+              {endingSoon && <span className="mr-1 text-amber-600">⏰</span>}
+              <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+              {' → '}
+              <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+              <span className="ml-2 text-xs text-gray-400">
+                (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+              </span>
+            </p>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          {hasDbSale && (
+            <Button variant="outline" size="sm" onClick={onClear} disabled={saving}>
+              <X className="h-4 w-4" />
+              Clear Sale
+            </Button>
+          )}
+          <div className="ml-auto">
+            <Button onClick={onSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Sale Pricing'}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

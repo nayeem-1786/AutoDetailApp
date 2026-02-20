@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { Package } from 'lucide-react';
+import { Package, Clock } from 'lucide-react';
 import { getProductBySlug, getAllProductsForSitemap } from '@/lib/data/products';
 import { getBusinessInfo } from '@/lib/data/business';
 import { generateProductMetadata } from '@/lib/seo/metadata';
@@ -9,6 +9,7 @@ import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { generateProductSchema, generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { SITE_URL } from '@/lib/utils/constants';
 import { formatCurrency } from '@/lib/utils/format';
+import { getSaleStatus, getTierSaleInfo, getSaleEndDescription, isEndingSoon } from '@/lib/utils/sale-pricing';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
@@ -108,9 +109,48 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 {product.name}
               </h1>
 
-              <p className="mt-4 font-display text-3xl font-bold text-lime">
-                {formatCurrency(product.retail_price)}
-              </p>
+              {(() => {
+                const saleStatus = getSaleStatus(product);
+                const saleInfo = getTierSaleInfo(product.retail_price, product.sale_price, saleStatus.isOnSale);
+
+                if (saleInfo?.isDiscounted) {
+                  const endDesc = getSaleEndDescription(saleStatus.saleEndsAt);
+                  const urgent = isEndingSoon(saleStatus.saleEndsAt);
+
+                  return (
+                    <div className="mt-4 space-y-1">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white uppercase tracking-wide">
+                          Sale
+                        </span>
+                        <span className="text-sm font-medium text-site-text-muted">
+                          Save {saleInfo.discountPercent}%
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-lg text-site-text-muted line-through">
+                          {formatCurrency(saleInfo.originalPrice)}
+                        </span>
+                        <span className="font-display text-3xl font-bold text-lime">
+                          {formatCurrency(saleInfo.currentPrice)}
+                        </span>
+                      </div>
+                      {endDesc && (
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${urgent ? 'text-red-400' : 'text-site-text-muted'}`}>
+                          <Clock className="h-3 w-3" />
+                          {endDesc}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <p className="mt-4 font-display text-3xl font-bold text-lime">
+                    {formatCurrency(product.retail_price)}
+                  </p>
+                );
+              })()}
 
               {/* Availability */}
               <div className="mt-4">
@@ -139,7 +179,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   name: product.name,
                   slug: product.slug,
                   categorySlug: category.slug,
-                  price: product.retail_price,
+                  price: (() => {
+                    const ss = getSaleStatus(product);
+                    const si = getTierSaleInfo(product.retail_price, product.sale_price, ss.isOnSale);
+                    return si?.isDiscounted ? si.currentPrice : product.retail_price;
+                  })(),
                   stockQuantity: product.quantity_on_hand,
                   imageUrl: product.image_url,
                 }}
