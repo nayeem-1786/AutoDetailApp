@@ -4,6 +4,36 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Service Areas Empty Prefix + Icon Theme Colors — 2026-02-19
+
+### Fix: Service Areas Prefix Text — Allow Empty
+- Admin UI (`footer/page.tsx`): Changed `||` to `??` for `prefix_text` initialization and dirty check. Empty string is now a valid value.
+- Frontend (`footer-client.tsx`): Changed `||` to `??` for prefix text fallback. When empty, no prefix text or trailing space renders — just city links.
+- Placeholder updated to "e.g. Mobile Detailing in (leave blank for none)" with helper text clarifying behavior.
+- API route (`/api/admin/footer/sections`) already stored `config` as-is — no changes needed.
+
+### Icon Theme Color Token (`--site-icon-accent`)
+- New CSS variable `--site-icon-accent: var(--lime)` in `:root` (globals.css) — defaults to lime accent, overridable via theme settings.
+- Added to `@theme inline` as `--color-site-icon-accent` so `text-site-icon-accent` Tailwind utility works.
+- Added to `.public-theme[data-user-theme="light"]` CSS section.
+- Added to `LIGHT_VARS` in `theme-toggle.tsx` for JS-based light mode toggle.
+- Added to `buildSiteThemeVars()` in `theme-provider.tsx` — maps `color_icon_accent` from `site_theme_settings`.
+- Added `color_icon_accent: string | null` to `SiteThemeSettings` TypeScript type.
+
+### Icon Picker Theme Colors
+- `icon-picker.tsx`: Color options changed from `[currentColor, #ffffff, #CCFF00]` to `[Theme Accent, Text Color, White, Muted]`.
+- Default color changed from `currentColor` to `var(--site-icon-accent)` (Theme Accent).
+- CSS variable colors use `style="color:var(--site-icon-accent)"` with `stroke="currentColor"` pattern for proper cascading.
+- Color swatch previews use hardcoded hex for admin display, but generated SVG uses CSS variables.
+
+### Footer Icons Use Icon Accent Token
+- Brand column icons (Phone, Mail, MapPin) changed from `text-lime` to `text-site-icon-accent`.
+- Business Info column icons (Phone, Mail) changed similarly.
+- Trust badge strip icons (Shield, Award, Leaf, Clock) changed similarly.
+- All footer icons now follow `--site-icon-accent` → consistent with HTML toolbar-inserted icons.
+
+---
+
 ## Full HTML Editor Toolbar — Images, Media, Layout & Embeds — 2026-02-19
 
 ### Shared Toolbar Component

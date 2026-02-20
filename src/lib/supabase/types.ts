@@ -1148,6 +1148,8 @@ export interface SiteThemeSettings {
   // Colors - Links
   color_link: string | null;
   color_link_hover: string | null;
+  // Colors - Icons
+  color_icon_accent: string | null;
   // Colors - Borders
   color_border: string | null;
   color_border_light: string | null;

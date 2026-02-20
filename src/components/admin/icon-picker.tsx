@@ -63,9 +63,10 @@ const ICONS: { name: string; icon: LucideIcon; category: string }[] = [
 
 const ICON_SIZES = [16, 20, 24, 32] as const;
 const ICON_COLORS = [
-  { label: 'Current', value: 'currentColor' },
-  { label: 'White', value: '#ffffff' },
-  { label: 'Lime', value: '#CCFF00' },
+  { label: 'Theme Accent', value: 'var(--site-icon-accent)', preview: '#CCFF00' },
+  { label: 'Text Color', value: 'currentColor', preview: '#6b7280' },
+  { label: 'White', value: '#ffffff', preview: '#ffffff' },
+  { label: 'Muted', value: 'var(--site-text-muted)', preview: '#9CA3AF' },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -123,7 +124,7 @@ function IconPickerDropdown({
 }) {
   const [search, setSearch] = useState('');
   const [selectedSize, setSelectedSize] = useState<number>(20);
-  const [selectedColor, setSelectedColor] = useState('currentColor');
+  const [selectedColor, setSelectedColor] = useState('var(--site-icon-accent)');
 
   const filtered = search
     ? ICONS.filter(
@@ -136,17 +137,19 @@ function IconPickerDropdown({
   const categories = [...new Set(filtered.map((i) => i.category))];
 
   const generateSvg = (iconDef: (typeof ICONS)[number]) => {
+    // For CSS variable colors, render with currentColor and set color via style
+    const isCssVar = selectedColor.startsWith('var(');
     const svgString = renderToStaticMarkup(
       createElement(iconDef.icon, {
         size: selectedSize,
-        color: selectedColor,
+        color: isCssVar ? 'currentColor' : selectedColor,
         strokeWidth: 2,
       })
     );
-    return svgString.replace(
-      '<svg ',
-      `<svg style="display:inline-block;vertical-align:middle" `
-    );
+    const styleAttr = isCssVar
+      ? `style="display:inline-block;vertical-align:middle;color:${selectedColor}"`
+      : 'style="display:inline-block;vertical-align:middle"';
+    return svgString.replace('<svg ', `<svg ${styleAttr} `);
   };
 
   return (
@@ -200,8 +203,7 @@ function IconPickerDropdown({
                   selectedColor === c.value ? 'border-brand-600' : 'border-gray-300'
                 }`}
                 style={{
-                  backgroundColor:
-                    c.value === 'currentColor' ? '#6b7280' : c.value,
+                  backgroundColor: c.preview,
                 }}
               />
             ))}

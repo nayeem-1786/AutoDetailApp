@@ -67,6 +67,9 @@ function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
   if (st.font_family) vars['--font-body'] = st.font_family;
   if (st.font_heading_family) vars['--font-display'] = st.font_heading_family;
 
+  // Icon accent color — defaults to var(--lime) in CSS
+  if (st.color_icon_accent) vars['--site-icon-accent'] = st.color_icon_accent;
+
   // Buttons
   if (st.btn_primary_bg) vars['--site-btn-primary-bg'] = st.btn_primary_bg;
   if (st.btn_primary_text) vars['--site-btn-primary-text'] = st.btn_primary_text;

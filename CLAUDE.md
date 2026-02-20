@@ -515,9 +515,14 @@ Build full e-commerce within the existing Next.js app. Product catalog pages alr
 - **API**: Checks active (enabled) column count and span total before allowing new columns. Auto-calculates span for new columns from remaining space.
 - **Admin UI**: `canAdd` checks both count and span. Enable toggle validates both limits. Span input min=2.
 - **ColumnWidthPreview**: 3-state (green/amber/red), narrow columns show just span number
-- **IconPicker**: Extracted from footer admin to `src/components/admin/icon-picker.tsx`. Added to CMS page editor toolbar.
+- **IconPicker**: Extracted from footer admin to `src/components/admin/icon-picker.tsx`. Added to CMS page editor toolbar. Default color: `var(--site-icon-accent)` (Theme Accent). 4 color options: Theme Accent, Text Color, White, Muted.
 - **Tablet grid**: Footer wraps 2 per row on 640-767px (span 6), custom spans on 768px+
 - TypeScript clean, build passes.
+
+### Service Areas Prefix + Icon Theme Token
+- **Service areas prefix_text**: Admin and frontend now use `??` not `||` — empty string is valid (no prefix text, just city links)
+- **`--site-icon-accent`**: New CSS variable defaulting to `var(--lime)`. Footer brand/trust icons use `text-site-icon-accent`. Icon picker inserts SVGs with `var(--site-icon-accent)`. Overridable via `site_theme_settings.color_icon_accent`.
+- **Icon picker colors**: Theme Accent (default), Text Color, White, Muted — all use CSS variables for theme cascading
 
 ### Full HTML Editor Toolbar — Images, Media, Layout & Embeds
 - **Shared toolbar**: `src/components/admin/html-editor-toolbar.tsx` — used by both footer HTML editor and CMS page editor

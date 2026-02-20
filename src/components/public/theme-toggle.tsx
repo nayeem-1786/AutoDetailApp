@@ -30,6 +30,8 @@ const LIGHT_VARS: Record<string, string> = {
   '--site-text-on-primary': '#000000',
   // Divider
   '--site-divider': '#e5e7eb',
+  // Icon accent — stays lime in light mode (cascades through var(--lime))
+  '--site-icon-accent': 'var(--lime)',
   // Links
   '--site-link': '#4d7c0f',
   '--site-link-hover': '#65a30d',

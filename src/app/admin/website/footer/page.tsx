@@ -1452,10 +1452,10 @@ function ServiceAreasPanel({
 }) {
   const config = section.config ?? {};
   const [prefixText, setPrefixText] = useState(
-    (config.prefix_text as string) || 'Mobile Detailing in'
+    (config.prefix_text as string) ?? ''
   );
   const [saving, setSaving] = useState(false);
-  const isDirty = prefixText !== ((config.prefix_text as string) || 'Mobile Detailing in');
+  const isDirty = prefixText !== ((config.prefix_text as string) ?? '');
 
   const save = async () => {
     setSaving(true);
@@ -1489,10 +1489,10 @@ function ServiceAreasPanel({
           value={prefixText}
           onChange={(e) => setPrefixText(e.target.value)}
           className="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-          placeholder="Mobile Detailing in"
+          placeholder="e.g. Mobile Detailing in (leave blank for none)"
         />
         <p className="mt-1 text-xs text-gray-500">
-          This text appears before the list of cities.
+          This text appears before the list of cities. Leave blank to show only city links.
         </p>
       </div>
 

@@ -75,6 +75,9 @@
   /* Site divider color (defaults to border color) */
   --site-divider: rgba(255, 255, 255, 0.1);
 
+  /* Icon accent color — defaults to lime, overridable via admin theme settings */
+  --site-icon-accent: var(--lime);
+
   /* Site button tokens — ThemeProvider overrides these from admin settings.
      Fallbacks match the default lime/dark design. */
   --site-btn-primary-bg: var(--lime);
@@ -229,6 +232,7 @@
   --site-footer-bg: #f8fafc;
   --site-text-on-primary: #000000;
   --site-divider: #e5e7eb;
+  --site-icon-accent: var(--lime);
   --site-link: var(--lime-600, #4d7c0f);
   --site-link-hover: var(--lime-500, #65a30d);
   /* Buttons — #4d7c0f with white text = 4.6:1 (passes WCAG AA normal text) */
@@ -305,6 +309,9 @@
 
   /* Site divider */
   --color-site-divider: var(--site-divider);
+
+  /* Icon accent color */
+  --color-site-icon-accent: var(--site-icon-accent);
 
   /* Accent glow shadows — use the RGB var so seasonal themes auto-update */
   --shadow-lime-sm: 0 0 10px rgba(var(--theme-accent-glow-rgb), 0.1);

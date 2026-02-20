@@ -44,7 +44,7 @@ export function FooterClient({ footerData, phone, reviews }: FooterClientProps) 
                   key={badge.label}
                   className="flex items-center gap-2 text-sm text-site-text-muted"
                 >
-                  <Icon className="h-4 w-4 text-lime" />
+                  <Icon className="h-4 w-4 text-site-icon-accent" />
                   <span className="font-medium">{badge.label}</span>
                 </div>
               );
@@ -245,7 +245,7 @@ function BrandColumn({
               href={`tel:${businessInfo.phone}`}
               className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
             >
-              <Phone className="w-4 h-4 text-lime shrink-0" />
+              <Phone className="w-4 h-4 text-site-icon-accent shrink-0" />
               {phone}
             </a>
           )}
@@ -254,13 +254,13 @@ function BrandColumn({
               href={`mailto:${businessInfo.email}`}
               className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
             >
-              <Mail className="w-4 h-4 text-lime shrink-0" />
+              <Mail className="w-4 h-4 text-site-icon-accent shrink-0" />
               {businessInfo.email}
             </a>
           )}
           {showAddress && businessInfo.address && (
             <div className="flex items-start gap-3 text-sm text-site-text-muted">
-              <MapPin className="w-4 h-4 text-lime shrink-0 mt-0.5" />
+              <MapPin className="w-4 h-4 text-site-icon-accent shrink-0 mt-0.5" />
               {businessInfo.address}
             </div>
           )}
@@ -319,7 +319,7 @@ function BusinessInfoColumn({
           href={`tel:${businessInfo.phone}`}
           className="flex items-center gap-2 text-sm text-site-text-muted hover:text-site-text transition-colors"
         >
-          <Phone className="w-3.5 h-3.5 text-lime shrink-0" />
+          <Phone className="w-3.5 h-3.5 text-site-icon-accent shrink-0" />
           {phone}
         </a>
         {businessInfo.email && (
@@ -327,7 +327,7 @@ function BusinessInfoColumn({
             href={`mailto:${businessInfo.email}`}
             className="flex items-center gap-2 text-sm text-site-text-muted hover:text-site-text transition-colors"
           >
-            <Mail className="w-3.5 h-3.5 text-lime shrink-0" />
+            <Mail className="w-3.5 h-3.5 text-site-icon-accent shrink-0" />
             {businessInfo.email}
           </a>
         )}
@@ -347,7 +347,7 @@ function ServiceAreasSection({
   cities: FooterData['cities'];
   config: Record<string, unknown>;
 }) {
-  const prefixText = (config?.prefix_text as string) || 'Mobile Detailing in';
+  const prefixText = (config?.prefix_text as string) ?? '';
   const showDividers = config?.show_dividers !== false;
 
   return (
@@ -357,7 +357,7 @@ function ServiceAreasSection({
           Service Areas
         </h4>
         <p className="mt-3 text-sm text-site-text-muted">
-          {prefixText}{' '}
+          {prefixText && <>{prefixText}{' '}</>}
           {cities.map((city, i) => (
             <span key={city.id}>
               {i > 0 && showDividers && (
