@@ -463,12 +463,9 @@ h1, h2, h3 {
   animation: marquee 20s linear infinite;
 }
 
-/* Pause ticker marquee and entering-phase transition instantly on hover */
-.ticker-hover-pause:hover .animate-marquee {
+/* Freeze ticker marquee instantly on hover — pure CSS, zero latency */
+.ticker-track:hover .animate-marquee {
   animation-play-state: paused !important;
-}
-.ticker-hover-pause:hover .ticker-entering {
-  transition-duration: 9999s !important;
 }
 
 /* Gradient text utility */

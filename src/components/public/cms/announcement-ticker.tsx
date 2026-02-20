@@ -41,90 +41,6 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 const SPACER_REM = 5;
 
 // ---------------------------------------------------------------------------
-// 4-phase marquee hook (unchanged — used for single-ticker and "scroll" mode)
-// ---------------------------------------------------------------------------
-type MarqueePhase = 'hidden' | 'ready' | 'entering' | 'looping';
-
-function useMarquee(speedValue: number) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [loopDuration, setLoopDuration] = useState(20);
-  const [enterDuration, setEnterDuration] = useState(3);
-  const [enterOffset, setEnterOffset] = useState(0);
-  const [phase, setPhase] = useState<MarqueePhase>('hidden');
-
-  const measure = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const pxPerSec = speedToPxPerSec(speedValue);
-    const totalWidth = el.scrollWidth;
-    const halfWidth = totalWidth / 2;
-    setLoopDuration(Math.max(3, halfWidth / pxPerSec));
-    const vw = window.innerWidth;
-    setEnterDuration(Math.max(1, vw / pxPerSec));
-    setEnterOffset(vw);
-    setPhase((prev) => (prev === 'hidden' ? 'ready' : prev));
-  }, [speedValue]);
-
-  useEffect(() => {
-    requestAnimationFrame(measure);
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [measure]);
-
-  useEffect(() => {
-    if (phase !== 'ready') return;
-    let cancelled = false;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) setPhase('entering');
-      });
-    });
-    return () => { cancelled = true; };
-  }, [phase]);
-
-  useEffect(() => {
-    if (phase !== 'entering') return;
-    const timer = setTimeout(() => {
-      setPhase((prev) => (prev === 'entering' ? 'looping' : prev));
-    }, enterDuration * 1000 + 100);
-    return () => clearTimeout(timer);
-  }, [phase, enterDuration]);
-
-  return { ref, loopDuration, enterDuration, enterOffset, phase };
-}
-
-function marqueeProps(
-  phase: MarqueePhase,
-  enterDuration: number,
-  loopDuration: number,
-  enterOffset: number,
-): { className: string; style: React.CSSProperties } {
-  switch (phase) {
-    case 'hidden':
-      return { className: 'inline-block', style: { opacity: 0 } };
-    case 'ready':
-      return {
-        className: 'inline-block',
-        style: { transform: `translateX(${enterOffset}px)`, willChange: 'transform' },
-      };
-    case 'entering':
-      return {
-        className: 'inline-block ticker-entering',
-        style: {
-          transform: 'translateX(0)',
-          transition: `transform ${enterDuration.toFixed(1)}s linear`,
-          willChange: 'transform',
-        },
-      };
-    case 'looping':
-      return {
-        className: 'inline-block animate-marquee',
-        style: { animationDuration: `${loopDuration.toFixed(1)}s`, willChange: 'transform' },
-      };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // MessageUnit — message text + optional link + spacer
 // ---------------------------------------------------------------------------
 function MessageUnit({ ticker }: { ticker: AnnouncementTicker }) {
@@ -154,18 +70,39 @@ function MessageUnit({ ticker }: { ticker: AnnouncementTicker }) {
 const REPEAT_COUNT = 6;
 
 // ---------------------------------------------------------------------------
-// SingleTickerMarquee — continuous marquee for a single ticker (or one ticker
-// in rotation "scroll" mode). Full bar in that ticker's colors/font.
+// SingleTickerMarquee — single continuous CSS animation, no phases.
+// Uses duplicated content (2 × REPEAT_COUNT) so translateX(0 → -50%)
+// creates a seamless loop. Hover pause is handled entirely by CSS:
+//   .ticker-track:hover .animate-marquee { animation-play-state: paused }
 // ---------------------------------------------------------------------------
 function SingleTickerMarquee({ ticker }: { ticker: AnnouncementTicker }) {
   const speedValue = getSpeedValue(ticker);
-  const { ref, loopDuration, enterDuration, enterOffset, phase } = useMarquee(speedValue);
+  const ref = useRef<HTMLSpanElement>(null);
+  const [duration, setDuration] = useState(20);
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const pxPerSec = speedToPxPerSec(speedValue);
+    const halfWidth = el.scrollWidth / 2;
+    setDuration(Math.max(3, halfWidth / pxPerSec));
+  }, [speedValue]);
+
+  useEffect(() => {
+    requestAnimationFrame(measure);
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+
   const fontSize = FONT_SIZE_CLASS[ticker.font_size] || FONT_SIZE_CLASS.sm;
-  const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
 
   return (
     <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
-      <span ref={ref} className={mp.className} style={mp.style}>
+      <span
+        ref={ref}
+        className="inline-block animate-marquee"
+        style={{ animationDuration: `${duration.toFixed(1)}s`, willChange: 'transform' }}
+      >
         {Array.from({ length: REPEAT_COUNT }, (_, i) => (
           <MessageUnit key={`a-${i}`} ticker={ticker} />
         ))}
@@ -263,6 +200,7 @@ const DEFAULT_OPTIONS: TickerPlacementOptions = {
 // ---------------------------------------------------------------------------
 // MultiTickerRotation — cycles through tickers one at a time with
 // configurable background transition and text entry animation.
+// JS timer paused on hover via React state; marquee visual freeze is CSS.
 // ---------------------------------------------------------------------------
 function MultiTickerRotation({
   tickers,
@@ -291,20 +229,17 @@ function MultiTickerRotation({
     let timer: ReturnType<typeof setTimeout>;
 
     if (bgPhase === 'in') {
-      // Background is entering — wait for transition, then show content
       const bgDuration = bgTransition === 'none' ? 50 : 400;
       timer = setTimeout(() => {
         setShowContent(true);
         setBgPhase('visible');
       }, bgDuration);
     } else if (bgPhase === 'visible') {
-      // Content visible — hold for duration, then transition to next
       timer = setTimeout(() => {
         setShowContent(false);
         setBgPhase('out');
       }, holdDuration);
     } else if (bgPhase === 'out') {
-      // Content hidden — transition bg out, then move to next ticker
       const bgDuration = bgTransition === 'none' ? 50 : 400;
       timer = setTimeout(() => {
         setCurrentIndex((prev) => (prev + 1) % tickers.length);
@@ -395,7 +330,8 @@ function getBgTransitionStyles(
 }
 
 // ---------------------------------------------------------------------------
-// Shared hover-to-pause hook
+// Hover-to-pause hook — only used for multi-ticker JS rotation timer.
+// Visual marquee freeze is pure CSS (.ticker-track:hover .animate-marquee).
 // ---------------------------------------------------------------------------
 function useHoverPause() {
   const [paused, setPaused] = useState(false);
@@ -416,18 +352,16 @@ export function TopBarTicker({
   tickers: AnnouncementTicker[];
   options?: TickerPlacementOptions;
 }) {
-  // React state only needed for multi-ticker JS timer pausing.
-  // CSS .ticker-hover-pause:hover handles animation/transition freeze instantly.
   const { paused, handlers } = useHoverPause();
 
   if (tickers.length === 0) return null;
 
-  // Single ticker — always continuous marquee
+  // Single ticker — continuous marquee, hover pause is pure CSS
   if (tickers.length === 1) {
     const ticker = tickers[0];
     return (
       <div
-        className="ticker-hover-pause relative overflow-hidden py-2.5"
+        className="ticker-track relative overflow-hidden py-2.5"
         style={{
           backgroundColor: ticker.bg_color || '#CCFF00',
           color: ticker.text_color || '#000000',
@@ -440,7 +374,7 @@ export function TopBarTicker({
 
   // Multiple tickers — CSS pauses marquee, React state pauses JS rotation timer
   return (
-    <div {...handlers} className="ticker-hover-pause">
+    <div {...handlers} className="ticker-track">
       <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} paused={paused} />
     </div>
   );
@@ -460,12 +394,12 @@ export function SectionTicker({
 
   if (tickers.length === 0) return null;
 
-  // Single ticker — always continuous marquee
+  // Single ticker — continuous marquee, hover pause is pure CSS
   if (tickers.length === 1) {
     const ticker = tickers[0];
     return (
       <div
-        className="ticker-hover-pause overflow-hidden py-2.5"
+        className="ticker-track overflow-hidden py-2.5"
         style={{
           backgroundColor: ticker.bg_color || '#CCFF00',
           color: ticker.text_color || '#000000',
@@ -477,7 +411,7 @@ export function SectionTicker({
   }
 
   return (
-    <div {...handlers} className="ticker-hover-pause">
+    <div {...handlers} className="ticker-track">
       <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} paused={paused} />
     </div>
   );

@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Ticker Instant Hover Pause — 2026-02-19
+
+### Removed two-phase marquee system, replaced with single CSS animation
+- Removed the 4-phase system (hidden → ready → entering → looping) that used a CSS transition for entry and a CSS animation for looping. `animation-play-state: paused` only works on animations, not transitions, so hover-pause had latency during the entering phase.
+- Now uses a single `animate-marquee` CSS animation applied immediately on mount. Content starts scrolling instantly — no entering transition, no JavaScript phase state.
+- Hover pause is pure CSS: `.ticker-track:hover .animate-marquee { animation-play-state: paused }` — freezes on the exact frame the mouse enters, zero latency.
+- Removed `useMarquee` hook, `marqueeProps` function, `MarqueePhase` type, `ticker-entering` class, `ticker-hover-pause` class, and the `transition-duration: 9999s` hack.
+- React `useHoverPause` state kept only for multi-ticker rotation JS timer pausing (not for visual freeze).
+- DB migration: `section_position` column changed from INTEGER to TEXT with CHECK constraint for valid position values.
+
+---
+
 ## Section Ticker Position-Based Rendering + Smart Fallback — 2026-02-19
 
 ### Position-aware section tickers with fallback chain
