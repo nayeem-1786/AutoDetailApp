@@ -157,15 +157,20 @@ const REPEAT_COUNT = 6;
 // SingleTickerMarquee — continuous marquee for a single ticker (or one ticker
 // in rotation "scroll" mode). Full bar in that ticker's colors/font.
 // ---------------------------------------------------------------------------
-function SingleTickerMarquee({ ticker }: { ticker: AnnouncementTicker }) {
+function SingleTickerMarquee({ ticker, paused }: { ticker: AnnouncementTicker; paused?: boolean }) {
   const speedValue = getSpeedValue(ticker);
   const { ref, loopDuration, enterDuration, enterOffset, phase } = useMarquee(speedValue);
   const fontSize = FONT_SIZE_CLASS[ticker.font_size] || FONT_SIZE_CLASS.sm;
   const mp = marqueeProps(phase, enterDuration, loopDuration, enterOffset);
 
+  const style = { ...mp.style };
+  if (paused) {
+    style.animationPlayState = 'paused';
+  }
+
   return (
     <div className={`whitespace-nowrap font-medium tracking-wide uppercase ${fontSize}`}>
-      <span ref={ref} className={mp.className} style={mp.style}>
+      <span ref={ref} className={mp.className} style={style}>
         {Array.from({ length: REPEAT_COUNT }, (_, i) => (
           <MessageUnit key={`a-${i}`} ticker={ticker} />
         ))}
@@ -267,9 +272,11 @@ const DEFAULT_OPTIONS: TickerPlacementOptions = {
 function MultiTickerRotation({
   tickers,
   options,
+  paused,
 }: {
   tickers: AnnouncementTicker[];
   options: TickerPlacementOptions;
+  paused?: boolean;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [bgPhase, setBgPhase] = useState<'in' | 'visible' | 'out'>('in');
@@ -282,6 +289,9 @@ function MultiTickerRotation({
   const isScrollMode = textEntry === 'scroll';
 
   useEffect(() => {
+    // Don't advance timers while paused
+    if (paused) return;
+
     // Phase machine: bg in -> show content -> hold -> hide content -> bg out -> next
     let timer: ReturnType<typeof setTimeout>;
 
@@ -308,7 +318,7 @@ function MultiTickerRotation({
     }
 
     return () => clearTimeout(timer);
-  }, [bgPhase, holdDuration, bgTransition, tickers.length]);
+  }, [bgPhase, holdDuration, bgTransition, tickers.length, paused]);
 
   // Reset phases when ticker list changes
   useEffect(() => {
@@ -330,7 +340,7 @@ function MultiTickerRotation({
       >
         {showContent ? (
           isScrollMode ? (
-            <SingleTickerMarquee key={currentIndex} ticker={current} />
+            <SingleTickerMarquee key={currentIndex} ticker={current} paused={paused} />
           ) : (
             <StaticMessage
               key={currentIndex}
@@ -390,6 +400,18 @@ function getBgTransitionStyles(
 }
 
 // ---------------------------------------------------------------------------
+// Shared hover-to-pause hook
+// ---------------------------------------------------------------------------
+function useHoverPause() {
+  const [paused, setPaused] = useState(false);
+  const handlers = {
+    onMouseEnter: () => setPaused(true),
+    onMouseLeave: () => setPaused(false),
+  };
+  return { paused, handlers };
+}
+
+// ---------------------------------------------------------------------------
 // TopBarTicker
 // ---------------------------------------------------------------------------
 export function TopBarTicker({
@@ -399,6 +421,8 @@ export function TopBarTicker({
   tickers: AnnouncementTicker[];
   options?: TickerPlacementOptions;
 }) {
+  const { paused, handlers } = useHoverPause();
+
   if (tickers.length === 0) return null;
 
   // Single ticker — always continuous marquee
@@ -406,19 +430,24 @@ export function TopBarTicker({
     const ticker = tickers[0];
     return (
       <div
-        className="relative overflow-hidden py-2.5"
+        className="relative overflow-hidden py-2.5 cursor-default"
         style={{
           backgroundColor: ticker.bg_color || '#CCFF00',
           color: ticker.text_color || '#000000',
         }}
+        {...handlers}
       >
-        <SingleTickerMarquee ticker={ticker} />
+        <SingleTickerMarquee ticker={ticker} paused={paused} />
       </div>
     );
   }
 
   // Multiple tickers — use configurable rotation
-  return <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} />;
+  return (
+    <div {...handlers} className="cursor-default">
+      <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} paused={paused} />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -431,6 +460,8 @@ export function SectionTicker({
   tickers: AnnouncementTicker[];
   options?: TickerPlacementOptions;
 }) {
+  const { paused, handlers } = useHoverPause();
+
   if (tickers.length === 0) return null;
 
   // Single ticker — always continuous marquee
@@ -438,18 +469,23 @@ export function SectionTicker({
     const ticker = tickers[0];
     return (
       <div
-        className="overflow-hidden py-2.5"
+        className="overflow-hidden py-2.5 cursor-default"
         style={{
           backgroundColor: ticker.bg_color || '#CCFF00',
           color: ticker.text_color || '#000000',
         }}
+        {...handlers}
       >
-        <SingleTickerMarquee ticker={ticker} />
+        <SingleTickerMarquee ticker={ticker} paused={paused} />
       </div>
     );
   }
 
-  return <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} />;
+  return (
+    <div {...handlers} className="cursor-default">
+      <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} paused={paused} />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
