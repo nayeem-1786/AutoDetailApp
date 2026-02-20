@@ -377,7 +377,7 @@ function MainFooterPanel({
 
       const res = await adminFetch('/api/admin/footer/columns', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-idempotency-key': crypto.randomUUID() },
         body: JSON.stringify({
           section_id: sectionId,
           title: newColumnTitle.trim(),
@@ -1040,7 +1040,7 @@ function LinksEditor({
     execute(async () => {
       const res = await adminFetch(`/api/admin/footer/columns/${column.id}/links`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-idempotency-key': crypto.randomUUID() },
         body: JSON.stringify({
           label: addLabel.trim(),
           url: addUrl.trim() || '#',
@@ -1580,7 +1580,7 @@ function BottomBarPanel({
     execute(async () => {
       const res = await adminFetch('/api/admin/footer/bottom-links', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-idempotency-key': crypto.randomUUID() },
         body: JSON.stringify({
           label: addLabel.trim(),
           url: addUrl.trim(),

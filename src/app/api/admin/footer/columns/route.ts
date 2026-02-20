@@ -3,6 +3,7 @@ import { revalidateTag } from '@/lib/utils/revalidate';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { checkIdempotency, saveIdempotency } from '@/lib/utils/idempotency';
 
 const MAX_ACTIVE_COLUMNS = 6;
 const GRID_UNITS = 12;
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
 
   const denied = await requirePermission(employee.id, 'cms.pages.manage');
   if (denied) return denied;
+
+  const idempotencyKey = request.headers.get('x-idempotency-key');
+  const cached = await checkIdempotency(idempotencyKey);
+  if (cached) return cached;
 
   const body = await request.json();
   const { section_id, title, content_type, html_content, config } = body;
@@ -125,12 +130,18 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'This column already exists' }, { status: 409 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   revalidateTag('footer-data');
 
-  return NextResponse.json({ data }, { status: 201 });
+  const responseBody = { data };
+  await saveIdempotency(idempotencyKey, responseBody, 201);
+
+  return NextResponse.json(responseBody, { status: 201 });
 }
 
 export async function PATCH(request: NextRequest) {

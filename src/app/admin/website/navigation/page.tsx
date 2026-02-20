@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useAsyncAction } from '@/lib/hooks/use-async-action';
 import type { WebsiteNavItem, WebsitePage, NavPlacement } from '@/lib/supabase/types';
 
 const PLACEMENTS: { value: NavPlacement; label: string }[] = [
@@ -33,6 +34,7 @@ const BUILT_IN_ROUTES = [
 ];
 
 export default function NavigationPage() {
+  const { isSubmitting, execute } = useAsyncAction();
   const [activePlacement, setActivePlacement] = useState<NavPlacement>('header');
   const [items, setItems] = useState<WebsiteNavItem[]>([]);
   const [pages, setPages] = useState<WebsitePage[]>([]);
@@ -76,38 +78,42 @@ export default function NavigationPage() {
   }, [loadItems]);
 
   const toggleActive = async (item: WebsiteNavItem) => {
-    const newValue = !item.is_active;
-    setItems((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, is_active: newValue } : i))
-    );
-
-    const res = await adminFetch(`/api/admin/cms/navigation/${item.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: newValue }),
-    });
-
-    if (!res.ok) {
+    await execute(async () => {
+      const newValue = !item.is_active;
       setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, is_active: !newValue } : i))
+        prev.map((i) => (i.id === item.id ? { ...i, is_active: newValue } : i))
       );
-      toast.error('Failed to update');
-    }
+
+      const res = await adminFetch(`/api/admin/cms/navigation/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: newValue }),
+      });
+
+      if (!res.ok) {
+        setItems((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, is_active: !newValue } : i))
+        );
+        toast.error('Failed to update');
+      }
+    });
   };
 
   const deleteItem = async (item: WebsiteNavItem) => {
     if (!confirm(`Remove "${item.label}" from navigation?`)) return;
 
-    const res = await adminFetch(`/api/admin/cms/navigation/${item.id}`, {
-      method: 'DELETE',
-    });
+    await execute(async () => {
+      const res = await adminFetch(`/api/admin/cms/navigation/${item.id}`, {
+        method: 'DELETE',
+      });
 
-    if (res.ok) {
-      setItems((prev) => prev.filter((i) => i.id !== item.id));
-      toast.success('Link removed');
-    } else {
-      toast.error('Failed to delete');
-    }
+      if (res.ok) {
+        setItems((prev) => prev.filter((i) => i.id !== item.id));
+        toast.success('Link removed');
+      } else {
+        toast.error('Failed to delete');
+      }
+    });
   };
 
   const startEdit = (item: WebsiteNavItem) => {
@@ -119,23 +125,25 @@ export default function NavigationPage() {
   const saveEdit = async () => {
     if (!editingId) return;
 
-    const res = await adminFetch(`/api/admin/cms/navigation/${editingId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: editLabel, url: editUrl }),
-    });
+    await execute(async () => {
+      const res = await adminFetch(`/api/admin/cms/navigation/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: editLabel, url: editUrl }),
+      });
 
-    if (res.ok) {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === editingId ? { ...i, label: editLabel, url: editUrl } : i
-        )
-      );
-      setEditingId(null);
-      toast.success('Link updated');
-    } else {
-      toast.error('Failed to update');
-    }
+      if (res.ok) {
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === editingId ? { ...i, label: editLabel, url: editUrl } : i
+          )
+        );
+        setEditingId(null);
+        toast.success('Link updated');
+      } else {
+        toast.error('Failed to update');
+      }
+    });
   };
 
   const handleAdd = async () => {
@@ -167,27 +175,29 @@ export default function NavigationPage() {
       return;
     }
 
-    const res = await adminFetch('/api/admin/cms/navigation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        placement: activePlacement,
-        label: label.trim(),
-        url: url || '#',
-        page_id: pageId,
-        parent_id: addParentId || null,
-        target: addTarget,
-      }),
-    });
+    await execute(async () => {
+      const res = await adminFetch('/api/admin/cms/navigation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          placement: activePlacement,
+          label: label.trim(),
+          url: url || '#',
+          page_id: pageId,
+          parent_id: addParentId || null,
+          target: addTarget,
+        }),
+      });
 
-    if (res.ok) {
-      await loadItems();
-      setShowAddDialog(false);
-      resetAddForm();
-      toast.success('Link added');
-    } else {
-      toast.error('Failed to add link');
-    }
+      if (res.ok) {
+        await loadItems();
+        setShowAddDialog(false);
+        resetAddForm();
+        toast.success('Link added');
+      } else {
+        toast.error('Failed to add link');
+      }
+    });
   };
 
   const resetAddForm = () => {
@@ -215,31 +225,33 @@ export default function NavigationPage() {
     e.preventDefault();
     if (!dragId || dragId === targetId) return;
 
-    const oldItems = [...items];
-    const dragIdx = items.findIndex((i) => i.id === dragId);
-    const targetIdx = items.findIndex((i) => i.id === targetId);
+    await execute(async () => {
+      const oldItems = [...items];
+      const dragIdx = items.findIndex((i) => i.id === dragId);
+      const targetIdx = items.findIndex((i) => i.id === targetId);
 
-    if (dragIdx === -1 || targetIdx === -1) return;
+      if (dragIdx === -1 || targetIdx === -1) return;
 
-    const newItems = [...items];
-    const [moved] = newItems.splice(dragIdx, 1);
-    newItems.splice(targetIdx, 0, moved);
-    setItems(newItems);
-    setDragId(null);
+      const newItems = [...items];
+      const [moved] = newItems.splice(dragIdx, 1);
+      newItems.splice(targetIdx, 0, moved);
+      setItems(newItems);
+      setDragId(null);
 
-    const res = await adminFetch('/api/admin/cms/navigation/reorder', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        placement: activePlacement,
-        orderedIds: newItems.map((i) => i.id),
-      }),
+      const res = await adminFetch('/api/admin/cms/navigation/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          placement: activePlacement,
+          orderedIds: newItems.map((i) => i.id),
+        }),
+      });
+
+      if (!res.ok) {
+        setItems(oldItems);
+        toast.error('Failed to reorder');
+      }
     });
-
-    if (!res.ok) {
-      setItems(oldItems);
-      toast.error('Failed to reorder');
-    }
   };
 
   const topLevelItems = items.filter((i) => !i.parent_id);
@@ -251,7 +263,7 @@ export default function NavigationPage() {
         title="Navigation"
         description="Manage header and footer navigation links."
         action={
-          <Button onClick={() => setShowAddDialog(true)}>
+          <Button onClick={() => setShowAddDialog(true)} disabled={isSubmitting}>
             <Plus className="mr-2 h-4 w-4" />
             Add Link
           </Button>
@@ -302,6 +314,7 @@ export default function NavigationPage() {
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, item.id)}
                 indent={0}
+                disabled={isSubmitting}
               />
               {/* Children */}
               {getChildren(item.id).map((child) => (
@@ -322,6 +335,7 @@ export default function NavigationPage() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, child.id)}
                   indent={1}
+                  disabled={isSubmitting}
                 />
               ))}
             </div>
@@ -480,10 +494,11 @@ export default function NavigationPage() {
                   setShowAddDialog(false);
                   resetAddForm();
                 }}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button onClick={handleAdd}>Add Link</Button>
+              <Button onClick={handleAdd} disabled={isSubmitting}>Add Link</Button>
             </div>
           </div>
         </div>
@@ -512,6 +527,7 @@ interface NavItemRowProps {
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   indent: number;
+  disabled?: boolean;
 }
 
 function NavItemRow({
@@ -530,6 +546,7 @@ function NavItemRow({
   onDragOver,
   onDrop,
   indent,
+  disabled,
 }: NavItemRowProps) {
   return (
     <div
@@ -581,17 +598,20 @@ function NavItemRow({
           <Switch
             checked={item.is_active}
             onCheckedChange={onToggleActive}
+            disabled={disabled}
           />
           <button
             onClick={onStartEdit}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={disabled}
+            className={`text-gray-400 hover:text-gray-600 transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
             title="Edit"
           >
             <Pencil className="h-4 w-4" />
           </button>
           <button
             onClick={onDelete}
-            className="text-gray-400 hover:text-red-600 transition-colors"
+            disabled={disabled}
+            className={`text-gray-400 hover:text-red-600 transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
             title="Delete"
           >
             <Trash2 className="h-4 w-4" />

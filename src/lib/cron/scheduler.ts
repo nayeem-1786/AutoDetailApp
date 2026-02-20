@@ -60,6 +60,11 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/cleanup-orders', 'cleanup-orders');
   });
 
+  // Idempotency key cleanup — daily at 3 AM PST (11:00 UTC)
+  cron.schedule('0 11 * * *', () => {
+    callCronEndpoint('/api/cron/cleanup-idempotency', 'cleanup-idempotency');
+  });
+
   console.log('[CRON] Scheduled jobs:');
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
@@ -68,4 +73,5 @@ export function setupCronJobs() {
   console.log('  - theme-activation: every 15 minutes');
   console.log('  - google-reviews: daily at 6:00 AM PST');
   console.log('  - cleanup-orders: every 6 hours');
+  console.log('  - cleanup-idempotency: daily at 3:00 AM PST');
 }

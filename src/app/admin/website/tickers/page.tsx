@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useAsyncAction } from '@/lib/hooks/use-async-action';
 import { createClient } from '@/lib/supabase/client';
 import {
   Plus,
@@ -58,6 +59,7 @@ const TEXT_ENTRY_OPTIONS = [
 // ---------------------------------------------------------------------------
 export default function TickerManagerPage() {
   const router = useRouter();
+  const { isSubmitting, execute } = useAsyncAction();
   const [tickers, setTickers] = useState<AnnouncementTicker[]>([]);
   const [masterEnabled, setMasterEnabled] = useState(false);
   const [featureFlagEnabled, setFeatureFlagEnabled] = useState(true);
@@ -130,65 +132,73 @@ export default function TickerManagerPage() {
   }, [load, loadMaster, loadOptions]);
 
   const toggleMaster = async (val: boolean) => {
-    setMasterEnabled(val);
-    try {
-      const res = await adminFetch('/api/admin/settings/business', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'ticker_enabled', value: val }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      toast.success(val ? 'Tickers enabled' : 'Tickers disabled');
-    } catch {
-      setMasterEnabled(!val);
-      toast.error('Failed to update');
-    }
+    await execute(async () => {
+      setMasterEnabled(val);
+      try {
+        const res = await adminFetch('/api/admin/settings/business', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'ticker_enabled', value: val }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        toast.success(val ? 'Tickers enabled' : 'Tickers disabled');
+      } catch {
+        setMasterEnabled(!val);
+        toast.error('Failed to update');
+      }
+    });
   };
 
   const addTicker = async () => {
-    try {
-      const res = await adminFetch('/api/admin/cms/tickers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'New announcement' }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const { data } = await res.json();
-      router.push(`/admin/website/tickers/${data.id}`);
-    } catch {
-      toast.error('Failed to create ticker');
-    }
+    await execute(async () => {
+      try {
+        const res = await adminFetch('/api/admin/cms/tickers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'New announcement' }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        const { data } = await res.json();
+        router.push(`/admin/website/tickers/${data.id}`);
+      } catch {
+        toast.error('Failed to create ticker');
+      }
+    });
   };
 
   const toggleActive = async (id: string, isActive: boolean) => {
-    setTickers((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, is_active: isActive } : t))
-    );
-    try {
-      const res = await adminFetch(`/api/admin/cms/tickers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: isActive }),
-      });
-      if (!res.ok) throw new Error('Failed');
-    } catch {
+    await execute(async () => {
       setTickers((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, is_active: !isActive } : t))
+        prev.map((t) => (t.id === id ? { ...t, is_active: isActive } : t))
       );
-      toast.error('Failed to update ticker');
-    }
+      try {
+        const res = await adminFetch(`/api/admin/cms/tickers/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: isActive }),
+        });
+        if (!res.ok) throw new Error('Failed');
+      } catch {
+        setTickers((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, is_active: !isActive } : t))
+        );
+        toast.error('Failed to update ticker');
+      }
+    });
   };
 
   const deleteTicker = async (id: string) => {
     if (!confirm('Delete this ticker?')) return;
-    try {
-      const res = await adminFetch(`/api/admin/cms/tickers/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed');
-      setTickers((prev) => prev.filter((t) => t.id !== id));
-      toast.success('Ticker deleted');
-    } catch {
-      toast.error('Failed to delete ticker');
-    }
+    await execute(async () => {
+      try {
+        const res = await adminFetch(`/api/admin/cms/tickers/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed');
+        setTickers((prev) => prev.filter((t) => t.id !== id));
+        toast.success('Ticker deleted');
+      } catch {
+        toast.error('Failed to delete ticker');
+      }
+    });
   };
 
   const moveItem = async (
@@ -199,48 +209,52 @@ export default function TickerManagerPage() {
     const swapIdx = idx + direction;
     if (swapIdx < 0 || swapIdx >= placementTickers.length) return;
 
-    const reordered = [...placementTickers];
-    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
-    const items = reordered.map((t, i) => ({ id: t.id, sort_order: i }));
+    await execute(async () => {
+      const reordered = [...placementTickers];
+      [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+      const items = reordered.map((t, i) => ({ id: t.id, sort_order: i }));
 
-    const prev = [...tickers];
-    setTickers((current) => {
-      const updated = [...current];
-      for (const item of items) {
-        const found = updated.find((t) => t.id === item.id);
-        if (found) found.sort_order = item.sort_order;
-      }
-      return updated.sort((a, b) => a.sort_order - b.sort_order);
-    });
-
-    try {
-      const res = await adminFetch('/api/admin/cms/tickers/reorder', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
+      const prev = [...tickers];
+      setTickers((current) => {
+        const updated = [...current];
+        for (const item of items) {
+          const found = updated.find((t) => t.id === item.id);
+          if (found) found.sort_order = item.sort_order;
+        }
+        return updated.sort((a, b) => a.sort_order - b.sort_order);
       });
-      if (!res.ok) throw new Error('Failed');
-    } catch {
-      setTickers(prev);
-      toast.error('Failed to reorder');
-    }
+
+      try {
+        const res = await adminFetch('/api/admin/cms/tickers/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        });
+        if (!res.ok) throw new Error('Failed');
+      } catch {
+        setTickers(prev);
+        toast.error('Failed to reorder');
+      }
+    });
   };
 
   const saveOptions = async (
     key: 'ticker_top_bar_options' | 'ticker_section_options',
     value: TickerPlacementOptions
   ) => {
-    try {
-      const res = await adminFetch('/api/admin/settings/business', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      toast.success('Options saved');
-    } catch {
-      toast.error('Failed to save options');
-    }
+    await execute(async () => {
+      try {
+        const res = await adminFetch('/api/admin/settings/business', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        toast.success('Options saved');
+      } catch {
+        toast.error('Failed to save options');
+      }
+    });
   };
 
   // Group tickers by placement
@@ -263,7 +277,7 @@ export default function TickerManagerPage() {
         title="Announcement Tickers"
         description="Scrolling announcements on the public website"
         action={
-          <Button onClick={addTicker}>
+          <Button onClick={addTicker} disabled={isSubmitting}>
             <Plus className="mr-2 h-4 w-4" />
             Add Ticker
           </Button>
@@ -301,7 +315,7 @@ export default function TickerManagerPage() {
             Master toggle — when off, no tickers display on the website
           </p>
         </div>
-        <Switch checked={masterEnabled} onCheckedChange={toggleMaster} />
+        <Switch checked={masterEnabled} onCheckedChange={toggleMaster} disabled={isSubmitting} />
       </div>
 
       {/* Tickers List */}
@@ -309,7 +323,7 @@ export default function TickerManagerPage() {
         <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
           <Megaphone className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-3 text-sm text-gray-500">No tickers yet</p>
-          <Button variant="outline" onClick={addTicker} className="mt-4">
+          <Button variant="outline" onClick={addTicker} className="mt-4" disabled={isSubmitting}>
             <Plus className="mr-2 h-4 w-4" />
             Create First Ticker
           </Button>
@@ -326,6 +340,7 @@ export default function TickerManagerPage() {
               onToggle={toggleActive}
               onDelete={deleteTicker}
               onEdit={(id) => router.push(`/admin/website/tickers/${id}`)}
+              disabled={isSubmitting}
             />
           )}
 
@@ -338,6 +353,7 @@ export default function TickerManagerPage() {
                 setTopBarOptions(opts);
                 saveOptions('ticker_top_bar_options', opts);
               }}
+              disabled={isSubmitting}
             />
           )}
 
@@ -351,6 +367,7 @@ export default function TickerManagerPage() {
               onToggle={toggleActive}
               onDelete={deleteTicker}
               onEdit={(id) => router.push(`/admin/website/tickers/${id}`)}
+              disabled={isSubmitting}
             />
           )}
 
@@ -363,6 +380,7 @@ export default function TickerManagerPage() {
                 setSectionOptions(opts);
                 saveOptions('ticker_section_options', opts);
               }}
+              disabled={isSubmitting}
             />
           )}
         </div>
@@ -378,10 +396,12 @@ function OptionsCard({
   label,
   options,
   onChange,
+  disabled,
 }: {
   label: string;
   options: TickerPlacementOptions;
   onChange: (opts: TickerPlacementOptions) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30 p-4">
@@ -405,6 +425,7 @@ function OptionsCard({
             onChange={(e) =>
               onChange({ ...options, text_entry: e.target.value as TickerPlacementOptions['text_entry'] })
             }
+            disabled={disabled}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           >
             {TEXT_ENTRY_OPTIONS.map((opt) => (
@@ -425,6 +446,7 @@ function OptionsCard({
             onChange={(e) =>
               onChange({ ...options, bg_transition: e.target.value as TickerPlacementOptions['bg_transition'] })
             }
+            disabled={disabled}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           >
             {BG_TRANSITION_OPTIONS.map((opt) => (
@@ -449,6 +471,7 @@ function OptionsCard({
               onChange={(e) =>
                 onChange({ ...options, hold_duration: Math.max(1, Math.min(30, Number(e.target.value) || 5)) })
               }
+              disabled={disabled}
               className="w-20 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
             <span className="text-xs text-gray-500">seconds</span>
@@ -470,6 +493,7 @@ function PlacementGroup({
   onToggle,
   onDelete,
   onEdit,
+  disabled,
 }: {
   label: string;
   description: string;
@@ -482,6 +506,7 @@ function PlacementGroup({
   onToggle: (id: string, isActive: boolean) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -507,7 +532,7 @@ function PlacementGroup({
                 <button
                   type="button"
                   onClick={() => onMove(tickers, idx, -1)}
-                  disabled={idx === 0}
+                  disabled={idx === 0 || disabled}
                   className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   title="Move up"
                 >
@@ -517,7 +542,7 @@ function PlacementGroup({
                 <button
                   type="button"
                   onClick={() => onMove(tickers, idx, 1)}
-                  disabled={idx === tickers.length - 1}
+                  disabled={idx === tickers.length - 1 || disabled}
                   className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   title="Move down"
                 >
@@ -572,11 +597,13 @@ function PlacementGroup({
                 <Switch
                   checked={ticker.is_active}
                   onCheckedChange={(val) => onToggle(ticker.id, val)}
+                  disabled={disabled}
                 />
                 <button
                   type="button"
                   onClick={() => onDelete(ticker.id)}
-                  className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                  disabled={disabled}
+                  className={`p-1.5 text-gray-400 hover:text-red-500 transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

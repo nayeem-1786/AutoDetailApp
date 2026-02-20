@@ -3,6 +3,7 @@ import { revalidateTag } from '@/lib/utils/revalidate';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { checkIdempotency, saveIdempotency } from '@/lib/utils/idempotency';
 
 // ---------------------------------------------------------------------------
 // GET    /api/admin/footer/columns/[columnId]/links — List links for a column
@@ -51,6 +52,10 @@ export async function POST(
   const denied = await requirePermission(employee.id, 'cms.pages.manage');
   if (denied) return denied;
 
+  const idempotencyKey = request.headers.get('x-idempotency-key');
+  const cached = await checkIdempotency(idempotencyKey);
+  if (cached) return cached;
+
   const { columnId } = await params;
   const body = await request.json();
   const { label, url, target } = body;
@@ -86,13 +91,19 @@ export async function POST(
     .single();
 
   if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'This link already exists in this column' }, { status: 409 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   revalidateTag('footer-data');
   revalidateTag('cms-navigation');
 
-  return NextResponse.json({ data }, { status: 201 });
+  const responseBody = { data };
+  await saveIdempotency(idempotencyKey, responseBody, 201);
+
+  return NextResponse.json(responseBody, { status: 201 });
 }
 
 export async function PATCH(
