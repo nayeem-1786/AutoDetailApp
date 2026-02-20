@@ -95,6 +95,14 @@ export async function DELETE(
 
   const { id } = await params;
   const admin = createAdminClient();
+
+  // Fetch creative to find images to clean up from storage
+  const { data: creative } = await admin
+    .from('ad_creatives')
+    .select('image_url, image_url_mobile')
+    .eq('id', id)
+    .single();
+
   const { error } = await admin
     .from('ad_creatives')
     .delete()
@@ -102,6 +110,20 @@ export async function DELETE(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Clean up storage images (best-effort)
+  if (creative) {
+    const imageUrls = [creative.image_url, creative.image_url_mobile].filter(Boolean) as string[];
+    const storagePaths = imageUrls
+      .map((url) => {
+        const match = url.match(/cms-assets\/(.+)/);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean) as string[];
+    if (storagePaths.length > 0) {
+      await admin.storage.from('cms-assets').remove(storagePaths).catch(() => {});
+    }
   }
 
   revalidateTag('cms-ads');

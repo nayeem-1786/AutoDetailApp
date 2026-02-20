@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Ads Image Upload and Preview — 2026-02-19
+
+- **Root cause**: Ad creative editor only had text `<Input>` fields for image URLs — no actual file upload mechanism. Users had to manually paste URLs, and without an upload there was no way to add images from their computer.
+- Replaced URL text inputs with drag-and-drop upload zones (click or drag to upload) for both desktop and mobile images
+- Images upload to Supabase `cms-assets` bucket under `ad-creatives/{id}/` path
+- Uploaded images show as preview with hover overlay for Replace/Remove actions
+- Sidebar preview panel also acts as an upload zone when no image is set (clickable + drag-and-drop)
+- Upload supports JPEG, PNG, WebP, and GIF up to 5MB
+- Old images are cleaned up from storage when replaced or removed
+- API DELETE handler now cleans up storage images when a creative is deleted (matching hero slide cleanup pattern)
+- Removed unused `ImageIcon` import
+
+---
+
 ## Fix Stale Data Between Promotions and Catalog Pages — 2026-02-19
 
 - Added `Cache-Control: no-store, no-cache, must-revalidate` header to promotions API GET response

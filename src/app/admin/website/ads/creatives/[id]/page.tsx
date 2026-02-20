@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
@@ -13,18 +13,25 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   ArrowLeft,
   Save,
-  Image as ImageIcon,
+  ImagePlus,
   Eye,
   MousePointerClick,
   Percent,
   Trash2,
+  Upload,
+  Loader2,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import type { AdCreative, AdSize } from '@/lib/supabase/types';
 import { AD_SIZE_LABELS } from '@/lib/utils/cms-zones';
 
 // ---------------------------------------------------------------------------
 // Ad size options
 // ---------------------------------------------------------------------------
+
+const BUCKET = 'cms-assets';
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const AD_SIZE_OPTIONS: { value: AdSize; label: string }[] = [
   { value: '728x90', label: 'Leaderboard (728x90)' },
@@ -76,6 +83,13 @@ export default function AdCreativeEditorPage() {
     ends_at: '',
     is_active: true,
   });
+
+  // Image upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mobileFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadingMobile, setUploadingMobile] = useState(false);
+  const [storageId] = useState(() => (isNew ? crypto.randomUUID() : id));
 
   // -----------------------------------------------------------------------
   // Load
@@ -140,11 +154,8 @@ export default function AdCreativeEditorPage() {
       toast.error('Name is required');
       return;
     }
-    if (!form.image_url.trim() && !isNew) {
-      // Allow save without image for existing (might just be updating other fields)
-    }
     if (isNew && !form.image_url.trim()) {
-      toast.error('Image URL is required');
+      toast.error('Image is required');
       return;
     }
 
@@ -218,6 +229,76 @@ export default function AdCreativeEditorPage() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  // -----------------------------------------------------------------------
+  // Image upload
+  // -----------------------------------------------------------------------
+
+  const uploadImage = async (file: File, field: 'image_url' | 'image_url_mobile') => {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Only JPEG, PNG, WebP, and GIF files are supported');
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+
+    const setter = field === 'image_url' ? setUploading : setUploadingMobile;
+    setter(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split('.').pop() || 'jpg';
+      const prefix = field === 'image_url_mobile' ? 'mobile-' : '';
+      const path = `ad-creatives/${storageId}/${prefix}${Date.now()}.${ext}`;
+
+      // Remove old image from storage if replacing
+      const oldUrl = form[field];
+      if (oldUrl) {
+        const match = oldUrl.match(/cms-assets\/(.+)/);
+        if (match) {
+          await supabase.storage.from(BUCKET).remove([match[1]]).catch(() => {});
+        }
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, new Uint8Array(arrayBuffer), {
+          upsert: true,
+          contentType: file.type,
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        toast.error('Failed to upload image');
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from(BUCKET)
+        .getPublicUrl(path);
+
+      updateField(field, urlData.publicUrl);
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Failed to upload image');
+    } finally {
+      setter(false);
+    }
+  };
+
+  const removeImage = async (field: 'image_url' | 'image_url_mobile') => {
+    const url = form[field];
+    if (!url) return;
+
+    const match = url.match(/cms-assets\/(.+)/);
+    if (match) {
+      const supabase = createClient();
+      await supabase.storage.from(BUCKET).remove([match[1]]).catch(() => {});
+    }
+    updateField(field, '');
   };
 
   // -----------------------------------------------------------------------
@@ -340,31 +421,162 @@ export default function AdCreativeEditorPage() {
               Images
             </h3>
 
+            {/* Desktop Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Image URL
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Desktop Image
               </label>
-              <Input
-                value={form.image_url}
-                onChange={(e) => updateField('image_url', e.target.value)}
-                className="mt-1"
-                placeholder="https://..."
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadImage(file, 'image_url');
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className="hidden"
               />
+              {form.image_url ? (
+                <div className="relative group rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-100 dark:bg-gray-700">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.image_url}
+                    alt={form.alt_text || form.name || 'Ad preview'}
+                    className="w-full max-h-48 object-contain"
+                  />
+                  {!uploading && (
+                    <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/0 transition-colors group-hover:bg-black/50">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-medium text-gray-700 opacity-0 shadow transition-opacity group-hover:opacity-100 hover:bg-white"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeImage('image_url')}
+                        className="flex items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-medium text-red-600 opacity-0 shadow transition-opacity group-hover:opacity-100 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  {uploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <Loader2 className="h-8 w-8 animate-spin text-white" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => !uploading && fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (!uploading) {
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) uploadImage(file, 'image_url');
+                    }
+                  }}
+                  disabled={uploading}
+                  className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800 hover:border-gray-400 hover:bg-gray-100/50 dark:hover:border-gray-500 dark:hover:bg-gray-700/50 py-8 transition-colors"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  ) : (
+                    <ImagePlus className="h-8 w-8 text-gray-300 dark:text-gray-500" />
+                  )}
+                  <p className="text-xs text-gray-400">
+                    {uploading ? 'Uploading...' : 'Click or drag to upload'}
+                  </p>
+                  <p className="text-[10px] text-gray-300 dark:text-gray-600">
+                    JPEG, PNG, WebP, or GIF. Max 5MB.
+                  </p>
+                </button>
+              )}
             </div>
 
+            {/* Mobile Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Mobile Image URL{' '}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Mobile Image{' '}
                 <span className="text-gray-400 font-normal">(optional)</span>
               </label>
-              <Input
-                value={form.image_url_mobile}
-                onChange={(e) =>
-                  updateField('image_url_mobile', e.target.value)
-                }
-                className="mt-1"
-                placeholder="https://... (smaller image for mobile)"
+              <input
+                ref={mobileFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadImage(file, 'image_url_mobile');
+                  if (mobileFileInputRef.current) mobileFileInputRef.current.value = '';
+                }}
+                className="hidden"
               />
+              {form.image_url_mobile ? (
+                <div className="relative group rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-100 dark:bg-gray-700">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.image_url_mobile}
+                    alt={form.alt_text || form.name || 'Ad mobile preview'}
+                    className="w-full max-h-36 object-contain"
+                  />
+                  {!uploadingMobile && (
+                    <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/0 transition-colors group-hover:bg-black/50">
+                      <button
+                        type="button"
+                        onClick={() => mobileFileInputRef.current?.click()}
+                        className="flex items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-medium text-gray-700 opacity-0 shadow transition-opacity group-hover:opacity-100 hover:bg-white"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeImage('image_url_mobile')}
+                        className="flex items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-medium text-red-600 opacity-0 shadow transition-opacity group-hover:opacity-100 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  {uploadingMobile && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <Loader2 className="h-8 w-8 animate-spin text-white" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => !uploadingMobile && mobileFileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (!uploadingMobile) {
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) uploadImage(file, 'image_url_mobile');
+                    }
+                  }}
+                  disabled={uploadingMobile}
+                  className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800 hover:border-gray-400 hover:bg-gray-100/50 dark:hover:border-gray-500 dark:hover:bg-gray-700/50 py-6 transition-colors"
+                >
+                  {uploadingMobile ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  ) : (
+                    <ImagePlus className="h-6 w-6 text-gray-300 dark:text-gray-500" />
+                  )}
+                  <p className="text-xs text-gray-400">
+                    {uploadingMobile ? 'Uploading...' : 'Click or drag to upload mobile image'}
+                  </p>
+                </button>
+              )}
             </div>
 
             <div>
@@ -462,19 +674,38 @@ export default function AdCreativeEditorPage() {
                   width: previewW * previewScale,
                   height: previewH * previewScale,
                 }}
-                className="rounded border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center"
+                className={`rounded border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center ${
+                  !form.image_url ? 'cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition-colors' : ''
+                }`}
+                onClick={() => {
+                  if (!form.image_url && !uploading) fileInputRef.current?.click();
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!uploading) {
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) uploadImage(file, 'image_url');
+                  }
+                }}
               >
                 {form.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={form.image_url}
                     alt={form.alt_text || form.name || 'Ad preview'}
                     className="h-full w-full object-contain"
                   />
+                ) : uploading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                 ) : (
                   <div className="text-center p-2">
-                    <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
+                    <ImagePlus className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-500" />
                     <p className="text-xs text-gray-400 mt-1">
                       {previewW} x {previewH}
+                    </p>
+                    <p className="text-[10px] text-gray-300 mt-0.5">
+                      Click or drag to upload
                     </p>
                   </div>
                 )}
