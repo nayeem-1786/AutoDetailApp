@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Sticky Ticker Below Header — 2026-02-19
+
+- Ticker was scrolling away with page content — now sticks below header while scrolling
+- Wrapped header + ticker in a single `sticky top-0 z-50` container in public layout
+- Moved ticker render order: now renders BELOW header (was above)
+- Removed `sticky top-0 z-50` from `<header>` element — wrapper handles stickiness
+- Scroll-dependent header background effects (blur, shadow) still work via `window.scrollY` detection
+
+### Files Modified
+- `src/app/(public)/layout.tsx` — sticky wrapper, swapped header/ticker order
+- `src/components/public/header-client.tsx` — removed `sticky top-0 z-50` from `<header>`
+
+---
+
 ## Hero Section Readability Fixes + Per-Slide Color Overrides — 2026-02-19
 
 ### Issue #1 (CRITICAL): Hero text invisible in light mode

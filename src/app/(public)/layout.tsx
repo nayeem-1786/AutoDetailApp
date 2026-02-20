@@ -35,8 +35,11 @@ export default async function PublicLayout({
       <ThemeToggleInitializer />
       <CartProviderWrapper>
         <div className="public-theme bg-brand-black text-site-text min-h-screen antialiased">
-          {showTickers && <TopBarTickerFiltered tickers={topBarTickers} options={tickerOptions.top_bar} />}
-          <SiteHeader navItems={headerNav} />
+          {/* Sticky wrapper: header + ticker pinned to top while scrolling */}
+          <div className="sticky top-0 z-50">
+            <SiteHeader navItems={headerNav} />
+            {showTickers && <TopBarTickerFiltered tickers={topBarTickers} options={tickerOptions.top_bar} />}
+          </div>
           <main className="min-h-[calc(100vh-4rem)]">{children}</main>
           <SiteFooter footerData={footerData} />
           <CartDrawer />

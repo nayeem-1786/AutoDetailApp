@@ -36,7 +36,7 @@ export function HeaderClient({
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-all duration-500 ${
+      className={`transition-all duration-500 ${
         scrolled
           ? 'bg-site-header-bg/95 backdrop-blur-xl shadow-2xl shadow-black/20'
           : 'bg-site-header-bg'
