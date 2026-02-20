@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Audit Ad Zone Placements — Fix Invalid Sidebar Zones — 2026-02-20
+
+Audited every public page's actual layout vs the ad zones offered in the Page Map. Found 2 zones labeled "sidebar" on pages with no sidebar:
+
+- **Booking `/book`**: Renamed `sidebar` → `below_form` — page is single-column centered, ad was rendered as full-width block below form. Sizes changed from vertical (300x250, 160x600) to horizontal (728x90, 970x250). Removed desktop-only wrapper so mobile users also see the ad.
+- **Product Detail `/products/:cat/:slug`**: Renamed `sidebar` → `below_content` — page has 2-col image/details grid but ad was placed outside the grid as full-width. Sizes changed from vertical (300x250, 336x280) to horizontal (728x90, 970x250).
+- **Service Detail** sidebar confirmed valid — genuine `<aside>` element in 3-col grid, no change needed.
+- All 12 other zones verified correct. Updated `docs/audits/ad-management.md` with full layout analysis.
+
+---
+
 ## Fix Ad Zones — Dynamic Route Resolution + Full Zone Wiring — 2026-02-20
 
 **Critical fix**: Ads on all dynamic routes (service category, service detail, product detail) never rendered because `getAdsForZone()` compared actual paths (e.g., `/services/ceramic-coatings/ceramic-coating`) against template paths stored in DB (e.g., `/services/:categorySlug/:serviceSlug`) — exact match always failed. Added `resolveTemplatePath()` to convert actual paths back to template paths before querying. This unblocked 5 zones across 3 pages.

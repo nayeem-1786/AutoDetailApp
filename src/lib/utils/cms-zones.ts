@@ -126,11 +126,11 @@ export const PAGE_ZONES: PageZones[] = [
     label: 'Product Detail',
     zones: [
       {
-        id: 'sidebar',
-        label: 'Sidebar',
-        description: 'Sidebar ad on product detail page',
-        desktopSizes: ['300x250', '336x280'],
-        mobileSizes: ['320x100'],
+        id: 'below_content',
+        label: 'Below Product Content',
+        description: 'Full-width banner below product details',
+        desktopSizes: ['728x90', '970x250'],
+        mobileSizes: ['320x100', '320x50'],
       },
     ],
   },
@@ -159,11 +159,11 @@ export const PAGE_ZONES: PageZones[] = [
     label: 'Booking',
     zones: [
       {
-        id: 'sidebar',
-        label: 'Sidebar (Desktop)',
-        description: 'Sidebar ad on booking page, desktop only',
-        desktopSizes: ['300x250', '160x600'],
-        mobileSizes: [],
+        id: 'below_form',
+        label: 'Below Booking Form',
+        description: 'Full-width banner below the booking wizard',
+        desktopSizes: ['728x90', '970x250'],
+        mobileSizes: ['320x100', '320x50'],
       },
     ],
   },

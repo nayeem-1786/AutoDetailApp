@@ -236,7 +236,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/products/${categorySlug}/${productSlug}`} className="mt-8" /></Suspense>}
+          {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="below_content" pagePath={`/products/${categorySlug}/${productSlug}`} className="mt-8" /></Suspense>}
         </div>
       </article>
 

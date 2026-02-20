@@ -160,11 +160,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
         </div>
       </section>
 
-      {/* Desktop-only sidebar ad — zone has no mobile sizes */}
       {cmsToggles.adPlacements && (
-        <div className="hidden sm:block">
-          <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath="/book" /></Suspense>
-        </div>
+        <Suspense fallback={null}><AdZone zoneId="below_form" pagePath="/book" /></Suspense>
       )}
     </>
   );
