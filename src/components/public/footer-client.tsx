@@ -277,10 +277,11 @@ function BrandColumn({
               className="flex items-center gap-1.5 text-sm text-site-text-secondary"
             >
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              <span className="font-semibold">{r.rating}</span>
-              <span className="text-site-text-dim">on {r.platform}</span>
-              <span className="text-site-text-faint">&middot;</span>
-              <span className="text-site-text-dim">{r.count} reviews</span>
+              <span>
+                <span className="font-semibold">{parseFloat(r.rating).toFixed(1)}</span>
+                {' '}
+                <span className="text-site-text-dim">on {r.platform} &middot; {r.count} reviews</span>
+              </span>
             </div>
           ))}
         </div>

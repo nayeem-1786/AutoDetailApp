@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Review Display Formatting — 2026-02-19
+
+- Fixed footer review badges rendering "5on Google·37 reviews" instead of "5.0 on Google · 37 reviews"
+- Rating now formatted with `parseFloat(r.rating).toFixed(1)` for consistent decimal display
+- Collapsed separate flex-gapped spans into inline text so word spacing is natural, not dependent on flex gap
+- Only frontend (`footer-client.tsx`) affected — admin has no review preview, just a show/hide toggle
+
+---
+
 ## Footer Brand Column Fixes — 2026-02-19
 
 ### Logo Width Input
