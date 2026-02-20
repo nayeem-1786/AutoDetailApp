@@ -84,8 +84,9 @@ function SingleTickerMarquee({ ticker }: { ticker: AnnouncementTicker }) {
     const el = ref.current;
     if (!el) return;
     const pxPerSec = speedToPxPerSec(speedValue);
-    const halfWidth = el.scrollWidth / 2;
-    setDuration(Math.max(3, halfWidth / pxPerSec));
+    // Total travel: 100vw (start off-screen right) + 100% element width (exit off-screen left)
+    const totalDistance = window.innerWidth + el.scrollWidth;
+    setDuration(Math.max(3, totalDistance / pxPerSec));
   }, [speedValue]);
 
   useEffect(() => {

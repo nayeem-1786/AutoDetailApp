@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Ticker Marquee Starts Off-Screen — 2026-02-19
+
+- Changed `@keyframes marquee` from `translateX(0) → translateX(-50%)` to `translateX(100vw) → translateX(-100%)` so text enters from fully off-screen right and exits fully off-screen left
+- Updated duration calculation: total travel distance is now `window.innerWidth + el.scrollWidth` instead of `el.scrollWidth / 2`
+
+---
+
 ## Ticker Hover UX Polish — 2026-02-19
 
 - Added `cursor: default` and `user-select: none` to `.ticker-track` container to prevent text I-beam cursor and accidental text selection on hover
