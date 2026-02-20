@@ -111,7 +111,7 @@ export default function CouponsListPage() {
     async function load() {
       setLoading(true);
       try {
-        const res = await adminFetch('/api/marketing/coupons?limit=1000');
+        const res = await adminFetch('/api/marketing/coupons?limit=1000', { cache: 'no-store' });
         const json = await res.json();
         if (res.ok) {
           if (json.data) setCoupons(json.data);

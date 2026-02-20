@@ -4,6 +4,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Marketing Pages — Cached Fetch Causing Data Disappearance — 2026-02-20
+
+### Bug Fix
+- **Coupons, Campaigns, Automations list pages**: Items disappeared after clicking Status/Auto-Apply toggle badges. Root cause: browser fetch caching returned stale/empty responses on re-render.
+- Applied proven fix pattern (from Promotions page): `cache: 'no-store'` on all client-side fetches + `Cache-Control: no-store, no-cache, must-revalidate` on API responses.
+
+### Architecture Fixes
+- **Automations page**: Migrated from direct browser Supabase client (`createClient()`) to API routes via `adminFetch` — consistent with admin architecture pattern.
+- **Campaigns page**: Switched from raw `fetch()` to `adminFetch` wrapper (auto-redirect on 401).
+- **Automations API routes** (`route.ts` + `[id]/route.ts`): Switched from `createClient()` (server/RLS) to `createAdminClient()` (service role) for all data queries — consistent with admin API pattern.
+
+### Files Changed
+- `src/app/admin/marketing/coupons/page.tsx` — `cache: 'no-store'` on initial load
+- `src/app/admin/marketing/campaigns/page.tsx` — `adminFetch` + `cache: 'no-store'` on all fetches
+- `src/app/admin/marketing/automations/page.tsx` — full migration to `adminFetch` API routes
+- `src/app/api/marketing/coupons/route.ts` — `Cache-Control` header on GET
+- `src/app/api/marketing/campaigns/route.ts` — `Cache-Control` header on GET
+- `src/app/api/marketing/automations/route.ts` — `createAdminClient()` + `Cache-Control` header
+- `src/app/api/marketing/automations/[id]/route.ts` — `createAdminClient()` for all handlers
+
+---
+
 ## Fix: Auto-Focus OTP Input on Verification Page — 2026-02-20
 
 - **Signin page** (`/signin`): OTP code input is now auto-focused when the verification step renders, so users can start typing immediately without clicking.

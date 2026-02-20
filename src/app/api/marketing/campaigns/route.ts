@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
     const { data, count, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ data, total: count ?? 0, page, limit });
+    return NextResponse.json({ data, total: count ?? 0, page, limit }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    });
   } catch (err) {
     console.error('List campaigns error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

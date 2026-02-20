@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { lifecycleRuleSchema } from '@/lib/utils/validation';
 
 export async function GET(_request: NextRequest) {
@@ -8,7 +9,8 @@ export async function GET(_request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -17,7 +19,7 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('lifecycle_rules')
       .select('*, services:trigger_service_id(id, name), coupons:coupon_id(id, name, code)')
       .order('chain_order')
@@ -25,7 +27,9 @@ export async function GET(_request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: data || [] }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    });
   } catch (err) {
     console.error('List automations error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -38,7 +42,8 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: employee } = await admin
       .from('employees')
       .select('role')
       .eq('auth_user_id', user.id)
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('lifecycle_rules')
       .insert(parsed.data)
       .select()

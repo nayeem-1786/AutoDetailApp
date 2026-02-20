@@ -15,6 +15,7 @@ import { Plus, Pencil, Trash2, Copy } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 
 export default function CampaignsListPage() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function CampaignsListPage() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch('/api/marketing/campaigns?limit=1000');
+        const res = await adminFetch('/api/marketing/campaigns?limit=1000', { cache: 'no-store' });
         if (res.ok) {
           const { data } = await res.json();
           if (data) setCampaigns(data);
@@ -61,7 +62,7 @@ export default function CampaignsListPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/marketing/campaigns/${deleteTarget.id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/marketing/campaigns/${deleteTarget.id}`, { method: 'DELETE' });
       if (res.ok) {
         setCampaigns((prev) => prev.filter((c) => c.id !== deleteTarget.id));
         toast.success('Campaign deleted');
@@ -80,7 +81,7 @@ export default function CampaignsListPage() {
   async function handleDuplicate(campaignId: string) {
     setDuplicating(campaignId);
     try {
-      const res = await fetch(`/api/marketing/campaigns/${campaignId}/duplicate`, { method: 'POST' });
+      const res = await adminFetch(`/api/marketing/campaigns/${campaignId}/duplicate`, { method: 'POST' });
       if (res.ok) {
         const { data } = await res.json();
         toast.success('Campaign duplicated');

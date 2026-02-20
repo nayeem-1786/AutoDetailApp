@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { CAMPAIGN_CHANNEL_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
@@ -14,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Plus } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 
 interface RuleWithService {
   id: string;
@@ -32,43 +32,49 @@ interface RuleWithService {
 
 export default function AutomationsListPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [rules, setRules] = useState<RuleWithService[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('');
 
   useEffect(() => {
+    async function loadRules() {
+      setLoading(true);
+      try {
+        const res = await adminFetch('/api/marketing/automations', { cache: 'no-store' });
+        if (res.ok) {
+          const { data } = await res.json();
+          if (data) setRules(data);
+        } else {
+          toast.error('Failed to load automation rules');
+        }
+      } catch {
+        toast.error('Failed to load automation rules');
+      }
+      setLoading(false);
+    }
     loadRules();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadRules() {
-    setLoading(true);
-    const { data } = await supabase
-      .from('lifecycle_rules')
-      .select('*, services:trigger_service_id(id, name), coupons:coupon_id(id, name, code)')
-      .order('chain_order')
-      .order('created_at', { ascending: false });
-
-    if (data) setRules(data as RuleWithService[]);
-    setLoading(false);
-  }
+  }, []);
 
   async function toggleActive(ruleId: string, isActive: boolean) {
-    const { error } = await supabase
-      .from('lifecycle_rules')
-      .update({ is_active: !isActive })
-      .eq('id', ruleId);
-
-    if (error) {
+    try {
+      const res = await adminFetch(`/api/marketing/automations/${ruleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !isActive }),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setRules((prev) =>
+          prev.map((r) => (r.id === data.id ? { ...r, ...data } : r))
+        );
+        toast.success(`Rule ${!isActive ? 'activated' : 'deactivated'}`);
+      } else {
+        toast.error('Failed to update rule');
+      }
+    } catch {
       toast.error('Failed to update rule');
-      return;
     }
-
-    setRules((prev) =>
-      prev.map((r) => (r.id === ruleId ? { ...r, is_active: !isActive } : r))
-    );
-    toast.success(`Rule ${!isActive ? 'activated' : 'deactivated'}`);
   }
 
   const filtered = useMemo(() => {
