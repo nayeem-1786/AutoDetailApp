@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Auto-Focus OTP Input on Verification Page — 2026-02-20
+
+- **Signin page** (`/signin`): OTP code input is now auto-focused when the verification step renders, so users can start typing immediately without clicking.
+- Uses `requestAnimationFrame` + ref to ensure focus after React renders the input.
+
+---
+
 ## Fix: Hide All Ineligible Coupons in Booking Step 5 — 2026-02-20
 
 ### Bug Fix

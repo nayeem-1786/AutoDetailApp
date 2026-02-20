@@ -40,6 +40,7 @@ export default function CustomerSignInPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const signedOutRef = useRef(false);
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
   // When redirected here due to session expiry, sign out to clear the
   // refresh token from cookies. Without this, navigating back to /account
@@ -51,6 +52,14 @@ export default function CustomerSignInPage() {
       supabase.auth.signOut();
     }
   }, [sessionExpired]);
+
+  // Auto-focus OTP input when entering verification mode
+  useEffect(() => {
+    if (mode === 'otp') {
+      // Small delay to ensure the input is rendered
+      requestAnimationFrame(() => otpInputRef.current?.focus());
+    }
+  }, [mode]);
 
   // Cooldown timer
   useEffect(() => {
@@ -300,6 +309,9 @@ export default function CustomerSignInPage() {
     setLoading(false);
   };
 
+  // Destructure register to merge refs for auto-focus
+  const { ref: otpCodeRef, ...otpCodeField } = otpForm.register('code');
+
   return (
     <section className="flex items-center justify-center py-12 sm:py-16">
       <div className="w-full max-w-md space-y-6 px-4">
@@ -405,7 +417,11 @@ export default function CustomerSignInPage() {
                   maxLength={6}
                   placeholder="000000"
                   className="text-center text-lg tracking-[0.3em]"
-                  {...otpForm.register('code')}
+                  {...otpCodeField}
+                  ref={(el) => {
+                    otpCodeRef(el);
+                    otpInputRef.current = el;
+                  }}
                 />
               </FormField>
 
