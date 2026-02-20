@@ -48,11 +48,6 @@ export const SIDEBAR_NAV: NavItem[] = [
     icon: 'Megaphone',
     children: [
       {
-        label: 'Promotions',
-        href: '/admin/marketing/promotions',
-        icon: 'BarChart3',
-      },
-      {
         label: 'Coupons',
         href: '/admin/marketing/coupons',
         icon: 'Ticket',
@@ -66,6 +61,11 @@ export const SIDEBAR_NAV: NavItem[] = [
         label: 'Campaigns',
         href: '/admin/marketing/campaigns',
         icon: 'Send',
+      },
+      {
+        label: 'Promotions',
+        href: '/admin/marketing/promotions',
+        icon: 'BarChart3',
       },
       {
         label: 'Compliance',
