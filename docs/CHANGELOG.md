@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Before/After Image Slider in Homepage CTA Section — 2026-02-20
+
+- Split the "Ready to Transform Your Vehicle?" CTA section into two-column layout: text/button on left, before/after image comparison slider on right
+- Created `src/components/public/before-after-slider.tsx` — pure React + CSS component with pointer events (mouse + touch), `clip-path` for smooth reveal, draggable handle with lime-bordered circle, and "Before"/"After" labels
+- `CtaSection` now accepts optional `beforeImage`/`afterImage` props — when provided, renders 2-column layout; otherwise keeps existing centered single-column layout (no breaking change for other pages)
+- Homepage passes `/images/before-after-old.png` and `/images/before-after-new.png` (590x578 truck images)
+- Mobile: stacks text above slider (single column)
+
+---
+
 ## Fix Service Detail Sidebar Ad Placement — 2026-02-20
 
 - **Root cause**: `<AdZone>` was placed inside the `<aside>` but **outside** the `<div className="sticky top-24 ...">` container, so the ad scrolled behind the sticky sidebar instead of staying visible with the nav links.

@@ -329,7 +329,10 @@ export default async function HomePage() {
 
       <SectionTickerSlot position="before_cta" pageType="home" />
 
-      <CtaSection />
+      <CtaSection
+        beforeImage="/images/before-after-old.png"
+        afterImage="/images/before-after-new.png"
+      />
     </>
   );
 }
