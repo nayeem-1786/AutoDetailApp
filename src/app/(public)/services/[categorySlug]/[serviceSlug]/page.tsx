@@ -21,6 +21,7 @@ import { CtaSection } from '@/components/public/cta-section';
 import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import { JsonLd } from '@/components/public/json-ld';
 import { AdZone } from '@/components/public/cms/ad-zone';
+import { getCmsToggles } from '@/lib/data/cms';
 
 export const revalidate = 300;
 
@@ -63,9 +64,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
   }
 
   const { service, category } = result;
-  const [businessInfo, categoryResult] = await Promise.all([
+  const [businessInfo, categoryResult, cmsToggles] = await Promise.all([
     getBusinessInfo(),
     getServicesByCategory(categorySlug),
+    getCmsToggles(),
   ]);
   const addonSuggestions = service.service_addon_suggestions ?? [];
 
@@ -210,7 +212,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   )}
                 </dl>
               </div>
-              <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/services/${categorySlug}/${serviceSlug}`} /></Suspense>
+              {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/services/${categorySlug}/${serviceSlug}`} /></Suspense>}
             </aside>
           </div>
 

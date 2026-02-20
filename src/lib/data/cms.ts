@@ -215,10 +215,10 @@ export const getCmsToggles = unstable_cache(
     return {
       heroCarousel: flagMap.hero_carousel ?? true,
       announcementTickers: flagMap.announcement_tickers ?? false,
-      adPlacements: flagMap.ad_placements ?? false,
+      adPlacements: (flagMap.ad_placements ?? false) && (settingMap.ads_enabled ?? true),
       seasonalThemes: flagMap.seasonal_themes ?? false,
       tickerEnabled: settingMap.ticker_enabled ?? false,
-      adsEnabled: settingMap.ads_enabled ?? false,
+      adsEnabled: settingMap.ads_enabled ?? true,
     };
   },
   ['cms-toggles'],

@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Ad Management System — Functional Audit + Fixes — 2026-02-20
+
+Full code-traced audit of the ad management system. Found and fixed 5 issues:
+
+- **Master toggle wired to frontend**: `ads_enabled` business setting was written by admin toggle but never checked on public pages. `getCmsToggles()` now merges both `ad_placements` feature flag AND `ads_enabled` setting — both must be true for ads to render. Default for `ads_enabled` is `true` so existing installs aren't affected.
+- **Ad container clipping fixed**: Leaderboard ads (970x90) were clipped by `overflow-hidden` + `maxHeight: 90` + `rounded-2xl` (16px radius). Removed `maxHeight`, reduced to `rounded-lg` (8px), added `py-4` vertical spacing.
+- **Page Map empty state**: Zone assignment dialog showed only "-- No ad (remove) --" when no active creatives existed. Now shows "No ad creatives yet" with a "Create New Ad" button.
+- **Detail page toggle guards**: Service detail and product detail sidebar ads now check `cmsToggles.adPlacements` before rendering (were rendering unconditionally).
+- **Schedule dates verified correct**: `getAdsForZone()` already handles null `starts_at`/`ends_at` correctly (null = always active).
+- Updated `docs/audits/ad-management.md` with functional test results
+
+---
+
 ## Fix Ads Image Upload and Preview — 2026-02-19
 
 - **Root cause**: Ad creative editor only had text `<Input>` fields for image URLs — no actual file upload mechanism. Users had to manually paste URLs, and without an upload there was no way to add images from their computer.

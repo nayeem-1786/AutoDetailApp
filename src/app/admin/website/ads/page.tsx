@@ -763,20 +763,42 @@ export default function AdManagementPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Select Creative
                 </label>
-                <select
-                  value={selectedCreativeId}
-                  onChange={(e) => setSelectedCreativeId(e.target.value)}
-                  className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                >
-                  <option value="">-- No ad (remove) --</option>
-                  {creatives
-                    .filter((c) => c.is_active)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({AD_SIZE_LABELS[c.ad_size] || c.ad_size})
-                      </option>
-                    ))}
-                </select>
+                {creatives.filter((c) => c.is_active).length === 0 &&
+                !zoneDialog.currentPlacement ? (
+                  <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 text-center">
+                    <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-500">
+                      No ad creatives yet
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        closeZoneDialog();
+                        router.push('/admin/website/ads/creatives/new');
+                      }}
+                      className="mt-3"
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Create New Ad
+                    </Button>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedCreativeId}
+                    onChange={(e) => setSelectedCreativeId(e.target.value)}
+                    className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    <option value="">-- No ad (remove) --</option>
+                    {creatives
+                      .filter((c) => c.is_active)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({AD_SIZE_LABELS[c.ad_size] || c.ad_size})
+                        </option>
+                      ))}
+                  </select>
+                )}
               </div>
 
               {/* Preview */}

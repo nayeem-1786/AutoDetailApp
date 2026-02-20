@@ -130,15 +130,14 @@ export function AdZone({ zoneId, pagePath, className, ad: preloaded }: AdZonePro
   return (
     <div
       ref={containerRef}
-      className={`flex justify-center ${className ?? ''}`}
+      className={`flex justify-center py-4 ${className ?? ''}`}
     >
       <div
-        className={`overflow-hidden rounded-2xl ${ad.creative.link_url ? 'cursor-pointer' : ''}`}
+        className={`overflow-hidden rounded-lg ${ad.creative.link_url ? 'cursor-pointer' : ''}`}
         onClick={handleClick}
         role={ad.creative.link_url ? 'link' : undefined}
-        style={{ maxWidth: width, maxHeight: height }}
+        style={{ maxWidth: width }}
       >
-        {/* Desktop image */}
         <picture>
           {ad.creative.image_url_mobile && (
             <source media="(max-width: 639px)" srcSet={ad.creative.image_url_mobile} />

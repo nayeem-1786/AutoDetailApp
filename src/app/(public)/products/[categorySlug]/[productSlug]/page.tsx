@@ -15,6 +15,7 @@ import { CtaSection } from '@/components/public/cta-section';
 import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import { JsonLd } from '@/components/public/json-ld';
 import { AdZone } from '@/components/public/cms/ad-zone';
+import { getCmsToggles } from '@/lib/data/cms';
 import { ProductAddToCart } from '@/components/public/cart/product-add-to-cart';
 
 export const revalidate = 300;
@@ -58,7 +59,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   const { product, category } = result;
-  const businessInfo = await getBusinessInfo();
+  const [businessInfo, cmsToggles] = await Promise.all([
+    getBusinessInfo(),
+    getCmsToggles(),
+  ]);
 
   const breadcrumbItems = [
     { name: 'Home', url: SITE_URL },
@@ -232,7 +236,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/products/${categorySlug}/${productSlug}`} className="mt-8" /></Suspense>
+          {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/products/${categorySlug}/${productSlug}`} className="mt-8" /></Suspense>}
         </div>
       </article>
 
