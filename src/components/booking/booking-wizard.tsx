@@ -57,6 +57,8 @@ interface AvailableCoupon {
     discount_value: number;
     max_discount: number | null;
   }[];
+  is_eligible?: boolean;
+  ineligibility_reason?: string | null;
 }
 
 interface AppliedCoupon {
@@ -513,8 +515,15 @@ export function BookingWizard({
       }
     } else {
       try {
+        // Build coupon URL with service context for eligibility filtering
+        const couponParams = new URLSearchParams();
+        if (state.service?.id) couponParams.set('service_id', state.service.id);
+        const addonServiceIds = state.config?.addons?.map((a) => a.service_id) || [];
+        if (addonServiceIds.length > 0) couponParams.set('addon_ids', addonServiceIds.join(','));
+        const couponUrl = `/api/customer/coupons${couponParams.toString() ? `?${couponParams.toString()}` : ''}`;
+
         const [couponsRes, loyaltyRes] = await Promise.all([
-          fetch('/api/customer/coupons'),
+          fetch(couponUrl),
           fetch('/api/customer/loyalty'),
         ]);
 

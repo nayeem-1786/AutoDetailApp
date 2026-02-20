@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Booking Coupon Filtering by Service — 2026-02-20
+
+### Bug Fix
+- **Portal booking flow** (`/api/customer/coupons`): Now filters coupons by service applicability. Previously returned ALL active coupons regardless of the selected service, showing unrelated coupons in Step 5.
+- Accepts `service_id` and `addon_ids` query params to check eligibility against the customer's selected services.
+- Checks `requires_service_ids`, `requires_service_category_ids`, and reward `target_service_id`/`target_service_category_id` — matching the logic already used in the guest flow (`/api/book/check-customer`).
+- Ineligible general coupons are filtered out entirely. Customer-specific coupons that don't match are kept (dimmed with reason) so customers know they have them.
+- Returns `is_eligible` and `ineligibility_reason` fields per coupon.
+- **Booking wizard** updated to pass service context when fetching portal coupons.
+
+---
+
 ## Site Performance Audit & Optimization — 2026-02-20
 
 ### Image Optimization
