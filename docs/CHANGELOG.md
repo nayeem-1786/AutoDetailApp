@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Trust Bar + Hero Rating Fixes — 2026-02-19
+
+### Rating formatting
+- Fixed hero section and trust bar showing "5" instead of "5.0" — both now use `parseFloat(rating).toFixed(1)`
+- Affects `hero-section.tsx` (Google + Yelp inline stats) and `trust-bar-client.tsx` (Google + Yelp sections)
+
+### Dynamic vehicle count
+- Replaced hardcoded `6000+` in trust bar with live count from database
+- New `src/lib/data/vehicle-count.ts`: baseline (3,816) + COUNT of completed jobs since Jan 1, 2026
+- Baseline and cutoff date default in code, overridable via `business_settings` keys `vehicle_count_baseline` and `vehicle_count_baseline_date`
+- Count auto-increments as new jobs complete through POS
+- Trust bar server component fetches count in parallel with review data
+
+---
+
 ## Review Display Formatting — 2026-02-19
 
 - Fixed footer review badges rendering "5on Google·37 reviews" instead of "5.0 on Google · 37 reviews"

@@ -8,6 +8,7 @@ interface TrustBarClientProps {
   googleCount: string;
   yelpRating: string;
   yelpCount: string;
+  vehicleCount: number;
 }
 
 export function TrustBarClient({
@@ -15,6 +16,7 @@ export function TrustBarClient({
   googleCount,
   yelpRating,
   yelpCount,
+  vehicleCount,
 }: TrustBarClientProps) {
   return (
     <section className="border-t border-b border-site-border-light bg-brand-dark py-6">
@@ -23,7 +25,7 @@ export function TrustBarClient({
           {/* Google */}
           <div className="flex items-center gap-2">
             <Star className="h-5 w-5 fill-lime text-lime" />
-            <span className="text-xl sm:text-2xl font-bold text-site-text">{googleRating}</span>
+            <span className="text-xl sm:text-2xl font-bold text-site-text">{parseFloat(googleRating).toFixed(1)}</span>
             <span className="text-sm text-site-text-muted">
               Google (<CountUp end={parseInt(googleCount) || 0} className="font-semibold text-site-text" /> reviews)
             </span>
@@ -34,7 +36,7 @@ export function TrustBarClient({
           {/* Yelp */}
           <div className="flex items-center gap-2">
             <Star className="h-5 w-5 fill-lime text-lime" />
-            <span className="text-xl sm:text-2xl font-bold text-site-text">{yelpRating}</span>
+            <span className="text-xl sm:text-2xl font-bold text-site-text">{parseFloat(yelpRating).toFixed(1)}</span>
             <span className="text-sm text-site-text-muted">
               Yelp (<CountUp end={parseInt(yelpCount) || 0} className="font-semibold text-site-text" /> reviews)
             </span>
@@ -46,7 +48,7 @@ export function TrustBarClient({
           <div className="flex items-center gap-2">
             <Car className="h-5 w-5 text-lime" />
             <span className="text-xl sm:text-2xl font-bold text-site-text">
-              <CountUp end={6000} suffix="+" />
+              <CountUp end={vehicleCount} suffix="+" />
             </span>
             <span className="text-sm text-site-text-muted">Vehicles</span>
           </div>

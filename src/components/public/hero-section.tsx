@@ -26,13 +26,13 @@ export async function HeroSection() {
             <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-site-text-muted">
               <span className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-lime text-lime" />
-                <span className="font-semibold text-site-text">{reviews.google.rating}</span>
+                <span className="font-semibold text-site-text">{parseFloat(reviews.google.rating).toFixed(1)}</span>
                 <span>&middot; {reviews.google.count} Google Reviews</span>
               </span>
               <span className="hidden sm:inline text-white/30">|</span>
               <span className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-lime text-lime" />
-                <span className="font-semibold text-site-text">{reviews.yelp.rating}</span>
+                <span className="font-semibold text-site-text">{parseFloat(reviews.yelp.rating).toFixed(1)}</span>
                 <span>&middot; {reviews.yelp.count} Yelp Reviews</span>
               </span>
             </div>
