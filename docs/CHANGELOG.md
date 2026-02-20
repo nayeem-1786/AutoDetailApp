@@ -4,14 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Hide All Ineligible Coupons in Booking Step 5 — 2026-02-20
+
+### Bug Fix
+- **Both coupon APIs** (`/api/customer/coupons` + `/api/book/check-customer`): ALL ineligible coupons are now filtered out entirely — no dimmed state, no "Not applicable" badge. If a coupon doesn't apply to the selected service, it simply doesn't appear.
+- Previously, customer-specific ineligible coupons were kept visible (dimmed with reason). Now they're hidden like general coupons.
+- **0-value coupon filter**: Coupons where all rewards have 0% or $0 discount (bad data) are also filtered out. Fixes "0% off your order" display issue.
+- Removed `is_eligible` / `ineligibility_reason` fields from API responses and frontend interfaces.
+- Removed all dimmed/ineligible UI from `step-review.tsx` (badge, warning icon, muted styling, disabled Apply button).
+- Removed unnecessary DB queries for service/category names on ineligible coupons (performance improvement).
+
+---
+
 ## Fix: Booking Coupon Filtering by Service — 2026-02-20
 
 ### Bug Fix
 - **Portal booking flow** (`/api/customer/coupons`): Now filters coupons by service applicability. Previously returned ALL active coupons regardless of the selected service, showing unrelated coupons in Step 5.
 - Accepts `service_id` and `addon_ids` query params to check eligibility against the customer's selected services.
 - Checks `requires_service_ids`, `requires_service_category_ids`, and reward `target_service_id`/`target_service_category_id` — matching the logic already used in the guest flow (`/api/book/check-customer`).
-- Ineligible general coupons are filtered out entirely. Customer-specific coupons that don't match are kept (dimmed with reason) so customers know they have them.
-- Returns `is_eligible` and `ineligibility_reason` fields per coupon.
 - **Booking wizard** updated to pass service context when fetching portal coupons.
 
 ---

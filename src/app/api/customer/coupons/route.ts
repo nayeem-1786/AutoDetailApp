@@ -93,95 +93,41 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Service eligibility checking (only when service context is provided)
-      let isEligible = true;
-      let ineligibilityReason: string | null = null;
-      const isCustomerSpecific = coupon.customer_id === customer.id;
-
+      // Service eligibility — skip ALL ineligible coupons (no dimmed state)
       if (allServiceIds.length > 0) {
-        // Check requires_service_ids
         const reqServiceIds = coupon.requires_service_ids as string[] | null;
         if (reqServiceIds && reqServiceIds.length > 0) {
-          const hasRequiredService = reqServiceIds.some((reqId: string) =>
-            allServiceIds.includes(reqId)
-          );
-          if (!hasRequiredService) {
-            isEligible = false;
-            const { data: reqServices } = await admin
-              .from('services')
-              .select('name')
-              .in('id', reqServiceIds);
-            const names = reqServices?.map((s: { name: string }) => s.name) || [];
-            ineligibilityReason =
-              names.length === 1
-                ? `Requires "${names[0]}" service`
-                : `Requires one of: ${names.join(', ')}`;
+          if (!reqServiceIds.some((reqId: string) => allServiceIds.includes(reqId))) {
+            continue;
           }
         }
 
-        // Check requires_service_category_ids
         const reqCatIds = coupon.requires_service_category_ids as string[] | null;
-        if (isEligible && reqCatIds && reqCatIds.length > 0) {
-          const hasRequiredCategory = reqCatIds.some((catId: string) =>
-            serviceCategoryIds.includes(catId)
-          );
-          if (!hasRequiredCategory) {
-            isEligible = false;
-            const { data: reqCats } = await admin
-              .from('service_categories')
-              .select('name')
-              .in('id', reqCatIds);
-            const catNames = reqCats?.map((c: { name: string }) => c.name) || [];
-            ineligibilityReason =
-              catNames.length === 1
-                ? `Requires a "${catNames[0]}" service`
-                : `Requires a service from: ${catNames.join(', ')}`;
+        if (reqCatIds && reqCatIds.length > 0) {
+          if (!reqCatIds.some((catId: string) => serviceCategoryIds.includes(catId))) {
+            continue;
           }
         }
 
-        // Check if rewards target specific services not in cart
         const rewards = coupon.coupon_rewards as CouponReward[] | null;
-        if (isEligible && rewards) {
+        if (rewards) {
           const serviceRewards = rewards.filter(
-            (r: CouponReward) =>
-              r.applies_to === 'service' && r.target_service_id
+            (r: CouponReward) => r.applies_to === 'service' && r.target_service_id
           );
           if (serviceRewards.length > 0) {
-            const hasMatchingService = serviceRewards.some((r: CouponReward) =>
-              allServiceIds.includes(r.target_service_id!)
-            );
-            if (!hasMatchingService) {
-              isEligible = false;
-              const targetIds = serviceRewards
-                .map((r: CouponReward) => r.target_service_id)
-                .filter(Boolean);
-              const { data: targetServices } = await admin
-                .from('services')
-                .select('name')
-                .in('id', targetIds as string[]);
-              const names =
-                targetServices?.map((s: { name: string }) => s.name) || [];
-              ineligibilityReason =
-                names.length === 1
-                  ? `Only applies to "${names[0]}" service`
-                  : `Only applies to: ${names.join(', ')}`;
+            if (!serviceRewards.some((r: CouponReward) => allServiceIds.includes(r.target_service_id!))) {
+              continue;
             }
           }
 
-          // Check service category rewards
           const serviceCategoryRewards = rewards.filter(
             (r: CouponReward) =>
               r.applies_to === 'service' &&
               r.target_service_category_id &&
               !r.target_service_id
           );
-          if (isEligible && serviceCategoryRewards.length > 0) {
-            const hasMatchingCategory = serviceCategoryRewards.some(
-              (r: CouponReward) =>
-                serviceCategoryIds.includes(r.target_service_category_id!)
-            );
-            if (!hasMatchingCategory) {
-              // Only mark ineligible if ALL rewards target specific items
+          if (serviceCategoryRewards.length > 0) {
+            if (!serviceCategoryRewards.some((r: CouponReward) => serviceCategoryIds.includes(r.target_service_category_id!))) {
               const allRewardsTargetSpecific = rewards.every(
                 (r: CouponReward) =>
                   r.target_service_id ||
@@ -189,31 +135,19 @@ export async function GET(request: NextRequest) {
                   r.target_product_id ||
                   r.target_product_category_id
               );
-              if (allRewardsTargetSpecific) {
-                isEligible = false;
-                const targetCatIds = serviceCategoryRewards
-                  .map((r: CouponReward) => r.target_service_category_id)
-                  .filter(Boolean);
-                const { data: targetCats } = await admin
-                  .from('service_categories')
-                  .select('name')
-                  .in('id', targetCatIds as string[]);
-                const catNames =
-                  targetCats?.map((c: { name: string }) => c.name) || [];
-                ineligibilityReason =
-                  catNames.length === 1
-                    ? `Only applies to "${catNames[0]}" services`
-                    : `Only applies to services from: ${catNames.join(', ')}`;
-              }
+              if (allRewardsTargetSpecific) continue;
             }
           }
         }
+      }
 
-        // Skip ineligible general coupons entirely — only keep ineligible
-        // customer-specific coupons (so they see them dimmed with a reason)
-        if (!isEligible && !isCustomerSpecific) {
-          continue;
-        }
+      // Skip coupons with 0-value rewards (bad data — e.g. "0% off")
+      const rewards = coupon.coupon_rewards as CouponReward[] | null;
+      if (rewards && rewards.length > 0) {
+        const hasUsefulReward = rewards.some(
+          (r: CouponReward) => r.discount_type === 'free' || r.discount_value > 0
+        );
+        if (!hasUsefulReward) continue;
       }
 
       // Remove internal fields before returning
@@ -226,11 +160,7 @@ export async function GET(request: NextRequest) {
         ...rest
       } = coupon;
 
-      filteredCoupons.push({
-        ...rest,
-        is_eligible: isEligible,
-        ineligibility_reason: ineligibilityReason,
-      });
+      filteredCoupons.push(rest);
     }
 
     return NextResponse.json({ data: filteredCoupons });

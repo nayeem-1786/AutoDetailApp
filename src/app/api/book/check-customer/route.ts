@@ -22,8 +22,6 @@ interface AvailableCoupon {
   expires_at: string | null;
   is_single_use: boolean;
   coupon_rewards: CouponReward[];
-  is_eligible: boolean;
-  ineligibility_reason: string | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -127,86 +125,42 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Check eligibility based on service requirements
-        let isEligible = true;
-        let ineligibilityReason: string | null = null;
-
-        // Check requires_service_ids
-        if (
-          coupon.requires_service_ids &&
-          coupon.requires_service_ids.length > 0
-        ) {
-          const hasRequiredService = coupon.requires_service_ids.some(
-            (reqId: string) => allServiceIds.includes(reqId)
-          );
-          if (!hasRequiredService) {
-            isEligible = false;
-            // Get names of required services
-            const { data: reqServices } = await supabase
-              .from('services')
-              .select('name')
-              .in('id', coupon.requires_service_ids);
-            const names =
-              reqServices?.map((s: { name: string }) => s.name) || [];
-            ineligibilityReason =
-              names.length === 1
-                ? `Requires "${names[0]}" service`
-                : `Requires one of: ${names.join(', ')}`;
-          }
-        }
-
-        // Check requires_service_category_ids
-        if (
-          isEligible &&
-          coupon.requires_service_category_ids &&
-          coupon.requires_service_category_ids.length > 0
-        ) {
-          const hasRequiredCategory = coupon.requires_service_category_ids.some(
-            (catId: string) => serviceCategoryIds.includes(catId)
-          );
-          if (!hasRequiredCategory) {
-            isEligible = false;
-            // Get names of required categories
-            const { data: reqCats } = await supabase
-              .from('service_categories')
-              .select('name')
-              .in('id', coupon.requires_service_category_ids);
-            const catNames =
-              reqCats?.map((c: { name: string }) => c.name) || [];
-            ineligibilityReason =
-              catNames.length === 1
-                ? `Requires a "${catNames[0]}" service`
-                : `Requires a service from: ${catNames.join(', ')}`;
-          }
-        }
-
-        // Check if rewards target specific services not in cart
-        if (isEligible && coupon.coupon_rewards) {
-          const serviceRewards = coupon.coupon_rewards.filter(
-            (r: CouponReward) =>
-              r.applies_to === 'service' && r.target_service_id
-          );
-          if (serviceRewards.length > 0) {
-            const hasMatchingService = serviceRewards.some((r: CouponReward) =>
-              allServiceIds.includes(r.target_service_id!)
-            );
-            if (!hasMatchingService) {
-              isEligible = false;
-              const targetIds = serviceRewards
-                .map((r: CouponReward) => r.target_service_id)
-                .filter(Boolean);
-              const { data: targetServices } = await supabase
-                .from('services')
-                .select('name')
-                .in('id', targetIds as string[]);
-              const names =
-                targetServices?.map((s: { name: string }) => s.name) || [];
-              ineligibilityReason =
-                names.length === 1
-                  ? `Only applies to "${names[0]}" service`
-                  : `Only applies to: ${names.join(', ')}`;
+        // Service eligibility — skip ALL ineligible coupons (no dimmed state)
+        if (allServiceIds.length > 0) {
+          const reqServiceIds = coupon.requires_service_ids as string[] | null;
+          if (reqServiceIds && reqServiceIds.length > 0) {
+            if (!reqServiceIds.some((reqId: string) => allServiceIds.includes(reqId))) {
+              continue;
             }
           }
+
+          const reqCatIds = coupon.requires_service_category_ids as string[] | null;
+          if (reqCatIds && reqCatIds.length > 0) {
+            if (!reqCatIds.some((catId: string) => serviceCategoryIds.includes(catId))) {
+              continue;
+            }
+          }
+
+          const rewards = coupon.coupon_rewards as CouponReward[] | null;
+          if (rewards) {
+            const serviceRewards = rewards.filter(
+              (r: CouponReward) => r.applies_to === 'service' && r.target_service_id
+            );
+            if (serviceRewards.length > 0) {
+              if (!serviceRewards.some((r: CouponReward) => allServiceIds.includes(r.target_service_id!))) {
+                continue;
+              }
+            }
+          }
+        }
+
+        // Skip coupons with 0-value rewards (bad data — e.g. "0% off")
+        const rewards = coupon.coupon_rewards as CouponReward[] | null;
+        if (rewards && rewards.length > 0) {
+          const hasUsefulReward = rewards.some(
+            (r: CouponReward) => r.discount_type === 'free' || r.discount_value > 0
+          );
+          if (!hasUsefulReward) continue;
         }
 
         availableCoupons.push({
@@ -217,8 +171,6 @@ export async function POST(request: NextRequest) {
           expires_at: coupon.expires_at,
           is_single_use: coupon.is_single_use,
           coupon_rewards: coupon.coupon_rewards || [],
-          is_eligible: isEligible,
-          ineligibility_reason: ineligibilityReason,
         });
       }
     }

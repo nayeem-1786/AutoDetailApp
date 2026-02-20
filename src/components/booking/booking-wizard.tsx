@@ -57,8 +57,6 @@ interface AvailableCoupon {
     discount_value: number;
     max_discount: number | null;
   }[];
-  is_eligible?: boolean;
-  ineligibility_reason?: string | null;
 }
 
 interface AppliedCoupon {

@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { CalendarDays, Clock, Truck, User, Car, Tag, CheckCircle2, Info, Gift, Coins, AlertTriangle, Pencil } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
-import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils/format';
 import { VEHICLE_SIZE_LABELS, VEHICLE_TYPE_LABELS, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
@@ -24,8 +24,6 @@ interface AvailableCoupon {
     discount_value: number;
     max_discount: number | null;
   }[];
-  is_eligible?: boolean;
-  ineligibility_reason?: string | null;
 }
 
 interface AppliedCoupon {
@@ -448,46 +446,26 @@ export function StepReview({
               <div className="space-y-2">
                 {availableCoupons.map((coupon) => {
                   const details = getCouponDetails(coupon);
-                  const isEligible = coupon.is_eligible !== false; // Default to eligible if not specified
                   return (
                     <div
                       key={coupon.id}
-                      className={`rounded-lg border border-dashed p-3 ${
-                        isEligible
-                          ? 'border-purple-500/30 bg-purple-500/10'
-                          : 'border-site-border bg-brand-surface/50 opacity-75'
-                      }`}
+                      className="rounded-lg border border-dashed border-purple-500/30 bg-purple-500/10 p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <Tag className={`h-4 w-4 flex-shrink-0 ${isEligible ? 'text-purple-500' : 'text-site-text-muted'}`} />
-                            <span className={`font-mono text-sm font-bold ${isEligible ? 'text-site-text' : 'text-site-text-muted'}`}>
+                            <Tag className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                            <span className="font-mono text-sm font-bold text-site-text">
                               {coupon.code}
                             </span>
-                            {!isEligible && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-400 border-amber-500/30">
-                                Not applicable
-                              </Badge>
-                            )}
                           </div>
                           {coupon.name && (
-                            <p className={`mt-0.5 text-sm ${isEligible ? 'text-site-text-secondary' : 'text-site-text-muted'}`}>{coupon.name}</p>
+                            <p className="mt-0.5 text-sm text-site-text-secondary">{coupon.name}</p>
                           )}
-
-                          {/* Ineligibility reason */}
-                          {!isEligible && coupon.ineligibility_reason && (
-                            <p className="mt-1 text-xs text-amber-400 flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              {coupon.ineligibility_reason}
-                            </p>
-                          )}
-
-                          {/* Detailed description */}
                           <ul className="mt-2 space-y-0.5">
                             {details.map((detail, i) => (
-                              <li key={i} className={`text-xs flex items-start gap-1.5 ${isEligible ? 'text-site-text-secondary' : 'text-site-text-muted'}`}>
-                                <span className={`mt-0.5 ${isEligible ? 'text-purple-400' : 'text-site-text-dim'}`}>•</span>
+                              <li key={i} className="text-xs flex items-start gap-1.5 text-site-text-secondary">
+                                <span className="mt-0.5 text-purple-400">•</span>
                                 {detail}
                               </li>
                             ))}
@@ -498,11 +476,10 @@ export function StepReview({
                           variant="outline"
                           size="sm"
                           onClick={() => handleApplyCoupon(coupon.code)}
-                          disabled={couponLoading || !isEligible}
+                          disabled={couponLoading}
                           className="flex-shrink-0 border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
-                          title={!isEligible ? coupon.ineligibility_reason || 'Not applicable to selected services' : undefined}
                         >
-                          {couponLoading ? <Spinner size="sm" /> : isEligible ? 'Apply' : 'N/A'}
+                          {couponLoading ? <Spinner size="sm" /> : 'Apply'}
                         </Button>
                       </div>
                     </div>
