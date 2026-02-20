@@ -546,7 +546,8 @@ function PlacementGroup({
                     {ticker.placement === 'top_bar' ? 'Top Bar' : 'Section'}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-3 mt-0.5">
+                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                  <TargetPagesBadges pages={ticker.target_pages} />
                   {ticker.link_url && (
                     <span className="text-xs text-blue-500 flex items-center gap-0.5">
                       <ArrowUpRight className="h-3 w-3" />
@@ -585,5 +586,43 @@ function PlacementGroup({
         ))}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TargetPagesBadges — shows page visibility as inline badges
+// ---------------------------------------------------------------------------
+
+const PAGE_TYPE_LABELS: Record<string, string> = {
+  all: 'All Pages',
+  home: 'Home',
+  cms_pages: 'CMS Pages',
+  products: 'Products',
+  services: 'Services',
+  cart: 'Cart',
+  checkout: 'Checkout',
+  account: 'Account',
+};
+
+function TargetPagesBadges({ pages }: { pages: string[] | null }) {
+  const targets = pages && pages.length > 0 ? pages : ['all'];
+  if (targets.includes('all')) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-300">
+        All Pages
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      {targets.map((p) => (
+        <span
+          key={p}
+          className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300"
+        >
+          {PAGE_TYPE_LABELS[p] || p}
+        </span>
+      ))}
+    </span>
   );
 }

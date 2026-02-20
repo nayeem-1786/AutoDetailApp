@@ -13,7 +13,7 @@ import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles, getSectionTi
 import { HeroCarousel } from '@/components/public/cms/hero-carousel';
 import { HeroSection } from '@/components/public/hero-section';
 import { AdZone } from '@/components/public/cms/ad-zone';
-import { SectionTicker } from '@/components/public/cms/announcement-ticker';
+import { SectionTickerFiltered } from '@/components/public/cms/announcement-ticker';
 import { TrustBar } from '@/components/public/trust-bar';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
 import { CtaSection } from '@/components/public/cta-section';
@@ -141,7 +141,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {showSectionTickers && <SectionTicker tickers={sectionTickers} options={tickerOptions.section} />}
+      {showSectionTickers && <SectionTickerFiltered tickers={sectionTickers} options={tickerOptions.section} />}
 
       {/* Why Choose Us — 3 items with dividers */}
       <section className="bg-brand-dark section-spacing">

@@ -45,56 +45,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return mergeMetadata(autoMeta, seoOverrides);
 }
 
-/**
- * Simple markdown → HTML converter (matches the one in content-block-renderer).
- */
-function markdownToHtml(md: string): string {
-  let html = md;
-
-  html = html
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
-  // Headings
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-
-  // Bold and italic
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-lime hover:underline">$1</a>');
-
-  // Unordered lists
-  html = html.replace(
-    /^(?:- (.+)\n?)+/gm,
-    (match) => {
-      const items = match
-        .split('\n')
-        .filter((line) => line.startsWith('- '))
-        .map((line) => `<li>${line.slice(2)}</li>`)
-        .join('');
-      return `<ul class="list-disc pl-6 space-y-1">${items}</ul>`;
-    }
-  );
-
-  // Paragraphs
-  html = html
-    .split('\n\n')
-    .map((block) => {
-      const trimmed = block.trim();
-      if (!trimmed) return '';
-      if (trimmed.startsWith('<')) return trimmed;
-      return `<p>${trimmed.replace(/\n/g, '<br />')}</p>`;
-    })
-    .join('\n');
-
-  return html;
-}
-
 export default async function CustomPage({ params }: PageProps) {
   const { slug } = await params;
   const slugPath = slug.join('/');
@@ -116,7 +66,7 @@ export default async function CustomPage({ params }: PageProps) {
         {page.content && (
           <div
             className="mt-8 prose prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: markdownToHtml(page.content) }}
+            dangerouslySetInnerHTML={{ __html: page.content }}
           />
         )}
         {contentBlocks.length > 0 && (
@@ -136,7 +86,7 @@ export default async function CustomPage({ params }: PageProps) {
           <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
             <div
               className="prose prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: markdownToHtml(page.content) }}
+              dangerouslySetInnerHTML={{ __html: page.content }}
             />
           </div>
         )}

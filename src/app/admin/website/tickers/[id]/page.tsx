@@ -343,6 +343,18 @@ export default function TickerEditorPage() {
         </div>
       </div>
 
+      {/* Page Visibility */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Show On</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Choose which page types this ticker appears on.
+        </p>
+        <TargetPagesSelector
+          value={ticker.target_pages || ['all']}
+          onChange={(pages) => update('target_pages', pages)}
+        />
+      </div>
+
       {/* Schedule */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Schedule</h3>
@@ -374,6 +386,83 @@ export default function TickerEditorPage() {
           Leave blank to show indefinitely. Tickers will only display within the specified date range.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TargetPagesSelector — multi-checkbox for page type visibility
+// ---------------------------------------------------------------------------
+
+const PAGE_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Pages' },
+  { value: 'home', label: 'Homepage' },
+  { value: 'cms_pages', label: 'CMS Pages (/p/*)' },
+  { value: 'products', label: 'Products' },
+  { value: 'services', label: 'Services' },
+  { value: 'cart', label: 'Cart' },
+  { value: 'checkout', label: 'Checkout' },
+  { value: 'account', label: 'Account Pages' },
+] as const;
+
+function TargetPagesSelector({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (pages: string[]) => void;
+}) {
+  const isAll = value.includes('all') || value.length === 0;
+
+  const handleToggle = (pageType: string) => {
+    if (pageType === 'all') {
+      onChange(['all']);
+      return;
+    }
+
+    // If currently "all", switch to just this specific page
+    if (isAll) {
+      onChange([pageType]);
+      return;
+    }
+
+    // Toggle the specific page type
+    const newValue = value.includes(pageType)
+      ? value.filter((v) => v !== pageType)
+      : [...value.filter((v) => v !== 'all'), pageType];
+
+    // If nothing selected, default to all
+    if (newValue.length === 0) {
+      onChange(['all']);
+      return;
+    }
+
+    onChange(newValue);
+  };
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {PAGE_TYPE_OPTIONS.map((opt) => {
+        const checked = opt.value === 'all' ? isAll : !isAll && value.includes(opt.value);
+        return (
+          <label
+            key={opt.value}
+            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm cursor-pointer transition-colors ${
+              checked
+                ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400 dark:border-brand-500/50'
+                : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => handleToggle(opt.value)}
+              className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+            />
+            {opt.label}
+          </label>
+        );
+      })}
     </div>
   );
 }

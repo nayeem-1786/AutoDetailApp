@@ -1019,6 +1019,13 @@ export interface HeroSlide {
   text_alignment: HeroSlideTextAlignment;
   sort_order: number;
   is_active: boolean;
+  // Per-slide color overrides (nullable — null = use theme default)
+  text_color: string | null;
+  subtitle_color: string | null;
+  accent_color: string | null;
+  overlay_color: string | null;
+  cta_bg_color: string | null;
+  cta_text_color: string | null;
   created_at: string;
   updated_at: string;
 }

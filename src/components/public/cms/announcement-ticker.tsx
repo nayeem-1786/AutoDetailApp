@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 import type { TickerPlacementOptions } from '@/lib/data/cms';
@@ -448,4 +449,58 @@ export function SectionTicker({
   }
 
   return <MultiTickerRotation tickers={tickers} options={options ?? DEFAULT_OPTIONS} />;
+}
+
+// ---------------------------------------------------------------------------
+// Page type detection for ticker filtering
+// ---------------------------------------------------------------------------
+
+function getPageType(pathname: string): string {
+  if (pathname === '/') return 'home';
+  if (pathname.startsWith('/p/')) return 'cms_pages';
+  if (pathname.startsWith('/products')) return 'products';
+  if (pathname.startsWith('/services')) return 'services';
+  if (pathname === '/cart') return 'cart';
+  if (pathname.startsWith('/checkout')) return 'checkout';
+  if (pathname.startsWith('/account')) return 'account';
+  return 'other';
+}
+
+function tickerMatchesPage(ticker: AnnouncementTicker, pathname: string): boolean {
+  const pages = ticker.target_pages;
+  if (!pages || pages.length === 0 || pages.includes('all')) return true;
+  const pageType = getPageType(pathname);
+  return pages.includes(pageType);
+}
+
+// ---------------------------------------------------------------------------
+// TopBarTickerFiltered — client wrapper that filters tickers by pathname
+// ---------------------------------------------------------------------------
+
+export function TopBarTickerFiltered({
+  tickers,
+  options,
+}: {
+  tickers: AnnouncementTicker[];
+  options?: TickerPlacementOptions;
+}) {
+  const pathname = usePathname();
+  const filtered = tickers.filter((t) => tickerMatchesPage(t, pathname));
+  return <TopBarTicker tickers={filtered} options={options} />;
+}
+
+// ---------------------------------------------------------------------------
+// SectionTickerFiltered — client wrapper that filters tickers by pathname
+// ---------------------------------------------------------------------------
+
+export function SectionTickerFiltered({
+  tickers,
+  options,
+}: {
+  tickers: AnnouncementTicker[];
+  options?: TickerPlacementOptions;
+}) {
+  const pathname = usePathname();
+  const filtered = tickers.filter((t) => tickerMatchesPage(t, pathname));
+  return <SectionTicker tickers={filtered} options={options} />;
 }

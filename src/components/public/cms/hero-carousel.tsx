@@ -76,8 +76,35 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
     exit: (dir: number) => ({ x: dir > 0 ? '-100%' : '100%', opacity: 0 }),
   };
 
+  // Force light text on the hero — the dark overlay demands white text
+  // regardless of the user's dark/light theme toggle. Per-slide overrides
+  // on child elements will naturally win over these parent-level defaults.
+  const heroDefaultStyles: React.CSSProperties = {
+    '--site-text': '#ffffff',
+    '--site-text-secondary': '#D1D5DB',
+    '--site-text-muted': '#9CA3AF',
+    '--site-text-dim': '#6B7280',
+    '--site-text-faint': '#4B5563',
+    '--site-link': 'var(--lime)',
+    '--site-link-hover': 'var(--lime-200)',
+  } as React.CSSProperties;
+
+  // Per-slide color overrides — applied on the content wrapper so
+  // child CSS-var-based classes inherit the slide-specific values.
+  const slideOverrides: React.CSSProperties = {} as React.CSSProperties;
+  if (slide.text_color) (slideOverrides as Record<string, string>)['--site-text'] = slide.text_color;
+  if (slide.subtitle_color) (slideOverrides as Record<string, string>)['--site-text-secondary'] = slide.subtitle_color;
+  if (slide.accent_color) {
+    (slideOverrides as Record<string, string>)['--lime'] = slide.accent_color;
+    (slideOverrides as Record<string, string>)['--site-btn-cta-bg'] = slide.accent_color;
+  }
+  if (slide.cta_bg_color) (slideOverrides as Record<string, string>)['--site-btn-cta-bg'] = slide.cta_bg_color;
+  if (slide.cta_text_color) (slideOverrides as Record<string, string>)['--site-btn-cta-text'] = slide.cta_text_color;
+
   return (
     <section
+      data-hero-scope
+      style={heroDefaultStyles}
       className="relative overflow-hidden bg-brand-black min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh]"
       onMouseEnter={() => config.pause_on_hover && setIsPaused(true)}
       onMouseLeave={() => config.pause_on_hover && setIsPaused(false)}
@@ -150,20 +177,41 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
             />
           )}
 
-          {/* Overlay gradients */}
-          <div
-            className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20"
-            style={{ opacity: (overlayPct / 100) + 0.3 }}
-          />
-          <div
-            className="absolute inset-0 bg-black"
-            style={{ opacity: (overlayPct / 100) * 0.5 }}
-          />
+          {/* Overlay gradients — per-slide overlay_color replaces hardcoded black */}
+          {slide.overlay_color ? (
+            <>
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(to top, ${slide.overlay_color}, ${slide.overlay_color}80, ${slide.overlay_color}33)`,
+                  opacity: (overlayPct / 100) + 0.3,
+                }}
+              />
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundColor: slide.overlay_color,
+                  opacity: (overlayPct / 100) * 0.5,
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <div
+                className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20"
+                style={{ opacity: (overlayPct / 100) + 0.3 }}
+              />
+              <div
+                className="absolute inset-0 bg-black"
+                style={{ opacity: (overlayPct / 100) * 0.5 }}
+              />
+            </>
+          )}
         </motion.div>
       </AnimatePresence>
 
-      {/* Content overlay */}
-      <div className="relative z-10 h-full min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh] flex items-end pb-16 sm:pb-24 lg:pb-32">
+      {/* Content overlay — per-slide CSS variable overrides applied here */}
+      <div style={slideOverrides} className="relative z-10 h-full min-h-[500px] sm:min-h-[600px] lg:min-h-[85vh] flex items-end pb-16 sm:pb-24 lg:pb-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
           <AnimatePresence mode="wait">
             <motion.div

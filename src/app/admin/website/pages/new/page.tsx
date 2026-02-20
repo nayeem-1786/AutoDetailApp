@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { MarkdownEditor } from '@/components/admin/content/markdown-editor';
+import { Spinner } from '@/components/ui/spinner';
+import { PageHtmlEditor } from '@/components/admin/content/page-html-editor';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { WebsitePage, PageTemplate } from '@/lib/supabase/types';
 
@@ -35,6 +36,8 @@ export default function NewPagePage() {
   const [metaTitle, setMetaTitle] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
   const [ogImageUrl, setOgImageUrl] = useState('');
+  const [seoGenerating, setSeoGenerating] = useState(false);
+  const [seoGenerated, setSeoGenerated] = useState(false);
 
   useEffect(() => {
     adminFetch('/api/admin/cms/pages')
@@ -49,6 +52,34 @@ export default function NewPagePage() {
       setSlug(toSlug(title));
     }
   }, [title, slugTouched]);
+
+  const handleSeoGenerate = async () => {
+    const pagePath = `/p/${slug || toSlug(title)}`;
+    if (!title.trim()) {
+      toast.error('Enter a page title first');
+      return;
+    }
+    setSeoGenerating(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/seo/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'single', pagePath }),
+      });
+      if (!res.ok) throw new Error('Generation failed');
+      const { data } = await res.json();
+      if (data?.generated) {
+        setMetaTitle(data.generated.seo_title || '');
+        setMetaDescription(data.generated.meta_description || '');
+        setSeoGenerated(true);
+        toast.success('SEO fields generated');
+      }
+    } catch {
+      toast.error('Failed to generate SEO');
+    } finally {
+      setSeoGenerating(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,10 +200,11 @@ export default function NewPagePage() {
         {pageTemplate !== 'blank' && (
           <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Content</h2>
-            <MarkdownEditor
+            <PageHtmlEditor
               value={content}
               onChange={setContent}
-              placeholder="Write your page content in markdown..."
+              pageTitle={title}
+              placeholder="Write your page content in HTML..."
               rows={16}
             />
           </div>
@@ -180,7 +212,31 @@ export default function NewPagePage() {
 
         {/* SEO */}
         <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">SEO</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">SEO</h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSeoGenerate}
+              disabled={seoGenerating || !title.trim()}
+            >
+              {seoGenerating ? (
+                <>
+                  <Spinner size="sm" className="mr-1" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-1 h-3.5 w-3.5" />
+                  AI Generate
+                </>
+              )}
+            </Button>
+          </div>
+          {seoGenerated && (
+            <p className="text-xs text-amber-600">AI-generated — review and adjust</p>
+          )}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
@@ -191,6 +247,7 @@ export default function NewPagePage() {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="Page title for search engines"
               />
+              <CharCount value={metaTitle} max={60} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -203,6 +260,7 @@ export default function NewPagePage() {
                 rows={3}
                 placeholder="Brief description for search engine results"
               />
+              <CharCount value={metaDescription} max={160} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">OG Image URL</label>
@@ -250,5 +308,26 @@ export default function NewPagePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CharCount — character count indicator with color coding
+// ---------------------------------------------------------------------------
+function CharCount({ value, max }: { value: string; max: number }) {
+  const len = value.length;
+  const color =
+    len === 0
+      ? 'text-gray-400'
+      : len <= max * 0.85
+        ? 'text-green-600'
+        : len <= max
+          ? 'text-amber-600'
+          : 'text-red-600';
+
+  return (
+    <p className={`mt-1 text-xs ${color}`}>
+      {len}/{max} chars
+    </p>
   );
 }

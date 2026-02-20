@@ -1,7 +1,7 @@
 import { SiteHeader } from '@/components/public/site-header';
 import { SiteFooter } from '@/components/public/site-footer';
 import { ThemeProvider } from '@/components/public/cms/theme-provider';
-import { TopBarTicker } from '@/components/public/cms/announcement-ticker';
+import { TopBarTickerFiltered } from '@/components/public/cms/announcement-ticker';
 import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrapper';
 import { CartDrawer } from '@/components/public/cart/cart-drawer';
 import { ThemeToggleInitializer } from '@/components/public/theme-toggle-initializer';
@@ -35,7 +35,7 @@ export default async function PublicLayout({
       <ThemeToggleInitializer />
       <CartProviderWrapper>
         <div className="public-theme bg-brand-black text-site-text min-h-screen antialiased">
-          {showTickers && <TopBarTicker tickers={topBarTickers} options={tickerOptions.top_bar} />}
+          {showTickers && <TopBarTickerFiltered tickers={topBarTickers} options={tickerOptions.top_bar} />}
           <SiteHeader navItems={headerNav} />
           <main className="min-h-[calc(100vh-4rem)]">{children}</main>
           <SiteFooter footerData={footerData} />

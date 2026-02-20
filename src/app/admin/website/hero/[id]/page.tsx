@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { ArrowLeft, Save, Image as ImageIcon, Video, Columns } from 'lucide-react';
+import { ArrowLeft, Save, Image as ImageIcon, Video, Columns, ChevronDown, X } from 'lucide-react';
 import { HeroImageUpload } from '../components/hero-image-upload';
 import type { HeroSlide } from '@/lib/supabase/types';
 
@@ -70,6 +70,13 @@ export default function HeroSlideEditorPage() {
           overlay_opacity: slide.overlay_opacity,
           text_alignment: slide.text_alignment,
           is_active: slide.is_active,
+          // Per-slide color overrides
+          text_color: slide.text_color,
+          subtitle_color: slide.subtitle_color,
+          accent_color: slide.accent_color,
+          overlay_color: slide.overlay_color,
+          cta_bg_color: slide.cta_bg_color,
+          cta_text_color: slide.cta_text_color,
         }),
       });
       if (!res.ok) throw new Error('Failed');
@@ -316,6 +323,140 @@ export default function HeroSlideEditorPage() {
           </div>
         </div>
       )}
+
+      {/* Color Overrides */}
+      <ColorOverridesSection slide={slide} update={update} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Color override field — hex input + native color picker + reset
+// ---------------------------------------------------------------------------
+
+const COLOR_FIELDS: { field: keyof HeroSlide; label: string; hint?: string }[] = [
+  { field: 'text_color', label: 'Text Color', hint: 'Headline text' },
+  { field: 'subtitle_color', label: 'Subtitle Color' },
+  { field: 'accent_color', label: 'Accent Color', hint: 'Gradient highlight + active indicator' },
+  { field: 'overlay_color', label: 'Overlay Color', hint: 'Default: black' },
+  { field: 'cta_bg_color', label: 'CTA Background' },
+  { field: 'cta_text_color', label: 'CTA Text Color' },
+];
+
+function isValidHex(v: string): boolean {
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v);
+}
+
+function ColorOverridesSection({
+  slide,
+  update,
+}: {
+  slide: HeroSlide;
+  update: (field: keyof HeroSlide, value: unknown) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasOverrides = COLOR_FIELDS.some((cf) => slide[cf.field] != null);
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100"
+      >
+        <span className="flex items-center gap-2">
+          Color Overrides
+          {hasOverrides && (
+            <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
+              Active
+            </span>
+          )}
+        </span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 pb-4 pt-3 space-y-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Leave blank to use your site theme colors. Set a color to override for this specific slide.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {COLOR_FIELDS.map((cf) => (
+              <ColorField
+                key={cf.field}
+                label={cf.label}
+                hint={cf.hint}
+                value={(slide[cf.field] as string | null) ?? ''}
+                onChange={(v) => update(cf.field, v || null)}
+              />
+            ))}
+          </div>
+          {hasOverrides && (
+            <button
+              type="button"
+              onClick={() => {
+                for (const cf of COLOR_FIELDS) update(cf.field, null);
+              }}
+              className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+            >
+              Reset all overrides
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColorField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+        {label}
+        {hint && <span className="ml-1 text-gray-400 dark:text-gray-500">({hint})</span>}
+      </label>
+      <div className="mt-1 flex items-center gap-2">
+        {/* Swatch / native picker */}
+        <label className="relative">
+          <span
+            className="block h-8 w-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+            style={{ backgroundColor: isValidHex(value) ? value : '#000000' }}
+          />
+          <input
+            type="color"
+            value={isValidHex(value) ? value : '#000000'}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+        </label>
+        {/* Hex input */}
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#000000"
+          className={`flex-1 font-mono text-xs ${value && !isValidHex(value) ? 'border-red-400' : ''}`}
+        />
+        {/* Reset */}
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            title="Reset to theme default"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

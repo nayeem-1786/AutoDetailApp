@@ -56,6 +56,9 @@ export async function PATCH(
     'video_thumbnail_url', 'before_image_url', 'after_image_url',
     'before_label', 'after_label', 'overlay_opacity', 'text_alignment',
     'sort_order', 'is_active',
+    // Per-slide color overrides
+    'text_color', 'subtitle_color', 'accent_color',
+    'overlay_color', 'cta_bg_color', 'cta_text_color',
   ];
 
   const updates: Record<string, unknown> = {};

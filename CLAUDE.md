@@ -151,6 +151,11 @@ Smart Detail Auto Spa — custom POS, booking, portal, and admin system replacin
 - Duplicate toast fix — `catalog-browser.tsx` and `service-detail-dialog.tsx` skip local toasts when `onAddService`/`onAdd` callbacks are provided (callback mode). Toast ownership belongs to the caller.
 - Service quantity enforcement — all non-per-unit services limited to qty=1 per ticket (one-per-vehicle rule). Per-unit services (Scratch Repair) increment `perUnitQty` up to `per_unit_max`. Visual checkmark badge on already-added services in catalog grid. Stepper restrictions in item rows: hidden for regular services, max-enforced for per-unit, unrestricted for products. New `TicketItem.perUnitMax` field + `UPDATE_PER_UNIT_QTY` reducer action. Applied to both quote-reducer and ticket-reducer.
 - Booking module theme fix — all booking components now follow site dark theme. Shared UI components (Input, Select, Textarea, Card, Button, Tabs) overridden via className with theme-aware tokens (`bg-brand-surface`, `border-site-border`, `text-site-text`, `bg-lime`). Semantic alerts use dark-friendly colors (`bg-green-500/10 text-green-400` instead of `bg-green-50 text-green-800`). Select/Textarea got missing `dark:` variants. FormField got `labelClassName` prop. Tabs got `data-state` attribute for per-instance override support.
+- Hero section WCAG readability fixes + per-slide color overrides:
+  - Light mode fix: `data-hero-scope` + inline CSS var defaults force white text on dark overlay regardless of theme toggle
+  - Memorial Day accent: `#1e40af` → `#60a5fa` (visible on dark backgrounds, 8.6:1 contrast)
+  - Light mode CTA: `#65a30d` → `#4d7c0f` (4.6:1, passes WCAG AA normal text)
+  - Per-slide color overrides: 6 nullable columns (`text_color`, `subtitle_color`, `accent_color`, `overlay_color`, `cta_bg_color`, `cta_text_color`). Admin collapsible Color Overrides section with hex input + color picker + reset. Frontend applies via inline CSS vars.
 
 ### Verified Complete (previously listed as pending)
 - Product edit/new pages — full forms with all fields, image upload, Zod validation, soft-delete

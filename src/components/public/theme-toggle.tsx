@@ -31,15 +31,15 @@ const LIGHT_VARS: Record<string, string> = {
   // Divider
   '--site-divider': '#e5e7eb',
   // Links
-  '--site-link': '#65a30d',
-  '--site-link-hover': '#84cc16',
-  // Buttons
-  '--site-btn-primary-bg': '#65a30d',
+  '--site-link': '#4d7c0f',
+  '--site-link-hover': '#65a30d',
+  // Buttons — #4d7c0f with white text = 4.6:1 (passes WCAG AA normal text)
+  '--site-btn-primary-bg': '#4d7c0f',
   '--site-btn-primary-text': '#ffffff',
-  '--site-btn-primary-hover-bg': '#84cc16',
-  '--site-btn-cta-bg': '#65a30d',
+  '--site-btn-primary-hover-bg': '#65a30d',
+  '--site-btn-cta-bg': '#4d7c0f',
   '--site-btn-cta-text': '#ffffff',
-  '--site-btn-cta-hover-bg': '#84cc16',
+  '--site-btn-cta-hover-bg': '#65a30d',
   // Accent glow
   '--theme-accent-glow-rgb': '101, 163, 13',
   // UI tokens

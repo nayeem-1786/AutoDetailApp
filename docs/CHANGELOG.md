@@ -4,6 +4,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Hero Section Readability Fixes + Per-Slide Color Overrides — 2026-02-19
+
+### Issue #1 (CRITICAL): Hero text invisible in light mode
+- Hero overlay is hardcoded black but text colors followed theme toggle → dark text on dark overlay in light mode
+- Fix: `data-hero-scope` attribute + inline CSS variable defaults force white text regardless of theme toggle
+- Per-slide overrides on child elements naturally override parent defaults via CSS custom property inheritance
+
+### Issues #2+3 (MODERATE): Memorial Day theme contrast
+- Memorial Day `--lime` was `#1e40af` (dark navy) → 2.3:1 contrast for button text, accent invisible on dark backgrounds
+- Changed to `#60a5fa` (blue-400) → 8.6:1 on black, visible accent, updated full palette + glow RGB
+
+### Issue #4 (LOW): Light mode CTA button borderline contrast
+- Light mode CTA button was `#65a30d` with white text → 3.6:1 (fails WCAG AA normal text)
+- Changed to `#4d7c0f` → 4.6:1 (passes WCAG AA), hover state uses `#65a30d`
+- Updated both `theme-toggle.tsx` LIGHT_VARS and `globals.css` `[data-user-theme="light"]` block
+
+### Issues #5+6 (LOW): text-faint/text-dim audit
+- `text-site-text-faint`: 80+ usages — all decorative/disabled (cursor-not-allowed, separators, placeholder, optional labels)
+- `text-site-text-dim`: 70+ usages — all de-emphasized labels, placeholders, section dividers at large text sizes
+- No code changes needed — added WCAG usage comments in `globals.css`
+
+### Per-Slide Hero Color Overrides
+- **Migration**: `20260219000005_hero_slide_colors.sql` — 6 nullable columns on `hero_slides`: `text_color`, `subtitle_color`, `accent_color`, `overlay_color`, `cta_bg_color`, `cta_text_color`
+- **Types**: Updated `HeroSlide` interface with new fields
+- **API**: Added 6 color fields to PATCH allowed fields in `/api/admin/cms/hero/[id]`
+- **Admin UI**: Collapsible "Color Overrides" section in hero slide editor with hex input + native color picker + reset per field, "Reset all" button, active badge indicator
+- **Frontend**: Per-slide CSS variable overrides applied as inline styles on content wrapper, overlay_color replaces hardcoded black gradients
+
+### Files Modified
+- `src/components/public/cms/hero-carousel.tsx` — hero scope defaults, per-slide overrides, overlay color support
+- `src/lib/utils/cms-theme-presets.ts` — Memorial Day palette changed to #60a5fa
+- `src/components/public/theme-toggle.tsx` — CTA button #65a30d → #4d7c0f
+- `src/app/globals.css` — light mode button fallbacks, text-dim/faint comments
+- `src/lib/supabase/types.ts` — HeroSlide color fields
+- `src/app/api/admin/cms/hero/[id]/route.ts` — allowed fields
+- `src/app/admin/website/hero/[id]/page.tsx` — ColorOverridesSection, save payload
+- `supabase/migrations/20260219000005_hero_slide_colors.sql` — new columns
+
+---
+
 ## CMS Page Route Fix — Typography & Static Params — 2026-02-19
 
 - Installed `@tailwindcss/typography` plugin — `prose`/`prose-invert` classes on CMS pages and content blocks were non-functional without it

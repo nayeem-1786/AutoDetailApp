@@ -118,17 +118,19 @@ export const THEME_PRESETS: ThemePreset[] = [
     slug: 'memorial-day',
     description: 'Navy and red patriotic theme',
     colorOverrides: {
-      'lime': '#1e40af',
+      // Changed from #1e40af (dark navy, 2.3:1 on black) to #60a5fa
+      // (blue-400, 8.6:1 on black) for readability on dark backgrounds
+      'lime': '#60a5fa',
       'lime-50': '#eff6ff',
       'lime-100': '#dbeafe',
       'lime-200': '#bfdbfe',
       'lime-300': '#93c5fd',
       'lime-400': '#60a5fa',
-      'lime-500': '#1d4ed8',
-      'lime-600': '#1e3a8a',
+      'lime-500': '#3b82f6',
+      'lime-600': '#2563eb',
       'brand-dark': '#0a0a14',
       'brand-surface': '#1a1a2a',
-      'accent-glow-rgb': '30, 64, 175',
+      'accent-glow-rgb': '96, 165, 250',
     },
     gradientOverrides: {
       hero: 'linear-gradient(135deg, #172554 0%, #7f1d1d 100%)',

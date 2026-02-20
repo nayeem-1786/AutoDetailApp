@@ -51,7 +51,9 @@
   --site-text: #ffffff;
   --site-text-secondary: #D1D5DB;
   --site-text-muted: #9CA3AF;
+  /* 4.4:1 — passes AA for large text (>=18px) only. Use for de-emphasized labels, placeholders, section dividers. */
   --site-text-dim: #6B7280;
+  /* 2.8:1 — intentionally below WCAG AA. Use ONLY for decorative/disabled text, cursor-not-allowed states, separators. */
   --site-text-faint: #4B5563;
 
   /* Site border colors */
@@ -227,15 +229,16 @@
   --site-footer-bg: #f8fafc;
   --site-text-on-primary: #000000;
   --site-divider: #e5e7eb;
-  --site-link: var(--lime-600, #65a30d);
-  --site-link-hover: var(--lime-500, #84cc16);
-  --site-btn-primary-bg: var(--lime-600, #65a30d);
+  --site-link: var(--lime-600, #4d7c0f);
+  --site-link-hover: var(--lime-500, #65a30d);
+  /* Buttons — #4d7c0f with white text = 4.6:1 (passes WCAG AA normal text) */
+  --site-btn-primary-bg: var(--lime-600, #4d7c0f);
   --site-btn-primary-text: #ffffff;
-  --site-btn-primary-hover-bg: var(--lime-500, #84cc16);
-  --site-btn-cta-bg: var(--lime-600, #65a30d);
+  --site-btn-primary-hover-bg: var(--lime-500, #65a30d);
+  --site-btn-cta-bg: var(--lime-600, #4d7c0f);
   --site-btn-cta-text: #ffffff;
-  --site-btn-cta-hover-bg: var(--lime-500, #84cc16);
-  --theme-accent-glow-rgb: 101, 163, 13;
+  --site-btn-cta-hover-bg: var(--lime-500, #65a30d);
+  --theme-accent-glow-rgb: 77, 124, 15;
 }
 
 @theme inline {
