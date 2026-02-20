@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LayoutDashboard, LogOut } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import type { WebsiteNavItem } from '@/lib/supabase/types';
 
 interface MobileMenuProps {
@@ -20,6 +21,13 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
 
   const links = navItems && navItems.length > 0 ? navItems : defaultNavLinks;
+
+  const handleSignOut = useCallback(async () => {
+    setOpen(false);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  }, []);
 
   return (
     <>
@@ -85,13 +93,37 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
                 </div>
               ))}
               <div className="mt-4 h-px w-16 bg-site-border-medium" />
-              <Link
-                href={customerName ? '/account' : '/signin'}
-                className="text-lg font-medium text-site-text/60 hover:text-site-text transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                {customerName ? `Hi, ${customerName}` : 'Sign In'}
-              </Link>
+              {customerName ? (
+                <>
+                  <span className="text-sm font-medium text-site-text/40">
+                    Hi, {customerName}
+                  </span>
+                  <Link
+                    href="/account"
+                    className="flex items-center gap-2.5 text-lg font-medium text-site-text/60 hover:text-site-text transition-colors"
+                    onClick={() => setOpen(false)}
+                  >
+                    <LayoutDashboard className="w-5 h-5" />
+                    Dashboard
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="flex items-center gap-2.5 text-lg font-medium text-site-text/60 hover:text-red-400 transition-colors"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Log Out
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/signin"
+                  className="text-lg font-medium text-site-text/60 hover:text-site-text transition-colors"
+                  onClick={() => setOpen(false)}
+                >
+                  Sign In
+                </Link>
+              )}
               <Link
                 href="/book"
                 className="mt-4 inline-flex items-center justify-center rounded-full site-btn-cta font-semibold text-lg h-14 px-10 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"

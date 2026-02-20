@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## User Dropdown Menu in Header — 2026-02-20
+
+### Desktop
+- **Hover dropdown** on "Hi, [Name]" with chevron indicator: Dashboard and Log Out options
+- **Dashboard**: Links to `/account` (customer portal)
+- **Log Out**: Calls `supabase.auth.signOut()` then redirects to homepage
+- **Smooth animation**: Framer Motion enter/exit (opacity + translate + scale), 150ms close delay to prevent flicker
+- **Styling**: `bg-brand-surface` card with `shadow-2xl`, right-aligned, `rounded-xl`. Log Out highlights red on hover.
+
+### Mobile
+- When logged in, mobile menu shows greeting label + Dashboard and Log Out as separate menu items
+- Dashboard has `LayoutDashboard` icon, Log Out has `LogOut` icon with red hover
+- When not logged in, shows "Sign In" link (unchanged)
+
+### Both `header-client.tsx` and `mobile-menu.tsx` updated
+
+---
+
 ## Service Thumbnail Visibility Fix + Phone Pre-fill on Login — 2026-02-20
 
 ### Service Selection (Step 1) — Thumbnail Visibility Fix

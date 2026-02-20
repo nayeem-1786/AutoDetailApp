@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ChevronDown, Phone, MapPin } from 'lucide-react';
+import { Menu, X, ChevronDown, Phone, MapPin, LayoutDashboard, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 import type { WebsiteNavItem } from '@/lib/supabase/types';
 import { CartIconButton } from './cart/cart-icon-button';
 import { ThemeToggle } from './theme-toggle';
@@ -26,12 +27,35 @@ export function HeaderClient({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const userDropdownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (userDropdownTimer.current) clearTimeout(userDropdownTimer.current);
+    };
+  }, []);
+
+  const openUserDropdown = useCallback(() => {
+    if (userDropdownTimer.current) clearTimeout(userDropdownTimer.current);
+    setUserDropdownOpen(true);
+  }, []);
+
+  const closeUserDropdown = useCallback(() => {
+    userDropdownTimer.current = setTimeout(() => setUserDropdownOpen(false), 150);
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = '/';
   }, []);
 
   return (
@@ -146,13 +170,60 @@ export function HeaderClient({
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {/* Account link — desktop */}
-            <Link
-              href={customerName ? '/account' : '/signin'}
-              className="hidden lg:inline-flex items-center text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
-            >
-              {customerName ? `Hi, ${customerName}` : 'Sign In'}
-            </Link>
+            {/* Account — desktop */}
+            {customerName ? (
+              <div
+                className="relative hidden lg:block"
+                onMouseEnter={openUserDropdown}
+                onMouseLeave={closeUserDropdown}
+              >
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
+                >
+                  Hi, {customerName}
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      userDropdownOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                <AnimatePresence>
+                  {userDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute top-full right-0 mt-1 w-44 bg-brand-surface border border-site-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden p-1.5"
+                    >
+                      <Link
+                        href="/account"
+                        className="flex items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-lime/10 rounded-lg transition-colors"
+                      >
+                        <LayoutDashboard className="w-4 h-4 text-site-text-muted" />
+                        Dashboard
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-colors"
+                      >
+                        <LogOut className="w-4 h-4 text-site-text-muted" />
+                        Log Out
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <Link
+                href="/signin"
+                className="hidden lg:inline-flex items-center text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
 
             {/* Theme toggle */}
             <ThemeToggle />
@@ -228,15 +299,39 @@ export function HeaderClient({
                 </div>
               ))}
 
-              {/* Account link — mobile */}
-              <div className="pt-2 border-t border-site-border">
-                <Link
-                  href={customerName ? '/account' : '/signin'}
-                  className="block py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {customerName ? `Hi, ${customerName}` : 'Sign In'}
-                </Link>
+              {/* Account — mobile */}
+              <div className="pt-2 border-t border-site-border space-y-1">
+                {customerName ? (
+                  <>
+                    <p className="px-3 pt-1 text-xs font-medium text-site-text-dim">
+                      Hi, {customerName}
+                    </p>
+                    <Link
+                      href="/account"
+                      className="flex items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      Dashboard
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => { setMobileOpen(false); handleSignOut(); }}
+                      className="flex w-full items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Log Out
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    href="/signin"
+                    className="block py-3 px-3 text-site-text-muted hover:text-site-text hover:bg-site-border-light rounded-xl transition-colors font-medium"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Sign In
+                  </Link>
+                )}
               </div>
 
               <div className="pt-3">
