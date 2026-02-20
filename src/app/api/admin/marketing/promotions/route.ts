@@ -100,5 +100,7 @@ export async function GET(request: NextRequest) {
     no_sale: items.filter((i) => i.sale_status === 'no_sale').length,
   };
 
-  return NextResponse.json({ data: filtered, counts });
+  return NextResponse.json({ data: filtered, counts }, {
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+  });
 }

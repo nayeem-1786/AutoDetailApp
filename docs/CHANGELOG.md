@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Stale Data Between Promotions and Catalog Pages — 2026-02-19
+
+- Added `Cache-Control: no-store, no-cache, must-revalidate` header to promotions API GET response
+- Added `cache: 'no-store'` to both `fetch()` calls in the promotions page (main data load + Quick Sale search)
+- Service/product edit pages already use Supabase browser client (no caching) — no changes needed
+- Ensures fresh data on every navigation: Quick Sale → service edit, End Sale → service edit, and vice versa
+
+---
+
 ## Add Discount Type Options to Sale Pricing — 2026-02-19
 
 - Added Percentage off / Fixed amount off / Direct price radio-style pill selector to both service and product edit pages

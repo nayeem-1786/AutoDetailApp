@@ -96,7 +96,7 @@ export default function PromotionsPage() {
       if (typeFilter !== 'all') params.set('type', typeFilter);
       if (statusFilter !== 'all') params.set('status', statusFilter);
 
-      const res = await fetch(`/api/admin/marketing/promotions?${params}`);
+      const res = await fetch(`/api/admin/marketing/promotions?${params}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch');
       const json = await res.json();
       setItems(json.data || []);
@@ -479,7 +479,7 @@ function QuickSaleDialog({
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/admin/marketing/promotions?search=${encodeURIComponent(searchQuery)}`);
+        const res = await fetch(`/api/admin/marketing/promotions?search=${encodeURIComponent(searchQuery)}`, { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
           setSearchResults(json.data || []);
