@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Add Discount Type Options to Sale Pricing — 2026-02-19
+
+- Added Percentage off / Fixed amount off / Direct price radio-style pill selector to both service and product edit pages
+- **Service page**: `SaleDiscountControls` component with per-tier auto-calculation for vehicle_size, scope, and specialty pricing models
+- **Product page**: `ProductSaleDiscountControls` component with single-price auto-calculation
+- When Percentage or Fixed is selected, a single input drives all sale prices — per-tier inputs become read-only calculated values
+- Switching back to Direct unlocks manual per-tier editing
+- Discount type/value are UI-only state (not persisted) — the final calculated `sale_price` values are what gets saved
+
+---
+
 ## Fix Sale Pricing Not Saving — 2026-02-19
 
 - **Root cause**: `onSavePricing` did not include `sale_price` in upsert/update operations for `service_pricing` rows, and did not save `sale_starts_at`/`sale_ends_at` on the service. Clicking "Save Pricing" would reset sale prices to null.

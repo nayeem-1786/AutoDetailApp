@@ -129,6 +129,8 @@ export default function ServiceDetailPage() {
   const [saleEndsAt, setSaleEndsAt] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [showClearSaleDialog, setShowClearSaleDialog] = useState(false);
+  const [saleDiscountType, setSaleDiscountType] = useState<'percentage' | 'fixed' | 'direct'>('direct');
+  const [saleDiscountValue, setSaleDiscountValue] = useState<number | ''>('');
 
   // Add-on dialog state
   const [addonDialogOpen, setAddonDialogOpen] = useState(false);
@@ -262,6 +264,8 @@ export default function ServiceDetailPage() {
     // Convert ISO timestamps to local date strings for date inputs
     setSaleStartsAt(svc.sale_starts_at ? new Date(svc.sale_starts_at).toISOString().split('T')[0] : '');
     setSaleEndsAt(svc.sale_ends_at ? new Date(svc.sale_ends_at).toISOString().split('T')[0] : '');
+    setSaleDiscountType('direct');
+    setSaleDiscountValue('');
 
     setLoading(false);
   }, [serviceId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -327,6 +331,33 @@ export default function ServiceDetailPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Recalculate sale prices when discount type/value or standard prices change
+  useEffect(() => {
+    if (saleDiscountType === 'direct') return;
+    if (typeof saleDiscountValue !== 'number' || saleDiscountValue <= 0) return;
+
+    const newSP: Record<string, number | ''> = {};
+
+    if (pricingValue.model === 'vehicle_size') {
+      for (const { key } of VEHICLE_SIZE_TIER_KEYS) {
+        const std = typeof pricingValue.data[key] === 'number' ? (pricingValue.data[key] as number) : 0;
+        if (std <= 0) { newSP[key] = ''; continue; }
+        newSP[key] = saleDiscountType === 'percentage'
+          ? Math.round(std * (1 - saleDiscountValue / 100) * 100) / 100
+          : Math.max(0.01, Math.round((std - saleDiscountValue) * 100) / 100);
+      }
+    } else {
+      for (const row of pricing) {
+        if (row.price <= 0) { newSP[row.tier_name] = ''; continue; }
+        newSP[row.tier_name] = saleDiscountType === 'percentage'
+          ? Math.round(row.price * (1 - saleDiscountValue / 100) * 100) / 100
+          : Math.max(0.01, Math.round((row.price - saleDiscountValue) * 100) / 100);
+      }
+    }
+
+    setSalePrices(newSP);
+  }, [saleDiscountType, saleDiscountValue, pricingValue, pricing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleVehicleType(type: VehicleType) {
     const current = vehicleCompatibility;
@@ -1227,6 +1258,10 @@ export default function ServiceDetailPage() {
                   salePrices={salePrices}
                   setSalePrices={setSalePrices}
                   pricing={pricing}
+                  discountType={saleDiscountType}
+                  setDiscountType={setSaleDiscountType}
+                  discountValue={saleDiscountValue}
+                  setDiscountValue={setSaleDiscountValue}
                 />
               ) : (
                 <>
@@ -1237,8 +1272,14 @@ export default function ServiceDetailPage() {
                   />
                   {/* Inline sale pricing for scope/specialty tiers */}
                   {pricing.length > 0 && (
-                    <div className="border-t border-gray-200 pt-6">
-                      <p className="mb-3 text-sm font-semibold text-gray-700">Sale Prices</p>
+                    <div className="border-t border-gray-200 pt-6 space-y-4">
+                      <p className="mb-1 text-sm font-semibold text-gray-700">Sale Prices</p>
+                      <SaleDiscountControls
+                        discountType={saleDiscountType}
+                        setDiscountType={setSaleDiscountType}
+                        discountValue={saleDiscountValue}
+                        setDiscountValue={setSaleDiscountValue}
+                      />
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -1257,22 +1298,28 @@ export default function ServiceDetailPage() {
                                   <td className="px-3 py-3 font-medium text-gray-700">{tier.tier_label || tier.tier_name}</td>
                                   <td className="px-3 py-3 text-gray-600">{formatCurrency(tier.price)}</td>
                                   <td className="px-3 py-3">
-                                    <div className="relative max-w-[160px]">
-                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="No sale"
-                                        className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
-                                        value={sp}
-                                        onChange={(e) => setSalePrices({
-                                          ...salePrices,
-                                          [tier.tier_name]: e.target.value === '' ? '' : parseFloat(e.target.value),
-                                        })}
-                                      />
-                                      {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(tier.price)}</p>}
-                                    </div>
+                                    {saleDiscountType !== 'direct' ? (
+                                      <p className="text-sm font-medium text-gray-700 pl-1">
+                                        {sp !== '' && typeof sp === 'number' ? formatCurrency(sp) : <span className="text-gray-400">—</span>}
+                                      </p>
+                                    ) : (
+                                      <div className="relative max-w-[160px]">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          placeholder="No sale"
+                                          className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                                          value={sp}
+                                          onChange={(e) => setSalePrices({
+                                            ...salePrices,
+                                            [tier.tier_name]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                                          })}
+                                        />
+                                        {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(tier.price)}</p>}
+                                      </div>
+                                    )}
                                   </td>
                                 </tr>
                               );
@@ -1690,6 +1737,74 @@ export default function ServiceDetailPage() {
   );
 }
 
+// ─── Sale Discount Type Controls ─────────────────────────────────────────
+
+function SaleDiscountControls({
+  discountType,
+  setDiscountType,
+  discountValue,
+  setDiscountValue,
+}: {
+  discountType: 'percentage' | 'fixed' | 'direct';
+  setDiscountType: (v: 'percentage' | 'fixed' | 'direct') => void;
+  discountValue: number | '';
+  setDiscountValue: (v: number | '') => void;
+}) {
+  const types: { value: 'percentage' | 'fixed' | 'direct'; label: string }[] = [
+    { value: 'percentage', label: 'Percentage off' },
+    { value: 'fixed', label: 'Fixed amount off' },
+    { value: 'direct', label: 'Direct price' },
+  ];
+
+  return (
+    <div className="flex flex-wrap items-end gap-4">
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-gray-500">Discount type</p>
+        <div className="flex gap-1.5">
+          {types.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setDiscountType(t.value)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                discountType === t.value
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {discountType !== 'direct' && (
+        <div className="max-w-[140px]">
+          <p className="mb-1.5 text-xs font-medium text-gray-500">
+            {discountType === 'percentage' ? 'Percent off' : 'Amount off'}
+          </p>
+          <div className="relative">
+            {discountType === 'fixed' && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+            )}
+            <Input
+              type="number"
+              min="0"
+              step={discountType === 'percentage' ? '1' : '0.01'}
+              placeholder="0"
+              className={discountType === 'fixed' ? 'pl-7 pr-3' : 'pr-8'}
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value === '' ? '' : parseFloat(e.target.value))}
+            />
+            {discountType === 'percentage' && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Vehicle Size Unified Pricing (Standard + Sale in one table) ─────────
 
 const VEHICLE_SIZE_TIER_KEYS: { key: 'sedan' | 'truck_suv_2row' | 'suv_3row_van'; label: string }[] = [
@@ -1704,15 +1819,33 @@ function VehicleSizeUnifiedPricing({
   salePrices,
   setSalePrices,
   pricing,
+  discountType,
+  setDiscountType,
+  discountValue,
+  setDiscountValue,
 }: {
   pricingValue: VehicleSizePricing;
   onPricingChange: (data: VehicleSizePricing) => void;
   salePrices: Record<string, number | ''>;
   setSalePrices: (v: Record<string, number | ''>) => void;
   pricing: ServicePricing[];
+  discountType: 'percentage' | 'fixed' | 'direct';
+  setDiscountType: (v: 'percentage' | 'fixed' | 'direct') => void;
+  discountValue: number | '';
+  setDiscountValue: (v: number | '') => void;
 }) {
+  const isReadOnly = discountType !== 'direct';
+
   return (
     <>
+      {/* Discount type controls */}
+      <SaleDiscountControls
+        discountType={discountType}
+        setDiscountType={setDiscountType}
+        discountValue={discountValue}
+        setDiscountValue={setDiscountValue}
+      />
+
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
@@ -1750,22 +1883,28 @@ function VehicleSizeUnifiedPricing({
                     </div>
                   </td>
                   <td className="px-3 py-3">
-                    <div className="relative max-w-[160px]">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="No sale"
-                        className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
-                        value={sp}
-                        onChange={(e) => setSalePrices({
-                          ...salePrices,
-                          [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
-                        })}
-                      />
-                      {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(standardNum)}</p>}
-                    </div>
+                    {isReadOnly ? (
+                      <p className="text-sm font-medium text-gray-700 pl-1">
+                        {sp !== '' && typeof sp === 'number' ? formatCurrency(sp) : <span className="text-gray-400">—</span>}
+                      </p>
+                    ) : (
+                      <div className="relative max-w-[160px]">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="No sale"
+                          className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                          value={sp}
+                          onChange={(e) => setSalePrices({
+                            ...salePrices,
+                            [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                          })}
+                        />
+                        {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(standardNum)}</p>}
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -1805,22 +1944,28 @@ function VehicleSizeUnifiedPricing({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Sale</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="No sale"
-                      className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
-                      value={sp}
-                      onChange={(e) => setSalePrices({
-                        ...salePrices,
-                        [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
-                      })}
-                    />
-                    {hasError && <p className="mt-1 text-xs text-red-500">Must be &lt; standard</p>}
-                  </div>
+                  {isReadOnly ? (
+                    <p className="text-sm font-medium text-gray-700 pt-2">
+                      {sp !== '' && typeof sp === 'number' ? formatCurrency(sp) : <span className="text-gray-400">—</span>}
+                    </p>
+                  ) : (
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="No sale"
+                        className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                        value={sp}
+                        onChange={(e) => setSalePrices({
+                          ...salePrices,
+                          [key]: e.target.value === '' ? '' : parseFloat(e.target.value),
+                        })}
+                      />
+                      {hasError && <p className="mt-1 text-xs text-red-500">Must be &lt; standard</p>}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

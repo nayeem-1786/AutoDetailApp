@@ -71,6 +71,8 @@ export default function ProductDetailPage() {
   const [saleEndsAt, setSaleEndsAt] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [showClearSaleDialog, setShowClearSaleDialog] = useState(false);
+  const [saleDiscountType, setSaleDiscountType] = useState<'percentage' | 'fixed' | 'direct'>('direct');
+  const [saleDiscountValue, setSaleDiscountValue] = useState<number | ''>('');
 
   const {
     register,
@@ -180,11 +182,29 @@ export default function ProductDetailPage() {
       setSalePrice(p.sale_price ?? '');
       setSaleStartsAt(p.sale_starts_at ? new Date(p.sale_starts_at).toISOString().split('T')[0] : '');
       setSaleEndsAt(p.sale_ends_at ? new Date(p.sale_ends_at).toISOString().split('T')[0] : '');
+      setSaleDiscountType('direct');
+      setSaleDiscountValue('');
 
       setLoading(false);
     }
     loadData();
   }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Recalculate sale price when discount type/value changes
+  useEffect(() => {
+    if (saleDiscountType === 'direct') return;
+    if (typeof saleDiscountValue !== 'number' || saleDiscountValue <= 0) return;
+    if (!product) return;
+
+    const std = product.retail_price;
+    if (std <= 0) return;
+
+    const newPrice = saleDiscountType === 'percentage'
+      ? Math.round(std * (1 - saleDiscountValue / 100) * 100) / 100
+      : Math.max(0.01, Math.round((std - saleDiscountValue) * 100) / 100);
+
+    setSalePrice(newPrice);
+  }, [saleDiscountType, saleDiscountValue, product]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Multi-image handlers (immediate operations) ---
 
@@ -719,6 +739,10 @@ export default function ProductDetailPage() {
         saleEndsAt={saleEndsAt}
         setSaleEndsAt={setSaleEndsAt}
         onSave={onSaveSalePricing}
+        discountType={saleDiscountType}
+        setDiscountType={setSaleDiscountType}
+        discountValue={saleDiscountValue}
+        setDiscountValue={setSaleDiscountValue}
         onClear={() => setShowClearSaleDialog(true)}
         saving={savingSale}
       />
@@ -766,6 +790,10 @@ function ProductSalePricingCard({
   onSave,
   onClear,
   saving,
+  discountType,
+  setDiscountType,
+  discountValue,
+  setDiscountValue,
 }: {
   product: ProductWithRelations;
   salePrice: number | '';
@@ -777,6 +805,10 @@ function ProductSalePricingCard({
   onSave: () => void;
   onClear: () => void;
   saving: boolean;
+  discountType: 'percentage' | 'fixed' | 'direct';
+  setDiscountType: (v: 'percentage' | 'fixed' | 'direct') => void;
+  discountValue: number | '';
+  setDiscountValue: (v: number | '') => void;
 }) {
   const hasDbSale = product.sale_price !== null;
   const hasSaleInput = salePrice !== '' && typeof salePrice === 'number';
@@ -814,6 +846,12 @@ function ProductSalePricingCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <ProductSaleDiscountControls
+          discountType={discountType}
+          setDiscountType={setDiscountType}
+          discountValue={discountValue}
+          setDiscountValue={setDiscountValue}
+        />
         <div className="grid gap-4 sm:grid-cols-4">
           <div>
             <p className="mb-1 text-xs font-medium text-gray-500">Standard Price</p>
@@ -822,23 +860,29 @@ function ProductSalePricingCard({
             </p>
           </div>
           <FormField label="Sale Price">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="No sale"
-                className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
-                value={salePrice}
-                onChange={(e) => setSalePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-              />
-              {hasError && (
-                <p className="mt-1 text-xs text-red-500">
-                  Must be less than {formatCurrency(product.retail_price)}
-                </p>
-              )}
-            </div>
+            {discountType !== 'direct' ? (
+              <p className="text-sm font-semibold text-gray-900 pt-2">
+                {hasSaleInput ? formatCurrency(salePrice as number) : <span className="text-gray-400">—</span>}
+              </p>
+            ) : (
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="No sale"
+                  className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                />
+                {hasError && (
+                  <p className="mt-1 text-xs text-red-500">
+                    Must be less than {formatCurrency(product.retail_price)}
+                  </p>
+                )}
+              </div>
+            )}
           </FormField>
           <FormField label="Start Date">
             <Input
@@ -886,6 +930,74 @@ function ProductSalePricingCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Product Sale Discount Controls ────────────────────────────────
+
+function ProductSaleDiscountControls({
+  discountType,
+  setDiscountType,
+  discountValue,
+  setDiscountValue,
+}: {
+  discountType: 'percentage' | 'fixed' | 'direct';
+  setDiscountType: (v: 'percentage' | 'fixed' | 'direct') => void;
+  discountValue: number | '';
+  setDiscountValue: (v: number | '') => void;
+}) {
+  const types: { value: 'percentage' | 'fixed' | 'direct'; label: string }[] = [
+    { value: 'percentage', label: 'Percentage off' },
+    { value: 'fixed', label: 'Fixed amount off' },
+    { value: 'direct', label: 'Direct price' },
+  ];
+
+  return (
+    <div className="flex flex-wrap items-end gap-4">
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-gray-500">Discount type</p>
+        <div className="flex gap-1.5">
+          {types.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setDiscountType(t.value)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                discountType === t.value
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {discountType !== 'direct' && (
+        <div className="max-w-[140px]">
+          <p className="mb-1.5 text-xs font-medium text-gray-500">
+            {discountType === 'percentage' ? 'Percent off' : 'Amount off'}
+          </p>
+          <div className="relative">
+            {discountType === 'fixed' && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+            )}
+            <Input
+              type="number"
+              min="0"
+              step={discountType === 'percentage' ? '1' : '0.01'}
+              placeholder="0"
+              className={discountType === 'fixed' ? 'pl-7 pr-3' : 'pr-8'}
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value === '' ? '' : parseFloat(e.target.value))}
+            />
+            {discountType === 'percentage' && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
