@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { bookingCustomerSchema, bookingVehicleSchema, type BookingCustomerInput, type BookingVehicleInput } from '@/lib/utils/validation';
-import { formatPhoneInput } from '@/lib/utils/format';
+import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import { VEHICLE_TYPE_LABELS, VEHICLE_SIZE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import type { VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
 import { z } from 'zod';
-import { Plus, Check } from 'lucide-react';
+import { Plus, Check, LogIn, X } from 'lucide-react';
 
 interface SavedVehicle {
   id: string;
@@ -39,6 +39,12 @@ interface StepCustomerInfoProps {
   savedVehicles?: SavedVehicle[];
   onContinue: (customer: BookingCustomerInput, vehicle: BookingVehicleInput) => void;
   onBack: () => void;
+}
+
+// Check if a phone string has 10 digits (valid US number)
+function isValidPhoneForLookup(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
 }
 
 export function StepCustomerInfo({
@@ -107,8 +113,107 @@ export function StepCustomerInfo({
   // Vehicle selection error state
   const [vehicleError, setVehicleError] = useState<string | null>(null);
 
+  // --- Phone lookup state ---
+  const [phoneLookup, setPhoneLookup] = useState<{
+    exists: boolean;
+    firstName?: string;
+  } | null>(null);
+  const [phoneLookupDismissed, setPhoneLookupDismissed] = useState(false);
+  const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastLookedUpPhone = useRef<string | null>(null);
+  const isPortal = savedVehicles.length > 0;
+
   const vehicleType = watch('vehicle.vehicle_type');
   const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[vehicleType] ?? [];
+
+  // Phone lookup function
+  const doPhoneLookup = useCallback(async (phone: string) => {
+    const e164 = normalizePhone(phone);
+    if (!e164) return;
+
+    // Skip if same phone was already looked up
+    if (lastLookedUpPhone.current === e164) return;
+    lastLookedUpPhone.current = e164;
+
+    try {
+      const res = await fetch('/api/book/check-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (data.exists) {
+        setPhoneLookup({ exists: true, firstName: data.firstName });
+        setPhoneLookupDismissed(false);
+      } else {
+        setPhoneLookup(null);
+      }
+    } catch {
+      // Fail silently — don't disrupt the booking flow
+    }
+  }, []);
+
+  // Schedule phone lookup on change (debounced 500ms + valid number)
+  const schedulePhoneLookup = useCallback(
+    (phone: string) => {
+      // Clear any pending lookup
+      if (lookupTimerRef.current) {
+        clearTimeout(lookupTimerRef.current);
+        lookupTimerRef.current = null;
+      }
+
+      // Don't look up if already logged in
+      if (isPortal) return;
+
+      // Check if phone changed from what was looked up
+      const e164 = normalizePhone(phone);
+      if (e164 && lastLookedUpPhone.current === e164) return;
+
+      // If phone changed, dismiss old notification
+      if (lastLookedUpPhone.current && e164 !== lastLookedUpPhone.current) {
+        setPhoneLookup(null);
+        setPhoneLookupDismissed(false);
+        lastLookedUpPhone.current = null;
+      }
+
+      // Only look up with a valid 10-digit number
+      if (!isValidPhoneForLookup(phone)) return;
+
+      lookupTimerRef.current = setTimeout(() => {
+        doPhoneLookup(phone);
+      }, 500);
+    },
+    [isPortal, doPhoneLookup]
+  );
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
+    };
+  }, []);
+
+  function handlePhoneBlur() {
+    const phone = watch('customer.phone');
+    if (phone && isValidPhoneForLookup(phone) && !isPortal) {
+      // Clear pending debounce and do immediate lookup on blur
+      if (lookupTimerRef.current) {
+        clearTimeout(lookupTimerRef.current);
+        lookupTimerRef.current = null;
+      }
+      doPhoneLookup(phone);
+    }
+  }
+
+  function handleLoginClick() {
+    // Build redirect URL preserving current booking URL state
+    const currentUrl = window.location.href;
+    const redirectUrl = encodeURIComponent(currentUrl);
+    window.location.href = `/signin?redirect=${redirectUrl}`;
+  }
 
   function handleSelectSavedVehicle(v: SavedVehicle) {
     setSelectedSavedVehicleId(v.id);
@@ -168,6 +273,7 @@ export function StepCustomerInfo({
 
   const hasSavedVehicles = savedVehicles.length > 0;
   const showVehicleForm = isAddingNew || !hasSavedVehicles;
+  const showWelcomeBack = phoneLookup?.exists && !phoneLookupDismissed && !isPortal;
 
   // Theme-aware overrides for dark booking background
   const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim';
@@ -235,7 +341,9 @@ export function StepCustomerInfo({
                     shouldDirty: true,
                     shouldValidate: true,
                   });
+                  schedulePhoneLookup(formatted);
                 },
+                onBlur: handlePhoneBlur,
               })}
             />
           </FormField>
@@ -256,6 +364,47 @@ export function StepCustomerInfo({
             />
           </FormField>
         </div>
+
+        {/* Welcome Back Notification */}
+        {showWelcomeBack && (
+          <div className="mt-4 relative rounded-lg border border-lime bg-lime/10 p-4">
+            <button
+              type="button"
+              onClick={() => setPhoneLookupDismissed(true)}
+              className="absolute top-2 right-2 text-site-text-muted hover:text-site-text transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <p className="text-sm font-medium text-site-text">
+              {phoneLookup.firstName
+                ? `Welcome back, ${phoneLookup.firstName}!`
+                : 'Welcome back!'}
+            </p>
+            <p className="mt-1 text-xs text-site-text-muted">
+              We found an account with this phone number. Log in to auto-fill your details and access your booking history.
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                onClick={handleLoginClick}
+                className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200 text-xs h-8 px-3"
+              >
+                <LogIn className="mr-1.5 h-3.5 w-3.5" />
+                Log In to Continue
+              </Button>
+              <button
+                type="button"
+                onClick={() => setPhoneLookupDismissed(true)}
+                className="text-xs text-site-text-muted hover:text-site-text transition-colors"
+              >
+                Continue as Guest
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Consent Checkboxes */}
         <div className="mt-5 space-y-3">

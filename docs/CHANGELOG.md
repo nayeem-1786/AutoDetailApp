@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Service Thumbnails + Phone Lookup for Returning Customers — 2026-02-20
+
+### Service Selection (Step 1) — Thumbnails with Fallback Icons
+- **Service thumbnails**: Each service card shows `image_url` as a 16x16 / 20x20 rounded thumbnail
+- **Fallback icons**: When no image, shows contextual Lucide icon based on category/service name (Car for exterior, Shield for ceramic, Paintbrush for paint, Sparkles default)
+- **Hidden on extra-small**: Thumbnails hidden below `xs` breakpoint to save space on very small screens
+
+### Customer Info (Step 4) — Phone Lookup for Returning Customers
+- **Phone lookup API**: `POST /api/book/check-phone` — lightweight endpoint returns `{ exists, firstName }` with in-memory rate limiting (10/min per IP)
+- **Auto-detect returning customers**: After entering a valid 10-digit phone number, debounced 500ms lookup checks if customer exists
+- **"Welcome back" notification**: Shows personalized greeting with first name if available, styled `bg-lime/10 border-lime`
+- **"Log In to Continue"**: Redirects to `/signin` with full booking URL preserved as redirect — after login, auto-fills name, email, phone, and saved vehicles
+- **"Continue as Guest"**: Dismisses notification, customer proceeds without login
+- **Edge cases**: Re-entering a different phone dismisses old notification and re-checks; notification not shown for portal (already logged in) customers
+- **Security**: API returns only `exists` boolean + first name — no sensitive data exposed; rate limited to prevent phone enumeration
+
+---
+
 ## Booking Flow UX Overhaul (Steps 4-6 + Edit Links + Coupons + Confirmation) — 2026-02-20
 
 Continuation of booking flow overhaul. Handles Steps 4 (Info), 5 (Review), 6 (Payment), and the confirmation page.
