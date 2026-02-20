@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Sale Pricing Not Saving — 2026-02-19
+
+- **Root cause**: `onSavePricing` did not include `sale_price` in upsert/update operations for `service_pricing` rows, and did not save `sale_starts_at`/`sale_ends_at` on the service. Clicking "Save Pricing" would reset sale prices to null.
+- Added `sale_price` to vehicle_size upsert rows, scope update/insert, and specialty update/insert
+- Added `sale_starts_at` and `sale_ends_at` to the service update in `onSavePricing`
+- Added sale price validation (must be < standard price, must be > $0) to the pricing save
+- Merged the two save buttons ("Save Pricing" + "Save Sale Pricing") into a single "Save Pricing" button that saves everything
+- Bug 1 (Promotions sidebar): Already resolved — Promotions was already in `SIDEBAR_NAV` and the page exists
+
+---
+
 ## Merge Vehicle Size + Sale Pricing Cards — 2026-02-19
 
 - Merged the separate "Vehicle Size Pricing" card and "Sale Pricing" card into a single unified "Pricing" card on the service edit page

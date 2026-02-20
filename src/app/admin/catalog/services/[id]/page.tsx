@@ -479,7 +479,24 @@ export default function ServiceDetailPage() {
     try {
       const model = service.pricing_model;
 
-      // Update service-level fields
+      // Validate sale prices before saving
+      for (const row of pricing) {
+        const sp = salePrices[row.tier_name];
+        if (sp !== '' && sp !== undefined && typeof sp === 'number') {
+          if (sp >= row.price) {
+            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be less than standard price (${formatCurrency(row.price)})`);
+            setSavingPricing(false);
+            return;
+          }
+          if (sp <= 0) {
+            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be greater than $0`);
+            setSavingPricing(false);
+            return;
+          }
+        }
+      }
+
+      // Update service-level fields (including sale dates)
       const serviceUpdate: Record<string, unknown> = {};
       if (model === 'flat' && pricingValue.model === 'flat') {
         serviceUpdate.flat_price = typeof pricingValue.data.flat_price === 'number' ? pricingValue.data.flat_price : null;
@@ -493,10 +510,14 @@ export default function ServiceDetailPage() {
         serviceUpdate.per_unit_label = pricingValue.data.per_unit_label || null;
       }
 
-      if (Object.keys(serviceUpdate).length > 0) {
-        const { error } = await supabase.from('services').update(serviceUpdate).eq('id', serviceId);
-        if (error) throw error;
-      }
+      // Always save sale dates
+      const startTs = saleStartsAt ? new Date(saleStartsAt + 'T00:00:00-08:00').toISOString() : null;
+      const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
+      serviceUpdate.sale_starts_at = startTs;
+      serviceUpdate.sale_ends_at = endTs;
+
+      const { error } = await supabase.from('services').update(serviceUpdate).eq('id', serviceId);
+      if (error) throw error;
 
       // Handle pricing rows for models that use service_pricing table
       if (['vehicle_size', 'scope', 'specialty'].includes(model)) {
@@ -504,9 +525,9 @@ export default function ServiceDetailPage() {
         // ---- Vehicle Size: use upsert on (service_id, tier_name) unique constraint ----
         if (model === 'vehicle_size' && pricingValue.model === 'vehicle_size') {
           const upsertRows = [
-            { service_id: serviceId, tier_name: 'sedan', tier_label: 'Sedan', price: typeof pricingValue.data.sedan === 'number' ? pricingValue.data.sedan : 0, display_order: 0, is_vehicle_size_aware: false },
-            { service_id: serviceId, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price: typeof pricingValue.data.truck_suv_2row === 'number' ? pricingValue.data.truck_suv_2row : 0, display_order: 1, is_vehicle_size_aware: false },
-            { service_id: serviceId, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price: typeof pricingValue.data.suv_3row_van === 'number' ? pricingValue.data.suv_3row_van : 0, display_order: 2, is_vehicle_size_aware: false },
+            { service_id: serviceId, tier_name: 'sedan', tier_label: 'Sedan', price: typeof pricingValue.data.sedan === 'number' ? pricingValue.data.sedan : 0, display_order: 0, is_vehicle_size_aware: false, sale_price: typeof salePrices['sedan'] === 'number' ? salePrices['sedan'] : null },
+            { service_id: serviceId, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price: typeof pricingValue.data.truck_suv_2row === 'number' ? pricingValue.data.truck_suv_2row : 0, display_order: 1, is_vehicle_size_aware: false, sale_price: typeof salePrices['truck_suv_2row'] === 'number' ? salePrices['truck_suv_2row'] : null },
+            { service_id: serviceId, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price: typeof pricingValue.data.suv_3row_van === 'number' ? pricingValue.data.suv_3row_van : 0, display_order: 2, is_vehicle_size_aware: false, sale_price: typeof salePrices['suv_3row_van'] === 'number' ? salePrices['suv_3row_van'] : null },
           ];
           const { error: upsertError } = await supabase
             .from('service_pricing')
@@ -549,6 +570,7 @@ export default function ServiceDetailPage() {
                 vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
                 vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
                 vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
+                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
               })
               .eq('id', t.id as string);
             if (updateError) throw updateError;
@@ -568,6 +590,7 @@ export default function ServiceDetailPage() {
                 vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
                 vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
                 vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
+                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
               };
             });
             const { error: insertError } = await supabase.from('service_pricing').insert(insertRows);
@@ -606,6 +629,7 @@ export default function ServiceDetailPage() {
                 price: typeof t.price === 'number' ? t.price : 0,
                 display_order: displayOrder,
                 is_vehicle_size_aware: false,
+                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
               })
               .eq('id', t.id as string);
             if (updateError) throw updateError;
@@ -622,6 +646,7 @@ export default function ServiceDetailPage() {
                 price: typeof t.price === 'number' ? t.price : 0,
                 display_order: displayOrder,
                 is_vehicle_size_aware: false,
+                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
               };
             });
             const { error: insertError } = await supabase.from('service_pricing').insert(insertRows);
@@ -630,7 +655,7 @@ export default function ServiceDetailPage() {
         }
       }
 
-      toast.success('Pricing updated');
+      toast.success('Pricing & sale settings saved');
       loadData();
     } catch (err) {
       console.error('Failed to update pricing:', err);
@@ -1333,11 +1358,6 @@ export default function ServiceDetailPage() {
                   <Button onClick={onSavePricing} disabled={savingPricing}>
                     {savingPricing ? 'Saving...' : 'Save Pricing'}
                   </Button>
-                  {pricing.length > 0 && (
-                    <Button onClick={onSaveSalePricing} disabled={savingSale}>
-                      {savingSale ? 'Saving...' : 'Save Sale Pricing'}
-                    </Button>
-                  )}
                 </div>
               </div>
             </CardContent>
