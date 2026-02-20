@@ -23,6 +23,7 @@ import {
   Settings2,
 } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
+import { TICKER_POSITION_OPTIONS } from '@/lib/utils/ticker-sections';
 
 // ---------------------------------------------------------------------------
 // Types for multi-ticker options
@@ -568,7 +569,9 @@ function PlacementGroup({
                     {ticker.message}
                   </p>
                   <Badge variant="secondary" className="text-[10px] flex-shrink-0">
-                    {ticker.placement === 'top_bar' ? 'Top Bar' : 'Section'}
+                    {ticker.placement === 'top_bar'
+                      ? 'Top Bar'
+                      : TICKER_POSITION_OPTIONS.find((o) => o.value === ticker.section_position)?.label || 'Before Footer'}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-3 mt-0.5 flex-wrap">
@@ -626,6 +629,8 @@ const PAGE_TYPE_LABELS: Record<string, string> = {
   cms_pages: 'CMS Pages',
   products: 'Products',
   services: 'Services',
+  areas: 'Service Areas',
+  gallery: 'Gallery',
   cart: 'Cart',
   checkout: 'Checkout',
   account: 'Account',

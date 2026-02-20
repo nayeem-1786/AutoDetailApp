@@ -10,6 +10,12 @@ import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { ArrowLeft, Save } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
+import {
+  TICKER_POSITION_OPTIONS,
+  POSITION_AVAILABILITY,
+  PAGE_TYPE_LABELS,
+  type TickerPosition,
+} from '@/lib/utils/ticker-sections';
 
 // ---------------------------------------------------------------------------
 // Speed → consistent px/s rate (content-width-aware)
@@ -256,8 +262,8 @@ export default function TickerEditorPage() {
                 onChange={(e) => update('section_position', e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
               >
-                {SECTION_POSITION_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                {TICKER_POSITION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label} — {opt.description}</option>
                 ))}
               </select>
             </div>
@@ -401,32 +407,8 @@ export default function TickerEditorPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Section Position options & availability map
+// Section Position options & availability — imported from shared module
 // ---------------------------------------------------------------------------
-
-const SECTION_POSITION_OPTIONS = [
-  { value: 'after_hero', label: 'After Hero' },
-  { value: 'after_services', label: 'After Services' },
-  { value: 'before_footer', label: 'Before Footer' },
-] as const;
-
-/** Which page types support each section position */
-const POSITION_AVAILABILITY: Record<string, string[]> = {
-  after_hero: ['home'],
-  after_services: ['home'],
-  before_footer: ['all', 'home', 'cms_pages', 'products', 'services', 'cart', 'checkout', 'account'],
-};
-
-/** Human-readable page type labels */
-const PAGE_TYPE_LABELS: Record<string, string> = {
-  home: 'Homepage',
-  cms_pages: 'CMS Pages',
-  products: 'Products',
-  services: 'Services',
-  cart: 'Cart',
-  checkout: 'Checkout',
-  account: 'Account',
-};
 
 function PositionAvailabilityWarning({
   position,
@@ -435,24 +417,32 @@ function PositionAvailabilityWarning({
   position: string;
   targetPages: string[];
 }) {
-  const availableOn = POSITION_AVAILABILITY[position];
-  if (!availableOn || availableOn.includes('all')) return null;
+  const pos = position as TickerPosition;
+  const availableOn = POSITION_AVAILABILITY[pos];
+  if (!availableOn) return null;
+
+  // before_footer is universal — no warning needed
+  if (pos === 'before_footer') return null;
 
   // Expand 'all' in target pages to all specific page types
+  const allPageTypes = Object.keys(PAGE_TYPE_LABELS).filter((p) => p !== 'all');
   const effectivePages = targetPages.includes('all') || targetPages.length === 0
-    ? Object.keys(PAGE_TYPE_LABELS)
+    ? allPageTypes
     : targetPages.filter((p) => p !== 'all');
 
-  const unavailablePages = effectivePages.filter((p) => !availableOn.includes(p));
+  const unavailablePages = effectivePages.filter((p) => !(availableOn as string[]).includes(p));
   if (unavailablePages.length === 0) return null;
 
-  const posLabel = SECTION_POSITION_OPTIONS.find((o) => o.value === position)?.label || position;
-  const pageLabels = unavailablePages.map((p) => PAGE_TYPE_LABELS[p] || p).join(', ');
+  const posLabel = TICKER_POSITION_OPTIONS.find((o) => o.value === pos)?.label || position;
+  const availableLabels = availableOn.map((p) => PAGE_TYPE_LABELS[p] || p).join(', ');
+  const fallbackLabel = availableOn.includes('home') && !availableOn.includes('products')
+    ? 'Before CTA or Before Footer'
+    : 'Before Footer';
 
   return (
     <div className="sm:col-span-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:border-amber-700/50 dark:text-amber-300">
-      <span className="font-medium">Note:</span> Position &ldquo;{posLabel}&rdquo; is only available on the Homepage.
-      This ticker will render at &ldquo;Before Footer&rdquo; on: {pageLabels}.
+      <span className="font-medium">Note:</span> &ldquo;{posLabel}&rdquo; is only available on: {availableLabels}.
+      On other pages, this ticker will fall back to &ldquo;{fallbackLabel}&rdquo;.
     </div>
   );
 }
@@ -467,6 +457,8 @@ const PAGE_TYPE_OPTIONS = [
   { value: 'cms_pages', label: 'CMS Pages (/p/*)' },
   { value: 'products', label: 'Products' },
   { value: 'services', label: 'Services' },
+  { value: 'areas', label: 'Service Areas' },
+  { value: 'gallery', label: 'Gallery' },
   { value: 'cart', label: 'Cart' },
   { value: 'checkout', label: 'Checkout' },
   { value: 'account', label: 'Account Pages' },

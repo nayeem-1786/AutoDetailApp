@@ -7,6 +7,7 @@ import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { ProductCard } from '@/components/public/product-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 export const revalidate = 300;
@@ -94,6 +95,8 @@ export default async function ProductCategoryPage({ params }: PageProps) {
           )}
         </div>
       </section>
+
+      <SectionTickerSlot position="before_cta" pageType="products" />
 
       <CtaSection />
     </>

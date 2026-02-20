@@ -9,6 +9,7 @@ import { generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { JsonLd } from '@/components/public/json-ld';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 export const revalidate = 300;
@@ -126,6 +127,8 @@ export default async function AreasIndexPage() {
           )}
         </div>
       </section>
+
+      <SectionTickerSlot position="before_cta" pageType="areas" />
 
       <CtaSection />
     </>

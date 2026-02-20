@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Section Ticker Position-Based Rendering + Smart Fallback — 2026-02-19
+
+### Position-aware section tickers with fallback chain
+- Section tickers now support 5 positions: After Hero, After Services, After Reviews, Before CTA, Before Footer
+- Created shared `ticker-sections.ts` utility with `TickerPosition` type, `POSITION_AVAILABILITY` map, `resolveTickerPosition()` fallback logic, and `tickersForPosition()` filter
+- Created `SectionTickerSlot` server component — fetches tickers, filters by position/pageType, handles CMS toggle checks
+- Homepage now renders 4 position slots (after_hero, after_services, after_reviews, before_cta) instead of a single hardcoded ticker
+- Added `SectionTickerSlot position="before_cta"` to 8 pages: Products (3), Services (3), Areas (2)
+- `LayoutSectionTickers` now renders only `before_footer` tickers on ALL pages (removed homepage skip)
+- Fallback chain: `after_hero` → `before_cta` → `before_footer`, etc. Existing tickers with null position default to `before_footer`
+
+### Admin ticker editor updates
+- Dropdown now shows all 5 positions with descriptions (e.g., "After Hero — Below the hero section (homepage only)")
+- `PositionAvailabilityWarning` shows which pages support the position and where it will fall back
+- Target pages selector now includes Service Areas and Gallery options
+- Admin list page shows position labels (e.g., "After Hero") instead of generic "Section" badge
+
+---
+
 ## Section Tickers on All Pages + Admin Position Warnings — 2026-02-19
 
 ### Section tickers now render on Products, Cart, Checkout, Services, CMS, and Account pages

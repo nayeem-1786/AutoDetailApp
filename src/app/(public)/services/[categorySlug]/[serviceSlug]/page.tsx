@@ -18,6 +18,7 @@ import { ServicePricingDisplay } from '@/components/public/service-pricing-displ
 import { ServiceCard } from '@/components/public/service-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import { JsonLd } from '@/components/public/json-ld';
 import { AdZone } from '@/components/public/cms/ad-zone';
 
@@ -296,6 +297,8 @@ export default async function ServiceDetailPage({ params }: PageProps) {
           </div>
         </section>
       )}
+
+      <SectionTickerSlot position="before_cta" pageType="services" />
 
       <CtaSection />
     </>

@@ -8,6 +8,7 @@ import { getCmsToggles } from '@/lib/data/cms';
 import { ProductCategoryCard } from '@/components/public/product-category-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import { AdZone } from '@/components/public/cms/ad-zone';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
@@ -87,6 +88,8 @@ export default async function ProductsPage() {
       </section>
 
       {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="above_cta" pagePath="/products" /></Suspense>}
+
+      <SectionTickerSlot position="before_cta" pageType="products" />
 
       <CtaSection />
     </>

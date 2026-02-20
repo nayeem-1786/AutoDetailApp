@@ -17,6 +17,7 @@ import { ServiceCategoryCard } from '@/components/public/service-category-card';
 export const revalidate = 300;
 import { ContentBlocks } from '@/components/public/content-block-renderer';
 import { CtaSection } from '@/components/public/cta-section';
+import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import { formatPhone, phoneToE164 } from '@/lib/utils/format';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
@@ -281,6 +282,8 @@ export default async function CityLandingPage({
           </div>
         </section>
       )}
+
+      <SectionTickerSlot position="before_cta" pageType="areas" />
 
       {/* CTA Section */}
       <CtaSection

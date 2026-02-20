@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 import type { TickerPlacementOptions } from '@/lib/data/cms';
+import { resolveTickerPosition, type PageType } from '@/lib/utils/ticker-sections';
 
 // ---------------------------------------------------------------------------
 // Speed -> consistent px/s rate
@@ -455,11 +456,13 @@ export function SectionTicker({
 // Page type detection for ticker filtering
 // ---------------------------------------------------------------------------
 
-function getPageType(pathname: string): string {
+function getPageType(pathname: string): PageType {
   if (pathname === '/') return 'home';
   if (pathname.startsWith('/p/')) return 'cms_pages';
   if (pathname.startsWith('/products')) return 'products';
   if (pathname.startsWith('/services')) return 'services';
+  if (pathname.startsWith('/areas')) return 'areas';
+  if (pathname === '/gallery') return 'gallery';
   if (pathname === '/cart') return 'cart';
   if (pathname.startsWith('/checkout')) return 'checkout';
   if (pathname.startsWith('/account')) return 'account';
@@ -546,8 +549,9 @@ export function SectionTickerFiltered({
 }
 
 // ---------------------------------------------------------------------------
-// LayoutSectionTickers — renders section tickers before the footer on all
-// non-homepage pages. The homepage handles its own inline section tickers.
+// LayoutSectionTickers — renders section tickers at the before_footer
+// position on ALL pages. Position-specific slots (after_hero, after_services,
+// etc.) are handled by SectionTickerSlot in each page component.
 // ---------------------------------------------------------------------------
 
 export function LayoutSectionTickers({
@@ -558,11 +562,14 @@ export function LayoutSectionTickers({
   options?: TickerPlacementOptions;
 }) {
   const pathname = usePathname();
+  const pageType = getPageType(pathname);
 
-  // Homepage renders section tickers inline — skip here to avoid duplicates
-  if (pathname === '/') return null;
+  // Only render tickers whose resolved position is before_footer
+  const filtered = tickers.filter((t) => {
+    if (!tickerMatchesPage(t, pathname)) return false;
+    return resolveTickerPosition(t.section_position, pageType) === 'before_footer';
+  });
 
-  const filtered = tickers.filter((t) => tickerMatchesPage(t, pathname));
   if (filtered.length === 0) return null;
 
   return <SectionTicker tickers={filtered} options={options} />;

@@ -11,6 +11,7 @@ import { SITE_URL } from '@/lib/utils/constants';
 import { formatCurrency } from '@/lib/utils/format';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
+import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import { JsonLd } from '@/components/public/json-ld';
 import { AdZone } from '@/components/public/cms/ad-zone';
 import { ProductAddToCart } from '@/components/public/cart/product-add-to-cart';
@@ -190,6 +191,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
           <Suspense fallback={null}><AdZone zoneId="sidebar" pagePath={`/products/${categorySlug}/${productSlug}`} className="mt-8" /></Suspense>
         </div>
       </article>
+
+      <SectionTickerSlot position="before_cta" pageType="products" />
 
       <CtaSection
         title="Need professional application?"
