@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Docs Reorganization + Lean CLAUDE.md — 2026-02-19
+
+### CLAUDE.md Slimmed
+- 1,304 lines (185KB) → 127 lines (7KB) — 90% reduction
+- Now a lean cheat sheet: tech stack, critical rules, project structure, key patterns, phase status, reference doc table
+- All session history, feature details, and system-specific documentation moved to appropriate docs
+
+### docs/ Folder Structure
+- `docs/dev/` — 8 active developer reference docs (ARCHITECTURE, CONVENTIONS, DESIGN_SYSTEM, DASHBOARD_RULES, POS_SECURITY, QBO_INTEGRATION, SERVICE_CATALOG, DATA_MIGRATION_RULES)
+- `docs/audits/` — 13 archived system audits (code-consistency, ui-consistency, variable-data, verification, feature-toggles, hero-theme, nav-footer, permissions, pos-dashboard-boundary, quote-summary, role-experience, tcpa, theme-system)
+- `docs/planning/` — 7 project planning docs (PROJECT, POST_LAUNCH_ROADMAP, PHASE8_JOB_MANAGEMENT, COUPONS, NEW_SITE, iPAD, MEMORY)
+- `docs/manual/` — User manual skeleton (README.md) + website system guide seed (website/README.md)
+- `docs/CHANGELOG.md` — stays at root
+
+### Content Enriched
+- `ARCHITECTURE.md`: Added Footer System, Announcement Ticker System, Order System sections
+- `DESIGN_SYSTEM.md`: Added Public Site Theme System section (CSS variable indirection, theme priority chain, key variable groups, seasonal presets, per-slide hero overrides, cross-references to audits)
+
+### Zero Information Loss
+- All 30 original files moved — nothing deleted
+- Filenames normalized: dev/ = UPPER_CASE with underscores, audits/ = lowercase with hyphens
+
+---
+
 ## Service Areas Empty Prefix + Icon Theme Colors — 2026-02-19
 
 ### Fix: Service Areas Prefix Text — Allow Empty
