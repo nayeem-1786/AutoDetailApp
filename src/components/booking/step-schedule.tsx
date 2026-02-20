@@ -76,11 +76,18 @@ export function StepSchedule({
     const dateStr = format(date, 'yyyy-MM-dd');
     try {
       const res = await fetch(
-        `/api/book/slots?date=${dateStr}&duration=${durationMinutes}`
+        `/api/book/slots?date=${dateStr}&duration=${durationMinutes}`,
+        { cache: 'no-store' }
       );
+      if (!res.ok) {
+        console.error('Slots API error:', res.status);
+        setSlots([]);
+        return;
+      }
       const data = await res.json();
       setSlots(data.slots ?? []);
-    } catch {
+    } catch (err) {
+      console.error('Failed to fetch slots:', err);
       setSlots([]);
     } finally {
       setLoadingSlots(false);

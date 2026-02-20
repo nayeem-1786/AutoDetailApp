@@ -12,6 +12,8 @@ const DAY_NAMES = [
   'saturday',
 ] as const;
 
+const CACHE_HEADERS = { 'Cache-Control': 'no-store, no-cache, must-revalidate' };
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -33,8 +35,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse the date to get day-of-week
-    const dateObj = new Date(dateStr + 'T12:00:00');
+    // Parse date string to get day-of-week in a timezone-safe way.
+    // Use explicit UTC (Z suffix) so getUTCDay() matches the calendar date
+    // regardless of the server's local timezone.
+    const dateObj = new Date(dateStr + 'T12:00:00Z');
     if (isNaN(dateObj.getTime())) {
       return NextResponse.json(
         { error: 'Invalid date format' },
@@ -70,18 +74,19 @@ export async function GET(request: NextRequest) {
     const dayHours = hours?.[dayName];
     if (!dayHours) {
       // Closed on this day
-      return NextResponse.json({ slots: [] });
+      return NextResponse.json({ slots: [] }, { headers: CACHE_HEADERS });
     }
 
     const slotInterval = config.slot_interval_minutes ?? 30;
     const totalNeeded = duration + APPOINTMENT.BUFFER_MINUTES;
 
-    // Fetch existing non-cancelled appointments for this date
+    // Fetch appointments that actively block time slots for this date
+    // Only pending/confirmed/in_progress block slots — completed, cancelled, and no_show do not
     const { data: existing } = await supabase
       .from('appointments')
       .select('scheduled_start_time, scheduled_end_time')
       .eq('scheduled_date', dateStr)
-      .neq('status', 'cancelled');
+      .in('status', ['pending', 'confirmed', 'in_progress']);
 
     const appointments = (existing ?? []).map((a) => ({
       start: timeToMinutes(a.scheduled_start_time),
@@ -125,7 +130,7 @@ export async function GET(request: NextRequest) {
 
       if (allStaffBlocked) {
         // Everyone is blocked -- no slots
-        return NextResponse.json({ slots: [] });
+        return NextResponse.json({ slots: [] }, { headers: CACHE_HEADERS });
       }
 
       // Filter out employees who are individually blocked
@@ -135,7 +140,7 @@ export async function GET(request: NextRequest) {
 
       if (availableSchedules.length === 0) {
         // All available employees are blocked on this date
-        return NextResponse.json({ slots: [] });
+        return NextResponse.json({ slots: [] }, { headers: CACHE_HEADERS });
       }
 
       // Compute the UNION window (widest possible from all available employees)
@@ -161,6 +166,16 @@ export async function GET(request: NextRequest) {
       closeMin = timeToMinutes(dayHours.close);
     }
 
+    // Pre-compute blocked employee IDs for slot-level checks (hoisted out of loop)
+    const slotBlockedIds = new Set<string>();
+    if (hasEmployeeSchedules) {
+      for (const bd of blockedDates ?? []) {
+        if (bd.employee_id !== null) {
+          slotBlockedIds.add(bd.employee_id);
+        }
+      }
+    }
+
     // Generate time slots
     const slots: string[] = [];
 
@@ -176,15 +191,8 @@ export async function GET(request: NextRequest) {
         // If employee schedules exist, verify at least one available (non-blocked)
         // employee covers this specific slot time range
         if (hasEmployeeSchedules) {
-          const blockedEmployeeIds = new Set<string>();
-          for (const bd of blockedDates ?? []) {
-            if (bd.employee_id !== null) {
-              blockedEmployeeIds.add(bd.employee_id);
-            }
-          }
-
           const slotCovered = employeeSchedules!.some((es) => {
-            if (blockedEmployeeIds.has(es.employee_id)) return false;
+            if (slotBlockedIds.has(es.employee_id)) return false;
             const esOpen = timeToMinutes(es.start_time);
             const esClose = timeToMinutes(es.end_time);
             return t >= esOpen && (t + totalNeeded) <= esClose;
@@ -199,7 +207,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ slots });
+    return NextResponse.json({ slots }, { headers: CACHE_HEADERS });
   } catch (err) {
     console.error('Slots API error:', err);
     return NextResponse.json(

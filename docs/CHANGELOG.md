@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Booking Time Slots Intermittently Empty — 2026-02-20
+
+### Root Causes
+1. **Timezone-unsafe day-of-week calculation**: `new Date(dateStr + 'T12:00:00')` (server local time) with `getUTCDay()` (UTC time) — could return wrong day-of-week on servers with positive UTC offset, leading to wrong employee schedules and empty slots. Fixed by using explicit UTC: `new Date(dateStr + 'T12:00:00Z')` so `getUTCDay()` always matches the calendar date.
+2. **Appointment status over-filtering**: `.neq('status', 'cancelled')` included `completed` and `no_show` appointments as slot blockers. Changed to `.in('status', ['pending', 'confirmed', 'in_progress'])` — only active/future appointments block slots.
+3. **Missing `Cache-Control` headers**: Slots API responses had no cache-control, allowing browser heuristic caching of GET responses. Added `no-store, no-cache, must-revalidate` to all response paths.
+4. **Client fetch had no `cache: 'no-store'` or error handling**: API errors silently returned "No available times" instead of an error indicator.
+
+### Performance
+- Hoisted `blockedEmployeeIds` Set computation out of the slot generation loop (was needlessly recomputed per slot).
+
+### Files Changed
+- `src/app/api/book/slots/route.ts` — timezone fix, status filter, Cache-Control headers, loop optimization
+- `src/components/booking/step-schedule.tsx` — `cache: 'no-store'` + `res.ok` error handling
+
+---
+
 ## Fix: Marketing Pages — Cached Fetch Causing Data Disappearance — 2026-02-20
 
 ### Bug Fix
