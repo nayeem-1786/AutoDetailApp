@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
+  DialogClose,
   DialogHeader,
   DialogTitle,
   DialogContent,
@@ -652,6 +653,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
       {/* Customer Lookup Dialog */}
       <Dialog open={customerLookupOpen} onOpenChange={setCustomerLookupOpen}>
+        <DialogClose onClose={() => setCustomerLookupOpen(false)} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
         <DialogHeader>
           <DialogTitle>Find Customer</DialogTitle>
         </DialogHeader>
@@ -684,6 +686,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           open={showVehicleSelector}
           onOpenChange={setShowVehicleSelector}
         >
+          <DialogClose onClose={() => setShowVehicleSelector(false)} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
           <DialogHeader>
             <DialogTitle>
               Select Vehicle — {quote.customer.first_name}{' '}

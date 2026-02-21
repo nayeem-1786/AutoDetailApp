@@ -1,5 +1,5 @@
-const CACHE_NAME = 'pos-cache-v1';
-const DATA_CACHE_NAME = 'pos-data-v1';
+const CACHE_NAME = 'pos-cache-v2';
+const DATA_CACHE_NAME = 'pos-data-v2';
 
 // App shell assets to pre-cache
 const APP_SHELL = [
@@ -24,6 +24,7 @@ const NEVER_CACHE_PATTERNS = [
   '/api/pos/refund',
   '/api/stripe',
   '/api/pos/customers',
+  '/api/pos/version',
 ];
 
 self.addEventListener('install', (event) => {
@@ -83,7 +84,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // POS pages — cache first, network update in background (stale-while-revalidate)
+  // POS pages — stale-while-revalidate: serve cached, update in background
   if (url.pathname.startsWith('/pos')) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -97,9 +98,8 @@ self.addEventListener('fetch', (event) => {
           })
           .catch(() => null);
 
-        // Return cached version immediately, or wait for network
         if (cached) {
-          // Fire and forget network update
+          // Serve cached immediately, fire background update
           networkFetch;
           return cached;
         }
@@ -141,5 +141,31 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+
+  if (event.data?.type === 'CHECK_VERSION') {
+    fetch('/api/pos/version', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        const currentVersion = self.__POS_VERSION;
+        if (currentVersion && data.version !== currentVersion) {
+          // New version detected — purge all POS caches
+          caches.keys().then((keys) =>
+            Promise.all(
+              keys.filter((k) => k.startsWith('pos-')).map((k) => caches.delete(k))
+            )
+          ).then(() => {
+            self.clients.matchAll().then((clients) => {
+              clients.forEach((client) =>
+                client.postMessage({ type: 'NEW_VERSION_AVAILABLE' })
+              );
+            });
+          });
+        }
+        self.__POS_VERSION = data.version;
+      })
+      .catch(() => {
+        // Silently fail if offline
+      });
   }
 });

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
+  DialogClose,
   DialogHeader,
   DialogTitle,
   DialogContent,
@@ -73,6 +74,7 @@ export function CustomerTypePrompt({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogClose onClose={() => onOpenChange(false)} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
         <DialogTitle>Customer Type</DialogTitle>
       </DialogHeader>

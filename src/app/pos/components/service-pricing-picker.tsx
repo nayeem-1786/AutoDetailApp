@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import {
   Dialog,
+  DialogClose,
   DialogHeader,
   DialogTitle,
   DialogContent,
@@ -55,6 +56,7 @@ export function ServicePricingPicker({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
+      <DialogClose onClose={onClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
         <DialogTitle>{service.name}</DialogTitle>
       </DialogHeader>
@@ -206,6 +208,7 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
+      <DialogClose onClose={onClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
         <DialogTitle>{service.name}</DialogTitle>
       </DialogHeader>

@@ -33,7 +33,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 });
     }
 
-    return NextResponse.json({ data: services ?? [] });
+    return NextResponse.json(
+      { data: services ?? [] },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (err) {
     console.error('Services route error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

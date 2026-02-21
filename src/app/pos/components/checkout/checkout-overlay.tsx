@@ -1,5 +1,6 @@
 'use client';
 
+import { X } from 'lucide-react';
 import { useCheckout } from '../../context/checkout-context';
 import { PaymentMethodScreen } from './payment-method-screen';
 import { CashPayment } from './cash-payment';
@@ -33,6 +34,16 @@ export function CheckoutOverlay() {
         onClick={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
       >
+        {/* X close button — desktop only */}
+        {canClose && (
+          <button
+            onClick={closeCheckout}
+            className="absolute right-4 top-4 z-10 hidden pointer-fine:flex items-center justify-center h-8 w-8 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </button>
+        )}
         {/* Step content */}
         <div className="flex h-full flex-col overflow-y-auto overscroll-contain">
           {step === 'payment-method' && <PaymentMethodScreen />}

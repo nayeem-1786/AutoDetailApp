@@ -2,109 +2,20 @@
 
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Users, DollarSign, Tag, Package, Wrench, Percent, X } from 'lucide-react';
+import { Loader2, Package, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useFavorites } from '../hooks/use-favorites';
 import { useCatalog } from '../hooks/use-catalog';
 import { useTicket } from '../context/ticket-context';
+import { usePosTheme } from '../context/pos-theme-context';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { PinPad } from './pin-pad';
 import { resolveServicePrice } from '../utils/pricing';
-import type { FavoriteItem, FavoriteColor, CatalogService } from '../types';
+import { getTileColors, TYPE_ICONS } from '@/lib/pos/tile-colors';
+import type { FavoriteItem, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 
 const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
-
-// Explicit Tailwind class map — 12 colors × 6 shades for JIT detection
-const TILE_COLORS: Record<string, { bg: string; text: string; hover: string }> = {
-  'red-10': { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-900 dark:text-red-300', hover: 'hover:bg-red-200 dark:hover:bg-red-900/50' },
-  'red-25': { bg: 'bg-red-200 dark:bg-red-900/50', text: 'text-red-900 dark:text-red-300', hover: 'hover:bg-red-300 dark:hover:bg-red-800/50' },
-  'red-40': { bg: 'bg-red-300 dark:bg-red-800/50', text: 'text-red-900 dark:text-red-300', hover: 'hover:bg-red-400 dark:hover:bg-red-500' },
-  'red-60': { bg: 'bg-red-400 dark:bg-red-500', text: 'text-white', hover: 'hover:bg-red-500 dark:hover:bg-red-600' },
-  'red-80': { bg: 'bg-red-500 dark:bg-red-600', text: 'text-white', hover: 'hover:bg-red-600 dark:hover:bg-red-500' },
-  'red-100': { bg: 'bg-red-600 dark:bg-red-500', text: 'text-white', hover: 'hover:bg-red-700 dark:hover:bg-red-600' },
-  'orange-10': { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-900 dark:text-orange-300', hover: 'hover:bg-orange-200 dark:hover:bg-orange-900/50' },
-  'orange-25': { bg: 'bg-orange-200 dark:bg-orange-900/50', text: 'text-orange-900 dark:text-orange-300', hover: 'hover:bg-orange-300 dark:hover:bg-orange-800/50' },
-  'orange-40': { bg: 'bg-orange-300 dark:bg-orange-800/50', text: 'text-orange-900 dark:text-orange-300', hover: 'hover:bg-orange-400 dark:hover:bg-orange-500' },
-  'orange-60': { bg: 'bg-orange-400 dark:bg-orange-500', text: 'text-white', hover: 'hover:bg-orange-500 dark:hover:bg-orange-600' },
-  'orange-80': { bg: 'bg-orange-500 dark:bg-orange-600', text: 'text-white', hover: 'hover:bg-orange-600 dark:hover:bg-orange-500' },
-  'orange-100': { bg: 'bg-orange-600 dark:bg-orange-500', text: 'text-white', hover: 'hover:bg-orange-700 dark:hover:bg-orange-600' },
-  'fuchsia-10': { bg: 'bg-fuchsia-100', text: 'text-fuchsia-900', hover: 'hover:bg-fuchsia-200' },
-  'fuchsia-25': { bg: 'bg-fuchsia-200', text: 'text-fuchsia-900', hover: 'hover:bg-fuchsia-300' },
-  'fuchsia-40': { bg: 'bg-fuchsia-300', text: 'text-fuchsia-900', hover: 'hover:bg-fuchsia-400' },
-  'fuchsia-60': { bg: 'bg-fuchsia-400', text: 'text-white', hover: 'hover:bg-fuchsia-500' },
-  'fuchsia-80': { bg: 'bg-fuchsia-500', text: 'text-white', hover: 'hover:bg-fuchsia-600' },
-  'fuchsia-100': { bg: 'bg-fuchsia-600', text: 'text-white', hover: 'hover:bg-fuchsia-700' },
-  'lime-10': { bg: 'bg-lime-100', text: 'text-lime-900', hover: 'hover:bg-lime-200' },
-  'lime-25': { bg: 'bg-lime-200', text: 'text-lime-900', hover: 'hover:bg-lime-300' },
-  'lime-40': { bg: 'bg-lime-300', text: 'text-lime-900', hover: 'hover:bg-lime-400' },
-  'lime-60': { bg: 'bg-lime-400', text: 'text-white', hover: 'hover:bg-lime-500' },
-  'lime-80': { bg: 'bg-lime-500', text: 'text-white', hover: 'hover:bg-lime-600' },
-  'lime-100': { bg: 'bg-lime-600', text: 'text-white', hover: 'hover:bg-lime-700' },
-  'cyan-10': { bg: 'bg-cyan-100', text: 'text-cyan-900', hover: 'hover:bg-cyan-200' },
-  'cyan-25': { bg: 'bg-cyan-200', text: 'text-cyan-900', hover: 'hover:bg-cyan-300' },
-  'cyan-40': { bg: 'bg-cyan-300', text: 'text-cyan-900', hover: 'hover:bg-cyan-400' },
-  'cyan-60': { bg: 'bg-cyan-400', text: 'text-white', hover: 'hover:bg-cyan-500' },
-  'cyan-80': { bg: 'bg-cyan-500', text: 'text-white', hover: 'hover:bg-cyan-600' },
-  'cyan-100': { bg: 'bg-cyan-600', text: 'text-white', hover: 'hover:bg-cyan-700' },
-  'rose-10': { bg: 'bg-rose-100', text: 'text-rose-900', hover: 'hover:bg-rose-200' },
-  'rose-25': { bg: 'bg-rose-200', text: 'text-rose-900', hover: 'hover:bg-rose-300' },
-  'rose-40': { bg: 'bg-rose-300', text: 'text-rose-900', hover: 'hover:bg-rose-400' },
-  'rose-60': { bg: 'bg-rose-400', text: 'text-white', hover: 'hover:bg-rose-500' },
-  'rose-80': { bg: 'bg-rose-500', text: 'text-white', hover: 'hover:bg-rose-600' },
-  'rose-100': { bg: 'bg-rose-600', text: 'text-white', hover: 'hover:bg-rose-700' },
-  'teal-10': { bg: 'bg-teal-100', text: 'text-teal-900', hover: 'hover:bg-teal-200' },
-  'teal-25': { bg: 'bg-teal-200', text: 'text-teal-900', hover: 'hover:bg-teal-300' },
-  'teal-40': { bg: 'bg-teal-300', text: 'text-teal-900', hover: 'hover:bg-teal-400' },
-  'teal-60': { bg: 'bg-teal-400', text: 'text-white', hover: 'hover:bg-teal-500' },
-  'teal-80': { bg: 'bg-teal-500', text: 'text-white', hover: 'hover:bg-teal-600' },
-  'teal-100': { bg: 'bg-teal-600', text: 'text-white', hover: 'hover:bg-teal-700' },
-  'blue-10': { bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-900 dark:text-blue-300', hover: 'hover:bg-blue-200 dark:hover:bg-blue-900/50' },
-  'blue-25': { bg: 'bg-blue-200 dark:bg-blue-900/50', text: 'text-blue-900 dark:text-blue-300', hover: 'hover:bg-blue-300 dark:hover:bg-blue-800/50' },
-  'blue-40': { bg: 'bg-blue-300 dark:bg-blue-800/50', text: 'text-blue-900 dark:text-blue-300', hover: 'hover:bg-blue-400 dark:hover:bg-blue-500' },
-  'blue-60': { bg: 'bg-blue-400 dark:bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-500 dark:hover:bg-blue-600' },
-  'blue-80': { bg: 'bg-blue-500 dark:bg-blue-600', text: 'text-white', hover: 'hover:bg-blue-600 dark:hover:bg-blue-500' },
-  'blue-100': { bg: 'bg-blue-600 dark:bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-700 dark:hover:bg-blue-600' },
-  'indigo-10': { bg: 'bg-indigo-100', text: 'text-indigo-900', hover: 'hover:bg-indigo-200' },
-  'indigo-25': { bg: 'bg-indigo-200', text: 'text-indigo-900', hover: 'hover:bg-indigo-300' },
-  'indigo-40': { bg: 'bg-indigo-300', text: 'text-indigo-900', hover: 'hover:bg-indigo-400' },
-  'indigo-60': { bg: 'bg-indigo-400', text: 'text-white', hover: 'hover:bg-indigo-500' },
-  'indigo-80': { bg: 'bg-indigo-500', text: 'text-white', hover: 'hover:bg-indigo-600' },
-  'indigo-100': { bg: 'bg-indigo-600', text: 'text-white', hover: 'hover:bg-indigo-700' },
-  'purple-10': { bg: 'bg-purple-100', text: 'text-purple-900', hover: 'hover:bg-purple-200' },
-  'purple-25': { bg: 'bg-purple-200', text: 'text-purple-900', hover: 'hover:bg-purple-300' },
-  'purple-40': { bg: 'bg-purple-300', text: 'text-purple-900', hover: 'hover:bg-purple-400' },
-  'purple-60': { bg: 'bg-purple-400', text: 'text-white', hover: 'hover:bg-purple-500' },
-  'purple-80': { bg: 'bg-purple-500', text: 'text-white', hover: 'hover:bg-purple-600' },
-  'purple-100': { bg: 'bg-purple-600', text: 'text-white', hover: 'hover:bg-purple-700' },
-  'pink-10': { bg: 'bg-pink-100', text: 'text-pink-900', hover: 'hover:bg-pink-200' },
-  'pink-25': { bg: 'bg-pink-200', text: 'text-pink-900', hover: 'hover:bg-pink-300' },
-  'pink-40': { bg: 'bg-pink-300', text: 'text-pink-900', hover: 'hover:bg-pink-400' },
-  'pink-60': { bg: 'bg-pink-400', text: 'text-white', hover: 'hover:bg-pink-500' },
-  'pink-80': { bg: 'bg-pink-500', text: 'text-white', hover: 'hover:bg-pink-600' },
-  'pink-100': { bg: 'bg-pink-600', text: 'text-white', hover: 'hover:bg-pink-700' },
-  'slate-10': { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-900 dark:text-slate-100', hover: 'hover:bg-slate-200 dark:hover:bg-slate-700' },
-  'slate-25': { bg: 'bg-slate-200 dark:bg-slate-700', text: 'text-slate-900 dark:text-slate-100', hover: 'hover:bg-slate-300 dark:hover:bg-slate-600' },
-  'slate-40': { bg: 'bg-slate-300 dark:bg-slate-600', text: 'text-slate-900 dark:text-slate-100', hover: 'hover:bg-slate-400 dark:hover:bg-slate-500' },
-  'slate-60': { bg: 'bg-slate-400 dark:bg-slate-500', text: 'text-white', hover: 'hover:bg-slate-500 dark:hover:bg-slate-400' },
-  'slate-80': { bg: 'bg-slate-500 dark:bg-slate-400', text: 'text-white', hover: 'hover:bg-slate-600 dark:hover:bg-slate-500' },
-  'slate-100': { bg: 'bg-slate-600 dark:bg-slate-500', text: 'text-white', hover: 'hover:bg-slate-700 dark:hover:bg-slate-600' },
-};
-
-const DEFAULT_TILE = { bg: 'bg-blue-500 dark:bg-blue-600', text: 'text-white', hover: 'hover:bg-blue-600 dark:hover:bg-blue-500' };
-
-function getTileColors(color: FavoriteColor, shade: number = 80) {
-  return TILE_COLORS[`${color}-${shade}`] ?? TILE_COLORS[`${color}-80`] ?? DEFAULT_TILE;
-}
-
-const TYPE_ICONS: Record<string, typeof Package> = {
-  product: Package,
-  service: Wrench,
-  custom_amount: DollarSign,
-  customer_lookup: Users,
-  discount: Tag,
-  surcharge: Percent,
-};
 
 interface RegisterTabProps {
   onOpenCustomerLookup: () => void;
@@ -114,6 +25,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   const { favorites, loading: favLoading } = useFavorites();
   const { products, services } = useCatalog();
   const { ticket, dispatch } = useTicket();
+  const { resolvedTheme } = usePosTheme();
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
 
   // Keypad state
@@ -296,7 +208,10 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           ) : favorites.length > 0 ? (
             <div className="grid grid-cols-3 gap-2" style={{ gridAutoRows: 'minmax(64px, 1fr)' }}>
               {favorites.slice(0, 15).map((fav) => {
-                const colors = getTileColors(fav.color, fav.colorShade);
+                // Use dark override color when in dark mode and override is set
+                const useColor = (resolvedTheme === 'dark' && fav.darkColor) ? fav.darkColor : fav.color;
+                const useShade = (resolvedTheme === 'dark' && fav.darkColor) ? (fav.darkColorShade ?? 80) : fav.colorShade;
+                const colors = getTileColors(useColor, useShade);
                 const Icon = TYPE_ICONS[fav.type] ?? Package;
                 return (
                   <button

@@ -8,6 +8,16 @@
    Note: @custom-variant overrides the built-in dark variant (media-query)
    so only class-based rules are generated. */
 @custom-variant dark (.dark &);
+@custom-variant pointer-fine (@media (pointer: fine));
+@custom-variant pointer-coarse (@media (pointer: coarse));
+@custom-variant standalone (@media (display-mode: standalone));
+
+/* PWA standalone mode: pad for iOS status bar */
+@media (display-mode: standalone) {
+  .pos-standalone-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
 
 :root {
   --background: #ffffff;

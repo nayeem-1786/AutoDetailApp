@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import {
   Dialog,
+  DialogClose,
   DialogHeader,
   DialogTitle,
   DialogContent,
@@ -91,6 +92,7 @@ export function VehicleCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
+      <DialogClose onClose={handleClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
         <DialogTitle>Add Vehicle</DialogTitle>
       </DialogHeader>

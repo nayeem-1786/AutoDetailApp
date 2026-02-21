@@ -240,7 +240,7 @@ function PosShellContent({
   }, [dispatch, ticket.items.length, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen, router]);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-gray-100 dark:bg-gray-950 touch-manipulation pb-[env(safe-area-inset-bottom)]">
+    <div className="pos-standalone-safe flex h-dvh flex-col overflow-hidden bg-gray-100 dark:bg-gray-950 touch-manipulation pb-[env(safe-area-inset-bottom)]">
       {/* Offline indicator banner */}
       <OfflineIndicator />
 

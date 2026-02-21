@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowUp, ArrowDown, Trash2, Plus, Pencil } from 'lucide-react';
+import { ArrowUp, ArrowDown, Trash2, Plus, Pencil, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { TILE_COLORS, TYPE_ICONS, getTileColors } from '@/lib/pos/tile-colors';
 import type { FavoriteItem, FavoriteActionType, FavoriteColor, FavoriteColorShade } from '@/app/pos/types';
 
 const SETTINGS_KEY = 'pos_favorites';
@@ -47,7 +48,7 @@ const TYPE_OPTIONS: { value: FavoriteActionType; label: string }[] = [
   { value: 'surcharge', label: 'Surcharge (% of sale)' },
 ];
 
-// Explicit Tailwind class map — every color × shade combo as full strings for JIT detection
+// Explicit Tailwind class map — every color x shade combo as full strings for JIT detection
 const BG_CLASSES: Record<string, string> = {
   'red-10': 'bg-red-100', 'red-25': 'bg-red-200', 'red-40': 'bg-red-300', 'red-60': 'bg-red-400', 'red-80': 'bg-red-500', 'red-100': 'bg-red-600',
   'orange-10': 'bg-orange-100', 'orange-25': 'bg-orange-200', 'orange-40': 'bg-orange-300', 'orange-60': 'bg-orange-400', 'orange-80': 'bg-orange-500', 'orange-100': 'bg-orange-600',
@@ -77,6 +78,149 @@ const TYPE_BADGES: Record<FavoriteActionType, { label: string; className: string
   surcharge: { label: 'Surcharge', className: 'bg-orange-100 text-orange-700' },
 };
 
+// ─── Preview component ──────────────────────────────────────────
+
+function FavoriteTilePreview({
+  label,
+  type,
+  color,
+  colorShade,
+  mode,
+}: {
+  label: string;
+  type: FavoriteActionType;
+  color: FavoriteColor;
+  colorShade: FavoriteColorShade;
+  mode: 'light' | 'dark';
+}) {
+  const Icon = TYPE_ICONS[type];
+  const colors = getTileColors(color, colorShade);
+
+  return (
+    <div className={mode === 'dark' ? 'dark' : ''}>
+      <div
+        className={cn(
+          'flex flex-col items-center justify-center rounded-lg p-2 w-20 h-16 text-center transition-colors',
+          colors.bg,
+          colors.text,
+        )}
+      >
+        {Icon && <Icon className="h-4 w-4 mb-0.5" />}
+        <span className="text-[10px] font-medium leading-tight line-clamp-2">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Dark mode override UI (shared between Add and Edit forms) ──
+
+function DarkModeOverride({
+  enabled,
+  onEnabledChange,
+  darkColor,
+  onDarkColorChange,
+  darkShade,
+  onDarkShadeChange,
+  lightColor,
+  lightShade,
+  label,
+  type,
+}: {
+  enabled: boolean;
+  onEnabledChange: (v: boolean) => void;
+  darkColor: FavoriteColor;
+  onDarkColorChange: (c: FavoriteColor) => void;
+  darkShade: FavoriteColorShade;
+  onDarkShadeChange: (s: FavoriteColorShade) => void;
+  lightColor: FavoriteColor;
+  lightShade: FavoriteColorShade;
+  label: string;
+  type: FavoriteActionType;
+}) {
+  return (
+    <div className="col-span-full space-y-3">
+      {/* Dark mode checkbox */}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onEnabledChange(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300"
+        />
+        <span className="text-gray-700">Custom dark mode colors</span>
+      </label>
+
+      {enabled && (
+        <div className="ml-6 space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-16 shrink-0">Dark color:</span>
+            <div className="flex flex-wrap gap-1">
+              {COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onDarkColorChange(opt.value)}
+                  className={cn(
+                    'h-6 w-6 rounded-full border-2 transition-all',
+                    getBgClass(opt.value, darkShade),
+                    darkColor === opt.value ? 'border-gray-900 ring-2 ring-gray-300' : 'border-transparent'
+                  )}
+                  title={opt.label}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-16 shrink-0">Dark shade:</span>
+            <Select
+              value={String(darkShade)}
+              onChange={(e) => onDarkShadeChange(Number(e.target.value) as FavoriteColorShade)}
+              className="w-20 shrink-0"
+            >
+              {SHADE_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {/* Live preview */}
+      <div className="mt-4">
+        <span className="text-xs text-gray-500 font-medium">Preview:</span>
+        <div className="flex gap-3 mt-1.5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-[10px] text-gray-400">
+              <Sun className="h-3 w-3" /> Light
+            </div>
+            <FavoriteTilePreview
+              label={label || 'Label'}
+              type={type}
+              color={lightColor}
+              colorShade={lightShade}
+              mode="light"
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-[10px] text-gray-400">
+              <Moon className="h-3 w-3" /> Dark
+            </div>
+            <FavoriteTilePreview
+              label={label || 'Label'}
+              type={type}
+              color={enabled ? darkColor : lightColor}
+              colorShade={enabled ? darkShade : lightShade}
+              mode="dark"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page component ─────────────────────────────────────────
+
 interface CatalogItem {
   id: string;
   name: string;
@@ -97,6 +241,9 @@ export default function PosFavoritesPage() {
   const [newShade, setNewShade] = useState<FavoriteColorShade>(80);
   const [newReferenceId, setNewReferenceId] = useState('');
   const [newPercentage, setNewPercentage] = useState('');
+  const [newDarkEnabled, setNewDarkEnabled] = useState(false);
+  const [newDarkColor, setNewDarkColor] = useState<FavoriteColor>('blue');
+  const [newDarkShade, setNewDarkShade] = useState<FavoriteColorShade>(80);
 
   // Edit form state
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -106,6 +253,9 @@ export default function PosFavoritesPage() {
   const [editShade, setEditShade] = useState<FavoriteColorShade>(80);
   const [editReferenceId, setEditReferenceId] = useState('');
   const [editPercentage, setEditPercentage] = useState('');
+  const [editDarkEnabled, setEditDarkEnabled] = useState(false);
+  const [editDarkColor, setEditDarkColor] = useState<FavoriteColor>('blue');
+  const [editDarkShade, setEditDarkShade] = useState<FavoriteColorShade>(80);
 
   useEffect(() => {
     async function load() {
@@ -186,7 +336,7 @@ export default function PosFavoritesPage() {
     }
     const parsedPct = parseFloat(newPercentage);
     if (newType === 'surcharge' && (!parsedPct || parsedPct <= 0 || parsedPct > 100)) {
-      toast.error('Enter a valid percentage (1–100)');
+      toast.error('Enter a valid percentage (1\u2013100)');
       return;
     }
 
@@ -200,6 +350,7 @@ export default function PosFavoritesPage() {
       color: newColor,
       colorShade: newShade,
       ...(newType === 'surcharge' ? { percentage: parsedPct } : {}),
+      ...(newDarkEnabled ? { darkColor: newDarkColor, darkColorShade: newDarkShade } : {}),
     };
 
     setFavorites([...favorites, item]);
@@ -209,6 +360,9 @@ export default function PosFavoritesPage() {
     setNewType('product');
     setNewColor('blue');
     setNewShade(80);
+    setNewDarkEnabled(false);
+    setNewDarkColor('blue');
+    setNewDarkShade(80);
     setShowAdd(false);
   }
 
@@ -231,6 +385,9 @@ export default function PosFavoritesPage() {
     setEditShade(fav.colorShade ?? 80);
     setEditReferenceId(fav.referenceId ?? '');
     setEditPercentage(fav.percentage != null ? String(fav.percentage) : '');
+    setEditDarkEnabled(!!fav.darkColor);
+    setEditDarkColor(fav.darkColor ?? fav.color);
+    setEditDarkShade(fav.darkColorShade ?? fav.colorShade ?? 80);
     setShowAdd(false);
   }
 
@@ -259,7 +416,7 @@ export default function PosFavoritesPage() {
     }
     const parsedPct = parseFloat(editPercentage);
     if (editType === 'surcharge' && (!parsedPct || parsedPct <= 0 || parsedPct > 100)) {
-      toast.error('Enter a valid percentage (1–100)');
+      toast.error('Enter a valid percentage (1\u2013100)');
       return;
     }
 
@@ -271,6 +428,7 @@ export default function PosFavoritesPage() {
       color: editColor,
       colorShade: editShade,
       ...(editType === 'surcharge' ? { percentage: parsedPct } : {}),
+      ...(editDarkEnabled ? { darkColor: editDarkColor, darkColorShade: editDarkShade } : {}),
     };
 
     setFavorites(favorites.map((f, i) => (i === editIndex ? updated : f)));
@@ -399,6 +557,20 @@ export default function PosFavoritesPage() {
                     </Select>
                   </div>
                 </FormField>
+
+                {/* Dark mode override + preview */}
+                <DarkModeOverride
+                  enabled={newDarkEnabled}
+                  onEnabledChange={setNewDarkEnabled}
+                  darkColor={newDarkColor}
+                  onDarkColorChange={setNewDarkColor}
+                  darkShade={newDarkShade}
+                  onDarkShadeChange={setNewDarkShade}
+                  lightColor={newColor}
+                  lightShade={newShade}
+                  label={newLabel}
+                  type={newType}
+                />
               </div>
 
               <div className="mt-4 flex justify-end">
@@ -514,6 +686,20 @@ export default function PosFavoritesPage() {
                             </Select>
                           </div>
                         </FormField>
+
+                        {/* Dark mode override + preview */}
+                        <DarkModeOverride
+                          enabled={editDarkEnabled}
+                          onEnabledChange={setEditDarkEnabled}
+                          darkColor={editDarkColor}
+                          onDarkColorChange={setEditDarkColor}
+                          darkShade={editDarkShade}
+                          onDarkShadeChange={setEditDarkShade}
+                          lightColor={editColor}
+                          lightShade={editShade}
+                          label={editLabel}
+                          type={editType}
+                        />
                       </div>
 
                       <div className="mt-4 flex justify-end gap-2">
@@ -529,8 +715,18 @@ export default function PosFavoritesPage() {
                     key={fav.id}
                     className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3"
                   >
-                    {/* Color swatch */}
-                    <div className={cn('h-6 w-6 shrink-0 rounded-full', getBgClass(fav.color, fav.colorShade))} />
+                    {/* Color swatch — split circle if dark override exists */}
+                    {fav.darkColor ? (
+                      <div
+                        className="h-7 w-7 shrink-0 rounded-full overflow-hidden flex"
+                        title={`${fav.color} / ${fav.darkColor}`}
+                      >
+                        <div className={cn('w-1/2 h-full', getBgClass(fav.color, fav.colorShade))} />
+                        <div className={cn('w-1/2 h-full', getBgClass(fav.darkColor, fav.darkColorShade))} />
+                      </div>
+                    ) : (
+                      <div className={cn('h-7 w-7 shrink-0 rounded-full', getBgClass(fav.color, fav.colorShade))} />
+                    )}
 
                     {/* Label */}
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">

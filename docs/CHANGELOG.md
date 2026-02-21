@@ -4,6 +4,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS Cache Busting, PWA Safe Area, Desktop-Only Fullscreen — 2026-02-21
+
+### Cache Busting & Faster Refresh
+- Added `generateBuildId` to `next.config.ts` (timestamp-based) and exposed `BUILD_ID` env var
+- Created `/api/pos/version` endpoint — returns current build version with `no-store` cache headers
+- Updated service worker (`pos-sw.js`) with `CHECK_VERSION` message handler: compares cached version against server, purges all POS caches on mismatch, notifies clients via `NEW_VERSION_AVAILABLE` message
+- Added `/api/pos/version` to `NEVER_CACHE_PATTERNS` in service worker
+- Updated `PosServiceWorker` component: checks version every 5 minutes, listens for version mismatch messages, shows a fixed blue banner with "Refresh now" button when a new deploy is detected
+- Added `Cache-Control: no-store, no-cache, must-revalidate` headers to POS services API route
+- Bumped cache names from `v1` to `v2` to force clean slate
+
+### PWA Status Bar Overlap Fix
+- Added `@custom-variant standalone` for `display-mode: standalone` media query
+- Added `.pos-standalone-safe` CSS class that applies `padding-top: env(safe-area-inset-top)` only in standalone mode
+- Applied `pos-standalone-safe` class to POS shell outer container
+- `viewportFit: 'cover'` already set in POS layout (required for `env(safe-area-inset-top)` to return non-zero)
+
+### Desktop-Only Fullscreen Button
+- Updated `FullscreenToggle` to check `pointer: fine` media query and standalone mode
+- Button now hidden on touch devices (iPad Safari, iPad PWA) — only visible on desktop browsers
+- PWA standalone users get fullscreen natively, so the toggle is unnecessary
+
+### Files Changed
+- `next.config.ts` — `generateBuildId`, `BUILD_ID` env var
+- `public/pos-sw.js` — Version check messaging, cache v2, version endpoint in never-cache list
+- `src/app/api/pos/version/route.ts` — New version endpoint
+- `src/app/api/pos/services/route.ts` — Added Cache-Control headers
+- `src/app/pos/components/pos-service-worker.tsx` — Version check interval + update banner
+- `src/app/pos/components/fullscreen-toggle.tsx` — Desktop-only visibility
+- `src/app/pos/pos-shell.tsx` — Added `pos-standalone-safe` class
+- `src/app/globals.css` — `@custom-variant standalone`, `.pos-standalone-safe` CSS rule
+
+---
+
 ## Fix: POS Dark Mode Cleanup, Ticket Scroll UX, Fullscreen Gesture — 2026-02-21
 
 ### Dark Mode — Theme Provider Cleanup

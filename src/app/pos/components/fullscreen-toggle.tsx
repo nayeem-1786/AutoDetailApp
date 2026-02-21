@@ -5,15 +5,22 @@ import { Maximize, Minimize } from 'lucide-react';
 
 export function FullscreenToggle() {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [supported, setSupported] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setSupported(
-      !!(
-        document.documentElement.requestFullscreen ||
-        (document.documentElement as any).webkitRequestFullscreen
-      )
+    const supportsFullscreen = !!(
+      document.documentElement.requestFullscreen ||
+      (document.documentElement as any).webkitRequestFullscreen
     );
+
+    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true;
+
+    // Only show on desktop (fine pointer) non-standalone browsers that support fullscreen
+    setVisible(supportsFullscreen && hasFinePointer && !isStandalone);
 
     const handler = () =>
       setIsFullscreen(
@@ -49,7 +56,7 @@ export function FullscreenToggle() {
     }
   }, []);
 
-  if (!supported) return null;
+  if (!visible) return null;
 
   return (
     <button

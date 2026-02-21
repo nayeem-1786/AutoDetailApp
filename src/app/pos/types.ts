@@ -98,6 +98,9 @@ export interface FavoriteItem {
   color: FavoriteColor;
   colorShade?: FavoriteColorShade; // Intensity: 10%–100%, default 80% (Tailwind 500)
   percentage?: number; // For surcharge type: X% of subtotal
+  // Dark mode overrides (optional — uses automatic dark: variants when not set)
+  darkColor?: FavoriteColor;
+  darkColorShade?: FavoriteColorShade;
 }
 
 export type FavoriteColor = 'red' | 'orange' | 'fuchsia' | 'lime' | 'cyan' | 'teal' | 'blue' | 'indigo' | 'purple' | 'pink' | 'rose' | 'slate';

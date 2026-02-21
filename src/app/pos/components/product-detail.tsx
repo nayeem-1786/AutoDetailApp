@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Minus, Plus, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
-import { Dialog } from '@/components/ui/dialog';
+import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { useTicket } from '../context/ticket-context';
 import type { CatalogProduct } from '../types';
 
@@ -31,6 +31,7 @@ export function ProductDetail({ product, open, onClose }: ProductDetailProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogClose onClose={onClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
 
       <div className="p-5">
         {/* Product info */}
