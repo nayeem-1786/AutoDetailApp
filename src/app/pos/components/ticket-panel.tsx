@@ -202,7 +202,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   return (
     <div className="flex h-full flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {/* Customer / Vehicle summary */}
-      <div className="border-b border-gray-100 dark:border-gray-800 px-4 py-2">
+      <div className="shrink-0 border-b border-gray-100 dark:border-gray-800 px-4 py-2">
         <CustomerVehicleSummary
           customer={ticket.customer}
           vehicle={ticket.vehicle}
@@ -220,7 +220,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       </div>
 
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Ticket
         </h2>
@@ -255,12 +255,14 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
       {/* Add-on Suggestions */}
       {ticket.items.some((i) => i.itemType === 'service') && (
-        <AddonSuggestions />
+        <div className="shrink-0">
+          <AddonSuggestions />
+        </div>
       )}
 
       {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (
-        <div className="space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
+        <div className="shrink-0 space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
           <CouponInput />
           <LoyaltyPanel />
 

@@ -337,6 +337,7 @@ function PosShellContent({
           {/* Theme toggle */}
           <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
             <button
+              type="button"
               onClick={() => setTheme('light')}
               className={cn(
                 'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
@@ -349,6 +350,7 @@ function PosShellContent({
               <Sun className="h-4 w-4" />
             </button>
             <button
+              type="button"
               onClick={() => setTheme('dark')}
               className={cn(
                 'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
@@ -361,6 +363,7 @@ function PosShellContent({
               <Moon className="h-4 w-4" />
             </button>
             <button
+              type="button"
               onClick={() => setTheme('system')}
               className={cn(
                 'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',

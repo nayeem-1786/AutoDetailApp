@@ -33,65 +33,47 @@ function resolveTheme(theme: PosTheme): 'light' | 'dark' {
   return theme;
 }
 
-/** Apply dark class and color-scheme to <html> so ALL CSS chunks respect the toggle.
- *  color-scheme on the root element overrides @media (prefers-color-scheme) queries,
- *  neutralizing the media-query dark styles Turbopack generates in a separate chunk. */
-function applyThemeToDocument(resolved: 'light' | 'dark', mode: PosTheme) {
-  const root = document.documentElement;
-  root.classList.toggle('dark', resolved === 'dark');
-
-  // color-scheme on root overrides prefers-color-scheme media queries.
-  // 'light'       → forces @media(prefers-color-scheme:dark) = false
-  // 'dark'        → forces @media(prefers-color-scheme:dark) = true
-  // 'light dark'  → follows OS preference (correct for "system" mode)
-  if (mode === 'system') {
-    root.style.colorScheme = 'light dark';
-  } else {
-    root.style.colorScheme = resolved;
-  }
-}
-
-function cleanupDocument() {
-  const root = document.documentElement;
-  root.classList.remove('dark');
-  root.style.removeProperty('color-scheme');
-}
-
 export function PosThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<PosTheme>(getInitialTheme);
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolveTheme(theme));
+  const [mounted, setMounted] = useState(false);
+  const [theme, setThemeState] = useState<PosTheme>('light');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
 
-  // Apply dark class + color-scheme to <html> on mount and when theme changes
+  // Read stored theme on mount (client only)
   useEffect(() => {
-    const resolved = resolveTheme(theme);
-    setResolvedTheme(resolved);
-    applyThemeToDocument(resolved, theme);
+    const stored = getInitialTheme();
+    setThemeState(stored);
+    setResolvedTheme(resolveTheme(stored));
+    setMounted(true);
+  }, []);
+
+  // Listen for system preference changes when in "system" mode
+  useEffect(() => {
+    if (!mounted) return;
+    setResolvedTheme(resolveTheme(theme));
 
     if (theme === 'system') {
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = () => {
-        const r = mq.matches ? 'dark' : 'light';
-        setResolvedTheme(r);
-        applyThemeToDocument(r, 'system');
-      };
+      const handler = () => setResolvedTheme(mq.matches ? 'dark' : 'light');
       mq.addEventListener('change', handler);
-      return () => {
-        mq.removeEventListener('change', handler);
-        cleanupDocument();
-      };
+      return () => mq.removeEventListener('change', handler);
     }
-
-    return cleanupDocument;
-  }, [theme]);
+  }, [theme, mounted]);
 
   const setTheme = useCallback((t: PosTheme) => {
     setThemeState(t);
+    setResolvedTheme(resolveTheme(t));
     localStorage.setItem(STORAGE_KEY, t);
   }, []);
 
+  // Render wrapper div with .dark class — React manages this, no imperative DOM hacks.
+  // Uses inline display:contents so the div is invisible to layout (flex/grid pass through).
+  const isDark = mounted && resolvedTheme === 'dark';
+
   return (
     <PosThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
-      {children}
+      <div className={isDark ? 'dark' : undefined} style={{ display: 'contents' }}>
+        {children}
+      </div>
     </PosThemeContext.Provider>
   );
 }

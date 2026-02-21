@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* POS dark mode: class-based toggle via .dark on <html>.
+/* POS dark mode: class-based toggle via .dark on a wrapper div.
    Uses :is() (not :where()) so dark variants get specificity (0,2,0),
    beating base utilities (0,1,0) even when Turbopack generates duplicate
    CSS chunks with different source order. */

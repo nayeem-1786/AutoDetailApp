@@ -6,6 +6,8 @@ import type { TicketState, TicketAction } from '../types';
 import { ticketReducer, initialTicketState } from './ticket-reducer';
 import { posFetch } from '../lib/pos-fetch';
 
+const TICKET_SESSION_KEY = 'pos-ticket-state';
+
 interface TicketContextType {
   ticket: TicketState;
   dispatch: React.Dispatch<TicketAction>;
@@ -13,11 +15,47 @@ interface TicketContextType {
 
 const TicketContext = createContext<TicketContextType | null>(null);
 
+function loadTicketFromSession(): TicketState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(TICKET_SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as TicketState;
+  } catch {
+    return null;
+  }
+}
+
+function saveTicketToSession(state: TicketState): void {
+  try {
+    sessionStorage.setItem(TICKET_SESSION_KEY, JSON.stringify(state));
+  } catch {
+    // sessionStorage full or unavailable — silently ignore
+  }
+}
+
 export function TicketProvider({ children }: { children: ReactNode }) {
   const [ticket, dispatch] = useReducer(ticketReducer, initialTicketState);
+  const restoredRef = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevItemsRef = useRef<string>('');
   const prevCustomerRef = useRef<string | null>(null);
+
+  // Restore ticket state from sessionStorage on mount
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const saved = loadTicketFromSession();
+    if (saved && (saved.items.length > 0 || saved.customer)) {
+      dispatch({ type: 'RESTORE_TICKET', state: saved });
+    }
+  }, []);
+
+  // Persist ticket state to sessionStorage on every change
+  useEffect(() => {
+    if (!restoredRef.current) return; // Don't persist until after restore
+    saveTicketToSession(ticket);
+  }, [ticket]);
 
   // Serialize items for change detection
   const itemsKey = ticket.items.map((i) => `${i.id}:${i.quantity}:${i.unitPrice}`).join(',');

@@ -434,7 +434,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   return (
     <div className="flex h-full flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {/* Customer / Vehicle summary */}
-      <div className="border-b border-gray-100 dark:border-gray-800 px-4 py-2">
+      <div className="shrink-0 border-b border-gray-100 dark:border-gray-800 px-4 py-2">
         <CustomerVehicleSummary
           customer={quote.customer}
           vehicle={quote.vehicle}
@@ -451,7 +451,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       </div>
 
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           {walkInMode
             ? 'Walk-In Job'
@@ -476,7 +476,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
       {/* Coupon + Loyalty + Discount */}
       {quote.items.length > 0 && (
-        <div className="space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
+        <div className="shrink-0 space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
           <QuoteCouponInput />
           <QuoteLoyaltyPanel />
 
@@ -590,7 +590,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
       {/* Valid Until — hidden in walk-in mode */}
       {!walkInMode && (
-        <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-2">
+        <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
           <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <CalendarDays className="h-3 w-3" />
             Valid Until
@@ -605,7 +605,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       )}
 
       {/* Notes */}
-      <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-2">
+      <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
         <label className="text-xs text-gray-500 dark:text-gray-400">Internal Notes</label>
         <textarea
           value={quote.notes || ''}

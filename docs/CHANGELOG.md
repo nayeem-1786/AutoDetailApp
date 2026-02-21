@@ -4,6 +4,63 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Ticket State Lost on Page Refresh — 2026-02-20
+
+Customer info, vehicle, items, and discounts on the POS ticket disappeared on page refresh/reload because the ticket state (React `useReducer`) had no persistence.
+
+### Fix
+Added sessionStorage persistence to `TicketProvider`. On mount, restores saved ticket via `RESTORE_TICKET` action. On every state change, persists to sessionStorage. Clears automatically when `CLEAR_TICKET` fires (resets to empty initial state which overwrites sessionStorage).
+
+### Files Changed
+- `src/app/pos/context/ticket-context.tsx` — sessionStorage save/restore with guard against persisting before restore completes
+
+---
+
+## Fix: POS Ticket Sidebar Not Scrolling — 2026-02-20
+
+When multiple services/products were added to a POS ticket, the items list would not scroll because sibling flex children (customer summary, header, addon suggestions, coupon/discount section) were competing for space with the scrollable area.
+
+### Fix
+Added `shrink-0` to all non-scrollable siblings of the `flex-1 overflow-y-auto` items list so they maintain their natural height and the items list takes remaining space.
+
+### Files Changed
+- `src/app/pos/components/ticket-panel.tsx` — `shrink-0` on customer summary, header, addon wrapper, coupon/discount section
+- `src/app/pos/components/quotes/quote-ticket-panel.tsx` — same pattern applied to customer summary, header, coupon/discount, valid-until, notes sections
+
+---
+
+## Fix: POS Theme Toggle Exiting iPad Fullscreen — 2026-02-20
+
+Clicking the Sun/Moon/Monitor theme toggle buttons in the POS header was exiting iPad fullscreen mode.
+
+### Root Cause
+Toggle buttons without explicit `type="button"` defaulted to `type="submit"`, which could trigger form submission behavior. Additionally, the previous dark mode fix manipulated `document.documentElement.style.colorScheme` which can trigger Safari to exit fullscreen.
+
+### Fix
+- Added `type="button"` to all 3 theme toggle buttons
+- PosThemeProvider now uses a React-managed wrapper `<div>` with `style={{display:'contents'}}` instead of imperatively modifying `document.documentElement`
+
+### Files Changed
+- `src/app/pos/pos-shell.tsx` — `type="button"` on all theme toggle buttons
+- `src/app/pos/context/pos-theme-context.tsx` — reverted to wrapper div approach, removed `documentElement` manipulation
+
+---
+
+## Fix: POS Dark Mode Toggle — Corrected Approach — 2026-02-20
+
+The previous dark mode fix (applying `.dark` class + `color-scheme` to `document.documentElement`) didn't work because: (1) `color-scheme` CSS property does NOT override `@media (prefers-color-scheme)` media queries, and (2) imperative DOM manipulation on `<html>` conflicts with React's ownership and causes Safari fullscreen exits.
+
+### Corrected Fix
+- PosThemeProvider uses a React-managed `<div className="dark">` wrapper with `display: contents` (invisible to layout, but present in DOM for CSS `:is(.dark *)` matching)
+- `mounted` state prevents hydration mismatch (SSR always renders light)
+- `@custom-variant dark (&:is(.dark, .dark *))` with `:is()` gives dark variants specificity (0,2,0), beating base utilities at (0,1,0) regardless of Turbopack CSS chunk ordering
+
+### Files Changed
+- `src/app/pos/context/pos-theme-context.tsx` — wrapper div with display:contents, mounted guard
+- `src/app/globals.css` — `:is()` specificity (unchanged from first fix)
+
+---
+
 ## Fix: POS Backdrop Dismiss on iPad — 2026-02-20
 
 Fixed backdrop tap-to-dismiss not working on iPadOS Safari. iOS/iPadOS doesn't fire `click` events on non-interactive `div` elements. Added `onTouchEnd` handler + `cursor-pointer` to all dialog backdrops and the checkout overlay backdrop so tapping the background reliably dismisses popups on iPad.
