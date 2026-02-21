@@ -74,6 +74,10 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
     fetchTransaction();
   }, [fetchTransaction]);
 
+  // Hooks must be called before any early returns
+  const { granted: hasRefundPerm } = usePosPermission('pos.issue_refunds');
+  const { granted: hasVoidPerm } = usePosPermission('pos.void_transactions');
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -93,9 +97,6 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
       </div>
     );
   }
-
-  const { granted: hasRefundPerm } = usePosPermission('pos.issue_refunds');
-  const { granted: hasVoidPerm } = usePosPermission('pos.void_transactions');
 
   const refundEligible =
     transaction.status === 'completed' || transaction.status === 'partial_refund';
@@ -276,7 +277,7 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
         </div>
 
         {/* Payments */}
-        {transaction.payments.length > 0 && (
+        {transaction.payments?.length > 0 && (
           <div className="mb-6">
             <h2 className="mb-3 text-sm font-semibold text-gray-900">Payments</h2>
             <div className="space-y-2">
@@ -394,7 +395,7 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
         )}
 
         {/* Refund History */}
-        {transaction.refunds.length > 0 && (
+        {transaction.refunds?.length > 0 && (
           <div className="mb-6">
             <h2 className="mb-3 text-sm font-semibold text-gray-900">Refund History</h2>
             <div className="space-y-3">
