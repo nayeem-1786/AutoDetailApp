@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Minus, Plus, StickyNote } from 'lucide-react';
+import { Minus, Plus, StickyNote, Trash2 } from 'lucide-react';
 import type { TicketItem } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
@@ -228,6 +228,18 @@ export function TicketItemRow({ item }: TicketItemRowProps) {
               </p>
             )}
           </div>
+
+          {/* Remove — desktop only (touch uses swipe-to-delete) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+            }}
+            className="hidden pointer-fine:flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
+            aria-label="Remove item"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
 
         </div>
       </div>

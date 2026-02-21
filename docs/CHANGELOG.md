@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: Desktop-Only Trash Icon on Ticket Items — 2026-02-21
+
+- Added `Trash2` remove button to `ticket-item-row.tsx` — visible only on desktop (`pointer-fine`)
+- Touch/iPad users continue using swipe-to-delete; desktop mouse users now also have a click-to-remove trash icon
+- Complements the `DialogClose` X buttons and `pointer-fine`/`pointer-coarse` variants added in the prior session
+
+### Files Changed
+- `src/app/pos/components/ticket-item-row.tsx` — Trash2 icon import + desktop-only remove button
+
+---
+
+## Feat: POS Favorites Dark Mode — Complete Coverage, Admin Override, Live Preview — 2026-02-21
+
+### Complete Dark Mode Coverage
+- Added `dark:` Tailwind variants to all 8 remaining colors in TILE_COLORS (fuchsia, lime, cyan, rose, teal, indigo, purple, pink)
+- All 72 tile color entries (12 colors x 6 shades) now have proper dark mode support
+- Extracted TILE_COLORS, TYPE_ICONS, getTileColors to shared `src/lib/pos/tile-colors.ts` — imported by both POS register-tab and admin favorites page
+
+### Per-Tile Dark Mode Override
+- Added optional `darkColor` and `darkColorShade` fields to `FavoriteItem` interface
+- POS register-tab uses `usePosTheme()` to detect dark mode and applies override color when set
+- Tiles without overrides use automatic `dark:` CSS variants (the default behavior)
+
+### Admin Settings UI
+- Added "Custom dark mode colors" checkbox to both Add and Edit forms
+- When enabled, shows dark color picker dots + dark shade dropdown
+- Live preview shows side-by-side Light/Dark tile previews (with Sun/Moon icons)
+- Preview updates in real-time as colors/shades change
+- Dark override color is saved to `business_settings` JSON; omitted when not enabled
+
+### Split Color Swatch in List
+- Tiles with dark override show a split circle (left = light color, right = dark color)
+- Tiles without override show a single color circle (enlarged to h-7 w-7)
+
+### Files Changed
+- `src/lib/pos/tile-colors.ts` — NEW: shared TILE_COLORS map with full dark coverage + TYPE_ICONS + getTileColors
+- `src/app/pos/types.ts` — added `darkColor`, `darkColorShade` to FavoriteItem
+- `src/app/pos/components/register-tab.tsx` — imports from shared module, dark override via usePosTheme
+- `src/app/admin/settings/pos-favorites/page.tsx` — dark mode override UI, FavoriteTilePreview, DarkModeOverride component, split swatch
+
+---
+
 ## Feat: POS Cache Busting, PWA Safe Area, Desktop-Only Fullscreen — 2026-02-21
 
 ### Cache Busting & Faster Refresh
