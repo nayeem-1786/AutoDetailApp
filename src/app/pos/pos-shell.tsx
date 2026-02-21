@@ -240,7 +240,7 @@ function PosShellContent({
   }, [dispatch, ticket.items.length, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen, router]);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-gray-100 dark:bg-gray-950">
+    <div className="flex h-dvh flex-col overflow-hidden bg-gray-100 dark:bg-gray-950 touch-manipulation pb-[env(safe-area-inset-bottom)]">
       {/* Offline indicator banner */}
       <OfflineIndicator />
 
@@ -389,7 +389,7 @@ function PosShellContent({
       </header>
 
       {/* Main Content */}
-      <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+      <main className="min-h-0 flex-1 overflow-hidden touch-pan-y">{children}</main>
 
       {/* Bottom Navigation */}
       <BottomNav />

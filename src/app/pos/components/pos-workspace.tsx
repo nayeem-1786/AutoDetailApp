@@ -144,7 +144,7 @@ export function PosWorkspace() {
   const isGlobalSearch = search && tab === 'register';
 
   return (
-    <div className="grid h-full grid-cols-[1fr_380px] grid-rows-[1fr]">
+    <div className="grid h-full min-h-0 grid-cols-[1fr_380px] grid-rows-[1fr]">
       {/* Left panel */}
       <div className="flex min-w-0 flex-col overflow-hidden">
         {/* Search bar */}
@@ -179,7 +179,7 @@ export function PosWorkspace() {
         </div>
 
         {/* Tab content */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y">
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />

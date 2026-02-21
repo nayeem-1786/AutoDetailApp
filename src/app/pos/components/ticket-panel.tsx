@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, type UIEvent } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -53,6 +53,25 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
   const [discountValue, setDiscountValue] = useState('');
   const [discountLabel, setDiscountLabel] = useState('');
+
+  // Scroll fade indicator state
+  const [showTopFade, setShowTopFade] = useState(false);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    setShowTopFade(el.scrollTop > 10);
+    setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 10);
+  }, []);
+
+  // Check initial scroll state when items change
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowTopFade(el.scrollTop > 10);
+    setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 10);
+  }, [ticket.items.length]);
 
   // Swipe-to-delete undo state
   const undoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -227,30 +246,48 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       </div>
 
       {/* Items list */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
-        {ticket.items.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
-            Tap items to add to ticket
-          </div>
-        ) : (
-          <div className="py-2">
-            <SwipeableCartList>
-              {ticket.items.map((item) => (
-                <SwipeableCartItemWrapper key={item.id} itemId={item.id}>
-                  <SwipeableCartItem
-                    itemId={item.id}
-                    itemName={item.itemName}
-                    disabled={checkoutOpen}
-                    onRemove={handleSwipeRemove}
-                    onUndo={handleSwipeUndo}
-                  >
-                    <TicketItemRow item={item} />
-                  </SwipeableCartItem>
-                </SwipeableCartItemWrapper>
-              ))}
-            </SwipeableCartList>
-          </div>
-        )}
+      <div className="relative min-h-0 flex-1">
+        {/* Top fade — shows when scrolled down */}
+        <div
+          className="pointer-events-none absolute top-0 right-0 left-0 z-10 h-4 bg-gradient-to-b from-white to-transparent transition-opacity dark:from-gray-900"
+          style={{ opacity: showTopFade ? 1 : 0 }}
+        />
+
+        <div
+          ref={scrollRef}
+          className="h-full overflow-y-auto overscroll-contain touch-pan-y px-4"
+          onScroll={handleScroll}
+        >
+          {ticket.items.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
+              Tap items to add to ticket
+            </div>
+          ) : (
+            <div className="py-2">
+              <SwipeableCartList>
+                {ticket.items.map((item) => (
+                  <SwipeableCartItemWrapper key={item.id} itemId={item.id}>
+                    <SwipeableCartItem
+                      itemId={item.id}
+                      itemName={item.itemName}
+                      disabled={checkoutOpen}
+                      onRemove={handleSwipeRemove}
+                      onUndo={handleSwipeUndo}
+                    >
+                      <TicketItemRow item={item} />
+                    </SwipeableCartItem>
+                  </SwipeableCartItemWrapper>
+                ))}
+              </SwipeableCartList>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom fade — shows when more content below */}
+        <div
+          className="pointer-events-none absolute right-0 bottom-0 left-0 z-10 h-4 bg-gradient-to-t from-white to-transparent transition-opacity dark:from-gray-900"
+          style={{ opacity: showBottomFade ? 1 : 0 }}
+        />
       </div>
 
       {/* Add-on Suggestions */}

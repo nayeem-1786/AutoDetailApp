@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Dark Mode Cleanup, Ticket Scroll UX, Fullscreen Gesture — 2026-02-21
+
+### Dark Mode — Theme Provider Cleanup
+Verified that `@custom-variant dark (.dark &)` in `globals.css` correctly generates class-based dark rules (`.dark .dark\:xxx` at specificity 0,2,0) in both production and Turbopack dev builds. Zero `@media (prefers-color-scheme: dark)` rules exist — the custom variant fully overrides the built-in. Removed the now-unnecessary `disableMediaQueryDarkRules()` function and its `MutationObserver` from `PosThemeProvider`. Provider now only: manages theme state in localStorage, resolves system preference, toggles `.dark` class on `<html>`, sets `color-scheme`.
+
+### Ticket Scroll — Fade Indicators
+Added top/bottom gradient fade indicators on the ticket items scroll container. Fades appear/disappear based on scroll position — top fade shows when scrolled down, bottom fade shows when more content below. Uses React state driven by `onScroll` handler + `useEffect` to initialize on item count changes.
+
+### Fullscreen Gesture Conflict
+Added `touch-manipulation` on the outer POS shell container (`h-dvh` div) to prevent Safari from interpreting any touch gesture within the POS as a system gesture (like "swipe down to exit fullscreen"). Combined with existing `touch-pan-y` on individual scroll containers (ticket panel, workspace catalog), this ensures fullscreen stays active during normal scrolling.
+
+### Bottom Nav Safe Area (Verified)
+Confirmed `viewportFit: 'cover'` (layout.tsx) and `pb-[env(safe-area-inset-bottom)]` (pos-shell.tsx outer container) were already in place. The flex-column layout with safe-area bottom padding ensures the bottom nav sits above the home indicator on Face ID iPads.
+
+### Files Changed
+- `src/app/pos/context/pos-theme-context.tsx` — Removed `disableMediaQueryDarkRules()` + MutationObserver (no longer needed)
+- `src/app/pos/components/ticket-panel.tsx` — Scroll fade indicators (top/bottom gradients)
+- `src/app/pos/pos-shell.tsx` — Added `touch-manipulation` to outer container
+
+---
+
 ## Fix: POS Dark Mode Toggle + Ticket Scroll — 2026-02-21
 
 ### Dark Mode Toggle (Root Cause Found + Fixed)
