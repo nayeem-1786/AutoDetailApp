@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Customer Portal Nav Cut Off by Main Header — 2026-02-20
+
+Fixed portal navigation tabs (Dashboard, Appointments, Vehicles, etc.) being obscured after the user dropdown menu was added to the site header.
+
+### Root Cause
+- `--ticker-height` CSS variable (set by announcement tickers on public pages) persisted on `:root` when navigating to account/auth pages. The sticky header used this variable for its `top` offset, causing it to stick at a non-zero position and overlap content.
+- Mobile menu (changed from conditional render to always-in-DOM CSS grid approach) added a visible `border-t` even when closed, contributing extra height to the header.
+
+### Fixes
+- **Ticker height cleanup**: `useTickerHeight` hook now resets `--ticker-height` to `0px` on unmount (previously only disconnected ResizeObserver)
+- **Account layout**: Set `--ticker-height: 0px` inline on wrapper div (belt-and-suspenders defense)
+- **Customer-auth layout**: Same `--ticker-height` reset applied
+- **Both layouts**: Now fetch and pass `navItems` to `SiteHeader` (was using hardcoded fallback nav)
+- **Account layout**: Added `pt-2` on `<main>` for breathing room between header and portal content
+- **Mobile menu border**: Changed from always-visible `border-site-border` to `border-transparent` when closed, preventing phantom 1px height addition
+
+### Files Changed
+- `src/app/(account)/layout.tsx` — ticker-height reset, navItems, main padding
+- `src/app/(customer-auth)/layout.tsx` — ticker-height reset, navItems
+- `src/components/public/header-client.tsx` — conditional mobile menu border
+- `src/components/public/cms/announcement-ticker.tsx` — cleanup resets --ticker-height
+
+---
+
 ## Fix: POS Popup UX — Backdrop Dismiss + Remove Redundant X Buttons — 2026-02-20
 
 iPad POS UX cleanup. All popups now dismiss on backdrop tap (standard iPad pattern). Redundant X/close buttons removed since backdrop dismiss is the primary close mechanism.

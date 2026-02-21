@@ -249,8 +249,8 @@ export function HeaderClient({
 
       {/* Mobile menu — CSS transition via grid row trick */}
       <div
-        className={`lg:hidden grid transition-[grid-template-rows] duration-300 border-t border-site-border bg-brand-dark ${
-          mobileOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        className={`lg:hidden grid transition-[grid-template-rows] duration-300 border-t bg-brand-dark ${
+          mobileOpen ? 'grid-rows-[1fr] border-site-border' : 'grid-rows-[0fr] border-transparent'
         }`}
       >
         <div className="overflow-hidden">

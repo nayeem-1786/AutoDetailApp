@@ -466,7 +466,10 @@ function useTickerHeight(ref: RefObject<HTMLDivElement | null>, active: boolean)
     observer.observe(el);
     updateHeight();
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.setProperty('--ticker-height', '0px');
+    };
   }, [ref, active]);
 }
 

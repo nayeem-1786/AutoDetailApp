@@ -6,17 +6,18 @@ import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrap
 import { CartDrawer } from '@/components/public/cart/cart-drawer';
 import { ThemeToggleInitializer } from '@/components/public/theme-toggle-initializer';
 import { getActiveTheme, getCmsToggles, getSiteThemeSettings } from '@/lib/data/cms';
-import { getFooterData } from '@/lib/data/website-pages';
+import { getNavigationItems, getFooterData } from '@/lib/data/website-pages';
 
 export default async function CustomerAuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [cmsToggles, activeTheme, siteTheme, footerData] = await Promise.all([
+  const [cmsToggles, activeTheme, siteTheme, headerNav, footerData] = await Promise.all([
     getCmsToggles(),
     getActiveTheme(),
     getSiteThemeSettings(),
+    getNavigationItems('header'),
     getFooterData(),
   ]);
 
@@ -30,8 +31,11 @@ export default async function CustomerAuthLayout({
     >
       <ThemeToggleInitializer />
       <CartProviderWrapper>
-        <div className="public-theme bg-brand-black text-site-text min-h-screen">
-          <SiteHeader />
+        <div
+          className="public-theme bg-brand-black text-site-text min-h-screen"
+          style={{ '--ticker-height': '0px' } as React.CSSProperties}
+        >
+          <SiteHeader navItems={headerNav} />
           <main className="min-h-[calc(100vh-4rem)]">
             <Suspense>{children}</Suspense>
           </main>
