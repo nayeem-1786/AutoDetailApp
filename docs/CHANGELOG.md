@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS Fullscreen Toggle Button — 2026-02-20
+
+Added a fullscreen toggle button to the POS header (between the clock and theme toggle). Uses the browser Fullscreen API with webkit prefix support for iPad Safari.
+
+- Press once to enter fullscreen, press again to exit
+- Icon switches between Maximize and Minimize
+- 44px touch target, dark mode support
+- Auto-hides when Fullscreen API is not available (e.g., standalone PWA mode)
+
+### Files Changed
+- `src/app/pos/components/fullscreen-toggle.tsx` — New component
+- `src/app/pos/pos-shell.tsx` — Import and render FullscreenToggle in header
+
+---
+
 ## Fix: POS Dark Mode Toggle Not Working — 2026-02-20
 
 POS dark mode was implemented (72 files, 1,864 `dark:` classes, `PosThemeProvider`, toggle buttons in header) but the toggle buttons produced no visual change.
