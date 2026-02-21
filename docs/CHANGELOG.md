@@ -4,6 +4,37 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Popups Dismiss on Backdrop Tap — 2026-02-20
+
+Standard iPad behavior: tapping outside a popup/modal should close it. Audited all POS popup components and fixed those missing backdrop dismiss.
+
+### Components Fixed (8 custom overlays + 1 dropdown)
+1. **pos-shell.tsx** — Keyboard Shortcuts overlay: added `onClick` on backdrop
+2. **held-tickets-panel.tsx** — Held tickets panel: added `onClick` on backdrop
+3. **checkout-overlay.tsx** — Checkout overlay: added backdrop dismiss when not processing/complete
+4. **job-detail.tsx** — Reassign Detailer modal: added backdrop dismiss
+5. **job-detail.tsx** — Edit Customer modal: added backdrop dismiss
+6. **job-detail.tsx** — Edit Vehicle modal: added backdrop dismiss
+7. **job-detail.tsx** — Edit Notes modal: added backdrop dismiss
+8. **job-detail.tsx** — Edit Services modal: added backdrop dismiss
+9. **bottom-nav.tsx** — "More" dropdown: added `touchstart` listener for iPad (had `mousedown` only)
+
+### Confirmation Dialogs — Correctly NOT Dismissible (verified)
+- Clear Ticket confirmation (`ticket-actions.tsx`)
+- Hold & Resume confirmation (`held-tickets-panel.tsx`)
+- Replace Coupon confirmation (`promotions-tab.tsx`)
+- Customer Pickup confirmation (`job-detail.tsx`)
+- Cancel Job / Cancel Reason (`job-detail.tsx`)
+- Void Transaction confirmation (`transaction-detail.tsx`)
+
+### Dialog Component Popups — Already Working (verified)
+All components using the custom `Dialog` from `@/components/ui/dialog` already had backdrop dismiss via `onClick={() => onOpenChange(false)}` on the overlay div. This includes: product-detail, service-detail-dialog, service-pricing-picker, customer-create-dialog, vehicle-create-dialog, customer-type-prompt, refund-dialog, quote-delete-dialog, quote-send-dialog, quote-book-dialog, send-method-dialog, and all Dialog-based customer/vehicle lookup panels.
+
+### Pattern
+For custom overlays: `onClick={dismiss}` on the backdrop `div`, `onClick={(e) => e.stopPropagation()}` on the content `div` to prevent bubbling.
+
+---
+
 ## Fix: POS Input Text Invisible on White Backgrounds — 2026-02-20
 
 ### Root Cause

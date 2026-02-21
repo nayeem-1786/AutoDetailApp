@@ -1216,8 +1216,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
       {/* Reassign Detailer Modal */}
       {showReassignModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowReassignModal(false)}>
+          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-5 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Reassign Detailer</h3>
@@ -1389,8 +1389,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
       {/* Edit Customer Modal */}
       {showEditCustomer && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowEditCustomer(false)}>
+          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-5 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Change Customer</h3>
@@ -1421,8 +1421,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
       {/* Edit Vehicle Modal */}
       {showEditVehicle && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowEditVehicle(false)}>
+          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-5 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Change Vehicle</h3>
@@ -1493,8 +1493,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
       {/* Edit Notes Modal */}
       {editingNotes && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setEditingNotes(false)}>
+          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-5 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Edit Notes</h3>
@@ -1537,8 +1537,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
       {/* Edit Services Modal */}
       {showEditServices && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-          <div className="flex w-full max-w-md flex-col rounded-t-xl bg-white shadow-xl sm:max-h-[80vh] sm:rounded-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowEditServices(false)}>
+          <div className="flex w-full max-w-md flex-col rounded-t-xl bg-white shadow-xl sm:max-h-[80vh] sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-5 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Edit Services</h3>

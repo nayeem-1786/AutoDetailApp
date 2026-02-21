@@ -17,8 +17,8 @@ export function CheckoutOverlay() {
   const canClose = !processing && step !== 'complete';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="relative h-full w-full bg-white md:h-[90vh] md:max-h-[700px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={canClose ? closeCheckout : undefined}>
+      <div className="relative h-full w-full bg-white md:h-[90vh] md:max-h-[700px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         {canClose && (
           <button

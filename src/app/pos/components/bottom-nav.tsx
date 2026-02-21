@@ -67,16 +67,20 @@ export function BottomNav() {
     router.replace('/pos/login');
   }
 
-  // Close more menu when clicking outside
+  // Close more menu when clicking/tapping outside
   useEffect(() => {
     if (!moreOpen) return;
-    function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent | TouchEvent) {
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
         setMoreOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
   }, [moreOpen]);
 
   return (
