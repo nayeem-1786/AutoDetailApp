@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Input Text Invisible on White Backgrounds — 2026-02-20
+
+### Root Cause
+- **`prefers-color-scheme: dark` media query** in `globals.css` changed `--foreground` to `#ededed` (light grey) when the browser/OS was in dark mode. Since `body { color: var(--foreground) }` applies globally, any input without an explicit text color inherited light grey text — invisible on white backgrounds.
+- **23 raw `<input>` and `<textarea>` elements** across 13 POS files had no explicit `text-*` class and relied on CSS inheritance from `body`.
+
+### Fixes
+1. **Removed unused `prefers-color-scheme: dark` media query** — a leftover from Next.js scaffolding. The app's theme system handles dark/light via `.public-theme` + `data-user-theme`, not `prefers-color-scheme`. Public pages use `--site-text`, not `--foreground`.
+2. **Added `text-gray-900` to all 23 vulnerable inputs** — every raw input/textarea in POS now declares its text color explicitly.
+
+### Also Fixed (same session)
+- **React hooks order violation** in `TransactionDetail`: `usePosPermission` was called after early returns, violating Rules of Hooks. Moved before conditional returns.
+- **Runtime TypeError** in `TransactionDetail`: `transaction.refunds.length` crashed when `refunds` was undefined. Added optional chaining on `refunds` and `payments`.
+
+### Files Changed
+- `src/app/globals.css` — removed `prefers-color-scheme: dark` block
+- `src/app/pos/components/search-bar.tsx` — `text-gray-900`
+- `src/app/pos/components/customer-lookup.tsx` — `text-gray-900`
+- `src/app/pos/components/keypad-tab.tsx` — `text-gray-900`
+- `src/app/pos/components/register-tab.tsx` — `text-gray-900`
+- `src/app/pos/components/checkout/tip-screen.tsx` — `text-gray-900`
+- `src/app/pos/components/checkout/cash-payment.tsx` — `text-gray-900`
+- `src/app/pos/components/checkout/check-payment.tsx` — `text-gray-900`
+- `src/app/pos/components/checkout/split-payment.tsx` — `text-gray-900`
+- `src/app/pos/components/transactions/transaction-list.tsx` — `text-gray-900` on 2 date inputs
+- `src/app/pos/end-of-day/page.tsx` — `text-gray-900` on notes textarea
+- `src/app/pos/jobs/components/flag-issue-flow.tsx` — `text-gray-900` on 8 inputs/textareas
+- `src/app/pos/jobs/components/job-detail.tsx` — `text-gray-900` on 1 search + 3 textareas
+- `src/app/pos/components/transactions/transaction-detail.tsx` — hooks order fix + optional chaining
+
+---
+
 ## Fix: Booking Time Slots Intermittently Empty — 2026-02-20
 
 ### Root Causes
