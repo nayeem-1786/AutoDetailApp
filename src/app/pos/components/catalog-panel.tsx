@@ -189,7 +189,7 @@ export function CatalogPanel() {
             selected={productCategoryId}
             onSelect={setProductCategoryId}
           />
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overscroll-contain">
             <ProductGrid
               products={filteredProducts}
               onTapProduct={handleTapProduct}
@@ -203,7 +203,7 @@ export function CatalogPanel() {
             selected={serviceCategoryId}
             onSelect={setServiceCategoryId}
           />
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overscroll-contain">
             <ServiceGrid
               services={filteredServices}
               vehicleSizeClass={vehicleSizeClass}

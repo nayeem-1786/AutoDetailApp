@@ -179,7 +179,7 @@ export function PosWorkspace() {
         </div>
 
         {/* Tab content */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />

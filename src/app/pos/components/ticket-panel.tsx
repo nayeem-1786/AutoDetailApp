@@ -227,7 +227,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       </div>
 
       {/* Items list */}
-      <div className="flex-1 overflow-y-auto px-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
         {ticket.items.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             Tap items to add to ticket

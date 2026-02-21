@@ -460,7 +460,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       </div>
 
       {/* Items list */}
-      <div className="flex-1 overflow-y-auto px-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
         {quote.items.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             Browse catalog to add items

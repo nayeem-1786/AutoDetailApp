@@ -293,7 +293,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         <h3 className="px-4 pt-2 text-base font-semibold text-gray-900 dark:text-gray-100">
           {browseState.categoryName}
         </h3>
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
           {type === 'products' ? (
             <ProductGrid
               products={categoryItems as CatalogProduct[]}

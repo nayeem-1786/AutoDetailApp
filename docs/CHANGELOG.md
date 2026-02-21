@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Fullscreen Scroll + Bottom Nav Cutoff — 2026-02-21
+
+### Ticket Sidebar Scroll Fix
+- Added `min-h-0` to ticket items scrollable div — critical for flex items to shrink below content height so `overflow-y-auto` activates
+- Added `overscroll-contain` to prevent scroll chaining — stops iPad Safari from exiting fullscreen when swiping down at top of scrolled ticket list
+- Applied to both `ticket-panel.tsx` and `quote-ticket-panel.tsx`
+
+### Overscroll Containment (All POS Scrollable Areas)
+- `pos-workspace.tsx`: Main content area
+- `catalog-browser.tsx`: Category browsing
+- `catalog-panel.tsx`: Product and service grids (2 instances)
+- `checkout-overlay.tsx`: Payment flow
+- Prevents ANY scroll area from accidentally triggering fullscreen exit on iPad
+
+### Bottom Nav Cutoff Fix
+- Changed `h-screen` to `h-dvh` on POS shell root container (`pos-shell.tsx`)
+- `h-dvh` (dynamic viewport height) accounts for browser chrome changes during fullscreen transitions on iPad Safari
+- Ensures bottom nav is always fully visible in both normal and fullscreen modes
+
+---
+
 ## Fix: POS Ticket State Lost on Page Refresh — 2026-02-20
 
 Customer info, vehicle, items, and discounts on the POS ticket disappeared on page refresh/reload because the ticket state (React `useReducer`) had no persistence.

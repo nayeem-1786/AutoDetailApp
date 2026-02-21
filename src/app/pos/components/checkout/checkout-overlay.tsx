@@ -34,7 +34,7 @@ export function CheckoutOverlay() {
         onTouchEnd={(e) => e.stopPropagation()}
       >
         {/* Step content */}
-        <div className="flex h-full flex-col overflow-y-auto">
+        <div className="flex h-full flex-col overflow-y-auto overscroll-contain">
           {step === 'payment-method' && <PaymentMethodScreen />}
           {step === 'cash' && <CashPayment />}
           {step === 'card' && <CardPayment />}
