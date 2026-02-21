@@ -284,37 +284,30 @@ Transactions are accessible via **one tap** from the bottom navigation bar, **pl
 
 ### 8. Dark Mode
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 
-**The POS is always light.** No dark mode support exists.
+**Implementation:** Tailwind `dark:` class variant strategy — completely independent from public site theme system.
 
-| Question | Answer |
-|----------|--------|
-| `dark:` classes in POS components? | ZERO (0 files with `dark:` in POS directory) |
-| `prefers-color-scheme` detection? | NO |
-| Theme toggle? | NO |
-| Uses site theme system? | NO — POS uses hardcoded `bg-white`, `text-gray-900`, etc. |
-| System preference detection? | NO |
-| Current color scheme | White backgrounds, gray-200 borders, gray-900 text |
+| Component | Details |
+|-----------|---------|
+| Dark variant | `@custom-variant dark` in globals.css — class-based, not media query |
+| Theme provider | `pos-theme-context.tsx` — light/dark/system toggle with localStorage persistence |
+| Dark class scope | `<div className="dark contents">` wrapper in PosThemeProvider — only affects POS descendants |
+| Toggle location | POS header, between clock and shortcuts button — Sun/Moon/Monitor icons, 44px touch targets |
+| Files modified | 72 POS `.tsx` files, ~1,864 dark: classes added |
+| PIN screen | Exempted — already dark-themed (bg-gray-900), no dark: overrides applied |
+| Receipt template | Unaffected — generated as HTML in separate window, always light |
+| Public site | Completely isolated — uses `.public-theme` + CSS variables, no `dark` class |
 
-**Color palette currently used in POS:**
-- Backgrounds: `bg-white`, `bg-gray-50`, `bg-gray-100`
-- Text: `text-gray-900`, `text-gray-700`, `text-gray-500`, `text-gray-400`
-- Borders: `border-gray-200`, `border-gray-100`
-- Accents: `text-blue-600` (active nav), `bg-green-600` (checkout), `bg-amber-*` (focus rings)
-- PIN screen: `bg-gray-900` (already dark)
-
-**Site has a contextual UI variable system** (`--ui-bg`, `--ui-text`, etc. in globals.css) but POS does NOT use it. POS uses direct Tailwind color classes everywhere.
-
-**Public site already supports dark/light toggle** via `.public-theme` and `data-user-theme="light"`. The POS is outside this system entirely.
-
-**Receipt template:** Uses light-only styling (matches printed output) — should remain light per iPAD.md spec.
-
-**Estimated effort:** 15-20 hours
-- Design dark palette: 2 hours
-- Refactor POS to use CSS variables or `dark:` variants: 8-12 hours (128 files to audit)
-- Theme toggle + persistence: 2 hours
-- Testing all screens: 3-4 hours
+**Dark palette mapping:**
+- Shell root: `bg-gray-100` → `dark:bg-gray-950` (darkest level)
+- Cards/surfaces: `bg-white` → `dark:bg-gray-900` (elevated)
+- Subtle sections: `bg-gray-50`/`bg-gray-100` → `dark:bg-gray-800`
+- Hover states: `bg-gray-200` → `dark:bg-gray-700`
+- Primary text: `text-gray-900` → `dark:text-gray-100`
+- Secondary text: `text-gray-600` → `dark:text-gray-400`
+- Borders: `border-gray-200` → `dark:border-gray-700`
+- Status colors: Light tints → dark tints with opacity (e.g., `bg-green-50` → `dark:bg-green-900/30`)
 
 ---
 
@@ -355,7 +348,7 @@ Based on current state — prioritized by value/effort ratio:
 | 5 | Swipe-to-delete | ✅ Done | — | Medium | framer-motion swipe + undo toast |
 | 6 | Recent transactions | ✅ Done | — | Medium | Header dropdown + deep-link to detail |
 | 7 | PWA + offline | ✅ Done | — | High | Manifest, SW, offline queue, auto-sync |
-| 8 | Dark mode | ❌ Not started | 15-20 hrs | Low-Med | Large refactor; POS uses hardcoded colors |
+| 8 | Dark mode | ✅ Done | — | Low-Med | 72 files, ~1,864 dark: classes, independent theme toggle |
 
 **Total estimated effort:** 47-67 hours (excluding the 2 already-complete features)
 

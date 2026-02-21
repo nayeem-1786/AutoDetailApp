@@ -30,7 +30,7 @@ export function CategoryTabs({
     <div className="relative flex items-center gap-1">
       <button
         onClick={() => scroll('left')}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
@@ -46,7 +46,7 @@ export function CategoryTabs({
             'min-h-[44px] min-w-[44px]',
             selected === null
               ? 'bg-gray-900 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
           )}
         >
           All
@@ -60,7 +60,7 @@ export function CategoryTabs({
               'min-h-[44px] min-w-[44px]',
               selected === cat.id
                 ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
             )}
           >
             {cat.name}
@@ -70,7 +70,7 @@ export function CategoryTabs({
 
       <button
         onClick={() => scroll('right')}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
       >
         <ChevronRight className="h-5 w-5" />
       </button>

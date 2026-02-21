@@ -53,14 +53,14 @@ export function ZonePhotosView({
     return (
       <div className="flex h-full flex-col bg-black">
         <div className="flex items-center justify-between bg-gray-900 px-4 py-2">
-          <button onClick={() => setSelectedPhoto(null)} className="text-gray-300 hover:text-white">
+          <button onClick={() => setSelectedPhoto(null)} className="text-gray-300 dark:text-gray-500 hover:text-white">
             <X className="h-5 w-5" />
           </button>
-          <span className="text-sm text-gray-300">{getZoneLabel(zone)}</span>
+          <span className="text-sm text-gray-300 dark:text-gray-500">{getZoneLabel(zone)}</span>
           <button
             onClick={() => handleDelete(selectedPhoto.id)}
             disabled={deleting === selectedPhoto.id}
-            className="text-red-400 hover:text-red-300 disabled:opacity-50"
+            className="text-red-400 dark:text-red-300 hover:text-red-300 dark:hover:text-red-400 disabled:opacity-50"
           >
             <Trash2 className="h-5 w-5" />
           </button>
@@ -75,12 +75,12 @@ export function ZonePhotosView({
           {annotations.length > 0 && <AnnotationOverlay annotations={annotations} />}
         </div>
         {selectedPhoto.notes && (
-          <div className="bg-gray-900 px-4 py-2 text-sm text-gray-300">
+          <div className="bg-gray-900 px-4 py-2 text-sm text-gray-300 dark:text-gray-500">
             {selectedPhoto.notes}
           </div>
         )}
         {selectedPhoto.is_internal && (
-          <div className="bg-amber-900/50 px-4 py-1 text-center text-xs text-amber-300">
+          <div className="bg-amber-900/50 px-4 py-1 text-center text-xs text-amber-300 dark:text-amber-400">
             Internal Only
           </div>
         )}
@@ -91,19 +91,19 @@ export function ZonePhotosView({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-        <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100">
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
+      <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+        <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+          <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
         </button>
         <div className="flex-1">
-          <h2 className="text-lg font-semibold text-gray-900">{getZoneLabel(zone)}</h2>
-          <p className="text-xs text-gray-500">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{getZoneLabel(zone)}</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             {photos.length} photo{photos.length !== 1 ? 's' : ''}
           </p>
         </div>
         <button
           onClick={onAddPhoto}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
         >
           <Plus className="h-4 w-4" />
           Add
@@ -111,14 +111,14 @@ export function ZonePhotosView({
       </div>
 
       {/* Photo grid */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
         {photos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Camera className="mb-3 h-10 w-10 text-gray-300" />
-            <p className="text-sm text-gray-500">No photos yet</p>
+            <Camera className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-500" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">No photos yet</p>
             <button
               onClick={onAddPhoto}
-              className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="mt-3 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
             >
               Take Photo
             </button>
@@ -131,7 +131,7 @@ export function ZonePhotosView({
                 <button
                   key={photo.id}
                   onClick={() => setSelectedPhoto(photo)}
-                  className="group relative aspect-square overflow-hidden rounded-lg bg-gray-200"
+                  className="group relative aspect-square overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -140,7 +140,7 @@ export function ZonePhotosView({
                     className="h-full w-full object-cover"
                   />
                   {annotations.length > 0 && (
-                    <div className="absolute right-1 top-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    <div className="absolute right-1 top-1 rounded-full bg-red-600 dark:bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                       {annotations.length}
                     </div>
                   )}

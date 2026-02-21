@@ -51,7 +51,7 @@ export function KeypadTab() {
         <span
           className={cn(
             'tabular-nums font-bold',
-            cents === 0 ? 'text-gray-300' : 'text-gray-900',
+            cents === 0 ? 'text-gray-300 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100',
             display.length > 8 ? 'text-4xl' : 'text-5xl'
           )}
         >
@@ -62,19 +62,19 @@ export function KeypadTab() {
       {/* Note toggle / input */}
       <div className="mb-4 w-full max-w-xs">
         {showNote ? (
-          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2">
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Item description..."
-              className="flex-1 bg-transparent text-sm text-gray-900 outline-none"
+              className="flex-1 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none"
               maxLength={100}
               autoFocus
             />
             <button
               onClick={() => { setNote(''); setShowNote(false); }}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400"
             >
               <X className="h-4 w-4" />
             </button>
@@ -82,7 +82,7 @@ export function KeypadTab() {
         ) : (
           <button
             onClick={() => setShowNote(true)}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
           >
             <MessageSquarePlus className="h-4 w-4" />
             + Note

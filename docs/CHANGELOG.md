@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS Dark Mode — 2026-02-20
+
+iPad optimization (Phase 12, item 8 from audit). Independent dark mode for the POS system with light/dark/system toggle.
+
+### Theme Infrastructure
+- `@custom-variant dark` in globals.css — class-based dark mode scoped to POS only (not media query)
+- `PosThemeProvider` context (`pos-theme-context.tsx`) — manages theme state, resolves system preference
+- Wrapper `<div className="dark contents">` applies the dark class without affecting layout
+- localStorage persistence (`pos-theme` key) — preference per device, survives refresh
+- System preference detection via `matchMedia('prefers-color-scheme: dark')` with live listener
+
+### Theme Toggle
+- Three-button toggle (Sun/Moon/Monitor) in POS header between clock and shortcuts button
+- All buttons are 44px minimum touch targets (iPad HIG compliant)
+- Active state highlighted with white/gray-700 background + shadow
+
+### Dark Mode Classes
+- 72 POS files modified, ~1,864 `dark:` Tailwind classes added
+- Comprehensive color mapping: backgrounds, text, borders, shadows, status colors, hover/focus states
+- Shell root uses `dark:bg-gray-950` (darkest) while cards use `dark:bg-gray-900` (elevated hierarchy)
+- Status colors use opacity-based dark tints (e.g., `bg-green-50` → `dark:bg-green-900/30`)
+
+### Exclusions
+- PIN screen: Exempted from dark mode — already dark-themed (bg-gray-900 background, white text)
+- Receipt template: Unaffected — rendered in separate browser window, always matches printed output
+- Public site: Completely isolated — uses `.public-theme` + CSS variables, no `dark` class leak
+
+---
+
 ## Feat: POS PWA with Offline Support — 2026-02-20
 
 iPad optimization (Phase 12, item 4 from audit). Full PWA infrastructure for "Add to Home Screen" on iPad and offline cash transactions.

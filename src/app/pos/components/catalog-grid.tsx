@@ -11,7 +11,7 @@ interface ProductGridProps {
 export function ProductGrid({ products, onTapProduct }: ProductGridProps) {
   if (products.length === 0) {
     return (
-      <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+      <div className="flex h-40 items-center justify-center text-sm text-gray-400 dark:text-gray-500">
         No products found
       </div>
     );
@@ -42,7 +42,7 @@ export function ServiceGrid({
 }: ServiceGridProps) {
   if (services.length === 0) {
     return (
-      <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+      <div className="flex h-40 items-center justify-center text-sm text-gray-400 dark:text-gray-500">
         No services found
       </div>
     );

@@ -16,19 +16,19 @@ export function ProductCard({ product, onTap }: ProductCardProps) {
     <button
       onClick={() => onTap(product)}
       className={cn(
-        'flex flex-col items-start gap-1 rounded-lg border border-gray-200 bg-white p-3 text-left transition-all',
-        'min-h-[80px] active:scale-[0.98] active:bg-gray-50',
-        'hover:border-gray-300 hover:shadow-sm'
+        'flex flex-col items-start gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left transition-all',
+        'min-h-[80px] active:scale-[0.98] active:bg-gray-50 dark:active:bg-gray-800',
+        'hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm dark:hover:shadow-gray-950/30'
       )}
     >
-      <span className="text-sm font-medium text-gray-900 line-clamp-2">
+      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
         {product.name}
       </span>
-      <span className="text-sm font-semibold text-gray-700">
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
         ${product.retail_price.toFixed(2)}
       </span>
       {product.quantity_on_hand <= 0 && (
-        <span className="text-xs text-red-500">Out of stock</span>
+        <span className="text-xs text-red-500 dark:text-red-400">Out of stock</span>
       )}
     </button>
   );
@@ -57,19 +57,19 @@ export function ServiceCard({
         'relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all',
         'min-h-[80px] active:scale-[0.98]',
         isAdded
-          ? 'border-green-300 bg-green-50 hover:border-green-400'
-          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm active:bg-gray-50'
+          ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30 hover:border-green-400 dark:hover:border-green-600'
+          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm dark:hover:shadow-gray-950/30 active:bg-gray-50 dark:active:bg-gray-800'
       )}
     >
       {isAdded && (
-        <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-green-500">
+        <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 dark:bg-green-600">
           <Check className="h-3 w-3 text-white" />
         </span>
       )}
-      <span className="text-sm font-medium text-gray-900 line-clamp-2">
+      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
         {service.name}
       </span>
-      <span className="text-sm font-semibold text-gray-700">
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
         {priceDisplay}
       </span>
     </button>

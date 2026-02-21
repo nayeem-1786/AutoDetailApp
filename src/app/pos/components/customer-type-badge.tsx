@@ -10,10 +10,10 @@ export type { CustomerType };
 const TYPE_CONFIG = {
   enthusiast: {
     label: 'Enthusiast',
-    bg: 'bg-blue-50',
-    text: 'text-blue-700',
-    border: 'border-blue-200',
-    dot: 'bg-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-900/30',
+    text: 'text-blue-700 dark:text-blue-400',
+    border: 'border-blue-200 dark:border-blue-800',
+    dot: 'bg-blue-500 dark:bg-blue-600',
   },
   professional: {
     label: 'Professional',
@@ -92,9 +92,9 @@ export function CustomerTypeBadge({
       <button
         onClick={handleToggle}
         disabled={saving}
-        className={`inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 font-medium text-gray-400 hover:border-gray-400 hover:text-gray-600 ${sizeClasses} ${saving ? 'opacity-50' : ''}`}
+        className={`inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 dark:border-gray-600 font-medium text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-600 dark:hover:text-gray-400 ${sizeClasses} ${saving ? 'opacity-50' : ''}`}
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-300 dark:bg-gray-600" />
         Unknown
       </button>
     );

@@ -37,16 +37,16 @@ function MetricCard({
   detail?: string;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
       <div className="flex items-center gap-2">
         <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconBg}`}>
           <Icon className={`h-4 w-4 ${iconColor}`} />
         </div>
-        <span className="text-xs font-medium text-gray-500">{label}</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-bold tabular-nums text-gray-900">{value}</p>
+      <p className="mt-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{value}</p>
       {detail && (
-        <p className="mt-0.5 text-xs text-gray-500">{detail}</p>
+        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{detail}</p>
       )}
     </div>
   );
@@ -56,14 +56,14 @@ export function DaySummary({ summary, loading }: DaySummaryProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />
       </div>
     );
   }
 
   if (!summary) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
         No data for this day
       </div>
     );
@@ -76,16 +76,16 @@ export function DaySummary({ summary, loading }: DaySummaryProps) {
     <div className="grid grid-cols-2 gap-3">
       <MetricCard
         icon={DollarSign}
-        iconBg="bg-green-50"
-        iconColor="text-green-600"
+        iconBg="bg-green-50 dark:bg-green-900/30"
+        iconColor="text-green-600 dark:text-green-400"
         label="Total Revenue"
         value={formatCurrency(summary.total_revenue)}
         detail={`${formatCurrency(summary.total_tips)} in tips`}
       />
       <MetricCard
         icon={Receipt}
-        iconBg="bg-blue-50"
-        iconColor="text-blue-600"
+        iconBg="bg-blue-50 dark:bg-blue-900/30"
+        iconColor="text-blue-600 dark:text-blue-400"
         label="Transactions"
         value={String(summary.total_transactions)}
         detail={summary.total_refunds > 0 ? `${formatCurrency(summary.total_refunds)} refunds` : undefined}

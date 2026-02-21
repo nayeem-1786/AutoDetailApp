@@ -91,9 +91,9 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
   const subText = subParts.join(' \u00B7 ');
 
   return (
-    <div className="border-b border-gray-100 py-2">
+    <div className="border-b border-gray-100 dark:border-gray-800 py-2">
       {/* Line 1: Full item name */}
-      <p className="text-sm font-medium leading-snug text-gray-900">
+      <p className="text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">
         {item.itemName}
       </p>
 
@@ -102,7 +102,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
         {/* Left: sub-text + note icon */}
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {subText && (
-            <span className="truncate text-xs text-gray-500">{subText}</span>
+            <span className="truncate text-xs text-gray-500 dark:text-gray-400">{subText}</span>
           )}
           <button
             onClick={() => {
@@ -111,8 +111,8 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
             }}
             className={`shrink-0 flex h-11 w-11 items-center justify-center rounded ${
               item.notes
-                ? 'text-amber-500 hover:text-amber-600'
-                : 'text-gray-300 hover:text-gray-500'
+                ? 'text-amber-500 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400'
+                : 'text-gray-300 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
             }`}
             title={item.notes ? `Note: ${item.notes}` : 'Add note'}
           >
@@ -131,11 +131,11 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                     ? dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: item.id, perUnitQty: item.perUnitQty! - 1 })
                     : dispatch({ type: 'REMOVE_ITEM', itemId: item.id })
                 }
-                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               >
                 <Minus className="h-4 w-4" />
               </button>
-              <span className="flex h-11 min-w-[44px] items-center justify-center px-1 text-sm tabular-nums text-gray-900">
+              <span className="flex h-11 min-w-[44px] items-center justify-center px-1 text-sm tabular-nums text-gray-900 dark:text-gray-100">
                 {item.perUnitQty}
               </span>
               <button
@@ -148,8 +148,8 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                 disabled={item.perUnitQty! >= (item.perUnitMax ?? 10)}
                 className={`flex h-11 w-11 items-center justify-center rounded ${
                   item.perUnitQty! >= (item.perUnitMax ?? 10)
-                    ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-gray-50 dark:bg-gray-800 text-gray-300 dark:text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
                 <Plus className="h-4 w-4" />
@@ -157,7 +157,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
             </>
           ) : item.itemType === 'service' ? (
             /* Regular service: no stepper — always qty 1 */
-            <span className="flex h-11 min-w-[44px] items-center justify-center px-1 text-sm tabular-nums text-gray-400">
+            <span className="flex h-11 min-w-[44px] items-center justify-center px-1 text-sm tabular-nums text-gray-400 dark:text-gray-500">
               1
             </span>
           ) : (
@@ -171,7 +171,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                     quantity: item.quantity - 1,
                   })
                 }
-                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               >
                 <Minus className="h-4 w-4" />
               </button>
@@ -191,13 +191,13 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                     if (e.key === 'Enter') commitEdit();
                     if (e.key === 'Escape') setEditing(false);
                   }}
-                  className="h-11 w-14 rounded border border-blue-400 bg-white text-center text-sm tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-blue-300"
+                  className="h-11 w-14 rounded border border-blue-400 bg-white dark:bg-gray-900 text-center text-sm tabular-nums text-gray-900 dark:text-gray-100 outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-700"
                   autoFocus
                 />
               ) : (
                 <button
                   onClick={startEditing}
-                  className="flex h-11 min-w-[44px] items-center justify-center rounded px-1 text-sm tabular-nums text-gray-900 hover:bg-blue-50 hover:text-blue-700"
+                  className="flex h-11 min-w-[44px] items-center justify-center rounded px-1 text-sm tabular-nums text-gray-900 dark:text-gray-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400"
                 >
                   {item.quantity}
                 </button>
@@ -210,7 +210,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                     quantity: item.quantity + 1,
                   })
                 }
-                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -219,11 +219,11 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
 
           {/* Price */}
           <div className="w-16 text-right">
-            <p className="text-sm font-medium tabular-nums text-gray-900">
+            <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
               ${item.totalPrice.toFixed(2)}
             </p>
             {item.taxAmount > 0 && (
-              <p className="text-xs tabular-nums text-gray-400">
+              <p className="text-xs tabular-nums text-gray-400 dark:text-gray-500">
                 +${item.taxAmount.toFixed(2)}
               </p>
             )}
@@ -232,7 +232,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
           {/* Remove */}
           <button
             onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: item.id })}
-            className="flex h-11 w-11 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
+            className="flex h-11 w-11 items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400"
           >
             <X className="h-4 w-4" />
           </button>
@@ -241,7 +241,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
 
       {/* Note text (when exists and note input is closed) */}
       {item.notes && !noteOpen && (
-        <p className="mt-0.5 truncate text-xs text-gray-400 italic">
+        <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500 italic">
           {item.notes}
         </p>
       )}
@@ -258,11 +258,11 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
             onKeyDown={handleNoteKeyDown}
             placeholder="Add a note..."
             maxLength={200}
-            className="min-h-[44px] min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+            className="min-h-[44px] min-w-0 flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 dark:focus:ring-blue-800"
           />
           <button
             onClick={handleNoteSave}
-            className="min-h-[44px] shrink-0 rounded bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600"
+            className="min-h-[44px] shrink-0 rounded bg-blue-500 dark:bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600 dark:hover:bg-blue-500"
           >
             Save
           </button>
@@ -271,7 +271,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
               setNoteValue(item.notes ?? '');
               setNoteOpen(false);
             }}
-            className="min-h-[44px] shrink-0 rounded px-3 py-2 text-xs text-gray-500 hover:bg-gray-100"
+            className="min-h-[44px] shrink-0 rounded px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             Cancel
           </button>

@@ -107,11 +107,11 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-        <h1 className="text-lg font-semibold text-gray-900">Quotes</h1>
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quotes</h1>
         <button
           onClick={onNewQuote}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
         >
           <Plus className="h-4 w-4" />
           New Quote
@@ -119,7 +119,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
       </div>
 
       {/* Search + Filters */}
-      <div className="shrink-0 space-y-3 border-b border-gray-200 bg-white px-4 py-3">
+      <div className="shrink-0 space-y-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         {/* Status tabs */}
         <div className="flex flex-wrap gap-2">
           {TABS.map((tab) => (
@@ -133,7 +133,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
                 'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                 statusFilter === tab.key
                   ? 'bg-gray-900 text-white'
-                  : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                  : 'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
               )}
             >
               {tab.label}
@@ -143,13 +143,13 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
 
         {/* Search bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by quote #, customer name, or phone..."
-            className="h-9 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-blue-300 focus:bg-white focus:ring-1 focus:ring-blue-200"
+            className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:border-blue-300 dark:focus:border-blue-700 focus:bg-white dark:focus:bg-gray-900 focus:ring-1 focus:ring-blue-200 dark:focus:ring-blue-800"
           />
         </div>
       </div>
@@ -158,14 +158,14 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />
           </div>
         ) : quotes.length === 0 ? (
           <div className="flex h-40 flex-col items-center justify-center gap-2">
-            <p className="text-sm text-gray-400">No quotes found</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500">No quotes found</p>
             <button
               onClick={onNewQuote}
-              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
             >
               Create your first quote
             </button>
@@ -173,8 +173,8 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
         ) : (
           <>
             {/* Showing count */}
-            <div className="border-b border-gray-200 px-4 py-2">
-              <p className="text-xs text-gray-500">
+            <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Showing {startIndex + 1}-{Math.min(startIndex + limit, total)} of {total}
               </p>
             </div>
@@ -182,7 +182,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Quote #</th>
                     <th className="px-4 py-3">Customer</th>
@@ -192,7 +192,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
                     <th className="px-4 py-3 text-right">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {quotes.map((quote) => {
                     const badge = STATUS_BADGE_CONFIG[quote.status];
                     const customerName = quote.customer
@@ -206,22 +206,22 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
                       <tr
                         key={quote.id}
                         onClick={() => onSelect(quote.id)}
-                        className="cursor-pointer transition-colors hover:bg-gray-50"
+                        className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
                         <td
-                          className="whitespace-nowrap px-4 py-3 text-gray-600"
+                          className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400"
                           title={new Date(quote.created_at).toLocaleString()}
                         >
                           {formatRelativeDate(quote.created_at)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
+                        <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                           {quote.quote_number}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
                           {customerName}
                         </td>
                         <td
-                          className="max-w-[200px] truncate px-4 py-3 text-gray-600"
+                          className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400"
                           title={
                             quote.items
                               ?.map((i) => i.item_name)
@@ -235,18 +235,18 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
                                 .map((i) => i.item_name)
                                 .join(', ')}
                               {quote.items.length > 2 && (
-                                <span className="text-gray-400">
+                                <span className="text-gray-400 dark:text-gray-500">
                                   {' '}
                                   +{quote.items.length - 2}
                                 </span>
                               )}
                             </>
                           ) : (
-                            <span className="text-gray-400">--</span>
+                            <span className="text-gray-400 dark:text-gray-500">--</span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                          {vehicleStr || <span className="text-gray-400">--</span>}
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {vehicleStr || <span className="text-gray-400 dark:text-gray-500">--</span>}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <span
@@ -259,7 +259,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
                             {badge.label}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900">
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900 dark:text-gray-100">
                           {formatCurrency(quote.total_amount)}
                         </td>
                       </tr>
@@ -274,15 +274,15 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-3">
-          <p className="text-sm text-gray-600">
+        <div className="flex shrink-0 items-center justify-between border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Page {page} of {totalPages}
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" />
               Previous
@@ -290,7 +290,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
             >
               Next
               <ChevronRight className="h-4 w-4" />

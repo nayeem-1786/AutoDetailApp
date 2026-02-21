@@ -121,8 +121,8 @@ export function PhotoAnnotation({
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium',
               activeTool === 'circle'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                ? 'bg-red-600 dark:bg-red-500 text-white'
+                : 'bg-gray-700 text-gray-300 dark:text-gray-500 hover:bg-gray-600'
             )}
           >
             <Circle className="h-4 w-4" />
@@ -133,8 +133,8 @@ export function PhotoAnnotation({
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium',
               activeTool === 'arrow'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                ? 'bg-red-600 dark:bg-red-500 text-white'
+                : 'bg-gray-700 text-gray-300 dark:text-gray-500 hover:bg-gray-600'
             )}
           >
             <ArrowUpRight className="h-4 w-4" />
@@ -145,8 +145,8 @@ export function PhotoAnnotation({
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium',
               activeTool === 'text'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                ? 'bg-red-600 dark:bg-red-500 text-white'
+                : 'bg-gray-700 text-gray-300 dark:text-gray-500 hover:bg-gray-600'
             )}
           >
             <Type className="h-4 w-4" />
@@ -157,14 +157,14 @@ export function PhotoAnnotation({
           <button
             onClick={handleUndo}
             disabled={annotations.length === 0}
-            className="rounded-lg bg-gray-700 px-2 py-2 text-gray-300 hover:bg-gray-600 disabled:opacity-30"
+            className="rounded-lg bg-gray-700 px-2 py-2 text-gray-300 dark:text-gray-500 hover:bg-gray-600 disabled:opacity-30"
           >
             <Undo2 className="h-4 w-4" />
           </button>
           <button
             onClick={handleClearAll}
             disabled={annotations.length === 0}
-            className="rounded-lg bg-gray-700 px-2 py-2 text-gray-300 hover:bg-gray-600 disabled:opacity-30"
+            className="rounded-lg bg-gray-700 px-2 py-2 text-gray-300 dark:text-gray-500 hover:bg-gray-600 disabled:opacity-30"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -279,12 +279,12 @@ export function PhotoAnnotation({
                 }
               }}
               placeholder="Label..."
-              className="w-32 rounded border border-red-500 bg-white px-2 py-1 text-xs text-gray-900 focus:outline-none"
+              className="w-32 rounded border border-red-500 dark:border-red-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs text-gray-900 dark:text-gray-100 focus:outline-none"
               autoFocus
             />
             <button
               onClick={handleTextSubmit}
-              className="rounded bg-red-600 p-1 text-white"
+              className="rounded bg-red-600 dark:bg-red-500 p-1 text-white"
             >
               <Check className="h-3 w-3" />
             </button>
@@ -294,7 +294,7 @@ export function PhotoAnnotation({
 
       {/* Active tool hint */}
       {activeTool && (
-        <div className="bg-gray-900 px-3 py-1.5 text-center text-xs text-gray-400">
+        <div className="bg-gray-900 px-3 py-1.5 text-center text-xs text-gray-400 dark:text-gray-500">
           {activeTool === 'circle' && 'Tap and drag to draw a circle'}
           {activeTool === 'arrow' && 'Tap and drag to draw an arrow'}
           {activeTool === 'text' && 'Tap to place a text label'}
@@ -305,13 +305,13 @@ export function PhotoAnnotation({
       <div className="flex gap-2 bg-gray-900 px-3 py-3">
         <button
           onClick={onCancel}
-          className="flex-1 rounded-lg border border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-gray-800"
+          className="flex-1 rounded-lg border border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-300 dark:text-gray-500 hover:bg-gray-800"
         >
           Cancel
         </button>
         <button
           onClick={() => onSave(annotations)}
-          className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="flex-1 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
         >
           Done ({annotations.length})
         </button>

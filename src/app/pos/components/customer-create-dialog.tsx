@@ -25,7 +25,7 @@ interface CustomerCreateDialogProps {
 }
 
 const TYPE_OPTIONS: { value: CustomerType | null; label: string; activeClass: string }[] = [
-  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'bg-blue-600 text-white border-blue-600' },
+  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500' },
   { value: 'professional', label: 'Professional', activeClass: 'bg-purple-600 text-white border-purple-600' },
   { value: null, label: 'Unknown', activeClass: 'bg-gray-900 text-white border-gray-900' },
 ];
@@ -104,7 +104,7 @@ export function CustomerCreateDialog({
           <button
             type="button"
             onClick={handleBack}
-            className="mb-1 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+            className="mb-1 flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to search
@@ -116,7 +116,7 @@ export function CustomerCreateDialog({
         <DialogContent className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 First Name
               </label>
               <Input
@@ -127,7 +127,7 @@ export function CustomerCreateDialog({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Last Name
               </label>
               <Input
@@ -138,7 +138,7 @@ export function CustomerCreateDialog({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
               Mobile
             </label>
             <Input
@@ -149,7 +149,7 @@ export function CustomerCreateDialog({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
               Customer Type
             </label>
             <div className="flex gap-2">
@@ -161,7 +161,7 @@ export function CustomerCreateDialog({
                   className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                     customerType === opt.value
                       ? opt.activeClass
-                      : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
                   {opt.label}

@@ -16,7 +16,7 @@ export function CategoryTile({ name, itemCount, imageUrl, onClick }: CategoryTil
       className={cn(
         'relative flex flex-col justify-end overflow-hidden rounded-xl text-left transition-all',
         'min-h-[120px] active:scale-[0.98]',
-        'hover:shadow-md'
+        'hover:shadow-md dark:hover:shadow-gray-950/40'
       )}
     >
       {/* Background */}
@@ -35,7 +35,7 @@ export function CategoryTile({ name, itemCount, imageUrl, onClick }: CategoryTil
       {/* Content */}
       <div className="relative p-3">
         <span className="block text-sm font-semibold text-white">{name}</span>
-        <span className="block text-xs text-gray-300">
+        <span className="block text-xs text-gray-300 dark:text-gray-500">
           {itemCount} {itemCount === 1 ? 'item' : 'items'}
         </span>
       </div>

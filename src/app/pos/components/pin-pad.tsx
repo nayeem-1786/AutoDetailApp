@@ -52,18 +52,18 @@ export function PinPad({
               'active:scale-[0.97]',
               isDark
                 ? 'border-gray-600 bg-gray-800 text-white hover:bg-gray-700 active:bg-gray-600'
-                : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 active:bg-gray-100',
+                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800',
               isSm
                 ? 'min-h-[44px] rounded-lg text-base'
                 : isLg
                   ? 'min-h-[72px] rounded-xl text-2xl'
                   : 'min-h-[60px] rounded-xl text-xl',
-              key === '.' && (isDark ? 'text-gray-500' : 'text-gray-400')
+              key === '.' && (isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500')
             )}
           >
             {key === 'backspace' ? (
               <Delete className={cn(
-                isDark ? 'text-gray-400' : 'text-gray-500',
+                isDark ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400',
                 isSm ? 'h-4 w-4' : isLg ? 'h-7 w-7' : 'h-5 w-5',
               )} />
             ) : (
@@ -78,8 +78,8 @@ export function PinPad({
           type="button"
           onClick={onAction}
           className={cn(
-            'w-full bg-blue-600 font-semibold text-white transition-all',
-            'hover:bg-blue-700 active:scale-[0.99]',
+            'w-full bg-blue-600 dark:bg-blue-500 font-semibold text-white transition-all',
+            'hover:bg-blue-700 dark:hover:bg-blue-600 active:scale-[0.99]',
             isSm
               ? 'mt-0.5 min-h-[44px] rounded-lg text-sm'
               : isLg

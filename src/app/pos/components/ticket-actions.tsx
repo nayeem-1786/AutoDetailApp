@@ -42,7 +42,7 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
 
   return (
     <>
-      <div className="flex gap-2 border-t border-gray-200 pt-3">
+      <div className="flex gap-2 border-t border-gray-200 dark:border-gray-700 pt-3">
         <Button
           variant="outline"
           className="flex-1"
@@ -61,7 +61,7 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
           <PauseCircle className="h-4 w-4" />
         </Button>
         <Button
-          className="flex-1 bg-green-600 hover:bg-green-700"
+          className="flex-1 bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
           disabled={!hasItems}
           onClick={() => {
             // Require vehicle selection if customer is selected but no vehicle
@@ -101,23 +101,23 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
       {/* Clear Ticket Confirmation Modal */}
       {confirmClearOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900">
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-6 shadow-2xl dark:shadow-gray-950/60">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Clear all items?
             </h3>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               This will remove all items from the current ticket.
             </p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setConfirmClearOpen(false)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmClear}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+                className="flex-1 rounded-lg bg-red-600 dark:bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-600"
               >
                 Clear
               </button>

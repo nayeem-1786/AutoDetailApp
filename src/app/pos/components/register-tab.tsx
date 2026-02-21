@@ -17,18 +17,18 @@ const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']
 
 // Explicit Tailwind class map — 12 colors × 6 shades for JIT detection
 const TILE_COLORS: Record<string, { bg: string; text: string; hover: string }> = {
-  'red-10': { bg: 'bg-red-100', text: 'text-red-900', hover: 'hover:bg-red-200' },
-  'red-25': { bg: 'bg-red-200', text: 'text-red-900', hover: 'hover:bg-red-300' },
-  'red-40': { bg: 'bg-red-300', text: 'text-red-900', hover: 'hover:bg-red-400' },
-  'red-60': { bg: 'bg-red-400', text: 'text-white', hover: 'hover:bg-red-500' },
-  'red-80': { bg: 'bg-red-500', text: 'text-white', hover: 'hover:bg-red-600' },
-  'red-100': { bg: 'bg-red-600', text: 'text-white', hover: 'hover:bg-red-700' },
-  'orange-10': { bg: 'bg-orange-100', text: 'text-orange-900', hover: 'hover:bg-orange-200' },
-  'orange-25': { bg: 'bg-orange-200', text: 'text-orange-900', hover: 'hover:bg-orange-300' },
-  'orange-40': { bg: 'bg-orange-300', text: 'text-orange-900', hover: 'hover:bg-orange-400' },
-  'orange-60': { bg: 'bg-orange-400', text: 'text-white', hover: 'hover:bg-orange-500' },
-  'orange-80': { bg: 'bg-orange-500', text: 'text-white', hover: 'hover:bg-orange-600' },
-  'orange-100': { bg: 'bg-orange-600', text: 'text-white', hover: 'hover:bg-orange-700' },
+  'red-10': { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-900 dark:text-red-300', hover: 'hover:bg-red-200 dark:hover:bg-red-900/50' },
+  'red-25': { bg: 'bg-red-200 dark:bg-red-900/50', text: 'text-red-900 dark:text-red-300', hover: 'hover:bg-red-300 dark:hover:bg-red-800/50' },
+  'red-40': { bg: 'bg-red-300 dark:bg-red-800/50', text: 'text-red-900 dark:text-red-300', hover: 'hover:bg-red-400 dark:hover:bg-red-500' },
+  'red-60': { bg: 'bg-red-400 dark:bg-red-500', text: 'text-white', hover: 'hover:bg-red-500 dark:hover:bg-red-600' },
+  'red-80': { bg: 'bg-red-500 dark:bg-red-600', text: 'text-white', hover: 'hover:bg-red-600 dark:hover:bg-red-500' },
+  'red-100': { bg: 'bg-red-600 dark:bg-red-500', text: 'text-white', hover: 'hover:bg-red-700 dark:hover:bg-red-600' },
+  'orange-10': { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-900 dark:text-orange-300', hover: 'hover:bg-orange-200 dark:hover:bg-orange-900/50' },
+  'orange-25': { bg: 'bg-orange-200 dark:bg-orange-900/50', text: 'text-orange-900 dark:text-orange-300', hover: 'hover:bg-orange-300 dark:hover:bg-orange-800/50' },
+  'orange-40': { bg: 'bg-orange-300 dark:bg-orange-800/50', text: 'text-orange-900 dark:text-orange-300', hover: 'hover:bg-orange-400 dark:hover:bg-orange-500' },
+  'orange-60': { bg: 'bg-orange-400 dark:bg-orange-500', text: 'text-white', hover: 'hover:bg-orange-500 dark:hover:bg-orange-600' },
+  'orange-80': { bg: 'bg-orange-500 dark:bg-orange-600', text: 'text-white', hover: 'hover:bg-orange-600 dark:hover:bg-orange-500' },
+  'orange-100': { bg: 'bg-orange-600 dark:bg-orange-500', text: 'text-white', hover: 'hover:bg-orange-700 dark:hover:bg-orange-600' },
   'fuchsia-10': { bg: 'bg-fuchsia-100', text: 'text-fuchsia-900', hover: 'hover:bg-fuchsia-200' },
   'fuchsia-25': { bg: 'bg-fuchsia-200', text: 'text-fuchsia-900', hover: 'hover:bg-fuchsia-300' },
   'fuchsia-40': { bg: 'bg-fuchsia-300', text: 'text-fuchsia-900', hover: 'hover:bg-fuchsia-400' },
@@ -59,12 +59,12 @@ const TILE_COLORS: Record<string, { bg: string; text: string; hover: string }> =
   'teal-60': { bg: 'bg-teal-400', text: 'text-white', hover: 'hover:bg-teal-500' },
   'teal-80': { bg: 'bg-teal-500', text: 'text-white', hover: 'hover:bg-teal-600' },
   'teal-100': { bg: 'bg-teal-600', text: 'text-white', hover: 'hover:bg-teal-700' },
-  'blue-10': { bg: 'bg-blue-100', text: 'text-blue-900', hover: 'hover:bg-blue-200' },
-  'blue-25': { bg: 'bg-blue-200', text: 'text-blue-900', hover: 'hover:bg-blue-300' },
-  'blue-40': { bg: 'bg-blue-300', text: 'text-blue-900', hover: 'hover:bg-blue-400' },
-  'blue-60': { bg: 'bg-blue-400', text: 'text-white', hover: 'hover:bg-blue-500' },
-  'blue-80': { bg: 'bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-600' },
-  'blue-100': { bg: 'bg-blue-600', text: 'text-white', hover: 'hover:bg-blue-700' },
+  'blue-10': { bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-900 dark:text-blue-300', hover: 'hover:bg-blue-200 dark:hover:bg-blue-900/50' },
+  'blue-25': { bg: 'bg-blue-200 dark:bg-blue-900/50', text: 'text-blue-900 dark:text-blue-300', hover: 'hover:bg-blue-300 dark:hover:bg-blue-800/50' },
+  'blue-40': { bg: 'bg-blue-300 dark:bg-blue-800/50', text: 'text-blue-900 dark:text-blue-300', hover: 'hover:bg-blue-400 dark:hover:bg-blue-500' },
+  'blue-60': { bg: 'bg-blue-400 dark:bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-500 dark:hover:bg-blue-600' },
+  'blue-80': { bg: 'bg-blue-500 dark:bg-blue-600', text: 'text-white', hover: 'hover:bg-blue-600 dark:hover:bg-blue-500' },
+  'blue-100': { bg: 'bg-blue-600 dark:bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-700 dark:hover:bg-blue-600' },
   'indigo-10': { bg: 'bg-indigo-100', text: 'text-indigo-900', hover: 'hover:bg-indigo-200' },
   'indigo-25': { bg: 'bg-indigo-200', text: 'text-indigo-900', hover: 'hover:bg-indigo-300' },
   'indigo-40': { bg: 'bg-indigo-300', text: 'text-indigo-900', hover: 'hover:bg-indigo-400' },
@@ -83,15 +83,15 @@ const TILE_COLORS: Record<string, { bg: string; text: string; hover: string }> =
   'pink-60': { bg: 'bg-pink-400', text: 'text-white', hover: 'hover:bg-pink-500' },
   'pink-80': { bg: 'bg-pink-500', text: 'text-white', hover: 'hover:bg-pink-600' },
   'pink-100': { bg: 'bg-pink-600', text: 'text-white', hover: 'hover:bg-pink-700' },
-  'slate-10': { bg: 'bg-slate-100', text: 'text-slate-900', hover: 'hover:bg-slate-200' },
-  'slate-25': { bg: 'bg-slate-200', text: 'text-slate-900', hover: 'hover:bg-slate-300' },
-  'slate-40': { bg: 'bg-slate-300', text: 'text-slate-900', hover: 'hover:bg-slate-400' },
-  'slate-60': { bg: 'bg-slate-400', text: 'text-white', hover: 'hover:bg-slate-500' },
-  'slate-80': { bg: 'bg-slate-500', text: 'text-white', hover: 'hover:bg-slate-600' },
-  'slate-100': { bg: 'bg-slate-600', text: 'text-white', hover: 'hover:bg-slate-700' },
+  'slate-10': { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-900 dark:text-slate-100', hover: 'hover:bg-slate-200 dark:hover:bg-slate-700' },
+  'slate-25': { bg: 'bg-slate-200 dark:bg-slate-700', text: 'text-slate-900 dark:text-slate-100', hover: 'hover:bg-slate-300 dark:hover:bg-slate-600' },
+  'slate-40': { bg: 'bg-slate-300 dark:bg-slate-600', text: 'text-slate-900 dark:text-slate-100', hover: 'hover:bg-slate-400 dark:hover:bg-slate-500' },
+  'slate-60': { bg: 'bg-slate-400 dark:bg-slate-500', text: 'text-white', hover: 'hover:bg-slate-500 dark:hover:bg-slate-400' },
+  'slate-80': { bg: 'bg-slate-500 dark:bg-slate-400', text: 'text-white', hover: 'hover:bg-slate-600 dark:hover:bg-slate-500' },
+  'slate-100': { bg: 'bg-slate-600 dark:bg-slate-500', text: 'text-white', hover: 'hover:bg-slate-700 dark:hover:bg-slate-600' },
 };
 
-const DEFAULT_TILE = { bg: 'bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-600' };
+const DEFAULT_TILE = { bg: 'bg-blue-500 dark:bg-blue-600', text: 'text-white', hover: 'hover:bg-blue-600 dark:hover:bg-blue-500' };
 
 function getTileColors(color: FavoriteColor, shade: number = 80) {
   return TILE_COLORS[`${color}-${shade}`] ?? TILE_COLORS[`${color}-80`] ?? DEFAULT_TILE;
@@ -291,7 +291,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           </div>
           {favLoading ? (
             <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400 dark:text-gray-500" />
             </div>
           ) : favorites.length > 0 ? (
             <div className="grid grid-cols-3 gap-2" style={{ gridAutoRows: 'minmax(64px, 1fr)' }}>
@@ -319,7 +319,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
               })}
             </div>
           ) : (
-            <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-xs text-gray-400">
+            <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-400 dark:text-gray-500">
               No favorites configured — add via Admin &gt; Settings
             </div>
           )}
@@ -331,26 +331,26 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
             <span
               className={cn(
                 'tabular-nums font-bold',
-                cents === 0 ? 'text-gray-300' : 'text-gray-900',
+                cents === 0 ? 'text-gray-300 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100',
                 display.length > 8 ? 'text-4xl' : 'text-6xl'
               )}
             >
               ${display}
             </span>
           </div>
-          <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-3">
+          <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-3">
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Description..."
-              className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none"
+              className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none"
               maxLength={100}
             />
             {note && (
               <button
                 onClick={() => setNote('')}
-                className="shrink-0 text-gray-400 hover:text-gray-600"
+                className="shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400"
               >
                 <X className="h-3.5 w-3.5" />
               </button>

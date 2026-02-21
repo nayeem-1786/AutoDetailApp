@@ -46,7 +46,7 @@ export function VehicleSelector({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-4">
-        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-gray-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -54,7 +54,7 @@ export function VehicleSelector({
   return (
     <div className="flex flex-col gap-2">
       {vehicles.length === 0 && (
-        <p className="text-center text-sm text-gray-400">No vehicles on file</p>
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500">No vehicles on file</p>
       )}
 
       {vehicles.map((v) => {
@@ -72,23 +72,23 @@ export function VehicleSelector({
               'flex items-center justify-between rounded-lg border p-3 text-left transition-all',
               'min-h-[56px] active:scale-[0.99]',
               isSelected
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                ? 'border-blue-500 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30'
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm dark:hover:shadow-gray-950/30'
             )}
           >
             <div className="flex items-center gap-2.5">
-              <Car className={cn('h-4 w-4', isSelected ? 'text-blue-500' : 'text-gray-400')} />
+              <Car className={cn('h-4 w-4', isSelected ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500')} />
               <div>
-                <p className={cn('text-sm font-medium', isSelected ? 'text-blue-900' : 'text-gray-900')}>
+                <p className={cn('text-sm font-medium', isSelected ? 'text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100')}>
                   {label}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {v.color && `${v.color} · `}
                   {v.size_class ? VEHICLE_SIZE_LABELS[v.size_class] : VEHICLE_TYPE_LABELS[v.vehicle_type]}
                 </p>
               </div>
             </div>
-            {isSelected && <Check className="h-4 w-4 text-blue-500" />}
+            {isSelected && <Check className="h-4 w-4 text-blue-500 dark:text-blue-400" />}
           </button>
         );
       })}

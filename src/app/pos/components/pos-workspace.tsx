@@ -154,7 +154,7 @@ export function PosWorkspace() {
 
         {/* Tab bar */}
         <div className="shrink-0 px-4 pt-3">
-          <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+          <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
             {TABS.map((t) => (
               <button
                 key={t.key}
@@ -168,8 +168,8 @@ export function PosWorkspace() {
                 className={cn(
                   'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all',
                   tab === t.key
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 )}
               >
                 {t.label}
@@ -182,20 +182,20 @@ export function PosWorkspace() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex h-full items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />
             </div>
           ) : isGlobalSearch ? (
             // Global search results (from Register tab)
             <div className="space-y-4 p-4">
               {filteredProducts.length > 0 && (
                 <div>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Products</h3>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Products</h3>
                   <ProductGrid products={filteredProducts} onTapProduct={handleTapProduct} />
                 </div>
               )}
               {filteredServices.length > 0 && (
                 <div>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Services</h3>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Services</h3>
                   <ServiceGrid
                     services={filteredServices}
                     vehicleSizeClass={vehicleSizeClass}
@@ -204,7 +204,7 @@ export function PosWorkspace() {
                 </div>
               )}
               {filteredProducts.length === 0 && filteredServices.length === 0 && (
-                <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+                <div className="flex h-40 items-center justify-center text-sm text-gray-400 dark:text-gray-500">
                   No results for &quot;{search}&quot;
                 </div>
               )}

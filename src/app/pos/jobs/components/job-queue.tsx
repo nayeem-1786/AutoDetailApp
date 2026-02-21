@@ -25,13 +25,13 @@ interface JobListItem {
 }
 
 const STATUS_CONFIG: Record<JobStatus, { label: string; color: string }> = {
-  scheduled: { label: 'Scheduled', color: 'bg-gray-100 text-gray-700' },
-  intake: { label: 'Intake', color: 'bg-blue-100 text-blue-700' },
-  in_progress: { label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
-  pending_approval: { label: 'Pending Approval', color: 'bg-orange-100 text-orange-700' },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
-  closed: { label: 'Closed', color: 'bg-slate-100 text-slate-600' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700' },
+  scheduled: { label: 'Scheduled', color: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300' },
+  intake: { label: 'Intake', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' },
+  in_progress: { label: 'In Progress', color: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300' },
+  pending_approval: { label: 'Pending Approval', color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400' },
+  completed: { label: 'Completed', color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
+  closed: { label: 'Closed', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+  cancelled: { label: 'Cancelled', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' },
 };
 
 // Status priority for sorting (lower = higher priority, shown first)
@@ -81,13 +81,13 @@ function getAddonBadge(addons: { id: string; status: string }[] | null): {
   const hasDeclined = addons.some((a) => a.status === 'declined');
 
   if (hasPending) {
-    return { label: 'Addon Pending', color: 'bg-amber-100 text-amber-800' };
+    return { label: 'Addon Pending', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300' };
   }
   if (hasApproved) {
-    return { label: 'Addon Approved', color: 'bg-green-100 text-green-700' };
+    return { label: 'Addon Approved', color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' };
   }
   if (hasDeclined) {
-    return { label: 'Addon Declined', color: 'bg-gray-100 text-gray-600' };
+    return { label: 'Addon Declined', color: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' };
   }
   return null;
 }
@@ -166,8 +166,8 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-        <h1 className="text-lg font-semibold text-gray-900">Jobs</h1>
+      <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Jobs</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
@@ -175,7 +175,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
               fetchJobs();
             }}
             disabled={populating}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
           >
             <RefreshCw className={cn('h-4 w-4', populating && 'animate-spin')} />
             Refresh
@@ -183,7 +183,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           {canCreateWalkIn && (
             <button
               onClick={onNewWalkIn}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
             >
               <Plus className="h-4 w-4" />
               New Walk-in
@@ -193,7 +193,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       </div>
 
       {/* Filter pills */}
-      <div className="flex gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2">
+      <div className="flex gap-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 py-2">
         {(['mine', 'all', 'unassigned'] as const)
           .filter((f) => f !== 'mine' || isBookable)
           .map((f) => (
@@ -203,8 +203,8 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
               className={cn(
                 'rounded-full px-3 py-1 text-sm font-medium transition-colors',
                 filter === f
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                  : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
               )}
             >
               {f === 'mine' ? 'My Jobs' : f === 'all' ? 'All Jobs' : 'Unassigned'}
@@ -213,16 +213,16 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       </div>
 
       {/* Job list */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
           </div>
         ) : sortedJobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-            <User className="mb-3 h-10 w-10 text-gray-300" />
+          <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400">
+            <User className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-500" />
             <p className="text-sm font-medium">No jobs for today</p>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
               {filter === 'mine'
                 ? `No jobs assigned to ${employee?.first_name ?? 'you'}`
                 : filter === 'unassigned'
@@ -245,22 +245,22 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                   tabIndex={0}
                   onClick={() => onSelectJob(job.id)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectJob(job.id); } }}
-                  className="w-full cursor-pointer rounded-lg border border-gray-200 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md active:bg-gray-50"
+                  className="w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-shadow hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800"
                 >
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                       {/* Customer */}
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
                         {job.customer
                           ? `${job.customer.first_name} ${job.customer.last_name}`
                           : 'Unknown Customer'}
                       </span>
-                      <p className="mt-0.5 text-sm text-gray-500">
+                      <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                         {formatVehicle(job.vehicle)}
                       </p>
 
                       {/* Services */}
-                      <p className="mt-1 truncate text-xs text-gray-400">
+                      <p className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500">
                         {serviceNames || 'No services'}
                       </p>
                     </div>
@@ -273,7 +273,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                             'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
                             job.appointment_id
                               ? 'bg-purple-100 text-purple-700'
-                              : 'bg-amber-100 text-amber-700'
+                              : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
                           )}
                         >
                           {job.appointment_id ? (
@@ -292,7 +292,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                         </span>
                       </div>
                       {pickupTime && (
-                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                        <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                           <Clock className="h-3 w-3" />
                           {pickupTime}
                         </span>
@@ -317,7 +317,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
                   {/* Assigned staff */}
                   {job.assigned_staff && (
-                    <p className="mt-1.5 text-xs text-gray-400">
+                    <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                       Assigned: {job.assigned_staff.first_name} {job.assigned_staff.last_name}
                     </p>
                   )}
@@ -330,7 +330,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                           e.stopPropagation();
                           onCheckout(job.id);
                         }}
-                        className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 active:bg-blue-800"
+                        className="flex items-center gap-1.5 rounded-full bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700"
                       >
                         <ShoppingCart className="h-3.5 w-3.5" />
                         Checkout
@@ -339,7 +339,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                   )}
                   {job.status === 'closed' && (
                     <div className="mt-2 flex justify-end">
-                      <span className="flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                      <span className="flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-400">
                         <Check className="h-3 w-3" />
                         Paid
                       </span>

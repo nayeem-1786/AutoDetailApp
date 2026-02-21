@@ -79,10 +79,10 @@ export function CashCountForm({ onTotalChange, title, compact, skipChange }: Cas
     <div className={compact ? 'space-y-0.5' : 'space-y-1'}>
       {/* Title */}
       {title && (
-        <h3 className="mb-2 text-sm font-semibold text-gray-900">{title}</h3>
+        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
       )}
       {/* Header */}
-      <div className="grid grid-cols-[4rem_5rem_1fr] items-center gap-2 px-1 text-xs font-medium text-gray-500">
+      <div className="grid grid-cols-[4rem_5rem_1fr] items-center gap-2 px-1 text-xs font-medium text-gray-500 dark:text-gray-400">
         <span>Denom</span>
         <span className="text-center">Qty</span>
         <span className="text-right">Subtotal</span>
@@ -97,7 +97,7 @@ export function CashCountForm({ onTotalChange, title, compact, skipChange }: Cas
             key={d.value}
             className={`grid grid-cols-[4rem_5rem_1fr] items-center gap-2 px-1 ${compact ? 'py-0' : 'py-0.5'}`}
           >
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {d.label}
             </span>
             <Input
@@ -111,7 +111,7 @@ export function CashCountForm({ onTotalChange, title, compact, skipChange }: Cas
               }}
               className="h-8 w-20 text-center tabular-nums"
             />
-            <span className="text-right text-sm tabular-nums text-gray-600">
+            <span className="text-right text-sm tabular-nums text-gray-600 dark:text-gray-400">
               {formatCurrency(roundedSubtotal)}
             </span>
           </div>
@@ -119,9 +119,9 @@ export function CashCountForm({ onTotalChange, title, compact, skipChange }: Cas
       })}
 
       {/* Total */}
-      <div className="mt-3 flex items-center justify-between border-t border-gray-200 px-1 pt-3">
-        <span className="text-sm font-bold text-gray-900">Total</span>
-        <span className="text-lg font-bold tabular-nums text-gray-900">
+      <div className="mt-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-1 pt-3">
+        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">Total</span>
+        <span className="text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">
           {formatCurrency(roundedTotal)}
         </span>
       </div>

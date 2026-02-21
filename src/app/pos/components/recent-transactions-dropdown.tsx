@@ -33,11 +33,11 @@ interface RecentTransaction {
 }
 
 const STATUS_DOT: Record<string, string> = {
-  completed: 'bg-green-500',
-  refunded: 'bg-red-500',
-  partial_refund: 'bg-amber-500',
+  completed: 'bg-green-500 dark:bg-green-600',
+  refunded: 'bg-red-500 dark:bg-red-600',
+  partial_refund: 'bg-amber-500 dark:bg-amber-600',
   voided: 'bg-gray-400',
-  open: 'bg-blue-500',
+  open: 'bg-blue-500 dark:bg-blue-600',
 };
 
 function timeAgo(dateStr: string): string {
@@ -142,8 +142,8 @@ export function RecentTransactionsDropdown() {
         onClick={() => setOpen((prev) => !prev)}
         className={`flex h-8 w-8 items-center justify-center rounded-full ${
           open
-            ? 'bg-blue-50 text-blue-600'
-            : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+            : 'text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400'
         }`}
         title="Recent transactions"
         aria-label="Recent transactions"
@@ -154,28 +154,28 @@ export function RecentTransactionsDropdown() {
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
-            <h3 className="text-sm font-semibold text-gray-900">
+          <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 px-4 py-2.5">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               Recent Transactions
             </h3>
-            <span className="text-xs text-gray-400">Today</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Today</span>
           </div>
 
           {/* Content */}
           <div className="max-h-80 overflow-y-auto">
             {loading && transactions.length === 0 ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400 dark:text-gray-500" />
               </div>
             ) : error ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
+              <div className="flex flex-col items-center gap-2 py-8 text-gray-400 dark:text-gray-500">
                 <AlertCircle className="h-5 w-5" />
                 <span className="text-xs">{error}</span>
               </div>
             ) : transactions.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
+              <div className="flex flex-col items-center gap-2 py-8 text-gray-400 dark:text-gray-500">
                 <Receipt className="h-6 w-6" />
                 <span className="text-sm">No transactions today</span>
               </div>
@@ -189,37 +189,37 @@ export function RecentTransactionsDropdown() {
                   <button
                     key={txn.id}
                     onClick={() => handleRowClick(txn)}
-                    className="flex w-full items-center gap-3 border-b border-gray-50 px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-gray-50"
+                    className="flex w-full items-center gap-3 border-b border-gray-50 dark:border-gray-800 px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
                     {/* Status dot */}
                     <span
-                      className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[txn.status] || 'bg-gray-300'}`}
+                      className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[txn.status] || 'bg-gray-300 dark:bg-gray-600'}`}
                     />
 
                     {/* Details */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-gray-900">
+                        <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                           {customerName}
                         </span>
-                        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                           {formatCurrency(txn.total_amount)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
                           {txn.receipt_number ? `#${txn.receipt_number}` : '—'}
                           {txn.payment_method && (
                             <> &middot; {txn.payment_method}</>
                           )}
                         </span>
-                        <span className="shrink-0 text-xs text-gray-400">
+                        <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
                           {timeAgo(txn.transaction_date)}
                         </span>
                       </div>
                     </div>
 
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-500" />
                   </button>
                 );
               })
@@ -227,10 +227,10 @@ export function RecentTransactionsDropdown() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-100">
+          <div className="border-t border-gray-100 dark:border-gray-800">
             <button
               onClick={handleViewAll}
-              className="flex w-full items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50"
+              className="flex w-full items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-blue-600 dark:text-blue-400 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30"
             >
               View All Transactions
               <ChevronRight className="h-3.5 w-3.5" />

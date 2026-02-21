@@ -27,7 +27,7 @@ export function RefundSummary({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <h3 className="text-sm font-semibold text-gray-900">Refund Summary</h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Refund Summary</h3>
 
       {/* Item list */}
       <div className="space-y-2">
@@ -37,15 +37,15 @@ export function RefundSummary({
             className="flex items-center justify-between text-sm"
           >
             <div className="min-w-0 flex-1">
-              <span className="text-gray-700">{entry.item.item_name}</span>
-              <span className="ml-1.5 text-gray-400">x{entry.quantity}</span>
+              <span className="text-gray-700 dark:text-gray-300">{entry.item.item_name}</span>
+              <span className="ml-1.5 text-gray-400 dark:text-gray-500">x{entry.quantity}</span>
               {entry.restock && (
-                <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
+                <span className="ml-2 rounded bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 text-xs text-blue-600 dark:text-blue-400">
                   restock
                 </span>
               )}
             </div>
-            <span className="shrink-0 font-medium tabular-nums text-gray-900">
+            <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
               ${entry.amount.toFixed(2)}
             </span>
           </div>
@@ -53,23 +53,23 @@ export function RefundSummary({
       </div>
 
       {/* Divider */}
-      <div className="border-t border-gray-200" />
+      <div className="border-t border-gray-200 dark:border-gray-700" />
 
       {/* Total */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-gray-900">
+        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           Total Refund
         </span>
-        <span className="text-lg font-bold tabular-nums text-red-600">
+        <span className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
           ${totalAmount.toFixed(2)}
         </span>
       </div>
 
       {/* Reason */}
       {reason && (
-        <div className="rounded-md bg-gray-50 px-3 py-2">
-          <p className="text-xs font-medium text-gray-500">Reason</p>
-          <p className="mt-0.5 text-sm text-gray-700">{reason}</p>
+        <div className="rounded-md bg-gray-50 dark:bg-gray-800 px-3 py-2">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Reason</p>
+          <p className="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{reason}</p>
         </div>
       )}
 

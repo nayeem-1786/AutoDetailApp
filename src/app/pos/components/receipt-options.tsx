@@ -181,7 +181,7 @@ export function ReceiptOptions({
           {emailing ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
           ) : emailed ? (
-            <Check className="mr-1.5 h-4 w-4 text-green-500" />
+            <Check className="mr-1.5 h-4 w-4 text-green-500 dark:text-green-400" />
           ) : (
             <Mail className="mr-1.5 h-4 w-4" />
           )}
@@ -203,7 +203,7 @@ export function ReceiptOptions({
           {smsing ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
           ) : smsed ? (
-            <Check className="mr-1.5 h-4 w-4 text-green-500" />
+            <Check className="mr-1.5 h-4 w-4 text-green-500 dark:text-green-400" />
           ) : (
             <MessageSquare className="mr-1.5 h-4 w-4" />
           )}
@@ -219,7 +219,7 @@ export function ReceiptOptions({
           {printing ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
           ) : printed ? (
-            <Check className="mr-1.5 h-4 w-4 text-green-500" />
+            <Check className="mr-1.5 h-4 w-4 text-green-500 dark:text-green-400" />
           ) : (
             <Receipt className="mr-1.5 h-4 w-4" />
           )}

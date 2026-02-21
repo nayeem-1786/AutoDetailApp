@@ -270,17 +270,17 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   if (step === 'issue-type') {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={onBack} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={onBack} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Flag Issue</h2>
-            <p className="text-sm text-gray-500">Step 1: What did you find?</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Flag Issue</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Step 1: What did you find?</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-          <p className="mb-3 text-sm font-medium text-gray-700">What did you notice?</p>
+        <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
+          <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">What did you notice?</p>
           <div className="grid grid-cols-2 gap-2">
             {ISSUE_TYPES.map((issue) => (
               <button
@@ -295,12 +295,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 className={cn(
                   'flex flex-col items-start rounded-xl border p-4 text-left transition-colors min-h-[72px]',
                   selectedIssueType === issue.key
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100'
+                    ? 'border-orange-500 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/30'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800'
                 )}
               >
-                <p className="text-sm font-semibold text-gray-900">{issue.label}</p>
-                <p className="mt-0.5 text-xs text-gray-500 leading-tight">{issue.description}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{issue.label}</p>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 leading-tight">{issue.description}</p>
               </button>
             ))}
           </div>
@@ -308,13 +308,13 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
           {/* Free text input when "Other" is selected */}
           {selectedIssueType === 'other' && (
             <div className="mt-3 space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Describe the issue</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Describe the issue</label>
               <textarea
                 value={issueDescription}
                 onChange={(e) => setIssueDescription(e.target.value)}
                 placeholder="e.g., Deep scratches on the rear bumper from a parking incident"
                 rows={3}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 autoFocus
               />
               <button
@@ -326,7 +326,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                   setStep('zone-select');
                 }}
                 disabled={!issueDescription.trim()}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 min-h-11"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 min-h-11"
               >
                 Next: Take Photo
                 <ChevronRight className="h-4 w-4" />
@@ -345,17 +345,17 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
     const allZones = [...EXTERIOR_ZONES, ...INTERIOR_ZONES];
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('issue-type')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={() => setStep('issue-type')} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Flag Issue</h2>
-            <p className="text-sm text-gray-500">Step 2: Select zone and capture photo</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Flag Issue</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Step 2: Select zone and capture photo</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-          <p className="mb-3 text-sm font-medium text-gray-700">Where is the issue?</p>
+        <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
+          <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">Where is the issue?</p>
           <div className="space-y-2">
             {allZones.map((zone) => (
               <button
@@ -364,13 +364,13 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                   setSelectedZone(zone.key);
                   setStep('photo');
                 }}
-                className="flex w-full items-center justify-between rounded-lg bg-white p-3 shadow-sm hover:bg-gray-50 min-h-11"
+                className="flex w-full items-center justify-between rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30 hover:bg-gray-50 dark:hover:bg-gray-800 min-h-11"
               >
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{zone.label}</p>
-                  <p className="text-xs text-gray-500">{zone.description}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{zone.label}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{zone.description}</p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-gray-400" />
+                <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </button>
             ))}
           </div>
@@ -400,20 +400,20 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   if (step === 'catalog') {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('zone-select')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={() => setStep('zone-select')} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Select Service/Product</h2>
-            <p className="text-sm text-gray-500">Step 3: What do you recommend?</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Select Service/Product</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Step 3: What do you recommend?</p>
           </div>
         </div>
 
         {/* Search + Tabs */}
-        <div className="border-b border-gray-200 bg-white px-4 py-2">
+        <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2">
           {/* Tab bar */}
-          <div className="mb-2 flex gap-1 rounded-lg bg-gray-100 p-0.5">
+          <div className="mb-2 flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
             {([
               { key: 'services' as CatalogTab, label: 'Services', icon: Wrench },
               { key: 'products' as CatalogTab, label: 'Products', icon: Package },
@@ -428,8 +428,8 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 className={cn(
                   'flex flex-1 items-center justify-center gap-1.5 rounded-md py-2.5 text-xs font-medium transition-colors min-h-11',
                   catalogTab === key
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -446,14 +446,14 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 placeholder={`Search ${catalogTab}...`}
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 py-2.5 pl-3 pr-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 pl-3 pr-3 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
               />
             </div>
           )}
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800">
           {catalogTab === 'services' && (
             <CatalogBrowser
               type="services"
@@ -472,19 +472,19 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
           )}
           {catalogTab === 'custom' && (
             <div className="p-4">
-              <div className="space-y-3 rounded-lg bg-white p-4 shadow-sm">
+              <div className="space-y-3 rounded-lg bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-gray-950/30">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
                   <input
                     type="text"
                     placeholder="e.g., Paint touch-up on rear bumper"
                     value={customDescription}
                     onChange={(e) => setCustomDescription(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Price ($)</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Price ($)</label>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -493,13 +493,13 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                     placeholder="0.00"
                     value={customPrice}
                     onChange={(e) => setCustomPrice(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                 </div>
                 <button
                   onClick={handleCustomSubmit}
                   disabled={!customDescription.trim() || !customPrice || parseFloat(customPrice) <= 0}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 min-h-11"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 min-h-11"
                 >
                   <Check className="h-4 w-4" />
                   Use Custom Item
@@ -518,23 +518,23 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   if (step === 'discount') {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('catalog')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={() => setStep('catalog')} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Discount</h2>
-            <p className="text-sm text-gray-500">Step 4: Optional discount</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Discount</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Step 4: Optional discount</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-          <div className="rounded-lg bg-white p-4 shadow-sm">
+        <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
+          <div className="rounded-lg bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-gray-950/30">
             <div className="mb-4">
-              <p className="text-sm font-medium text-gray-900">{itemName}</p>
-              <p className="text-lg font-semibold text-gray-900">${price.toFixed(2)}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{itemName}</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">${price.toFixed(2)}</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <DollarSign className="mr-1 inline h-4 w-4" />
                 Discount Amount ($)
               </label>
@@ -547,32 +547,32 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 placeholder="0.00"
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
               />
-              <p className="mt-1 text-xs text-gray-500">Leave empty for no discount</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave empty for no discount</p>
             </div>
             {discount > 0 && (
-              <div className="mt-3 rounded-lg bg-green-50 p-3">
+              <div className="mt-3 rounded-lg bg-green-50 dark:bg-green-900/30 p-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Original</span>
-                  <span className="text-gray-600 line-through">${price.toFixed(2)}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Original</span>
+                  <span className="text-gray-600 dark:text-gray-400 line-through">${price.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-green-600">Discount</span>
-                  <span className="text-green-600">-${discount.toFixed(2)}</span>
+                  <span className="text-green-600 dark:text-green-400">Discount</span>
+                  <span className="text-green-600 dark:text-green-400">-${discount.toFixed(2)}</span>
                 </div>
-                <div className="mt-1 flex justify-between border-t border-green-200 pt-1 text-sm font-semibold">
-                  <span className="text-gray-900">Final Price</span>
-                  <span className="text-gray-900">${finalPrice.toFixed(2)}</span>
+                <div className="mt-1 flex justify-between border-t border-green-200 dark:border-green-800 pt-1 text-sm font-semibold">
+                  <span className="text-gray-900 dark:text-gray-100">Final Price</span>
+                  <span className="text-gray-900 dark:text-gray-100">${finalPrice.toFixed(2)}</span>
                 </div>
               </div>
             )}
           </div>
         </div>
-        <div className="border-t border-gray-200 bg-white px-4 py-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
           <button
             onClick={() => setStep('delay')}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 min-h-11"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 min-h-11"
           >
             Next: Pickup Delay
             <ChevronRight className="h-4 w-4" />
@@ -588,18 +588,18 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   if (step === 'delay') {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('discount')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={() => setStep('discount')} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Pickup Delay</h2>
-            <p className="text-sm text-gray-500">Step 5: Additional time needed</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pickup Delay</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Step 5: Additional time needed</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-          <div className="rounded-lg bg-white p-4 shadow-sm">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+        <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
+          <div className="rounded-lg bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-gray-950/30">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               <Clock className="mr-1 inline h-4 w-4" />
               Additional Minutes
             </label>
@@ -611,24 +611,24 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               placeholder="0"
               value={pickupDelay}
               onChange={(e) => setPickupDelay(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {selectedItem?.base_duration_minutes
                 ? `Auto-filled from service duration (${selectedItem.base_duration_minutes} min). You can adjust.`
                 : 'Enter 0 if no additional time needed.'}
             </p>
 
             {job.estimated_pickup_at && delayMinutes > 0 && (
-              <div className="mt-3 rounded-lg bg-blue-50 p-3">
-                <p className="text-sm text-blue-700">
+              <div className="mt-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 p-3">
+                <p className="text-sm text-blue-700 dark:text-blue-400">
                   Current ETA: {new Date(job.estimated_pickup_at).toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
                     timeZone: 'America/Los_Angeles',
                   })}
                 </p>
-                <p className="text-sm font-medium text-blue-800">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
                   New ETA: {newEta?.toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
@@ -639,16 +639,16 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               </div>
             )}
             {!job.estimated_pickup_at && delayMinutes > 0 && (
-              <div className="mt-3 rounded-lg bg-blue-50 p-3">
-                <p className="text-sm text-blue-700">+{delayMinutes} minutes to service time</p>
+              <div className="mt-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 p-3">
+                <p className="text-sm text-blue-700 dark:text-blue-400">+{delayMinutes} minutes to service time</p>
               </div>
             )}
           </div>
         </div>
-        <div className="border-t border-gray-200 bg-white px-4 py-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
           <button
             onClick={() => setStep('message')}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 min-h-11"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 min-h-11"
           >
             Next: Message
             <ChevronRight className="h-4 w-4" />
@@ -664,16 +664,16 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   if (step === 'message') {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('delay')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={() => setStep('delay')} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Message to Customer</h2>
-            <p className="text-sm text-gray-500">Step 6: Choose a template or write custom</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Message to Customer</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Step 6: Choose a template or write custom</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+        <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
           <div className="space-y-2">
             {MESSAGE_TEMPLATES.map((tmpl) => {
               const preview = tmpl.template
@@ -691,12 +691,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                   className={cn(
                     'w-full rounded-lg border p-3 text-left transition-colors min-h-11',
                     selectedTemplate === tmpl.id && !isCustomMessage
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                      ? 'border-blue-500 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'
                   )}
                 >
-                  <p className="text-xs font-medium text-gray-500">{tmpl.label}</p>
-                  <p className="mt-0.5 text-sm text-gray-900">{preview}</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{tmpl.label}</p>
+                  <p className="mt-0.5 text-sm text-gray-900 dark:text-gray-100">{preview}</p>
                 </button>
               );
             })}
@@ -710,12 +710,12 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               className={cn(
                 'flex w-full items-center gap-2 rounded-lg border p-3 text-left min-h-11',
                 isCustomMessage
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white hover:bg-gray-50'
+                  ? 'border-blue-500 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'
               )}
             >
-              <MessageSquare className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Write custom message</span>
+              <MessageSquare className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Write custom message</span>
             </button>
 
             {isCustomMessage && (
@@ -724,16 +724,16 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 onChange={(e) => setCustomMessageText(e.target.value)}
                 placeholder="Type your message to the customer..."
                 rows={4}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
               />
             )}
           </div>
         </div>
-        <div className="border-t border-gray-200 bg-white px-4 py-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
           <button
             onClick={() => setStep('preview')}
             disabled={!messageText}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 min-h-11"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 min-h-11"
           >
             <Eye className="h-4 w-4" />
             Preview
@@ -752,27 +752,27 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
 
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button onClick={() => setStep('message')} className="rounded-lg p-2 hover:bg-gray-100 min-h-11 min-w-11 flex items-center justify-center">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={() => setStep('message')} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-11 min-w-11 flex items-center justify-center">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Preview</h2>
-            <p className="text-sm text-gray-500">Step 7: Review before sending</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Preview</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Step 7: Review before sending</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+        <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
           {/* Mock authorization page preview */}
-          <div className="rounded-xl bg-white shadow-md">
-            <div className="rounded-t-xl bg-blue-800 p-4 text-center">
+          <div className="rounded-xl bg-white dark:bg-gray-900 shadow-md dark:shadow-gray-950/40">
+            <div className="rounded-t-xl bg-blue-800 dark:bg-blue-700 p-4 text-center">
               <p className="text-lg font-semibold text-white">Additional Service Authorization</p>
             </div>
             <div className="space-y-4 p-4">
               {/* Issue type badge */}
               {selectedIssueType && (
-                <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-800">
+                <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/30 px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
                     Found: {getIssueHumanReadable(selectedIssueType, issueDescription)}
                   </span>
                 </div>
@@ -793,36 +793,36 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               )}
 
               {/* Message */}
-              <p className="text-sm text-gray-700">{messageText}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">{messageText}</p>
 
               {/* Vehicle */}
-              <p className="text-xs text-gray-500">Vehicle: {vehicleDesc}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Vehicle: {vehicleDesc}</p>
 
               {/* Price */}
-              <div className="rounded-lg bg-gray-50 p-3">
+              <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
                 {discount > 0 ? (
                   <>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Original</span>
-                      <span className="text-gray-500 line-through">${price.toFixed(2)}</span>
+                      <span className="text-gray-500 dark:text-gray-400">Original</span>
+                      <span className="text-gray-500 dark:text-gray-400 line-through">${price.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-green-600">Discount</span>
-                      <span className="text-green-600">-${discount.toFixed(2)}</span>
+                      <span className="text-green-600 dark:text-green-400">Discount</span>
+                      <span className="text-green-600 dark:text-green-400">-${discount.toFixed(2)}</span>
                     </div>
-                    <div className="mt-1 flex justify-between border-t border-gray-200 pt-1">
-                      <span className="font-semibold text-gray-900">Additional Cost</span>
-                      <span className="text-lg font-bold text-gray-900">${finalPrice.toFixed(2)}</span>
+                    <div className="mt-1 flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1">
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">Additional Cost</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">${finalPrice.toFixed(2)}</span>
                     </div>
                   </>
                 ) : (
                   <div className="flex justify-between">
-                    <span className="font-semibold text-gray-900">Additional Cost</span>
-                    <span className="text-lg font-bold text-gray-900">${finalPrice.toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">Additional Cost</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-gray-100">${finalPrice.toFixed(2)}</span>
                   </div>
                 )}
                 {delayMinutes > 0 && (
-                  <p className="mt-2 text-sm text-gray-500">
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                     Additional time: +{delayMinutes} min
                     {newEta && (
                       <>
@@ -839,10 +839,10 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
 
               {/* Mock buttons */}
               <div className="space-y-2">
-                <div className="flex items-center justify-center rounded-lg bg-green-600 py-3.5 text-sm font-semibold text-white opacity-60">
+                <div className="flex items-center justify-center rounded-lg bg-green-600 dark:bg-green-500 py-3.5 text-sm font-semibold text-white opacity-60">
                   Approve
                 </div>
-                <div className="flex items-center justify-center rounded-lg border-2 border-gray-300 py-3.5 text-sm font-semibold text-gray-600 opacity-60">
+                <div className="flex items-center justify-center rounded-lg border-2 border-gray-300 dark:border-gray-600 py-3.5 text-sm font-semibold text-gray-600 dark:text-gray-400 opacity-60">
                   Decline
                 </div>
               </div>
@@ -850,8 +850,8 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
           </div>
 
           {/* Notification info */}
-          <div className="mt-4 rounded-lg bg-blue-50 p-3">
-            <p className="text-sm text-blue-700">
+          <div className="mt-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 p-3">
+            <p className="text-sm text-blue-700 dark:text-blue-400">
               Will be sent via:
               {job.customer?.phone && ' SMS'}
               {job.customer?.phone && job.customer?.email && ' + '}
@@ -860,18 +860,18 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
             </p>
           </div>
         </div>
-        <div className="border-t border-gray-200 bg-white px-4 py-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
           <div className="flex gap-2">
             <button
               onClick={() => setStep('message')}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-11"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 min-h-11"
             >
               Edit
             </button>
             <button
               onClick={handleSend}
               disabled={sending}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50 min-h-11"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-500 dark:bg-orange-600 px-4 py-3 text-sm font-medium text-white hover:bg-orange-600 dark:hover:bg-orange-500 disabled:opacity-50 min-h-11"
             >
               <Send className="h-4 w-4" />
               {sending ? 'Sending...' : 'Send to Customer'}

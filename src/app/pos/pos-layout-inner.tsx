@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { PosShell } from './pos-shell';
 import { PosServiceWorker } from './components/pos-service-worker';
+import { PosThemeProvider } from './context/pos-theme-context';
 
 export function PosLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -12,7 +13,9 @@ export function PosLayoutInner({ children }: { children: React.ReactNode }) {
     return (
       <>
         <PosServiceWorker />
-        {children}
+        <PosThemeProvider>
+          {children}
+        </PosThemeProvider>
       </>
     );
   }
@@ -20,7 +23,9 @@ export function PosLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <>
       <PosServiceWorker />
-      <PosShell>{children}</PosShell>
+      <PosThemeProvider>
+        <PosShell>{children}</PosShell>
+      </PosThemeProvider>
     </>
   );
 }

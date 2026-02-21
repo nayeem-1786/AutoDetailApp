@@ -76,20 +76,20 @@ export function CouponInput() {
   // Show applied coupon
   if (ticket.coupon) {
     return (
-      <div className="flex items-center justify-between rounded-md bg-green-50 px-3 py-1.5">
-        <div className="flex items-center gap-1.5 text-sm text-green-700">
+      <div className="flex items-center justify-between rounded-md bg-green-50 dark:bg-green-900/30 px-3 py-1.5">
+        <div className="flex items-center gap-1.5 text-sm text-green-700 dark:text-green-400">
           <Tag className="h-3.5 w-3.5" />
           <span className="font-medium">{ticket.coupon.code}</span>
           {ticket.coupon.isAutoApplied && (
-            <span className="text-[10px] text-green-500">(auto)</span>
+            <span className="text-[10px] text-green-500 dark:text-green-400">(auto)</span>
           )}
-          <span className="text-green-600">
+          <span className="text-green-600 dark:text-green-400">
             -${ticket.coupon.discount.toFixed(2)}
           </span>
         </div>
         <button
           onClick={handleRemove}
-          className="flex h-11 w-11 items-center justify-center rounded text-green-500 hover:bg-green-100 hover:text-green-700"
+          className="flex h-11 w-11 items-center justify-center rounded text-green-500 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 hover:text-green-700 dark:hover:text-green-400"
         >
           <X className="h-4 w-4" />
         </button>

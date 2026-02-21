@@ -220,8 +220,8 @@ export function CardPayment() {
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
-        <p className="text-lg text-gray-500">Card Payment</p>
-        <p className="mt-1 text-3xl font-bold text-gray-900">
+        <p className="text-lg text-gray-500 dark:text-gray-400">Card Payment</p>
+        <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">
           ${amountDue.toFixed(2)}
         </p>
       </div>
@@ -230,18 +230,18 @@ export function CardPayment() {
       <div className="flex flex-col items-center gap-4">
         {status === 'creating-intent' && (
           <>
-            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-            <p className="text-lg text-gray-600">Preparing payment...</p>
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500 dark:text-blue-400" />
+            <p className="text-lg text-gray-600 dark:text-gray-400">Preparing payment...</p>
           </>
         )}
 
         {status === 'waiting-for-card' && (
           <>
-            <CreditCard className="h-16 w-16 text-blue-500" />
-            <p className="text-xl font-medium text-gray-900">
+            <CreditCard className="h-16 w-16 text-blue-500 dark:text-blue-400" />
+            <p className="text-xl font-medium text-gray-900 dark:text-gray-100">
               Present card on reader
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Tap, insert, or swipe the card
             </p>
           </>
@@ -249,15 +249,15 @@ export function CardPayment() {
 
         {status === 'processing' && (
           <>
-            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-            <p className="text-lg text-gray-600">Processing payment...</p>
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500 dark:text-blue-400" />
+            <p className="text-lg text-gray-600 dark:text-gray-400">Processing payment...</p>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <CheckCircle2 className="h-16 w-16 text-green-500" />
-            <p className="text-xl font-medium text-green-700">
+            <CheckCircle2 className="h-16 w-16 text-green-500 dark:text-green-400" />
+            <p className="text-xl font-medium text-green-700 dark:text-green-400">
               Payment approved
             </p>
           </>
@@ -265,10 +265,10 @@ export function CardPayment() {
 
         {status === 'error' && (
           <>
-            <AlertCircle className="h-16 w-16 text-red-500" />
-            <p className="text-lg font-medium text-red-700">Payment failed</p>
+            <AlertCircle className="h-16 w-16 text-red-500 dark:text-red-400" />
+            <p className="text-lg font-medium text-red-700 dark:text-red-400">Payment failed</p>
             {errorMsg && (
-              <p className="max-w-sm text-center text-sm text-red-600">
+              <p className="max-w-sm text-center text-sm text-red-600 dark:text-red-400">
                 {errorMsg}
               </p>
             )}
@@ -290,7 +290,7 @@ export function CardPayment() {
               isProcessingRef.current = false; // Reset to allow retry
               processCard();
             }}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600"
           >
             Retry
           </Button>

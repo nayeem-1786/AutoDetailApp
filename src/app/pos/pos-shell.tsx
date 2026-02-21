@@ -13,6 +13,9 @@ import {
   X,
   Wifi,
   WifiOff,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/utils/constants';
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
@@ -31,6 +34,7 @@ import { PinScreen } from './components/pin-screen';
 import { OfflineIndicator } from './components/offline-indicator';
 import { OfflineQueueBadge } from './components/offline-queue-badge';
 import { cn } from '@/lib/utils/cn';
+import { usePosTheme } from './context/pos-theme-context';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, locked, lock, replaceSession } = usePosAuth();
@@ -114,8 +118,8 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-800">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -170,6 +174,7 @@ function PosShellContent({
   const { openCheckout, isOpen: checkoutOpen } = useCheckout();
   const { heldTickets } = useHeldTickets();
   const { connectedReader, isConnecting, discoverAndConnect } = useReader();
+  const { theme, setTheme } = usePosTheme();
   const [heldPanelOpen, setHeldPanelOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -234,22 +239,22 @@ function PosShellContent({
   }, [dispatch, ticket.items.length, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen, router]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
+    <div className="flex h-screen flex-col overflow-hidden bg-gray-100 dark:bg-gray-950">
       {/* Offline indicator banner */}
       <OfflineIndicator />
 
       {/* Top Bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4">
         {/* Left: Back navigation + Logo */}
         <div className="flex items-center gap-4">
           <Link
             href={pathname === '/pos' ? '/admin' : '/pos'}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
+            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">{pathname === '/pos' ? 'Admin' : 'POS'}</span>
           </Link>
-          <span className="text-lg font-semibold text-gray-900">
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             Smart Detail POS
           </span>
         </div>
@@ -258,13 +263,13 @@ function PosShellContent({
         <div className="flex items-center gap-3">
           {/* Card Reader Status */}
           {isConnecting ? (
-            <div className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+            <div className="flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-blue-700 dark:text-blue-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="hidden text-xs font-medium sm:inline">Connecting...</span>
             </div>
           ) : connectedReader ? (
             <div
-              className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-green-700"
+              className="flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2 py-1 text-green-700 dark:text-green-400"
               title={`Reader: ${connectedReader.label || 'Connected'}`}
             >
               <Wifi className="h-4 w-4" />
@@ -275,7 +280,7 @@ function PosShellContent({
           ) : (
             <button
               onClick={discoverAndConnect}
-              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
               title="Click to connect reader"
             >
               <WifiOff className="h-4 w-4" />
@@ -285,15 +290,15 @@ function PosShellContent({
 
           {/* P5: Scanner Connection Indicator */}
           <div className="flex items-center gap-1" title="Scanner: disconnected">
-            <ScanLine className="h-4 w-4 text-gray-400" />
-            <span className="hidden text-xs text-gray-400 sm:inline">Disconnected</span>
+            <ScanLine className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+            <span className="hidden text-xs text-gray-400 dark:text-gray-500 sm:inline">Disconnected</span>
           </div>
 
           {/* P3: Held Tickets badge */}
           {heldCount > 0 && (
             <button
               onClick={() => setHeldPanelOpen(true)}
-              className="relative flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700 hover:bg-amber-100"
+              className="relative flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40"
             >
               <PauseCircle className="h-4 w-4" />
               <span className="text-xs font-medium">{heldCount} held</span>
@@ -304,7 +309,7 @@ function PosShellContent({
           {heldCount === 0 && (
             <button
               onClick={() => setHeldPanelOpen(true)}
-              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
               title="Held tickets"
             >
               <PauseCircle className="h-4 w-4" />
@@ -317,18 +322,58 @@ function PosShellContent({
           {/* Recent transactions quick-access */}
           <RecentTransactionsDropdown />
 
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {displayName}
           </span>
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+          <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
             {ROLE_LABELS[role] || role}
           </span>
-          <span className="text-sm tabular-nums text-gray-400">{clock}</span>
+          <span className="text-sm tabular-nums text-gray-400 dark:text-gray-500">{clock}</span>
+
+          {/* Theme toggle */}
+          <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+            <button
+              onClick={() => setTheme('light')}
+              className={cn(
+                'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
+                theme === 'light'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+              )}
+              aria-label="Light mode"
+            >
+              <Sun className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setTheme('dark')}
+              className={cn(
+                'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
+                theme === 'dark'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+              )}
+              aria-label="Dark mode"
+            >
+              <Moon className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setTheme('system')}
+              className={cn(
+                'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
+                theme === 'system'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+              )}
+              aria-label="System preference"
+            >
+              <Monitor className="h-4 w-4" />
+            </button>
+          </div>
 
           {/* P7: Shortcuts help button */}
           <button
             onClick={() => setShortcutsOpen((prev) => !prev)}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-xs font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
             title="Keyboard shortcuts"
           >
             ?
@@ -351,49 +396,49 @@ function PosShellContent({
       {/* P7: Keyboard Shortcuts Overlay */}
       {shortcutsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShortcutsOpen(false)}>
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-6 shadow-2xl dark:shadow-gray-950/60" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Keyboard className="h-5 w-5 text-gray-400" />
-                <h3 className="text-lg font-semibold text-gray-900">
+                <Keyboard className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Keyboard Shortcuts
                 </h3>
               </div>
               <button
                 onClick={() => setShortcutsOpen(false)}
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-full p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">New ticket (clear current)</span>
-                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                <span className="text-sm text-gray-600 dark:text-gray-400">New ticket (clear current)</span>
+                <kbd className="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
                   F1
                 </kbd>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Go to payment / checkout</span>
-                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Go to payment / checkout</span>
+                <kbd className="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
                   F2
                 </kbd>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Go to quotes</span>
-                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Go to quotes</span>
+                <kbd className="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
                   F3
                 </kbd>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Cancel / go back / close</span>
-                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Cancel / go back / close</span>
+                <kbd className="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
                   Esc
                 </kbd>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Toggle this help</span>
-                <kbd className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Toggle this help</span>
+                <kbd className="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
                   ?
                 </kbd>
               </div>

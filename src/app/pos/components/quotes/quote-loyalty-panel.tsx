@@ -41,15 +41,15 @@ export function QuoteLoyaltyPanel() {
   }
 
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+    <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-3 py-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-sm">
-          <Star className="h-3.5 w-3.5 text-amber-500" />
-          <span className="font-medium text-amber-800">
+          <Star className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+          <span className="font-medium text-amber-800 dark:text-amber-300">
             {balance} pts
           </span>
           {canRedeem && !isRedeeming && (
-            <span className="text-xs text-amber-600">
+            <span className="text-xs text-amber-600 dark:text-amber-400">
               (worth ${redeemDiscount.toFixed(2)})
             </span>
           )}
@@ -61,8 +61,8 @@ export function QuoteLoyaltyPanel() {
             className={cn(
               'rounded px-2 py-0.5 text-xs font-medium transition-colors',
               isRedeeming
-                ? 'bg-amber-200 text-amber-800 hover:bg-amber-300'
-                : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                ? 'bg-amber-200 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 hover:bg-amber-300 dark:hover:bg-amber-800/50'
+                : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50'
             )}
           >
             {isRedeeming ? `Redeeming -$${redeemDiscount.toFixed(2)}` : 'Redeem'}

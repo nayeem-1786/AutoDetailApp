@@ -100,7 +100,7 @@ export function VehicleCreateDialog({
         <DialogContent className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Type
               </label>
               <Select
@@ -120,7 +120,7 @@ export function VehicleCreateDialog({
             </div>
             {sizeClasses.length > 0 && (
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                   Size Class
                 </label>
                 <Select
@@ -139,7 +139,7 @@ export function VehicleCreateDialog({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Year
               </label>
               <Input
@@ -156,7 +156,7 @@ export function VehicleCreateDialog({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Make
               </label>
               <Input
@@ -166,7 +166,7 @@ export function VehicleCreateDialog({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Model
               </label>
               <Input
@@ -178,7 +178,7 @@ export function VehicleCreateDialog({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
               Color
             </label>
             <Input

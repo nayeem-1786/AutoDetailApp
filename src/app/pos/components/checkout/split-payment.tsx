@@ -214,8 +214,8 @@ export function SplitPayment() {
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
-        <p className="text-lg text-gray-500">Split Payment</p>
-        <p className="mt-1 text-3xl font-bold text-gray-900">
+        <p className="text-lg text-gray-500 dark:text-gray-400">Split Payment</p>
+        <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">
           ${grandTotal.toFixed(2)}
         </p>
       </div>
@@ -223,14 +223,14 @@ export function SplitPayment() {
       {splitStep === 'enter-amounts' && (
         <>
           {/* Mode toggle: cash-first vs card-first */}
-          <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+          <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
             <button
               onClick={() => { setSplitMode('cash-first'); setPrimaryAmount(''); }}
               className={cn(
                 'rounded-md px-4 py-2 text-sm font-medium transition-all',
                 splitMode === 'cash-first'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               )}
             >
               Enter Cash Amount
@@ -240,8 +240,8 @@ export function SplitPayment() {
               className={cn(
                 'rounded-md px-4 py-2 text-sm font-medium transition-all',
                 splitMode === 'card-first'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               )}
             >
               Enter Card Amount
@@ -250,13 +250,13 @@ export function SplitPayment() {
 
           {/* Amount input */}
           <div className="flex flex-col items-center gap-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               {splitMode === 'cash-first'
                 ? 'Enter cash amount \u2014 remainder goes to card'
                 : 'Enter card amount \u2014 remainder is cash'}
             </p>
             <div className="flex items-center gap-2">
-              <span className="text-xl text-gray-500">$</span>
+              <span className="text-xl text-gray-500 dark:text-gray-400">$</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -267,7 +267,7 @@ export function SplitPayment() {
                   setPrimaryAmount(v);
                 }}
                 autoFocus
-                className="h-14 w-40 rounded-lg border border-gray-300 text-center text-2xl tabular-nums text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                className="h-14 w-40 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
                 placeholder="0.00"
               />
             </div>
@@ -276,7 +276,7 @@ export function SplitPayment() {
             <div className="flex gap-2">
               <button
                 onClick={handleSplitHalf}
-                className="min-h-[44px] rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                className="min-h-[44px] rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 50/50
               </button>
@@ -286,7 +286,7 @@ export function SplitPayment() {
                   onClick={() => setPrimaryAmount(amt.toFixed(2))}
                   disabled={amt >= grandTotal}
                   className={cn(
-                    'min-h-[44px] rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                    'min-h-[44px] rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800',
                     amt >= grandTotal && 'opacity-40 cursor-not-allowed'
                   )}
                 >
@@ -297,30 +297,30 @@ export function SplitPayment() {
 
             {/* Running totals */}
             {primaryNum > 0 && (
-              <div className="w-full max-w-xs rounded-lg bg-gray-50 p-4">
+              <div className="w-full max-w-xs rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Cash</span>
-                    <span className="text-lg font-semibold tabular-nums text-green-700">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Cash</span>
+                    <span className="text-lg font-semibold tabular-nums text-green-700 dark:text-green-400">
                       ${cashAmount.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Card</span>
-                    <span className="text-lg font-semibold tabular-nums text-blue-700">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Card</span>
+                    <span className="text-lg font-semibold tabular-nums text-blue-700 dark:text-blue-400">
                       ${cardAmount.toFixed(2)}
                     </span>
                   </div>
                   {remaining > 0.01 && (
-                    <div className="flex items-center justify-between border-t border-gray-200 pt-2">
-                      <span className="text-sm font-medium text-red-600">Remaining</span>
-                      <span className="text-lg font-semibold tabular-nums text-red-600">
+                    <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-2">
+                      <span className="text-sm font-medium text-red-600 dark:text-red-400">Remaining</span>
+                      <span className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
                         ${remaining.toFixed(2)}
                       </span>
                     </div>
                   )}
                   {remaining <= 0.01 && (
-                    <div className="border-t border-gray-200 pt-2 text-center text-sm font-medium text-green-600">
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
                       Fully allocated
                     </div>
                   )}
@@ -341,7 +341,7 @@ export function SplitPayment() {
               size="lg"
               onClick={handleProcessSplit}
               disabled={!isValidSplit}
-              className="min-w-[160px] bg-green-600 hover:bg-green-700"
+              className="min-w-[160px] bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
             >
               Process Card ${cardAmount.toFixed(2)}
             </Button>
@@ -352,14 +352,14 @@ export function SplitPayment() {
       {splitStep === 'processing-card' && (
         <>
           <div className="flex flex-col items-center gap-4">
-            <p className="rounded-lg bg-green-50 px-4 py-2 text-sm text-green-700">
+            <p className="rounded-lg bg-green-50 dark:bg-green-900/30 px-4 py-2 text-sm text-green-700 dark:text-green-400">
               Cash: ${cashAmount.toFixed(2)} collected
             </p>
-            <CreditCard className="h-16 w-16 text-blue-500" />
-            <p className="text-xl font-medium text-gray-900">
+            <CreditCard className="h-16 w-16 text-blue-500 dark:text-blue-400" />
+            <p className="text-xl font-medium text-gray-900 dark:text-gray-100">
               Present card for ${cardAmount.toFixed(2)}
             </p>
-            <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-blue-400 dark:text-blue-300" />
           </div>
           <Button variant="outline" size="lg" onClick={handleCancel}>
             Cancel
@@ -369,17 +369,17 @@ export function SplitPayment() {
 
       {splitStep === 'complete' && (
         <div className="flex flex-col items-center gap-4">
-          <CheckCircle2 className="h-16 w-16 text-green-500" />
-          <p className="text-xl font-medium text-green-700">Payment complete</p>
+          <CheckCircle2 className="h-16 w-16 text-green-500 dark:text-green-400" />
+          <p className="text-xl font-medium text-green-700 dark:text-green-400">Payment complete</p>
         </div>
       )}
 
       {splitStep === 'error' && (
         <div className="flex flex-col items-center gap-4">
-          <AlertCircle className="h-16 w-16 text-red-500" />
-          <p className="text-lg font-medium text-red-700">Payment failed</p>
+          <AlertCircle className="h-16 w-16 text-red-500 dark:text-red-400" />
+          <p className="text-lg font-medium text-red-700 dark:text-red-400">Payment failed</p>
           {errorMsg && (
-            <p className="max-w-sm text-center text-sm text-red-600">
+            <p className="max-w-sm text-center text-sm text-red-600 dark:text-red-400">
               {errorMsg}
             </p>
           )}
@@ -397,7 +397,7 @@ export function SplitPayment() {
             <Button
               size="lg"
               onClick={handleProcessSplit}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600"
             >
               Retry
             </Button>

@@ -255,7 +255,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
   if (loading || !quote) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -271,17 +271,17 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"
+            className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
           >
             <ArrowLeft className="h-4 w-4" />
             Quotes
           </button>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-gray-900">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {quote.quote_number}
             </h1>
             <span
@@ -332,7 +332,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 variant="outline"
                 size="sm"
                 onClick={() => setDeleteDialogOpen(true)}
-                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-400"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -423,48 +423,48 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
         <div className="mx-auto max-w-2xl space-y-6">
           {/* Customer & Vehicle */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg border border-gray-200 p-4">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Customer
               </h3>
-              <p className="text-sm font-medium text-gray-900">{customerName}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{customerName}</p>
               {quote.customer?.email && (
-                <p className="mt-0.5 text-xs text-gray-500">{quote.customer.email}</p>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{quote.customer.email}</p>
               )}
               {quote.customer?.phone && (
-                <p className="mt-0.5 text-xs text-gray-500">{quote.customer.phone}</p>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{quote.customer.phone}</p>
               )}
             </div>
-            <div className="rounded-lg border border-gray-200 p-4">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Vehicle
               </h3>
-              <p className="text-sm font-medium text-gray-900">{vehicleStr}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{vehicleStr}</p>
             </div>
           </div>
 
           {/* Items */}
-          <div className="rounded-lg border border-gray-200">
-            <div className="border-b border-gray-200 px-4 py-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Services & Products
               </h3>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {quote.items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.item_name}</p>
                     {item.tier_name && (
-                      <p className="text-xs text-gray-500">{item.tier_name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.tier_name}</p>
                     )}
                     {item.notes && (
-                      <p className="text-xs text-gray-400 italic">{item.notes}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 italic">{item.notes}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-gray-500">x{item.quantity}</span>
-                    <span className="font-medium tabular-nums text-gray-900">
+                    <span className="text-gray-500 dark:text-gray-400">x{item.quantity}</span>
+                    <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
                       {formatCurrency(item.total_price)}
                     </span>
                   </div>
@@ -473,18 +473,18 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
             </div>
 
             {/* Totals */}
-            <div className="border-t border-gray-200 px-4 py-3 space-y-1">
-              <div className="flex justify-between text-sm text-gray-600">
+            <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 space-y-1">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                 <span>Subtotal</span>
                 <span className="tabular-nums">{formatCurrency(quote.subtotal)}</span>
               </div>
               {quote.tax_amount > 0 && (
-                <div className="flex justify-between text-sm text-gray-600">
+                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                   <span>Tax</span>
                   <span className="tabular-nums">{formatCurrency(quote.tax_amount)}</span>
                 </div>
               )}
-              <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
+              <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 text-base font-semibold text-gray-900 dark:text-gray-100">
                 <span>Total</span>
                 <span className="tabular-nums">{formatCurrency(quote.total_amount)}</span>
               </div>
@@ -492,75 +492,75 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
           </div>
 
           {/* Details */}
-          <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
               Details
             </h3>
             <div className="grid grid-cols-2 gap-y-2 text-sm">
-              <span className="text-gray-500">Created</span>
-              <span className="text-gray-900">{formatQuoteDateTime(quote.created_at)}</span>
+              <span className="text-gray-500 dark:text-gray-400">Created</span>
+              <span className="text-gray-900 dark:text-gray-100">{formatQuoteDateTime(quote.created_at)}</span>
 
               {quote.sent_at && (
                 <>
-                  <span className="text-gray-500">Last Contacted</span>
-                  <span className="text-gray-900">{formatQuoteDateTime(quote.sent_at)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Last Contacted</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatQuoteDateTime(quote.sent_at)}</span>
                 </>
               )}
 
               {quote.valid_until && (
                 <>
-                  <span className="text-gray-500">Valid Until</span>
-                  <span className="text-gray-900">{formatQuoteDate(quote.valid_until)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Valid Until</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatQuoteDate(quote.valid_until)}</span>
                 </>
               )}
 
-              <span className="text-gray-500">Last Updated</span>
-              <span className="text-gray-900">{formatQuoteDateTime(quote.updated_at)}</span>
+              <span className="text-gray-500 dark:text-gray-400">Last Updated</span>
+              <span className="text-gray-900 dark:text-gray-100">{formatQuoteDateTime(quote.updated_at)}</span>
             </div>
 
             {quote.notes && (
-              <div className="mt-3 border-t border-gray-100 pt-3">
-                <p className="text-xs text-gray-500">Notes</p>
-                <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{quote.notes}</p>
+              <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Notes</p>
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.notes}</p>
               </div>
             )}
           </div>
 
           {/* Communication History */}
           {communications.length > 0 && (
-            <div className="rounded-lg border border-gray-200">
-              <div className="border-b border-gray-200 px-4 py-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Communication History
                 </h3>
               </div>
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {communications.map((comm) => (
                   <div key={comm.id} className="flex items-center gap-3 px-4 py-2.5">
                     {comm.channel === 'email' ? (
-                      <Mail className="h-4 w-4 text-gray-400" />
+                      <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                     ) : (
-                      <MessageSquare className="h-4 w-4 text-gray-400" />
+                      <MessageSquare className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700 capitalize">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
                           {comm.channel}
                         </span>
                         <span
                           className={cn(
                             'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
                             comm.status === 'sent'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
+                              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                              : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
                           )}
                         >
                           {comm.status}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500">{comm.sent_to}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{comm.sent_to}</p>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                       <Clock className="h-3 w-3" />
                       {formatQuoteDateTime(comm.created_at)}
                     </div>

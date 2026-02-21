@@ -38,7 +38,7 @@ function ExpiryBadge({ expiresAt }: { expiresAt: string | null }) {
   if (days < 0) return null;
   if (days <= 3) {
     return (
-      <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+      <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
         <Clock className="h-2.5 w-2.5" />
         {days === 0 ? 'Expires today' : `${days}d left`}
       </span>
@@ -46,7 +46,7 @@ function ExpiryBadge({ expiresAt }: { expiresAt: string | null }) {
   }
   if (days <= 7) {
     return (
-      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
         <Clock className="h-2.5 w-2.5" />
         {days}d left
       </span>
@@ -77,35 +77,35 @@ function PromotionCard({
   };
 
   return (
-    <div className={`rounded-md border border-gray-200 border-l-4 p-3 ${accentClasses[accent]}`}>
+    <div className={`rounded-md border border-gray-200 dark:border-gray-700 border-l-4 p-3 ${accentClasses[accent]}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
               {promo.name || promo.code}
             </p>
             <ExpiryBadge expiresAt={promo.expires_at} />
           </div>
-          <p className="mt-0.5 text-xs text-gray-600">{promo.description}</p>
+          <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">{promo.description}</p>
           {promo.discount_amount > 0 && (
-            <p className="mt-0.5 text-xs font-medium text-gray-700">
+            <p className="mt-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
               Save ${promo.discount_amount.toFixed(2)}
             </p>
           )}
           {promo.missing_items && promo.missing_items.length > 0 && (
-            <p className="mt-1 text-xs text-amber-700">
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
               Needs: {promo.missing_items.join(', ')}
             </p>
           )}
           {promo.warning && (
-            <p className="mt-0.5 text-xs text-amber-600">{promo.warning}</p>
+            <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">{promo.warning}</p>
           )}
         </div>
         <div className="shrink-0">
           {isApplied ? (
             <button
               onClick={onRemove}
-              className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700 hover:bg-red-100 hover:text-red-700 transition-colors"
+              className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/40 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-700 dark:hover:text-red-400 transition-colors"
               title="Remove coupon"
             >
               <X className="h-3 w-3" />
@@ -152,18 +152,18 @@ function CollapsibleSection({
         className="flex w-full items-center justify-between py-2 text-left"
       >
         <div className="flex items-center gap-1.5">
-          <Icon className="h-3.5 w-3.5 text-gray-500" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <Icon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {title}
           </span>
-          <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+          <span className="rounded-full bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-400">
             {count}
           </span>
         </div>
         {open ? (
-          <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
+          <ChevronUp className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
         ) : (
-          <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+          <ChevronDown className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
         )}
       </button>
       {open && <div className="space-y-2 pb-3">{children}</div>}
@@ -305,8 +305,8 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
   if (!ticket.customer) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <Search className="h-8 w-8 text-gray-300" />
-        <p className="text-sm text-gray-500">
+        <Search className="h-8 w-8 text-gray-300 dark:text-gray-500" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Select a customer to view available promotions
         </p>
         <Button variant="outline" size="sm" onClick={onOpenCustomerLookup}>
@@ -319,7 +319,7 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
   if (loading && !promotions) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -331,14 +331,14 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
   return (
     <div className="h-full overflow-y-auto p-4">
       {loading && (
-        <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-400">
+        <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
           <Loader2 className="h-3 w-3 animate-spin" />
           Refreshing...
         </div>
       )}
 
       {totalCount === 0 && !loading ? (
-        <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+        <div className="flex h-40 items-center justify-center text-sm text-gray-400 dark:text-gray-500">
           No promotions available
         </div>
       ) : (
@@ -403,9 +403,9 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
       {/* Replace coupon confirmation */}
       {confirmReplace && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="mx-4 w-full max-w-sm rounded-lg border bg-white p-4 shadow-lg">
-            <p className="text-sm font-medium text-gray-900">Replace current coupon?</p>
-            <p className="mt-1 text-xs text-gray-500">
+          <div className="mx-4 w-full max-w-sm rounded-lg border bg-white dark:bg-gray-900 p-4 shadow-lg dark:shadow-gray-950/50">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Replace current coupon?</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               <span className="font-medium">{ticket.coupon?.code}</span> is currently applied.
               Replace with <span className="font-medium">{confirmReplace.name || confirmReplace.code}</span>?
             </p>

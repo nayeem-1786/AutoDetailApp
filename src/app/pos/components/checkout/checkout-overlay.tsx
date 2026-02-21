@@ -18,12 +18,12 @@ export function CheckoutOverlay() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={canClose ? closeCheckout : undefined}>
-      <div className="relative h-full w-full bg-white md:h-[90vh] md:max-h-[700px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative h-full w-full bg-white dark:bg-gray-900 md:h-[90vh] md:max-h-[700px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         {canClose && (
           <button
             onClick={closeCheckout}
-            className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
           >
             <X className="h-5 w-5" />
           </button>

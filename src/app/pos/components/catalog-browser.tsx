@@ -285,12 +285,12 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       <div className="flex h-full flex-col">
         <button
           onClick={() => setBrowseState({ view: 'categories' })}
-          className="flex shrink-0 items-center gap-1.5 px-4 pt-4 text-sm text-gray-500 hover:text-gray-800"
+          className="flex shrink-0 items-center gap-1.5 px-4 pt-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
         >
           <ArrowLeft className="h-4 w-4" />
           All Categories
         </button>
-        <h3 className="px-4 pt-2 text-base font-semibold text-gray-900">
+        <h3 className="px-4 pt-2 text-base font-semibold text-gray-900 dark:text-gray-100">
           {browseState.categoryName}
         </h3>
         <div className="flex-1 overflow-y-auto p-4">
@@ -317,7 +317,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   return (
     <div className="p-4">
       {categories.length === 0 ? (
-        <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+        <div className="flex h-40 items-center justify-center text-sm text-gray-400 dark:text-gray-500">
           No {type} found
         </div>
       ) : (

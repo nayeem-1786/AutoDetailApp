@@ -206,7 +206,7 @@ export function RefundDialog({
           <div className="space-y-4">
             {/* Item selection list */}
             <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Select items to refund
               </p>
               <div className="max-h-64 space-y-1.5 overflow-y-auto">
@@ -235,9 +235,9 @@ export function RefundDialog({
             <div className="space-y-1.5">
               <label
                 htmlFor="refund-reason"
-                className="text-sm font-medium text-gray-700"
+                className="text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Reason for refund <span className="text-red-500">*</span>
+                Reason for refund <span className="text-red-500 dark:text-red-400">*</span>
               </label>
               <textarea
                 id="refund-reason"
@@ -245,7 +245,7 @@ export function RefundDialog({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Describe why this refund is being issued..."
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:border-gray-400 dark:focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:ring-offset-2"
               />
             </div>
 

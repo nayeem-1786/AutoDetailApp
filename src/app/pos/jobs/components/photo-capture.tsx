@@ -101,7 +101,7 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
   // No photo captured yet — show capture trigger
   if (!capturedFile || !previewUrl) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-gray-50 p-4">
+      <div className="flex h-full flex-col items-center justify-center bg-gray-50 dark:bg-gray-800 p-4">
         <input
           ref={fileInputRef}
           type="file"
@@ -111,22 +111,22 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
           className="hidden"
         />
         <div className="text-center">
-          <Camera className="mx-auto mb-3 h-12 w-12 text-gray-300" />
-          <h3 className="text-sm font-medium text-gray-700">
+          <Camera className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-500" />
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Capture {getZoneLabel(zone)}
           </h3>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Take a photo of the {getZoneLabel(zone).toLowerCase()} area
           </p>
           <button
             onClick={openCamera}
-            className="mt-4 rounded-lg bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700"
+            className="mt-4 rounded-lg bg-blue-600 dark:bg-blue-500 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
           >
             Open Camera
           </button>
           <button
             onClick={onCancel}
-            className="mt-2 block w-full text-sm text-gray-500 hover:text-gray-700"
+            className="mt-2 block w-full text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
           >
             Cancel
           </button>
@@ -142,7 +142,7 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
       <div className="flex items-center justify-between bg-gray-800 px-4 py-2">
         <span className="text-sm font-medium text-white">{getZoneLabel(zone)}</span>
         {annotations.length > 0 && (
-          <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
+          <span className="rounded-full bg-red-600 dark:bg-red-500 px-2 py-0.5 text-xs text-white">
             {annotations.length} annotation{annotations.length !== 1 ? 's' : ''}
           </span>
         )}
@@ -165,27 +165,27 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
       <div className="space-y-2 bg-gray-800 px-4 py-3">
         {/* Notes */}
         <div className="flex items-center gap-2">
-          <StickyNote className="h-4 w-4 shrink-0 text-gray-400" />
+          <StickyNote className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Add notes (optional)..."
-            className="flex-1 rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+            className="flex-1 rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none"
           />
         </div>
 
         {/* Internal only toggle */}
         <button
           onClick={() => setIsInternal(!isInternal)}
-          className="flex w-full items-center gap-2 rounded px-1 py-1 text-sm text-gray-300 hover:bg-gray-700"
+          className="flex w-full items-center gap-2 rounded px-1 py-1 text-sm text-gray-300 dark:text-gray-500 hover:bg-gray-700"
         >
           {isInternal ? (
-            <EyeOff className="h-4 w-4 text-amber-400" />
+            <EyeOff className="h-4 w-4 text-amber-400 dark:text-amber-300" />
           ) : (
-            <Eye className="h-4 w-4 text-gray-400" />
+            <Eye className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           )}
-          <span className={cn(isInternal && 'text-amber-400')}>
+          <span className={cn(isInternal && 'text-amber-400 dark:text-amber-300')}>
             {isInternal ? 'Internal Only — hidden from customer' : 'Visible to customer'}
           </span>
         </button>
@@ -195,14 +195,14 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
       <div className="flex gap-2 bg-gray-800 px-4 pb-4">
         <button
           onClick={handleRetake}
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-600 px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-700"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-600 px-3 py-2.5 text-sm text-gray-300 dark:text-gray-500 hover:bg-gray-700"
         >
           <RotateCcw className="h-4 w-4" />
           Retake
         </button>
         <button
           onClick={() => setShowAnnotation(true)}
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-600 px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-700"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-600 px-3 py-2.5 text-sm text-gray-300 dark:text-gray-500 hover:bg-gray-700"
         >
           <Pencil className="h-4 w-4" />
           Annotate
@@ -210,7 +210,7 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
           {saving ? 'Saving...' : 'Save Photo'}

@@ -155,47 +155,47 @@ export function ZonePicker({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
-        <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100">
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
+      <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+        <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+          <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
         </button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold text-gray-900">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {phase === 'intake' ? 'Intake Photos' : phase === 'completion' ? 'Completion Photos' : 'Progress Photos'}
           </h1>
-          <p className="text-xs text-gray-500">Tap a zone to capture photos</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Tap a zone to capture photos</p>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="flex items-center gap-3 border-b border-gray-100 bg-white px-4 py-2.5">
+      <div className="flex items-center gap-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2.5">
         <div className="flex items-center gap-1.5">
           <span
             className={cn(
               'rounded-full px-2 py-0.5 text-xs font-medium',
-              exteriorMet ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              exteriorMet ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
             )}
           >
             {exteriorCovered}/{minExterior} Exterior
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-gray-300 dark:text-gray-500">|</span>
           <span
             className={cn(
               'rounded-full px-2 py-0.5 text-xs font-medium',
-              interiorMet ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              interiorMet ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
             )}
           >
             {interiorCovered}/{minInterior} Interior
           </span>
         </div>
         <div className="flex-1" />
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-gray-400 dark:text-gray-500">
           {photos.length} photo{photos.length !== 1 ? 's' : ''} total
         </span>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 bg-white">
+      <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         {(['exterior', 'interior'] as const).map((t) => (
           <button
             key={t}
@@ -203,8 +203,8 @@ export function ZonePicker({
             className={cn(
               'flex-1 py-2.5 text-center text-sm font-medium transition-colors',
               tab === t
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             )}
           >
             {t === 'exterior' ? 'Exterior' : 'Interior'}
@@ -213,10 +213,10 @@ export function ZonePicker({
       </div>
 
       {/* SVG Vehicle Diagram + Zone List */}
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
           </div>
         ) : (
           <>
@@ -241,7 +241,7 @@ export function ZonePicker({
                 return (
                   <div
                     key={zone.key}
-                    className="flex items-center rounded-lg bg-white shadow-sm"
+                    className="flex items-center rounded-lg bg-white dark:bg-gray-900 shadow-sm dark:shadow-gray-950/30"
                   >
                     {/* Zone info — taps to view existing photos */}
                     <button
@@ -252,42 +252,42 @@ export function ZonePicker({
                         <img
                           src={intakePhoto.thumbnail_url || intakePhoto.image_url}
                           alt="Intake"
-                          className="h-10 w-10 shrink-0 rounded-md object-cover ring-1 ring-gray-200"
+                          className="h-10 w-10 shrink-0 rounded-md object-cover ring-1 ring-gray-200 dark:ring-gray-700"
                         />
                       ) : (
                         <div
                           className={cn(
                             'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                            hasPhotos ? 'bg-green-100' : 'bg-gray-100'
+                            hasPhotos ? 'bg-green-100 dark:bg-green-900/40' : 'bg-gray-100 dark:bg-gray-800'
                           )}
                         >
                           {hasPhotos ? (
-                            <Check className="h-4 w-4 text-green-600" />
+                            <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
                           ) : (
-                            <Camera className="h-4 w-4 text-gray-400" />
+                            <Camera className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                           )}
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900">{zone.label}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{zone.label}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
                           {isCompletionFlow && intakePhoto
                             ? 'Tap to capture after photo'
                             : zone.description}
                         </p>
                       </div>
                       {hasPhotos && (
-                        <span className="mr-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        <span className="mr-1 rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">
                           {count}
                         </span>
                       )}
-                      {hasPhotos && <ChevronRight className="h-4 w-4 text-gray-400" />}
+                      {hasPhotos && <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />}
                     </button>
 
                     {/* Quick capture button */}
                     <button
                       onClick={() => setCaptureZone(zone.key)}
-                      className="flex items-center gap-1 border-l border-gray-100 px-3 py-3 text-blue-600 hover:bg-blue-50"
+                      className="flex items-center gap-1 border-l border-gray-100 dark:border-gray-800 px-3 py-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
                     >
                       <Camera className="h-4 w-4" />
                     </button>
@@ -300,15 +300,15 @@ export function ZonePicker({
       </div>
 
       {/* Complete button */}
-      <div className="border-t border-gray-200 bg-white px-4 py-3">
+      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         <button
           onClick={handleComplete}
           disabled={!allMet || completing}
           className={cn(
             'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
             allMet
-              ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'cursor-not-allowed bg-gray-200 text-gray-400'
+              ? 'bg-green-600 dark:bg-green-500 text-white hover:bg-green-700 dark:hover:bg-green-600'
+              : 'cursor-not-allowed bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
           )}
         >
           <Check className="h-4 w-4" />

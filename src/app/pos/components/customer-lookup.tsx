@@ -84,41 +84,41 @@ export function CustomerLookup({
     <div className="flex flex-col gap-3">
       {/* Phone input */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         <input
           type="text"
           value={searchInput}
           onChange={(e) => handleInputChange(e.target.value)}
           placeholder="Search by name or phone..."
           autoFocus
-          className="h-10 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm text-gray-900 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+          className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-400 dark:focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700"
         />
         {loading && (
-          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" />
+          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400 dark:text-gray-500" />
         )}
       </div>
 
       {/* Results */}
       {searched && results.length === 0 && (
-        <p className="text-center text-sm text-gray-400">No customers found</p>
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500">No customers found</p>
       )}
 
       {results.length > 0 && (
-        <div className="max-h-48 overflow-y-auto rounded-md border border-gray-200">
+        <div className="max-h-48 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
           {results.map((r) => (
             <div
               key={r.id}
-              className="flex w-full items-center justify-between border-b border-gray-100 px-3 py-2.5 last:border-b-0 hover:bg-gray-50"
+              className="flex w-full items-center justify-between border-b border-gray-100 dark:border-gray-800 px-3 py-2.5 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <button
                 onClick={() => handleSelectResult(r)}
                 className="flex-1 text-left"
               >
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   {r.first_name} {r.last_name}
                 </p>
                 {r.phone && (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {formatPhone(r.phone)}
                   </p>
                 )}
@@ -139,11 +139,11 @@ export function CustomerLookup({
                   onClick={() => handleSelectResult(r)}
                   className="text-right"
                 >
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {r.visit_count} visit{r.visit_count !== 1 ? 's' : ''}
                   </p>
                   {r.loyalty_points_balance > 0 && (
-                    <p className="text-xs text-amber-600">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
                       {r.loyalty_points_balance} pts
                     </p>
                   )}

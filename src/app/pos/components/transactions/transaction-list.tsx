@@ -21,11 +21,11 @@ interface TransactionListProps {
 const PAGE_SIZE = 20;
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  completed: 'bg-green-50 text-green-700',
-  refunded: 'bg-red-50 text-red-700',
-  partial_refund: 'bg-amber-50 text-amber-700',
-  voided: 'bg-gray-100 text-gray-500',
-  open: 'bg-blue-50 text-blue-700',
+  completed: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+  refunded: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+  partial_refund: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+  voided: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400',
+  open: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
 };
 
 type DatePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_year' | 'all' | 'custom';
@@ -168,9 +168,9 @@ export function TransactionList({ onSelect }: TransactionListProps) {
   const presets: DatePreset[] = ['today', 'yesterday', 'this_week', 'this_month', 'this_year', 'all', 'custom'];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-white">
+    <div className="flex h-full flex-col overflow-hidden bg-white dark:bg-gray-900">
       {/* Filters */}
-      <div className="border-b border-gray-200 p-4 space-y-3">
+      <div className="border-b border-gray-200 dark:border-gray-700 p-4 space-y-3">
         {/* Date preset chips */}
         <div className="flex flex-wrap gap-2">
           {presets.map((preset) => (
@@ -179,8 +179,8 @@ export function TransactionList({ onSelect }: TransactionListProps) {
               onClick={() => handlePresetClick(preset)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 activePreset === preset
-                  ? 'bg-blue-600 text-white'
-                  : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                  : 'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
               }`}
             >
               {PRESET_LABELS[preset]}
@@ -195,21 +195,21 @@ export function TransactionList({ onSelect }: TransactionListProps) {
               type="date"
               value={dateFrom}
               onChange={(e) => handleCustomDateChange(e.target.value, dateTo)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm text-gray-900 dark:text-gray-100"
             />
-            <span className="text-sm text-gray-400">to</span>
+            <span className="text-sm text-gray-400 dark:text-gray-500">to</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => handleCustomDateChange(dateFrom, e.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm text-gray-900 dark:text-gray-100"
             />
           </div>
         )}
 
         {/* Search bar */}
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -223,16 +223,16 @@ export function TransactionList({ onSelect }: TransactionListProps) {
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />
           </div>
         ) : transactions.length === 0 ? (
           <div className="flex items-center justify-center py-20">
-            <p className="text-sm text-gray-500">No transactions found</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No transactions found</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 <th className="px-4 py-3">Receipt #</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Customer</th>
@@ -241,36 +241,36 @@ export function TransactionList({ onSelect }: TransactionListProps) {
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {transactions.map((tx) => (
                 <tr
                   key={tx.id}
                   onClick={() => onSelect(tx)}
-                  className="cursor-pointer transition-colors hover:bg-gray-50"
+                  className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                     {tx.receipt_number ?? '---'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
                     {formatDateTime(tx.transaction_date)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
                     {tx.customer
                       ? `${tx.customer.first_name} ${tx.customer.last_name}`
                       : 'Walk-in'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
                     {tx.payment_method
                       ? tx.payment_method.charAt(0).toUpperCase() + tx.payment_method.slice(1)
                       : '---'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900 dark:text-gray-100">
                     {formatCurrency(tx.total_amount)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        STATUS_BADGE_CLASSES[tx.status] ?? 'bg-gray-100 text-gray-500'
+                        STATUS_BADGE_CLASSES[tx.status] ?? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
                       }`}
                     >
                       {TRANSACTION_STATUS_LABELS[tx.status] ?? tx.status}
@@ -285,8 +285,8 @@ export function TransactionList({ onSelect }: TransactionListProps) {
 
       {/* Pagination */}
       {!loading && total > 0 && (
-        <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
-          <p className="text-sm text-gray-600">
+        <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Showing {startIndex + 1}-{endIndex} of {total}
           </p>
           <div className="flex items-center gap-2">

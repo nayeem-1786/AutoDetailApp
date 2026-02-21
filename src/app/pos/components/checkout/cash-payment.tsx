@@ -159,14 +159,14 @@ export function CashPayment() {
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
-        <p className="text-lg text-gray-500">Cash Payment</p>
-        <p className="mt-1 text-3xl font-bold text-gray-900">
+        <p className="text-lg text-gray-500 dark:text-gray-400">Cash Payment</p>
+        <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">
           ${amountDue.toFixed(2)}
         </p>
       </div>
 
       {!isOnline && (
-        <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-700">
+        <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/30 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
           <WifiOff className="h-4 w-4 shrink-0" />
           <span>Offline — transaction will be queued and synced later</span>
         </div>
@@ -182,8 +182,8 @@ export function CashPayment() {
             className={cn(
               'h-14 w-20 rounded-lg border-2 text-lg font-semibold transition-all',
               tendered === amt.toString()
-                ? 'border-green-500 bg-green-50 text-green-700'
-                : 'border-gray-200 text-gray-700 hover:border-gray-300',
+                ? 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600',
               amt < amountDue && 'opacity-40'
             )}
           >
@@ -195,8 +195,8 @@ export function CashPayment() {
           className={cn(
             'h-14 rounded-lg border-2 px-4 text-lg font-semibold transition-all',
             tendered === amountDue.toFixed(2)
-              ? 'border-green-500 bg-green-50 text-green-700'
-              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              ? 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+              : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
           )}
         >
           Exact
@@ -205,7 +205,7 @@ export function CashPayment() {
 
       {/* Custom amount input */}
       <div className="flex items-center gap-2">
-        <span className="text-xl text-gray-500">$</span>
+        <span className="text-xl text-gray-500 dark:text-gray-400">$</span>
         <input
           type="text"
           inputMode="decimal"
@@ -215,7 +215,7 @@ export function CashPayment() {
             const v = e.target.value.replace(/[^0-9.]/g, '');
             setTendered(v);
           }}
-          className="h-14 w-40 rounded-lg border border-gray-300 text-center text-2xl tabular-nums text-gray-900 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-200"
+          className="h-14 w-40 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-green-400 dark:focus:border-green-600 focus:outline-none focus:ring-2 focus:ring-green-200 dark:focus:ring-green-800"
           placeholder="0.00"
         />
       </div>
@@ -225,18 +225,18 @@ export function CashPayment() {
         <div
           className={cn(
             'rounded-lg px-6 py-3 text-center',
-            isValid ? 'bg-green-50' : 'bg-red-50'
+            isValid ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
           )}
         >
           {isValid ? (
             <p className="text-lg">
               Change:{' '}
-              <span className="text-2xl font-bold text-green-700">
+              <span className="text-2xl font-bold text-green-700 dark:text-green-400">
                 ${change.toFixed(2)}
               </span>
             </p>
           ) : (
-            <p className="text-lg text-red-600">
+            <p className="text-lg text-red-600 dark:text-red-400">
               Short ${(amountDue - tenderedNum).toFixed(2)}
             </p>
           )}
@@ -244,7 +244,7 @@ export function CashPayment() {
       )}
 
       {checkout.error && (
-        <p className="text-sm text-red-600">{checkout.error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400">{checkout.error}</p>
       )}
 
       {/* Actions */}
@@ -261,7 +261,7 @@ export function CashPayment() {
           size="lg"
           onClick={handleProcessCash}
           disabled={!isValid || processing}
-          className="min-w-[160px] bg-green-600 hover:bg-green-700"
+          className="min-w-[160px] bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
         >
           {processing ? (
             <Loader2 className="h-5 w-5 animate-spin" />

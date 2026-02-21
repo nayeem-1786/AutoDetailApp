@@ -59,9 +59,9 @@ export function QuoteDeleteDialog({
       </DialogHeader>
       <DialogContent>
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-md bg-red-50 p-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-            <div className="text-sm text-red-700">
+          <div className="flex items-start gap-3 rounded-md bg-red-50 dark:bg-red-900/30 p-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500 dark:text-red-400" />
+            <div className="text-sm text-red-700 dark:text-red-400">
               <p className="font-medium">Are you sure?</p>
               <p className="mt-1">
                 This will permanently delete quote <strong>{quoteNumber}</strong> and all its items. This action cannot be undone.

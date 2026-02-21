@@ -75,17 +75,17 @@ export function QuoteCouponInput() {
 
   if (quote.coupon) {
     return (
-      <div className="flex items-center justify-between rounded-md bg-green-50 px-3 py-1.5">
-        <div className="flex items-center gap-1.5 text-sm text-green-700">
+      <div className="flex items-center justify-between rounded-md bg-green-50 dark:bg-green-900/30 px-3 py-1.5">
+        <div className="flex items-center gap-1.5 text-sm text-green-700 dark:text-green-400">
           <Tag className="h-3.5 w-3.5" />
           <span className="font-medium">{quote.coupon.code}</span>
-          <span className="text-green-600">
+          <span className="text-green-600 dark:text-green-400">
             -${quote.coupon.discount.toFixed(2)}
           </span>
         </div>
         <button
           onClick={handleRemove}
-          className="rounded p-0.5 text-green-500 hover:bg-green-100 hover:text-green-700"
+          className="rounded p-0.5 text-green-500 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 hover:text-green-700 dark:hover:text-green-400"
         >
           <X className="h-3.5 w-3.5" />
         </button>

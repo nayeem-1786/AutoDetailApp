@@ -201,9 +201,9 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   }
 
   return (
-    <div className="flex h-full flex-col border-l border-gray-200 bg-white">
+    <div className="flex h-full flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {/* Customer / Vehicle summary */}
-      <div className="border-b border-gray-100 px-4 py-2">
+      <div className="border-b border-gray-100 dark:border-gray-800 px-4 py-2">
         <CustomerVehicleSummary
           customer={ticket.customer}
           vehicle={ticket.vehicle}
@@ -221,8 +221,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       </div>
 
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+      <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Ticket
         </h2>
       </div>
@@ -230,7 +230,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       {/* Items list */}
       <div className="flex-1 overflow-y-auto px-4">
         {ticket.items.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-gray-400">
+          <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             Tap items to add to ticket
           </div>
         ) : (
@@ -261,7 +261,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
       {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (
-        <div className="space-y-2 border-t border-gray-100 px-4 py-2">
+        <div className="space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
           <CouponInput />
           <LoyaltyPanel />
 
@@ -269,13 +269,13 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           {canManualDiscount && (
             <>
               {ticket.manualDiscount ? (
-                <div className="flex items-center justify-between rounded-md bg-red-50 px-3 py-1.5">
-                  <div className="flex items-center gap-1.5 text-sm text-red-700">
+                <div className="flex items-center justify-between rounded-md bg-red-50 dark:bg-red-900/30 px-3 py-1.5">
+                  <div className="flex items-center gap-1.5 text-sm text-red-700 dark:text-red-400">
                     <Tag className="h-3.5 w-3.5" />
                     <span className="font-medium">
                       {ticket.manualDiscount.label || 'Discount'}
                     </span>
-                    <span className="text-red-600">
+                    <span className="text-red-600 dark:text-red-400">
                       {ticket.manualDiscount.type === 'percent'
                         ? `${ticket.manualDiscount.value}%`
                         : `-$${ticket.manualDiscount.value.toFixed(2)}`}
@@ -283,13 +283,13 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                   </div>
                   <button
                     onClick={handleRemoveDiscount}
-                    className="flex h-11 w-11 items-center justify-center rounded text-red-500 hover:bg-red-100 hover:text-red-700"
+                    className="flex h-11 w-11 items-center justify-center rounded text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-700 dark:hover:text-red-400"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               ) : showDiscountForm ? (
-                <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+                <div className="space-y-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
                   {/* Toggle: Dollar / Percent */}
                   <div className="flex gap-1">
                     <button
@@ -297,7 +297,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                       className={`min-h-[44px] flex-1 rounded px-3 py-2 text-xs font-medium transition-colors ${
                         discountType === 'dollar'
                           ? 'bg-gray-900 text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                          : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
                     >
                       Dollar ($)
@@ -307,7 +307,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                       className={`min-h-[44px] flex-1 rounded px-3 py-2 text-xs font-medium transition-colors ${
                         discountType === 'percent'
                           ? 'bg-gray-900 text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                          : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
                     >
                       Percent (%)
@@ -369,7 +369,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
               ) : (
                 <button
                   onClick={() => setShowDiscountForm(true)}
-                  className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
+                  className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                 >
                   <Tag className="h-4 w-4" />
                   Add Discount

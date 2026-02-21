@@ -28,7 +28,7 @@ export function CustomerVehicleSummary({
     return (
       <button
         onClick={onChangeCustomer}
-        className="flex w-full items-center justify-between rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700"
+        className="flex w-full items-center justify-between rounded-md border border-dashed border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
       >
         <div className="flex items-center gap-1.5">
           <User className="h-3.5 w-3.5" />
@@ -49,18 +49,18 @@ export function CustomerVehicleSummary({
     : null;
 
   return (
-    <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+    <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2">
       {/* Customer row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <button
             onClick={onChangeCustomer}
-            className="flex items-center gap-1.5 text-sm font-medium text-gray-900 hover:text-blue-600"
+            className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400"
           >
-            <User className="h-3.5 w-3.5 text-gray-400" />
+            <User className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
             {customer.first_name} {customer.last_name}
             {customer.phone && (
-              <span className="text-xs font-normal text-gray-500">
+              <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
                 {formatPhone(customer.phone)}
               </span>
             )}
@@ -73,7 +73,7 @@ export function CustomerVehicleSummary({
         </div>
         <button
           onClick={onClear}
-          className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+          className="rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-400"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -82,18 +82,18 @@ export function CustomerVehicleSummary({
       {/* Vehicle row */}
       <button
         onClick={onChangeVehicle}
-        className="mt-1 flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600"
+        className="mt-1 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
       >
-        <Car className="h-3.5 w-3.5 text-gray-400" />
+        <Car className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
         {vehicleLabel ? (
           <>
             <span>{vehicleLabel}</span>
             {sizeLabel && (
-              <span className="text-xs text-gray-400">({sizeLabel})</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">({sizeLabel})</span>
             )}
           </>
         ) : (
-          <span className="text-gray-400">Tap to select vehicle</span>
+          <span className="text-gray-400 dark:text-gray-500">Tap to select vehicle</span>
         )}
       </button>
     </div>

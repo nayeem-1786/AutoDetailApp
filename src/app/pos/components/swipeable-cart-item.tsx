@@ -57,7 +57,7 @@ export function SwipeableCartItem({
     <div className="relative overflow-hidden" ref={constraintsRef}>
       {/* Red delete background revealed on swipe */}
       <motion.div
-        className="absolute inset-0 flex items-center justify-end rounded-r bg-red-500 pr-4"
+        className="absolute inset-0 flex items-center justify-end rounded-r bg-red-500 dark:bg-red-600 pr-4"
         style={{ opacity: deleteOpacity }}
         aria-hidden
       >
@@ -78,7 +78,7 @@ export function SwipeableCartItem({
         dragElastic={0.1}
         style={{ x }}
         onDragEnd={handleDragEnd}
-        className="relative z-10 bg-white"
+        className="relative z-10 bg-white dark:bg-gray-900"
         aria-label="Swipe left to remove"
       >
         {children}

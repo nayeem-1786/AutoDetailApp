@@ -84,11 +84,11 @@ export function BottomNav() {
   }, [moreOpen]);
 
   return (
-    <nav className="flex h-14 shrink-0 items-center justify-around border-t border-gray-200 bg-white px-2">
+    <nav className="flex h-14 shrink-0 items-center justify-around border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2">
       {/* Log out */}
       <button
         onClick={handleLogout}
-        className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px] text-gray-500 hover:text-gray-800"
+        className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px] text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
       >
         <LogOut className="h-5 w-5" />
         <span className="text-[10px] font-medium leading-tight">{initials || 'Out'}</span>
@@ -99,13 +99,13 @@ export function BottomNav() {
         href="/pos/end-of-day"
         className={cn(
           'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
-          pathname === '/pos/end-of-day' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+          pathname === '/pos/end-of-day' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
         )}
       >
         <div className="relative">
           <Vault className="h-5 w-5" />
           {drawerOpen && (
-            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500" />
+            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500 dark:bg-green-600" />
           )}
         </div>
         <span className="text-[10px] font-medium leading-tight">Register</span>
@@ -116,7 +116,7 @@ export function BottomNav() {
         href="/pos/transactions"
         className={cn(
           'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
-          pathname.startsWith('/pos/transactions') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+          pathname.startsWith('/pos/transactions') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
         )}
       >
         <Receipt className="h-5 w-5" />
@@ -128,7 +128,7 @@ export function BottomNav() {
         href="/pos/quotes"
         className={cn(
           'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
-          pathname.startsWith('/pos/quotes') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+          pathname.startsWith('/pos/quotes') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
         )}
       >
         <FileText className="h-5 w-5" />
@@ -140,7 +140,7 @@ export function BottomNav() {
         href="/pos/jobs"
         className={cn(
           'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
-          pathname.startsWith('/pos/jobs') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+          pathname.startsWith('/pos/jobs') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
         )}
       >
         <ClipboardList className="h-5 w-5" />
@@ -153,7 +153,7 @@ export function BottomNav() {
           onClick={() => setMoreOpen((prev) => !prev)}
           className={cn(
             'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
-            moreOpen ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
+            moreOpen ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
           )}
         >
           <MoreHorizontal className="h-5 w-5" />
@@ -162,21 +162,21 @@ export function BottomNav() {
 
         {/* More dropdown menu */}
         {moreOpen && (
-          <div className="absolute bottom-full right-0 mb-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          <div className="absolute bottom-full right-0 mb-2 w-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-1 shadow-lg dark:shadow-gray-950/50">
             <Link
               href="/admin"
               onClick={() => setMoreOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              <ExternalLink className="h-4 w-4 text-gray-400" />
+              <ExternalLink className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               Go to Admin
             </Link>
             <Link
               href="/admin/settings"
               onClick={() => setMoreOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              <Settings className="h-4 w-4 text-gray-400" />
+              <Settings className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               Settings
             </Link>
           </div>

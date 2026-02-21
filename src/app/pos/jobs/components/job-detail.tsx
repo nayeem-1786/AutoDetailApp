@@ -98,20 +98,20 @@ interface JobDetailData {
 }
 
 const STATUS_CONFIG: Record<JobStatus, { label: string; color: string }> = {
-  scheduled: { label: 'Scheduled', color: 'bg-gray-100 text-gray-700' },
-  intake: { label: 'Intake', color: 'bg-blue-100 text-blue-700' },
-  in_progress: { label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
-  pending_approval: { label: 'Pending Approval', color: 'bg-orange-100 text-orange-700' },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
-  closed: { label: 'Closed', color: 'bg-slate-100 text-slate-600' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700' },
+  scheduled: { label: 'Scheduled', color: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300' },
+  intake: { label: 'Intake', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' },
+  in_progress: { label: 'In Progress', color: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300' },
+  pending_approval: { label: 'Pending Approval', color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400' },
+  completed: { label: 'Completed', color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
+  closed: { label: 'Closed', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+  cancelled: { label: 'Cancelled', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' },
 };
 
 const ADDON_STATUS_CONFIG: Record<JobAddonStatus, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: 'bg-orange-100 text-orange-700' },
-  approved: { label: 'Approved', color: 'bg-green-100 text-green-700' },
-  declined: { label: 'Declined', color: 'bg-red-100 text-red-700' },
-  expired: { label: 'Expired', color: 'bg-gray-100 text-gray-600' },
+  pending: { label: 'Pending', color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400' },
+  approved: { label: 'Approved', color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
+  declined: { label: 'Declined', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' },
+  expired: { label: 'Expired', color: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' },
 };
 
 const CANCELLATION_REASONS = [
@@ -650,7 +650,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
       </div>
     );
   }
@@ -658,8 +658,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   if (!job) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
-        <p className="text-gray-500">Job not found</p>
-        <button onClick={onBack} className="mt-4 text-sm text-blue-600 hover:underline">
+        <p className="text-gray-500 dark:text-gray-400">Job not found</p>
+        <button onClick={onBack} className="mt-4 text-sm text-blue-600 dark:text-blue-400 hover:underline">
           Back to queue
         </button>
       </div>
@@ -679,14 +679,14 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-white px-4 py-3">
+      <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-lg font-semibold text-gray-900">
+              <h1 className="truncate text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {job.customer
                   ? `${job.customer.first_name} ${job.customer.last_name}`
                   : 'Unknown Customer'}
@@ -696,7 +696,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
                   job.appointment_id
                     ? 'bg-purple-100 text-purple-700'
-                    : 'bg-amber-100 text-amber-700'
+                    : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
                 )}
               >
                 {job.appointment_id ? (
@@ -714,7 +714,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 {statusConfig.label}
               </span>
             </div>
-            <p className="text-sm text-gray-500">{formatVehicle(job.vehicle)}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{formatVehicle(job.vehicle)}</p>
           </div>
         </div>
 
@@ -733,11 +733,11 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
         <div className="space-y-3">
           {/* Intake completed banner */}
           {job.status === 'intake' && job.intake_completed_at && !job.work_started_at && (
-            <div className="flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 p-3 text-sm text-blue-700 dark:text-blue-400">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Intake complete — ready to start work</span>
             </div>
@@ -747,30 +747,30 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           {canManageJobs && !['completed', 'closed', 'cancelled'].includes(job.status) ? (
             <button
               onClick={handleOpenReassign}
-              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+              className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <User className="h-4 w-4" />
                     <span>Assigned Detailer</span>
                   </div>
-                  <p className="mt-1 font-medium text-gray-900">
+                  <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">
                     {job.assigned_staff
                       ? `${job.assigned_staff.first_name} ${job.assigned_staff.last_name}`
                       : 'Unassigned'}
                   </p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-gray-400" />
+                <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </div>
             </button>
           ) : (
-            <div className="rounded-lg bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <User className="h-4 w-4" />
                 <span>Assigned Detailer</span>
               </div>
-              <p className="mt-1 font-medium text-gray-900">
+              <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">
                 {job.assigned_staff
                   ? `${job.assigned_staff.first_name} ${job.assigned_staff.last_name}`
                   : 'Unassigned'}
@@ -782,47 +782,47 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           {isEditable ? (
             <button
               onClick={handleOpenEditServices}
-              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+              className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                   <Wrench className="h-4 w-4" />
                   <span>Services</span>
                 </div>
-                <Pencil className="h-4 w-4 text-gray-400" />
+                <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </div>
               <div className="mt-2 space-y-1">
                 {job.services.map((svc) => (
                   <div key={svc.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-900">{svc.name}</span>
-                    <span className="text-gray-600">${svc.price.toFixed(2)}</span>
+                    <span className="text-gray-900 dark:text-gray-100">{svc.name}</span>
+                    <span className="text-gray-600 dark:text-gray-400">${svc.price.toFixed(2)}</span>
                   </div>
                 ))}
-                <div className="mt-1 border-t border-gray-100 pt-1">
+                <div className="mt-1 border-t border-gray-100 dark:border-gray-800 pt-1">
                   <div className="flex items-center justify-between text-sm font-medium">
-                    <span className="text-gray-700">Total</span>
-                    <span className="text-gray-900">${servicesTotal.toFixed(2)}</span>
+                    <span className="text-gray-700 dark:text-gray-300">Total</span>
+                    <span className="text-gray-900 dark:text-gray-100">${servicesTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
             </button>
           ) : (
-            <div className="rounded-lg bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <Wrench className="h-4 w-4" />
                 <span>Services</span>
               </div>
               <div className="mt-2 space-y-1">
                 {job.services.map((svc) => (
                   <div key={svc.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-900">{svc.name}</span>
-                    <span className="text-gray-600">${svc.price.toFixed(2)}</span>
+                    <span className="text-gray-900 dark:text-gray-100">{svc.name}</span>
+                    <span className="text-gray-600 dark:text-gray-400">${svc.price.toFixed(2)}</span>
                   </div>
                 ))}
-                <div className="mt-1 border-t border-gray-100 pt-1">
+                <div className="mt-1 border-t border-gray-100 dark:border-gray-800 pt-1">
                   <div className="flex items-center justify-between text-sm font-medium">
-                    <span className="text-gray-700">Total</span>
-                    <span className="text-gray-900">${servicesTotal.toFixed(2)}</span>
+                    <span className="text-gray-700 dark:text-gray-300">Total</span>
+                    <span className="text-gray-900 dark:text-gray-100">${servicesTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -830,44 +830,44 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           )}
 
           {/* Timing */}
-          <div className="rounded-lg bg-white p-3 shadow-sm">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
               <Clock className="h-4 w-4" />
               <span>Timing</span>
             </div>
             <div className="mt-2 space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Created</span>
-                <span className="text-gray-900">{formatDateTime(job.created_at)}</span>
+                <span className="text-gray-500 dark:text-gray-400">Created</span>
+                <span className="text-gray-900 dark:text-gray-100">{formatDateTime(job.created_at)}</span>
               </div>
               {job.estimated_pickup_at && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Est. Pickup</span>
-                  <span className="text-gray-900">{formatTime(job.estimated_pickup_at)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Est. Pickup</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatTime(job.estimated_pickup_at)}</span>
                 </div>
               )}
               {job.intake_started_at && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Intake Started</span>
-                  <span className="text-gray-900">{formatTime(job.intake_started_at)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Intake Started</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatTime(job.intake_started_at)}</span>
                 </div>
               )}
               {job.intake_completed_at && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Intake Completed</span>
-                  <span className="text-gray-900">{formatTime(job.intake_completed_at)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Intake Completed</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatTime(job.intake_completed_at)}</span>
                 </div>
               )}
               {job.work_started_at && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Work Started</span>
-                  <span className="text-gray-900">{formatTime(job.work_started_at)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Work Started</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatTime(job.work_started_at)}</span>
                 </div>
               )}
               {job.work_completed_at && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Work Completed</span>
-                  <span className="text-gray-900">{formatTime(job.work_completed_at)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Work Completed</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatTime(job.work_completed_at)}</span>
                 </div>
               )}
             </div>
@@ -877,26 +877,26 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           {isEditable ? (
             <button
               onClick={handleStartEditNotes}
-              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+              className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                   <FileText className="h-4 w-4" />
                   <span>Notes</span>
                 </div>
-                <Pencil className="h-4 w-4 text-gray-400" />
+                <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </div>
-              <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
-                {job.intake_notes || <span className="italic text-gray-400">Tap to add notes</span>}
+              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {job.intake_notes || <span className="italic text-gray-400 dark:text-gray-500">Tap to add notes</span>}
               </p>
             </button>
           ) : job.intake_notes ? (
-            <div className="rounded-lg bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <FileText className="h-4 w-4" />
                 <span>Notes</span>
               </div>
-              <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                 {job.intake_notes}
               </p>
             </div>
@@ -904,8 +904,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
           {/* Addons Section */}
           {allAddons.length > 0 && (
-            <div className="rounded-lg bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <AlertTriangle className="h-4 w-4" />
                 <span>Add-ons / Issues Flagged</span>
               </div>
@@ -917,11 +917,11 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   return (
                     <div
                       key={addon.id}
-                      className="rounded-lg border border-gray-100 p-2.5"
+                      className="rounded-lg border border-gray-100 dark:border-gray-800 p-2.5"
                     >
                       <div className="flex items-start justify-between">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             {addon.custom_description || 'Service Add-on'}
                           </p>
                           <div className="mt-0.5 flex items-center gap-2">
@@ -935,21 +935,21 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                               {addonConfig.label}
                             </span>
                             {addon.sent_at && (
-                              <span className="text-[11px] text-gray-400">
+                              <span className="text-[11px] text-gray-400 dark:text-gray-500">
                                 Sent {timeAgo(addon.sent_at)}
                               </span>
                             )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             ${finalPrice.toFixed(2)}
                           </span>
                           {canResend && (
                             <button
                               onClick={() => handleResendAddon(addon.id)}
                               disabled={resendingAddon === addon.id}
-                              className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-100 disabled:opacity-50"
+                              className="flex items-center gap-1 rounded-md bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50"
                             >
                               {resendingAddon === addon.id ? (
                                 <RotateCcw className="h-3 w-3 animate-spin" />
@@ -962,13 +962,13 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                         </div>
                       </div>
                       {addon.discount_amount > 0 && (
-                        <p className="mt-1 text-[11px] text-gray-400">
+                        <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                           <span className="line-through">${addon.price.toFixed(2)}</span>
                           {' '}-${addon.discount_amount.toFixed(2)} discount
                         </p>
                       )}
                       {addon.pickup_delay_minutes > 0 && (
-                        <p className="text-[11px] text-gray-400">
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
                           +{addon.pickup_delay_minutes} min additional time
                         </p>
                       )}
@@ -981,7 +981,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
           {/* Pending Addons Alert */}
           {pendingAddons.length > 0 && (
-            <div className="flex items-center gap-2 rounded-lg bg-orange-50 p-3 text-sm text-orange-700">
+            <div className="flex items-center gap-2 rounded-lg bg-orange-50 dark:bg-orange-900/30 p-3 text-sm text-orange-700 dark:text-orange-400">
               <Bell className="h-4 w-4 shrink-0 animate-pulse" />
               <span>
                 {pendingAddons.length} pending authorization{pendingAddons.length > 1 ? 's' : ''}
@@ -993,43 +993,43 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           {isEditable ? (
             <button
               onClick={() => setShowEditCustomer(true)}
-              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+              className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <User className="h-4 w-4" />
                     <span>Customer</span>
                   </div>
-                  <p className="mt-1 font-medium text-gray-900">
+                  <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">
                     {job.customer
                       ? `${job.customer.first_name} ${job.customer.last_name}`
                       : 'No customer'}
                   </p>
                   {job.customer?.phone && (
-                    <p className="text-sm text-gray-500">{formatPhone(job.customer.phone)}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{formatPhone(job.customer.phone)}</p>
                   )}
                   {job.customer?.email && (
-                    <p className="text-sm text-gray-400">{job.customer.email}</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500">{job.customer.email}</p>
                   )}
                 </div>
-                <Pencil className="h-4 w-4 text-gray-400" />
+                <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </div>
             </button>
           ) : job.customer ? (
-            <div className="rounded-lg bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <User className="h-4 w-4" />
                 <span>Customer</span>
               </div>
-              <p className="mt-1 font-medium text-gray-900">
+              <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">
                 {job.customer.first_name} {job.customer.last_name}
               </p>
               {job.customer.phone && (
-                <p className="text-sm text-gray-500">{formatPhone(job.customer.phone)}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{formatPhone(job.customer.phone)}</p>
               )}
               {job.customer.email && (
-                <p className="text-sm text-gray-400">{job.customer.email}</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">{job.customer.email}</p>
               )}
             </div>
           ) : null}
@@ -1038,28 +1038,28 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           {isEditable ? (
             <button
               onClick={handleOpenEditVehicle}
-              className="w-full rounded-lg bg-white p-3 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+              className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <Car className="h-4 w-4" />
                     <span>Vehicle</span>
                   </div>
-                  <p className="mt-1 font-medium text-gray-900">
+                  <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">
                     {formatVehicle(job.vehicle)}
                   </p>
                 </div>
-                <Pencil className="h-4 w-4 text-gray-400" />
+                <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </div>
             </button>
           ) : (
-            <div className="rounded-lg bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <Car className="h-4 w-4" />
                 <span>Vehicle</span>
               </div>
-              <p className="mt-1 font-medium text-gray-900">
+              <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">
                 {formatVehicle(job.vehicle)}
               </p>
             </div>
@@ -1070,29 +1070,29 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       {/* Pickup Dialog */}
       {showPickupDialog && job && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Customer Pickup</h3>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-5 shadow-xl dark:shadow-gray-950/50">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Customer Pickup</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Mark {job.customer ? `${job.customer.first_name}'s` : 'this'} {formatVehicle(job.vehicle)} as picked up?
             </p>
             <textarea
               value={pickupNotes}
               onChange={(e) => setPickupNotes(e.target.value)}
               placeholder="Optional notes (e.g., customer satisfied, noted concern about X)"
-              className="mt-3 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-3 w-full rounded-lg border border-gray-200 dark:border-gray-700 p-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
               rows={3}
             />
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => { setShowPickupDialog(false); setPickupNotes(''); }}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePickup}
                 disabled={pickingUp}
-                className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50"
               >
                 {pickingUp ? 'Processing...' : 'Confirm Pickup'}
               </button>
@@ -1102,12 +1102,12 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       )}
 
       {/* Action buttons */}
-      <div className="border-t border-gray-200 bg-white px-4 py-3">
+      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         {job.status === 'scheduled' && (
           <button
             onClick={handleStartIntake}
             disabled={startingIntake}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
           >
             <Camera className="h-4 w-4" />
             {startingIntake ? 'Starting...' : 'Start Intake'}
@@ -1116,7 +1116,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         {job.status === 'intake' && !job.intake_completed_at && (
           <button
             onClick={() => setZonePickerMode('intake')}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
           >
             <Camera className="h-4 w-4" />
             Continue Intake
@@ -1126,7 +1126,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           <button
             onClick={handleStartWork}
             disabled={startingWork}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-yellow-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-yellow-600 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-yellow-500 dark:bg-yellow-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-yellow-600 dark:hover:bg-yellow-500 disabled:opacity-50"
           >
             <Play className="h-4 w-4" />
             {startingWork ? 'Starting...' : 'Start Work'}
@@ -1137,7 +1137,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => setZonePickerMode('progress')}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 <ImageIcon className="h-4 w-4" />
                 Photos
@@ -1145,7 +1145,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
               {canFlagIssue && (
                 <button
                   onClick={() => setShowFlagIssue(true)}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-500 dark:bg-orange-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 dark:hover:bg-orange-500"
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Flag Issue
@@ -1154,7 +1154,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             </div>
             <button
               onClick={() => setZonePickerMode('completion')}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-600"
             >
               <CheckCircle2 className="h-4 w-4" />
               Complete Job
@@ -1165,7 +1165,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           <div className="flex gap-2">
             <button
               onClick={() => setZonePickerMode('progress')}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <ImageIcon className="h-4 w-4" />
               View Photos
@@ -1177,14 +1177,14 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             <button
               onClick={handleCheckout}
               disabled={checkingOut}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
             >
               <ShoppingCart className="h-4 w-4" />
               {checkingOut ? 'Loading...' : 'Checkout'}
             </button>
             <button
               onClick={() => setShowPickupDialog(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <CheckCircle2 className="h-4 w-4" />
               Customer Pickup
@@ -1192,13 +1192,13 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           </div>
         )}
         {job.status === 'closed' && (
-          <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 px-4 py-2.5 text-sm font-medium text-green-700">
+          <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 dark:bg-green-900/30 px-4 py-2.5 text-sm font-medium text-green-700 dark:text-green-400">
             <Check className="h-4 w-4" />
             Paid
           </div>
         )}
         {job.status === 'cancelled' && (
-          <p className="text-center text-sm text-gray-400">
+          <p className="text-center text-sm text-gray-400 dark:text-gray-500">
             This job is cancelled
           </p>
         )}
@@ -1206,7 +1206,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         {canCancel && (
           <button
             onClick={handleCancelClick}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-red-300 dark:border-red-700 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
           >
             <XCircle className="h-4 w-4" />
             Cancel Job
@@ -1217,22 +1217,22 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       {/* Reassign Detailer Modal */}
       {showReassignModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowReassignModal(false)}>
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Reassign Detailer</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Reassign Detailer</h3>
                 <button
                   onClick={() => setShowReassignModal(false)}
-                  className="rounded-lg p-1 hover:bg-gray-100"
+                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
             <div className="max-h-[60vh] overflow-y-auto p-2">
               {loadingStaff ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -1241,16 +1241,16 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                     onClick={() => handleReassign(null)}
                     disabled={reassigning}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50',
-                      !job?.assigned_staff && 'bg-blue-50'
+                      'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800 disabled:opacity-50',
+                      !job?.assigned_staff && 'bg-blue-50 dark:bg-blue-900/30'
                     )}
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Unassigned</p>
-                      <p className="text-xs text-gray-400">Remove assignment</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Unassigned</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">Remove assignment</p>
                     </div>
                     {!job?.assigned_staff && (
-                      <Check className="h-4 w-4 text-blue-600" />
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     )}
                   </button>
 
@@ -1263,34 +1263,34 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                         onClick={() => handleReassign(staff.id)}
                         disabled={reassigning}
                         className={cn(
-                          'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50',
-                          isCurrentlyAssigned && 'bg-blue-50'
+                          'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800 disabled:opacity-50',
+                          isCurrentlyAssigned && 'bg-blue-50 dark:bg-blue-900/30'
                         )}
                       >
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                               {staff.first_name} {staff.last_name}
                             </p>
                             {staff.is_busy && (
-                              <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
+                              <span className="rounded-full bg-orange-100 dark:bg-orange-900/40 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 dark:text-orange-400">
                                 busy
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
                             {staff.job_count_today} job{staff.job_count_today !== 1 ? 's' : ''} today
                           </p>
                         </div>
                         {isCurrentlyAssigned && (
-                          <Check className="h-4 w-4 text-blue-600" />
+                          <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         )}
                       </button>
                     );
                   })}
 
                   {availableStaff.length === 0 && (
-                    <p className="py-6 text-center text-sm text-gray-400">
+                    <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">
                       No bookable staff found
                     </p>
                   )}
@@ -1304,9 +1304,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       {/* Cancel Reason Dialog */}
       {showCancelDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Cancel Job</h3>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-5 shadow-xl dark:shadow-gray-950/50">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Cancel Job</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Why is this job being cancelled?
             </p>
 
@@ -1317,8 +1317,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   className={cn(
                     'flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm transition-colors',
                     cancelReason === r
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-200 hover:bg-gray-50'
+                      ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30'
+                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                   )}
                 >
                   <input
@@ -1329,7 +1329,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                     onChange={() => setCancelReason(r)}
                     className="accent-red-600"
                   />
-                  <span className="text-gray-700">{r}</span>
+                  <span className="text-gray-700 dark:text-gray-300">{r}</span>
                 </label>
               ))}
             </div>
@@ -1339,7 +1339,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 value={customReason}
                 onChange={(e) => setCustomReason(e.target.value)}
                 placeholder="Describe the reason..."
-                className="mt-3 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                className="mt-3 w-full rounded-lg border border-gray-200 dark:border-gray-700 p-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-red-500 dark:focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400"
                 rows={2}
                 autoFocus
               />
@@ -1348,7 +1348,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => setShowCancelDialog(false)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 Keep Job
               </button>
@@ -1359,7 +1359,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   !cancelReason ||
                   (cancelReason === 'Other' && !customReason.trim())
                 }
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-red-600 dark:bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50"
               >
                 {cancelling ? 'Cancelling...' : job.appointment_id ? 'Next' : 'Cancel Job'}
               </button>
@@ -1390,15 +1390,15 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       {/* Edit Customer Modal */}
       {showEditCustomer && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowEditCustomer(false)}>
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Change Customer</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Change Customer</h3>
                 <button
                   onClick={() => setShowEditCustomer(false)}
-                  className="rounded-lg p-1 hover:bg-gray-100"
+                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -1411,7 +1411,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
               />
               {savingEdit && (
                 <div className="mt-3 flex items-center justify-center">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
                 </div>
               )}
             </div>
@@ -1422,22 +1422,22 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       {/* Edit Vehicle Modal */}
       {showEditVehicle && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowEditVehicle(false)}>
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Change Vehicle</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Change Vehicle</h3>
                 <button
                   onClick={() => setShowEditVehicle(false)}
-                  className="rounded-lg p-1 hover:bg-gray-100"
+                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
             <div className="max-h-[60vh] overflow-y-auto p-2">
               {loadingVehicles ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -1446,15 +1446,15 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                     onClick={() => handleEditVehicleSelect(null)}
                     disabled={savingEdit}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50',
-                      !job?.vehicle && 'bg-blue-50'
+                      'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800 disabled:opacity-50',
+                      !job?.vehicle && 'bg-blue-50 dark:bg-blue-900/30'
                     )}
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-700">No vehicle</p>
-                      <p className="text-xs text-gray-400">Remove vehicle assignment</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No vehicle</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">Remove vehicle assignment</p>
                     </div>
-                    {!job?.vehicle && <Check className="h-4 w-4 text-blue-600" />}
+                    {!job?.vehicle && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                   </button>
 
                   {editVehicles.map((v) => {
@@ -1466,21 +1466,21 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                         onClick={() => handleEditVehicleSelect(v.id)}
                         disabled={savingEdit}
                         className={cn(
-                          'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50',
-                          isCurrentVehicle && 'bg-blue-50'
+                          'flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800 disabled:opacity-50',
+                          isCurrentVehicle && 'bg-blue-50 dark:bg-blue-900/30'
                         )}
                       >
                         <div className="flex items-center gap-2">
-                          <Car className="h-4 w-4 text-gray-400" />
-                          <p className="text-sm font-medium text-gray-900">{label}</p>
+                          <Car className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
                         </div>
-                        {isCurrentVehicle && <Check className="h-4 w-4 text-blue-600" />}
+                        {isCurrentVehicle && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                       </button>
                     );
                   })}
 
                   {editVehicles.length === 0 && (
-                    <p className="py-6 text-center text-sm text-gray-400">
+                    <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">
                       No vehicles for this customer
                     </p>
                   )}
@@ -1494,15 +1494,15 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       {/* Edit Notes Modal */}
       {editingNotes && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setEditingNotes(false)}>
-          <div className="w-full max-w-sm rounded-t-xl bg-white shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Notes</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Notes</h3>
                 <button
                   onClick={() => setEditingNotes(false)}
-                  className="rounded-lg p-1 hover:bg-gray-100"
+                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -1511,21 +1511,21 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 value={notesValue}
                 onChange={(e) => setNotesValue(e.target.value)}
                 placeholder="Add notes about this job..."
-                className="w-full rounded-lg border border-gray-200 p-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 rows={5}
                 autoFocus
               />
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => setEditingNotes(false)}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveNotes}
                   disabled={savingEdit}
-                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
                 >
                   {savingEdit ? 'Saving...' : 'Save'}
                 </button>
@@ -1538,32 +1538,32 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       {/* Edit Services Modal */}
       {showEditServices && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowEditServices(false)}>
-          <div className="flex w-full max-w-md flex-col rounded-t-xl bg-white shadow-xl sm:max-h-[80vh] sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-5 py-4">
+          <div className="flex w-full max-w-md flex-col rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:max-h-[80vh] sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Services</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Services</h3>
                 <button
                   onClick={() => setShowEditServices(false)}
-                  className="rounded-lg p-1 hover:bg-gray-100"
+                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
               <div className="relative mt-3">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                 <input
                   type="text"
                   value={serviceSearch}
                   onChange={(e) => setServiceSearch(e.target.value)}
                   placeholder="Search services..."
-                  className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2" style={{ maxHeight: '50vh' }}>
               {loadingServices ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -1579,19 +1579,19 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                           className={cn(
                             'flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors',
                             isSelected
-                              ? 'bg-blue-50 ring-1 ring-blue-200'
-                              : 'hover:bg-gray-50'
+                              ? 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200 dark:ring-blue-800'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                           )}
                         >
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{svc.name}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{svc.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
                               ${price.toFixed(2)}
                               {svc.pricing_model !== 'flat' && ' (starting)'}
                             </p>
                           </div>
                           {isSelected && (
-                            <div className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600">
+                            <div className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 dark:bg-blue-500">
                               <Check className="h-4 w-4 text-white" />
                             </div>
                           )}
@@ -1601,19 +1601,19 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 </div>
               )}
             </div>
-            <div className="border-t border-gray-200 px-5 py-3">
+            <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-3">
               <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500">
+                <span className="text-gray-500 dark:text-gray-400">
                   {editSelectedServices.length} service{editSelectedServices.length !== 1 ? 's' : ''}
                 </span>
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-gray-900 dark:text-gray-100">
                   ${editSelectedServices.reduce((sum, s) => sum + s.price, 0).toFixed(2)}
                 </span>
               </div>
               <button
                 onClick={handleSaveEditServices}
                 disabled={editSelectedServices.length === 0 || savingEdit}
-                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="w-full rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
               >
                 {savingEdit ? 'Saving...' : 'Update Services'}
               </button>

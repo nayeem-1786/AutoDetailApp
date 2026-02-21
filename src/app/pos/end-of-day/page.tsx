@@ -215,7 +215,7 @@ export default function EndOfDayPage() {
   if (!mounted) {
     return (
       <div className="flex h-full items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -225,34 +225,34 @@ export default function EndOfDayPage() {
     return (
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-2xl px-4 py-6">
-          <div className="rounded-lg border border-green-200 bg-green-50 p-8 text-center">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
-            <h2 className="mt-4 text-xl font-bold text-gray-900">
+          <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 p-8 text-center">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-green-600 dark:text-green-400" />
+            <h2 className="mt-4 text-xl font-bold text-gray-900 dark:text-gray-100">
               Register Closed
             </h2>
-            <p className="mt-2 text-sm text-gray-600">{todayFormatted}</p>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{todayFormatted}</p>
             <div className="mt-4 space-y-1">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Counted Cash:{' '}
-                <span className="font-medium tabular-nums text-gray-900">
+                <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
                   {formatCurrency(countedCash)}
                 </span>
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Expected Cash:{' '}
-                <span className="font-medium tabular-nums text-gray-900">
+                <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
                   {formatCurrency(expectedCash)}
                 </span>
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Variance:{' '}
                 <span
                   className={`font-bold tabular-nums ${
                     variance > 0
-                      ? 'text-green-600'
+                      ? 'text-green-600 dark:text-green-400'
                       : variance < 0
-                        ? 'text-red-600'
-                        : 'text-gray-900'
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-gray-900 dark:text-gray-100'
                   }`}
                 >
                   {variance >= 0 ? '+' : ''}
@@ -276,15 +276,15 @@ export default function EndOfDayPage() {
     return (
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-2xl px-4 py-6 pb-8">
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm dark:shadow-gray-950/30">
             {/* Header */}
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
-                <LockOpen className="h-5 w-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30">
+                <LockOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Open Register</h1>
-                <p className="text-sm text-gray-500">{todayFormatted}</p>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Open Register</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{todayFormatted}</p>
               </div>
             </div>
 
@@ -303,16 +303,16 @@ export default function EndOfDayPage() {
                 type="checkbox"
                 checked={skipChange}
                 onChange={(e) => setSkipChange(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
               />
-              <span className="text-sm text-gray-600">Skip counting change (coins)</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Skip counting change (coins)</span>
             </label>
 
             {/* Open Register button */}
             <div className="mt-6">
               <Button
                 size="lg"
-                className="w-full bg-green-600 hover:bg-green-700"
+                className="w-full bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
                 onClick={handleOpenRegister}
               >
                 <LockOpen className="mr-2 h-4 w-4" />
@@ -339,19 +339,19 @@ export default function EndOfDayPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
-              <Lock className="h-5 w-5 text-green-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50 dark:bg-green-900/30">
+              <Lock className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Close Register</h1>
-              <p className="text-sm text-gray-500">{todayFormatted}</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Close Register</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{todayFormatted}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Opened at {openedTime}
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               by {sessionOpenedBy} &middot; Float: {formatCurrency(sessionOpeningFloat)}
             </p>
           </div>
@@ -359,7 +359,7 @@ export default function EndOfDayPage() {
 
         {/* Section 1: Day Summary */}
         <section className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Day Summary
           </h2>
           <DaySummary summary={summary} loading={loading} />
@@ -367,12 +367,12 @@ export default function EndOfDayPage() {
 
         {/* Access control: permission gated */}
         {!canEndOfDay ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center">
-            <Lock className="mx-auto h-8 w-8 text-amber-500" />
-            <p className="mt-2 text-sm font-medium text-amber-800">
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-6 text-center">
+            <Lock className="mx-auto h-8 w-8 text-amber-500 dark:text-amber-400" />
+            <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-300">
               Manager access required to close the register.
             </p>
-            <p className="mt-1 text-xs text-amber-600">
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
               Ask a manager to close out for the day.
             </p>
           </div>
@@ -380,60 +380,60 @@ export default function EndOfDayPage() {
           <>
             {/* Section 2: Count Your Drawer */}
             <section className="mb-6">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Count Your Drawer
               </h2>
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-gray-950/30">
                 <CashCountForm onTotalChange={handleCountedCashChange} />
               </div>
             </section>
 
             {/* Section 3: Reconciliation */}
             <section className="mb-6">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Reconciliation
               </h2>
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-gray-950/30">
                 {summary ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Opening Float</span>
-                      <span className="text-sm font-medium tabular-nums text-gray-900">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Opening Float</span>
+                      <span className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
                         {formatCurrency(sessionOpeningFloat)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Cash Sales + Tips</span>
-                      <span className="text-sm font-medium tabular-nums text-gray-900">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Cash Sales + Tips</span>
+                      <span className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
                         {formatCurrency(cashSales)}
                       </span>
                     </div>
-                    <div className="border-t border-gray-100 pt-2">
+                    <div className="border-t border-gray-100 dark:border-gray-800 pt-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-gray-900">Expected Cash</span>
-                        <span className="text-sm font-bold tabular-nums text-gray-900">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Expected Cash</span>
+                        <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100">
                           {formatCurrency(expectedCash)}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Counted Cash</span>
-                      <span className="text-sm font-medium tabular-nums text-gray-900">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Counted Cash</span>
+                      <span className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
                         {formatCurrency(countedCash)}
                       </span>
                     </div>
-                    <div className="border-t border-gray-100 pt-2">
+                    <div className="border-t border-gray-100 dark:border-gray-800 pt-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-gray-900">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                           Variance {variance > 0 ? '(Over)' : variance < 0 ? '(Short)' : ''}
                         </span>
                         <span
                           className={`text-lg font-bold tabular-nums ${
                             variance > 0
-                              ? 'text-green-600'
+                              ? 'text-green-600 dark:text-green-400'
                               : variance < 0
-                                ? 'text-red-600'
-                                : 'text-gray-900'
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-900 dark:text-gray-100'
                           }`}
                         >
                           {variance >= 0 ? '+' : ''}
@@ -443,7 +443,7 @@ export default function EndOfDayPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {loading ? 'Loading summary...' : 'No sales data available.'}
                   </p>
                 )}
@@ -452,14 +452,14 @@ export default function EndOfDayPage() {
 
             {/* Section 4: Close Out */}
             <section className="mb-6">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Close Out
               </h2>
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-gray-950/30 space-y-4">
                 <div>
                   <label
                     htmlFor="next-day-float"
-                    className="mb-1 block text-sm font-medium text-gray-700"
+                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     Next Day Float
                   </label>
@@ -476,7 +476,7 @@ export default function EndOfDayPage() {
                 <div>
                   <label
                     htmlFor="deposit-amount"
-                    className="mb-1 block text-sm font-medium text-gray-700"
+                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     Deposit Amount
                   </label>
@@ -489,21 +489,21 @@ export default function EndOfDayPage() {
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
                   />
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                     Auto-calculated: {formatCurrency(autoDeposit)} (counted − next-day float)
                   </p>
                 </div>
                 <div>
                   <label
                     htmlFor="eod-notes"
-                    className="mb-1 block text-sm font-medium text-gray-700"
+                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     Notes
                   </label>
                   <textarea
                     id="eod-notes"
                     rows={3}
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:focus-visible:ring-gray-500 focus-visible:ring-offset-1"
                     placeholder="Any notes for this day..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -516,7 +516,7 @@ export default function EndOfDayPage() {
             <div className="pb-8">
               <Button
                 size="lg"
-                className="w-full bg-red-600 hover:bg-red-700"
+                className="w-full bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600"
                 onClick={handleCloseRegister}
                 disabled={submitting}
               >

@@ -58,15 +58,15 @@ export function HeldTicketsPanel({ open, onClose }: HeldTicketsPanelProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="mx-4 w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 shadow-2xl dark:shadow-gray-950/60" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-5 py-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             Held Tickets ({heldTickets.length})
           </h3>
           <button
             onClick={onClose}
-            className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-full p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
           >
             <X className="h-5 w-5" />
           </button>
@@ -75,7 +75,7 @@ export function HeldTicketsPanel({ open, onClose }: HeldTicketsPanelProps) {
         {/* Ticket list */}
         <div className="max-h-[60vh] overflow-y-auto p-4">
           {heldTickets.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-400">
+            <p className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
               No held tickets
             </p>
           ) : (
@@ -90,17 +90,17 @@ export function HeldTicketsPanel({ open, onClose }: HeldTicketsPanelProps) {
                 return (
                   <div
                     key={held.id}
-                    className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                    className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4"
                   >
                     <div className="flex items-start justify-between">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-gray-900">
+                        <p className="truncate font-medium text-gray-900 dark:text-gray-100">
                           {customerName}
                         </p>
-                        <p className="mt-0.5 text-sm text-gray-500">
+                        <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                           {itemCount} item{itemCount !== 1 ? 's' : ''} &middot; ${total.toFixed(2)}
                         </p>
-                        <div className="mt-1 flex items-center gap-1 text-xs text-gray-400">
+                        <div className="mt-1 flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                           <Clock className="h-3 w-3" />
                           {formatTimeAgo(held.heldAt)}
                         </div>
@@ -108,7 +108,7 @@ export function HeldTicketsPanel({ open, onClose }: HeldTicketsPanelProps) {
                       <div className="ml-3 flex items-center gap-1.5">
                         <button
                           onClick={() => handleResume(held.id)}
-                          className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+                          className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
                         >
                           <Play className="h-3.5 w-3.5" />
                           Resume
@@ -118,7 +118,7 @@ export function HeldTicketsPanel({ open, onClose }: HeldTicketsPanelProps) {
                             removeHeldTicket(held.id);
                             toast.success('Held ticket removed');
                           }}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -132,10 +132,10 @@ export function HeldTicketsPanel({ open, onClose }: HeldTicketsPanelProps) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-5 py-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-3">
           <button
             onClick={onClose}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Close
           </button>
@@ -145,23 +145,23 @@ export function HeldTicketsPanel({ open, onClose }: HeldTicketsPanelProps) {
       {/* Hold current & resume confirmation */}
       {confirmResumeId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900">
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-6 shadow-2xl dark:shadow-gray-950/60">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Current ticket has items
             </h3>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               Hold the current ticket and resume the selected one?
             </p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setConfirmResumeId(null)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 Cancel
               </button>
               <button
                 onClick={handleHoldCurrentAndResume}
-                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+                className="flex-1 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
               >
                 Hold & Resume
               </button>

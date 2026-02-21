@@ -40,8 +40,8 @@ export function TipScreen() {
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
-        <p className="text-lg text-gray-500">Add a tip?</p>
-        <p className="mt-1 text-3xl font-bold text-gray-900">
+        <p className="text-lg text-gray-500 dark:text-gray-400">Add a tip?</p>
+        <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">
           ${ticket.total.toFixed(2)}
         </p>
       </div>
@@ -60,12 +60,12 @@ export function TipScreen() {
               className={cn(
                 'flex h-24 w-24 flex-col items-center justify-center rounded-xl border-2 transition-all',
                 selected === pct
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               )}
             >
               <span className="text-xl font-bold">{pct}%</span>
-              <span className="text-sm text-gray-500">${amt.toFixed(2)}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">${amt.toFixed(2)}</span>
             </button>
           );
         })}
@@ -76,19 +76,19 @@ export function TipScreen() {
           className={cn(
             'flex h-24 w-24 flex-col items-center justify-center rounded-xl border-2 transition-all',
             selected === 'custom'
-              ? 'border-blue-500 bg-blue-50 text-blue-700'
-              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+              : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
           )}
         >
           <span className="text-xl font-bold">$</span>
-          <span className="text-sm text-gray-500">Custom</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">Custom</span>
         </button>
       </div>
 
       {/* Custom input */}
       {selected === 'custom' && (
         <div className="flex items-center gap-2">
-          <span className="text-lg text-gray-500">$</span>
+          <span className="text-lg text-gray-500 dark:text-gray-400">$</span>
           <input
             type="text"
             inputMode="decimal"
@@ -99,7 +99,7 @@ export function TipScreen() {
               const v = e.target.value.replace(/[^0-9.]/g, '');
               setCustomAmount(v);
             }}
-            className="h-12 w-32 rounded-lg border border-gray-300 text-center text-xl text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="h-12 w-32 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-xl text-gray-900 dark:text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
             placeholder="0.00"
           />
         </div>
@@ -107,10 +107,10 @@ export function TipScreen() {
 
       {/* Tip display */}
       {selected != null && selected !== 'none' && (
-        <p className="text-lg text-gray-600">
+        <p className="text-lg text-gray-600 dark:text-gray-400">
           Tip: <span className="font-semibold">${getTipAmount().toFixed(2)}</span>
           {' '}— Total:{' '}
-          <span className="font-bold text-gray-900">
+          <span className="font-bold text-gray-900 dark:text-gray-100">
             ${(ticket.total + getTipAmount()).toFixed(2)}
           </span>
         </p>
@@ -134,13 +134,13 @@ export function TipScreen() {
           size="lg"
           onClick={handleContinue}
           disabled={selected === null}
-          className="min-w-[140px] bg-green-600 hover:bg-green-700"
+          className="min-w-[140px] bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
         >
           Continue
         </Button>
       </div>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         5% CC processing fee on card tips (informational)
       </p>
     </div>

@@ -93,20 +93,20 @@ export function JobTimer({
       <div
         className={cn(
           'flex items-center gap-2 rounded-lg px-3 py-1.5',
-          isPaused && 'animate-pulse bg-yellow-50',
-          isRunning && 'bg-green-50'
+          isPaused && 'animate-pulse bg-yellow-50 dark:bg-yellow-900/30',
+          isRunning && 'bg-green-50 dark:bg-green-900/30'
         )}
       >
         <span
           className={cn(
             'font-mono text-lg font-semibold tabular-nums',
-            isPaused ? 'text-yellow-700' : 'text-green-700'
+            isPaused ? 'text-yellow-700 dark:text-yellow-400' : 'text-green-700 dark:text-green-400'
           )}
         >
           {formatTimer(displaySeconds)}
         </span>
         {isPaused && (
-          <span className="text-xs font-medium uppercase text-yellow-600">Paused</span>
+          <span className="text-xs font-medium uppercase text-yellow-600 dark:text-yellow-400">Paused</span>
         )}
       </div>
       <button
@@ -115,8 +115,8 @@ export function JobTimer({
         className={cn(
           'flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:opacity-50',
           isPaused
-            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+            ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+            : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
         )}
         title={isPaused ? 'Resume timer' : 'Pause timer'}
       >

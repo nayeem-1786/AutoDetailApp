@@ -91,15 +91,15 @@ export function CheckPayment() {
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
-        <p className="text-lg text-gray-500">Check Payment</p>
-        <p className="mt-1 text-3xl font-bold text-gray-900">
+        <p className="text-lg text-gray-500 dark:text-gray-400">Check Payment</p>
+        <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">
           ${amountDue.toFixed(2)}
         </p>
       </div>
 
       {/* Check number input */}
       <div className="flex flex-col items-center gap-2">
-        <label htmlFor="check-number" className="text-sm text-gray-600">
+        <label htmlFor="check-number" className="text-sm text-gray-600 dark:text-gray-400">
           Check number (optional)
         </label>
         <input
@@ -108,13 +108,13 @@ export function CheckPayment() {
           value={checkNumber}
           onChange={(e) => setCheckNumber(e.target.value)}
           autoFocus
-          className="h-14 w-48 rounded-lg border border-gray-300 text-center text-2xl tabular-nums text-gray-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+          className="h-14 w-48 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-amber-400 dark:focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-200 dark:focus:ring-amber-800"
           placeholder="#"
         />
       </div>
 
       {checkout.error && (
-        <p className="text-sm text-red-600">{checkout.error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400">{checkout.error}</p>
       )}
 
       {/* Actions */}
@@ -131,7 +131,7 @@ export function CheckPayment() {
           size="lg"
           onClick={handleProcessCheck}
           disabled={processing}
-          className="min-w-[160px] bg-green-600 hover:bg-green-700"
+          className="min-w-[160px] bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
         >
           {processing ? (
             <Loader2 className="h-5 w-5 animate-spin" />

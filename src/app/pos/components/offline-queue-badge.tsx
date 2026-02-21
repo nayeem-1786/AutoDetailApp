@@ -69,7 +69,7 @@ export function OfflineQueueBadge() {
 
   return (
     <div
-      className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700"
+      className="flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 text-amber-700 dark:text-amber-400"
       title={`${count} offline transaction${count > 1 ? 's' : ''} pending sync`}
     >
       <CloudOff className={`h-4 w-4 ${syncing ? 'animate-pulse' : ''}`} />

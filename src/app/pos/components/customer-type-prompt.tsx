@@ -27,7 +27,7 @@ const TYPE_OPTIONS: { value: CustomerType; label: string; description: string; c
     value: 'enthusiast',
     label: 'Enthusiast',
     description: 'Personal vehicle owner who cares about their car',
-    color: 'border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100',
+    color: 'border-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40',
   },
   {
     value: 'professional',
@@ -79,8 +79,8 @@ export function CustomerTypePrompt({
         <DialogTitle>Customer Type</DialogTitle>
       </DialogHeader>
       <DialogContent>
-        <p className="mb-4 text-sm text-gray-600">
-          What type of customer is <span className="font-medium text-gray-900">{customerName}</span>?
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          What type of customer is <span className="font-medium text-gray-900 dark:text-gray-100">{customerName}</span>?
         </p>
         <div className="space-y-2">
           {TYPE_OPTIONS.map((opt) => (
