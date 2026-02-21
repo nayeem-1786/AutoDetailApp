@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Dark Mode Toggle + Ticket Scroll — 2026-02-21
+
+### Dark Mode Toggle (Root Cause Found + Fixed)
+
+The POS dark/light/system toggle buttons had no visual effect. Two independent issues combined:
+
+**1. Turbopack dual CSS compilation**: In dev mode, Turbopack generates a second CSS chunk (`[root-of-the-server]__*.css`) with its own Tailwind compilation. This chunk uses `@media (prefers-color-scheme: dark)` (the Tailwind default) instead of our `@custom-variant dark` (class-based). When the OS is in dark mode and the user toggles POS to light, the media-query rules at `(0,1,0)` specificity compete with base utilities at the same specificity, and source order makes the dark rules win.
+
+**Fix**: `PosThemeProvider` now runs `disableMediaQueryDarkRules()` on mount — iterates all stylesheets, finds `@media (prefers-color-scheme: dark)` blocks, and deletes them. A `MutationObserver` on `<head>` re-cleans when Turbopack hot-reloads inject new style elements. Our class-based rules (specificity `(0,2,0)` via `:is()`) remain as the sole dark mode authority.
+
+**2. Wrapper div instead of `<html>`**: Previous implementation used a `<div class="dark" style="display:contents">` wrapper. Reverted to applying `.dark` class and `color-scheme` directly on `document.documentElement` via imperative DOM manipulation. This is more standard and avoids any `display: contents` edge cases.
+
+### Ticket Scroll (Root Cause Found + Fixed)
+
+Previous fixes (`shrink-0` on siblings, `min-h-0` on items list) were necessary but not sufficient. The actual root cause: the POS workspace grid (`grid h-full grid-cols-[1fr_380px]`) had no explicit row definition. Without `grid-template-rows`, the row is IMPLICIT (`grid-auto-rows: auto`) — its height is determined by content, not by the container. The TicketPanel's `h-full` resolved to content height, so `overflow-y-auto` never activated.
+
+**Fix**: Added `grid-rows-[1fr]` to the grid container, making the row explicit and filling the container height. Also added `overflow-hidden` to TicketPanel's outer div for defense-in-depth.
+
+### Files Changed
+- `src/app/pos/context/pos-theme-context.tsx` — Rewritten: imperative `.dark` on `<html>`, `disableMediaQueryDarkRules()`, MutationObserver for hot-reload, proper unmount cleanup
+- `src/app/pos/components/pos-workspace.tsx` — Added `grid-rows-[1fr]`
+- `src/app/pos/components/ticket-panel.tsx` — Added `overflow-hidden` to outer container
+- `src/app/pos/components/quotes/quote-builder.tsx` — Added `grid-rows-[1fr]`
+- `src/app/pos/components/quotes/quote-ticket-panel.tsx` — Added `overflow-hidden` to outer container
+
+---
+
 ## Fix: POS Fullscreen Scroll + Bottom Nav Cutoff — 2026-02-21
 
 ### Ticket Sidebar Scroll Fix

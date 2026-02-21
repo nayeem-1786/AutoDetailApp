@@ -223,7 +223,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
   }
 
   return (
-    <div className="grid h-full grid-cols-[1fr_380px]">
+    <div className="grid h-full grid-cols-[1fr_380px] grid-rows-[1fr]">
       {/* Left panel — Catalog */}
       <div className="flex min-w-0 flex-col overflow-hidden">
         {/* Back + Search bar */}

@@ -432,7 +432,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   }
 
   return (
-    <div className="flex h-full flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <div className="flex h-full flex-col overflow-hidden border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {/* Customer / Vehicle summary */}
       <div className="shrink-0 border-b border-gray-100 dark:border-gray-800 px-4 py-2">
         <CustomerVehicleSummary
