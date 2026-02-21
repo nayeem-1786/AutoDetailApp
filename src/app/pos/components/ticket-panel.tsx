@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Tag, X } from 'lucide-react';
 import { usePosPermission } from '../context/pos-permission-context';
 import { useTicket } from '../context/ticket-context';
+import { useCheckout } from '../context/checkout-context';
 import { useCatalog } from '../hooks/use-catalog';
 import { TicketItemRow } from './ticket-item-row';
 import { TicketTotals } from './ticket-totals';
@@ -27,6 +28,12 @@ import { CouponInput } from './coupon-input';
 import { LoyaltyPanel } from './loyalty-panel';
 import { CustomerTypePrompt } from './customer-type-prompt';
 import { AddonSuggestions } from './addon-suggestions';
+import {
+  SwipeableCartItem,
+  SwipeableCartList,
+  SwipeableCartItemWrapper,
+} from './swipeable-cart-item';
+import type { TicketItem } from '../types';
 import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
 interface TicketPanelProps {
@@ -37,6 +44,7 @@ interface TicketPanelProps {
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
   const { ticket, dispatch } = useTicket();
+  const { isOpen: checkoutOpen } = useCheckout();
   const { services } = useCatalog();
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
@@ -46,6 +54,61 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
   const [discountValue, setDiscountValue] = useState('');
   const [discountLabel, setDiscountLabel] = useState('');
+
+  // Swipe-to-delete undo state
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const pendingUndoRef = useRef<{ item: TicketItem; index: number } | null>(null);
+
+  const handleSwipeRemove = useCallback(
+    (itemId: string) => {
+      // Find item + index before removing
+      const index = ticket.items.findIndex((i) => i.id === itemId);
+      if (index === -1) return;
+      const item = ticket.items[index];
+
+      // Store for undo
+      pendingUndoRef.current = { item, index };
+
+      // Remove from ticket
+      dispatch({ type: 'REMOVE_ITEM', itemId });
+
+      // Clear any existing undo timer
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+
+      // Show undo toast
+      toast(`${item.itemName} removed`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            if (pendingUndoRef.current?.item.id === itemId) {
+              dispatch({
+                type: 'RESTORE_ITEM',
+                item: pendingUndoRef.current.item,
+                index: pendingUndoRef.current.index,
+              });
+              pendingUndoRef.current = null;
+            }
+          },
+        },
+        duration: 5000,
+        onAutoClose: () => {
+          if (pendingUndoRef.current?.item.id === itemId) {
+            pendingUndoRef.current = null;
+          }
+        },
+        onDismiss: () => {
+          if (pendingUndoRef.current?.item.id === itemId) {
+            pendingUndoRef.current = null;
+          }
+        },
+      });
+    },
+    [ticket.items, dispatch]
+  );
+
+  const handleSwipeUndo = useCallback((_itemId: string) => {
+    // Undo is handled via the toast action
+  }, []);
 
   function handleSelectCustomer(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
@@ -172,9 +235,21 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           </div>
         ) : (
           <div className="py-2">
-            {ticket.items.map((item) => (
-              <TicketItemRow key={item.id} item={item} />
-            ))}
+            <SwipeableCartList>
+              {ticket.items.map((item) => (
+                <SwipeableCartItemWrapper key={item.id} itemId={item.id}>
+                  <SwipeableCartItem
+                    itemId={item.id}
+                    itemName={item.itemName}
+                    disabled={checkoutOpen}
+                    onRemove={handleSwipeRemove}
+                    onUndo={handleSwipeUndo}
+                  >
+                    <TicketItemRow item={item} />
+                  </SwipeableCartItem>
+                </SwipeableCartItemWrapper>
+              ))}
+            </SwipeableCartList>
           </div>
         )}
       </div>
@@ -208,9 +283,9 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                   </div>
                   <button
                     onClick={handleRemoveDiscount}
-                    className="rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-700"
+                    className="flex h-11 w-11 items-center justify-center rounded text-red-500 hover:bg-red-100 hover:text-red-700"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               ) : showDiscountForm ? (
@@ -219,7 +294,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                   <div className="flex gap-1">
                     <button
                       onClick={() => setDiscountType('dollar')}
-                      className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                      className={`min-h-[44px] flex-1 rounded px-3 py-2 text-xs font-medium transition-colors ${
                         discountType === 'dollar'
                           ? 'bg-gray-900 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -229,7 +304,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                     </button>
                     <button
                       onClick={() => setDiscountType('percent')}
-                      className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                      className={`min-h-[44px] flex-1 rounded px-3 py-2 text-xs font-medium transition-colors ${
                         discountType === 'percent'
                           ? 'bg-gray-900 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -241,14 +316,18 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
                   {/* Value input */}
                   <Input
-                    type="number"
-                    min="0"
-                    max={discountType === 'percent' ? '100' : undefined}
-                    step="0.01"
+                    type="text"
+                    inputMode={discountType === 'percent' ? 'numeric' : 'decimal'}
+                    pattern={discountType === 'percent' ? '[0-9]*' : '[0-9]*\\.?[0-9]*'}
                     value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
+                    onChange={(e) => {
+                      const v = discountType === 'percent'
+                        ? e.target.value.replace(/[^0-9]/g, '')
+                        : e.target.value.replace(/[^0-9.]/g, '');
+                      setDiscountValue(v);
+                    }}
                     placeholder={discountType === 'dollar' ? 'Amount ($)' : 'Percentage (%)'}
-                    className="h-8 text-xs"
+                    className="min-h-[44px] text-sm"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleApplyDiscount();
                     }}
@@ -259,7 +338,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                     value={discountLabel}
                     onChange={(e) => setDiscountLabel(e.target.value)}
                     placeholder="Reason (e.g., Employee discount)"
-                    className="h-8 text-xs"
+                    className="min-h-[44px] text-sm"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleApplyDiscount();
                     }}
@@ -269,21 +348,19 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={() => {
                         setShowDiscountForm(false);
                         setDiscountValue('');
                         setDiscountLabel('');
                       }}
-                      className="h-8 flex-1 text-xs"
+                      className="min-h-[44px] flex-1 text-xs"
                     >
                       Cancel
                     </Button>
                     <Button
-                      size="sm"
                       onClick={handleApplyDiscount}
                       disabled={!discountValue.trim()}
-                      className="h-8 flex-1 text-xs"
+                      className="min-h-[44px] flex-1 text-xs"
                     >
                       Apply
                     </Button>
@@ -292,9 +369,9 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
               ) : (
                 <button
                   onClick={() => setShowDiscountForm(true)}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
+                  className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
                 >
-                  <Tag className="h-3 w-3" />
+                  <Tag className="h-4 w-4" />
                   Add Discount
                 </button>
               )}

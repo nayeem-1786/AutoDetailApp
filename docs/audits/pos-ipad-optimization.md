@@ -62,7 +62,7 @@
 
 ### 1. Touch Targets (44px minimum)
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 
 **84 interactive elements audited. 39 (46%) are under 44x44px.**
 
@@ -119,7 +119,7 @@
 
 ### 2. Numeric Keyboard
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 
 **9 numeric inputs found. 0 have `inputMode="numeric"`. All use `type="number"` only.**
 
@@ -230,61 +230,48 @@ This feature is **fully built and working** in the current POS. The iPAD.md desc
 
 ### 6. Recent Transactions Shortcut
 
-**Status:** 🟡 Partially implemented
+**Status:** ✅ Done
 
-Transactions are accessible via **one tap** from the bottom navigation bar ("Transactions" tab with Receipt icon). This is a persistent tab visible on every POS screen.
+Transactions are accessible via **one tap** from the bottom navigation bar, **plus** a new header dropdown for quick access without leaving the current view.
 
 | Requirement from iPAD.md | Current State |
 |---------------------------|---------------|
-| Quick access to recent transactions | YES — 1 tap from bottom nav |
+| Quick access to recent transactions | YES — 1 tap from bottom nav + header dropdown |
 | Reprint receipt | YES — Star printer + browser print |
 | Start refund | YES — Permission-gated refund dialog |
-| Quick-access panel in header | NO — requires full page navigation |
-| Shows last 5-10 transactions | NO — shows paginated list (20/page) |
-| One-tap to detail | YES — click row to view |
+| Quick-access panel in header | YES — `RecentTransactionsDropdown` component |
+| Shows last 5-10 transactions | YES — shows last 10 from today |
+| One-tap to detail | YES — click row → deep-links to `/pos/transactions?id=` |
 
-**What's missing vs. the spec:**
-- No **header shortcut** (dropdown/slide-out showing last 5-10 transactions)
-- No quick-access without leaving the current ticket/register view
-- Navigating to Transactions tab exits the register tab (context switch)
-
-**Current transaction list features:**
-- Search by receipt # or phone (400ms debounce)
-- Date presets: Today, Yesterday, This Week, This Month, Last Month, Custom
-- Pagination (20 per page)
-- Full detail view with receipt reprint + refund capability
-
-**Estimated effort:** 4-6 hours (header dropdown with last 5-10 transactions)
+**Implementation:**
+- `RecentTransactionsDropdown` component (`pos/components/recent-transactions-dropdown.tsx`)
+- Clock icon in POS header (between held tickets badge and employee name)
+- Fetches today's last 10 transactions via existing `/api/pos/transactions/search` endpoint
+- Each row shows: customer name (or "Walk-in"), amount, receipt #, payment method, time ago, status dot
+- Click row → navigates to transaction detail with `?id=` deep-link
+- "View All Transactions" footer link → full transactions page
+- Auto-refreshes every 60s while open
+- Dismisses on outside click/tap
+- Transactions page now supports `?id=` query parameter for direct detail navigation
 
 ---
 
 ### 7. Swipe-to-Delete on Cart Items
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 
-**Current delete method:** Small 28x28px X button on each cart item row.
-
-```
-ticket-item-row.tsx:230
-<button onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: item.id })}
-  className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500">
-```
-
-| Question | Answer |
-|----------|--------|
-| Current item display | Vertical list in ticket-panel.tsx, each item is `TicketItemRow` |
-| Current delete method | 28x28px X icon button (right side of row) |
-| Swipe/gesture handling in POS? | NO — only in photo-annotation.tsx (canvas drawing) |
-| Gesture libraries installed? | NO (`react-swipeable` and `@use-gesture` not in package.json) |
-| Animation library available? | YES — `framer-motion@^12.34.0` is installed |
-
-**Swipe/gesture references found:**
-- `photo-annotation.tsx` — touch handlers for canvas drawing (not cart-related)
-- `card-payment.tsx` — references "swipe" in Stripe Terminal reader prompts (not gesture)
-
-**Implementation path:** `framer-motion` is already installed and can handle swipe gestures via `drag` prop + `onDragEnd`. No additional library needed.
-
-**Estimated effort:** 4-6 hours (framer-motion drag + delete animation + undo toast)
+**Implementation:**
+- `SwipeableCartItem` wrapper component (`pos/components/swipeable-cart-item.tsx`)
+- Uses framer-motion `drag="x"` with `dragDirectionLock` for horizontal-only swipe
+- Swipe threshold: 100px to trigger delete (prevents accidental removal)
+- Red background with trash icon revealed progressively during swipe
+- `AnimatePresence` with `mode="popLayout"` for smooth exit animation (slide out + collapse height)
+- Auto-snap back if swipe doesn't reach threshold
+- **Undo toast**: 5-second toast with "Undo" button restores item at original position
+- `RESTORE_ITEM` reducer action added to `ticket-reducer.ts` and `TicketAction` type
+- Existing X button kept as secondary delete method
+- Swipe disabled during checkout (`checkoutOpen` state)
+- Directional lock prevents conflict with vertical cart scrolling
 
 ---
 
@@ -358,8 +345,8 @@ Based on current state — prioritized by value/effort ratio:
 | 2 | Touch targets | ❌ Not started | 3-4 hrs | High | Padding/min-size adjustments on 39 elements |
 | 3 | New Customer form | ✅ Done | 0 | — | Already fully implemented. Remove from scope. |
 | 4 | Sticky cart sidebar | ✅ Done | 0 | — | Already implemented. Consider portrait-responsive variant. |
-| 5 | Swipe-to-delete | ❌ Not started | 4-6 hrs | Medium | framer-motion already available |
-| 6 | Recent transactions | 🟡 Partial | 4-6 hrs | Medium | Bottom nav exists; add header quick-access |
+| 5 | Swipe-to-delete | ✅ Done | — | Medium | framer-motion swipe + undo toast |
+| 6 | Recent transactions | ✅ Done | — | Medium | Header dropdown + deep-link to detail |
 | 7 | PWA + offline | ❌ Not started | 20-30 hrs | High | Most complex; needs design decisions first |
 | 8 | Dark mode | ❌ Not started | 15-20 hrs | Low-Med | Large refactor; POS uses hardcoded colors |
 

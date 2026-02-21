@@ -60,6 +60,7 @@ export type TicketAction =
   | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
   | { type: 'UPDATE_PER_UNIT_QTY'; itemId: string; perUnitQty: number }
   | { type: 'REMOVE_ITEM'; itemId: string }
+  | { type: 'RESTORE_ITEM'; item: TicketItem; index: number }
   | { type: 'SET_CUSTOMER'; customer: Customer | null }
   | { type: 'SET_VEHICLE'; vehicle: Vehicle | null }
   | { type: 'RECALCULATE_VEHICLE_PRICES'; vehicle: Vehicle | null; services: Service[] }

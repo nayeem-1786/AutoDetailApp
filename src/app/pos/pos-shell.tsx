@@ -26,6 +26,7 @@ import { QuoteProvider } from './context/quote-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
 import { HeldTicketsPanel } from './components/held-tickets-panel';
+import { RecentTransactionsDropdown } from './components/recent-transactions-dropdown';
 import { PinScreen } from './components/pin-screen';
 import { cn } from '@/lib/utils/cn';
 
@@ -304,6 +305,9 @@ function PosShellContent({
               <PauseCircle className="h-4 w-4" />
             </button>
           )}
+
+          {/* Recent transactions quick-access */}
+          <RecentTransactionsDropdown />
 
           <span className="text-sm font-medium text-gray-700">
             {displayName}

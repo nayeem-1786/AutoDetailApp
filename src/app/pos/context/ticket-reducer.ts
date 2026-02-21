@@ -211,6 +211,17 @@ export function ticketReducer(
       return recalculateTotals({ ...state, items });
     }
 
+    case 'RESTORE_ITEM': {
+      const { item, index } = action;
+      // Don't restore if item already exists (duplicate undo)
+      if (state.items.some((i) => i.id === item.id)) return state;
+      const items = [...state.items];
+      // Insert at original index, or at end if index is out of range
+      const insertAt = Math.min(index, items.length);
+      items.splice(insertAt, 0, item);
+      return recalculateTotals({ ...state, items });
+    }
+
     case 'SET_CUSTOMER': {
       return { ...state, customer: action.customer };
     }

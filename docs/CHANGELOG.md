@@ -4,6 +4,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS Swipe-to-Delete Cart Items + Recent Transactions Header Shortcut — 2026-02-20
+
+iPad optimization features (Phase 12, items 6 & 7 from audit).
+
+### Swipe-to-Delete on Cart Items
+- `SwipeableCartItem` component wraps each `TicketItemRow` with framer-motion horizontal drag gesture
+- Swipe left past 100px threshold to delete; red background with trash icon revealed progressively
+- `AnimatePresence` exit animation: item slides out left, then collapses height
+- 5-second undo toast with "Undo" button restores item at original cart position
+- New `RESTORE_ITEM` reducer action in `ticket-reducer.ts` for undo support
+- Swipe disabled during active checkout; existing X button remains as fallback
+- `dragDirectionLock` prevents swipe from interfering with vertical cart scrolling
+
+### Recent Transactions Header Dropdown
+- `RecentTransactionsDropdown` component: clock icon in POS header bar
+- Shows last 10 transactions from today via existing `/api/pos/transactions/search` endpoint
+- Each row: customer name (or "Walk-in"), amount, receipt #, payment method, relative time, status dot
+- Click row → deep-links to `/pos/transactions?id=<txnId>` for instant detail view
+- "View All Transactions" footer link → full paginated transactions page
+- Auto-refreshes every 60s while dropdown is open
+- Backdrop dismiss on outside click/tap
+- Transactions page updated to accept `?id=` query param for direct detail navigation
+
+### Files Changed
+- `src/app/pos/components/swipeable-cart-item.tsx` (new)
+- `src/app/pos/components/recent-transactions-dropdown.tsx` (new)
+- `src/app/pos/components/ticket-panel.tsx` (swipe wrapper integration)
+- `src/app/pos/context/ticket-reducer.ts` (RESTORE_ITEM action)
+- `src/app/pos/types.ts` (RESTORE_ITEM in TicketAction union)
+- `src/app/pos/pos-shell.tsx` (header dropdown integration)
+- `src/app/pos/transactions/page.tsx` (deep-link support)
+- `docs/audits/pos-ipad-optimization.md` (features 6 & 7 marked done)
+
+---
+
 ## Fix: POS Popups Dismiss on Backdrop Tap — 2026-02-20
 
 Standard iPad behavior: tapping outside a popup/modal should close it. Audited all POS popup components and fixed those missing backdrop dismiss.
