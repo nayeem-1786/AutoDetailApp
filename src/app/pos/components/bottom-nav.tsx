@@ -88,7 +88,7 @@ export function BottomNav() {
       {/* Log out */}
       <button
         onClick={handleLogout}
-        className="flex flex-col items-center gap-0.5 px-3 py-1 text-gray-500 hover:text-gray-800"
+        className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px] text-gray-500 hover:text-gray-800"
       >
         <LogOut className="h-5 w-5" />
         <span className="text-[10px] font-medium leading-tight">{initials || 'Out'}</span>
@@ -98,7 +98,7 @@ export function BottomNav() {
       <Link
         href="/pos/end-of-day"
         className={cn(
-          'flex flex-col items-center gap-0.5 px-3 py-1',
+          'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
           pathname === '/pos/end-of-day' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
         )}
       >
@@ -115,7 +115,7 @@ export function BottomNav() {
       <Link
         href="/pos/transactions"
         className={cn(
-          'flex flex-col items-center gap-0.5 px-3 py-1',
+          'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
           pathname.startsWith('/pos/transactions') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
         )}
       >
@@ -127,7 +127,7 @@ export function BottomNav() {
       <Link
         href="/pos/quotes"
         className={cn(
-          'flex flex-col items-center gap-0.5 px-3 py-1',
+          'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
           pathname.startsWith('/pos/quotes') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
         )}
       >
@@ -139,7 +139,7 @@ export function BottomNav() {
       <Link
         href="/pos/jobs"
         className={cn(
-          'flex flex-col items-center gap-0.5 px-3 py-1',
+          'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
           pathname.startsWith('/pos/jobs') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
         )}
       >
@@ -152,7 +152,7 @@ export function BottomNav() {
         <button
           onClick={() => setMoreOpen((prev) => !prev)}
           className={cn(
-            'flex flex-col items-center gap-0.5 px-3 py-1',
+            'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px]',
             moreOpen ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'
           )}
         >

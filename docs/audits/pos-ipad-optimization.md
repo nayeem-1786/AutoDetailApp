@@ -341,8 +341,8 @@ Based on current state — prioritized by value/effort ratio:
 
 | Priority | Feature | Status | Effort | Impact | Notes |
 |----------|---------|--------|--------|--------|-------|
-| 1 | Numeric keyboard | ❌ Not started | 1 hr | High | Trivial — add `inputMode="numeric"` to 9 inputs |
-| 2 | Touch targets | ❌ Not started | 3-4 hrs | High | Padding/min-size adjustments on 39 elements |
+| 1 | Numeric keyboard | ✅ Done | 1 hr | High | All 9 inputs converted to inputMode numeric/decimal |
+| 2 | Touch targets | ✅ Done | 3-4 hrs | High | All 39 elements upgraded to 44px minimum |
 | 3 | New Customer form | ✅ Done | 0 | — | Already fully implemented. Remove from scope. |
 | 4 | Sticky cart sidebar | ✅ Done | 0 | — | Already implemented. Consider portrait-responsive variant. |
 | 5 | Swipe-to-delete | ✅ Done | — | Medium | framer-motion swipe + undo toast |

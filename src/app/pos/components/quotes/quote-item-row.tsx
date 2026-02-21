@@ -109,19 +109,19 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
               setNoteValue(item.notes ?? '');
               setNoteOpen(!noteOpen);
             }}
-            className={`shrink-0 rounded p-0.5 ${
+            className={`shrink-0 flex h-11 w-11 items-center justify-center rounded ${
               item.notes
                 ? 'text-amber-500 hover:text-amber-600'
                 : 'text-gray-300 hover:text-gray-500'
             }`}
             title={item.notes ? `Note: ${item.notes}` : 'Add note'}
           >
-            <StickyNote className="h-3 w-3" />
+            <StickyNote className="h-4 w-4" />
           </button>
         </div>
 
         {/* Right: qty controls + price + remove */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-2">
           {item.itemType === 'service' && item.perUnitQty != null && item.perUnitPrice != null ? (
             /* Per-unit service: stepper controls perUnitQty with max enforcement */
             <>
@@ -131,11 +131,11 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                     ? dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: item.id, perUnitQty: item.perUnitQty! - 1 })
                     : dispatch({ type: 'REMOVE_ITEM', itemId: item.id })
                 }
-                className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
-                <Minus className="h-3 w-3" />
+                <Minus className="h-4 w-4" />
               </button>
-              <span className="flex h-7 min-w-[28px] items-center justify-center px-1 text-sm tabular-nums text-gray-900">
+              <span className="flex h-11 min-w-[44px] items-center justify-center px-1 text-sm tabular-nums text-gray-900">
                 {item.perUnitQty}
               </span>
               <button
@@ -146,18 +146,18 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                   }
                 }}
                 disabled={item.perUnitQty! >= (item.perUnitMax ?? 10)}
-                className={`flex h-7 w-7 items-center justify-center rounded ${
+                className={`flex h-11 w-11 items-center justify-center rounded ${
                   item.perUnitQty! >= (item.perUnitMax ?? 10)
                     ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="h-4 w-4" />
               </button>
             </>
           ) : item.itemType === 'service' ? (
             /* Regular service: no stepper — always qty 1 */
-            <span className="flex h-7 min-w-[28px] items-center justify-center px-1 text-sm tabular-nums text-gray-400">
+            <span className="flex h-11 min-w-[44px] items-center justify-center px-1 text-sm tabular-nums text-gray-400">
               1
             </span>
           ) : (
@@ -171,29 +171,33 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                     quantity: item.quantity - 1,
                   })
                 }
-                className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
-                <Minus className="h-3 w-3" />
+                <Minus className="h-4 w-4" />
               </button>
               {editing ? (
                 <input
                   ref={inputRef}
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9]/g, '');
+                    setEditValue(v);
+                  }}
                   onBlur={commitEdit}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') commitEdit();
                     if (e.key === 'Escape') setEditing(false);
                   }}
-                  className="h-7 w-12 rounded border border-blue-400 bg-white text-center text-sm tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-blue-300"
+                  className="h-11 w-14 rounded border border-blue-400 bg-white text-center text-sm tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-blue-300"
                   autoFocus
                 />
               ) : (
                 <button
                   onClick={startEditing}
-                  className="flex h-7 min-w-[28px] items-center justify-center rounded px-1 text-sm tabular-nums text-gray-900 hover:bg-blue-50 hover:text-blue-700"
+                  className="flex h-11 min-w-[44px] items-center justify-center rounded px-1 text-sm tabular-nums text-gray-900 hover:bg-blue-50 hover:text-blue-700"
                 >
                   {item.quantity}
                 </button>
@@ -206,9 +210,9 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                     quantity: item.quantity + 1,
                   })
                 }
-                className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="h-4 w-4" />
               </button>
             </>
           )}
@@ -228,9 +232,9 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
           {/* Remove */}
           <button
             onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: item.id })}
-            className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
+            className="flex h-11 w-11 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -244,7 +248,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
 
       {/* Inline note input */}
       {noteOpen && (
-        <div className="mt-1.5 flex items-center gap-1.5">
+        <div className="mt-1.5 flex items-center gap-2">
           <input
             ref={noteInputRef}
             type="text"
@@ -254,11 +258,11 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
             onKeyDown={handleNoteKeyDown}
             placeholder="Add a note..."
             maxLength={200}
-            className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+            className="min-h-[44px] min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
           />
           <button
             onClick={handleNoteSave}
-            className="shrink-0 rounded bg-blue-500 px-2 py-1 text-xs font-medium text-white hover:bg-blue-600"
+            className="min-h-[44px] shrink-0 rounded bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600"
           >
             Save
           </button>
@@ -267,7 +271,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
               setNoteValue(item.notes ?? '');
               setNoteOpen(false);
             }}
-            className="shrink-0 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+            className="min-h-[44px] shrink-0 rounded px-3 py-2 text-xs text-gray-500 hover:bg-gray-100"
           >
             Cancel
           </button>

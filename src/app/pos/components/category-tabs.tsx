@@ -30,9 +30,9 @@ export function CategoryTabs({
     <div className="relative flex items-center gap-1">
       <button
         onClick={() => scroll('left')}
-        className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-5 w-5" />
       </button>
 
       <div
@@ -70,9 +70,9 @@ export function CategoryTabs({
 
       <button
         onClick={() => scroll('right')}
-        className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-5 w-5" />
       </button>
     </div>
   );

@@ -81,7 +81,7 @@ export function PinPad({
             'w-full bg-blue-600 font-semibold text-white transition-all',
             'hover:bg-blue-700 active:scale-[0.99]',
             isSm
-              ? 'mt-0.5 min-h-[38px] rounded-lg text-sm'
+              ? 'mt-0.5 min-h-[44px] rounded-lg text-sm'
               : isLg
                 ? 'mt-1 min-h-[60px] rounded-xl text-lg'
                 : 'mt-1 min-h-[48px] rounded-xl text-base'

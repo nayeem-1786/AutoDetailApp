@@ -154,9 +154,9 @@ export function ReceiptOptions({
       <div className="grid grid-cols-4 gap-2">
         <Button
           variant="outline"
-          size="sm"
           onClick={handleCopierPrint}
           disabled={copierPrinting}
+          className="min-h-[44px]"
         >
           {copierPrinting ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -168,7 +168,6 @@ export function ReceiptOptions({
 
         <Button
           variant="outline"
-          size="sm"
           onClick={() => {
             if (customerEmail) {
               handleEmail(customerEmail);
@@ -177,6 +176,7 @@ export function ReceiptOptions({
             }
           }}
           disabled={emailing || emailed}
+          className="min-h-[44px]"
         >
           {emailing ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -190,7 +190,6 @@ export function ReceiptOptions({
 
         <Button
           variant="outline"
-          size="sm"
           onClick={() => {
             if (customerPhone) {
               handleSms(customerPhone);
@@ -199,6 +198,7 @@ export function ReceiptOptions({
             }
           }}
           disabled={smsing || smsed}
+          className="min-h-[44px]"
         >
           {smsing ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -212,9 +212,9 @@ export function ReceiptOptions({
 
         <Button
           variant="outline"
-          size="sm"
           onClick={handleReceiptPrint}
           disabled={printing || printed}
+          className="min-h-[44px]"
         >
           {printing ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -235,14 +235,13 @@ export function ReceiptOptions({
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
             placeholder="customer@email.com"
-            className="h-8 w-48 text-xs"
+            className="min-h-[44px] w-48 text-sm"
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleEmail(emailInput);
             }}
           />
           <Button
-            size="sm"
-            className="h-8"
+            className="min-h-[44px]"
             onClick={() => handleEmail(emailInput)}
             disabled={!emailInput || emailing}
           >
@@ -256,17 +255,17 @@ export function ReceiptOptions({
         <div className="flex gap-2">
           <Input
             type="tel"
+            inputMode="tel"
             value={smsInput}
             onChange={(e) => setSmsInput(formatPhoneInput(e.target.value))}
             placeholder="(310) 555-0123"
-            className="h-8 w-48 text-xs"
+            className="min-h-[44px] w-48 text-sm"
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSms(smsInput);
             }}
           />
           <Button
-            size="sm"
-            className="h-8"
+            className="min-h-[44px]"
             onClick={() => handleSms(smsInput)}
             disabled={!smsInput || smsing}
           >

@@ -90,12 +90,15 @@ export function TipScreen() {
         <div className="flex items-center gap-2">
           <span className="text-lg text-gray-500">$</span>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
+            pattern="[0-9]*\.?[0-9]*"
             autoFocus
             value={customAmount}
-            onChange={(e) => setCustomAmount(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9.]/g, '');
+              setCustomAmount(v);
+            }}
             className="h-12 w-32 rounded-lg border border-gray-300 text-center text-xl text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
             placeholder="0.00"
           />

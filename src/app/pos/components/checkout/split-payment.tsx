@@ -258,12 +258,14 @@ export function SplitPayment() {
             <div className="flex items-center gap-2">
               <span className="text-xl text-gray-500">$</span>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                max={grandTotal - 0.5}
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*\.?[0-9]*"
                 value={primaryAmount}
-                onChange={(e) => setPrimaryAmount(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9.]/g, '');
+                  setPrimaryAmount(v);
+                }}
                 autoFocus
                 className="h-14 w-40 rounded-lg border border-gray-300 text-center text-2xl tabular-nums text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 placeholder="0.00"
@@ -274,7 +276,7 @@ export function SplitPayment() {
             <div className="flex gap-2">
               <button
                 onClick={handleSplitHalf}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                className="min-h-[44px] rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50"
               >
                 50/50
               </button>
@@ -284,7 +286,7 @@ export function SplitPayment() {
                   onClick={() => setPrimaryAmount(amt.toFixed(2))}
                   disabled={amt >= grandTotal}
                   className={cn(
-                    'rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                    'min-h-[44px] rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50',
                     amt >= grandTotal && 'opacity-40 cursor-not-allowed'
                   )}
                 >

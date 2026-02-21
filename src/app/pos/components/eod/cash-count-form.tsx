@@ -101,11 +101,14 @@ export function CashCountForm({ onTotalChange, title, compact, skipChange }: Cas
               {d.label}
             </span>
             <Input
-              type="number"
-              min={0}
-              step={1}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={counts[d.value] || ''}
-              onChange={(e) => handleCountChange(d.value, e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^0-9]/g, '');
+                handleCountChange(d.value, v);
+              }}
               className="h-8 w-20 text-center tabular-nums"
             />
             <span className="text-right text-sm tabular-nums text-gray-600">

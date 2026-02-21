@@ -143,12 +143,16 @@ export function VehicleCreateDialog({
                 Year
               </label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={year}
-                onChange={(e) => setYear(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, '');
+                  setYear(v);
+                }}
                 placeholder="2024"
-                min={1900}
-                max={2100}
+                maxLength={4}
               />
             </div>
             <div>

@@ -144,11 +144,14 @@ export function CashPayment() {
       <div className="flex items-center gap-2">
         <span className="text-xl text-gray-500">$</span>
         <input
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="decimal"
+          pattern="[0-9]*\.?[0-9]*"
           value={tendered}
-          onChange={(e) => setTendered(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value.replace(/[^0-9.]/g, '');
+            setTendered(v);
+          }}
           className="h-14 w-40 rounded-lg border border-gray-300 text-center text-2xl tabular-nums text-gray-900 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-200"
           placeholder="0.00"
         />

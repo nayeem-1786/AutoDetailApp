@@ -4,6 +4,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS 44px Touch Targets + Numeric Keyboard InputMode for iPad — 2026-02-20
+
+iPad optimization (Phase 12, items 1 & 2 from audit).
+
+### Touch Targets (44px Minimum)
+- All stepper buttons (qty +/-) upgraded from 28px to 44px (`h-11 w-11`) in ticket and quote item rows
+- Remove (X) buttons upgraded from 28px to 44px with larger icons
+- Note icon buttons expanded to 44px touch targets
+- Note save/cancel buttons: `min-h-[44px]` with increased padding
+- Receipt action buttons (Print, Email, SMS, Receipt): removed `size="sm"`, added `min-h-[44px]`
+- Email/SMS send buttons and inputs: upgraded to 44px minimum height
+- Coupon apply button and input: upgraded to 44px minimum height
+- Coupon/discount remove buttons: expanded to 44px with `h-11 w-11`
+- Split payment preset buttons (50/50, $20, $50, $100): `min-h-[44px]`
+- Checkout overlay close button: 44px with `h-11 w-11`
+- Category scroll chevrons: 44px with `h-11 w-11`, icon size increased
+- Bottom nav items: added `min-h-[44px] min-w-[44px]` and `justify-center`
+- Discount type toggle buttons (Dollar/$, Percent/%): `min-h-[44px]`
+- Discount form action buttons: upgraded from `h-8` to `min-h-[44px]`
+- "Add Discount" link button: `min-h-[44px]`
+- PinPad small variant action button: `min-h-[38px]` → `min-h-[44px]`
+- Search bar clear X: 44px touch target with centered icon
+- 8px minimum spacing between adjacent touch targets (gap-1 → gap-2)
+
+### Numeric Keyboard (inputMode)
+- Cash tendered input: `type="text" inputMode="decimal"` with decimal filter
+- Custom tip amount: `type="text" inputMode="decimal"` with decimal filter
+- Split payment amount: `type="text" inputMode="decimal"` with decimal filter
+- Item quantity edit (ticket + quote): `type="text" inputMode="numeric"` with digit filter
+- Discount value input (ticket + quote): dynamic `inputMode` (numeric for %, decimal for $)
+- EOD cash count qty: `type="text" inputMode="numeric"` with digit filter
+- Vehicle year: `type="text" inputMode="numeric"` with digit filter + maxLength=4
+- All inputs filter non-numeric characters via onChange handler
+
+### Files Changed
+- `ticket-item-row.tsx` — stepper/remove/note touch targets + qty inputMode
+- `quotes/quote-item-row.tsx` — same changes mirrored
+- `receipt-options.tsx` — receipt action button sizes + input sizes
+- `coupon-input.tsx` — apply button + remove button + input height
+- `search-bar.tsx` — clear X touch target
+- `checkout/split-payment.tsx` — preset buttons + amount inputMode
+- `checkout/checkout-overlay.tsx` — close button touch target
+- `checkout/cash-payment.tsx` — tendered amount inputMode
+- `checkout/tip-screen.tsx` — custom tip inputMode
+- `category-tabs.tsx` — scroll chevron touch targets
+- `bottom-nav.tsx` — nav item touch targets
+- `pin-pad.tsx` — small action button size
+- `ticket-panel.tsx` — discount section touch targets + inputMode
+- `quotes/quote-ticket-panel.tsx` — discount section touch targets + inputMode
+- `eod/cash-count-form.tsx` — denomination qty inputMode
+- `vehicle-create-dialog.tsx` — year inputMode
+
+---
+
 ## Feat: POS Swipe-to-Delete Cart Items + Recent Transactions Header Shortcut — 2026-02-20
 
 iPad optimization features (Phase 12, items 6 & 7 from audit).

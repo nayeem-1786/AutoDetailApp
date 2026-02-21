@@ -89,9 +89,9 @@ export function CouponInput() {
         </div>
         <button
           onClick={handleRemove}
-          className="rounded p-0.5 text-green-500 hover:bg-green-100 hover:text-green-700"
+          className="flex h-11 w-11 items-center justify-center rounded text-green-500 hover:bg-green-100 hover:text-green-700"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
     );
@@ -104,17 +104,16 @@ export function CouponInput() {
         value={code}
         onChange={(e) => setCode(e.target.value.toUpperCase())}
         placeholder="Coupon code"
-        className="h-8 text-xs"
+        className="min-h-[44px] text-sm"
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleValidate();
         }}
       />
       <Button
         variant="outline"
-        size="sm"
         onClick={handleValidate}
         disabled={!code.trim() || validating}
-        className="h-8 shrink-0 px-2"
+        className="min-h-[44px] shrink-0 px-3"
       >
         {validating ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />

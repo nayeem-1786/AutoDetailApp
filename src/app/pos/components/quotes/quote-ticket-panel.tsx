@@ -499,9 +499,9 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
                   </div>
                   <button
                     onClick={handleRemoveDiscount}
-                    className="rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-700"
+                    className="flex h-11 w-11 items-center justify-center rounded text-red-500 hover:bg-red-100 hover:text-red-700"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               ) : showDiscountForm ? (
@@ -509,7 +509,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
                   <div className="flex gap-1">
                     <button
                       onClick={() => setDiscountType('dollar')}
-                      className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                      className={`min-h-[44px] flex-1 rounded px-3 py-2 text-xs font-medium transition-colors ${
                         discountType === 'dollar'
                           ? 'bg-gray-900 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -519,7 +519,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
                     </button>
                     <button
                       onClick={() => setDiscountType('percent')}
-                      className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                      className={`min-h-[44px] flex-1 rounded px-3 py-2 text-xs font-medium transition-colors ${
                         discountType === 'percent'
                           ? 'bg-gray-900 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -529,14 +529,18 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
                     </button>
                   </div>
                   <Input
-                    type="number"
-                    min="0"
-                    max={discountType === 'percent' ? '100' : undefined}
-                    step="0.01"
+                    type="text"
+                    inputMode={discountType === 'percent' ? 'numeric' : 'decimal'}
+                    pattern={discountType === 'percent' ? '[0-9]*' : '[0-9]*\\.?[0-9]*'}
                     value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
+                    onChange={(e) => {
+                      const v = discountType === 'percent'
+                        ? e.target.value.replace(/[^0-9]/g, '')
+                        : e.target.value.replace(/[^0-9.]/g, '');
+                      setDiscountValue(v);
+                    }}
                     placeholder={discountType === 'dollar' ? 'Amount ($)' : 'Percentage (%)'}
-                    className="h-8 text-xs"
+                    className="min-h-[44px] text-sm"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleApplyDiscount();
                     }}
@@ -545,7 +549,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
                     value={discountLabel}
                     onChange={(e) => setDiscountLabel(e.target.value)}
                     placeholder="Reason (e.g., Employee discount)"
-                    className="h-8 text-xs"
+                    className="min-h-[44px] text-sm"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleApplyDiscount();
                     }}
@@ -553,21 +557,19 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={() => {
                         setShowDiscountForm(false);
                         setDiscountValue('');
                         setDiscountLabel('');
                       }}
-                      className="h-8 flex-1 text-xs"
+                      className="min-h-[44px] flex-1 text-xs"
                     >
                       Cancel
                     </Button>
                     <Button
-                      size="sm"
                       onClick={handleApplyDiscount}
                       disabled={!discountValue.trim()}
-                      className="h-8 flex-1 text-xs"
+                      className="min-h-[44px] flex-1 text-xs"
                     >
                       Apply
                     </Button>
@@ -576,9 +578,9 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
               ) : (
                 <button
                   onClick={() => setShowDiscountForm(true)}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
+                  className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
                 >
-                  <Tag className="h-3 w-3" />
+                  <Tag className="h-4 w-4" />
                   Add Discount
                 </button>
               )}

@@ -23,7 +23,7 @@ export function CheckoutOverlay() {
         {canClose && (
           <button
             onClick={closeCheckout}
-            className="absolute right-4 top-4 z-10 rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           >
             <X className="h-5 w-5" />
           </button>
