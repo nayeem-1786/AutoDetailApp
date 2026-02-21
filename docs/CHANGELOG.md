@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Backdrop Dismiss on iPad — 2026-02-20
+
+Fixed backdrop tap-to-dismiss not working on iPadOS Safari. iOS/iPadOS doesn't fire `click` events on non-interactive `div` elements. Added `onTouchEnd` handler + `cursor-pointer` to all dialog backdrops and the checkout overlay backdrop so tapping the background reliably dismisses popups on iPad.
+
+- `dialog.tsx`: Added `onTouchEnd` with `preventDefault()` + `cursor-pointer` class on backdrop div
+- `checkout-overlay.tsx`: Added matching `onTouchEnd` handler on backdrop + `stopPropagation()` on content div to prevent bubbling
+
+---
+
 ## Feat: POS Fullscreen Toggle Button — 2026-02-20
 
 Added a fullscreen toggle button to the POS header (between the clock and theme toggle). Uses the browser Fullscreen API with webkit prefix support for iPad Safari.

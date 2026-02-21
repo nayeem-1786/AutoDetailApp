@@ -84,9 +84,11 @@ function Dialog({ open, onOpenChange, children, modal }: DialogProps) {
 
   return (
     <div className="fixed inset-0 z-50">
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- backdrop dismiss */}
       <div
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/50 cursor-pointer"
         onClick={modal ? undefined : () => onOpenChange(false)}
+        onTouchEnd={modal ? undefined : (e) => { e.preventDefault(); onOpenChange(false); }}
       />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <div

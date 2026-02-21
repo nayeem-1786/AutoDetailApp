@@ -15,9 +15,24 @@ export function CheckoutOverlay() {
 
   const canClose = !processing && step !== 'complete';
 
+  function handleBackdropTouchEnd(e: React.TouchEvent) {
+    if (canClose && e.target === e.currentTarget) {
+      e.preventDefault();
+      closeCheckout();
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={canClose ? closeCheckout : undefined}>
-      <div className="relative h-full w-full bg-white dark:bg-gray-900 md:h-[90vh] md:max-h-[700px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 ${canClose ? 'cursor-pointer' : ''}`}
+      onClick={canClose ? closeCheckout : undefined}
+      onTouchEnd={handleBackdropTouchEnd}
+    >
+      <div
+        className="relative h-full w-full bg-white dark:bg-gray-900 md:h-[90vh] md:max-h-[700px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      >
         {/* Step content */}
         <div className="flex h-full flex-col overflow-y-auto">
           {step === 'payment-method' && <PaymentMethodScreen />}
