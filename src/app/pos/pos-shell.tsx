@@ -36,6 +36,7 @@ import { OfflineQueueBadge } from './components/offline-queue-badge';
 import { cn } from '@/lib/utils/cn';
 import { usePosTheme } from './context/pos-theme-context';
 import { FullscreenToggle } from './components/fullscreen-toggle';
+import { PwaRefreshButton } from './components/pwa-refresh-button';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, locked, lock, replaceSession } = usePosAuth();
@@ -330,6 +331,9 @@ function PosShellContent({
             {ROLE_LABELS[role] || role}
           </span>
           <span className="text-sm tabular-nums text-gray-400 dark:text-gray-500">{clock}</span>
+
+          {/* PWA refresh (standalone only — no address bar) */}
+          <PwaRefreshButton />
 
           {/* Fullscreen toggle */}
           <FullscreenToggle />

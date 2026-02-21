@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: PWA-Only Refresh Button in POS Header — 2026-02-21
+
+- Added `PwaRefreshButton` component — only renders in PWA standalone mode (no address bar = no native refresh)
+- 44px touch target, `RotateCw` icon, placed in POS header before fullscreen toggle
+- Hidden in regular browser where the address bar provides refresh
+
+### Files Changed
+- `src/app/pos/components/pwa-refresh-button.tsx` — New component
+- `src/app/pos/pos-shell.tsx` — Import and render `PwaRefreshButton`
+
+---
+
 ## Feat: Desktop-Only Trash Icon on Ticket Items — 2026-02-21
 
 - Added `Trash2` remove button to `ticket-item-row.tsx` — visible only on desktop (`pointer-fine`)
