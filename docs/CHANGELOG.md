@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Dark Mode Toggle Not Working — 2026-02-20
+
+POS dark mode was implemented (72 files, 1,864 `dark:` classes, `PosThemeProvider`, toggle buttons in header) but the toggle buttons produced no visual change.
+
+### Root Cause
+Two CSS issues combined to make the toggle completely inert:
+
+1. **Duplicate Tailwind compilation in Turbopack dev mode**: Turbopack generates a second CSS chunk (for server components) with its own Tailwind compilation that uses `@media (prefers-color-scheme: dark)` instead of the class-based `@custom-variant dark` from `globals.css`. This chunk also includes duplicate base utilities (e.g., `.bg-gray-100`).
+
+2. **Zero-specificity `:where()` in `@custom-variant`**: The original `@custom-variant dark (&:where(.dark, .dark *))` gives dark variants specificity `(0,1,0)` — the same as base utilities. When the second CSS chunk loads after `globals.css`, its base utilities appear later in the cascade and always win over the class-based dark variants.
+
+Result: dark: variants could never override base utilities regardless of the `.dark` class toggle.
+
+### Fixes
+- **`@custom-variant` specificity**: Changed `:where()` to `:is()` — dark variants now get specificity `(0,2,0)`, always beating base utilities at `(0,1,0)` regardless of CSS source order
+- **Apply to `<html>` element**: `PosThemeProvider` now applies `.dark` class and `color-scheme` property to `document.documentElement` instead of a wrapper `<div>`, ensuring ALL CSS chunks (including Turbopack's separate compilation) respect the toggle
+- **`color-scheme` override**: Setting `color-scheme: light` or `color-scheme: dark` on the root element overrides `@media (prefers-color-scheme)` queries, neutralizing the media-query dark styles in the separate chunk
+- **Removed wrapper div**: The `<div className="dark contents">` wrapper is no longer needed since the dark class is applied to `<html>`
+
+### Files Changed
+- `src/app/globals.css` — `@custom-variant dark` changed from `:where()` to `:is()`
+- `src/app/pos/context/pos-theme-context.tsx` — apply dark class + color-scheme to `<html>`, cleanup on unmount
+
+---
+
 ## Fix: Customer Portal Nav Cut Off by Main Header — 2026-02-20
 
 Fixed portal navigation tabs (Dashboard, Appointments, Vehicles, etc.) being obscured after the user dropdown menu was added to the site header.

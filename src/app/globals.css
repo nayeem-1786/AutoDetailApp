@@ -1,8 +1,11 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* POS dark mode: class-based (not media query) so it's scoped to POS only */
-@custom-variant dark (&:where(.dark, .dark *));
+/* POS dark mode: class-based toggle via .dark on <html>.
+   Uses :is() (not :where()) so dark variants get specificity (0,2,0),
+   beating base utilities (0,1,0) even when Turbopack generates duplicate
+   CSS chunks with different source order. */
+@custom-variant dark (&:is(.dark, .dark *));
 
 :root {
   --background: #ffffff;

@@ -33,20 +33,55 @@ function resolveTheme(theme: PosTheme): 'light' | 'dark' {
   return theme;
 }
 
+/** Apply dark class and color-scheme to <html> so ALL CSS chunks respect the toggle.
+ *  color-scheme on the root element overrides @media (prefers-color-scheme) queries,
+ *  neutralizing the media-query dark styles Turbopack generates in a separate chunk. */
+function applyThemeToDocument(resolved: 'light' | 'dark', mode: PosTheme) {
+  const root = document.documentElement;
+  root.classList.toggle('dark', resolved === 'dark');
+
+  // color-scheme on root overrides prefers-color-scheme media queries.
+  // 'light'       → forces @media(prefers-color-scheme:dark) = false
+  // 'dark'        → forces @media(prefers-color-scheme:dark) = true
+  // 'light dark'  → follows OS preference (correct for "system" mode)
+  if (mode === 'system') {
+    root.style.colorScheme = 'light dark';
+  } else {
+    root.style.colorScheme = resolved;
+  }
+}
+
+function cleanupDocument() {
+  const root = document.documentElement;
+  root.classList.remove('dark');
+  root.style.removeProperty('color-scheme');
+}
+
 export function PosThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<PosTheme>(getInitialTheme);
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolveTheme(theme));
 
-  // Resolve theme on mount and when theme changes
+  // Apply dark class + color-scheme to <html> on mount and when theme changes
   useEffect(() => {
-    setResolvedTheme(resolveTheme(theme));
+    const resolved = resolveTheme(theme);
+    setResolvedTheme(resolved);
+    applyThemeToDocument(resolved, theme);
 
     if (theme === 'system') {
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = () => setResolvedTheme(mq.matches ? 'dark' : 'light');
+      const handler = () => {
+        const r = mq.matches ? 'dark' : 'light';
+        setResolvedTheme(r);
+        applyThemeToDocument(r, 'system');
+      };
       mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
+      return () => {
+        mq.removeEventListener('change', handler);
+        cleanupDocument();
+      };
     }
+
+    return cleanupDocument;
   }, [theme]);
 
   const setTheme = useCallback((t: PosTheme) => {
@@ -56,9 +91,7 @@ export function PosThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <PosThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
-      <div className={resolvedTheme === 'dark' ? 'dark contents' : 'contents'}>
-        {children}
-      </div>
+      {children}
     </PosThemeContext.Provider>
   );
 }
