@@ -7,7 +7,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,7 +91,6 @@ export function VehicleCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogClose onClose={handleClose} />
       <DialogHeader>
         <DialogTitle>Add Vehicle</DialogTitle>
       </DialogHeader>

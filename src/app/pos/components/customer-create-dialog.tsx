@@ -7,7 +7,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,7 +97,6 @@ export function CustomerCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogClose onClose={handleClose} />
       <DialogHeader>
         {onBack && (
           <button

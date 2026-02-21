@@ -8,7 +8,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
@@ -74,7 +73,6 @@ export function CustomerTypePrompt({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogClose onClose={() => onOpenChange(false)} />
       <DialogHeader>
         <DialogTitle>Customer Type</DialogTitle>
       </DialogHeader>

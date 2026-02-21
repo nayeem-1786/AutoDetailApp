@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogContent,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -56,7 +55,6 @@ export function ServicePricingPicker({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogClose onClose={onClose} />
       <DialogHeader>
         <DialogTitle>{service.name}</DialogTitle>
       </DialogHeader>
@@ -208,7 +206,6 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogClose onClose={onClose} />
       <DialogHeader>
         <DialogTitle>{service.name}</DialogTitle>
       </DialogHeader>

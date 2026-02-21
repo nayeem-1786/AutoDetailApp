@@ -4,6 +4,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Popup UX — Backdrop Dismiss + Remove Redundant X Buttons — 2026-02-20
+
+iPad POS UX cleanup. All popups now dismiss on backdrop tap (standard iPad pattern). Redundant X/close buttons removed since backdrop dismiss is the primary close mechanism.
+
+### Backdrop Dismiss
+- All POS dialogs already support backdrop dismiss via base `Dialog` component — verified working on all popups
+- Added `modal` prop to base `Dialog` component — when true, backdrop click is disabled (Escape key still works)
+- `QuoteDeleteDialog`: uses `modal` to prevent accidental backdrop dismiss (destructive confirmation requires explicit Cancel/Delete)
+- `RefundDialog`: uses `modal` during confirm step and while processing (prevents accidental dismiss during refund)
+
+### Removed X/Close Buttons (12 files)
+- `ticket-panel.tsx`: Removed DialogClose from Customer Lookup and Vehicle Selector dialogs
+- `customer-create-dialog.tsx`: Removed DialogClose (Cancel button remains)
+- `vehicle-create-dialog.tsx`: Removed DialogClose (Cancel button remains)
+- `customer-type-prompt.tsx`: Removed DialogClose (Skip button remains)
+- `service-detail-dialog.tsx`: Removed DialogClose (backdrop dismiss)
+- `product-detail.tsx`: Removed DialogClose (backdrop dismiss)
+- `service-pricing-picker.tsx`: Removed DialogClose from both main picker and PerUnitPicker (Cancel buttons remain)
+- `refund-dialog.tsx`: Removed DialogClose (Cancel button remains)
+- `quote-delete-dialog.tsx`: Removed DialogClose (Cancel/Delete buttons remain)
+- `quote-ticket-panel.tsx`: Removed DialogClose from Customer Lookup and Vehicle Selector dialogs
+- `checkout-overlay.tsx`: Removed X close button (backdrop dismiss handles close when not processing)
+
+### Removed Ticket Item Row X Button
+- `ticket-item-row.tsx`: Removed inline X/remove button — swipe-to-delete is the primary removal method on iPad POS
+
+---
+
 ## Feat: POS Dark Mode — 2026-02-20
 
 iPad optimization (Phase 12, item 8 from audit). Independent dark mode for the POS system with light/dark/system toggle.

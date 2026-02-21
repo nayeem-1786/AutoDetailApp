@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Minus, Plus, X, StickyNote } from 'lucide-react';
+import { Minus, Plus, StickyNote } from 'lucide-react';
 import type { TicketItem } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
@@ -229,13 +229,6 @@ export function TicketItemRow({ item }: TicketItemRowProps) {
             )}
           </div>
 
-          {/* Remove */}
-          <button
-            onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: item.id })}
-            className="flex h-11 w-11 items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       </div>
 

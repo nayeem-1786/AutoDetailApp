@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogContent,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -194,8 +193,7 @@ export function RefundDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <DialogClose onClose={handleClose} />
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()} modal={step === 'confirm' || processing}>
       <DialogHeader>
         <DialogTitle>
           Issue Refund &mdash; #{transaction.receipt_number ?? 'N/A'}

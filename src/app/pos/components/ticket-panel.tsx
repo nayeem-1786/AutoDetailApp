@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogContent,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -396,7 +395,6 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
       {/* Customer Lookup Dialog */}
       <Dialog open={customerLookupOpen} onOpenChange={onCustomerLookupChange}>
-        <DialogClose onClose={() => onCustomerLookupChange(false)} />
         <DialogHeader>
           <DialogTitle>Find Customer</DialogTitle>
         </DialogHeader>
@@ -429,7 +427,6 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           open={showVehicleSelector}
           onOpenChange={setShowVehicleSelector}
         >
-          <DialogClose onClose={() => setShowVehicleSelector(false)} />
           <DialogHeader>
             <DialogTitle>
               Select Vehicle — {ticket.customer.first_name}{' '}

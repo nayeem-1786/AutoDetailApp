@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogContent,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertTriangle } from 'lucide-react';
@@ -52,8 +51,7 @@ export function QuoteDeleteDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogClose onClose={onClose} />
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()} modal>
       <DialogHeader>
         <DialogTitle>Delete Quote</DialogTitle>
       </DialogHeader>

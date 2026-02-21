@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Clock, Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
-import { Dialog, DialogClose } from '@/components/ui/dialog';
+import { Dialog } from '@/components/ui/dialog';
 import { useTicket } from '../context/ticket-context';
 import { resolveServicePrice } from '../utils/pricing';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
@@ -147,7 +147,6 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogClose onClose={onClose} />
 
       <div className="flex max-h-[80vh] flex-col">
         {/* Scrollable content */}

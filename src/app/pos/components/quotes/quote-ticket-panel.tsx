@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogContent,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -653,7 +652,6 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
       {/* Customer Lookup Dialog */}
       <Dialog open={customerLookupOpen} onOpenChange={setCustomerLookupOpen}>
-        <DialogClose onClose={() => setCustomerLookupOpen(false)} />
         <DialogHeader>
           <DialogTitle>Find Customer</DialogTitle>
         </DialogHeader>
@@ -686,7 +684,6 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           open={showVehicleSelector}
           onOpenChange={setShowVehicleSelector}
         >
-          <DialogClose onClose={() => setShowVehicleSelector(false)} />
           <DialogHeader>
             <DialogTitle>
               Select Vehicle — {quote.customer.first_name}{' '}
