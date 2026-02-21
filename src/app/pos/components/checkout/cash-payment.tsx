@@ -149,7 +149,7 @@ export function CashPayment() {
           min="0"
           value={tendered}
           onChange={(e) => setTendered(e.target.value)}
-          className="h-14 w-40 rounded-lg border border-gray-300 text-center text-2xl tabular-nums focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-200"
+          className="h-14 w-40 rounded-lg border border-gray-300 text-center text-2xl tabular-nums text-gray-900 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-200"
           placeholder="0.00"
         />
       </div>

@@ -344,7 +344,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Description..."
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none"
               maxLength={100}
             />
             {note && (

@@ -44,7 +44,7 @@ export function SearchBar({
         value={local}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
-        className="h-10 w-full rounded-md border border-gray-300 bg-white pl-9 pr-9 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+        className="h-10 w-full rounded-md border border-gray-300 bg-white pl-9 pr-9 text-sm text-gray-900 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
       />
       {local && (
         <button

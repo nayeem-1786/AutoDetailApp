@@ -314,7 +314,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 onChange={(e) => setIssueDescription(e.target.value)}
                 placeholder="e.g., Deep scratches on the rear bumper from a parking incident"
                 rows={3}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 autoFocus
               />
               <button
@@ -446,7 +446,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 placeholder={`Search ${catalogTab}...`}
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 py-2.5 pl-3 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 py-2.5 pl-3 pr-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           )}
@@ -480,7 +480,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                     placeholder="e.g., Paint touch-up on rear bumper"
                     value={customDescription}
                     onChange={(e) => setCustomDescription(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -493,7 +493,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                     placeholder="0.00"
                     value={customPrice}
                     onChange={(e) => setCustomPrice(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 <button
@@ -547,7 +547,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 placeholder="0.00"
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <p className="mt-1 text-xs text-gray-500">Leave empty for no discount</p>
             </div>
@@ -611,7 +611,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
               placeholder="0"
               value={pickupDelay}
               onChange={(e) => setPickupDelay(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <p className="mt-1 text-xs text-gray-500">
               {selectedItem?.base_duration_minutes
@@ -724,7 +724,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
                 onChange={(e) => setCustomMessageText(e.target.value)}
                 placeholder="Type your message to the customer..."
                 rows={4}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             )}
           </div>

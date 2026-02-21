@@ -1079,7 +1079,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
               value={pickupNotes}
               onChange={(e) => setPickupNotes(e.target.value)}
               placeholder="Optional notes (e.g., customer satisfied, noted concern about X)"
-              className="mt-3 w-full rounded-lg border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-3 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               rows={3}
             />
             <div className="mt-4 flex gap-2">
@@ -1339,7 +1339,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 value={customReason}
                 onChange={(e) => setCustomReason(e.target.value)}
                 placeholder="Describe the reason..."
-                className="mt-3 w-full rounded-lg border border-gray-200 p-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                className="mt-3 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 rows={2}
                 autoFocus
               />
@@ -1511,7 +1511,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 value={notesValue}
                 onChange={(e) => setNotesValue(e.target.value)}
                 placeholder="Add notes about this job..."
-                className="w-full rounded-lg border border-gray-200 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-200 p-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 rows={5}
                 autoFocus
               />
@@ -1556,7 +1556,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   value={serviceSearch}
                   onChange={(e) => setServiceSearch(e.target.value)}
                   placeholder="Search services..."
-                  className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>

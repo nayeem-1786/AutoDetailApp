@@ -195,14 +195,14 @@ export function TransactionList({ onSelect }: TransactionListProps) {
               type="date"
               value={dateFrom}
               onChange={(e) => handleCustomDateChange(e.target.value, dateTo)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
             />
             <span className="text-sm text-gray-400">to</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => handleCustomDateChange(dateFrom, e.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
             />
           </div>
         )}

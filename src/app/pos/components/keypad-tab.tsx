@@ -68,7 +68,7 @@ export function KeypadTab() {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Item description..."
-              className="flex-1 bg-transparent text-sm outline-none"
+              className="flex-1 bg-transparent text-sm text-gray-900 outline-none"
               maxLength={100}
               autoFocus
             />

@@ -96,7 +96,7 @@ export function TipScreen() {
             autoFocus
             value={customAmount}
             onChange={(e) => setCustomAmount(e.target.value)}
-            className="h-12 w-32 rounded-lg border border-gray-300 text-center text-xl focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="h-12 w-32 rounded-lg border border-gray-300 text-center text-xl text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
             placeholder="0.00"
           />
         </div>

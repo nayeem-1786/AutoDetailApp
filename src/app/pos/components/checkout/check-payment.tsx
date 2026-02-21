@@ -108,7 +108,7 @@ export function CheckPayment() {
           value={checkNumber}
           onChange={(e) => setCheckNumber(e.target.value)}
           autoFocus
-          className="h-14 w-48 rounded-lg border border-gray-300 text-center text-2xl tabular-nums focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+          className="h-14 w-48 rounded-lg border border-gray-300 text-center text-2xl tabular-nums text-gray-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
           placeholder="#"
         />
       </div>
