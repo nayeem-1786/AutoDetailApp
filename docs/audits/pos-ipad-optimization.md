@@ -171,33 +171,40 @@ The cart/ticket panel is **already fixed and always visible**. The current imple
 
 ### 4. PWA + Offline Support
 
-**Status:** ❌ Not started (nothing exists)
+**Status:** ✅ Done
 
-| Component | Exists? | Details |
-|-----------|---------|---------|
-| `manifest.json` / `manifest.webmanifest` | NO | Not in `/public/` |
-| Service worker (`sw.js`) | NO | No file, no registration code |
-| `next-pwa` package | NO | Not in `package.json` |
-| `workbox` | NO | Not in `package.json` |
-| Apple meta tags (`apple-mobile-web-app-capable`) | NO | Not in any layout |
-| `theme-color` meta tag | NO | Not in any layout |
-| `apple-touch-icon` link | NO | No icon files in `/public/` |
-| Offline detection (`navigator.onLine`) | NO | Not anywhere in codebase |
-| IndexedDB usage in POS | NO | |
-| localStorage usage in POS | YES | `pos_drawer_session` (drawer state only) |
-| Sync queue | NO | |
-| PWA icon files | NO | No icon-192.png, icon-512.png, etc. |
+**Implementation:**
+- `public/manifest.json` — PWA manifest scoped to `/pos`, standalone display, any orientation
+- `public/pos-sw.js` — Custom service worker: cache-first for assets, network-first for API, never-cache for mutations
+- `public/icons/` — 192px, 512px, maskable, and apple-touch-icon (180px)
+- POS layout exports `metadata` (manifest link, apple-mobile-web-app, apple-touch-icon) and `viewport` (theme-color, no-zoom for kiosk use)
+- `PosServiceWorker` component auto-registers SW with `/pos` scope, checks for updates every 30 min
+- `useOnlineStatus` hook (`useSyncExternalStore`) for reactive online/offline state
+- `OfflineIndicator` — amber "offline" banner + green "back online" reconnection flash (3s)
+- `OfflineQueueBadge` — shows pending sync count in POS header, auto-syncs when reconnected
+- `offline-queue.ts` — IndexedDB-based queue (`pos-offline` DB): `queueTransaction()`, `syncAllTransactions()`, `getQueueCount()`
+- `PaymentMethodScreen` disables Card, Check, Split when offline with explanatory message
+- `CashPayment` queues to IndexedDB when offline, processes normally when online
+- `PaymentComplete` shows "Saved offline" badge for queued transactions, hides receipt options
+- `/api/pos/sync-offline-transaction` — processes queued transactions with idempotency via `offline_id` column
+- `/pos/offline` — fallback page for first-time visitors with no cache
+- DB migration: `transactions.offline_id` column with unique index for dedup
 
-**What exists in `/public/`:** Only default Next.js SVGs (file.svg, globe.svg, next.svg, vercel.svg, window.svg) plus `/public/images/` for product/service images.
-
-**Viewport meta:** Uses Next.js default metadata export — no custom viewport settings for POS.
-
-**Estimated effort:** 20-30 hours (highest complexity feature)
-- Manifest + icons: 2 hours
-- Service worker + caching: 8-10 hours
-- Offline queue + sync: 8-10 hours
-- Conflict resolution: 4-6 hours
-- Testing: 4+ hours
+**Key files:**
+- `public/manifest.json`, `public/pos-sw.js`, `public/icons/*`
+- `src/app/pos/layout.tsx` (metadata + viewport exports)
+- `src/app/pos/pos-layout-inner.tsx` (PosServiceWorker registration)
+- `src/app/pos/components/pos-service-worker.tsx`
+- `src/app/pos/components/offline-indicator.tsx`
+- `src/app/pos/components/offline-queue-badge.tsx`
+- `src/lib/hooks/use-online-status.ts`
+- `src/lib/pos/offline-queue.ts`
+- `src/app/pos/components/checkout/payment-method-screen.tsx` (offline-aware)
+- `src/app/pos/components/checkout/cash-payment.tsx` (offline queue)
+- `src/app/pos/components/checkout/payment-complete.tsx` (offline badge)
+- `src/app/api/pos/sync-offline-transaction/route.ts`
+- `src/app/pos/offline/page.tsx`
+- `supabase/migrations/20260220000001_transactions_offline_id.sql`
 
 ---
 
@@ -347,7 +354,7 @@ Based on current state — prioritized by value/effort ratio:
 | 4 | Sticky cart sidebar | ✅ Done | 0 | — | Already implemented. Consider portrait-responsive variant. |
 | 5 | Swipe-to-delete | ✅ Done | — | Medium | framer-motion swipe + undo toast |
 | 6 | Recent transactions | ✅ Done | — | Medium | Header dropdown + deep-link to detail |
-| 7 | PWA + offline | ❌ Not started | 20-30 hrs | High | Most complex; needs design decisions first |
+| 7 | PWA + offline | ✅ Done | — | High | Manifest, SW, offline queue, auto-sync |
 | 8 | Dark mode | ❌ Not started | 15-20 hrs | Low-Med | Large refactor; POS uses hardcoded colors |
 
 **Total estimated effort:** 47-67 hours (excluding the 2 already-complete features)

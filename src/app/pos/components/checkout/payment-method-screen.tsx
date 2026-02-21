@@ -1,14 +1,16 @@
 'use client';
 
-import { Banknote, CreditCard, FileText, Split } from 'lucide-react';
+import { Banknote, CreditCard, FileText, Split, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
+import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 
 export function PaymentMethodScreen() {
   const { ticket } = useTicket();
   const { setPaymentMethod, setStep, closeCheckout } = useCheckout();
+  const isOnline = useOnlineStatus();
 
   function handleSelect(method: 'cash' | 'card' | 'check' | 'split') {
     setPaymentMethod(method);
@@ -24,6 +26,13 @@ export function PaymentMethodScreen() {
         </p>
       </div>
 
+      {!isOnline && (
+        <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-700">
+          <WifiOff className="h-4 w-4 shrink-0" />
+          <span>You&apos;re offline — only cash payments are available</span>
+        </div>
+      )}
+
       <div className="flex gap-6">
         <button
           onClick={() => handleSelect('cash')}
@@ -38,9 +47,12 @@ export function PaymentMethodScreen() {
 
         <button
           onClick={() => handleSelect('card')}
+          disabled={!isOnline}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 transition-all',
-            'hover:border-blue-400 hover:bg-blue-50 active:scale-[0.97]'
+            isOnline
+              ? 'hover:border-blue-400 hover:bg-blue-50 active:scale-[0.97]'
+              : 'cursor-not-allowed opacity-40'
           )}
         >
           <CreditCard className="h-8 w-8 text-blue-600" />
@@ -49,9 +61,12 @@ export function PaymentMethodScreen() {
 
         <button
           onClick={() => handleSelect('check')}
+          disabled={!isOnline}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 transition-all',
-            'hover:border-amber-400 hover:bg-amber-50 active:scale-[0.97]'
+            isOnline
+              ? 'hover:border-amber-400 hover:bg-amber-50 active:scale-[0.97]'
+              : 'cursor-not-allowed opacity-40'
           )}
         >
           <FileText className="h-8 w-8 text-amber-600" />
@@ -60,9 +75,12 @@ export function PaymentMethodScreen() {
 
         <button
           onClick={() => handleSelect('split')}
+          disabled={!isOnline}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 transition-all',
-            'hover:border-purple-400 hover:bg-purple-50 active:scale-[0.97]'
+            isOnline
+              ? 'hover:border-purple-400 hover:bg-purple-50 active:scale-[0.97]'
+              : 'cursor-not-allowed opacity-40'
           )}
         >
           <Split className="h-8 w-8 text-purple-600" />

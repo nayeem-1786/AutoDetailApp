@@ -1,12 +1,13 @@
 'use client';
 
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, CloudOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCheckout } from '../../context/checkout-context';
 import { ReceiptOptions } from '../receipt-options';
 
 export function PaymentComplete() {
   const checkout = useCheckout();
+  const isOfflineTx = checkout.transactionId?.startsWith('offline-');
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
@@ -18,6 +19,12 @@ export function PaymentComplete() {
           <p className="mt-1 text-sm text-gray-500">
             Receipt #{checkout.receiptNumber}
           </p>
+        )}
+        {isOfflineTx && (
+          <div className="mt-2 flex items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-sm text-amber-700">
+            <CloudOff className="h-3.5 w-3.5" />
+            <span>Saved offline — will sync when reconnected</span>
+          </div>
         )}
       </div>
 
@@ -83,8 +90,8 @@ export function PaymentComplete() {
         )}
       </div>
 
-      {/* Receipt delivery */}
-      {checkout.transactionId && (
+      {/* Receipt delivery — skip for offline transactions (not synced yet) */}
+      {checkout.transactionId && !isOfflineTx && (
         <ReceiptOptions
           transactionId={checkout.transactionId}
           customerEmail={checkout.customerEmail}

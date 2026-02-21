@@ -28,6 +28,8 @@ import { BottomNav } from './components/bottom-nav';
 import { HeldTicketsPanel } from './components/held-tickets-panel';
 import { RecentTransactionsDropdown } from './components/recent-transactions-dropdown';
 import { PinScreen } from './components/pin-screen';
+import { OfflineIndicator } from './components/offline-indicator';
+import { OfflineQueueBadge } from './components/offline-queue-badge';
 import { cn } from '@/lib/utils/cn';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
@@ -233,6 +235,9 @@ function PosShellContent({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
+      {/* Offline indicator banner */}
+      <OfflineIndicator />
+
       {/* Top Bar */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
         {/* Left: Back navigation + Logo */}
@@ -305,6 +310,9 @@ function PosShellContent({
               <PauseCircle className="h-4 w-4" />
             </button>
           )}
+
+          {/* Offline queue badge */}
+          <OfflineQueueBadge />
 
           {/* Recent transactions quick-access */}
           <RecentTransactionsDropdown />

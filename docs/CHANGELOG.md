@@ -4,6 +4,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS PWA with Offline Support — 2026-02-20
+
+iPad optimization (Phase 12, item 4 from audit). Full PWA infrastructure for "Add to Home Screen" on iPad and offline cash transactions.
+
+### PWA Manifest & Icons
+- `public/manifest.json` — scoped to `/pos`, standalone display, any orientation
+- Generated 5 icon files: 192px, 512px, maskable 192/512, apple-touch-icon 180px
+- POS layout exports Next.js `metadata` (manifest, apple-mobile-web-app-capable, apple-touch-icon) and `viewport` (theme-color, zoom disabled for kiosk use)
+
+### Service Worker
+- `public/pos-sw.js` — custom service worker (no next-pwa dependency)
+- Cache-first for static assets (`/_next/static/`, icons, fonts)
+- Stale-while-revalidate for POS pages
+- Network-first with cache fallback for read-only API data (services, products, settings)
+- Never-cache for mutation endpoints (transactions, payments, refunds)
+- Auto-registration via `PosServiceWorker` component, checks for updates every 30 min
+- `/pos/offline` fallback page for first-time visitors without cache
+
+### Offline Detection & UI
+- `useOnlineStatus` hook — `useSyncExternalStore` for reactive online/offline state
+- `OfflineIndicator` — amber banner when offline, green "Back online" flash on reconnect (3s)
+- `OfflineQueueBadge` — pending sync count in POS header with auto-sync on reconnect
+
+### Offline Transaction Queue
+- IndexedDB-based queue (`pos-offline` DB) in `src/lib/pos/offline-queue.ts`
+- `queueTransaction()` — stores full transaction data with offline ID
+- `syncAllTransactions()` — POSTs queued transactions to sync endpoint on reconnect
+- `getQueueCount()` — for badge display
+
+### Checkout Flow Integration
+- Payment method screen disables Card, Check, Split when offline with explanatory message
+- Cash payment queues to IndexedDB when offline, processes normally when online
+- Payment complete screen shows "Saved offline" badge, hides receipt options for queued txns
+
+### Sync API
+- `POST /api/pos/sync-offline-transaction` — full transaction creation with idempotency via `offline_id`
+- Replicates all transaction logic: items, payments, inventory, customer stats, loyalty, coupons, QBO sync, job linking
+- DB migration adds `transactions.offline_id` column with unique index
+
+---
+
 ## Feat: POS 44px Touch Targets + Numeric Keyboard InputMode for iPad — 2026-02-20
 
 iPad optimization (Phase 12, items 1 & 2 from audit).
