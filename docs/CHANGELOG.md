@@ -4,30 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Feat: AI-Generated Coupon Summaries — Session D11 — 2026-02-22
+## Refactor: Deterministic Coupon Summaries — Session D12 — 2026-02-22
 
-Added AI-generated plain-English summaries for coupons. Summaries auto-generate on create and regenerate when targeting, conditions, rewards, or constraints change.
+Replaced AI-generated coupon summaries (Anthropic API call) with deterministic string templates. Summaries now build instantly from resolved data — no API key dependency, no latency, no cost.
+
+### What changed
+- `src/lib/services/coupon-summary.ts` — removed `generateCouponSummary()` (Anthropic API) and `buildPrompt()`. Added `buildCouponSummary()` — deterministic function using simple string templates. `buildSummaryInput()` unchanged.
+- `src/app/api/marketing/coupons/route.ts` — `buildCouponSummary(summaryInput)` replaces `await generateCouponSummary(summaryInput)`
+- `src/app/api/marketing/coupons/[id]/route.ts` — same replacement
+- `src/app/api/marketing/coupons/[id]/summary/route.ts` — same replacement
+- `src/app/admin/marketing/coupons/[id]/page.tsx` — "AI Summary" → "Summary" label
+
+### Summary format
+- Covers targeting, cart conditions, and constraints only (rewards shown separately on POS card)
+- Phrases joined with " · " (middle dot)
+- Examples: "For Professional customers · Requires: Express Interior Clean", "First-time customers only · Min $50 purchase · One-time use", "No restrictions — available for any order."
+
+---
+
+## Feat: Coupon Summaries — Session D11 — 2026-02-22
+
+Added plain-English summaries for coupons. Summaries auto-generate on create and regenerate when targeting, conditions, rewards, or constraints change.
 
 ### New files
 - `supabase/migrations/20260222000001_coupon_summary.sql` — adds `summary` TEXT column to `coupons`
-- `src/lib/services/coupon-summary.ts` — `buildSummaryInput()` resolves UUIDs to names, `generateCouponSummary()` calls Claude API
-- `src/app/api/marketing/coupons/[id]/summary/route.ts` — POST (regenerate via AI), PATCH (manual edit)
+- `src/lib/services/coupon-summary.ts` — `buildSummaryInput()` resolves UUIDs to names, `buildCouponSummary()` builds deterministic summary
+- `src/app/api/marketing/coupons/[id]/summary/route.ts` — POST (regenerate), PATCH (manual edit)
 
 ### Modified files
 - `src/lib/supabase/types.ts` — added `summary: string | null` to `Coupon` interface
 - `src/app/api/marketing/coupons/route.ts` — generates summary after coupon+rewards insert (non-blocking)
 - `src/app/api/marketing/coupons/[id]/route.ts` — regenerates summary when trigger fields change, added `summary` to allowedFields
-- `src/app/admin/marketing/coupons/[id]/page.tsx` — AI Summary card (Regenerate + Edit) below Performance in right column
+- `src/app/admin/marketing/coupons/[id]/page.tsx` — Summary card (Regenerate + Edit) below Performance in right column
 - `src/app/api/pos/promotions/available/route.ts` — uses `summary` as description (falls back to reward labels)
 - `src/app/api/customer/coupons/route.ts` — includes `summary` in select
 - `src/components/account/coupon-card.tsx` — displays summary when available, falls back to reward badges
 
 ### Behavior
-- Summary auto-generates on POST (non-blocking — coupon still created if AI fails)
+- Summary auto-generates on POST (non-blocking — coupon still created if generation fails)
 - Summary regenerates on PATCH when any of: name, customer_id, customer_tags, tag_match_mode, target_customer_type, min_purchase, max_customer_visits, requires_*_ids, condition_logic, is_single_use, max_uses, expires_at, or rewards change
 - Code-only edits do NOT trigger regeneration
 - Admin detail page: "Regenerate" button (Sparkles icon) + "Edit" button (Pencil icon) for manual override
-- POS Promos tab: AI summary replaces raw "Needs: service" text in promotion cards
+- POS Promos tab: summary replaces raw "Needs: service" text in promotion cards
 - Customer portal: summary shown below code/name, replaces reward badges when available
 
 ---

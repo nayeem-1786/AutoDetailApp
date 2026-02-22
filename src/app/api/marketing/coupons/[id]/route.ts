@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { buildSummaryInput, generateCouponSummary } from '@/lib/services/coupon-summary';
+import { buildSummaryInput, buildCouponSummary } from '@/lib/services/coupon-summary';
 import type { Coupon, CouponReward } from '@/lib/supabase/types';
 
 const SUMMARY_TRIGGER_FIELDS = [
@@ -156,7 +156,7 @@ export async function PATCH(
 
     if (error) throw error;
 
-    // Regenerate AI summary if trigger fields changed (non-blocking)
+    // Regenerate summary if trigger fields changed (non-blocking)
     const shouldRegenerate =
       SUMMARY_TRIGGER_FIELDS.some((f) => f in fields) ||
       (rewards && Array.isArray(rewards));
@@ -169,7 +169,7 @@ export async function PATCH(
           data as unknown as Coupon,
           couponRewards,
         );
-        const summary = await generateCouponSummary(summaryInput);
+        const summary = buildCouponSummary(summaryInput);
         await admin.from('coupons').update({ summary }).eq('id', id);
         (data as Record<string, unknown>).summary = summary;
       } catch (err) {

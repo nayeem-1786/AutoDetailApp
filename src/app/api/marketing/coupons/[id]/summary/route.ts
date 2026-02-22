@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { buildSummaryInput, generateCouponSummary } from '@/lib/services/coupon-summary';
+import { buildSummaryInput, buildCouponSummary } from '@/lib/services/coupon-summary';
 import type { Coupon, CouponReward } from '@/lib/supabase/types';
 
-// POST — regenerate summary via AI
+// POST — regenerate summary
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -38,7 +38,7 @@ export async function POST(
 
     const rewards: CouponReward[] = (coupon as Record<string, unknown>).coupon_rewards as CouponReward[] || [];
     const summaryInput = await buildSummaryInput(coupon as unknown as Coupon, rewards);
-    const summary = await generateCouponSummary(summaryInput);
+    const summary = buildCouponSummary(summaryInput);
 
     await admin.from('coupons').update({ summary }).eq('id', id);
 

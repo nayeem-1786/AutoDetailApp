@@ -44,7 +44,7 @@ export default function CouponDetailPage() {
   const [editExpiry, setEditExpiry] = useState('');
   const [inlineSaving, setInlineSaving] = useState(false);
 
-  // AI Summary states
+  // Summary states
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editedSummary, setEditedSummary] = useState('');
@@ -701,7 +701,7 @@ export default function CouponDetailPage() {
           </Card>
         </div>
 
-        {/* Right column: Performance + AI Summary */}
+        {/* Right column: Performance + Summary */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -734,17 +734,17 @@ export default function CouponDetailPage() {
             </CardContent>
           </Card>
 
-          {/* AI Summary Card */}
+          {/* Summary Card */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>AI Summary</CardTitle>
+                <CardTitle>Summary</CardTitle>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={handleRegenerateSummary}
                     disabled={isRegenerating}
                     className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
-                    title="Regenerate with AI"
+                    title="Regenerate summary"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     {isRegenerating ? 'Generating...' : 'Regenerate'}
