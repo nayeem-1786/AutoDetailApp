@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS Numeric Keypad Default for Customer Lookup — Session D5 — 2026-02-21
+
+- Added `inputMode="tel"` to customer lookup search input (`customer-lookup.tsx`)
+- iPad/mobile: numeric keypad shows by default when tapping search field (most lookups are by phone)
+- `type` stays as `"text"` so letter input still works after switching keyboard
+- Desktop: no visible change (`inputMode` only affects mobile virtual keyboards)
+
+---
+
 ## Fix: POS Header/Ticket/Menu Polish — Session D4 — 2026-02-21
 
 ### More Menu Log Out (Fix 1)
