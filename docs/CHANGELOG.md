@@ -4,6 +4,61 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: POS Navigation Reorganization + Bug Fixes — 2026-02-21
+
+### Header Redesign
+- Reduced header from 16 elements to 8
+- LEFT zone: Employee first name + role badge (e.g., "Nayeem · Manager")
+- CENTER zone: "Smart Detail POS" (responsive — "POS" on narrow screens)
+- RIGHT zone: Scanner indicator, Card reader status (44px touch target), Held tickets button (44px), Offline queue badge
+- REMOVED: Back arrow, clock, recent transactions dropdown, theme toggle, fullscreen toggle, PWA refresh, keyboard shortcuts button
+
+### Bottom Nav Redesign
+- Changed from 6 tabs to 5: Transactions, Quotes, Sale (new), Jobs, More
+- REMOVED: Log Out tab (moved to More menu), Register tab (moved to More menu as "Cash Drawer")
+- NEW: "Sale" tab with ShoppingCart icon linking to /pos (exact pathname match)
+- All 5 tabs evenly spaced with flex-1
+
+### More Menu Expansion
+- Cash Drawer with green dot indicator (from former Register tab)
+- Theme segmented control (Light/Dark/System) — stays open after selection
+- Refresh App (PWA standalone mode only)
+- Fullscreen toggle (desktop non-standalone only)
+- Keyboard Shortcuts (opens modal)
+- Go to Dashboard (link to /admin)
+- Log Out in red with employee name confirmation
+- Full dark mode support, proper separators, Escape key support
+
+### Bug Fix: Card Reader PWA Connection
+- Added `resetTerminal()` to `stripe-terminal.ts` — fully destroys stale Terminal SDK singleton
+- `discoverAndConnect` now calls `resetTerminal()` before reconnecting (clears stale WebSocket state)
+- Added `visibilitychange` handler in `reader-context.tsx` — auto-reconnects reader when iPad resumes from background/sleep
+- Uses `isConnectingRef` to prevent duplicate reconnection attempts
+
+### Bug Fix: Customer Lookup Popup Dismiss
+- Fixed backdrop click/tap not dismissing dialog on iPad and desktop
+- Root cause: flex container overlay sat above the backdrop div, intercepting all pointer events
+- Fix: moved `onClick`/`onTouchEnd` handlers from backdrop div to the flex container
+- Added `onTouchEnd` stopPropagation on dialog card to prevent touch events bubbling through
+
+### Dead Code Cleanup
+- DELETED: `recent-transactions-dropdown.tsx` (functionality in Transactions tab)
+- DELETED: `fullscreen-toggle.tsx` (logic moved inline to More menu)
+- DELETED: `pwa-refresh-button.tsx` (logic moved inline to More menu)
+- Removed all orphaned imports, unused state, effects, and timers
+
+### Files Changed
+- `src/app/pos/pos-shell.tsx` — Header redesign, removed clock/dead imports
+- `src/app/pos/components/bottom-nav.tsx` — Complete rewrite (5 tabs + expanded More menu)
+- `src/app/pos/context/reader-context.tsx` — PWA reconnect, resetTerminal, visibilitychange
+- `src/app/pos/lib/stripe-terminal.ts` — Added `resetTerminal()` function
+- `src/components/ui/dialog.tsx` — Fixed backdrop dismiss for iPad Safari
+- `src/app/pos/components/recent-transactions-dropdown.tsx` — DELETED
+- `src/app/pos/components/fullscreen-toggle.tsx` — DELETED
+- `src/app/pos/components/pwa-refresh-button.tsx` — DELETED
+
+---
+
 ## Feat: PWA-Only Refresh Button in POS Header — 2026-02-21
 
 - Added `PwaRefreshButton` component — only renders in PWA standalone mode (no address bar = no native refresh)

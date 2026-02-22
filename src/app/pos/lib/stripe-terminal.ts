@@ -273,3 +273,22 @@ export async function disconnectReader(): Promise<void> {
   connectedReader = null;
   connectionPromise = null;
 }
+
+/**
+ * Fully reset the Terminal SDK singleton.
+ * Used to recover from stale connections in PWA mode after sleep/wake cycles.
+ * After calling this, the next getTerminal() call will create a fresh instance.
+ */
+export async function resetTerminal(): Promise<void> {
+  try {
+    if (terminal) {
+      await terminal.disconnectReader();
+    }
+  } catch {
+    // Already disconnected or SDK in bad state — ignore
+  }
+  terminal = null;
+  connectedReader = null;
+  connectionPromise = null;
+  initPromise = null;
+}

@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   ReactNode,
 } from 'react';
 import type { Reader } from '@stripe/terminal-js';
@@ -25,6 +26,7 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
   const [connectedReader, setConnectedReader] = useState<Reader | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const isConnectingRef = useRef(false);
 
   // Auto-connect on mount
   useEffect(() => {
@@ -32,6 +34,7 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
 
     async function autoConnect() {
       setIsConnecting(true);
+      isConnectingRef.current = true;
 
       try {
         const { ensureConnected } = await import('../lib/stripe-terminal');
@@ -50,6 +53,7 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
       } finally {
         if (mounted) {
           setIsConnecting(false);
+          isConnectingRef.current = false;
         }
       }
     }
@@ -63,11 +67,15 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
 
   const discoverAndConnect = useCallback(async () => {
     setIsConnecting(true);
+    isConnectingRef.current = true;
     setConnectionError(null);
 
     try {
-      const { ensureConnected } = await import('../lib/stripe-terminal');
-      const reader = await ensureConnected();
+      // Reset the Terminal SDK to clear stale state (fixes PWA sleep/wake issues)
+      const stripeTerminal = await import('../lib/stripe-terminal');
+      await stripeTerminal.resetTerminal();
+
+      const reader = await stripeTerminal.ensureConnected();
       setConnectedReader(reader);
       localStorage.setItem('pos_reader_id', reader.id);
     } catch (err) {
@@ -75,8 +83,39 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
       setConnectionError(message);
     } finally {
       setIsConnecting(false);
+      isConnectingRef.current = false;
     }
   }, []);
+
+  // Re-check connection when page becomes visible (PWA resume from background)
+  useEffect(() => {
+    let reconnectAttempted = false;
+
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') {
+        reconnectAttempted = false;
+        return;
+      }
+      if (reconnectAttempted || isConnectingRef.current) return;
+      reconnectAttempted = true;
+
+      try {
+        const { isReaderConnected } = await import('../lib/stripe-terminal');
+        const stillConnected = await isReaderConnected();
+        if (!stillConnected) {
+          // Was connected before but now stale — auto-reconnect
+          console.log('[ReaderContext] Connection stale after resume, reconnecting...');
+          setConnectedReader(null);
+          discoverAndConnect();
+        }
+      } catch {
+        setConnectedReader(null);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [discoverAndConnect]);
 
   const disconnect = useCallback(async () => {
     try {

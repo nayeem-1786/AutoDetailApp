@@ -2,10 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
   Loader2,
   ScanLine,
   PauseCircle,
@@ -13,9 +11,6 @@ import {
   X,
   Wifi,
   WifiOff,
-  Sun,
-  Moon,
-  Monitor,
 } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/utils/constants';
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
@@ -29,20 +24,15 @@ import { QuoteProvider } from './context/quote-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
 import { BottomNav } from './components/bottom-nav';
 import { HeldTicketsPanel } from './components/held-tickets-panel';
-import { RecentTransactionsDropdown } from './components/recent-transactions-dropdown';
 import { PinScreen } from './components/pin-screen';
 import { OfflineIndicator } from './components/offline-indicator';
 import { OfflineQueueBadge } from './components/offline-queue-badge';
 import { cn } from '@/lib/utils/cn';
-import { usePosTheme } from './context/pos-theme-context';
-import { FullscreenToggle } from './components/fullscreen-toggle';
-import { PwaRefreshButton } from './components/pwa-refresh-button';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, locked, lock, replaceSession } = usePosAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [clock, setClock] = useState('');
   const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { idleTimeoutMinutes } = usePosAuth();
 
@@ -85,22 +75,6 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
     };
   }, [employee, locked, resetIdleTimer]);
 
-  // Live clock
-  useEffect(() => {
-    function tick() {
-      setClock(
-        new Date().toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        })
-      );
-    }
-    tick();
-    const interval = setInterval(tick, 10_000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Lock screen success handler
   const handleLockSuccess = useCallback(
     (data: { token: string; employee: PosSessionEmployee; idle_timeout_minutes: number }) => {
@@ -138,7 +112,7 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
         <CheckoutProvider>
           <HeldTicketsProvider>
             <QuoteProvider>
-            <PosShellContent displayName={displayName} clock={clock} role={role}>
+            <PosShellContent displayName={displayName} role={role}>
               {children}
             </PosShellContent>
 
@@ -162,12 +136,10 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
 function PosShellContent({
   children,
   displayName,
-  clock,
   role,
 }: {
   children: React.ReactNode;
   displayName: string;
-  clock: string;
   role: string;
 }) {
   const pathname = usePathname();
@@ -176,7 +148,6 @@ function PosShellContent({
   const { openCheckout, isOpen: checkoutOpen } = useCheckout();
   const { heldTickets } = useHeldTickets();
   const { connectedReader, isConnecting, discoverAndConnect } = useReader();
-  const { theme, setTheme } = usePosTheme();
   const [heldPanelOpen, setHeldPanelOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -222,7 +193,6 @@ function PosShellContent({
         case '?':
           // Only toggle shortcuts if no modifier keys
           if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-            // Don't trigger when typing in inputs (already handled above except Escape)
             if (
               target.tagName !== 'INPUT' &&
               target.tagName !== 'TEXTAREA' &&
@@ -246,32 +216,42 @@ function PosShellContent({
       <OfflineIndicator />
 
       {/* Top Bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4">
-        {/* Left: Back navigation + Logo */}
-        <div className="flex items-center gap-4">
-          <Link
-            href={pathname === '/pos' ? '/admin' : '/pos'}
-            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">{pathname === '/pos' ? 'Admin' : 'POS'}</span>
-          </Link>
-          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Smart Detail POS
+      <header className="relative flex h-14 shrink-0 items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4">
+        {/* Left: Employee identity */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {displayName}
+          </span>
+          <span className="text-sm text-gray-400 dark:text-gray-500">&middot;</span>
+          <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+            {ROLE_LABELS[role] || role}
           </span>
         </div>
 
-        {/* Right: Reader status + Scanner indicator + Held tickets + Employee + Clock + Shortcuts help */}
-        <div className="flex items-center gap-3">
+        {/* Center: Brand name (absolute centered) */}
+        <div className="absolute inset-x-0 flex justify-center pointer-events-none">
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <span className="hidden sm:inline">Smart Detail POS</span>
+            <span className="sm:hidden">POS</span>
+          </span>
+        </div>
+
+        {/* Right: Status indicators + actions */}
+        <div className="ml-auto flex items-center gap-3">
+          {/* Scanner indicator */}
+          <div className="flex items-center gap-1" title="Scanner: disconnected">
+            <ScanLine className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+          </div>
+
           {/* Card Reader Status */}
           {isConnecting ? (
-            <div className="flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-blue-700 dark:text-blue-400">
+            <div className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-blue-700 dark:text-blue-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="hidden text-xs font-medium sm:inline">Connecting...</span>
             </div>
           ) : connectedReader ? (
             <div
-              className="flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2 py-1 text-green-700 dark:text-green-400"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2 py-1 text-green-700 dark:text-green-400"
               title={`Reader: ${connectedReader.label || 'Connected'}`}
             >
               <Wifi className="h-4 w-4" />
@@ -282,113 +262,31 @@ function PosShellContent({
           ) : (
             <button
               onClick={discoverAndConnect}
-              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
-              title="Click to connect reader"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 py-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
+              title="Tap to connect reader"
             >
               <WifiOff className="h-4 w-4" />
               <span className="hidden text-xs sm:inline">No Reader</span>
             </button>
           )}
 
-          {/* P5: Scanner Connection Indicator */}
-          <div className="flex items-center gap-1" title="Scanner: disconnected">
-            <ScanLine className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span className="hidden text-xs text-gray-400 dark:text-gray-500 sm:inline">Disconnected</span>
-          </div>
-
-          {/* P3: Held Tickets badge */}
-          {heldCount > 0 && (
-            <button
-              onClick={() => setHeldPanelOpen(true)}
-              className="relative flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-            >
-              <PauseCircle className="h-4 w-4" />
-              <span className="text-xs font-medium">{heldCount} held</span>
-            </button>
-          )}
-
-          {/* Show held tickets panel even when count is 0 — the button just won't be visible */}
-          {heldCount === 0 && (
-            <button
-              onClick={() => setHeldPanelOpen(true)}
-              className="flex items-center gap-1 rounded-full px-2 py-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
-              title="Held tickets"
-            >
-              <PauseCircle className="h-4 w-4" />
-            </button>
-          )}
+          {/* Held Tickets */}
+          <button
+            onClick={() => setHeldPanelOpen(true)}
+            className={cn(
+              'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2.5 py-1',
+              heldCount > 0
+                ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                : 'text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400'
+            )}
+            title="Held tickets"
+          >
+            <PauseCircle className="h-4 w-4" />
+            {heldCount > 0 && <span className="text-xs font-medium">{heldCount} held</span>}
+          </button>
 
           {/* Offline queue badge */}
           <OfflineQueueBadge />
-
-          {/* Recent transactions quick-access */}
-          <RecentTransactionsDropdown />
-
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {displayName}
-          </span>
-          <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {ROLE_LABELS[role] || role}
-          </span>
-          <span className="text-sm tabular-nums text-gray-400 dark:text-gray-500">{clock}</span>
-
-          {/* PWA refresh (standalone only — no address bar) */}
-          <PwaRefreshButton />
-
-          {/* Fullscreen toggle */}
-          <FullscreenToggle />
-
-          {/* Theme toggle */}
-          <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
-            <button
-              type="button"
-              onClick={() => setTheme('light')}
-              className={cn(
-                'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
-                theme === 'light'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-              )}
-              aria-label="Light mode"
-            >
-              <Sun className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme('dark')}
-              className={cn(
-                'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
-                theme === 'dark'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-              )}
-              aria-label="Dark mode"
-            >
-              <Moon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme('system')}
-              className={cn(
-                'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors',
-                theme === 'system'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-              )}
-              aria-label="System preference"
-            >
-              <Monitor className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* P7: Shortcuts help button */}
-          <button
-            onClick={() => setShortcutsOpen((prev) => !prev)}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
-            title="Keyboard shortcuts"
-          >
-            ?
-          </button>
         </div>
       </header>
 
@@ -396,7 +294,7 @@ function PosShellContent({
       <main className="min-h-0 flex-1 overflow-hidden touch-pan-y">{children}</main>
 
       {/* Bottom Navigation */}
-      <BottomNav />
+      <BottomNav onOpenShortcuts={() => setShortcutsOpen(true)} />
 
       {/* Checkout overlay renders on top of everything */}
       <CheckoutOverlay />
