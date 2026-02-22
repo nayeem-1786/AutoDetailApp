@@ -24,7 +24,7 @@ export async function posFetch(
     // Clear expired session and redirect to POS login
     if (typeof window !== 'undefined') {
       localStorage.removeItem(POS_SESSION_KEY);
-      window.location.href = '/pos/login';
+      window.location.href = '/pos/login?reason=session_expired';
     }
     // Return a never-resolving promise to prevent further execution
     return new Promise(() => {});

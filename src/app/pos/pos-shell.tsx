@@ -35,6 +35,44 @@ function PosShellInner({ children }: { children: React.ReactNode }) {
   const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { idleTimeoutMinutes } = usePosAuth();
 
+  // Global error handler — catch Stripe SDK auth crashes and redirect to login
+  useEffect(() => {
+    const AUTH_PATTERNS = [
+      'no longer authenticated',
+      'not authenticated',
+      'session expired',
+    ];
+
+    function isAuthError(msg: string): boolean {
+      const lower = msg.toLowerCase();
+      return AUTH_PATTERNS.some((p) => lower.includes(p));
+    }
+
+    const handleError = (event: ErrorEvent) => {
+      if (isAuthError(event.message || '')) {
+        event.preventDefault();
+        console.warn('[POS] Auth error caught globally, redirecting to login');
+        window.location.href = '/pos/login?reason=session_expired';
+      }
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const msg = event.reason?.message || String(event.reason) || '';
+      if (isAuthError(msg)) {
+        event.preventDefault();
+        console.warn('[POS] Auth rejection caught globally, redirecting to login');
+        window.location.href = '/pos/login?reason=session_expired';
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
   // Redirect if not authenticated — preserve intended destination
   useEffect(() => {
     if (loading) return;

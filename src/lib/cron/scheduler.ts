@@ -1,21 +1,37 @@
 import cron from 'node-cron';
 
 const CRON_API_KEY = process.env.CRON_API_KEY;
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+// Use localhost — cron runs inside the Next.js process, no need for external round-trip
+const BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 
 let initialized = false;
 
-async function callCronEndpoint(path: string, name: string) {
-  try {
-    console.log(`[CRON] Running ${name}...`);
-    const response = await fetch(`${BASE_URL}${path}`, {
-      method: 'GET',
-      headers: { 'x-api-key': CRON_API_KEY || '' },
-    });
-    const data = await response.json();
-    console.log(`[CRON] ${name} completed:`, JSON.stringify(data));
-  } catch (error) {
-    console.error(`[CRON] ${name} failed:`, error);
+async function callCronEndpoint(path: string, name: string, retries = 1) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      console.log(`[CRON] Running ${name}...${attempt > 0 ? ` (retry ${attempt})` : ''}`);
+      const response = await fetch(`${BASE_URL}${path}`, {
+        method: 'GET',
+        headers: { 'x-api-key': CRON_API_KEY || '' },
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!response.ok) {
+        console.error(`[CRON] ${name} returned ${response.status}`);
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      console.log(`[CRON] ${name} completed:`, data?.message || 'OK');
+      return;
+    } catch (err: any) {
+      const isLastAttempt = attempt === retries;
+      if (isLastAttempt) {
+        console.error(`[CRON] ${name} failed after ${retries + 1} attempts:`, err.message || err);
+      } else {
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    }
   }
 }
 

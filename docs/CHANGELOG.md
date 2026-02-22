@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Auth Expiry Redirect + CRON Resilience — Session D6 — 2026-02-21
+
+### POS Auth Expiry → Graceful Login Redirect (Fix 1)
+- **Layer 1 — posFetch 401 handler**: Updated redirect URL to `/pos/login?reason=session_expired` (was missing reason param)
+- **Layer 2 — Global error handler**: Added `window.error` + `unhandledrejection` listeners in `PosShellInner` to catch Stripe Terminal SDK "no longer authenticated" / "not authenticated" / "session expired" errors. Prevents React error boundary crash screen — redirects cleanly to login instead.
+- **Layer 3 — Already covered**: `posFetch` wrapper already handles 401 for all POS API calls. Only raw fetch bypass is `pin-screen.tsx` for login (excluded by design).
+- **Layer 4 — Login page toast**: Shows `toast.info('Your session has expired. Please log in again.')` when redirected with `?reason=session_expired`
+
+### CRON Scheduler Resilience (Fix 2)
+- **Localhost URL**: Changed `BASE_URL` from `process.env.NEXT_PUBLIC_APP_URL` to `http://localhost:${PORT || 3000}`. Cron runs inside the Next.js process — calling itself via external URL was causing `SocketError: other side closed` during rebuilds/deploys.
+- **30s timeout**: Added `AbortSignal.timeout(30000)` to prevent hanging connections
+- **Single retry with 5s delay**: On fetch failure, waits 5s then retries once. Only logs error on final failure — reduces log noise during brief rebuild windows.
+- **Graceful non-200 handling**: Logs status code and returns (no retry for HTTP errors, only network failures)
+
+---
+
 ## Feat: POS Numeric Keypad Default for Customer Lookup — Session D5 — 2026-02-21
 
 - Added `inputMode="tel"` to customer lookup search input (`customer-lookup.tsx`)
