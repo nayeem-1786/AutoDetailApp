@@ -251,3 +251,41 @@ export const MESSAGE_SENDER_TYPE_LABELS: Record<string, string> = {
   ai: 'AI',
   system: 'System',
 } as const;
+
+// Audit Log
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  create: 'Created',
+  update: 'Updated',
+  delete: 'Deleted',
+  void: 'Voided',
+  refund: 'Refunded',
+  apply: 'Applied',
+  login: 'Logged In',
+  logout: 'Logged Out',
+  adjust: 'Adjusted',
+} as const;
+
+export const AUDIT_ENTITY_TYPE_LABELS: Record<string, string> = {
+  customer: 'Customer',
+  transaction: 'Transaction',
+  order: 'Order',
+  coupon: 'Coupon',
+  booking: 'Booking',
+  product: 'Product',
+  service: 'Service',
+  employee: 'Employee',
+  settings: 'Settings',
+  campaign: 'Campaign',
+} as const;
+
+export const AUDIT_ACTION_BADGE_VARIANT: Record<string, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
+  create: 'success',
+  update: 'info',
+  delete: 'destructive',
+  void: 'destructive',
+  refund: 'warning',
+  apply: 'success',
+  login: 'default',
+  logout: 'default',
+  adjust: 'warning',
+} as const;

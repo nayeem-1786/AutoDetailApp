@@ -4,6 +4,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Audit Log Foundation — Session D12a — 2026-02-22
+
+Created the complete audit log infrastructure: database table, utility functions, API routes, cron cleanup, and enhanced viewer page. `logAudit()` is ready to be wired into API routes in Session D12b.
+
+### Database
+- `supabase/migrations/20260222000002_create_audit_log.sql` — `audit_log` table with columns: user_id, user_email, employee_name, action, entity_type, entity_id, entity_label, details (JSONB), ip_address, source. RLS: authenticated can read, service_role can insert/delete, no updates (immutable).
+- Indexes: `created_at DESC`, composite `(entity_type, action, created_at DESC)`
+
+### Utility — `src/lib/services/audit.ts`
+- `logAudit(params)` — fire-and-forget insert via admin client, never throws
+- `getRequestIp(request)` — extracts IP from x-forwarded-for / x-real-ip headers
+- `buildChangeDetails(before, after, fieldsToTrack?)` — produces lean before/after diff
+
+### Types — `src/lib/supabase/types.ts`
+- `AuditLogEntry` interface, `AuditAction`, `AuditEntityType`, `AuditSource` union types
+
+### Constants — `src/lib/utils/constants.ts`
+- `AUDIT_ACTION_LABELS`, `AUDIT_ENTITY_TYPE_LABELS`, `AUDIT_ACTION_BADGE_VARIANT`
+
+### API Routes
+- `GET /api/admin/audit-log` — server-side pagination (page/limit), filters (entity_type, action, source, search, date_from, date_to). Super_admin only.
+- `GET /api/admin/audit-log/export` — CSV export (5000 row cap), PST timestamps, same filters. Super_admin only.
+
+### Cron — 90-day retention
+- `src/app/api/cron/cleanup-audit-log/route.ts` — deletes entries older than 90 days
+- Added to `scheduler.ts` — daily at 3:30 AM PST (11:30 UTC)
+
+### Viewer — `src/app/admin/settings/audit-log/page.tsx`
+- Server-side pagination via API (50 per page)
+- Filters: search (debounced 500ms), entity type, action, date range (Today/7d/30d/All Time)
+- Relative timestamps ("2m ago") with full PST datetime on hover
+- Color-coded action badges (green=create, blue=update, red=delete/void, amber=refund)
+- Clickable entity links to admin detail pages (customer, order, coupon, product, service, staff, campaign)
+- Details column with click-to-expand dialog showing full JSON
+- Export CSV button with current filters
+- Dark mode support throughout
+
+---
+
 ## Refactor: Deterministic Coupon Summaries + POS Promo Polish — Session D12 — 2026-02-22
 
 Replaced AI-generated coupon summaries (Anthropic API call) with deterministic string templates. Summaries now build instantly from resolved data — no API key dependency, no latency, no cost. Also polished POS promotions tab UX.

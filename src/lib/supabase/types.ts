@@ -1486,6 +1486,26 @@ export interface ShippingSettingsRow {
   updated_at: string;
 }
 
+// Audit Log
+export type AuditAction = 'create' | 'update' | 'delete' | 'void' | 'refund' | 'apply' | 'login' | 'logout' | 'adjust';
+export type AuditEntityType = 'customer' | 'transaction' | 'order' | 'coupon' | 'booking' | 'product' | 'service' | 'employee' | 'settings' | 'campaign';
+export type AuditSource = 'admin' | 'pos' | 'api' | 'cron' | 'customer_portal';
+
+export interface AuditLogEntry {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  user_email: string | null;
+  employee_name: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  entity_label: string | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  source: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }

@@ -81,6 +81,11 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/cleanup-idempotency', 'cleanup-idempotency');
   });
 
+  // Audit log retention cleanup — daily at 3:30 AM PST (11:30 UTC)
+  cron.schedule('30 11 * * *', () => {
+    callCronEndpoint('/api/cron/cleanup-audit-log', 'cleanup-audit-log');
+  });
+
   console.log('[CRON] Scheduled jobs:');
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
@@ -90,4 +95,5 @@ export function setupCronJobs() {
   console.log('  - google-reviews: daily at 6:00 AM PST');
   console.log('  - cleanup-orders: every 6 hours');
   console.log('  - cleanup-idempotency: daily at 3:00 AM PST');
+  console.log('  - cleanup-audit-log: daily at 3:30 AM PST');
 }

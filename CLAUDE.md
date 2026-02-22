@@ -23,6 +23,7 @@
 8. **Business info**: NEVER hardcode business name/phone/address/email. Use `getBusinessInfo()` from `@/lib/data/business.ts`.
 9. **SMS**: ALL sends go through `sendSms()` or `sendMarketingSms()` in `src/lib/utils/sms.ts`. NEVER inline Twilio API calls. Consent changes MUST use `updateSmsConsent()` from `@/lib/utils/sms-consent`.
 10. **POS dark mode**: Every `bg-white` container in POS must have a corresponding `dark:bg-gray-900` (or appropriate dark variant). Audit dropdowns, modals, popovers, and tooltips.
+11. **Component Reuse** — Before writing ANY new component, search /src/components for existing reusable components.
 
 ## Project Structure
 
@@ -150,6 +151,7 @@ Previous: Phase 9 (E-commerce/Online Store) and Phase 11 (Intelligence & Growth)
 | Stock alerts | Daily 8 AM PST | `/api/cron/stock-alerts` |
 | QBO auto-sync | Every 30 min | `/api/cron/qbo-sync` |
 | Order cleanup | Every 6 hours | `/api/cron/cleanup-orders` |
+| Audit log cleanup | Daily 3:30 AM PST | `/api/cron/cleanup-audit-log` |
 
 ## Production Env Vars (Required)
 
