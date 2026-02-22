@@ -22,6 +22,7 @@
 7. **Multi-session prompts**: Separate files per session (session-1.md, session-2.md) — never combine.
 8. **Business info**: NEVER hardcode business name/phone/address/email. Use `getBusinessInfo()` from `@/lib/data/business.ts`.
 9. **SMS**: ALL sends go through `sendSms()` or `sendMarketingSms()` in `src/lib/utils/sms.ts`. NEVER inline Twilio API calls. Consent changes MUST use `updateSmsConsent()` from `@/lib/utils/sms-consent`.
+10. **POS dark mode**: Every `bg-white` container in POS must have a corresponding `dark:bg-gray-900` (or appropriate dark variant). Audit dropdowns, modals, popovers, and tooltips.
 
 ## Project Structure
 
@@ -64,12 +65,15 @@ src/
 - **Quotes are READ-ONLY in admin**: All creation/editing via POS builder deep-links
 - **Soft-delete**: Quotes use `deleted_at`. ALL queries MUST include `.is('deleted_at', null)` except `quote-number.ts` and public quote page
 - **Supabase `.or()` on related tables**: Does NOT work. Query related table first, then `.in('foreign_key', ids)`
+- **POS auth expiry**: 3 layers — (1) `posFetch()` in `pos-fetch.ts` catches 401 → redirect to `/pos/login?reason=session_expired`, (2) global error listeners in `pos-shell.tsx` catch Stripe SDK auth errors → redirect, (3) login page shows session expired toast on `?reason=session_expired`
+- **POS has TWO timeout systems**: Idle timeout (Admin > Settings, transparent overlay, PIN re-entry, session alive) vs JWT token expiry (12hr hardcoded, full redirect to login, session dead). Both are needed.
+- **Stripe Terminal in PWA**: Requires pfSense DNS exception — `private-domain: "stripe-terminal-local-reader.net"` in Unbound custom options. Without this, iPad Safari PWA can't resolve Stripe's local reader DNS (desktop browsers bypass via DoH).
 
 ## Current Phase
 
-Phase 9: E-commerce / Online Store — Cart, checkout, Shippo shipping, order management — **complete**.
+Phase 12: iPad POS Optimization & POS Polish — header/nav reorganization, Stripe Terminal PWA fix, dark mode, auth resilience — **in progress**.
 
-CMS/website features also complete: theme system, dark/light toggle, seasonal presets, CMS pages, HTML editor toolbar, configurable footer, announcement tickers, hero carousel with per-slide color overrides.
+Previous: Phase 9 (E-commerce/Online Store) and Phase 11 (Intelligence & Growth) complete. CMS/website complete.
 
 ## Build Phase Status
 
@@ -77,9 +81,53 @@ CMS/website features also complete: theme system, dark/light toggle, seasonal pr
 |-------|-------------|--------|
 | 1–8 | Foundation through Job Management | Done |
 | 9 | Native Online Store (cart, checkout, orders, shipping, CMS) | Done |
-| 10 | Recurring Services | Not started |
-| 11 | Intelligence & Growth | Done |
-| 12 | iPad POS Optimization | Not started |
+| 10 | Recurring Services | Postponed indefinitely |
+| 11 | Intelligence & Growth (campaigns, lifecycle, loyalty, coupons, AI responder) | Done |
+| 12 | iPad POS Optimization & POS Polish | In progress |
+| 13 | Full QA — section-by-section testing checklist across every module/tab | Not started |
+| 14 | User Manual — complete how-to document (see `docs/manual/README.md`) | Not started |
+| 15 | Store Setup & Hardware — scanners, receipt printer, copier, water system, email/SMS final checks | Not started |
+| 16 | Launch Prep — set go-live date, purge all test data, reimport real data | Not started |
+
+**Phase 16 details:** Delete ALL test data from Square, test jobs, test accounts — everything from Jan 1, 2026 to launch date. Then reimport real Square transactions from 01/01/2026 to launch date. Confirm that deleting test product purchases restores inventory levels back to correct counts before reimporting.
+
+## Phase 12: iPad POS Optimization — Details
+
+### Completed (Sessions D–D9)
+
+**Layout & Navigation (D, D1, D2, D4, D7)**
+- Header reduced from 16 → 8 elements: [Scanner] [CC Reader●] ... company name ... [⚡offline] [Role] | Staff | [→🚪]
+- Bottom nav reduced from 6 → 5 tabs (Sale renamed to Register)
+- More menu: 7 items with theme segmented control (Light/Dark/System) above Cash Drawer
+- All pill backgrounds removed from header; status icons at h-4 w-4
+- Role pill removed from header — only in ticket panel + More menu
+- Staff name moved to ticket panel header opposite "TICKET"
+- Held tickets (PauseCircle) button moved to ticket panel header
+- Logout moved from More menu to header (icon button)
+- Company text: "Smart Details Auto Spa - POS"
+
+**Stripe Terminal PWA Fix (D2 — CRITICAL)**
+- Root cause: pfSense DNS Rebind Protection blocks Stripe Terminal local reader DNS
+- Stripe SDK resolves `192-168-X-X.[random].device.stripe-terminal-local-reader.net` → local IP
+- Desktop browsers use DNS-over-HTTPS (bypasses pfSense); iPad Safari PWA uses system DNS → blocked
+- Fix: pfSense > Services > DNS Resolver > Custom options: `server: private-domain: "stripe-terminal-local-reader.net"`
+- NOT a code bug — 4 sessions of code attempts before discovering network-level root cause
+
+**Auth & Security (D5, D6)**
+- Auth expiry: 3 defensive layers (posFetch 401 catch, global error listeners, login toast)
+- CRON resilience: BASE_URL changed to `http://localhost:${PORT || 3000}`, 30s timeout, single retry with 5s delay
+
+**UX Polish (D2, D5, D7, D8, D9)**
+- Cash Drawer: green/red Vault icon + status text
+- Toast duration: 1.5s success, 3s error, max 3 visible
+- POS tabs light mode: bg-gray-200 container + white active pill
+- PIN entry lag: 200ms delay before auto-submit, touch-action: manipulation, transition-colors
+- CustomerLookup: inputMode="numeric" + pattern="[0-9]*" for native iOS number pad
+- Customer lookup results: dark mode fix — bg-white dark:bg-gray-900 on results container, professional badge dark variants
+
+### Remaining
+- Additional dark mode audit as issues surface during real-world use
+- Any further POS polish from daily use feedback
 
 ## Integrations
 
