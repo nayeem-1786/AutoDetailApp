@@ -128,7 +128,7 @@ export function ServicePricingPicker({
                       'flex items-center justify-between rounded-lg border p-4 text-left transition-all',
                       'min-h-[56px] active:scale-[0.99] active:bg-gray-50 dark:active:bg-gray-800',
                       vehicleSizeClass && tier.is_vehicle_size_aware
-                        ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 hover:border-blue-300 dark:hover:border-blue-700'
+                        ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm dark:hover:shadow-gray-950/30'
                     )}
                   >
@@ -267,7 +267,7 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
         </div>
 
         {/* Total display */}
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50/50 px-4 py-3">
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20 px-4 py-3">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {quantity} {perUnitLabel}{quantity > 1 ? 's' : ''} &times; ${perUnitPrice.toFixed(2)}
           </span>

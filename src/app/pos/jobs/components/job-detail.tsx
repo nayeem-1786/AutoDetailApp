@@ -695,7 +695,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
                   job.appointment_id
-                    ? 'bg-purple-100 text-purple-700'
+                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
                     : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
                 )}
               >

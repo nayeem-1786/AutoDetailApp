@@ -92,7 +92,7 @@ export function DaySummary({ summary, loading }: DaySummaryProps) {
       />
       <MetricCard
         icon={Banknote}
-        iconBg="bg-emerald-50"
+        iconBg="bg-emerald-50 dark:bg-emerald-900/30"
         iconColor="text-emerald-600"
         label="Cash Total"
         value={formatCurrency(cashTotal)}
@@ -100,7 +100,7 @@ export function DaySummary({ summary, loading }: DaySummaryProps) {
       />
       <MetricCard
         icon={CreditCard}
-        iconBg="bg-purple-50"
+        iconBg="bg-purple-50 dark:bg-purple-900/30"
         iconColor="text-purple-600"
         label="Card Total"
         value={formatCurrency(cardTotal)}

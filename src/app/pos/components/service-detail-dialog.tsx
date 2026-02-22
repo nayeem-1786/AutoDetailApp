@@ -223,7 +223,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
               </div>
 
               {/* Total display */}
-              <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50/50 px-4 py-3">
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20 px-4 py-3">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {perUnitQty} {perUnitLabel}{perUnitQty > 1 ? 's' : ''} &times; ${service.per_unit_price!.toFixed(2)}
                 </span>

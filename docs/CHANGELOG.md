@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Comprehensive POS Dark Mode Audit — Session D10 — 2026-02-21
+
+Exhaustive audit of all POS `.tsx` files for dark mode gaps. Ran 10 automated scans (bg-white, bg-gray-*, text colors, borders, dividers, shadows, hover states, hardcoded hex, inline styles, component inventory) plus manual review of colored badges and backgrounds.
+
+### Findings
+- **42 initial scan hits** across bg-white, bg-gray-50/100, text colors — **all false positives** (matched `hover:bg-gray-50` substrings that already had `dark:hover:bg-gray-800` counterparts, or always-dark components like pin-screen)
+- **10 real issues** found via secondary scan for colored backgrounds missing dark variants
+
+### Files Fixed (7 files, 10 issues)
+- `day-summary.tsx` — 2 fixes: emerald/purple `iconBg` props now include `dark:bg-*/30`
+- `job-detail.tsx` — 1 fix: Appointment badge `bg-purple-100 text-purple-700` → `dark:bg-purple-900/30 dark:text-purple-300`
+- `job-queue.tsx` — 1 fix: Same appointment badge
+- `refund-item-row.tsx` — 2 fixes: Package type badge + selected row `bg-red-50/50`
+- `promotions-tab.tsx` — 3 fixes: green/blue/amber accent backgrounds
+- `service-pricing-picker.tsx` — 2 fixes: selected tier `bg-blue-50/50` + total display
+- `service-detail-dialog.tsx` — 1 fix: per-unit total display `bg-blue-50/50`
+
+### Known Exceptions (intentionally no dark variant)
+- `pin-screen.tsx:113` — `bg-white` is the filled PIN dot on an always-dark (`bg-gray-900`) background
+- `zone-picker.tsx` — hardcoded hex colors in SVG vehicle diagram fills (status indicators)
+- `category-tile.tsx` — inline `backgroundImage` style (image URL, not a color)
+- Photo annotation/capture components — always-dark camera UI
+
+### Verification
+- Re-scan: zero remaining colored backgrounds without dark variants
+- TypeScript: `tsc --noEmit` passes with zero errors
+
+---
+
 ## Fix: Customer Lookup Results Dark Mode Contrast — Session D9 — 2026-02-21
 
 - Added missing `bg-white dark:bg-gray-900` to results container in CustomerLookup (had no background, inherited parent)

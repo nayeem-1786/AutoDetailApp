@@ -71,9 +71,9 @@ function PromotionCard({
   applying: boolean;
 }) {
   const accentClasses = {
-    green: 'border-l-green-500 bg-green-50/50',
-    blue: 'border-l-blue-500 bg-blue-50/50',
-    amber: 'border-l-amber-500 bg-amber-50/50',
+    green: 'border-l-green-500 bg-green-50/50 dark:bg-green-900/20',
+    blue: 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/20',
+    amber: 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/20',
   };
 
   return (

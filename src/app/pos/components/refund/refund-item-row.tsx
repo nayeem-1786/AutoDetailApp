@@ -17,7 +17,7 @@ interface RefundItemRowProps {
 const itemTypeBadgeColors: Record<string, string> = {
   product: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
   service: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-  package: 'bg-purple-50 text-purple-700',
+  package: 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
   custom: 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
 };
 
@@ -54,7 +54,7 @@ export function RefundItemRow({
         disabled
           ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 opacity-50'
           : selected
-            ? 'border-red-200 dark:border-red-800 bg-red-50/50'
+            ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20'
             : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
       }`}
     >
