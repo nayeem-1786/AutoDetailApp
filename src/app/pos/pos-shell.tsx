@@ -245,23 +245,26 @@ function PosShellContent({
 
           {/* Card Reader Status */}
           {isConnecting ? (
-            <div className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-blue-700 dark:text-blue-400">
+            <div className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 py-1 text-blue-700 dark:text-blue-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="hidden text-xs font-medium sm:inline">Connecting...</span>
             </div>
           ) : connectedReader ? (
-            <div
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2 py-1 text-green-700 dark:text-green-400"
+            <button
+              onClick={discoverAndConnect}
+              onTouchEnd={(e) => { e.preventDefault(); discoverAndConnect(); }}
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 py-1 text-green-700 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               title={`Reader: ${connectedReader.label || 'Connected'}`}
             >
               <Wifi className="h-4 w-4" />
               <span className="hidden text-xs font-medium sm:inline">
                 {connectedReader.label || 'Reader'}
               </span>
-            </div>
+            </button>
           ) : (
             <button
               onClick={discoverAndConnect}
+              onTouchEnd={(e) => { e.preventDefault(); discoverAndConnect(); }}
               className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 py-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
               title="Tap to connect reader"
             >
@@ -281,7 +284,7 @@ function PosShellContent({
             )}
             title="Held tickets"
           >
-            <PauseCircle className="h-4 w-4" />
+            <PauseCircle className="h-5 w-5" />
             {heldCount > 0 && <span className="text-xs font-medium">{heldCount} held</span>}
           </button>
 

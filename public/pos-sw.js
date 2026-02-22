@@ -59,8 +59,11 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests (POST, PUT, DELETE are mutations)
   if (request.method !== 'GET') return;
 
-  // Skip cross-origin requests
+  // Skip cross-origin requests (includes Stripe Terminal SDK, API, etc.)
   if (url.origin !== self.location.origin) return;
+
+  // Never intercept Stripe-related requests (belt-and-suspenders with cross-origin check)
+  if (url.hostname.includes('stripe.com')) return;
 
   // Never cache certain API routes
   if (NEVER_CACHE_PATTERNS.some((p) => url.pathname.includes(p))) return;

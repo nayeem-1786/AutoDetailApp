@@ -17,7 +17,10 @@ export async function POST(request: NextRequest) {
 
     const connectionToken = await stripe.terminal.connectionTokens.create();
 
-    return NextResponse.json({ secret: connectionToken.secret });
+    return NextResponse.json(
+      { secret: connectionToken.secret },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (err) {
     console.error('Connection token error:', err);
     return NextResponse.json(

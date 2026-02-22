@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Navigation Polish + Bug Fixes — 2026-02-21
+
+### More Menu Polish
+- Swapped order: Theme segmented control now appears above Cash Drawer
+- Fixed theme toggle overflow: replaced px-3 per button with flex-1 contained layout (iOS segmented control pattern)
+- Cash Drawer now shows colored Vault icon + explicit "Open"/"Closed" status text (replaces green dot)
+- Cash Drawer status re-reads localStorage when popover opens (fixes stale state in PWA)
+
+### Header Polish
+- Held Tickets icon size matched to bottom nav icons (h-4 → h-5)
+- Removed colored pill backgrounds from card reader status (connected/connecting states)
+- Card reader connected state changed from div to button (tappable to reconnect)
+
+### Customer Lookup Dialog Dismiss (iPad)
+- Added pointer-events-none to visual backdrop in dialog.tsx, ensuring touch events pass through to clickable dismiss layer
+- Added WebkitTapHighlightColor: transparent for iPad Safari PWA compatibility
+
+### Card Reader PWA Fixes
+- Added onTouchEnd fallback handlers on both connected and disconnected reader buttons
+- Service worker: explicit Stripe domain exclusion (belt-and-suspenders)
+- Connection token API: added Cache-Control: no-store header
+
+### Toast Duration
+- Global default shortened from 4s to 2s
+- Max visible toasts reduced from 5 to 3
+- Disabled expand mode to prevent toast stacking
+
+---
+
 ## Feat: POS Navigation Reorganization + Bug Fixes — 2026-02-21
 
 ### Header Redesign

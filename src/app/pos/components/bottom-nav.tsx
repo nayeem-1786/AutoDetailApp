@@ -59,6 +59,20 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
     } catch { /* ignore */ }
   }, []);
 
+  // Re-read drawer status every time More popover opens (fixes PWA stale state)
+  useEffect(() => {
+    if (!moreOpen) return;
+    try {
+      const raw = localStorage.getItem('pos_drawer_session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        setDrawerOpen(session.status === 'open');
+      } else {
+        setDrawerOpen(false);
+      }
+    } catch { /* ignore */ }
+  }, [moreOpen]);
+
   // Listen for storage changes (when drawer opens/closes from other components)
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
@@ -223,67 +237,48 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
         {/* More popover menu */}
         {moreOpen && (
           <div className="absolute bottom-full right-0 mb-2 w-64 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg dark:shadow-gray-950/50">
+            {/* Theme segmented control */}
+            <div className="px-4 py-3">
+              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
+                {([
+                  { value: 'light' as const, icon: Sun, label: 'Light' },
+                  { value: 'dark' as const, icon: Moon, label: 'Dark' },
+                  { value: 'system' as const, icon: Monitor, label: 'System' },
+                ] as const).map(({ value, icon: Icon, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setTheme(value)}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium transition-colors',
+                      theme === value
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 dark:border-gray-700" />
+
             {/* Cash Drawer */}
             <Link
               href="/pos/end-of-day"
               onClick={() => setMoreOpen(false)}
-              className="flex items-center gap-3 rounded-t-xl px-4 py-3 min-h-[44px] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
             >
-              <div className="relative">
-                <Vault className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                {drawerOpen && (
-                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-green-500" />
-                )}
-              </div>
-              Cash Drawer
+              <Vault className={cn('h-5 w-5', drawerOpen ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400')} />
+              <span className="text-gray-700 dark:text-gray-300">
+                Cash Drawer
+                <span className={cn('ml-1', drawerOpen ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400')}>
+                  · {drawerOpen ? 'Open' : 'Closed'}
+                </span>
+              </span>
             </Link>
-
-            <div className="border-t border-gray-100 dark:border-gray-700" />
-
-            {/* Theme segmented control */}
-            <div className="px-4 py-3">
-              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-900 p-1">
-                <button
-                  type="button"
-                  onClick={() => setTheme('light')}
-                  className={cn(
-                    'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 min-h-[36px] text-xs font-medium transition-colors',
-                    theme === 'light'
-                      ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <Sun className="h-3.5 w-3.5" />
-                  Light
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme('dark')}
-                  className={cn(
-                    'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 min-h-[36px] text-xs font-medium transition-colors',
-                    theme === 'dark'
-                      ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <Moon className="h-3.5 w-3.5" />
-                  Dark
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme('system')}
-                  className={cn(
-                    'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 min-h-[36px] text-xs font-medium transition-colors',
-                    theme === 'system'
-                      ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <Monitor className="h-3.5 w-3.5" />
-                  System
-                </button>
-              </div>
-            </div>
 
             <div className="border-t border-gray-100 dark:border-gray-700" />
 

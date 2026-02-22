@@ -39,7 +39,7 @@ export default function RootLayout({
         className={`${urbanist.variable} ${dmSans.variable} antialiased`}
       >
         {children}
-        <Toaster position="top-right" richColors closeButton expand visibleToasts={5} />
+        <Toaster position="top-right" richColors closeButton visibleToasts={3} duration={2000} />
       </body>
     </html>
   );

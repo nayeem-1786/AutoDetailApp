@@ -84,13 +84,14 @@ function Dialog({ open, onOpenChange, children, modal }: DialogProps) {
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* Backdrop (visual only) */}
-      <div className="fixed inset-0 bg-black/50" />
+      {/* Backdrop (visual only — pointer-events-none ensures touch events pass through to clickable layer) */}
+      <div className="fixed inset-0 bg-black/50 pointer-events-none" />
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- backdrop dismiss */}
       <div
         className="fixed inset-0 flex items-center justify-center p-4 cursor-pointer"
         onClick={modal ? undefined : () => onOpenChange(false)}
         onTouchEnd={modal ? undefined : (e) => { e.preventDefault(); onOpenChange(false); }}
+        style={{ WebkitTapHighlightColor: 'transparent' }}
       >
         <div
           ref={dialogRef}
