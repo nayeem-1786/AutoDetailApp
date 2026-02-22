@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Search, UserPlus, UserX, Loader2 } from 'lucide-react';
 import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { CustomerTypeBadge } from './customer-type-badge';
+import { PinPad } from './pin-pad';
 import type { Customer } from '@/lib/supabase/types';
 
 interface CustomerLookupProps {
@@ -36,6 +37,25 @@ export function CustomerLookup({
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // PWA standalone detection
+  const [isPwa, setIsPwa] = useState(false);
+  const [useNativeKeyboard, setUseNativeKeyboard] = useState(false);
+
+  useEffect(() => {
+    setIsPwa(
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true
+    );
+  }, []);
+
+  // Reset to custom keypad when search is cleared
+  useEffect(() => {
+    if (searchInput === '') {
+      setUseNativeKeyboard(false);
+    }
+  }, [searchInput]);
 
   const searchCustomers = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -75,6 +95,35 @@ export function CustomerLookup({
     }
   }
 
+  // Custom keypad handlers (PWA mode)
+  function handleKeypadDigit(digit: string) {
+    const currentDigits = searchInput.replace(/\D/g, '');
+    handleInputChange(currentDigits + digit);
+  }
+
+  function handleKeypadBackspace() {
+    const currentDigits = searchInput.replace(/\D/g, '');
+    const newValue = currentDigits.slice(0, -1);
+    if (newValue === '') {
+      setSearchInput('');
+      setResults([]);
+      setSearched(false);
+      clearTimeout(debounceRef.current);
+    } else {
+      handleInputChange(newValue);
+    }
+  }
+
+  function handleSwitchToKeyboard() {
+    setUseNativeKeyboard(true);
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.readOnly = false;
+        inputRef.current.focus();
+      }
+    }, 50);
+  }
+
   function handleSelectResult(result: SearchResult) {
     // Fetch full customer to pass up — the search result has enough for now
     onSelect(result as unknown as Customer);
@@ -86,8 +135,10 @@ export function CustomerLookup({
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         <input
+          ref={inputRef}
           type="text"
-          inputMode="tel"
+          inputMode={isPwa ? undefined : 'tel'}
+          readOnly={isPwa && !useNativeKeyboard}
           value={searchInput}
           onChange={(e) => handleInputChange(e.target.value)}
           placeholder="Search by name or phone..."
@@ -98,6 +149,17 @@ export function CustomerLookup({
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400 dark:text-gray-500" />
         )}
       </div>
+
+      {/* Custom numeric keypad — PWA mode only */}
+      {isPwa && !useNativeKeyboard && (
+        <PinPad
+          onDigit={handleKeypadDigit}
+          onBackspace={handleKeypadBackspace}
+          mode="phone"
+          onSwitchToKeyboard={handleSwitchToKeyboard}
+          size="sm"
+        />
+      )}
 
       {/* Results */}
       {searched && results.length === 0 && (

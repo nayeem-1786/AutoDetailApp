@@ -10,6 +10,8 @@ interface PinPadProps {
   actionLabel?: string;
   size?: 'sm' | 'default' | 'lg';
   variant?: 'light' | 'dark';
+  mode?: 'amount' | 'phone';
+  onSwitchToKeyboard?: () => void;
 }
 
 const KEYS = [
@@ -26,6 +28,8 @@ export function PinPad({
   actionLabel,
   size = 'default',
   variant = 'light',
+  mode = 'amount',
+  onSwitchToKeyboard,
 }: PinPadProps) {
   const isLg = size === 'lg';
   const isSm = size === 'sm';
@@ -34,6 +38,8 @@ export function PinPad({
   function handleKey(key: string) {
     if (key === 'backspace') {
       onBackspace();
+    } else if (key === '.' && mode === 'phone') {
+      onSwitchToKeyboard?.();
     } else {
       onDigit(key);
     }
@@ -58,7 +64,7 @@ export function PinPad({
                 : isLg
                   ? 'min-h-[72px] rounded-xl text-2xl'
                   : 'min-h-[60px] rounded-xl text-xl',
-              key === '.' && (isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500')
+              key === '.' && mode !== 'phone' && (isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500')
             )}
           >
             {key === 'backspace' ? (
@@ -66,6 +72,11 @@ export function PinPad({
                 isDark ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400',
                 isSm ? 'h-4 w-4' : isLg ? 'h-7 w-7' : 'h-5 w-5',
               )} />
+            ) : key === '.' && mode === 'phone' ? (
+              <span className={cn(
+                'font-semibold tracking-wide',
+                isSm ? 'text-[10px]' : isLg ? 'text-sm' : 'text-xs'
+              )}>ABC</span>
             ) : (
               key
             )}
