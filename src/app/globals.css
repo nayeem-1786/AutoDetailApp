@@ -153,6 +153,46 @@
   --ui-page-footer-bg: #f8fafc;
 }
 
+/* Layer 1.5: POS dark mode (.dark class on <html>) */
+.dark {
+  --ui-bg: #111827;
+  --ui-bg-hover: #1f2937;
+  --ui-bg-alt: #1f2937;
+  --ui-bg-muted: rgba(255, 255, 255, 0.05);
+  --ui-text: #f3f4f6;
+  --ui-text-secondary: #d1d5db;
+  --ui-text-muted: #9ca3af;
+  --ui-text-dim: #6b7280;
+  --ui-text-faint: #374151;
+  --ui-border: #374151;
+  --ui-border-light: #1f2937;
+  --ui-ring: #9ca3af;
+  --ui-placeholder: #6b7280;
+  --ui-shadow: rgba(0, 0, 0, 0.4);
+  --ui-input-bg: #1f2937;
+  --ui-input-border: #374151;
+  --ui-skeleton: rgba(255, 255, 255, 0.08);
+  --ui-switch-off: rgba(255, 255, 255, 0.1);
+  --ui-switch-thumb: #ffffff;
+  --ui-badge-default-bg: rgba(255, 255, 255, 0.08);
+  --ui-badge-default-text: #9ca3af;
+  --ui-tab-list-bg: rgba(255, 255, 255, 0.05);
+  --ui-tab-active-bg: #111827;
+  --ui-tab-active-text: #f3f4f6;
+  --ui-dropdown-bg: #111827;
+  --ui-dropdown-hover: #1f2937;
+  --ui-dropdown-border: #374151;
+  --ui-page-bg: #030712;
+  --ui-page-text: #f3f4f6;
+  --ui-page-text-secondary: #d1d5db;
+  --ui-page-text-muted: #9ca3af;
+  --ui-page-border: #374151;
+  --ui-page-section-bg: #1f2937;
+  --ui-page-card-bg: #111827;
+  --ui-page-header-bg: #111827;
+  --ui-page-footer-bg: #1f2937;
+}
+
 /* Layer 2: Dark mode for public/account/auth pages (DEFAULT) */
 .public-theme {
   --ui-bg: var(--brand-surface);

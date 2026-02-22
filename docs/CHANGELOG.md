@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Dialog & UI Token Dark Mode — Session D10b — 2026-02-21
+
+Root cause: All dialog/modal dark mode issues traced to `ui-*` CSS variables (e.g. `--ui-bg`, `--ui-text`, `--ui-border`) having no `.dark` override in `globals.css`. POS dark mode uses `.dark` class on `<html>`, but the `ui-*` tokens only had overrides for `.public-theme` (public pages) — not for `.dark`. This caused every component using `ui-*` tokens (dialog, card, button, input, table, tabs, dropdown, badge, slide-over, etc.) to render with white/light backgrounds in POS dark mode.
+
+### Fix
+Added `.dark` block in `globals.css` (Layer 1.5, between `:root` and `.public-theme`) with dark mode values for all 37 `ui-*` variables. Values match existing POS conventions: `gray-900` surfaces, `gray-800` alt/muted, `gray-700` borders, `gray-100` text, `gray-400` muted text.
+
+### Impact
+- Fixes dark mode for 30+ shared UI components that use `ui-*` tokens
+- No individual component changes needed — one CSS block fixes everything
+- No regression risk: `.dark` only activates for POS (admin uses `:root`, public uses `.public-theme`)
+
+---
+
 ## Fix: Comprehensive POS Dark Mode Audit — Session D10 — 2026-02-21
 
 Exhaustive audit of all POS `.tsx` files for dark mode gaps. Ran 10 automated scans (bg-white, bg-gray-*, text colors, borders, dividers, shadows, hover states, hardcoded hex, inline styles, component inventory) plus manual review of colored badges and backgrounds.
