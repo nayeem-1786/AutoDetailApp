@@ -33,7 +33,7 @@ const TYPE_OPTIONS: { value: CustomerType; label: string; description: string; c
     value: 'professional',
     label: 'Professional',
     description: 'Detailer, dealer, fleet manager, or other business customer',
-    color: 'border-purple-400 bg-purple-50 text-purple-700 hover:bg-purple-100',
+    color: 'border-purple-400 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40',
   },
 ];
 

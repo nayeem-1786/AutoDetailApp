@@ -106,7 +106,7 @@ export function CustomerLookup({
       )}
 
       {results.length > 0 && (
-        <div className="max-h-48 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+        <div className="max-h-48 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
           {results.map((r) => (
             <div
               key={r.id}

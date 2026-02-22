@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Customer Lookup Results Dark Mode Contrast — Session D9 — 2026-02-21
+
+- Added missing `bg-white dark:bg-gray-900` to results container in CustomerLookup (had no background, inherited parent)
+- Added dark mode variants to `professional` CustomerTypeBadge: `dark:bg-purple-900/30`, `dark:text-purple-400`, `dark:border-purple-800`, `dark:bg-purple-600` (enthusiast already had them)
+- Added dark mode variants to `professional` option in CustomerTypePrompt dialog
+
+---
+
 ## Fix: Revert Custom Keypad, Use Native iOS Numeric Input — Session D8 (Revised) — 2026-02-21
 
 - Reverted custom PinPad keypad integration from CustomerLookup (over-engineered)

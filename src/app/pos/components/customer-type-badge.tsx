@@ -17,10 +17,10 @@ const TYPE_CONFIG = {
   },
   professional: {
     label: 'Professional',
-    bg: 'bg-purple-50',
-    text: 'text-purple-700',
-    border: 'border-purple-200',
-    dot: 'bg-purple-500',
+    bg: 'bg-purple-50 dark:bg-purple-900/30',
+    text: 'text-purple-700 dark:text-purple-400',
+    border: 'border-purple-200 dark:border-purple-800',
+    dot: 'bg-purple-500 dark:bg-purple-600',
   },
 } as const;
 
