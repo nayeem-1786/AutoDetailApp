@@ -4,25 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Feat: Custom Numeric Keypad for Customer Lookup (PWA) — Session D8 — 2026-02-21
+## Fix: Revert Custom Keypad, Use Native iOS Numeric Input — Session D8 (Revised) — 2026-02-21
 
-### Custom Keypad in PWA Mode
-- In PWA standalone mode (iPad), the CustomerLookup search input now shows a custom 3×4 numeric keypad instead of triggering the native on-screen keyboard
-- Input is set to `readOnly` in PWA mode to prevent native keyboard from appearing
-- Keypad layout: digits 1-9, ABC (switch to native keyboard), 0, backspace
-- Tapping digits appends to search and triggers phone number lookup via existing debounced search
-- ABC button switches to native keyboard for name-based searches
-- Clearing the search field automatically resets back to the custom keypad
-
-### PinPad Component Extension
-- Added `mode` prop (`'amount' | 'phone'`) and `onSwitchToKeyboard` callback to the reusable `PinPad` component
-- When `mode='phone'`, the decimal `.` button renders as "ABC" and fires `onSwitchToKeyboard` instead of `onDigit`
-- All existing PinPad consumers (PIN screen, keypad tab, register) are unaffected (default mode is `'amount'`)
-
-### Behavior by Environment
-- **iPad PWA**: Custom numeric keypad by default, ABC to switch to native keyboard
-- **Mobile browser (non-PWA)**: No custom keypad, `inputMode="tel"` shows native phone pad
-- **Desktop browser**: No changes — normal keyboard input
+- Reverted custom PinPad keypad integration from CustomerLookup (over-engineered)
+- Reverted `mode`/`onSwitchToKeyboard` props from PinPad component (unused)
+- Changed CustomerLookup input from `inputMode="tel"` to `inputMode="numeric" pattern="[0-9]*"` — triggers iOS clean 10-key number pad (digits only, no phone symbols)
+- Users can tap globe icon on iOS keyboard to switch to full letter keyboard for name search
+- Desktop browsers completely unaffected — no visible change
 
 ---
 
