@@ -48,7 +48,7 @@ export function PinPad({
             type="button"
             onClick={() => handleKey(key)}
             className={cn(
-              'flex items-center justify-center border font-medium transition-all',
+              'flex items-center justify-center border font-medium transition-colors touch-manipulation',
               'active:scale-[0.97]',
               isDark
                 ? 'border-gray-600 bg-gray-800 text-white hover:bg-gray-700 active:bg-gray-600'

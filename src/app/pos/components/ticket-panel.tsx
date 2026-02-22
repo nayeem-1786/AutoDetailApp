@@ -11,10 +11,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tag, X } from 'lucide-react';
-import { ROLE_LABELS } from '@/lib/utils/constants';
-import { usePosAuth } from '../context/pos-auth-context';
+import { Tag, X, PauseCircle } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
 import { usePosPermission } from '../context/pos-permission-context';
+import { useHeldTickets } from '../context/held-tickets-context';
 import { useTicket } from '../context/ticket-context';
 import { useCheckout } from '../context/checkout-context';
 import { useCatalog } from '../hooks/use-catalog';
@@ -44,10 +44,9 @@ interface TicketPanelProps {
 }
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
-  const { employee, role } = usePosAuth();
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
-  const staffDisplayName = employee?.first_name || employee?.email?.split('@')[0] || '';
-  const roleLabel = role ? (ROLE_LABELS[role] || role) : '';
+  const { heldTickets } = useHeldTickets();
+  const heldCount = heldTickets.length;
   const { ticket, dispatch } = useTicket();
   const { isOpen: checkoutOpen } = useCheckout();
   const { services } = useCatalog();
@@ -249,16 +248,19 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Ticket
         </h2>
-        <div className="flex items-center gap-2">
-          {roleLabel && (
-            <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
-              {roleLabel}
-            </span>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('pos-open-held-panel'))}
+          className={cn(
+            'flex items-center gap-1 px-1.5 py-1',
+            heldCount > 0
+              ? 'text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300'
+              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
           )}
-          <span className="text-sm font-semibold tracking-wide text-gray-500 dark:text-gray-400">
-            {staffDisplayName}
-          </span>
-        </div>
+          title="Held tickets"
+        >
+          <PauseCircle className="h-5 w-5" />
+          {heldCount > 0 && <span className="text-xs font-medium">{heldCount} held</span>}
+        </button>
       </div>
 
       {/* Items list */}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   Receipt,
   FileText,
@@ -18,11 +18,8 @@ import {
   Minimize2,
   Keyboard,
   ExternalLink,
-  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { ROLE_LABELS } from '@/lib/utils/constants';
-import { usePosAuth } from '../context/pos-auth-context';
 import { usePosTheme } from '../context/pos-theme-context';
 
 interface BottomNavProps {
@@ -31,8 +28,6 @@ interface BottomNavProps {
 
 export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { employee, role, signOut: posSignOut } = usePosAuth();
   const { theme, setTheme } = usePosTheme();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -46,8 +41,6 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
 
   // PWA standalone mode
   const [isStandalone, setIsStandalone] = useState(false);
-
-  const displayName = employee?.first_name || employee?.email?.split('@')[0] || '';
 
   // Read drawer session status from localStorage on mount
   useEffect(() => {
@@ -140,12 +133,6 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
       console.error('Fullscreen error:', err);
     }
   }, []);
-
-  function handleLogout() {
-    setMoreOpen(false);
-    posSignOut();
-    router.replace('/pos/login');
-  }
 
   // Close more menu when clicking/tapping outside
   useEffect(() => {
@@ -338,30 +325,11 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
             <Link
               href="/admin"
               onClick={() => setMoreOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              className="flex items-center gap-3 rounded-b-xl px-4 py-3 min-h-[44px] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <ExternalLink className="h-5 w-5 text-gray-500 dark:text-gray-400" />
               Go to Dashboard
             </Link>
-
-            <div className="border-t border-gray-100 dark:border-gray-700" />
-
-            {/* Log Out */}
-            <button
-              onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-b-xl px-4 py-3 min-h-[44px] text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <LogOut className="h-5 w-5 text-red-500 dark:text-red-400" />
-              <span className="text-red-600 dark:text-red-400">Log Out</span>
-              <span className="ml-auto flex items-center gap-1.5">
-                {role && (
-                  <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
-                    {ROLE_LABELS[role] || role}
-                  </span>
-                )}
-                <span className="text-xs text-gray-400 dark:text-gray-500">{displayName}</span>
-              </span>
-            </button>
           </div>
         )}
       </div>

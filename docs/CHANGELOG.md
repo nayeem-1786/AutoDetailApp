@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS PIN Lag, Header Identity, Held Tickets Relocation — Session D7 — 2026-02-21
+
+### PIN Entry Lag (Fix 1)
+- Added 200ms `setTimeout` before auto-submit on 4th digit so user sees all 4 dots fill before "Verifying..." state
+- Added `touch-action: manipulation` to PIN overlay and full-page containers (prevents 300ms tap delay on touch devices)
+- Changed pin-pad buttons from `transition-all` to `transition-colors` (avoids transform animation competing with rapid taps)
+
+### Header Identity + Logout (Fix 2)
+- Right side of header now shows: `{Role Pill} | {Staff Name} | [LogOut icon]`
+- LogOut icon button with hover:red effect, calls `posSignOut()` + redirect to `/pos/login`
+- Removed PauseCircle held tickets from header (moved to ticket panel per Fix 4)
+- OfflineQueueBadge stays in header
+
+### Remove Logout from More Menu (Fix 3)
+- Removed Log Out button, last divider, and `handleLogout` function from bottom-nav
+- Cleaned up unused imports: `LogOut`, `ROLE_LABELS`, `usePosAuth`, `useRouter`
+- "Go to Dashboard" is now the last menu item with `rounded-b-xl`
+
+### Move PauseCircle to Ticket Panel Header (Fix 4)
+- PauseCircle + held count moved from main header to ticket-panel header (replaces role pill + staff name)
+- Cross-component communication via `CustomEvent('pos-open-held-panel')` — ticket panel dispatches, PosShellContent listens
+- Same styling: amber when held > 0, gray when empty. HeldTicketsPanel stays in PosShellContent.
+
+---
+
 ## Fix: Auth Expiry Redirect + CRON Resilience — Session D6 — 2026-02-21
 
 ### POS Auth Expiry → Graceful Login Redirect (Fix 1)

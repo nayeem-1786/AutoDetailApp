@@ -6,18 +6,19 @@ import { toast } from 'sonner';
 import {
   Loader2,
   ScanLine,
-  PauseCircle,
+  LogOut,
   Keyboard,
   X,
   Wifi,
   WifiOff,
 } from 'lucide-react';
+import { ROLE_LABELS } from '@/lib/utils/constants';
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
 import type { PosSessionEmployee } from './context/pos-auth-context';
 import { PosPermissionProvider } from './context/pos-permission-context';
 import { TicketProvider, useTicket } from './context/ticket-context';
 import { CheckoutProvider, useCheckout } from './context/checkout-context';
-import { HeldTicketsProvider, useHeldTickets } from './context/held-tickets-context';
+import { HeldTicketsProvider } from './context/held-tickets-context';
 import { ReaderProvider, useReader } from './context/reader-context';
 import { QuoteProvider } from './context/quote-context';
 import { CheckoutOverlay } from './components/checkout/checkout-overlay';
@@ -26,7 +27,6 @@ import { HeldTicketsPanel } from './components/held-tickets-panel';
 import { PinScreen } from './components/pin-screen';
 import { OfflineIndicator } from './components/offline-indicator';
 import { OfflineQueueBadge } from './components/offline-queue-badge';
-import { cn } from '@/lib/utils/cn';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, locked, lock, replaceSession } = usePosAuth();
@@ -181,14 +181,24 @@ function PosShellContent({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { signOut: posSignOut } = usePosAuth();
   const { ticket, dispatch } = useTicket();
   const { openCheckout, isOpen: checkoutOpen } = useCheckout();
-  const { heldTickets } = useHeldTickets();
   const { connectedReader, isConnecting, discoverAndConnect } = useReader();
   const [heldPanelOpen, setHeldPanelOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-  const heldCount = heldTickets.length;
+  // Listen for custom event from ticket panel to open held tickets panel
+  useEffect(() => {
+    const handler = () => setHeldPanelOpen(true);
+    window.addEventListener('pos-open-held-panel', handler);
+    return () => window.removeEventListener('pos-open-held-panel', handler);
+  }, []);
+
+  const handleHeaderLogout = useCallback(() => {
+    posSignOut();
+    router.replace('/pos/login');
+  }, [posSignOut, router]);
 
   // P7: Keyboard shortcuts
   useEffect(() => {
@@ -305,25 +315,22 @@ function PosShellContent({
           </span>
         </div>
 
-        {/* Right: Held tickets + Offline queue */}
-        <div className="ml-auto flex items-center gap-3">
-          {/* Held Tickets */}
-          <button
-            onClick={() => setHeldPanelOpen(true)}
-            className={cn(
-              'flex items-center gap-1 px-1.5 py-1',
-              heldCount > 0
-                ? 'text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300'
-                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
-            )}
-            title="Held tickets"
-          >
-            <PauseCircle className="h-5 w-5" />
-            {heldCount > 0 && <span className="text-xs font-medium">{heldCount} held</span>}
-          </button>
-
-          {/* Offline queue badge */}
+        {/* Right: Offline queue + Identity + Logout */}
+        <div className="ml-auto flex items-center gap-2">
           <OfflineQueueBadge />
+          <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
+            {ROLE_LABELS[role] || role}
+          </span>
+          <span className="text-gray-300 dark:text-gray-600 text-xs">|</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{displayName}</span>
+          <span className="text-gray-300 dark:text-gray-600 text-xs">|</span>
+          <button
+            onClick={handleHeaderLogout}
+            className="flex items-center justify-center p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
+            title="Log out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </header>
 

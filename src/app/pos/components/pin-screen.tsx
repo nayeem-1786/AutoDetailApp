@@ -63,7 +63,8 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
     setError(null);
 
     if (next.length === 4) {
-      handleSubmit(next);
+      // Brief delay so user sees all 4 dots fill before submit
+      setTimeout(() => handleSubmit(next), 200);
     }
   }
 
@@ -146,14 +147,14 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
 
   if (overlay) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/95">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/95 touch-manipulation">
         {content}
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-900 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-900 px-4 touch-manipulation">
       {content}
     </div>
   );
