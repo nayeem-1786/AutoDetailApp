@@ -1488,7 +1488,7 @@ export interface ShippingSettingsRow {
 
 // Audit Log
 export type AuditAction = 'create' | 'update' | 'delete' | 'void' | 'refund' | 'apply' | 'login' | 'logout' | 'adjust';
-export type AuditEntityType = 'customer' | 'transaction' | 'order' | 'coupon' | 'booking' | 'product' | 'service' | 'employee' | 'settings' | 'campaign';
+export type AuditEntityType = 'customer' | 'transaction' | 'order' | 'coupon' | 'booking' | 'product' | 'service' | 'employee' | 'settings' | 'campaign' | 'job' | 'quote';
 export type AuditSource = 'admin' | 'pos' | 'api' | 'cron' | 'customer_portal';
 
 export interface AuditLogEntry {

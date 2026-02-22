@@ -5,6 +5,7 @@ import { checkPosPermission } from '@/lib/pos/check-permission';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 const CANCELLABLE_EARLY = ['scheduled', 'intake'];
 const CANCELLABLE_LATE = ['in_progress', 'pending_approval'];
@@ -118,6 +119,19 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'delete',
+      entityType: 'job',
+      entityId: id,
+      entityLabel: `Job #${id.slice(0, 8)}`,
+      details: { reason: reason.trim(), previous_status: job.status },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     // If appointment-based, cancel the linked appointment and send notification
     let notified = false;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 // DELETE - Delete a customer and associated records
 export async function DELETE(
@@ -103,6 +104,18 @@ export async function DELETE(
       console.error('Failed to delete customer:', deleteError);
       return NextResponse.json({ error: 'Failed to delete customer' }, { status: 500 });
     }
+
+    logAudit({
+      userId: employee.auth_user_id,
+      userEmail: employee.email,
+      employeeName: [employee.first_name, employee.last_name].filter(Boolean).join(' ') || null,
+      action: 'delete',
+      entityType: 'customer',
+      entityId: id,
+      entityLabel: `${customer.first_name} ${customer.last_name}`.trim(),
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({
       success: true,

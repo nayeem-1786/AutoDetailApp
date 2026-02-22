@@ -4,6 +4,61 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Wire Audit Logging Into All Mutation Routes — Session D12b — 2026-02-22
+
+Wired `logAudit()` calls into ~32 API route files covering every significant mutation across admin, POS, marketing, and public endpoints. All calls are fire-and-forget (no `await` in critical path). Extended `getEmployeeFromSession()` to return employee name/email for audit entries.
+
+### Infrastructure changes
+- `src/lib/auth/get-employee.ts` — Extended `AuthenticatedEmployee` interface: added `auth_user_id`, `email`, `first_name`, `last_name` fields. Expanded `.select()` to include these columns.
+- `src/lib/supabase/types.ts` — Added `'job' | 'quote'` to `AuditEntityType`
+- `src/lib/utils/constants.ts` — Added `job: 'Job'`, `quote: 'Quote'` to `AUDIT_ENTITY_TYPE_LABELS`
+
+### Admin routes (source: `'admin'`)
+- `admin/customers/[id]` DELETE — logs customer deletion with name
+- `admin/orders/[id]` PATCH — logs order update with `buildChangeDetails()` diff (fulfillment_status, tracking, carrier, notes)
+- `admin/orders/[id]/refund` POST — logs refund with amount, reason, payment_status
+- `admin/staff/[id]` PATCH — logs employee update with before/after diff (name, email, role, rate)
+- `staff/create` POST — logs new employee creation
+- `admin/settings/business` PATCH — logs business setting changes with key/value
+- `appointments/[id]` PATCH — logs appointment update with `buildChangeDetails()` diff
+- `appointments/[id]/cancel` POST — logs cancellation with reason and fee details
+- `admin/stock-adjustments` POST — logs stock adjustment with qty before/after, type, reason
+
+### POS routes (source: `'pos'`)
+- `pos/auth/pin-login` POST — logs successful PIN logins (reuses existing `ip` variable)
+- `pos/customers` POST — logs customer creation with phone
+- `pos/customers/[id]/type` PATCH — logs customer type change with before/after values
+- `pos/transactions` POST — logs transaction creation with total, payment method, items count
+- `pos/transactions/[id]` PATCH — logs void with optional reason
+- `pos/refunds` POST — logs refund with amount, reason, item count
+- `pos/jobs` POST — logs job creation with services count, customer ID
+- `pos/jobs/[id]` PATCH — logs job update with changed fields
+- `pos/jobs/[id]/cancel` POST — logs job cancellation with reason, previous status
+- `pos/jobs/[id]/complete` POST — logs job completion with timer seconds
+- `pos/quotes` POST — logs quote creation (typed cast for `createQuote` return)
+- `pos/quotes/[id]` PATCH — logs quote update with changed fields
+- `pos/quotes/[id]` DELETE — logs quote soft-delete
+- `pos/quotes/[id]/convert` POST — logs quote-to-job conversion
+- `pos/loyalty/earn` POST — logs points earned with new balance, transaction ID
+- `pos/end-of-day` POST — logs EOD summary with register totals
+
+### Marketing routes (source: `'admin'`)
+- `marketing/coupons` POST — logs coupon creation with name, status
+- `marketing/coupons/[id]` PATCH — logs coupon update with changed fields
+- `marketing/coupons/[id]` DELETE — logs coupon deletion
+- `marketing/campaigns` POST — logs campaign creation with channel, status
+- `marketing/campaigns/[id]` PATCH — logs campaign update with changed fields
+- `marketing/campaigns/[id]` DELETE — logs campaign deletion
+- `marketing/campaigns/[id]/send` POST — logs campaign send with recipients/delivered count
+- `marketing/automations` POST — logs automation creation with trigger type
+- `marketing/automations/[id]` PATCH — logs automation update (toggle or full edit)
+- `marketing/automations/[id]` DELETE — logs automation deletion
+
+### Public routes (source: `'customer_portal'`)
+- `book` POST — logs booking creation with customer email
+
+---
+
 ## Audit Log Foundation — Session D12a — 2026-02-22
 
 Created the complete audit log infrastructure: database table, utility functions, API routes, cron cleanup, and enhanced viewer page. `logAudit()` is ready to be wired into API routes in Session D12b.

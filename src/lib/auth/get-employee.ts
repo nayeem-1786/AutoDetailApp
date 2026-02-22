@@ -4,6 +4,10 @@ import type { UserRole } from '@/lib/supabase/types';
 
 export interface AuthenticatedEmployee {
   id: string;
+  auth_user_id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
   role: UserRole;
   role_id: string;
   is_super: boolean;
@@ -25,7 +29,7 @@ export async function getEmployeeFromSession(): Promise<AuthenticatedEmployee | 
   const admin = createAdminClient();
   const { data: employee } = await admin
     .from('employees')
-    .select('id, role, role_id')
+    .select('id, auth_user_id, email, first_name, last_name, role, role_id')
     .eq('auth_user_id', user.id)
     .eq('status', 'active')
     .single();
@@ -34,6 +38,10 @@ export async function getEmployeeFromSession(): Promise<AuthenticatedEmployee | 
 
   return {
     id: employee.id,
+    auth_user_id: employee.auth_user_id,
+    email: employee.email || null,
+    first_name: employee.first_name || null,
+    last_name: employee.last_name || null,
     role: employee.role as UserRole,
     role_id: employee.role_id,
     is_super: employee.role === 'super_admin',

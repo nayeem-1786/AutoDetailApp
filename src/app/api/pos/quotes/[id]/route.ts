@@ -9,6 +9,7 @@ import {
   QuoteNotFoundError,
   QuoteDraftOnlyError,
 } from '@/lib/quotes/quote-service';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(
   request: NextRequest,
@@ -59,6 +60,18 @@ export async function PATCH(
     const supabase = createAdminClient();
     const updated = await updateQuote(supabase, id, parsed.data);
 
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'update',
+      entityType: 'quote',
+      entityId: id,
+      entityLabel: `Quote #${id.slice(0, 8)}`,
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
+
     return NextResponse.json({ quote: updated });
   } catch (err) {
     if (err instanceof QuoteNotFoundError) {
@@ -83,6 +96,18 @@ export async function DELETE(
     const supabase = createAdminClient();
 
     await softDeleteQuote(supabase, id);
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'delete',
+      entityType: 'quote',
+      entityId: id,
+      entityLabel: `Quote #${id.slice(0, 8)}`,
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

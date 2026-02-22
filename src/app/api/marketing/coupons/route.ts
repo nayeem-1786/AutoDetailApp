@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { couponSchema } from '@/lib/utils/validation';
 import { buildSummaryInput, buildCouponSummary } from '@/lib/services/coupon-summary';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 import type { Coupon, CouponReward } from '@/lib/supabase/types';
 
 function generateCode(): string {
@@ -165,6 +166,18 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error('Failed to generate coupon summary:', err);
     }
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'create',
+      entityType: 'coupon',
+      entityId: coupon.id,
+      entityLabel: coupon.code,
+      details: { name: coupon.name, status: insertStatus },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json(
       { data: { ...coupon, coupon_rewards: couponRewards } },

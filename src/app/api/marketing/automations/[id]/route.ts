@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { lifecycleRuleSchema } from '@/lib/utils/validation';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(
   _request: NextRequest,
@@ -72,6 +73,19 @@ export async function PATCH(
         .single();
 
       if (error) throw error;
+
+      logAudit({
+        userId: user.id,
+        userEmail: user.email,
+        action: 'update',
+        entityType: 'campaign',
+        entityId: id,
+        entityLabel: data.name,
+        details: { updated_fields: ['is_active'] },
+        ipAddress: getRequestIp(request),
+        source: 'admin',
+      });
+
       return NextResponse.json({ data });
     }
 
@@ -92,6 +106,18 @@ export async function PATCH(
 
     if (error) throw error;
 
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'update',
+      entityType: 'campaign',
+      entityId: id,
+      entityLabel: data.name,
+      details: { updated_fields: Object.keys(parsed.data) },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
+
     return NextResponse.json({ data });
   } catch (err) {
     console.error('Update automation error:', err);
@@ -100,7 +126,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -125,6 +151,17 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) throw error;
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'delete',
+      entityType: 'campaign',
+      entityId: id,
+      entityLabel: `Automation #${id.slice(0, 8)}`,
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

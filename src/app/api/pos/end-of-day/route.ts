@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { cashDrawerCloseSchema } from '@/lib/utils/validation';
 import { isQboSyncEnabled } from '@/lib/qbo/settings';
 import { batchSyncDayTransactions } from '@/lib/qbo/sync-batch';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -172,6 +173,24 @@ export async function POST(request: NextRequest) {
 
       drawer = inserted;
     }
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'create',
+      entityType: 'transaction',
+      entityId: drawer.id,
+      entityLabel: 'End of Day',
+      details: {
+        total_transactions: totalTransactions,
+        total_revenue: roundTwo(totalRevenue),
+        variance: roundTwo(variance),
+        counted_cash: data.counted_cash,
+      },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     // QBO EOD Batch Sync — fire-and-forget, never blocks register close
     isQboSyncEnabled().then((enabled) => {

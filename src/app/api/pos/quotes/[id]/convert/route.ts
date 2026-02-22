@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { convertQuote } from '@/lib/quotes/convert-service';
 import { convertSchema } from '@/lib/utils/validation';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(
   request: NextRequest,
@@ -34,6 +35,19 @@ export async function POST(
         { status: result.status }
       );
     }
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'update',
+      entityType: 'quote',
+      entityId: id,
+      entityLabel: `Quote #${id.slice(0, 8)} converted`,
+      details: { converted_to: 'job' },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json(result);
   } catch (err) {

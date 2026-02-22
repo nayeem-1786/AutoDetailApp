@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildSummaryInput, buildCouponSummary } from '@/lib/services/coupon-summary';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 import type { Coupon, CouponReward } from '@/lib/supabase/types';
 
 const SUMMARY_TRIGGER_FIELDS = [
@@ -177,6 +178,18 @@ export async function PATCH(
       }
     }
 
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'update',
+      entityType: 'coupon',
+      entityId: id,
+      entityLabel: data?.code || data?.name,
+      details: { updated_fields: Object.keys(updates) },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
+
     return NextResponse.json({ data });
   } catch (err) {
     console.error('Update coupon error:', err);
@@ -185,7 +198,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -222,6 +235,17 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) throw error;
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'delete',
+      entityType: 'coupon',
+      entityId: id,
+      entityLabel: `Coupon #${id.slice(0, 8)}`,
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

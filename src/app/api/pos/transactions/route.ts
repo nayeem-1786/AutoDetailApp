@@ -6,6 +6,7 @@ import { CC_FEE_RATE, LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/cons
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -350,6 +351,23 @@ export async function POST(request: NextRequest) {
         console.error('[JobCheckout] Failed to link job to transaction:', err);
       });
     }
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'create',
+      entityType: 'transaction',
+      entityId: transaction.id,
+      entityLabel: `Transaction $${data.total_amount}`,
+      details: {
+        total_amount: data.total_amount,
+        payment_method: data.payment_method,
+        items_count: data.items?.length ?? 0,
+      },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json({ data: transaction }, { status: 201 });
   } catch (err) {

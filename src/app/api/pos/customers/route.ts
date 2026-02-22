@@ -4,6 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { normalizePhone } from '@/lib/utils/format';
 import { isQboSyncEnabled, getQboSettings, getQboSetting } from '@/lib/qbo/settings';
 import { syncCustomerToQbo } from '@/lib/qbo/sync-customer';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,6 +84,19 @@ export async function POST(request: NextRequest) {
       }
     }).catch(err => {
       console.error('[QBO] Failed to check customer sync:', err);
+    });
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'create',
+      entityType: 'customer',
+      entityId: customer.id,
+      entityLabel: `${customer.first_name} ${customer.last_name}`,
+      details: { phone: customer.phone },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
     });
 
     return NextResponse.json({ data: customer }, { status: 201 });

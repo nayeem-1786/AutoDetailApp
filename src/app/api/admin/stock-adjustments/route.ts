@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
     // Get current stock
     const { data: product } = await admin
       .from('products')
-      .select('id, quantity_on_hand')
+      .select('id, name, quantity_on_hand')
       .eq('id', product_id)
       .single();
 
@@ -144,6 +145,23 @@ export async function POST(request: NextRequest) {
       console.error('Log stock adjustment error:', saError);
       // Stock was already updated — log error but don't fail
     }
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'adjust',
+      entityType: 'product',
+      entityId: product_id,
+      entityLabel: product.name || `Product #${product_id.slice(0, 8)}`,
+      details: {
+        quantity_before: quantityBefore,
+        quantity_after: quantityAfter,
+        adjustment_type: adjustment_type || 'manual',
+        reason: reason || null,
+      },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({
       data: {

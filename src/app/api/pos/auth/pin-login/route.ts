@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createPosToken } from '@/lib/pos/session';
+import { logAudit } from '@/lib/services/audit';
 
 // Simple in-memory rate limit (per IP, resets on deploy)
 const failureMap = new Map<string, { count: number; firstFailure: number; lockedUntil: number }>();
@@ -125,6 +126,19 @@ export async function POST(request: NextRequest) {
       : 15;
 
   clearFailures(ip);
+
+  logAudit({
+    userId: employee.auth_user_id,
+    userEmail: employee.email,
+    employeeName: `${employee.first_name} ${employee.last_name}`,
+    action: 'login',
+    entityType: 'employee',
+    entityId: employee.id,
+    entityLabel: `${employee.first_name} ${employee.last_name}`,
+    details: { role: employee.role },
+    ipAddress: ip,
+    source: 'pos',
+  });
 
   return NextResponse.json({
     token,

@@ -4,6 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-detailer';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 /**
  * GET /api/pos/jobs — List today's jobs
@@ -183,6 +184,23 @@ export async function POST(request: NextRequest) {
       console.error('Job create error:', error);
       return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
     }
+
+    const customerName = job.customer
+      ? `Job for ${job.customer.first_name} ${job.customer.last_name}`
+      : `Job #${job.id.slice(0, 8)}`;
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'create',
+      entityType: 'job',
+      entityId: job.id,
+      entityLabel: customerName,
+      details: { services_count: services.length, customer_id },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json({ data: job }, { status: 201 });
   } catch (err) {

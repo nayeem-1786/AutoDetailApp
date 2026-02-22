@@ -3,6 +3,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendFulfillmentEmail } from '@/lib/utils/order-emails';
+import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
 
 export async function GET(
   _request: NextRequest,
@@ -180,6 +181,19 @@ export async function PATCH(
         console.error('[order email] Error:', err)
       );
     }
+
+    logAudit({
+      userId: employee.auth_user_id,
+      userEmail: employee.email,
+      employeeName: [employee.first_name, employee.last_name].filter(Boolean).join(' ') || null,
+      action: 'update',
+      entityType: 'order',
+      entityId: id,
+      entityLabel: `Order #${id.slice(0, 8)}`,
+      details: buildChangeDetails(order, updated, ['fulfillment_status', 'tracking_number', 'tracking_url', 'shipping_carrier', 'internal_notes']),
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json(updated);
   } catch (err) {

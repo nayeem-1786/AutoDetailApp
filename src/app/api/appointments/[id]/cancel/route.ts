@@ -6,6 +6,7 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 const TERMINAL_STATUSES = ['completed', 'cancelled'];
 
@@ -145,6 +146,19 @@ export async function POST(
         }
       }
     }
+
+    logAudit({
+      userId: employee.auth_user_id,
+      userEmail: employee.email,
+      employeeName: [employee.first_name, employee.last_name].filter(Boolean).join(' ') || null,
+      action: 'delete',
+      entityType: 'booking',
+      entityId: id,
+      entityLabel: `Appointment #${id.slice(0, 8)}`,
+      details: { reason: data.cancellation_reason || null, cancellation_fee: fee },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ success: true, appointment: updated });
   } catch (err) {

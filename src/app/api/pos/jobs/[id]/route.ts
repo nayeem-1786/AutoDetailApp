@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 const JOB_SELECT = `
   *,
@@ -143,6 +144,19 @@ export async function PATCH(
       }
       return NextResponse.json({ error: 'Failed to update job' }, { status: 500 });
     }
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'update',
+      entityType: 'job',
+      entityId: id,
+      entityLabel: `Job #${id.slice(0, 8)}`,
+      details: { updated_fields: Object.keys(updates).filter((k) => k !== 'updated_at') },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json({ data: job });
   } catch (err) {

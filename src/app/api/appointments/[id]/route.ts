@@ -6,6 +6,7 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
 
 export async function PATCH(
   request: NextRequest,
@@ -50,7 +51,7 @@ export async function PATCH(
     // Fetch current appointment
     const { data: current, error: fetchErr } = await supabase
       .from('appointments')
-      .select('id, status, scheduled_date, scheduled_start_time, scheduled_end_time')
+      .select('id, status, scheduled_date, scheduled_start_time, scheduled_end_time, job_notes, internal_notes')
       .eq('id', id)
       .single();
 
@@ -154,6 +155,19 @@ export async function PATCH(
         },
       }, supabase).catch(err => console.error('Webhook fire failed:', err));
     }
+
+    logAudit({
+      userId: employee.auth_user_id,
+      userEmail: employee.email,
+      employeeName: [employee.first_name, employee.last_name].filter(Boolean).join(' ') || null,
+      action: 'update',
+      entityType: 'booking',
+      entityId: id,
+      entityLabel: `Appointment #${id.slice(0, 8)}`,
+      details: buildChangeDetails(current, update, ['status', 'scheduled_date', 'scheduled_start_time', 'scheduled_end_time', 'job_notes', 'internal_notes']),
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ success: true, appointment: updated });
   } catch (err) {

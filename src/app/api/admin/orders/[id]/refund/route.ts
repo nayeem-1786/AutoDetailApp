@@ -4,6 +4,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendRefundEmail } from '@/lib/utils/order-emails';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
@@ -100,6 +101,25 @@ export async function POST(
     sendRefundEmail(order, refundAmount).catch((err) =>
       console.error('[refund email] Error:', err)
     );
+
+    logAudit({
+      userId: employee.auth_user_id,
+      userEmail: employee.email,
+      employeeName: [employee.first_name, employee.last_name].filter(Boolean).join(' ') || null,
+      action: 'refund',
+      entityType: 'order',
+      entityId: id,
+      entityLabel: `Order #${id.slice(0, 8)}`,
+      details: {
+        refund_id: refund.id,
+        amount: refundAmount,
+        is_full_refund: isFullRefund,
+        reason: body.reason || null,
+        payment_status: newPaymentStatus,
+      },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
 
 export async function PATCH(
   request: NextRequest,
@@ -25,7 +26,7 @@ export async function PATCH(
     // Fetch current employee to check for email change
     const { data: current, error: fetchError } = await supabase
       .from('employees')
-      .select('auth_user_id, email')
+      .select('auth_user_id, first_name, last_name, email, role, hourly_rate')
       .eq('id', id)
       .single();
 
@@ -106,6 +107,19 @@ export async function PATCH(
         );
       }
     }
+
+    logAudit({
+      userId: caller.auth_user_id,
+      userEmail: caller.email,
+      employeeName: [caller.first_name, caller.last_name].filter(Boolean).join(' ') || null,
+      action: 'update',
+      entityType: 'employee',
+      entityId: id,
+      entityLabel: `${current.first_name} ${current.last_name}`.trim(),
+      details: buildChangeDetails(current, { first_name, last_name, email, role, hourly_rate: hourly_rate ?? null }, ['first_name', 'last_name', 'email', 'role', 'hourly_rate']),
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

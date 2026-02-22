@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -105,6 +106,19 @@ export async function POST(request: NextRequest) {
       .from('transactions')
       .update({ loyalty_points_earned: pointsEarned })
       .eq('id', transaction_id);
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'adjust',
+      entityType: 'customer',
+      entityId: customer_id,
+      entityLabel: `+${pointsEarned} loyalty points`,
+      details: { points_earned: pointsEarned, new_balance: newBalance, transaction_id },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json({
       data: {

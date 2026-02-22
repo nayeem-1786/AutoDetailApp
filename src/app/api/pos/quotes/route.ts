@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { createQuoteSchema } from '@/lib/utils/validation';
 import { listQuotes, createQuote } from '@/lib/quotes/quote-service';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,6 +49,20 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
     const result = await createQuote(supabase, parsed.data, posEmployee.employee_id);
+    const createdQuote = result.quote as { id?: string; quote_number?: string } | null;
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'create',
+      entityType: 'quote',
+      entityId: createdQuote?.id,
+      entityLabel: `Quote #${createdQuote?.quote_number || 'new'}`,
+      details: { customer_id: parsed.data.customer_id },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

@@ -4,6 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { refundCreateSchema } from '@/lib/utils/validation';
 import Stripe from 'stripe';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -210,6 +211,23 @@ export async function POST(request: NextRequest) {
       .from('transactions')
       .update({ status: newStatus })
       .eq('id', transaction.id);
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'refund',
+      entityType: 'transaction',
+      entityId: data.transaction_id,
+      entityLabel: `Refund $${totalRefundAmount.toFixed(2)}`,
+      details: {
+        amount: totalRefundAmount,
+        reason: data.reason,
+        item_count: data.items.length,
+      },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json({ data: refund }, { status: 201 });
   } catch (err) {

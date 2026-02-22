@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { revalidateTag } from '@/lib/utils/revalidate';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/settings/business?key=xxx — Read a single business setting
@@ -70,6 +71,19 @@ export async function PATCH(request: NextRequest) {
   if (key.startsWith('ticker_')) {
     revalidateTag('cms-tickers');
   }
+
+  logAudit({
+    userId: employee.auth_user_id,
+    userEmail: employee.email,
+    employeeName: [employee.first_name, employee.last_name].filter(Boolean).join(' ') || null,
+    action: 'update',
+    entityType: 'settings',
+    entityId: key,
+    entityLabel: key,
+    details: { key, value },
+    ipAddress: getRequestIp(request),
+    source: 'admin',
+  });
 
   return NextResponse.json({ success: true });
 }

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { employeeCreateSchema } from '@/lib/utils/validation';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,6 +93,19 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    logAudit({
+      userId: caller.auth_user_id,
+      userEmail: caller.email,
+      employeeName: [caller.first_name, caller.last_name].filter(Boolean).join(' ') || null,
+      action: 'create',
+      entityType: 'employee',
+      entityId: employee.id,
+      entityLabel: `${employee.first_name} ${employee.last_name}`.trim(),
+      details: { role: employee.role },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ data: employee }, { status: 201 });
   } catch (err) {

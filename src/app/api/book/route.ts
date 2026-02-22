@@ -7,6 +7,7 @@ import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -427,6 +428,21 @@ export async function POST(request: NextRequest) {
         console.error('Confirmed webhook fire failed:', err)
       );
     }
+
+    logAudit({
+      userId: null,
+      userEmail: data.customer.email,
+      action: 'create',
+      entityType: 'booking',
+      entityId: appointment.id,
+      entityLabel: `Booking for ${data.customer.first_name} ${data.customer.last_name}`,
+      details: {
+        service_name: serviceRow.name as string,
+        scheduled_date: data.date,
+      },
+      ipAddress: getRequestIp(request),
+      source: 'customer_portal',
+    });
 
     return NextResponse.json(
       {

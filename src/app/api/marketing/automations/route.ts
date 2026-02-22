@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { lifecycleRuleSchema } from '@/lib/utils/validation';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(_request: NextRequest) {
   try {
@@ -68,6 +69,18 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'create',
+      entityType: 'campaign',
+      entityId: data.id,
+      entityLabel: data.name,
+      details: { trigger_type: data.trigger_type },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (err) {

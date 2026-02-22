@@ -12,6 +12,7 @@ import { splitRecipients } from '@/lib/campaigns/ab-testing';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 import type { CampaignChannel, CampaignVariant } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
@@ -415,6 +416,18 @@ export async function POST(
       recipient_count: customers?.length ?? 0,
       delivered_count: deliveredCount,
       is_ab_test: isABTest,
+    });
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'update',
+      entityType: 'campaign',
+      entityId: id,
+      entityLabel: campaign.name,
+      details: { status: 'sent', recipients_count: customers?.length ?? 0, delivered_count: deliveredCount },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
     });
 
     return NextResponse.json({

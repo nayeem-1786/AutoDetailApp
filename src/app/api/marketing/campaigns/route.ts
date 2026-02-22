@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { campaignCreateSchema } from '@/lib/utils/validation';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -98,6 +99,18 @@ export async function POST(request: NextRequest) {
       }));
       await admin.from('campaign_variants').insert(variantRows);
     }
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'create',
+      entityType: 'campaign',
+      entityId: data.id,
+      entityLabel: data.name,
+      details: { channel: data.channel, status: data.status },
+      ipAddress: getRequestIp(request),
+      source: 'admin',
+    });
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (err) {

@@ -7,6 +7,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, type BusinessHours } from '@/lib/data/business-hours';
 import { createShortLink } from '@/lib/utils/short-link';
 import crypto from 'crypto';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 /**
  * POST /api/pos/jobs/[id]/complete
@@ -101,6 +102,19 @@ export async function POST(
       console.error('Job complete update error:', updateError);
       return NextResponse.json({ error: 'Failed to complete job' }, { status: 500 });
     }
+
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'update',
+      entityType: 'job',
+      entityId: id,
+      entityLabel: `Job #${id.slice(0, 8)}`,
+      details: { status: 'completed', timer_seconds: finalTimerSeconds },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     // Fire-and-forget: send customer notifications
     sendCompletionNotifications(supabase, updatedJob, galleryToken).catch((err) =>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 const CUSTOMER_TYPES = ['enthusiast', 'professional'] as const;
 
@@ -38,7 +39,7 @@ export async function PATCH(
       .from('customers')
       .update({ customer_type })
       .eq('id', id)
-      .select('id, customer_type')
+      .select('id, first_name, last_name, customer_type')
       .single();
 
     if (updateError) {
@@ -52,6 +53,23 @@ export async function PATCH(
     if (!updated) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
+
+    const entityLabel = updated.first_name && updated.last_name
+      ? `${updated.first_name} ${updated.last_name}`
+      : `Customer #${id.slice(0, 8)}`;
+
+    logAudit({
+      userId: posEmployee?.auth_user_id ?? null,
+      userEmail: posEmployee?.email ?? null,
+      employeeName: posEmployee ? `${posEmployee.first_name} ${posEmployee.last_name}` : null,
+      action: 'update',
+      entityType: 'customer',
+      entityId: id,
+      entityLabel,
+      details: { customer_type },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     return NextResponse.json({ data: updated });
   } catch (err) {

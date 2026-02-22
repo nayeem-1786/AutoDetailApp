@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 /**
  * Authenticate request via POS HMAC token or admin session.
@@ -83,6 +84,7 @@ export async function PATCH(
     if (!employeeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const posEmployee = authenticatePosRequest(request);
     const supabase = createAdminClient();
 
     const body = await request.json();
@@ -105,6 +107,19 @@ export async function PATCH(
           { status: 400 }
         );
       }
+
+      logAudit({
+        userId: posEmployee?.auth_user_id ?? null,
+        userEmail: posEmployee?.email ?? null,
+        employeeName: posEmployee ? `${posEmployee.first_name} ${posEmployee.last_name}` : null,
+        action: 'void',
+        entityType: 'transaction',
+        entityId: id,
+        entityLabel: `Transaction #${id.slice(0, 8)}`,
+        details: body.reason ? { reason: body.reason } : undefined,
+        ipAddress: getRequestIp(request),
+        source: 'pos',
+      });
 
       return NextResponse.json({ data: transaction });
     }

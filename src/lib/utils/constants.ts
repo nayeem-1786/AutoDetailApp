@@ -276,6 +276,8 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<string, string> = {
   employee: 'Employee',
   settings: 'Settings',
   campaign: 'Campaign',
+  job: 'Job',
+  quote: 'Quote',
 } as const;
 
 export const AUDIT_ACTION_BADGE_VARIANT: Record<string, 'default' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
