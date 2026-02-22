@@ -251,7 +251,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         </h2>
         <div className="flex items-center gap-2">
           {roleLabel && (
-            <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+            <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
               {roleLabel}
             </span>
           )}

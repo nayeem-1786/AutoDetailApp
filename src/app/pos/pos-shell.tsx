@@ -12,7 +12,6 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import { ROLE_LABELS } from '@/lib/utils/constants';
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
 import type { PosSessionEmployee } from './context/pos-auth-context';
 import { PosPermissionProvider } from './context/pos-permission-context';
@@ -217,7 +216,7 @@ function PosShellContent({
 
       {/* Top Bar */}
       <header className="relative flex h-14 shrink-0 items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4">
-        {/* Left: Scanner, Card Reader, Role pill */}
+        {/* Left: Scanner, Card Reader */}
         <div className="flex items-center gap-3">
           {/* Scanner indicator */}
           <div className="flex items-center gap-1" title="Scanner: disconnected">
@@ -258,11 +257,6 @@ function PosShellContent({
               <span className="hidden text-xs sm:inline">No Reader</span>
             </button>
           )}
-
-          {/* Role pill */}
-          <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {ROLE_LABELS[role] || role}
-          </span>
         </div>
 
         {/* Center: Brand name (absolute centered) */}

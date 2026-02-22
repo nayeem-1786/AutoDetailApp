@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Header/Ticket/Menu Polish — Session D4 — 2026-02-21
+
+### More Menu Log Out (Fix 1)
+- Shrunk role pill text from `text-xs` to `text-[10px]` with tighter padding (`px-1.5`) and `leading-none`
+- Gap between pill and name reduced from `gap-2` to `gap-1.5`
+- Everything fits cleanly on one line without wrapping
+
+### Ticket Header Font (Fix 2)
+- Staff name already matched TICKET font (`text-sm font-semibold tracking-wide`) — confirmed correct
+- Shrunk role pill in ticket header to match More menu style (`text-[10px]`, `px-1.5`, `leading-none`)
+
+### Header Role Pill Removed (Fix 3)
+- Removed role pill from header entirely — role now only shown in ticket panel header and More menu
+- Removed unused `ROLE_LABELS` import from pos-shell.tsx
+- Header left side is now just Scanner + Card Reader indicators
+
+---
+
 ## Fix: POS Header Layout, Identity Display & Card Reader PWA — Session D3 — 2026-02-21
 
 ### Header Layout (Fix 1 + 4)

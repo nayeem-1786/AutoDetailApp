@@ -353,9 +353,9 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
             >
               <LogOut className="h-5 w-5 text-red-500 dark:text-red-400" />
               <span className="text-red-600 dark:text-red-400">Log Out</span>
-              <span className="ml-auto flex items-center gap-2">
+              <span className="ml-auto flex items-center gap-1.5">
                 {role && (
-                  <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
                     {ROLE_LABELS[role] || role}
                   </span>
                 )}
