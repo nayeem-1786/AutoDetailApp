@@ -207,6 +207,11 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
         <Link
           key={tab.href}
           href={tab.href}
+          onClick={() => {
+            if (tab.href === '/pos' && pathname === '/pos') {
+              window.dispatchEvent(new CustomEvent('pos-reset-register'));
+            }
+          }}
           className={cn(
             'flex flex-1 flex-col items-center justify-center gap-0.5 py-1 min-h-[44px]',
             tab.active

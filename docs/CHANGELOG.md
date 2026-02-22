@@ -4,6 +4,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Navigation Polish — Session D2 — 2026-02-21
+
+### Header Layout Reorganization
+- Removed staff first name ("Nayeem") and dot separator from header
+- Role pill ("Manager") now sole item on header left side
+- Staff name relocated to Ticket panel header row (opposite side of "TICKET" label)
+- Changed center brand text from "Smart Detail POS" to "Smart Details Auto Spa - POS"
+- Responsive breakpoint still collapses to just "POS" on narrow screens
+
+### Header Status Indicators
+- Removed amber pill background (`bg-amber-50`) from held tickets button
+- Removed oversized `min-h-[44px] min-w-[44px]` touch targets from all header indicators
+- Removed `rounded-full` pill shape from card reader and held ticket buttons
+- Reverted held tickets PauseCircle icon from h-5 to h-4 (matches scanner icon)
+- Connecting state changed from non-interactive `<div>` to tappable `<button>`
+
+### Card Reader PWA Improvements
+- Added concurrent connection guard (`isConnectingRef` check) in discoverAndConnect
+- Connection success/failure now shows toast feedback (critical for PWA where console isn't visible)
+- Added `/api/pos/stripe` to service worker NEVER_CACHE_PATTERNS for explicit Stripe API exclusion
+- Connection token endpoint already had Cache-Control: no-store
+
+### POS Tabs Light Mode Contrast
+- Tab container background changed from `bg-gray-100` to `bg-gray-200` in light mode
+- Fixes invisible tabs where container blended into page background (`bg-gray-100`)
+- Active tab white pill + shadow now clearly visible against darker track
+- Dark mode unchanged (`bg-gray-800`)
+
+### Sale Tab → Register Reset
+- Pressing Sale tab while already on /pos now resets active tab to Register
+- Uses custom event (`pos-reset-register`) from bottom-nav to pos-workspace
+- Also clears any active search when resetting
+
+---
+
 ## Fix: POS Navigation Polish + Bug Fixes — 2026-02-21
 
 ### More Menu Polish

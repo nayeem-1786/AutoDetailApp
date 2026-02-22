@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tag, X } from 'lucide-react';
+import { usePosAuth } from '../context/pos-auth-context';
 import { usePosPermission } from '../context/pos-permission-context';
 import { useTicket } from '../context/ticket-context';
 import { useCheckout } from '../context/checkout-context';
@@ -42,7 +43,9 @@ interface TicketPanelProps {
 }
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
+  const { employee } = usePosAuth();
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
+  const staffDisplayName = employee?.first_name || employee?.email?.split('@')[0] || '';
   const { ticket, dispatch } = useTicket();
   const { isOpen: checkoutOpen } = useCheckout();
   const { services } = useCatalog();
@@ -240,10 +243,13 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       </div>
 
       {/* Header */}
-      <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Ticket
         </h2>
+        <span className="text-sm font-semibold tracking-wide text-gray-500 dark:text-gray-400">
+          {staffDisplayName}
+        </span>
       </div>
 
       {/* Items list */}

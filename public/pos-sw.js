@@ -16,12 +16,13 @@ const CACHEABLE_API_PATTERNS = [
   '/api/pos/favorites',
 ];
 
-// API routes that should NEVER be cached (mutations)
+// API routes that should NEVER be cached (mutations + real-time data)
 const NEVER_CACHE_PATTERNS = [
   '/api/pos/transactions',
   '/api/pos/sync-offline-transaction',
   '/api/pos/checkout',
   '/api/pos/refund',
+  '/api/pos/stripe',
   '/api/stripe',
   '/api/pos/customers',
   '/api/pos/version',

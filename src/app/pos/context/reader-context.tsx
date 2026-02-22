@@ -9,6 +9,7 @@ import {
   useRef,
   ReactNode,
 } from 'react';
+import { toast } from 'sonner';
 import type { Reader } from '@stripe/terminal-js';
 
 interface ReaderContextType {
@@ -66,6 +67,9 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const discoverAndConnect = useCallback(async () => {
+    // Prevent concurrent connection attempts
+    if (isConnectingRef.current) return;
+
     setIsConnecting(true);
     isConnectingRef.current = true;
     setConnectionError(null);
@@ -78,9 +82,11 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
       const reader = await stripeTerminal.ensureConnected();
       setConnectedReader(reader);
       localStorage.setItem('pos_reader_id', reader.id);
+      toast.success(`Connected to ${reader.label || 'card reader'}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to connect to reader';
       setConnectionError(message);
+      toast.error(`Reader: ${message}`, { duration: 4000 });
     } finally {
       setIsConnecting(false);
       isConnectingRef.current = false;

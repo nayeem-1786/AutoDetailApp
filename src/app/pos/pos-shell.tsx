@@ -217,12 +217,8 @@ function PosShellContent({
 
       {/* Top Bar */}
       <header className="relative flex h-14 shrink-0 items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4">
-        {/* Left: Employee identity */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {displayName}
-          </span>
-          <span className="text-sm text-gray-400 dark:text-gray-500">&middot;</span>
+        {/* Left: Role pill */}
+        <div className="flex items-center">
           <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
             {ROLE_LABELS[role] || role}
           </span>
@@ -231,7 +227,7 @@ function PosShellContent({
         {/* Center: Brand name (absolute centered) */}
         <div className="absolute inset-x-0 flex justify-center pointer-events-none">
           <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            <span className="hidden sm:inline">Smart Detail POS</span>
+            <span className="hidden sm:inline">Smart Details Auto Spa - POS</span>
             <span className="sm:hidden">POS</span>
           </span>
         </div>
@@ -245,15 +241,20 @@ function PosShellContent({
 
           {/* Card Reader Status */}
           {isConnecting ? (
-            <div className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 py-1 text-blue-700 dark:text-blue-400">
+            <button
+              onClick={discoverAndConnect}
+              onTouchEnd={(e) => { e.preventDefault(); discoverAndConnect(); }}
+              className="flex items-center gap-1 px-1.5 py-1 text-blue-700 dark:text-blue-400"
+              title="Connecting..."
+            >
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="hidden text-xs font-medium sm:inline">Connecting...</span>
-            </div>
+            </button>
           ) : connectedReader ? (
             <button
               onClick={discoverAndConnect}
               onTouchEnd={(e) => { e.preventDefault(); discoverAndConnect(); }}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 py-1 text-green-700 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex items-center gap-1 px-1.5 py-1 text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
               title={`Reader: ${connectedReader.label || 'Connected'}`}
             >
               <Wifi className="h-4 w-4" />
@@ -265,7 +266,7 @@ function PosShellContent({
             <button
               onClick={discoverAndConnect}
               onTouchEnd={(e) => { e.preventDefault(); discoverAndConnect(); }}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 py-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
+              className="flex items-center gap-1 px-1.5 py-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400"
               title="Tap to connect reader"
             >
               <WifiOff className="h-4 w-4" />
@@ -277,14 +278,14 @@ function PosShellContent({
           <button
             onClick={() => setHeldPanelOpen(true)}
             className={cn(
-              'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2.5 py-1',
+              'flex items-center gap-1 px-1.5 py-1',
               heldCount > 0
-                ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
-                : 'text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400'
+                ? 'text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300'
+                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
             )}
             title="Held tickets"
           >
-            <PauseCircle className="h-5 w-5" />
+            <PauseCircle className="h-4 w-4" />
             {heldCount > 0 && <span className="text-xs font-medium">{heldCount} held</span>}
           </button>
 

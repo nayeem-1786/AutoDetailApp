@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
@@ -34,6 +34,16 @@ export function PosWorkspace() {
   const [search, setSearch] = useState('');
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
   const [showCustomerLookup, setShowCustomerLookup] = useState(false);
+
+  // Listen for Sale tab reset event from bottom nav
+  useEffect(() => {
+    const handler = () => {
+      setTab('register');
+      setSearch('');
+    };
+    window.addEventListener('pos-reset-register', handler);
+    return () => window.removeEventListener('pos-reset-register', handler);
+  }, []);
 
   // Barcode scanner
   useBarcodeScanner({
@@ -154,7 +164,7 @@ export function PosWorkspace() {
 
         {/* Tab bar */}
         <div className="shrink-0 px-4 pt-3">
-          <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+          <div className="flex gap-1 rounded-lg bg-gray-200 dark:bg-gray-800 p-1">
             {TABS.map((t) => (
               <button
                 key={t.key}
