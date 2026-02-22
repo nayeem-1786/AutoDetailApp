@@ -13,6 +13,7 @@ interface PromotionItem {
   name: string | null;
   discount_amount: number;
   description: string;
+  summary: string | null;
   expires_at: string | null;
   target_customer_type: string | null;
   auto_apply: boolean;
@@ -87,14 +88,18 @@ function PromotionCard({
             <ExpiryBadge expiresAt={promo.expires_at} />
           </div>
           <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">{promo.description}</p>
+          {promo.summary ? (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+              {promo.summary}
+            </p>
+          ) : promo.missing_items && promo.missing_items.length > 0 ? (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+              Needs: {promo.missing_items.join(', ')}
+            </p>
+          ) : null}
           {promo.discount_amount > 0 && (
             <p className="mt-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
               Save ${promo.discount_amount.toFixed(2)}
-            </p>
-          )}
-          {promo.missing_items && promo.missing_items.length > 0 && (
-            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-              Needs: {promo.missing_items.join(', ')}
             </p>
           )}
           {promo.warning && (

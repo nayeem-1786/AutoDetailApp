@@ -59,15 +59,17 @@ export function CouponCard({ coupon }: CouponCardProps) {
           )}
         </div>
 
-        {coupon.summary ? (
-          <p className="mt-1.5 text-xs text-site-text-muted">{coupon.summary}</p>
-        ) : coupon.rewards && coupon.rewards.length > 0 ? (
+        {coupon.rewards && coupon.rewards.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {coupon.rewards.map((r, i) => (
               <Badge key={i} variant="info">{rewardLabel(r)}</Badge>
             ))}
           </div>
-        ) : null}
+        )}
+
+        {coupon.summary && (
+          <p className="mt-1.5 text-xs text-site-text-muted">{coupon.summary}</p>
+        )}
 
         <div className="mt-1.5 space-y-0.5 text-xs text-site-text-faint">
           {coupon.min_purchase != null && coupon.min_purchase > 0 && (

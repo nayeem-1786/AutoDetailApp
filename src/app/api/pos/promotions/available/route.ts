@@ -16,6 +16,7 @@ interface PromotionItem {
   name: string | null;
   discount_amount: number;
   description: string;
+  summary: string | null;
   expires_at: string | null;
   target_customer_type: string | null;
   auto_apply: boolean;
@@ -111,13 +112,15 @@ export async function POST(request: NextRequest) {
       // Calculate potential discount
       const discountAmount = calculateCouponDiscount(rewards, items, subtotal);
 
-      // Use AI summary if available, otherwise build fallback description
-      const description = (coupon as unknown as Record<string, unknown>).summary as string ||
-        rewards.map((r) => {
-          if (r.discount_type === 'free') return 'Free item';
-          if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
-          return `$${r.discount_value} off`;
-        }).join(' + ');
+      // Build reward labels for description (always computed)
+      const description = rewards.map((r) => {
+        if (r.discount_type === 'free') return 'Free item';
+        if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
+        return `$${r.discount_value} off`;
+      }).join(' + ');
+
+      // AI summary (replaces raw condition text in POS cards)
+      const summary = ((coupon as unknown as Record<string, unknown>).summary as string) || null;
 
       const promotionItem: PromotionItem = {
         id: coupon.id,
@@ -125,6 +128,7 @@ export async function POST(request: NextRequest) {
         name: coupon.name,
         discount_amount: discountAmount,
         description,
+        summary,
         expires_at: coupon.expires_at,
         target_customer_type: coupon.target_customer_type,
         auto_apply: coupon.auto_apply,
