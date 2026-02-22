@@ -77,16 +77,27 @@ export function ProductDetail({ product, open, onClose }: ProductDetailProps) {
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Qty:</span>
             <button
               onClick={() => setQty(Math.max(1, qty - 1))}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+              disabled={qty <= 1}
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                qty <= 1
+                  ? 'border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-500 cursor-not-allowed'
+                  : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-95'
+              )}
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-5 w-5" />
             </button>
-            <span className="w-8 text-center text-lg font-semibold tabular-nums">{qty}</span>
+            <div className="flex h-14 w-20 items-center justify-center rounded-xl bg-white dark:bg-gray-900 border-2 border-blue-200 dark:border-blue-800">
+              <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{qty}</span>
+            </div>
             <button
               onClick={() => setQty(qty + 1)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-95'
+              )}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
             </button>
           </div>
           <button
