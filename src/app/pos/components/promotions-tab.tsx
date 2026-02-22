@@ -56,6 +56,15 @@ function ExpiryBadge({ expiresAt }: { expiresAt: string | null }) {
   return null;
 }
 
+function buildActionMessage(promo: PromotionItem): string | null {
+  if (!promo.missing_items || promo.missing_items.length === 0) return null;
+
+  const actions = promo.missing_items.join(' + ');
+  const reward = promo.description; // "20% off entire order", "$20 off entire order"
+
+  return `${actions} to get ${reward}!`;
+}
+
 function PromotionCard({
   promo,
   accent,
@@ -88,15 +97,30 @@ function PromotionCard({
             <ExpiryBadge expiresAt={promo.expires_at} />
           </div>
           <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">{promo.description}</p>
-          {promo.summary ? (
-            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-              {promo.summary}
-            </p>
-          ) : promo.missing_items && promo.missing_items.length > 0 ? (
-            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-              Needs: {promo.missing_items.join(', ')}
-            </p>
-          ) : null}
+          {(() => {
+            const isReady = !promo.missing_items || promo.missing_items.length === 0;
+            const actionMsg = buildActionMessage(promo);
+
+            if (isReady && promo.summary) {
+              // Green: show summary (targeting + constraints only)
+              return (
+                <p className="mt-1 text-xs text-green-700 dark:text-green-400">
+                  {promo.summary}
+                </p>
+              );
+            }
+
+            if (actionMsg) {
+              // Amber: show what to add + what they get
+              return (
+                <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                  &rarr; {actionMsg}
+                </p>
+              );
+            }
+
+            return null;
+          })()}
           {promo.discount_amount > 0 && (
             <p className="mt-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
               Save ${promo.discount_amount.toFixed(2)}

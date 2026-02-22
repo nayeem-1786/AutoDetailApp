@@ -22,11 +22,14 @@ Replaced AI-generated coupon summaries (Anthropic API call) with deterministic s
 - Examples: "Professional customers · Requires: Express Interior Clean", "First-time customers only · Min $50 purchase · One-time use", "No restrictions — available for any order."
 
 ### POS promotions tab polish
-- `src/app/api/pos/promotions/available/route.ts` — reward descriptions now include targets ("10% off entire order", "$20 off services", "Free item") and max discount caps
+- `src/app/api/pos/promotions/available/route.ts`:
+  - Reward descriptions now include targets ("10% off entire order", "$20 off services", "Free item") and max discount caps
+  - Added `resolveMissingItems()` — resolves raw missing item tokens to human-readable phrases by looking up product/service/category names from DB. Min purchase shows "Spend $X more" (remaining amount).
 - `src/app/pos/components/promotions-tab.tsx`:
   - Section titles renamed: "For You" → "Exclusive", "Eligible" → "Available", "Upsell" → "Add to Unlock"
   - "Add to Unlock" section now defaults open (was collapsed)
   - Added coupon code in dashed-border box on right side of each promotion card (font-mono, tracking-wider, dark mode support)
+  - Actionable upsell messages: cards with missing items show amber "→ Add X to get Y!" instead of raw "Needs: service". Cards with all conditions met show green summary text. Cards flip green/amber automatically on cart changes via 500ms debounce refetch.
 
 ---
 

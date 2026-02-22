@@ -24,6 +24,59 @@ interface PromotionItem {
   warning?: string;
 }
 
+async function resolveMissingItems(
+  coupon: CouponRow,
+  missingItems: string[],
+  supabase: ReturnType<typeof createAdminClient>,
+  currentSubtotal: number
+): Promise<string[]> {
+  const resolved: string[] = [];
+
+  for (const item of missingItems) {
+    if (item === 'product' && coupon.requires_product_ids?.length) {
+      const { data } = await supabase
+        .from('products')
+        .select('name')
+        .in('id', coupon.requires_product_ids);
+      if (data?.length) {
+        resolved.push(`Add ${data.map((p) => p.name).join(' or ')}`);
+      }
+    } else if (item === 'service' && coupon.requires_service_ids?.length) {
+      const { data } = await supabase
+        .from('services')
+        .select('name')
+        .in('id', coupon.requires_service_ids);
+      if (data?.length) {
+        resolved.push(`Add ${data.map((s) => s.name).join(' or ')}`);
+      }
+    } else if (item === 'product_category' && coupon.requires_product_category_ids?.length) {
+      const { data } = await supabase
+        .from('product_categories')
+        .select('name')
+        .in('id', coupon.requires_product_category_ids);
+      if (data?.length) {
+        resolved.push(...data.map((c) => `Add any ${c.name} product`));
+      }
+    } else if (item === 'service_category' && coupon.requires_service_category_ids?.length) {
+      const { data } = await supabase
+        .from('service_categories')
+        .select('name')
+        .in('id', coupon.requires_service_category_ids);
+      if (data?.length) {
+        resolved.push(...data.map((c) => `Add any ${c.name} service`));
+      }
+    } else if (item.startsWith('min_purchase:')) {
+      const required = parseFloat(item.split(':')[1]);
+      const remaining = Math.max(0, required - currentSubtotal);
+      if (remaining > 0) {
+        resolved.push(`Spend $${remaining.toFixed(0)} more`);
+      }
+    }
+  }
+
+  return resolved;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const posEmployee = authenticatePosRequest(request);
@@ -163,18 +216,19 @@ export async function POST(request: NextRequest) {
         if (conditions.passed) {
           forYou.push(promotionItem);
         } else {
-          forYou.push({ ...promotionItem, missing_items: conditions.missingItems });
+          const resolved = await resolveMissingItems(coupon, conditions.missingItems, supabase, subtotal);
+          forYou.push({ ...promotionItem, missing_items: resolved });
         }
       } else if (conditions.passed) {
         eligible.push(promotionItem);
       } else {
         // Only show in upsell if at least some conditions are partially met
-        // (i.e., not all conditions failed)
-        const totalConditions = conditions.failedConditions.length + (conditions.passed ? 0 : 0);
-        if (totalConditions < 4) { // Don't upsell coupons that are way off
+        const totalConditions = conditions.failedConditions.length;
+        if (totalConditions < 4) {
+          const resolved = await resolveMissingItems(coupon, conditions.missingItems, supabase, subtotal);
           upsell.push({
             ...promotionItem,
-            missing_items: conditions.missingItems,
+            missing_items: resolved,
           });
         }
       }
