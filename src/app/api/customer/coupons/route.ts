@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     const { data: coupons, error } = await admin
       .from('coupons')
       .select(
-        'id, code, name, min_purchase, expires_at, is_single_use, customer_id, customer_tags, tag_match_mode, requires_service_ids, requires_service_category_ids, coupon_rewards(*)'
+        'id, code, name, summary, min_purchase, expires_at, is_single_use, customer_id, customer_tags, tag_match_mode, requires_service_ids, requires_service_category_ids, coupon_rewards(*)'
       )
       .or(`customer_id.eq.${customer.id},customer_id.is.null`)
       .eq('status', 'active')

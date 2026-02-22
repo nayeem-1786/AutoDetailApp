@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Check, Pencil, X } from 'lucide-react';
+import { ArrowLeft, Check, Pencil, Sparkles, X } from 'lucide-react';
 
 interface CouponStats {
   usage_count: number;
@@ -43,6 +43,11 @@ export default function CouponDetailPage() {
   const [editingExpiry, setEditingExpiry] = useState(false);
   const [editExpiry, setEditExpiry] = useState('');
   const [inlineSaving, setInlineSaving] = useState(false);
+
+  // AI Summary states
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [editedSummary, setEditedSummary] = useState('');
 
   // Name lookups for resolving IDs to display names
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
@@ -292,6 +297,46 @@ export default function CouponDetailPage() {
   async function saveExpiry() {
     const ok = await inlinePatch({ expires_at: editExpiry || null });
     if (ok) setEditingExpiry(false);
+  }
+
+  async function handleRegenerateSummary() {
+    setIsRegenerating(true);
+    try {
+      const res = await fetch(`/api/marketing/coupons/${id}/summary`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setCoupon((prev) => prev ? { ...prev, summary: data.summary } : prev);
+        toast.success('Summary regenerated');
+      } else {
+        toast.error('Failed to regenerate summary');
+      }
+    } catch {
+      toast.error('Failed to regenerate summary');
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
+
+  async function handleSaveSummary() {
+    try {
+      const res = await fetch(`/api/marketing/coupons/${id}/summary`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary: editedSummary }),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setCoupon((prev) => prev ? { ...prev, summary: data.summary } : prev);
+        setIsEditingSummary(false);
+        toast.success('Summary updated');
+      } else {
+        toast.error('Failed to save summary');
+      }
+    } catch {
+      toast.error('Failed to save summary');
+    }
   }
 
   if (loading) {
@@ -656,8 +701,8 @@ export default function CouponDetailPage() {
           </Card>
         </div>
 
-        {/* Right column: Performance */}
-        <div>
+        {/* Right column: Performance + AI Summary */}
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Performance</CardTitle>
@@ -686,6 +731,67 @@ export default function CouponDetailPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Summary Card */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>AI Summary</CardTitle>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleRegenerateSummary}
+                    disabled={isRegenerating}
+                    className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                    title="Regenerate with AI"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {isRegenerating ? 'Generating...' : 'Regenerate'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditedSummary(coupon.summary || '');
+                      setIsEditingSummary(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                    title="Edit manually"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isEditingSummary ? (
+                <div>
+                  <textarea
+                    value={editedSummary}
+                    onChange={(e) => setEditedSummary(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={handleSaveSummary}
+                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditingSummary(false)}
+                      className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {coupon.summary || 'No summary generated yet. Click "Regenerate" to create one.'}
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -18,6 +18,7 @@ interface CouponCardProps {
     id: string;
     code: string;
     name: string | null;
+    summary?: string | null;
     min_purchase: number | null;
     expires_at: string | null;
     is_single_use: boolean;
@@ -58,13 +59,15 @@ export function CouponCard({ coupon }: CouponCardProps) {
           )}
         </div>
 
-        {coupon.rewards && coupon.rewards.length > 0 && (
+        {coupon.summary ? (
+          <p className="mt-1.5 text-xs text-site-text-muted">{coupon.summary}</p>
+        ) : coupon.rewards && coupon.rewards.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {coupon.rewards.map((r, i) => (
               <Badge key={i} variant="info">{rewardLabel(r)}</Badge>
             ))}
           </div>
-        )}
+        ) : null}
 
         <div className="mt-1.5 space-y-0.5 text-xs text-site-text-faint">
           {coupon.min_purchase != null && coupon.min_purchase > 0 && (

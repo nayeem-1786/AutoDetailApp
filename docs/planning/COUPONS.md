@@ -47,6 +47,7 @@ Stores the coupon identity, targeting, conditions, and constraints.
 | `max_uses` | INTEGER | Total use cap (NULL = unlimited) |
 | `expires_at` | TIMESTAMPTZ | Expiration date/time |
 | `campaign_id` | UUID FK | Links to campaign that generated this coupon |
+| `summary` | TEXT | AI-generated plain-English summary for POS/admin display |
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
 
@@ -496,3 +497,14 @@ When a coupon is applied (manually or auto):
 59. Booking wizard: `couponCode` prop flows to StepReview (green banner) and BookingConfirmation (reminder)
 60. Mailgun open/click tracking: `sendEmail` accepts tracking options, webhook endpoint updates `campaign_recipients.opened_at`/`clicked_at`
 61. Campaign wizard preview: `book_now_url` rendered in template preview
+
+### Phase K: AI-Generated Summaries ✅
+62. DB migration — `summary` TEXT column on `coupons`
+63. `coupon-summary.ts` utility — `buildSummaryInput()` resolves UUIDs to names, `generateCouponSummary()` calls Claude API (claude-sonnet-4, max_tokens: 200)
+64. Summary API route — POST (regenerate via AI), PATCH (manual edit) at `/api/marketing/coupons/[id]/summary`
+65. POST API generates summary after coupon+rewards insert (non-blocking)
+66. PATCH API regenerates summary when trigger fields change (name, targeting, conditions, rewards, constraints)
+67. Admin detail page — AI Summary card with Regenerate (Sparkles) + Edit (Pencil) buttons
+68. POS promotions API — uses `summary` as description, falls back to reward labels for old coupons
+69. Customer coupons API — includes `summary` in select
+70. Customer portal coupon card — displays summary when available, falls back to reward badges

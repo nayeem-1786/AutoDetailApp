@@ -4,6 +4,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: AI-Generated Coupon Summaries — Session D11 — 2026-02-22
+
+Added AI-generated plain-English summaries for coupons. Summaries auto-generate on create and regenerate when targeting, conditions, rewards, or constraints change.
+
+### New files
+- `supabase/migrations/20260222000001_coupon_summary.sql` — adds `summary` TEXT column to `coupons`
+- `src/lib/services/coupon-summary.ts` — `buildSummaryInput()` resolves UUIDs to names, `generateCouponSummary()` calls Claude API
+- `src/app/api/marketing/coupons/[id]/summary/route.ts` — POST (regenerate via AI), PATCH (manual edit)
+
+### Modified files
+- `src/lib/supabase/types.ts` — added `summary: string | null` to `Coupon` interface
+- `src/app/api/marketing/coupons/route.ts` — generates summary after coupon+rewards insert (non-blocking)
+- `src/app/api/marketing/coupons/[id]/route.ts` — regenerates summary when trigger fields change, added `summary` to allowedFields
+- `src/app/admin/marketing/coupons/[id]/page.tsx` — AI Summary card (Regenerate + Edit) below Performance in right column
+- `src/app/api/pos/promotions/available/route.ts` — uses `summary` as description (falls back to reward labels)
+- `src/app/api/customer/coupons/route.ts` — includes `summary` in select
+- `src/components/account/coupon-card.tsx` — displays summary when available, falls back to reward badges
+
+### Behavior
+- Summary auto-generates on POST (non-blocking — coupon still created if AI fails)
+- Summary regenerates on PATCH when any of: name, customer_id, customer_tags, tag_match_mode, target_customer_type, min_purchase, max_customer_visits, requires_*_ids, condition_logic, is_single_use, max_uses, expires_at, or rewards change
+- Code-only edits do NOT trigger regeneration
+- Admin detail page: "Regenerate" button (Sparkles icon) + "Edit" button (Pencil icon) for manual override
+- POS Promos tab: AI summary replaces raw "Needs: service" text in promotion cards
+- Customer portal: summary shown below code/name, replaces reward badges when available
+
+---
+
 ## Fix: Dialog & UI Token Dark Mode — Session D10b — 2026-02-21
 
 Root cause: All dialog/modal dark mode issues traced to `ui-*` CSS variables (e.g. `--ui-bg`, `--ui-text`, `--ui-border`) having no `.dark` override in `globals.css`. POS dark mode uses `.dark` class on `<html>`, but the `ui-*` tokens only had overrides for `.public-theme` (public pages) — not for `.dark`. This caused every component using `ui-*` tokens (dialog, card, button, input, table, tabs, dropdown, badge, slide-over, etc.) to render with white/light backgrounds in POS dark mode.

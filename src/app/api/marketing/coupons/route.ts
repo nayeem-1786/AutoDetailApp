@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { couponSchema } from '@/lib/utils/validation';
+import { buildSummaryInput, generateCouponSummary } from '@/lib/services/coupon-summary';
+import type { Coupon, CouponReward } from '@/lib/supabase/types';
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -149,6 +151,19 @@ export async function POST(request: NextRequest) {
 
       if (rewardsError) throw rewardsError;
       couponRewards = rewardsData;
+    }
+
+    // Generate AI summary (non-blocking — coupon still created if this fails)
+    try {
+      const summaryInput = await buildSummaryInput(
+        coupon as unknown as Coupon,
+        couponRewards as CouponReward[],
+      );
+      const summary = await generateCouponSummary(summaryInput);
+      await admin.from('coupons').update({ summary }).eq('id', coupon.id);
+      coupon.summary = summary;
+    } catch (err) {
+      console.error('Failed to generate coupon summary:', err);
     }
 
     return NextResponse.json(

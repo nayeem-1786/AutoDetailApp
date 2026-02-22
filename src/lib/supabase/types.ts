@@ -492,6 +492,7 @@ export interface Coupon {
   target_customer_type: CustomerType | null;
   combinable_with_sales: boolean;
   campaign_id: string | null;
+  summary: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations

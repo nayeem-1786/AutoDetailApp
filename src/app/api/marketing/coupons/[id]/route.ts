@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { buildSummaryInput, generateCouponSummary } from '@/lib/services/coupon-summary';
+import type { Coupon, CouponReward } from '@/lib/supabase/types';
+
+const SUMMARY_TRIGGER_FIELDS = [
+  'name', 'customer_id', 'customer_tags', 'tag_match_mode', 'target_customer_type',
+  'min_purchase', 'max_customer_visits',
+  'requires_product_ids', 'requires_service_ids',
+  'requires_product_category_ids', 'requires_service_category_ids',
+  'condition_logic', 'is_single_use', 'max_uses', 'expires_at',
+];
 
 export async function GET(
   _request: NextRequest,
@@ -84,6 +94,7 @@ export async function PATCH(
       'is_single_use',
       'max_uses',
       'expires_at',
+      'summary',
     ];
     const updates: Record<string, unknown> = {};
     for (const key of allowedFields) {
@@ -144,6 +155,27 @@ export async function PATCH(
       .single();
 
     if (error) throw error;
+
+    // Regenerate AI summary if trigger fields changed (non-blocking)
+    const shouldRegenerate =
+      SUMMARY_TRIGGER_FIELDS.some((f) => f in fields) ||
+      (rewards && Array.isArray(rewards));
+
+    if (shouldRegenerate && data) {
+      try {
+        const couponRewards: CouponReward[] =
+          (data as Record<string, unknown>).coupon_rewards as CouponReward[] || [];
+        const summaryInput = await buildSummaryInput(
+          data as unknown as Coupon,
+          couponRewards,
+        );
+        const summary = await generateCouponSummary(summaryInput);
+        await admin.from('coupons').update({ summary }).eq('id', id);
+        (data as Record<string, unknown>).summary = summary;
+      } catch (err) {
+        console.error('Failed to regenerate coupon summary:', err);
+      }
+    }
 
     return NextResponse.json({ data });
   } catch (err) {
