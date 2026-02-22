@@ -180,12 +180,12 @@ export async function buildSummaryInput(
 export function buildCouponSummary(input: CouponSummaryInput): string {
   const phrases: string[] = [];
 
-  // --- Targeting (pick first that applies) ---
+  // 1. WHO qualifies (targeting) — only if restricted
   if (input.customer_name) {
     phrases.push(`For ${input.customer_name} only`);
   } else if (input.customer_type) {
     const label = input.customer_type.charAt(0).toUpperCase() + input.customer_type.slice(1);
-    phrases.push(`For ${label} customers`);
+    phrases.push(`${label} customers`);
   } else if (input.customer_tags?.length) {
     if (input.tag_match_mode === 'all') {
       phrases.push(`Must have all tags: ${input.customer_tags.join(', ')}`);
@@ -194,7 +194,7 @@ export function buildCouponSummary(input: CouponSummaryInput): string {
     }
   }
 
-  // --- Conditions ---
+  // 2. WHAT's needed in cart (conditions) — the actionable upsell info
   const conditionPhrases: string[] = [];
 
   if (input.max_customer_visits != null) {
@@ -204,48 +204,40 @@ export function buildCouponSummary(input: CouponSummaryInput): string {
       conditionPhrases.push(`${input.max_customer_visits} or fewer visits`);
     }
   }
-
   if (input.min_purchase) {
-    conditionPhrases.push(`Min $${input.min_purchase} purchase`);
+    conditionPhrases.push(`Min $${input.min_purchase.toFixed(0)} purchase`);
   }
-
   if (input.requires_service_names?.length) {
     conditionPhrases.push(`Requires: ${input.requires_service_names.join(', ')}`);
   }
-
   if (input.requires_product_names?.length) {
     conditionPhrases.push(`Requires: ${input.requires_product_names.join(', ')}`);
   }
-
   if (input.requires_service_category_names?.length) {
-    for (const cat of input.requires_service_category_names) {
-      conditionPhrases.push(`Add any ${cat} service`);
-    }
+    conditionPhrases.push(
+      input.requires_service_category_names.map(c => `Add any ${c} service`).join(', ')
+    );
   }
-
   if (input.requires_product_category_names?.length) {
-    for (const cat of input.requires_product_category_names) {
-      conditionPhrases.push(`Add any ${cat} product`);
-    }
+    conditionPhrases.push(
+      input.requires_product_category_names.map(c => `Add any ${c} product`).join(', ')
+    );
   }
 
-  // Join conditions with " or " if condition_logic is 'or' and multiple conditions
+  // If condition_logic is 'or' and multiple conditions, join with " or "
   if (input.condition_logic === 'or' && conditionPhrases.length > 1) {
-    phrases.push(`(${conditionPhrases.join(' or ')})`);
+    phrases.push(conditionPhrases.join(' or '));
   } else {
     phrases.push(...conditionPhrases);
   }
 
-  // --- Constraints ---
-  if (input.is_single_use) {
-    phrases.push('One-time use');
-  }
-
-  if (input.max_uses) {
+  // 3. Constraints (skip expires_at — already shown as ExpiryBadge)
+  if (input.is_single_use) phrases.push('One-time use');
+  if (input.max_uses && !input.is_single_use) {
     phrases.push(`Limited: ${input.max_uses} total uses`);
   }
 
-  // No targeting, no conditions, no constraints
+  // If nothing to say, it's unrestricted
   if (phrases.length === 0) {
     return 'No restrictions \u2014 available for any order.';
   }

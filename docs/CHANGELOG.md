@@ -4,11 +4,11 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Refactor: Deterministic Coupon Summaries — Session D12 — 2026-02-22
+## Refactor: Deterministic Coupon Summaries + POS Promo Polish — Session D12 — 2026-02-22
 
-Replaced AI-generated coupon summaries (Anthropic API call) with deterministic string templates. Summaries now build instantly from resolved data — no API key dependency, no latency, no cost.
+Replaced AI-generated coupon summaries (Anthropic API call) with deterministic string templates. Summaries now build instantly from resolved data — no API key dependency, no latency, no cost. Also polished POS promotions tab UX.
 
-### What changed
+### Coupon summary changes
 - `src/lib/services/coupon-summary.ts` — removed `generateCouponSummary()` (Anthropic API) and `buildPrompt()`. Added `buildCouponSummary()` — deterministic function using simple string templates. `buildSummaryInput()` unchanged.
 - `src/app/api/marketing/coupons/route.ts` — `buildCouponSummary(summaryInput)` replaces `await generateCouponSummary(summaryInput)`
 - `src/app/api/marketing/coupons/[id]/route.ts` — same replacement
@@ -18,7 +18,15 @@ Replaced AI-generated coupon summaries (Anthropic API call) with deterministic s
 ### Summary format
 - Covers targeting, cart conditions, and constraints only (rewards shown separately on POS card)
 - Phrases joined with " · " (middle dot)
-- Examples: "For Professional customers · Requires: Express Interior Clean", "First-time customers only · Min $50 purchase · One-time use", "No restrictions — available for any order."
+- `is_single_use` suppresses `max_uses` (redundant)
+- Examples: "Professional customers · Requires: Express Interior Clean", "First-time customers only · Min $50 purchase · One-time use", "No restrictions — available for any order."
+
+### POS promotions tab polish
+- `src/app/api/pos/promotions/available/route.ts` — reward descriptions now include targets ("10% off entire order", "$20 off services", "Free item") and max discount caps
+- `src/app/pos/components/promotions-tab.tsx`:
+  - Section titles renamed: "For You" → "Exclusive", "Eligible" → "Available", "Upsell" → "Add to Unlock"
+  - "Add to Unlock" section now defaults open (was collapsed)
+  - Added coupon code in dashed-border box on right side of each promotion card (font-mono, tracking-wider, dark mode support)
 
 ---
 

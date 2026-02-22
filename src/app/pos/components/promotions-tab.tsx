@@ -106,7 +106,14 @@ function PromotionCard({
             <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">{promo.warning}</p>
           )}
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          {/* Coupon code in dashed box */}
+          <div className="rounded border border-dashed border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-800 px-2 py-0.5">
+            <span className="text-[10px] font-mono font-bold tracking-wider text-gray-700 dark:text-gray-300">
+              {promo.code}
+            </span>
+          </div>
+          {/* Apply / Remove button */}
           {isApplied ? (
             <button
               onClick={onRemove}
@@ -349,7 +356,7 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
       ) : (
         <div className="space-y-1">
           <CollapsibleSection
-            title="For You"
+            title="Exclusive"
             icon={Gift}
             count={promotions?.for_you.length ?? 0}
           >
@@ -367,7 +374,7 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
           </CollapsibleSection>
 
           <CollapsibleSection
-            title="Eligible"
+            title="Available"
             icon={Tag}
             count={promotions?.eligible.length ?? 0}
           >
@@ -385,10 +392,10 @@ export function PromotionsTab({ onOpenCustomerLookup }: PromotionsTabProps) {
           </CollapsibleSection>
 
           <CollapsibleSection
-            title="Upsell"
+            title="Add to Unlock"
             icon={TrendingUp}
             count={promotions?.upsell.length ?? 0}
-            defaultOpen={false}
+            defaultOpen={true}
           >
             {promotions?.upsell.map((promo) => (
               <PromotionCard

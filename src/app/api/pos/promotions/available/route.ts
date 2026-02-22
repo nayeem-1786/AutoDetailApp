@@ -114,12 +114,30 @@ export async function POST(request: NextRequest) {
 
       // Build reward labels for description (always computed)
       const description = rewards.map((r) => {
-        if (r.discount_type === 'free') return 'Free item';
-        if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
-        return `$${r.discount_value} off`;
+        // Resolve target name for display
+        let target = '';
+        if (r.target_product_id || r.target_service_id) {
+          // Specific item — we don't have the name here, use applies_to
+          target = '';
+        } else if (r.target_product_category_id || r.target_service_category_id) {
+          target = '';
+        } else if (r.applies_to === 'order') {
+          target = ' entire order';
+        } else if (r.applies_to === 'product') {
+          target = ' products';
+        } else if (r.applies_to === 'service') {
+          target = ' services';
+        }
+
+        if (r.discount_type === 'free') return `Free${target || ' item'}`;
+        if (r.discount_type === 'percentage') {
+          const cap = r.max_discount ? ` (max $${r.max_discount})` : '';
+          return `${r.discount_value}% off${target}${cap}`;
+        }
+        return `$${r.discount_value} off${target}`;
       }).join(' + ');
 
-      // AI summary (replaces raw condition text in POS cards)
+      // Summary (replaces raw condition text in POS cards)
       const summary = ((coupon as unknown as Record<string, unknown>).summary as string) || null;
 
       const promotionItem: PromotionItem = {
