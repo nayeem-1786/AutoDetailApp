@@ -217,23 +217,8 @@ function PosShellContent({
 
       {/* Top Bar */}
       <header className="relative flex h-14 shrink-0 items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4">
-        {/* Left: Role pill */}
-        <div className="flex items-center">
-          <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {ROLE_LABELS[role] || role}
-          </span>
-        </div>
-
-        {/* Center: Brand name (absolute centered) */}
-        <div className="absolute inset-x-0 flex justify-center pointer-events-none">
-          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            <span className="hidden sm:inline">Smart Details Auto Spa - POS</span>
-            <span className="sm:hidden">POS</span>
-          </span>
-        </div>
-
-        {/* Right: Status indicators + actions */}
-        <div className="ml-auto flex items-center gap-3">
+        {/* Left: Scanner, Card Reader, Role pill */}
+        <div className="flex items-center gap-3">
           {/* Scanner indicator */}
           <div className="flex items-center gap-1" title="Scanner: disconnected">
             <ScanLine className="h-4 w-4 text-gray-400 dark:text-gray-500" />
@@ -274,6 +259,22 @@ function PosShellContent({
             </button>
           )}
 
+          {/* Role pill */}
+          <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+            {ROLE_LABELS[role] || role}
+          </span>
+        </div>
+
+        {/* Center: Brand name (absolute centered) */}
+        <div className="absolute inset-x-0 flex justify-center pointer-events-none">
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <span className="hidden sm:inline">Smart Details Auto Spa - POS</span>
+            <span className="sm:hidden">POS</span>
+          </span>
+        </div>
+
+        {/* Right: Held tickets + Offline queue */}
+        <div className="ml-auto flex items-center gap-3">
           {/* Held Tickets */}
           <button
             onClick={() => setHeldPanelOpen(true)}
@@ -285,7 +286,7 @@ function PosShellContent({
             )}
             title="Held tickets"
           >
-            <PauseCircle className="h-4 w-4" />
+            <PauseCircle className="h-5 w-5" />
             {heldCount > 0 && <span className="text-xs font-medium">{heldCount} held</span>}
           </button>
 

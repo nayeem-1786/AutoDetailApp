@@ -21,6 +21,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { ROLE_LABELS } from '@/lib/utils/constants';
 import { usePosAuth } from '../context/pos-auth-context';
 import { usePosTheme } from '../context/pos-theme-context';
 
@@ -31,7 +32,7 @@ interface BottomNavProps {
 export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { employee, signOut: posSignOut } = usePosAuth();
+  const { employee, role, signOut: posSignOut } = usePosAuth();
   const { theme, setTheme } = usePosTheme();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -352,7 +353,14 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
             >
               <LogOut className="h-5 w-5 text-red-500 dark:text-red-400" />
               <span className="text-red-600 dark:text-red-400">Log Out</span>
-              <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{displayName}</span>
+              <span className="ml-auto flex items-center gap-2">
+                {role && (
+                  <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {ROLE_LABELS[role] || role}
+                  </span>
+                )}
+                <span className="text-xs text-gray-400 dark:text-gray-500">{displayName}</span>
+              </span>
             </button>
           </div>
         )}

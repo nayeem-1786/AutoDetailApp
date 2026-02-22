@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tag, X } from 'lucide-react';
+import { ROLE_LABELS } from '@/lib/utils/constants';
 import { usePosAuth } from '../context/pos-auth-context';
 import { usePosPermission } from '../context/pos-permission-context';
 import { useTicket } from '../context/ticket-context';
@@ -43,9 +44,10 @@ interface TicketPanelProps {
 }
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
-  const { employee } = usePosAuth();
+  const { employee, role } = usePosAuth();
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
   const staffDisplayName = employee?.first_name || employee?.email?.split('@')[0] || '';
+  const roleLabel = role ? (ROLE_LABELS[role] || role) : '';
   const { ticket, dispatch } = useTicket();
   const { isOpen: checkoutOpen } = useCheckout();
   const { services } = useCatalog();
@@ -247,9 +249,16 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Ticket
         </h2>
-        <span className="text-sm font-semibold tracking-wide text-gray-500 dark:text-gray-400">
-          {staffDisplayName}
-        </span>
+        <div className="flex items-center gap-2">
+          {roleLabel && (
+            <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {roleLabel}
+            </span>
+          )}
+          <span className="text-sm font-semibold tracking-wide text-gray-500 dark:text-gray-400">
+            {staffDisplayName}
+          </span>
+        </div>
       </div>
 
       {/* Items list */}

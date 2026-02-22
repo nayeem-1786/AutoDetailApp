@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: POS Header Layout, Identity Display & Card Reader PWA — Session D3 — 2026-02-21
+
+### Header Layout (Fix 1 + 4)
+- Moved Scanner and Card Reader status indicators from RIGHT to LEFT side of header
+- New left-side order: Scanner → Card Reader → Role Pill
+- Right side now only has Held Tickets + Offline Queue badge
+- Increased PauseCircle (held tickets) icon from h-4 w-4 to h-5 w-5 (25% larger)
+
+### Ticket Panel Identity (Fix 2)
+- Ticket header now shows `TICKET ... [Super Admin] Nayeem` (role pill + name on right)
+- Role pill uses same gray rounded-full badge style as header
+- Imported ROLE_LABELS, destructured `role` from usePosAuth()
+
+### More Menu Log Out (Fix 3)
+- Log Out row now shows role pill badge + staff name (was just "· Nayeem")
+- Consistent identity display across header, ticket panel, and More menu
+
+### Card Reader PWA Service Worker (Fix 5 — CRITICAL)
+- **Rewrote service worker fetch handler** with whitelist approach: only intercept known cacheable patterns, let everything else pass through natively
+- **Added local/private network IP exclusion**: 192.168.x.x, 10.x.x.x, 172.16-31.x.x, localhost, .local — prevents SW from interfering with Stripe Terminal reader's direct HTTPS connection
+- **Removed NEVER_CACHE_PATTERNS blacklist** — replaced with positive-match-only logic (cacheable API patterns + POS pages + static assets)
+- **Incremented cache version** to v3 to force service worker update on all clients
+- `skipWaiting()` and `clients.claim()` ensure immediate activation
+- Root cause: Stripe Terminal Internet readers communicate via direct local network HTTPS to the reader's IP. In PWA standalone mode on iOS, the service worker could intercept or delay these requests even when returning without `respondWith`, causing "Could not communicate with Reader" errors.
+
+---
+
 ## Fix: POS Navigation Polish — Session D2 — 2026-02-21
 
 ### Header Layout Reorganization

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'pos-cache-v2';
-const DATA_CACHE_NAME = 'pos-data-v2';
+const CACHE_NAME = 'pos-cache-v3';
+const DATA_CACHE_NAME = 'pos-data-v3';
 
 // App shell assets to pre-cache
 const APP_SHELL = [
@@ -16,66 +16,59 @@ const CACHEABLE_API_PATTERNS = [
   '/api/pos/favorites',
 ];
 
-// API routes that should NEVER be cached (mutations + real-time data)
-const NEVER_CACHE_PATTERNS = [
-  '/api/pos/transactions',
-  '/api/pos/sync-offline-transaction',
-  '/api/pos/checkout',
-  '/api/pos/refund',
-  '/api/pos/stripe',
-  '/api/stripe',
-  '/api/pos/customers',
-  '/api/pos/version',
-];
-
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // addAll may fail if pages require auth — gracefully handle
       return cache.addAll(APP_SHELL).catch((err) => {
         console.warn('POS SW: Some app shell assets failed to cache:', err);
       });
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME && key !== DATA_CACHE_NAME)
-          .map((key) => caches.delete(key))
-      );
-    })
+    Promise.all([
+      self.clients.claim(),
+      caches.keys().then((keys) => {
+        return Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME && key !== DATA_CACHE_NAME)
+            .map((key) => caches.delete(key))
+        );
+      }),
+    ])
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests (POST, PUT, DELETE are mutations)
+  // CRITICAL: Only intercept same-origin GET requests.
+  // Everything else (cross-origin, POST/PUT/DELETE, local network,
+  // Stripe Terminal SDK, reader connections) passes through untouched.
   if (request.method !== 'GET') return;
-
-  // Skip cross-origin requests (includes Stripe Terminal SDK, API, etc.)
   if (url.origin !== self.location.origin) return;
 
-  // Never intercept Stripe-related requests (belt-and-suspenders with cross-origin check)
+  // CRITICAL: Never intercept Stripe-related requests
   if (url.hostname.includes('stripe.com')) return;
 
-  // Never cache certain API routes
-  if (NEVER_CACHE_PATTERNS.some((p) => url.pathname.includes(p))) return;
+  // CRITICAL: Never intercept local/private network requests
+  // Stripe Terminal Internet readers communicate via local HTTPS
+  if (url.hostname.match(/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|localhost|127\.)/) ||
+      url.hostname.endsWith('.local')) {
+    return;
+  }
 
-  // API requests — network first, cache fallback
+  // API requests
   if (url.pathname.startsWith('/api/')) {
+    // Only cache specific read-only API routes — let everything else pass through
     if (CACHEABLE_API_PATTERNS.some((p) => url.pathname.includes(p))) {
       event.respondWith(
         fetch(request)
           .then((response) => {
-            // Only cache successful responses
             if (response.ok) {
               const clone = response.clone();
               caches.open(DATA_CACHE_NAME).then((cache) => cache.put(request, clone));
@@ -85,10 +78,11 @@ self.addEventListener('fetch', (event) => {
           .catch(() => caches.match(request))
       );
     }
+    // All other API routes: don't call respondWith — browser handles natively
     return;
   }
 
-  // POS pages — stale-while-revalidate: serve cached, update in background
+  // POS pages — stale-while-revalidate
   if (url.pathname.startsWith('/pos')) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -103,12 +97,10 @@ self.addEventListener('fetch', (event) => {
           .catch(() => null);
 
         if (cached) {
-          // Serve cached immediately, fire background update
           networkFetch;
           return cached;
         }
 
-        // No cache — must wait for network, fall back to offline page
         return networkFetch.then((response) => {
           if (response) return response;
           return caches.match('/pos/offline');
@@ -139,6 +131,8 @@ self.addEventListener('fetch', (event) => {
       })
     );
   }
+
+  // Everything else: don't call respondWith — browser handles natively
 });
 
 // Handle messages from the app
@@ -153,7 +147,6 @@ self.addEventListener('message', (event) => {
       .then((data) => {
         const currentVersion = self.__POS_VERSION;
         if (currentVersion && data.version !== currentVersion) {
-          // New version detected — purge all POS caches
           caches.keys().then((keys) =>
             Promise.all(
               keys.filter((k) => k.startsWith('pos-')).map((k) => caches.delete(k))
