@@ -32,7 +32,7 @@ import type {
   QuoteStatus,
   CustomerType,
 } from '@/lib/supabase/types';
-import { formatCurrency, formatPhone, formatPhoneInput, formatDate, formatDateTime, formatPoints, normalizePhone } from '@/lib/utils/format';
+import { formatCurrency, formatPhone, formatPhoneInput, formatDate, formatDateTime, formatPoints } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -451,58 +451,15 @@ export default function CustomerProfilePage() {
 
     setSaving(true);
     try {
-      let phone = data.phone || null;
-      if (phone) {
-        const normalized = normalizePhone(phone);
-        phone = normalized;
-      }
-
-      // Check phone uniqueness (excluding self)
-      if (phone) {
-        const { data: existingByPhone } = await supabase
-          .from('customers')
-          .select('id, first_name, last_name')
-          .eq('phone', phone)
-          .neq('id', id)
-          .maybeSingle();
-
-        if (existingByPhone) {
-          toast.error(
-            `Phone number already in use by ${existingByPhone.first_name} ${existingByPhone.last_name}`
-          );
-          setSaving(false);
-          return;
-        }
-      }
-
-      // Check email uniqueness (excluding self)
-      const email = data.email?.toLowerCase().trim() || null;
-      if (email) {
-        const { data: existingByEmail } = await supabase
-          .from('customers')
-          .select('id, first_name, last_name')
-          .ilike('email', email)
-          .neq('id', id)
-          .maybeSingle();
-
-        if (existingByEmail) {
-          toast.error(
-            `Email already in use by ${existingByEmail.first_name} ${existingByEmail.last_name}`
-          );
-          setSaving(false);
-          return;
-        }
-      }
-
-      // Build birthday from month/day/year fields
       const birthday = buildBirthdayDate();
 
-      const { error } = await supabase
-        .from('customers')
-        .update({
+      const res = await adminFetch(`/api/admin/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           first_name: data.first_name,
           last_name: data.last_name,
-          phone,
+          phone: data.phone || null,
           email: data.email || null,
           birthday,
           address_line_1: data.address_line_1 || null,
@@ -515,39 +472,15 @@ export default function CustomerProfilePage() {
           sms_consent: data.sms_consent,
           email_consent: data.email_consent,
           customer_type: customerType,
-        })
-        .eq('id', id);
+        }),
+      });
 
-      if (error) throw error;
+      const json = await res.json();
 
-      // Log consent changes
-      if (data.sms_consent !== customer.sms_consent) {
-        await supabase.from('marketing_consent_log').insert({
-          customer_id: id,
-          channel: 'sms',
-          action: data.sms_consent ? 'opt_in' : 'opt_out',
-          source: 'manual',
-        });
-        // Also log to TCPA audit table
-        if (phone || customer.phone) {
-          await supabase.from('sms_consent_log').insert({
-            customer_id: id,
-            phone: phone || customer.phone,
-            action: data.sms_consent ? 'opt_in' : 'opt_out',
-            keyword: data.sms_consent ? 'opt_in' : 'opt_out',
-            source: 'admin_manual',
-            previous_value: customer.sms_consent,
-            new_value: data.sms_consent,
-          });
-        }
-      }
-      if (data.email_consent !== customer.email_consent) {
-        await supabase.from('marketing_consent_log').insert({
-          customer_id: id,
-          channel: 'email',
-          action: data.email_consent ? 'opt_in' : 'opt_out',
-          source: 'manual',
-        });
+      if (!res.ok) {
+        toast.error(json.error || 'Failed to update customer');
+        setSaving(false);
+        return;
       }
 
       toast.success('Customer updated successfully');

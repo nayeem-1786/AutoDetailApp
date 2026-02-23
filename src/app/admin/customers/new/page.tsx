@@ -5,10 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { customerCreateSchema, type CustomerCreateInput } from '@/lib/utils/validation';
-import { normalizePhone, formatPhoneInput } from '@/lib/utils/format';
+import { formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +42,6 @@ const US_STATES = [
 
 export default function NewCustomerPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [saving, setSaving] = useState(false);
 
   // Customer type
@@ -254,60 +252,15 @@ export default function NewCustomerPage() {
 
     setSaving(true);
     try {
-      // Normalize the phone if present
-      let phone = data.phone || null;
-      if (phone) {
-        const normalized = normalizePhone(phone);
-        phone = normalized;
-      }
-
-      // Check phone uniqueness (server-side double check)
-      if (phone) {
-        const { data: existingByPhone } = await supabase
-          .from('customers')
-          .select('id, first_name, last_name')
-          .eq('phone', phone)
-          .maybeSingle();
-
-        if (existingByPhone) {
-          toast.error(
-            `A customer with this phone already exists: ${existingByPhone.first_name} ${existingByPhone.last_name}`
-          );
-          setSaving(false);
-          return;
-        }
-      }
-
-      // Check email uniqueness (server-side double check)
-      const email = data.email?.toLowerCase().trim() || null;
-      if (email) {
-        const { data: existingByEmail } = await supabase
-          .from('customers')
-          .select('id, first_name, last_name')
-          .ilike('email', email)
-          .maybeSingle();
-
-        if (existingByEmail) {
-          toast.error(
-            `A customer with this email already exists: ${existingByEmail.first_name} ${existingByEmail.last_name}`
-          );
-          setSaving(false);
-          return;
-        }
-      }
-
-      // Parse tags from comma-separated string if it's a string
-      const tags = data.tags || [];
-
-      // Build birthday date from month/day/year fields
       const birthday = buildBirthdayDate();
 
-      const { data: customer, error } = await supabase
-        .from('customers')
-        .insert({
+      const res = await adminFetch('/api/admin/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           first_name: data.first_name,
           last_name: data.last_name,
-          phone,
+          phone: data.phone || null,
           email: data.email || null,
           birthday,
           address_line_1: data.address_line_1 || null,
@@ -316,48 +269,23 @@ export default function NewCustomerPage() {
           state: data.state || null,
           zip: data.zip || null,
           notes: data.notes || null,
-          tags,
+          tags: data.tags || [],
           sms_consent: data.sms_consent,
           email_consent: data.email_consent,
           customer_type: customerType,
-        })
-        .select('id')
-        .single();
+        }),
+      });
 
-      if (error) throw error;
+      const json = await res.json();
 
-      // Log marketing consent if given
-      if (data.sms_consent) {
-        await supabase.from('marketing_consent_log').insert({
-          customer_id: customer.id,
-          channel: 'sms',
-          action: 'opt_in',
-          source: 'manual',
-        });
-        // Also log to TCPA audit table
-        if (phone) {
-          await supabase.from('sms_consent_log').insert({
-            customer_id: customer.id,
-            phone,
-            action: 'opt_in',
-            keyword: 'opt_in',
-            source: 'admin_manual',
-            previous_value: null,
-            new_value: true,
-          });
-        }
-      }
-      if (data.email_consent) {
-        await supabase.from('marketing_consent_log').insert({
-          customer_id: customer.id,
-          channel: 'email',
-          action: 'opt_in',
-          source: 'manual',
-        });
+      if (!res.ok) {
+        toast.error(json.error || 'Failed to create customer');
+        setSaving(false);
+        return;
       }
 
       toast.success('Customer created successfully');
-      router.push(`/admin/customers/${customer.id}`);
+      router.push(`/admin/customers/${json.data.id}`);
     } catch (err) {
       console.error('Create customer error:', err);
       toast.error('Failed to create customer');
@@ -385,6 +313,35 @@ export default function NewCustomerPage() {
             <CardTitle>Contact Information</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Customer Type */}
+            <div className="mb-4 space-y-1.5">
+              <label className="text-sm font-medium text-ui-text">
+                Customer Type <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-1.5">
+                {TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setCustomerType(opt.value);
+                      setTypeError(false);
+                    }}
+                    className={`rounded-lg border-2 px-2 py-1.5 text-sm font-medium transition-all ${
+                      customerType === opt.value
+                        ? opt.activeClass
+                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {typeError && (
+                <p className="text-xs text-red-600">Please select a customer type</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* Row 1: First Name | Last Name | Mobile | Email */}
               <FormField label="First Name" error={errors.first_name?.message} required htmlFor="first_name">
@@ -466,36 +423,7 @@ export default function NewCustomerPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
-              {/* Customer Type — cols 1-2 */}
-              <div className="min-w-0 space-y-1.5 lg:col-span-2">
-                <label className="text-sm font-medium text-ui-text">
-                  Customer Type <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-1.5">
-                  {TYPE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        setCustomerType(opt.value);
-                        setTypeError(false);
-                      }}
-                      className={`rounded-lg border-2 px-2 py-1.5 text-sm font-medium transition-all ${
-                        customerType === opt.value
-                          ? opt.activeClass
-                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {typeError && (
-                  <p className="text-xs text-red-600">Please select a customer type</p>
-                )}
-              </div>
-
-              {/* Birthday — cols 3-6 */}
+              {/* Birthday — cols 1-4 */}
               <div className="space-y-1.5 lg:col-span-4">
                 <label className="text-sm font-medium text-ui-text">Birthday</label>
                 <div className="grid grid-cols-[3fr_4.5rem_3fr] gap-1.5 max-w-[75%]">

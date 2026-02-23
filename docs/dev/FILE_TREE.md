@@ -29,6 +29,7 @@ src/app/api/admin/customers/[id]/portal-access/route.ts
 src/app/api/admin/customers/[id]/reset-password/route.ts
 src/app/api/admin/customers/[id]/route.ts
 src/app/api/admin/customers/check-duplicate/route.ts
+src/app/api/admin/customers/route.ts
 src/app/api/admin/customers/search/route.ts
 src/app/api/admin/customers/stats/route.ts
 src/app/api/admin/footer/bottom-links/route.ts

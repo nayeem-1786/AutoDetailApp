@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Customer Create/Edit Audit Logging + Type Pill Cleanup — Session D12i — 2026-02-22
+
+### Create page: Customer Type moved out of Marketing Info
+- Removed Enthusiast/Professional pills from Marketing Info card (Birthday, SMS, Email column spans unchanged)
+- Customer Type pills moved to top of Contact Information card (above the 4-col grid)
+
+### Audit logging for admin customer create/update
+- Created `src/app/api/admin/customers/route.ts` (POST) — server-side customer creation with `logAudit()` for CREATE
+- Added PATCH handler to `src/app/api/admin/customers/[id]/route.ts` — server-side customer update with `logAudit()` for UPDATE
+- PATCH handler uses `buildChangeDetails()` to track which fields changed (first_name, last_name, phone, email, customer_type, sms_consent, email_consent)
+- PATCH handler handles consent change logging (marketing_consent_log + sms_consent_log) server-side
+- Create page (`new/page.tsx`) now POSTs to `/api/admin/customers` via `adminFetch()` instead of client-side Supabase insert
+- Edit page (`[id]/page.tsx`) now PATCHes to `/api/admin/customers/[id]` via `adminFetch()` instead of client-side Supabase update
+- Removed unused `createClient` and `normalizePhone` imports from create page; removed `normalizePhone` from edit page
+- All three customer mutation paths now have audit logging: CREATE (admin + POS), UPDATE (admin), DELETE (admin)
+
+---
+
 ## Admin Customer Edit Page — Card Redesign — Session D12h — 2026-02-22
 
 ### Customer edit page card overhaul
