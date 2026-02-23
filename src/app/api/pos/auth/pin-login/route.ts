@@ -92,11 +92,28 @@ export async function POST(request: NextRequest) {
 
   if (empError || !employee) {
     recordFailure(ip);
+    logAudit({
+      action: 'login',
+      entityType: 'employee',
+      entityLabel: 'Failed PIN attempt',
+      details: { success: false, reason: 'invalid_pin' },
+      ipAddress: ip,
+      source: 'pos',
+    });
     return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
   }
 
   if (!employee.auth_user_id) {
     recordFailure(ip);
+    logAudit({
+      action: 'login',
+      entityType: 'employee',
+      entityId: employee.id,
+      entityLabel: `${employee.first_name} ${employee.last_name}`,
+      details: { success: false, reason: 'no_auth_account' },
+      ipAddress: ip,
+      source: 'pos',
+    });
     return NextResponse.json(
       { error: 'This employee does not have a login account' },
       { status: 401 }

@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Audit Sweep + Missing Audit Points — Session D12d — 2026-02-22
+
+Full sweep of all 37 logAudit calls across 32 route files — all confirmed properly positioned before return statements. Added missing audit points for failed PIN attempts and logout.
+
+### Audit sweep results
+- Reviewed all 37 logAudit call sites with 8 lines of context — zero dead code found
+- The schema mismatch fixed in D12c was the sole root cause of audit entries not appearing
+
+### New audit points
+- **Failed PIN attempt** (`/api/pos/auth/pin-login`): Two new logAudit calls — wrong PIN (no employee match) and no auth account (employee found but no `auth_user_id`). Both log IP address and failure reason.
+- **POS logout** (`/api/pos/auth/logout`): New POST endpoint. Logs employee identity, IP, and reason (`manual`, `token_expired`). Handles expired tokens gracefully (logs "Unknown (expired token)").
+- **Client-side logout** (`pos-auth-context.tsx`): `signOut()` now fires a fetch to `/api/pos/auth/logout` before clearing localStorage. Accepts optional `reason` parameter. Token expiry timer passes `'token_expired'`, manual logout defaults to `'manual'`.
+
+---
+
 ## Fix Audit Log + Customer Uniqueness — Session D12c — 2026-02-22
 
 ### Audit log fix

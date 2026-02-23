@@ -36,7 +36,7 @@ interface PosAuthContextType {
   locked: boolean;
   loading: boolean;
   idleTimeoutMinutes: number;
-  signOut: () => void;
+  signOut: (reason?: string) => void;
   lock: () => void;
   unlock: (employee: PosSessionEmployee, token: string) => void;
   replaceSession: (data: PosSessionData) => void;
@@ -129,18 +129,30 @@ export function PosAuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback((reason?: string) => {
+    // Fire-and-forget audit log via API (capture token before clearing)
+    const currentToken = token;
+    if (currentToken) {
+      fetch('/api/pos/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-POS-Session': currentToken,
+        },
+        body: JSON.stringify({ reason: reason || 'manual' }),
+      }).catch(() => {}); // fire-and-forget
+    }
     clearSession();
     setEmployee(null);
     setToken(null);
     setLocked(false);
-  }, []);
+  }, [token]);
 
   // Periodic expiry check — every 60s, verify token hasn't expired
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       if (token && isTokenExpired(token)) {
-        signOut();
+        signOut('token_expired');
       }
     }, 60_000);
 
