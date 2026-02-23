@@ -4,6 +4,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Receipt Dialog Extraction + Transaction Page Overhaul + # Column Restyling — Session D13b — 2026-02-23
+
+### Shared Receipt Dialog Component
+- Extracted receipt dialog from `admin/customers/[id]/page.tsx` into reusable `src/components/admin/receipt-dialog.tsx`
+- Self-contained component: manages own loading, print/email/SMS state internally
+- Props: `open`, `onOpenChange`, `transactionId`, `customerEmail?`, `customerPhone?`
+- 4 actions preserved: Print (copier), Email, SMS, Receipt (thermal printer)
+- Email/SMS inline input fallback when customer has no contact info on file
+
+### Admin Transactions Page Overhaul
+- Removed expand/collapse row behavior (`TransactionDetailPanel` component deleted entirely)
+- Removed `expandedId` state, chevron column, `FullTransaction` type, `REFUND_STATUS_CLASSES`
+- Receipt # now styled as clickable blue monospace button → opens shared receipt dialog modal
+- Rows no longer clickable (no `cursor-pointer`, no `onClick`)
+- Customer name and employee links still work as before
+
+### Consistent # Column Styling (6 pages)
+- Applied `text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline` to:
+  - Admin Transactions (Receipt #) — clickable button opens receipt dialog
+  - Admin Quotes (Quote #) — clickable via row click to slide-over
+  - Admin Orders (Order #) — clickable via row click to detail page
+  - Admin Purchase Orders (PO #) — clickable button to detail page
+- Applied `text-sm font-mono text-blue-600` (no hover) to POS pages where rows are already clickable:
+  - POS Transactions (Receipt #)
+  - POS Quotes (Quote #)
+
+---
+
 ## Customer Auth Security — Duplicate Prevention, Error Messages & Audit Logging — Session D13a — 2026-02-22
 
 ### New API endpoint: check-exists

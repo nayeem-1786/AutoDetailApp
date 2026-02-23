@@ -739,6 +739,7 @@ src/components/admin/content/page-html-editor.tsx
 src/components/admin/html-editor-toolbar.tsx
 src/components/admin/html-image-manager.tsx
 src/components/admin/icon-picker.tsx
+src/components/admin/receipt-dialog.tsx
 src/components/admin/toolbar-items/accordion-dialog.tsx
 src/components/admin/toolbar-items/button-dialog.tsx
 src/components/admin/toolbar-items/callout-dialog.tsx

@@ -214,7 +214,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
                         >
                           {formatRelativeDate(quote.created_at)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-blue-600 dark:text-blue-400">
                           {quote.quote_number}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">

@@ -63,7 +63,7 @@ export default function PurchaseOrdersPage() {
       size: 110,
       cell: ({ row }) => (
         <button
-          className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
+          className="text-left text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline"
           onClick={() => router.push(`/admin/inventory/purchase-orders/${row.original.id}`)}
         >
           {row.original.po_number}

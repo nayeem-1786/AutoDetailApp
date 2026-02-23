@@ -267,7 +267,7 @@ export default function AdminOrdersPage() {
                       onClick={() => router.push(`/admin/orders/${order.id}`)}
                     >
                       <td className="px-4 py-3">
-                        <span className="text-blue-600 hover:text-blue-800 hover:underline font-medium">
+                        <span className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline">
                           {order.order_number}
                         </span>
                       </td>

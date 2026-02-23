@@ -315,8 +315,10 @@ export default function QuotesPage() {
                           </td>
 
                           {/* Quote # */}
-                          <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
-                            {q.quote_number}
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <span className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline">
+                              {q.quote_number}
+                            </span>
                           </td>
 
                           {/* Customer */}

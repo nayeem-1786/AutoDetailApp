@@ -55,16 +55,13 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Printer, Copy, Mail, MessageSquare, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { Pagination } from '@/components/ui/pagination';
-import { generateReceiptLines, generateReceiptHtml } from '@/app/pos/lib/receipt-template';
-import type { ReceiptTransaction } from '@/app/pos/lib/receipt-template';
-import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
-import { printReceipt } from '@/app/pos/lib/star-printer';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { ReceiptDialog } from '@/components/admin/receipt-dialog';
 import type { ColumnDef } from '@tanstack/react-table';
 
 const MONTHS = [
@@ -129,21 +126,7 @@ export default function CustomerProfilePage() {
 
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [receiptTransaction, setReceiptTransaction] = useState<any>(null);
-  const [receiptHtml, setReceiptHtml] = useState('');
-  const [receiptConfig, setReceiptConfig] = useState<MergedReceiptConfig | undefined>(undefined);
-  const [loadingReceipt, setLoadingReceipt] = useState(false);
-  const [receiptPrinting, setReceiptPrinting] = useState(false);
-  const [receiptPrinted, setReceiptPrinted] = useState(false);
-  const [receiptEmailing, setReceiptEmailing] = useState(false);
-  const [receiptEmailed, setReceiptEmailed] = useState(false);
-  const [receiptSmsing, setReceiptSmsing] = useState(false);
-  const [receiptSmsed, setReceiptSmsed] = useState(false);
-  const [showReceiptEmailInput, setShowReceiptEmailInput] = useState(false);
-  const [receiptEmailInput, setReceiptEmailInput] = useState('');
-  const [showReceiptSmsInput, setShowReceiptSmsInput] = useState(false);
-  const [receiptSmsInput, setReceiptSmsInput] = useState('');
+  const [receiptTransactionId, setReceiptTransactionId] = useState<string | null>(null);
 
   // Customer type (separate from form, like create page)
   const [customerType, setCustomerType] = useState<CustomerType | null>(null);
@@ -625,128 +608,6 @@ export default function CustomerProfilePage() {
     }
   }
 
-  // --- Receipt Dialog ---
-  async function openReceiptDialog(transactionId: string) {
-    setLoadingReceipt(true);
-    setReceiptDialogOpen(true);
-    setReceiptPrinted(false);
-    setReceiptEmailed(false);
-    setReceiptSmsed(false);
-    setShowReceiptEmailInput(false);
-    setShowReceiptSmsInput(false);
-    try {
-      const res = await fetch(`/api/pos/transactions/${transactionId}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to load transaction');
-      const tx = json.data;
-      const rcfg: MergedReceiptConfig | undefined = json.receipt_config ?? undefined;
-      setReceiptTransaction(tx);
-      setReceiptConfig(rcfg);
-      setReceiptEmailInput(tx.customer?.email || customer?.email || '');
-      setReceiptSmsInput(tx.customer?.phone ? formatPhone(tx.customer.phone) : customer?.phone ? formatPhone(customer.phone) : '');
-      const html = generateReceiptHtml({
-        receipt_number: tx.receipt_number,
-        transaction_date: tx.transaction_date,
-        subtotal: tx.subtotal,
-        tax_amount: tx.tax_amount,
-        discount_amount: tx.discount_amount,
-        coupon_code: tx.coupon_code,
-        loyalty_discount: tx.loyalty_discount,
-        loyalty_points_redeemed: tx.loyalty_points_redeemed,
-        tip_amount: tx.tip_amount,
-        total_amount: tx.total_amount,
-        customer: tx.customer,
-        employee: tx.employee,
-        vehicle: tx.vehicle,
-        items: tx.items ?? [],
-        payments: tx.payments ?? [],
-      }, rcfg);
-      setReceiptHtml(html);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load receipt');
-      setReceiptDialogOpen(false);
-    } finally {
-      setLoadingReceipt(false);
-    }
-  }
-
-  async function handleReceiptPrint() {
-    if (!receiptTransaction) return;
-    setReceiptPrinting(true);
-    try {
-      const res = await fetch('/api/pos/receipts/print', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: receiptTransaction.id }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Print failed');
-      const printConfig: MergedReceiptConfig | undefined = json.data.receipt_config ?? receiptConfig;
-      const lines = generateReceiptLines(json.data.transaction, printConfig);
-      await printReceipt(json.data.printer_ip, lines);
-      setReceiptPrinted(true);
-      toast.success('Receipt printed');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Print failed');
-    } finally {
-      setReceiptPrinting(false);
-    }
-  }
-
-  function handleReceiptCopierPrint() {
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      toast.error('Pop-up blocked — allow pop-ups and try again');
-      return;
-    }
-    printWindow.document.write(receiptHtml);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  }
-
-  async function handleReceiptEmail(email: string) {
-    if (!email || !receiptTransaction) return;
-    setReceiptEmailing(true);
-    try {
-      const res = await fetch('/api/pos/receipts/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: receiptTransaction.id, email }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Email failed');
-      setReceiptEmailed(true);
-      setShowReceiptEmailInput(false);
-      toast.success(`Receipt emailed to ${email}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send email');
-    } finally {
-      setReceiptEmailing(false);
-    }
-  }
-
-  async function handleReceiptSms(phone: string) {
-    if (!phone || !receiptTransaction) return;
-    setReceiptSmsing(true);
-    try {
-      const res = await fetch('/api/pos/receipts/sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: receiptTransaction.id, phone }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'SMS failed');
-      setReceiptSmsed(true);
-      setShowReceiptSmsInput(false);
-      toast.success('Receipt sent via SMS');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send SMS');
-    } finally {
-      setReceiptSmsing(false);
-    }
-  }
-
   // --- Password Reset ---
   async function handleSendPasswordReset() {
     if (!customer) return;
@@ -914,7 +775,10 @@ export default function CustomerProfilePage() {
         return (
           <button
             type="button"
-            onClick={() => openReceiptDialog(row.original.id)}
+            onClick={() => {
+              setReceiptTransactionId(row.original.id);
+              setReceiptDialogOpen(true);
+            }}
             className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline"
           >
             {receiptNum}
@@ -1780,150 +1644,16 @@ export default function CustomerProfilePage() {
           </Card>
 
           {/* Receipt Detail Dialog */}
-          <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
-            <DialogClose onClose={() => setReceiptDialogOpen(false)} />
-            <DialogHeader>
-              <DialogTitle>
-                Receipt {receiptTransaction?.receipt_number ? `#${receiptTransaction.receipt_number}` : ''}
-              </DialogTitle>
-            </DialogHeader>
-            <DialogContent className="max-h-[60vh] overflow-y-auto">
-              {loadingReceipt ? (
-                <div className="flex items-center justify-center py-8">
-                  <Spinner size="lg" />
-                </div>
-              ) : (
-                <div
-                  className="rounded border border-gray-200 bg-gray-50 p-2"
-                  dangerouslySetInnerHTML={{ __html: receiptHtml }}
-                />
-              )}
-            </DialogContent>
-            {!loadingReceipt && receiptTransaction && (
-              <DialogFooter className="flex-col items-stretch gap-3">
-                <div className="grid grid-cols-4 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleReceiptCopierPrint}
-                  >
-                    <Printer className="mr-1.5 h-4 w-4" />
-                    Print
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const email = receiptTransaction.customer?.email || customer?.email;
-                      if (email) {
-                        handleReceiptEmail(email);
-                      } else {
-                        setShowReceiptEmailInput(true);
-                      }
-                    }}
-                    disabled={receiptEmailing || receiptEmailed}
-                  >
-                    {receiptEmailing ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : receiptEmailed ? (
-                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
-                    ) : (
-                      <Mail className="mr-1.5 h-4 w-4" />
-                    )}
-                    Email
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const phone = receiptTransaction.customer?.phone || customer?.phone;
-                      if (phone) {
-                        handleReceiptSms(phone);
-                      } else {
-                        setShowReceiptSmsInput(true);
-                      }
-                    }}
-                    disabled={receiptSmsing || receiptSmsed}
-                  >
-                    {receiptSmsing ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : receiptSmsed ? (
-                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
-                    ) : (
-                      <MessageSquare className="mr-1.5 h-4 w-4" />
-                    )}
-                    SMS
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleReceiptPrint}
-                    disabled={receiptPrinting || receiptPrinted}
-                  >
-                    {receiptPrinting ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : receiptPrinted ? (
-                      <Check className="mr-1.5 h-4 w-4 text-green-500" />
-                    ) : (
-                      <Receipt className="mr-1.5 h-4 w-4" />
-                    )}
-                    Receipt
-                  </Button>
-                </div>
-
-                {/* Email input */}
-                {showReceiptEmailInput && (
-                  <div className="flex gap-2">
-                    <Input
-                      type="email"
-                      value={receiptEmailInput}
-                      onChange={(e) => setReceiptEmailInput(e.target.value)}
-                      placeholder="customer@email.com"
-                      className="h-8 text-xs"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleReceiptEmail(receiptEmailInput);
-                      }}
-                    />
-                    <Button
-                      size="sm"
-                      className="h-8"
-                      onClick={() => handleReceiptEmail(receiptEmailInput)}
-                      disabled={!receiptEmailInput || receiptEmailing}
-                    >
-                      Send
-                    </Button>
-                  </div>
-                )}
-
-                {/* SMS input */}
-                {showReceiptSmsInput && (
-                  <div className="flex gap-2">
-                    <Input
-                      type="tel"
-                      value={receiptSmsInput}
-                      onChange={(e) => setReceiptSmsInput(e.target.value)}
-                      placeholder="(310) 555-0123"
-                      className="h-8 text-xs"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleReceiptSms(receiptSmsInput);
-                      }}
-                    />
-                    <Button
-                      size="sm"
-                      className="h-8"
-                      onClick={() => handleReceiptSms(receiptSmsInput)}
-                      disabled={!receiptSmsInput || receiptSmsing}
-                    >
-                      Send
-                    </Button>
-                  </div>
-                )}
-              </DialogFooter>
-            )}
-          </Dialog>
+          <ReceiptDialog
+            open={receiptDialogOpen}
+            onOpenChange={(open) => {
+              setReceiptDialogOpen(open);
+              if (!open) setReceiptTransactionId(null);
+            }}
+            transactionId={receiptTransactionId}
+            customerEmail={customer?.email ?? undefined}
+            customerPhone={customer?.phone ?? undefined}
+          />
         </TabsContent>
 
         {/* ===== QUOTES TAB ===== */}

@@ -248,7 +248,7 @@ export function TransactionList({ onSelect }: TransactionListProps) {
                   onClick={() => onSelect(tx)}
                   className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-blue-600 dark:text-blue-400">
                     {tx.receipt_number ?? '---'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
