@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,6 +78,18 @@ export async function POST(request: NextRequest) {
 
         await admin.from('customers').update(updates).eq('id', existingByPhone.id);
 
+        logAudit({
+          userId: user.id,
+          userEmail: user.email || email,
+          action: 'update',
+          entityType: 'customer',
+          entityId: existingByPhone.id,
+          entityLabel: `${first_name} ${last_name}`.trim(),
+          details: { linked_auth: true, match: 'phone' },
+          ipAddress: getRequestIp(request),
+          source: 'customer_portal',
+        });
+
         return NextResponse.json({ success: true, customer_id: existingByPhone.id });
       }
     }
@@ -101,6 +114,18 @@ export async function POST(request: NextRequest) {
 
       await admin.from('customers').update(updates).eq('id', existingByEmail.id);
 
+      logAudit({
+        userId: user.id,
+        userEmail: user.email || email,
+        action: 'update',
+        entityType: 'customer',
+        entityId: existingByEmail.id,
+        entityLabel: `${first_name} ${last_name}`.trim(),
+        details: { linked_auth: true, match: 'email' },
+        ipAddress: getRequestIp(request),
+        source: 'customer_portal',
+      });
+
       return NextResponse.json({ success: true, customer_id: existingByEmail.id });
     }
 
@@ -124,6 +149,18 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email || email,
+      action: 'create',
+      entityType: 'customer',
+      entityId: newCustomer.id,
+      entityLabel: `${first_name} ${last_name}`.trim(),
+      details: { event: 'signup_portal' },
+      ipAddress: getRequestIp(request),
+      source: 'customer_portal',
+    });
 
     return NextResponse.json(
       { success: true, customer_id: newCustomer.id },

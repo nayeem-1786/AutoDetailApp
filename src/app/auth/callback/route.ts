@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
@@ -28,6 +29,28 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      // Log the auth event (fire-and-forget)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const isPasswordReset = next.includes('reset-password');
+        const isSignup = !user.last_sign_in_at || user.last_sign_in_at === user.created_at;
+
+        logAudit({
+          userId: user.id,
+          userEmail: user.email || null,
+          action: isPasswordReset ? 'update' : isSignup ? 'create' : 'login',
+          entityType: 'customer',
+          entityId: user.id,
+          details: isPasswordReset
+            ? { event: 'password_reset' }
+            : isSignup
+              ? { event: 'signup_email' }
+              : { event: 'signin_email' },
+          ipAddress: getRequestIp(request),
+          source: 'customer_portal',
+        });
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

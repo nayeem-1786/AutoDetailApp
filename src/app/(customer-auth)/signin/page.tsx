@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -23,6 +23,23 @@ import { Spinner } from '@/components/ui/spinner';
 
 type AuthMode = 'phone' | 'otp' | 'email';
 
+/** Check if phone/email already exists in the customers table */
+async function checkExists(params: { phone?: string; email?: string }): Promise<{
+  exists: boolean;
+  hasAuthAccount: boolean;
+}> {
+  try {
+    const qs = new URLSearchParams();
+    if (params.phone) qs.set('phone', params.phone);
+    if (params.email) qs.set('email', params.email);
+    const res = await fetch(`/api/customer/check-exists?${qs.toString()}`);
+    if (!res.ok) return { exists: false, hasAuthAccount: false };
+    return await res.json();
+  } catch {
+    return { exists: false, hasAuthAccount: false };
+  }
+}
+
 export default function CustomerSignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,7 +49,7 @@ export default function CustomerSignInPage() {
   const prefillPhone = searchParams.get('phone') || '';
   const { info: businessInfo } = useBusinessInfo();
   const [mode, setMode] = useState<AuthMode>('phone');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReactNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [otpPhone, setOtpPhone] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -91,7 +108,22 @@ export default function CustomerSignInPage() {
 
     const e164 = normalizePhone(data.phone);
     if (!e164) {
-      setError('Invalid phone number');
+      setError('Please enter a valid 10-digit phone number.');
+      setLoading(false);
+      return;
+    }
+
+    // Pre-check: verify the phone exists before sending OTP
+    const phoneCheck = await checkExists({ phone: data.phone });
+    if (!phoneCheck.exists) {
+      setError(
+        <>
+          No account found with this phone number.{' '}
+          <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+            Create an account
+          </Link>
+        </>
+      );
       setLoading(false);
       return;
     }
@@ -100,7 +132,11 @@ export default function CustomerSignInPage() {
     const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
 
     if (otpError) {
-      setError(otpError.message);
+      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes.');
+      } else {
+        setError(otpError.message);
+      }
       setLoading(false);
       return;
     }
@@ -118,7 +154,7 @@ export default function CustomerSignInPage() {
 
     const e164 = normalizePhone(data.phone);
     if (!e164) {
-      setError('Invalid phone number');
+      setError('Please enter a valid 10-digit phone number.');
       setLoading(false);
       return;
     }
@@ -131,7 +167,13 @@ export default function CustomerSignInPage() {
     });
 
     if (verifyError) {
-      setError(verifyError.message);
+      if (verifyError.message.includes('invalid') || verifyError.message.includes('expired')) {
+        setError('Invalid code. Please try again or request a new one.');
+      } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes.');
+      } else {
+        setError(verifyError.message);
+      }
       setLoading(false);
       return;
     }
@@ -242,7 +284,19 @@ export default function CustomerSignInPage() {
     });
 
     if (authError) {
-      setError(authError.message);
+      // Friendly error messages
+      if (authError.message.includes('Invalid login') || authError.message.includes('invalid')) {
+        setError(
+          <>
+            Invalid email or password.{' '}
+            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+              Create an account
+            </Link>
+          </>
+        );
+      } else {
+        setError(authError.message);
+      }
       setLoading(false);
       return;
     }
@@ -273,7 +327,14 @@ export default function CustomerSignInPage() {
 
       if (!cust) {
         await supabase.auth.signOut();
-        setError('No customer account found. Please sign up first.');
+        setError(
+          <>
+            No customer account found.{' '}
+            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+              Create an account
+            </Link>
+          </>
+        );
         setLoading(false);
         return;
       }
@@ -288,7 +349,7 @@ export default function CustomerSignInPage() {
     setError(null);
 
     if (!resetEmail.trim()) {
-      setError('Please enter your email address');
+      setError('Please enter your email address.');
       return;
     }
 

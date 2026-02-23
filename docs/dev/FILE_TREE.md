@@ -211,6 +211,7 @@ src/app/api/cron/theme-activation/route.ts
 ```
 src/app/api/customer/appointments/[id]/cancel/route.ts
 src/app/api/customer/appointments/[id]/route.ts
+src/app/api/customer/check-exists/route.ts
 src/app/api/customer/coupons/route.ts
 src/app/api/customer/link-account/route.ts
 src/app/api/customer/link-by-phone/route.ts

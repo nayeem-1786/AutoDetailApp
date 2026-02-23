@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -33,12 +33,30 @@ type OtpProfileInput = z.infer<typeof otpProfileSchema>;
 
 type SignupMode = 'full' | 'phone-otp' | 'phone-verify' | 'otp-profile';
 
+/** Check if phone/email already exists in the customers table */
+async function checkExists(params: { phone?: string; email?: string }): Promise<{
+  exists: boolean;
+  hasAuthAccount: boolean;
+}> {
+  try {
+    const qs = new URLSearchParams();
+    if (params.phone) qs.set('phone', params.phone);
+    if (params.email) qs.set('email', params.email);
+    const res = await fetch(`/api/customer/check-exists?${qs.toString()}`);
+    if (!res.ok) return { exists: false, hasAuthAccount: false };
+    return await res.json();
+  } catch {
+    return { exists: false, hasAuthAccount: false };
+  }
+}
+
 export default function CustomerSignUpPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phoneParam = searchParams.get('phone');
   const { info: businessInfo } = useBusinessInfo();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReactNode | null>(null);
+  const [hint, setHint] = useState<ReactNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<SignupMode>('full');
   const [otpPhone, setOtpPhone] = useState('');
@@ -98,6 +116,61 @@ export default function CustomerSignUpPage() {
   const onFullSubmit = async (data: CustomerSignupInput) => {
     setLoading(true);
     setError(null);
+    setHint(null);
+
+    // Pre-check: does email already exist?
+    const emailCheck = await checkExists({ email: data.email });
+    if (emailCheck.exists) {
+      if (emailCheck.hasAuthAccount) {
+        setError(
+          <>
+            An account with this email already exists.{' '}
+            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+              Sign in instead
+            </Link>
+          </>
+        );
+      } else {
+        setHint(
+          <>
+            We found your customer profile!{' '}
+            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+              Sign in to link your account
+            </Link>
+          </>
+        );
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Pre-check: does phone already exist?
+    if (data.phone) {
+      const phoneCheck = await checkExists({ phone: data.phone });
+      if (phoneCheck.exists) {
+        if (phoneCheck.hasAuthAccount) {
+          setError(
+            <>
+              This phone number is already registered.{' '}
+              <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+                Sign in instead
+              </Link>
+            </>
+          );
+        } else {
+          setHint(
+            <>
+              We found your customer profile!{' '}
+              <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+                Sign in to link your account
+              </Link>
+            </>
+          );
+        }
+        setLoading(false);
+        return;
+      }
+    }
 
     const supabase = createClient();
 
@@ -107,7 +180,19 @@ export default function CustomerSignUpPage() {
     });
 
     if (signUpError) {
-      setError(signUpError.message);
+      // Friendly message for common Supabase errors
+      if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
+        setError(
+          <>
+            An account with this email already exists.{' '}
+            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+              Sign in instead
+            </Link>
+          </>
+        );
+      } else {
+        setError(signUpError.message);
+      }
       setLoading(false);
       return;
     }
@@ -139,10 +224,38 @@ export default function CustomerSignUpPage() {
   const sendOtp = async (data: PhoneOtpSendInput) => {
     setLoading(true);
     setError(null);
+    setHint(null);
 
     const e164 = normalizePhone(data.phone);
     if (!e164) {
-      setError('Invalid phone number');
+      setError('Please enter a valid 10-digit phone number.');
+      setLoading(false);
+      return;
+    }
+
+    // Pre-check: does phone already exist?
+    const phoneCheck = await checkExists({ phone: data.phone });
+    if (phoneCheck.exists) {
+      if (phoneCheck.hasAuthAccount) {
+        setError(
+          <>
+            This phone number is already registered.{' '}
+            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+              Sign in instead
+            </Link>
+          </>
+        );
+      } else {
+        const phoneParam = encodeURIComponent(data.phone);
+        setHint(
+          <>
+            We found your customer profile!{' '}
+            <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-lime hover:text-lime-400 underline">
+              Sign in to link your account
+            </Link>
+          </>
+        );
+      }
       setLoading(false);
       return;
     }
@@ -151,7 +264,11 @@ export default function CustomerSignUpPage() {
     const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
 
     if (otpError) {
-      setError(otpError.message);
+      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes.');
+      } else {
+        setError(otpError.message);
+      }
       setLoading(false);
       return;
     }
@@ -167,10 +284,11 @@ export default function CustomerSignUpPage() {
   const verifyOtp = async (data: PhoneOtpVerifyInput) => {
     setLoading(true);
     setError(null);
+    setHint(null);
 
     const e164 = normalizePhone(data.phone);
     if (!e164) {
-      setError('Invalid phone number');
+      setError('Please enter a valid 10-digit phone number.');
       setLoading(false);
       return;
     }
@@ -183,7 +301,13 @@ export default function CustomerSignUpPage() {
     });
 
     if (verifyError) {
-      setError(verifyError.message);
+      if (verifyError.message.includes('invalid') || verifyError.message.includes('expired')) {
+        setError('Invalid code. Please try again or request a new one.');
+      } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes.');
+      } else {
+        setError(verifyError.message);
+      }
       setLoading(false);
       return;
     }
@@ -196,6 +320,7 @@ export default function CustomerSignUpPage() {
   const resendOtp = async () => {
     if (resendCooldown > 0) return;
     setError(null);
+    setHint(null);
 
     const e164 = normalizePhone(otpPhone);
     if (!e164) return;
@@ -215,6 +340,7 @@ export default function CustomerSignUpPage() {
   const onOtpProfileSubmit = async (data: OtpProfileInput) => {
     setLoading(true);
     setError(null);
+    setHint(null);
 
     const linkRes = await fetch('/api/customer/link-account', {
       method: 'POST',
@@ -270,6 +396,11 @@ export default function CustomerSignUpPage() {
           {error && (
             <div className="mb-5 rounded-md bg-red-950 p-3 text-sm text-red-300">
               {error}
+            </div>
+          )}
+          {hint && (
+            <div className="mb-5 rounded-md border border-amber-800 bg-amber-950 p-3 text-sm text-amber-200">
+              {hint}
             </div>
           )}
 
@@ -385,6 +516,7 @@ export default function CustomerSignUpPage() {
                 onClick={() => {
                   setMode('full');
                   setError(null);
+                  setHint(null);
                 }}
                 className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
@@ -434,6 +566,7 @@ export default function CustomerSignUpPage() {
                   onClick={() => {
                     setMode('phone-otp');
                     setError(null);
+                    setHint(null);
                     otpVerifyForm.reset();
                   }}
                   className="text-site-text-muted hover:text-site-text"
@@ -559,6 +692,7 @@ export default function CustomerSignUpPage() {
                 onClick={() => {
                   setMode('phone-otp');
                   setError(null);
+                  setHint(null);
                 }}
                 className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >

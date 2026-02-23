@@ -4,6 +4,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Customer Auth Security — Duplicate Prevention & Audit Logging — Session D13a — 2026-02-22
+
+### New API endpoint: check-exists
+- Created `src/app/api/customer/check-exists/route.ts` — public GET endpoint
+- Accepts `?phone=` or `?email=` query params
+- Returns `{ exists, hasAuthAccount }` only — no PII (names, IDs, etc.)
+- In-memory rate limiter: 10 requests per IP per minute
+- Normalizes phone (E.164) and email (lowercase trim) before lookup
+
+### Signup page: pre-check before auth account creation
+- **Email signup (full mode)**: Checks email + phone against customers table before `signUp()`
+  - Email/phone exists with auth account → "Already registered" error + link to /signin
+  - Email/phone exists without auth account → "Found your profile" hint + link to /signin
+  - Neither exists → proceeds normally
+- **Phone OTP signup**: Checks phone before sending OTP
+  - Phone exists with auth account → "Already registered" error + link to /signin
+  - Phone exists without auth account → "Found your profile" hint + link to /signin with phone prefilled
+  - Phone not found → OTP sent normally
+- Added `hint` state (amber banner) for informational messages vs `error` (red banner)
+- Friendly error messages for OTP verification failures (invalid code, rate limit)
+
+### Signin page: verify account exists before sending OTP
+- **Phone signin**: Checks phone exists via check-exists before sending OTP
+  - No account found → "No account found" error + link to /signup (NO OTP sent)
+  - Account exists → OTP sent normally
+- **Email signin**: Friendly error messages for invalid login + link to /signup
+- Friendly error messages for OTP verification (invalid code, rate limit, too many attempts)
+
+### Audit logging for customer auth events
+- **auth/callback**: Logs signup/signin/password-reset events after successful code exchange
+- **link-account**: Logs account creation and phone/email linking with match type
+- **link-by-phone**: Logs phone-based account linking
+- All events use `source: 'customer_portal'` for filtering in admin audit log
+
+---
+
 ## Customer Create/Edit Audit Logging + Type Pill Cleanup — Session D12i — 2026-02-22
 
 ### Edit page: Remove duplicate Customer Type pills

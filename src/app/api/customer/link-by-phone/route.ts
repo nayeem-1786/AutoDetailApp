@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 // POST - Link authenticated user to existing customer by phone number
 export async function POST(request: NextRequest) {
@@ -107,6 +108,17 @@ export async function POST(request: NextRequest) {
         error: 'Failed to link account'
       }, { status: 500 });
     }
+
+    logAudit({
+      userId: user.id,
+      userEmail: user.email || null,
+      action: 'update',
+      entityType: 'customer',
+      entityId: customer.id,
+      details: { linked_phone: true, phone },
+      ipAddress: getRequestIp(request),
+      source: 'customer_portal',
+    });
 
     return NextResponse.json({
       success: true,
