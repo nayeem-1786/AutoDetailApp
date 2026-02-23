@@ -6,6 +6,11 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ## Customer Create/Edit Audit Logging + Type Pill Cleanup — Session D12i — 2026-02-22
 
+### Edit page: Remove duplicate Customer Type pills
+- Removed Customer Type pills from Marketing Info card on edit page (already shown in summary card badge)
+- Removed unused `TYPE_OPTIONS` constant
+- Birthday, SMS Marketing, Email Marketing column spans unchanged
+
 ### Create page: Customer Type placement fix
 - Customer Type pills restored to Marketing Info card at col-span-2 (first column)
 - Final Marketing Info layout: Customer Type (2) | Birthday (4) | SMS Marketing (3) | Email Marketing (3) = 12 cols

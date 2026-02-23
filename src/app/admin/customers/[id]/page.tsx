@@ -67,11 +67,6 @@ import { printReceipt } from '@/app/pos/lib/star-printer';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { ColumnDef } from '@tanstack/react-table';
 
-const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[] = [
-  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  { value: 'professional', label: 'Professional', activeClass: 'border-purple-400 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
-];
-
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -1300,36 +1295,7 @@ export default function CustomerProfilePage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
-                  {/* Customer Type — cols 1-2 */}
-                  <div className="min-w-0 space-y-1.5 lg:col-span-2">
-                    <label className="text-sm font-medium text-ui-text">
-                      Customer Type <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex gap-1.5">
-                      {TYPE_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => {
-                            setCustomerType(opt.value);
-                            setTypeError(false);
-                          }}
-                          className={`rounded-lg border-2 px-2 py-1.5 text-sm font-medium transition-all ${
-                            customerType === opt.value
-                              ? opt.activeClass
-                              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                    {typeError && (
-                      <p className="text-xs text-red-600">Please select a customer type</p>
-                    )}
-                  </div>
-
-                  {/* Birthday — cols 3-6 */}
+                  {/* Birthday */}
                   <div className="space-y-1.5 lg:col-span-4">
                     <label className="text-sm font-medium text-ui-text">Birthday</label>
                     <div className="grid grid-cols-[3fr_4.5rem_3fr] gap-1.5 max-w-[75%]">
