@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatDateTime } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
@@ -53,6 +52,30 @@ function getEntityUrl(type: string, id: string): string | null {
   return routes[type] || null;
 }
 
+function formatPstDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Los_Angeles',
+  }).format(new Date(iso));
+}
+
+function formatPstFullDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'America/Los_Angeles',
+    timeZoneName: 'short',
+  }).format(new Date(iso));
+}
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const seconds = Math.floor(diff / 1000);
@@ -61,9 +84,7 @@ function timeAgo(iso: string): string {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return formatDateTime(iso);
+  return formatPstDateTime(iso);
 }
 
 function getDateRange(preset: string): { from: string; to: string } | null {
@@ -197,7 +218,7 @@ export default function AuditLogPage() {
       cell: ({ row }) => (
         <span
           className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400"
-          title={formatDateTime(row.original.created_at)}
+          title={formatPstFullDateTime(row.original.created_at)}
         >
           {timeAgo(row.original.created_at)}
         </span>
@@ -206,7 +227,7 @@ export default function AuditLogPage() {
     {
       id: 'user',
       header: 'User',
-      size: 180,
+      size: 120,
       cell: ({ row }) => {
         const { employee_name, user_email } = row.original;
         const display = employee_name || user_email || 'System';
@@ -266,6 +287,7 @@ export default function AuditLogPage() {
     {
       id: 'details',
       header: 'Details',
+      size: 300,
       enableSorting: false,
       cell: ({ row }) => {
         if (!row.original.details) {
@@ -274,7 +296,7 @@ export default function AuditLogPage() {
         const text = JSON.stringify(row.original.details);
         return (
           <button
-            className="block max-w-[200px] truncate text-left text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="block max-w-[400px] truncate text-left text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             title="Click to view details"
             onClick={() => setDetailEntry(row.original)}
           >
@@ -388,7 +410,7 @@ export default function AuditLogPage() {
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-[100px_1fr] gap-2">
                 <span className="font-medium text-gray-500 dark:text-gray-400">Time</span>
-                <span>{formatDateTime(detailEntry.created_at)}</span>
+                <span>{formatPstFullDateTime(detailEntry.created_at)}</span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-2">
                 <span className="font-medium text-gray-500 dark:text-gray-400">User</span>

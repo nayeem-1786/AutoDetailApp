@@ -29,6 +29,20 @@ export async function POST(request: NextRequest) {
     const { password, pin_code, ...employeeData } = parsed.data;
     const adminClient = createAdminClient();
 
+    // Look up role_id from roles table
+    const { data: roleRow, error: roleError } = await adminClient
+      .from('roles')
+      .select('id')
+      .eq('name', employeeData.role)
+      .single();
+
+    if (roleError || !roleRow) {
+      return NextResponse.json(
+        { error: `Invalid role: ${employeeData.role}` },
+        { status: 400 }
+      );
+    }
+
     // Check for duplicate PIN
     if (pin_code) {
       const { data: existing } = await adminClient
@@ -76,6 +90,7 @@ export async function POST(request: NextRequest) {
         email: employeeData.email,
         phone: employeeData.phone || null,
         role: employeeData.role,
+        role_id: roleRow.id,
         pin_code: pin_code || null,
         hourly_rate: employeeData.hourly_rate ?? null,
         bookable_for_appointments: employeeData.bookable_for_appointments,

@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Audit Log Column Tweaks + Staff Creation Bug — Session D12e — 2026-02-22
+
+### Audit log time display
+- Entries under 24h show relative time ("5m ago", "3h ago")
+- Entries older than 24h show date+time in PST ("Feb 22, 3:45 PM")
+- Tooltip (hover) always shows full PST datetime ("Saturday, Feb 22, 2026 3:45:23 PM PST")
+
+### Audit log column widths
+- User column narrowed (180→120) — only needs to fit a name
+- Details column widened (added size 300, max-w 200→400px) — more JSON preview visible
+
+### Staff creation role_id fix
+- **Root cause**: Migration `20260211000007` added NOT NULL `role_id` FK to `employees`, but `/api/staff/create` never set it
+- **Fix**: API now looks up `role_id` from `roles` table based on the role name before insert
+- Edit route (`/api/admin/staff/[id]`) already had this lookup — only create was missing
+
+---
+
 ## Audit Sweep + Missing Audit Points — Session D12d — 2026-02-22
 
 Full sweep of all 37 logAudit calls across 32 route files — all confirmed properly positioned before return statements. Added missing audit points for failed PIN attempts and logout.

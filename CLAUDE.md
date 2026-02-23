@@ -24,6 +24,8 @@
 9. **SMS**: ALL sends go through `sendSms()` or `sendMarketingSms()` in `src/lib/utils/sms.ts`. NEVER inline Twilio API calls. Consent changes MUST use `updateSmsConsent()` from `@/lib/utils/sms-consent`.
 10. **POS dark mode**: Every `bg-white` container in POS must have a corresponding `dark:bg-gray-900` (or appropriate dark variant). Audit dropdowns, modals, popovers, and tooltips.
 11. **Component Reuse** — Before writing ANY new component, search /src/components for existing reusable components.
+12. **File paths**: Exact file paths are in docs/dev/FILE_TREE.md. Read it before modifying any files. Never guess paths.
+13. **FILE_TREE.md**: If a session creates new files in API routes, admin pages, lib modules, components, POS components, or migrations, update `docs/dev/FILE_TREE.md` with the new paths before committing.
 
 ## Project Structure
 
