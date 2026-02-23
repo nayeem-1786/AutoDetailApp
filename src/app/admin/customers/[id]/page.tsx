@@ -230,6 +230,43 @@ export default function CustomerProfilePage() {
         phone = normalized;
       }
 
+      // Check phone uniqueness (excluding self)
+      if (phone) {
+        const { data: existingByPhone } = await supabase
+          .from('customers')
+          .select('id, first_name, last_name')
+          .eq('phone', phone)
+          .neq('id', id)
+          .maybeSingle();
+
+        if (existingByPhone) {
+          toast.error(
+            `Phone number already in use by ${existingByPhone.first_name} ${existingByPhone.last_name}`
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Check email uniqueness (excluding self)
+      const email = data.email?.toLowerCase().trim() || null;
+      if (email) {
+        const { data: existingByEmail } = await supabase
+          .from('customers')
+          .select('id, first_name, last_name')
+          .ilike('email', email)
+          .neq('id', id)
+          .maybeSingle();
+
+        if (existingByEmail) {
+          toast.error(
+            `Email already in use by ${existingByEmail.first_name} ${existingByEmail.last_name}`
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('customers')
         .update({

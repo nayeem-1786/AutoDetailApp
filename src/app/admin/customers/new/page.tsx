@@ -85,6 +85,41 @@ export default function NewCustomerPage() {
         phone = normalized;
       }
 
+      // Check phone uniqueness
+      if (phone) {
+        const { data: existingByPhone } = await supabase
+          .from('customers')
+          .select('id, first_name, last_name')
+          .eq('phone', phone)
+          .maybeSingle();
+
+        if (existingByPhone) {
+          toast.error(
+            `A customer with this phone already exists: ${existingByPhone.first_name} ${existingByPhone.last_name}`
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Check email uniqueness
+      const email = data.email?.toLowerCase().trim() || null;
+      if (email) {
+        const { data: existingByEmail } = await supabase
+          .from('customers')
+          .select('id, first_name, last_name')
+          .ilike('email', email)
+          .maybeSingle();
+
+        if (existingByEmail) {
+          toast.error(
+            `A customer with this email already exists: ${existingByEmail.first_name} ${existingByEmail.last_name}`
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
       // Parse tags from comma-separated string if it's a string
       const tags = data.tags || [];
 

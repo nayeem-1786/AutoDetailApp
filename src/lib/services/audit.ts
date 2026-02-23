@@ -21,7 +21,7 @@ export interface LogAuditParams {
 export async function logAudit(params: LogAuditParams): Promise<void> {
   try {
     const adminDb = createAdminClient();
-    await adminDb.from('audit_log').insert({
+    const { error } = await adminDb.from('audit_log').insert({
       user_id: params.userId || null,
       user_email: params.userEmail || null,
       employee_name: params.employeeName || null,
@@ -33,6 +33,9 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
       ip_address: params.ipAddress || null,
       source: params.source || 'admin',
     });
+    if (error) {
+      console.error('[audit] Insert failed:', error.message, error.code, params);
+    }
   } catch (err) {
     console.error('[audit] Failed to log:', err, params);
   }

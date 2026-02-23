@@ -45,6 +45,23 @@ export async function PATCH(request: NextRequest) {
 
     const e164Phone = normalizePhone(data.phone);
 
+    // Check phone uniqueness (excluding self)
+    if (e164Phone) {
+      const { data: existingByPhone } = await admin
+        .from('customers')
+        .select('id')
+        .eq('phone', e164Phone)
+        .neq('id', customer.id)
+        .maybeSingle();
+
+      if (existingByPhone) {
+        return NextResponse.json(
+          { error: 'This phone number is already in use by another customer' },
+          { status: 409 }
+        );
+      }
+    }
+
     // Log SMS consent change if it changed
     if (customer.sms_consent !== data.sms_consent) {
       const consentPhone = e164Phone || customer.phone;

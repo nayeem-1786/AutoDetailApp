@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Audit Log + Customer Uniqueness — Session D12c — 2026-02-22
+
+### Audit log fix
+- **Root cause**: Old migration (`20260201000033`) created `audit_log` with wrong columns (`employee_id`, `old_data`, `new_data`). New migration (`20260222000002`) used `CREATE TABLE IF NOT EXISTS` — no-op since table already existed. All `logAudit()` inserts were silently failing due to column mismatches.
+- **Fix**: `20260222000003_fix_audit_log_schema.sql` — DROP + recreate with correct schema (user_id, user_email, employee_name, entity_label, details, source)
+- **Also fixed**: `logAudit()` now checks the Supabase `{ error }` return value (PostgREST doesn't throw on errors, it returns them)
+
+### Customer phone/email uniqueness
+- **`20260222000004_customer_phone_email_unique.sql`**: Partial unique indexes on `phone` and `LOWER(email)` (allows NULL/empty). Cleaned up test duplicate (John Doe).
+- **Admin customer create** (`/admin/customers/new/page.tsx`): Added phone + email uniqueness checks before insert with named toast errors
+- **Admin customer edit** (`/admin/customers/[id]/page.tsx`): Added phone + email uniqueness checks before update (excluding self)
+- **Customer portal profile** (`/api/customer/profile/route.ts`): Added phone uniqueness check before update (excluding self, returns 409)
+- **POS customer create** (`/api/pos/customers/route.ts`): Improved existing 409 message to include customer name ("already exists: John Smith")
+- **POS UI** (`customer-create-dialog.tsx`): Already handled 409 — displays `json.error` in toast
+
+---
+
 ## Wire Audit Logging Into All Mutation Routes — Session D12b — 2026-02-22
 
 Wired `logAudit()` calls into ~32 API route files covering every significant mutation across admin, POS, marketing, and public endpoints. All calls are fire-and-forget (no `await` in critical path). Extended `getEmployeeFromSession()` to return employee name/email for audit entries.

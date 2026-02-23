@@ -35,13 +35,13 @@ export async function POST(request: NextRequest) {
     // Check for existing customer with same phone
     const { data: existing } = await supabase
       .from('customers')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('phone', normalizedPhone)
       .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
-        { error: 'A customer with this phone number already exists' },
+        { error: `A customer with this phone already exists: ${existing.first_name} ${existing.last_name}` },
         { status: 409 }
       );
     }
