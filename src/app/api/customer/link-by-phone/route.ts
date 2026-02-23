@@ -60,19 +60,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Broader search fallback (last 7 digits)
-    if (!customer) {
-      const { data: allWithDigits } = await supabase
-        .from('customers')
-        .select('id, auth_user_id, phone')
-        .ilike('phone', `%${digits.slice(-7)}%`)
-        .limit(1);
-
-      if (allWithDigits && allWithDigits.length > 0) {
-        customer = allWithDigits[0];
-      }
-    }
-
     if (!customer) {
       return NextResponse.json({
         found: false,
