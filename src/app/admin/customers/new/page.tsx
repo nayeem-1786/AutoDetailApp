@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 import { customerCreateSchema, type CustomerCreateInput } from '@/lib/utils/validation';
 import { normalizePhone, formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
@@ -16,12 +17,28 @@ import { Switch } from '@/components/ui/switch';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import type { CustomerType } from '@/lib/supabase/types';
+
+const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[] = [
+  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'border-blue-400 bg-blue-50 text-blue-700' },
+  { value: 'professional', label: 'Professional', activeClass: 'border-purple-400 bg-purple-50 text-purple-700' },
+];
 
 export default function NewCustomerPage() {
   const router = useRouter();
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [phonePreview, setPhonePreview] = useState<{ normalized: string | null; formatted: string } | null>(null);
+
+  // Customer type
+  const [customerType, setCustomerType] = useState<CustomerType | null>(null);
+  const [typeError, setTypeError] = useState(false);
+
+  // Duplicate check state
+  const [phoneDup, setPhoneDup] = useState<{ name: string } | null>(null);
+  const [emailDup, setEmailDup] = useState<{ name: string } | null>(null);
+  const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     register,
@@ -54,6 +71,66 @@ export default function NewCustomerPage() {
   const watchPhone = watch('phone');
   const watchEmail = watch('email');
 
+  // Debounced phone duplicate check
+  useEffect(() => {
+    if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current);
+
+    const digits = (watchPhone || '').replace(/\D/g, '');
+    if (digits.length < 10) {
+      setPhoneDup(null);
+      return;
+    }
+
+    phoneTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await adminFetch(`/api/admin/customers/check-duplicate?phone=${encodeURIComponent(watchPhone || '')}`);
+        const json = await res.json();
+        if (json.exists && json.field === 'phone') {
+          setPhoneDup({ name: `${json.match.first_name} ${json.match.last_name}` });
+        } else {
+          setPhoneDup(null);
+        }
+      } catch {
+        setPhoneDup(null);
+      }
+    }, 500);
+
+    return () => {
+      if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current);
+    };
+  }, [watchPhone]);
+
+  // Debounced email duplicate check
+  useEffect(() => {
+    if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
+
+    const trimmed = (watchEmail || '').trim();
+    if (!trimmed || !trimmed.includes('@')) {
+      setEmailDup(null);
+      return;
+    }
+
+    emailTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await adminFetch(`/api/admin/customers/check-duplicate?email=${encodeURIComponent(trimmed)}`);
+        const json = await res.json();
+        if (json.exists && json.field === 'email') {
+          setEmailDup({ name: `${json.match.first_name} ${json.match.last_name}` });
+        } else {
+          setEmailDup(null);
+        }
+      } catch {
+        setEmailDup(null);
+      }
+    }, 500);
+
+    return () => {
+      if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
+    };
+  }, [watchEmail]);
+
+  const hasDuplicateError = !!phoneDup || !!emailDup;
+
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
     // Format the input value and update form
@@ -76,6 +153,14 @@ export default function NewCustomerPage() {
   }
 
   async function onSubmit(data: CustomerCreateInput) {
+    if (!customerType) {
+      setTypeError(true);
+      toast.error('Please select a customer type');
+      return;
+    }
+
+    if (hasDuplicateError) return;
+
     setSaving(true);
     try {
       // Normalize the phone if present
@@ -85,7 +170,7 @@ export default function NewCustomerPage() {
         phone = normalized;
       }
 
-      // Check phone uniqueness
+      // Check phone uniqueness (server-side double check)
       if (phone) {
         const { data: existingByPhone } = await supabase
           .from('customers')
@@ -102,7 +187,7 @@ export default function NewCustomerPage() {
         }
       }
 
-      // Check email uniqueness
+      // Check email uniqueness (server-side double check)
       const email = data.email?.toLowerCase().trim() || null;
       if (email) {
         const { data: existingByEmail } = await supabase
@@ -140,6 +225,7 @@ export default function NewCustomerPage() {
           tags,
           sms_consent: data.sms_consent,
           email_consent: data.email_consent,
+          customer_type: customerType,
         })
         .select('id')
         .single();
@@ -232,11 +318,50 @@ export default function NewCustomerPage() {
                     )}
                   </div>
                 )}
+                {phoneDup && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Phone already belongs to {phoneDup.name}
+                  </p>
+                )}
               </FormField>
 
               <FormField label="Email" error={errors.email?.message} htmlFor="email">
                 <Input id="email" type="email" {...register('email')} placeholder="jane@example.com" />
+                {emailDup && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Email already belongs to {emailDup.name}
+                  </p>
+                )}
               </FormField>
+
+              {/* Customer Type */}
+              <div className="md:col-span-2">
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Customer Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  {TYPE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setCustomerType(opt.value);
+                        setTypeError(false);
+                      }}
+                      className={`rounded-lg border-2 px-5 py-2 text-sm font-medium transition-all ${
+                        customerType === opt.value
+                          ? opt.activeClass
+                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {typeError && (
+                  <p className="mt-1 text-xs text-red-600">Please select a customer type</p>
+                )}
+              </div>
 
               <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
                 <Input id="birthday" type="date" {...register('birthday')} />
@@ -369,7 +494,7 @@ export default function NewCustomerPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || hasDuplicateError}>
             {saving ? 'Creating...' : 'Create Customer'}
           </Button>
         </div>

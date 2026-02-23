@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Customer Create UX — Session D12f — 2026-02-22
+
+### Real-time phone/email duplicate checking
+- New API endpoints: `GET /api/pos/customers/check-duplicate` (HMAC auth) and `GET /api/admin/customers/check-duplicate` (session auth)
+- Phone checked after 10+ digits entered, email checked after `@` present — both with 500ms debounce
+- Inline red error text below field: "Phone already belongs to John Smith"
+- Save button disabled while any duplicate error is showing
+- Applied to both POS `customer-create-dialog.tsx` and admin `customers/new/page.tsx`
+
+### Customer Type required on create
+- POS dialog: Removed "Unknown" option — only Enthusiast and Professional pills
+- Neither pre-selected — staff must pick one before saving
+- Validation error on save attempt if no type selected
+- Admin create page: Added same Enthusiast/Professional pill buttons below Email field
+- Admin insert now includes `customer_type` in payload
+
+### POS dialog enhancements
+- Added email field to POS customer create dialog
+- POS customer create API (`/api/pos/customers`) now accepts and stores `email`
+
+### Customer edit page column rebalance
+- Changed from flex layout to `grid grid-cols-12` for the Customer Type + Journey + Online Access card
+- Customer Type: 4 columns, Customer Journey: 6 columns, Online Access: 2 columns
+- Removed vertical dividers (unnecessary with grid gaps)
+
+---
+
 ## Audit Log Column Tweaks + Staff Creation Bug — Session D12e — 2026-02-22
 
 ### Audit log time display

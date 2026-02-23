@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogClose,
@@ -24,11 +24,14 @@ interface CustomerCreateDialogProps {
   onBack?: () => void;
 }
 
-const TYPE_OPTIONS: { value: CustomerType | null; label: string; activeClass: string }[] = [
+const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[] = [
   { value: 'enthusiast', label: 'Enthusiast', activeClass: 'bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500' },
   { value: 'professional', label: 'Professional', activeClass: 'bg-purple-600 text-white border-purple-600' },
-  { value: null, label: 'Unknown', activeClass: 'bg-gray-900 text-white border-gray-900' },
 ];
+
+interface DuplicateError {
+  name: string;
+}
 
 export function CustomerCreateDialog({
   open,
@@ -39,16 +42,92 @@ export function CustomerCreateDialog({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [customerType, setCustomerType] = useState<CustomerType | null>(null);
+  const [typeError, setTypeError] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Duplicate check state
+  const [phoneDup, setPhoneDup] = useState<DuplicateError | null>(null);
+  const [emailDup, setEmailDup] = useState<DuplicateError | null>(null);
+  const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced phone duplicate check
+  useEffect(() => {
+    if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current);
+
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10) {
+      setPhoneDup(null);
+      return;
+    }
+
+    phoneTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await posFetch(`/api/pos/customers/check-duplicate?phone=${encodeURIComponent(phone)}`);
+        const json = await res.json();
+        if (json.exists && json.field === 'phone') {
+          setPhoneDup({ name: `${json.match.first_name} ${json.match.last_name}` });
+        } else {
+          setPhoneDup(null);
+        }
+      } catch {
+        setPhoneDup(null);
+      }
+    }, 500);
+
+    return () => {
+      if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current);
+    };
+  }, [phone]);
+
+  // Debounced email duplicate check
+  useEffect(() => {
+    if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
+
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes('@')) {
+      setEmailDup(null);
+      return;
+    }
+
+    emailTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await posFetch(`/api/pos/customers/check-duplicate?email=${encodeURIComponent(trimmed)}`);
+        const json = await res.json();
+        if (json.exists && json.field === 'email') {
+          setEmailDup({ name: `${json.match.first_name} ${json.match.last_name}` });
+        } else {
+          setEmailDup(null);
+        }
+      } catch {
+        setEmailDup(null);
+      }
+    }, 500);
+
+    return () => {
+      if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
+    };
+  }, [email]);
+
+  const hasDuplicateError = !!phoneDup || !!emailDup;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!firstName.trim() || !lastName.trim() || !phone.trim()) {
-      toast.error('All fields are required');
+      toast.error('First name, last name, and mobile are required');
       return;
     }
+
+    if (!customerType) {
+      setTypeError(true);
+      toast.error('Please select a customer type');
+      return;
+    }
+
+    if (hasDuplicateError) return;
 
     setSaving(true);
     try {
@@ -59,6 +138,7 @@ export function CustomerCreateDialog({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           phone,
+          email: email.trim() || undefined,
           customer_type: customerType,
         }),
       });
@@ -84,7 +164,11 @@ export function CustomerCreateDialog({
     setFirstName('');
     setLastName('');
     setPhone('');
+    setEmail('');
     setCustomerType(null);
+    setTypeError(false);
+    setPhoneDup(null);
+    setEmailDup(null);
     onClose();
   }
 
@@ -92,7 +176,11 @@ export function CustomerCreateDialog({
     setFirstName('');
     setLastName('');
     setPhone('');
+    setEmail('');
     setCustomerType(null);
+    setTypeError(false);
+    setPhoneDup(null);
+    setEmailDup(null);
     onBack?.();
   }
 
@@ -147,6 +235,27 @@ export function CustomerCreateDialog({
               onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
               placeholder="(310) 555-1234"
             />
+            {phoneDup && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                Phone already belongs to {phoneDup.name}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+              Email
+            </label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="jane@example.com"
+            />
+            {emailDup && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                Email already belongs to {emailDup.name}
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -157,7 +266,10 @@ export function CustomerCreateDialog({
                 <button
                   key={opt.label}
                   type="button"
-                  onClick={() => setCustomerType(opt.value)}
+                  onClick={() => {
+                    setCustomerType(opt.value);
+                    setTypeError(false);
+                  }}
                   className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                     customerType === opt.value
                       ? opt.activeClass
@@ -168,13 +280,18 @@ export function CustomerCreateDialog({
                 </button>
               ))}
             </div>
+            {typeError && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                Please select a customer type
+              </p>
+            )}
           </div>
         </DialogContent>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || hasDuplicateError}>
             {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
             Create
           </Button>

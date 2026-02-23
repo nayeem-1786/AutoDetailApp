@@ -28,6 +28,7 @@ src/app/api/admin/customers/[id]/photos/route.ts
 src/app/api/admin/customers/[id]/portal-access/route.ts
 src/app/api/admin/customers/[id]/reset-password/route.ts
 src/app/api/admin/customers/[id]/route.ts
+src/app/api/admin/customers/check-duplicate/route.ts
 src/app/api/admin/customers/search/route.ts
 src/app/api/admin/customers/stats/route.ts
 src/app/api/admin/footer/bottom-links/route.ts
@@ -268,6 +269,7 @@ src/app/api/pos/card-customer/route.ts
 src/app/api/pos/coupons/validate/route.ts
 src/app/api/pos/customers/[id]/type/route.ts
 src/app/api/pos/customers/[id]/vehicles/route.ts
+src/app/api/pos/customers/check-duplicate/route.ts
 src/app/api/pos/customers/route.ts
 src/app/api/pos/customers/search/route.ts
 src/app/api/pos/end-of-day/route.ts

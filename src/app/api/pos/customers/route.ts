@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     const body = await request.json();
-    const { first_name, last_name, phone, customer_type } = body;
+    const { first_name, last_name, phone, email, customer_type } = body;
 
     if (!first_name || !last_name || !phone) {
       return NextResponse.json(
@@ -50,12 +50,16 @@ export async function POST(request: NextRequest) {
     const validTypes = ['enthusiast', 'professional'];
     const resolvedType = customer_type && validTypes.includes(customer_type) ? customer_type : null;
 
+    // Normalize email if provided
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
+
     const { data: customer, error } = await supabase
       .from('customers')
       .insert({
         first_name: first_name.trim(),
         last_name: last_name.trim(),
         phone: normalizedPhone,
+        ...(normalizedEmail ? { email: normalizedEmail } : {}),
         ...(resolvedType ? { customer_type: resolvedType } : {}),
       })
       .select('*')
