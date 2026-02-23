@@ -14,15 +14,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import type { CustomerType } from '@/lib/supabase/types';
 
 const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[] = [
-  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'border-blue-400 bg-blue-50 text-blue-700' },
-  { value: 'professional', label: 'Professional', activeClass: 'border-purple-400 bg-purple-50 text-purple-700' },
+  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  { value: 'professional', label: 'Professional', activeClass: 'border-purple-400 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
 ];
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 export default function NewCustomerPage() {
   const router = useRouter();
@@ -34,9 +42,16 @@ export default function NewCustomerPage() {
   const [customerType, setCustomerType] = useState<CustomerType | null>(null);
   const [typeError, setTypeError] = useState(false);
 
+  // Birthday fields
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [birthdayError, setBirthdayError] = useState('');
+
   // Duplicate check state
   const [phoneDup, setPhoneDup] = useState<{ name: string } | null>(null);
   const [emailDup, setEmailDup] = useState<{ name: string } | null>(null);
+  const [emailFormatError, setEmailFormatError] = useState('');
   const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -100,15 +115,25 @@ export default function NewCustomerPage() {
     };
   }, [watchPhone]);
 
-  // Debounced email duplicate check
+  // Debounced email duplicate check + format validation
   useEffect(() => {
     if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
 
     const trimmed = (watchEmail || '').trim();
-    if (!trimmed || !trimmed.includes('@')) {
+    if (!trimmed) {
+      setEmailDup(null);
+      setEmailFormatError('');
+      return;
+    }
+
+    // Email format validation: must contain @ and at least one . after @
+    const atIdx = trimmed.indexOf('@');
+    if (atIdx === -1 || trimmed.indexOf('.', atIdx) === -1) {
+      setEmailFormatError('Please enter a valid email address');
       setEmailDup(null);
       return;
     }
+    setEmailFormatError('');
 
     emailTimerRef.current = setTimeout(async () => {
       try {
@@ -129,11 +154,30 @@ export default function NewCustomerPage() {
     };
   }, [watchEmail]);
 
+  // Birthday validation: if month or day is provided, both must be provided
+  useEffect(() => {
+    if ((birthMonth && !birthDay) || (!birthMonth && birthDay)) {
+      setBirthdayError('Both month and day are required');
+    } else if (birthYear) {
+      const yr = parseInt(birthYear);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(yr) || yr < 1920 || yr > currentYear) {
+        setBirthdayError(`Year must be between 1920 and ${currentYear}`);
+      } else {
+        setBirthdayError('');
+      }
+    } else {
+      setBirthdayError('');
+    }
+  }, [birthMonth, birthDay, birthYear]);
+
   const hasDuplicateError = !!phoneDup || !!emailDup;
+  const hasEmailFormatError = !!emailFormatError;
+  const hasBirthdayError = !!birthdayError;
+  const hasAnyError = hasDuplicateError || hasEmailFormatError || hasBirthdayError || typeError;
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
-    // Format the input value and update form
     const formatted = formatPhoneInput(raw);
     setValue('phone', formatted, { shouldDirty: true });
 
@@ -152,6 +196,18 @@ export default function NewCustomerPage() {
     }
   }
 
+  function buildBirthdayDate(): string | null {
+    if (!birthMonth && !birthDay) return null;
+    if (!birthMonth || !birthDay) return null; // validation catches this
+
+    const monthNum = String(MONTHS.indexOf(birthMonth) + 1).padStart(2, '0');
+    const dayNum = String(birthDay).padStart(2, '0');
+
+    // Birthday stored as DATE column. Year 1900 is sentinel when year is omitted.
+    const yr = birthYear ? String(parseInt(birthYear)) : '1900';
+    return `${yr}-${monthNum}-${dayNum}`;
+  }
+
   async function onSubmit(data: CustomerCreateInput) {
     if (!customerType) {
       setTypeError(true);
@@ -159,7 +215,7 @@ export default function NewCustomerPage() {
       return;
     }
 
-    if (hasDuplicateError) return;
+    if (hasAnyError) return;
 
     setSaving(true);
     try {
@@ -208,6 +264,9 @@ export default function NewCustomerPage() {
       // Parse tags from comma-separated string if it's a string
       const tags = data.tags || [];
 
+      // Build birthday date from month/day/year fields
+      const birthday = buildBirthdayDate();
+
       const { data: customer, error } = await supabase
         .from('customers')
         .insert({
@@ -215,7 +274,7 @@ export default function NewCustomerPage() {
           last_name: data.last_name,
           phone,
           email: data.email || null,
-          birthday: data.birthday || null,
+          birthday,
           address_line_1: data.address_line_1 || null,
           address_line_2: data.address_line_2 || null,
           city: data.city || null,
@@ -285,13 +344,14 @@ export default function NewCustomerPage() {
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Contact Info */}
+        {/* Card 1: Contact Information — 4-column grid, 2 rows */}
         <Card>
           <CardHeader>
             <CardTitle>Contact Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Row 1: First Name | Last Name | Mobile | Email */}
               <FormField label="First Name" error={errors.first_name?.message} required htmlFor="first_name">
                 <Input id="first_name" {...register('first_name')} placeholder="Jane" />
               </FormField>
@@ -306,8 +366,9 @@ export default function NewCustomerPage() {
                   {...register('phone')}
                   onChange={handlePhoneChange}
                   placeholder="(310) 555-1234"
+                  className={phoneDup ? 'border-red-500' : ''}
                 />
-                {phonePreview && (
+                {phonePreview && !phoneDup && (
                   <div className="mt-1 text-xs">
                     {phonePreview.normalized ? (
                       <span className="text-green-600">
@@ -326,7 +387,16 @@ export default function NewCustomerPage() {
               </FormField>
 
               <FormField label="Email" error={errors.email?.message} htmlFor="email">
-                <Input id="email" type="email" {...register('email')} placeholder="jane@example.com" />
+                <Input
+                  id="email"
+                  type="email"
+                  {...register('email')}
+                  placeholder="jane@example.com"
+                  className={emailDup || emailFormatError ? 'border-red-500' : ''}
+                />
+                {emailFormatError && (
+                  <p className="mt-1 text-xs text-red-600">{emailFormatError}</p>
+                )}
                 {emailDup && (
                   <p className="mt-1 text-xs text-red-600">
                     Email already belongs to {emailDup.name}
@@ -334,87 +404,42 @@ export default function NewCustomerPage() {
                 )}
               </FormField>
 
-              {/* Customer Type */}
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Customer Type <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-2">
-                  {TYPE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        setCustomerType(opt.value);
-                        setTypeError(false);
-                      }}
-                      className={`rounded-lg border-2 px-5 py-2 text-sm font-medium transition-all ${
-                        customerType === opt.value
-                          ? opt.activeClass
-                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {typeError && (
-                  <p className="mt-1 text-xs text-red-600">Please select a customer type</p>
-                )}
-              </div>
-
-              <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
-                <Input id="birthday" type="date" {...register('birthday')} />
+              {/* Row 2: Address Line 1 | Address Line 2 | City | State + Zip */}
+              <FormField label="Address Line 1" error={errors.address_line_1?.message} htmlFor="address_line_1">
+                <Input id="address_line_1" {...register('address_line_1')} placeholder="123 Main St" />
               </FormField>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Address */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Address</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <FormField label="Address Line 1" error={errors.address_line_1?.message} htmlFor="address_line_1">
-                  <Input id="address_line_1" {...register('address_line_1')} placeholder="123 Main St" />
-                </FormField>
-              </div>
-
-              <div className="md:col-span-2">
-                <FormField label="Address Line 2" error={errors.address_line_2?.message} htmlFor="address_line_2">
-                  <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt 4B" />
-                </FormField>
-              </div>
+              <FormField label="Address Line 2" error={errors.address_line_2?.message} htmlFor="address_line_2">
+                <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt 4B" />
+              </FormField>
 
               <FormField label="City" error={errors.city?.message} htmlFor="city">
                 <Input id="city" {...register('city')} placeholder="Lomita" />
               </FormField>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="State" error={errors.state?.message} htmlFor="state">
-                  <Input id="state" {...register('state')} placeholder="CA" maxLength={2} />
-                </FormField>
-
-                <FormField label="ZIP" error={errors.zip?.message} htmlFor="zip">
-                  <Input id="zip" {...register('zip')} placeholder="90717" />
-                </FormField>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-ui-text">State & Zip</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input {...register('state')} placeholder="CA" maxLength={2} />
+                  <Input {...register('zip')} placeholder="90717" />
+                </div>
+                {(errors.state?.message || errors.zip?.message) && (
+                  <p className="text-xs text-red-500">{errors.state?.message || errors.zip?.message}</p>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Notes & Tags */}
+        {/* Card 2: Notes & Tags */}
         <Card>
           <CardHeader>
             <CardTitle>Notes & Tags</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-6">
+            <div className="grid grid-cols-1 gap-4">
               <FormField label="Notes" error={errors.notes?.message} htmlFor="notes">
-                <Textarea id="notes" {...register('notes')} placeholder="Any notes about this customer..." rows={3} />
+                <Textarea id="notes" {...register('notes')} placeholder="Any notes about this customer..." rows={5} />
               </FormField>
 
               <FormField
@@ -439,46 +464,111 @@ export default function NewCustomerPage() {
           </CardContent>
         </Card>
 
-        {/* Marketing Consent */}
+        {/* Card 3: Marketing Info — 4-column grid */}
         <Card>
           <CardHeader>
-            <CardTitle>Marketing Consent</CardTitle>
+            <CardTitle>Marketing Info</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">SMS Marketing</p>
-                    <p className="text-xs text-gray-500">Allow promotional text messages</p>
-                  </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Customer Type */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-ui-text">
+                  Customer Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  {TYPE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setCustomerType(opt.value);
+                        setTypeError(false);
+                      }}
+                      className={`rounded-lg border-2 px-4 py-1.5 text-sm font-medium transition-all ${
+                        customerType === opt.value
+                          ? opt.activeClass
+                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {typeError && (
+                  <p className="text-xs text-red-600">Please select a customer type</p>
+                )}
+              </div>
+
+              {/* Birthday — Month | Day | Year (optional) */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-ui-text">Birthday</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Select
+                    value={birthMonth}
+                    onChange={(e) => setBirthMonth(e.target.value)}
+                    className={birthdayError ? 'border-red-500' : ''}
+                  >
+                    <option value="">Month</option>
+                    {MONTHS.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </Select>
+                  <Select
+                    value={birthDay}
+                    onChange={(e) => setBirthDay(e.target.value)}
+                    className={birthdayError ? 'border-red-500' : ''}
+                  >
+                    <option value="">Day</option>
+                    {DAYS.map((d) => (
+                      <option key={d} value={String(d)}>{d}</option>
+                    ))}
+                  </Select>
+                  <Input
+                    value={birthYear}
+                    onChange={(e) => setBirthYear(e.target.value)}
+                    placeholder="Year"
+                    maxLength={4}
+                    className={birthdayError && birthYear ? 'border-red-500' : ''}
+                  />
+                </div>
+                {birthdayError && (
+                  <p className="text-xs text-red-600">{birthdayError}</p>
+                )}
+              </div>
+
+              {/* SMS Marketing Toggle */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-ui-text">SMS Marketing</label>
+                <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">Allow SMS</p>
                   <Switch
                     checked={smsConsent}
                     onCheckedChange={(checked) => setValue('sms_consent', checked)}
                   />
                 </div>
                 {smsConsent && !watchPhone && (
-                  <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    SMS consent is on but no mobile number is on file. Add a mobile number or turn this off.
+                  <div className="flex items-center gap-1 text-xs text-amber-600">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    No mobile number
                   </div>
                 )}
               </div>
-              <div>
-                <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Email Marketing</p>
-                    <p className="text-xs text-gray-500">Allow promotional emails</p>
-                  </div>
+
+              {/* Email Marketing Toggle */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-ui-text">Email Marketing</label>
+                <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">Allow Email</p>
                   <Switch
                     checked={emailConsent}
                     onCheckedChange={(checked) => setValue('email_consent', checked)}
                   />
                 </div>
                 {emailConsent && !watchEmail && (
-                  <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    Email consent is on but no email address is on file. Add an email or turn this off.
+                  <div className="flex items-center gap-1 text-xs text-amber-600">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    No email address
                   </div>
                 )}
               </div>
@@ -494,7 +584,7 @@ export default function NewCustomerPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={saving || hasDuplicateError}>
+          <Button type="submit" disabled={saving || hasAnyError}>
             {saving ? 'Creating...' : 'Create Customer'}
           </Button>
         </div>

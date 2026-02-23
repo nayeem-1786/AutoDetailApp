@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { PageHeader } from '@/components/ui/page-header';
 import { SearchInput } from '@/components/ui/search-input';
-import { DataTable } from '@/components/ui/data-table';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { ClipboardList, Download } from 'lucide-react';
 import {
   AUDIT_ACTION_LABELS,
@@ -27,7 +27,6 @@ import {
   AUDIT_ACTION_BADGE_VARIANT,
 } from '@/lib/utils/constants';
 import type { AuditLogEntry } from '@/lib/supabase/types';
-import type { ColumnDef } from '@tanstack/react-table';
 
 const PAGE_SIZE = 50;
 
@@ -37,20 +36,6 @@ const DATE_PRESETS = [
   { label: '7 Days', value: '7d' },
   { label: '30 Days', value: '30d' },
 ];
-
-function getEntityUrl(type: string, id: string): string | null {
-  const routes: Record<string, string> = {
-    customer: `/admin/customers/${id}`,
-    order: `/admin/orders/${id}`,
-    coupon: `/admin/marketing/coupons/${id}`,
-    product: `/admin/catalog/products/${id}`,
-    service: `/admin/catalog/services/${id}`,
-    employee: `/admin/staff/${id}`,
-    campaign: `/admin/marketing/campaigns/${id}`,
-    settings: '/admin/settings',
-  };
-  return routes[type] || null;
-}
 
 function formatPstDateTime(iso: string): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -210,103 +195,6 @@ export default function AuditLogPage() {
     }
   }
 
-  const columns: ColumnDef<AuditLogEntry, unknown>[] = [
-    {
-      id: 'time',
-      header: 'Time',
-      size: 130,
-      cell: ({ row }) => (
-        <span
-          className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400"
-          title={formatPstFullDateTime(row.original.created_at)}
-        >
-          {timeAgo(row.original.created_at)}
-        </span>
-      ),
-    },
-    {
-      id: 'user',
-      header: 'User',
-      size: 120,
-      cell: ({ row }) => {
-        const { employee_name, user_email } = row.original;
-        const display = employee_name || user_email || 'System';
-        return (
-          <span className="text-sm text-gray-700 dark:text-gray-300" title={user_email || undefined}>
-            {display}
-          </span>
-        );
-      },
-    },
-    {
-      id: 'action',
-      header: 'Action',
-      size: 110,
-      cell: ({ row }) => {
-        const a = row.original.action;
-        const variant = AUDIT_ACTION_BADGE_VARIANT[a] || 'secondary';
-        return (
-          <Badge variant={variant}>
-            {AUDIT_ACTION_LABELS[a] || a}
-          </Badge>
-        );
-      },
-    },
-    {
-      id: 'type',
-      header: 'Type',
-      size: 110,
-      cell: ({ row }) => (
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          {AUDIT_ENTITY_TYPE_LABELS[row.original.entity_type] || row.original.entity_type}
-        </span>
-      ),
-    },
-    {
-      id: 'entity',
-      header: 'Entity',
-      size: 200,
-      cell: ({ row }) => {
-        const { entity_type, entity_id, entity_label } = row.original;
-        const label = entity_label || entity_id || '--';
-        const url = entity_id ? getEntityUrl(entity_type, entity_id) : null;
-
-        if (url) {
-          return (
-            <a
-              href={url}
-              className="text-sm text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              {label}
-            </a>
-          );
-        }
-        return <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>;
-      },
-    },
-    {
-      id: 'details',
-      header: 'Details',
-      size: 300,
-      enableSorting: false,
-      cell: ({ row }) => {
-        if (!row.original.details) {
-          return <span className="text-sm text-gray-400">--</span>;
-        }
-        const text = JSON.stringify(row.original.details);
-        return (
-          <button
-            className="block max-w-[400px] truncate text-left text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            title="Click to view details"
-            onClick={() => setDetailEntry(row.original)}
-          >
-            {text}
-          </button>
-        );
-      },
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -387,11 +275,70 @@ export default function AuditLogPage() {
         </Card>
       ) : (
         <>
-          <DataTable
-            columns={columns}
-            data={entries}
-            pageSize={PAGE_SIZE}
-          />
+          <div className="overflow-hidden rounded-lg border border-ui-border bg-ui-bg shadow-ui">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead style={{ width: 130 }}>Time</TableHead>
+                  <TableHead style={{ width: 120 }}>User</TableHead>
+                  <TableHead style={{ width: 110 }}>Action</TableHead>
+                  <TableHead style={{ width: 110 }}>Type</TableHead>
+                  <TableHead style={{ width: 200 }}>Entity</TableHead>
+                  <TableHead>Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {entries.map((entry, idx) => (
+                  <TableRow
+                    key={entry.id}
+                    className={idx % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800/50' : ''}
+                  >
+                    <TableCell className="py-1.5">
+                      <span
+                        className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400"
+                        title={formatPstFullDateTime(entry.created_at)}
+                      >
+                        {timeAgo(entry.created_at)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <span className="text-sm text-gray-700 dark:text-gray-300" title={entry.user_email || undefined}>
+                        {entry.employee_name || entry.user_email || 'System'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <Badge variant={AUDIT_ACTION_BADGE_VARIANT[entry.action] || 'secondary'}>
+                        {AUDIT_ACTION_LABELS[entry.action] || entry.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {AUDIT_ENTITY_TYPE_LABELS[entry.entity_type] || entry.entity_type}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {entry.entity_label || entry.entity_id || '--'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      {entry.details ? (
+                        <button
+                          className="block max-w-[400px] truncate text-left text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                          title="Click to view details"
+                          onClick={() => setDetailEntry(entry)}
+                        >
+                          {JSON.stringify(entry.details)}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-gray-400">--</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           <Pagination
             currentPage={page}
             totalPages={totalPages}

@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Audit Log Cleanup + Admin Customer Create Redesign — Session D12g — 2026-02-22
+
+### Audit log page cleanup
+- Removed `getEntityUrl()` function — all entity labels are now plain text (no clickable links)
+- Deleted records no longer create dead links
+- Replaced DataTable component with manual Table render for full row control
+- Compact row height: `py-3` → `py-1.5` on all table cells
+- Zebra striping: alternating white / `bg-gray-50` rows (dark mode: `bg-gray-800/50`)
+
+### Admin customer create page redesign
+- Condensed from 4 cards to 3: Contact Information, Notes & Tags, Marketing Info
+- Contact Info: 4-column grid with 2 rows (First/Last/Mobile/Email, Addr1/Addr2/City/State+Zip)
+- State and Zip share column 4 side-by-side
+- Notes textarea height increased from 3 rows to 5 rows
+- Marketing Info card: Customer Type pills, Birthday fields, SMS toggle, Email toggle in 4 columns
+- Birthday redesigned from single date input to Month dropdown, Day dropdown, Year text input (optional)
+- Birthday stored as DATE with year `1900` as sentinel when year is omitted
+- Birthday validation: month and day must both be provided or both empty; year range 1920–current year
+- Email format validation: real-time check for `@` and `.` after `@`, red border + error message
+- Phone duplicate check: red border on match + inline error
+- Email duplicate check: red border on match + inline error
+- Save button disabled while any validation error exists
+- Responsive: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`
+- Dark mode support on type pills and toggle borders
+
+---
+
 ## Customer Create UX — Session D12f — 2026-02-22
 
 ### Real-time phone/email duplicate checking
