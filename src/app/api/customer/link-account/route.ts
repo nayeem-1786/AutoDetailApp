@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     if (emp) {
       return NextResponse.json(
-        { error: 'This email is associated with a staff account. Please use the staff login.' },
+        { error: 'This email is used for a staff account and can\'t be used for customer registration.' },
         { status: 403 }
       );
     }
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     if (custErr || !newCustomer) {
       console.error('Customer creation failed:', custErr?.message);
       return NextResponse.json(
-        { error: 'Failed to create customer record' },
+        { error: 'Something went wrong creating your account. Please try again.' },
         { status: 500 }
       );
     }

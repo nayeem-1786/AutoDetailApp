@@ -124,19 +124,21 @@ export default function CustomerSignUpPage() {
       if (emailCheck.hasAuthAccount) {
         setError(
           <>
-            An account with this email already exists.{' '}
+            This email is already linked to an account.{' '}
             <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
-              Sign in instead
-            </Link>
+              Sign in here
+            </Link>{' '}
+            or use a different email.
           </>
         );
       } else {
         setHint(
           <>
-            We found your customer profile!{' '}
+            Welcome back! We already have your info on file.{' '}
             <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
-              Sign in to link your account
-            </Link>
+              Sign in here
+            </Link>{' '}
+            to access your account.
           </>
         );
       }
@@ -151,19 +153,25 @@ export default function CustomerSignUpPage() {
         if (phoneCheck.hasAuthAccount) {
           setError(
             <>
-              This phone number is already registered.{' '}
+              This phone number is already linked to an account.{' '}
               <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
-                Sign in instead
-              </Link>
+                Sign in here
+              </Link>{' '}
+              instead.
+              <span className="mt-1 block text-xs text-site-text-dim">
+                Not your account? Call or text us for help.
+              </span>
             </>
           );
         } else {
+          const phoneParam = encodeURIComponent(data.phone);
           setHint(
             <>
-              We found your customer profile!{' '}
-              <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
-                Sign in to link your account
-              </Link>
+              Welcome back! We already have your info on file.{' '}
+              <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-lime hover:text-lime-400 underline">
+                Sign in here
+              </Link>{' '}
+              to access your account.
             </>
           );
         }
@@ -180,18 +188,20 @@ export default function CustomerSignUpPage() {
     });
 
     if (signUpError) {
-      // Friendly message for common Supabase errors
       if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
         setError(
           <>
-            An account with this email already exists.{' '}
+            This email is already linked to an account.{' '}
             <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
-              Sign in instead
-            </Link>
+              Sign in here
+            </Link>{' '}
+            or use a different email.
           </>
         );
+      } else if (signUpError.message.includes('rate') || signUpError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError(signUpError.message);
+        setError('Something went wrong creating your account. Please try again.');
       }
       setLoading(false);
       return;
@@ -211,7 +221,29 @@ export default function CustomerSignUpPage() {
     const linkData = await linkRes.json();
 
     if (!linkRes.ok) {
-      setError(linkData.error || 'Failed to create account');
+      if (linkRes.status === 401) {
+        setError(
+          <>
+            Your session has expired. Please{' '}
+            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+              start over
+            </Link>{' '}
+            to try again.
+          </>
+        );
+      } else if (linkData.error?.includes('staff account')) {
+        setError(
+          <>
+            This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
+            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+              sign in as staff
+            </Link>
+            .
+          </>
+        );
+      } else {
+        setError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
+      }
       setLoading(false);
       return;
     }
@@ -239,20 +271,25 @@ export default function CustomerSignUpPage() {
       if (phoneCheck.hasAuthAccount) {
         setError(
           <>
-            This phone number is already registered.{' '}
+            This phone number is already linked to an account.{' '}
             <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
-              Sign in instead
-            </Link>
+              Sign in here
+            </Link>{' '}
+            instead.
+            <span className="mt-1 block text-xs text-site-text-dim">
+              Not your account? Call or text us for help.
+            </span>
           </>
         );
       } else {
         const phoneParam = encodeURIComponent(data.phone);
         setHint(
           <>
-            We found your customer profile!{' '}
+            Welcome back! We already have your info on file.{' '}
             <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-lime hover:text-lime-400 underline">
-              Sign in to link your account
-            </Link>
+              Sign in here
+            </Link>{' '}
+            to access your account.
           </>
         );
       }
@@ -265,9 +302,9 @@ export default function CustomerSignUpPage() {
 
     if (otpError) {
       if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes.');
+        setError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError(otpError.message);
+        setError('Something went wrong sending your code. Please try again.');
       }
       setLoading(false);
       return;
@@ -301,12 +338,14 @@ export default function CustomerSignUpPage() {
     });
 
     if (verifyError) {
-      if (verifyError.message.includes('invalid') || verifyError.message.includes('expired')) {
-        setError('Invalid code. Please try again or request a new one.');
+      if (verifyError.message.includes('expired')) {
+        setError('Your verification code has expired. Please request a new one.');
+      } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
+        setError('That code didn\u2019t work. Please check and try again, or request a new code.');
       } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes.');
+        setError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError(verifyError.message);
+        setError('Something went wrong verifying your code. Please try again.');
       }
       setLoading(false);
       return;
@@ -329,7 +368,11 @@ export default function CustomerSignUpPage() {
     const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
 
     if (otpError) {
-      setError(otpError.message);
+      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
+      } else {
+        setError('Something went wrong sending your code. Please try again.');
+      }
       return;
     }
 
@@ -356,7 +399,29 @@ export default function CustomerSignUpPage() {
     const linkData = await linkRes.json();
 
     if (!linkRes.ok) {
-      setError(linkData.error || 'Failed to create account');
+      if (linkRes.status === 401) {
+        setError(
+          <>
+            Your session has expired. Please{' '}
+            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+              start over
+            </Link>{' '}
+            to try again.
+          </>
+        );
+      } else if (linkData.error?.includes('staff account')) {
+        setError(
+          <>
+            This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
+            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+              sign in as staff
+            </Link>
+            .
+          </>
+        );
+      } else {
+        setError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
+      }
       setLoading(false);
       return;
     }

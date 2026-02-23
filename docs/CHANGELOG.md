@@ -4,7 +4,7 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Customer Auth Security — Duplicate Prevention & Audit Logging — Session D13a — 2026-02-22
+## Customer Auth Security — Duplicate Prevention, Error Messages & Audit Logging — Session D13a — 2026-02-22
 
 ### New API endpoint: check-exists
 - Created `src/app/api/customer/check-exists/route.ts` — public GET endpoint
@@ -15,28 +15,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ### Signup page: pre-check before auth account creation
 - **Email signup (full mode)**: Checks email + phone against customers table before `signUp()`
-  - Email/phone exists with auth account → "Already registered" error + link to /signin
-  - Email/phone exists without auth account → "Found your profile" hint + link to /signin
+  - Email/phone exists with auth account → "Already linked to an account" error + sign in link
+  - Email/phone exists without auth account → "Welcome back!" hint + sign in link
   - Neither exists → proceeds normally
 - **Phone OTP signup**: Checks phone before sending OTP
-  - Phone exists with auth account → "Already registered" error + link to /signin
-  - Phone exists without auth account → "Found your profile" hint + link to /signin with phone prefilled
+  - Phone exists with auth account → "Already linked" error + sign in link + "Not your account?" escape hatch
+  - Phone exists without auth account → "Welcome back!" hint + sign in link with phone prefilled
   - Phone not found → OTP sent normally
 - Added `hint` state (amber banner) for informational messages vs `error` (red banner)
-- Friendly error messages for OTP verification failures (invalid code, rate limit)
 
 ### Signin page: verify account exists before sending OTP
 - **Phone signin**: Checks phone exists via check-exists before sending OTP
-  - No account found → "No account found" error + link to /signup (NO OTP sent)
+  - No account found → "Couldn't find an account" error + link to /signup (NO OTP sent)
   - Account exists → OTP sent normally
 - **Email signin**: Friendly error messages for invalid login + link to /signup
-- Friendly error messages for OTP verification (invalid code, rate limit, too many attempts)
+- Staff account detection → link to staff login (/login) instead of generic error
+
+### Customer-friendly error messages (all auth flows)
+- **OTP expired**: "Your verification code has expired. Please request a new one."
+- **OTP invalid**: "That code didn't work. Please check and try again, or request a new code."
+- **Too many attempts**: "Too many attempts. Please wait a few minutes and try again."
+- **Staff email on customer signup**: "This email is used for a staff account... sign in as staff" (link to /login)
+- **Session expired during profile step**: "Your session has expired. Please start over." (link to /signup)
+- **Link failure**: "Something went wrong... Please try again. If the problem continues, contact us."
+- **Phone recycled/not yours**: "Not your account? Call or text us for help." shown below phone-already-registered errors
+- **No raw Supabase errors**: All error messages are plain English with next-step instructions
+- Every error that suggests another page includes a clickable link
 
 ### Audit logging for customer auth events
 - **auth/callback**: Logs signup/signin/password-reset events after successful code exchange
 - **link-account**: Logs account creation and phone/email linking with match type
 - **link-by-phone**: Logs phone-based account linking
 - All events use `source: 'customer_portal'` for filtering in admin audit log
+
+### API cleanup
+- **link-account**: Updated staff error and creation failure messages to be customer-friendly
+- **link-by-phone**: Removed debug console.log statements, broader search fallback now returns results
 
 ---
 

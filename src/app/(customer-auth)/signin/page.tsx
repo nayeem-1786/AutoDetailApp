@@ -118,10 +118,11 @@ export default function CustomerSignInPage() {
     if (!phoneCheck.exists) {
       setError(
         <>
-          No account found with this phone number.{' '}
+          We couldn&apos;t find an account with that phone number.{' '}
           <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
-            Create an account
-          </Link>
+            Create a new account
+          </Link>{' '}
+          to get started.
         </>
       );
       setLoading(false);
@@ -133,9 +134,9 @@ export default function CustomerSignInPage() {
 
     if (otpError) {
       if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes.');
+        setError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError(otpError.message);
+        setError('Something went wrong sending your code. Please try again.');
       }
       setLoading(false);
       return;
@@ -167,12 +168,14 @@ export default function CustomerSignInPage() {
     });
 
     if (verifyError) {
-      if (verifyError.message.includes('invalid') || verifyError.message.includes('expired')) {
-        setError('Invalid code. Please try again or request a new one.');
+      if (verifyError.message.includes('expired')) {
+        setError('Your verification code has expired. Please request a new one.');
+      } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
+        setError('That code didn\u2019t work. Please check and try again, or request a new code.');
       } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes.');
+        setError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError(verifyError.message);
+        setError('Something went wrong verifying your code. Please try again.');
       }
       setLoading(false);
       return;
@@ -192,7 +195,15 @@ export default function CustomerSignInPage() {
 
       if (emp) {
         await supabase.auth.signOut();
-        setError('This account is a staff account. Please use the staff login.');
+        setError(
+          <>
+            This phone number is linked to a staff account.{' '}
+            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+              Sign in as staff
+            </Link>{' '}
+            instead, or use a different number.
+          </>
+        );
         setLoading(false);
         return;
       }
@@ -214,7 +225,6 @@ export default function CustomerSignInPage() {
           });
 
           const linkData = await linkRes.json();
-          console.log('[SignIn] Link by phone result:', linkData);
 
           if (linkData.success) {
             // Successfully linked or already linked — continue to account
@@ -225,7 +235,14 @@ export default function CustomerSignInPage() {
 
           if (linkData.error === 'This phone number is already linked to another account') {
             await supabase.auth.signOut();
-            setError('This phone number is already linked to another account.');
+            setError(
+              <>
+                This phone number is already linked to another account.
+                <span className="mt-1 block text-xs text-site-text-dim">
+                  Not your account? Call or text us for help.
+                </span>
+              </>
+            );
             setLoading(false);
             return;
           }
@@ -238,12 +255,11 @@ export default function CustomerSignInPage() {
           }
 
           // Other error
-          setError(linkData.error || 'Failed to link your account. Please contact support.');
+          setError('Something went wrong linking your account. Please try again. If the problem continues, contact us.');
           setLoading(false);
           return;
-        } catch (linkErr) {
-          console.error('Link API error:', linkErr);
-          setError('Failed to link your account. Please contact support.');
+        } catch {
+          setError('Something went wrong linking your account. Please try again. If the problem continues, contact us.');
           setLoading(false);
           return;
         }
@@ -265,7 +281,11 @@ export default function CustomerSignInPage() {
     const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
 
     if (otpError) {
-      setError(otpError.message);
+      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
+      } else {
+        setError('Something went wrong sending your code. Please try again.');
+      }
       return;
     }
 
@@ -284,18 +304,20 @@ export default function CustomerSignInPage() {
     });
 
     if (authError) {
-      // Friendly error messages
       if (authError.message.includes('Invalid login') || authError.message.includes('invalid')) {
         setError(
           <>
-            Invalid email or password.{' '}
+            Incorrect email or password. Please try again, or{' '}
             <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
-              Create an account
+              create a new account
             </Link>
+            .
           </>
         );
+      } else if (authError.message.includes('rate') || authError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError(authError.message);
+        setError('Something went wrong signing you in. Please try again.');
       }
       setLoading(false);
       return;
@@ -314,7 +336,15 @@ export default function CustomerSignInPage() {
 
       if (emp) {
         await supabase.auth.signOut();
-        setError('This account is a staff account. Please use the staff login.');
+        setError(
+          <>
+            This email is linked to a staff account.{' '}
+            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+              Sign in as staff
+            </Link>{' '}
+            instead, or use a different email.
+          </>
+        );
         setLoading(false);
         return;
       }
@@ -329,10 +359,11 @@ export default function CustomerSignInPage() {
         await supabase.auth.signOut();
         setError(
           <>
-            No customer account found.{' '}
+            We couldn&apos;t find a customer account with that email.{' '}
             <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
-              Create an account
-            </Link>
+              Create a new account
+            </Link>{' '}
+            to get started.
           </>
         );
         setLoading(false);
@@ -361,7 +392,11 @@ export default function CustomerSignInPage() {
     });
 
     if (resetError) {
-      setError(resetError.message);
+      if (resetError.message.includes('rate') || resetError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
+      } else {
+        setError('Something went wrong. Please check your email address and try again.');
+      }
       setLoading(false);
       return;
     }

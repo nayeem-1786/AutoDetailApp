@@ -44,20 +44,15 @@ export async function POST(request: NextRequest) {
     const formatted = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
     const phoneFormats = [e164, digits, `+1${digits}`, formatted];
 
-    console.log('[link-by-phone] Searching with formats:', phoneFormats);
-
     let customer: { id: string; auth_user_id: string | null } | null = null;
 
     for (const phoneFormat of phoneFormats) {
-      // Use limit(1) instead of maybeSingle to handle duplicates
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('customers')
         .select('id, auth_user_id, phone')
         .eq('phone', phoneFormat)
-        .order('created_at', { ascending: true }) // Pick oldest record
+        .order('created_at', { ascending: true })
         .limit(1);
-
-      console.log(`[link-by-phone] Query "${phoneFormat}":`, data, error);
 
       if (data && data.length > 0) {
         customer = data[0];
@@ -65,14 +60,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Also try a broader search to debug
+    // Broader search fallback (last 7 digits)
     if (!customer) {
       const { data: allWithDigits } = await supabase
         .from('customers')
-        .select('id, phone')
+        .select('id, auth_user_id, phone')
         .ilike('phone', `%${digits.slice(-7)}%`)
-        .limit(5);
-      console.log('[link-by-phone] Broad search (last 7 digits):', allWithDigits);
+        .limit(1);
+
+      if (allWithDigits && allWithDigits.length > 0) {
+        customer = allWithDigits[0];
+      }
     }
 
     if (!customer) {
