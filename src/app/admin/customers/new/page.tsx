@@ -313,35 +313,6 @@ export default function NewCustomerPage() {
             <CardTitle>Contact Information</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Customer Type */}
-            <div className="mb-4 space-y-1.5">
-              <label className="text-sm font-medium text-ui-text">
-                Customer Type <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-1.5">
-                {TYPE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setCustomerType(opt.value);
-                      setTypeError(false);
-                    }}
-                    className={`rounded-lg border-2 px-2 py-1.5 text-sm font-medium transition-all ${
-                      customerType === opt.value
-                        ? opt.activeClass
-                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              {typeError && (
-                <p className="text-xs text-red-600">Please select a customer type</p>
-              )}
-            </div>
-
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* Row 1: First Name | Last Name | Mobile | Email */}
               <FormField label="First Name" error={errors.first_name?.message} required htmlFor="first_name">
@@ -423,7 +394,36 @@ export default function NewCustomerPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
-              {/* Birthday — cols 1-4 */}
+              {/* Customer Type — cols 1-2 */}
+              <div className="min-w-0 space-y-1.5 lg:col-span-2">
+                <label className="text-sm font-medium text-ui-text">
+                  Customer Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-1.5">
+                  {TYPE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setCustomerType(opt.value);
+                        setTypeError(false);
+                      }}
+                      className={`rounded-lg border-2 px-2 py-1.5 text-sm font-medium transition-all ${
+                        customerType === opt.value
+                          ? opt.activeClass
+                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {typeError && (
+                  <p className="text-xs text-red-600">Please select a customer type</p>
+                )}
+              </div>
+
+              {/* Birthday — cols 3-6 */}
               <div className="space-y-1.5 lg:col-span-4">
                 <label className="text-sm font-medium text-ui-text">Birthday</label>
                 <div className="grid grid-cols-[3fr_4.5rem_3fr] gap-1.5 max-w-[75%]">

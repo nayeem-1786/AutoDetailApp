@@ -6,9 +6,10 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ## Customer Create/Edit Audit Logging + Type Pill Cleanup — Session D12i — 2026-02-22
 
-### Create page: Customer Type moved out of Marketing Info
-- Removed Enthusiast/Professional pills from Marketing Info card (Birthday, SMS, Email column spans unchanged)
-- Customer Type pills moved to top of Contact Information card (above the 4-col grid)
+### Create page: Customer Type placement fix
+- Customer Type pills restored to Marketing Info card at col-span-2 (first column)
+- Final Marketing Info layout: Customer Type (2) | Birthday (4) | SMS Marketing (3) | Email Marketing (3) = 12 cols
+- Customer Type was briefly misplaced on Contact Information card — reverted
 
 ### Audit logging for admin customer create/update
 - Created `src/app/api/admin/customers/route.ts` (POST) — server-side customer creation with `logAudit()` for CREATE
