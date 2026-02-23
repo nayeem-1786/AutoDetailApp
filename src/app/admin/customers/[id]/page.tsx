@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
@@ -30,6 +30,7 @@ import type {
   LoyaltyAction,
   Quote,
   QuoteStatus,
+  CustomerType,
 } from '@/lib/supabase/types';
 import { formatCurrency, formatPhone, formatPhoneInput, formatDate, formatDateTime, formatPoints, normalizePhone } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
@@ -65,6 +66,27 @@ import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 import { printReceipt } from '@/app/pos/lib/star-printer';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { ColumnDef } from '@tanstack/react-table';
+
+const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[] = [
+  { value: 'enthusiast', label: 'Enthusiast', activeClass: 'border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  { value: 'professional', label: 'Professional', activeClass: 'border-purple-400 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+];
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  'DC',
+];
 
 export default function CustomerProfilePage() {
   const router = useRouter();
@@ -128,6 +150,30 @@ export default function CustomerProfilePage() {
   const [showReceiptSmsInput, setShowReceiptSmsInput] = useState(false);
   const [receiptSmsInput, setReceiptSmsInput] = useState('');
 
+  // Customer type (separate from form, like create page)
+  const [customerType, setCustomerType] = useState<CustomerType | null>(null);
+  const [typeError, setTypeError] = useState(false);
+
+  // Birthday fields (month/day/year dropdowns, not date input)
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [birthdayError, setBirthdayError] = useState('');
+
+  // Duplicate check state
+  const [phoneDup, setPhoneDup] = useState<{ name: string } | null>(null);
+  const [emailDup, setEmailDup] = useState<{ name: string } | null>(null);
+  const [emailFormatError, setEmailFormatError] = useState('');
+  const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-toggle refs
+  const prevPhoneHadValue = useRef(false);
+  const prevEmailHadValue = useRef(false);
+
+  // Phone required validation
+  const [phoneRequired, setPhoneRequired] = useState(false);
+
   // Customer edit form
   const {
     register,
@@ -135,7 +181,7 @@ export default function CustomerProfilePage() {
     watch,
     setValue,
     reset,
-    formState: { errors, isDirty },
+    formState: { errors },
   } = useForm<CustomerUpdateInput>({
     resolver: formResolver(customerUpdateSchema),
   });
@@ -144,6 +190,125 @@ export default function CustomerProfilePage() {
   const emailConsent = watch('email_consent');
   const watchPhone = watch('phone');
   const watchEmail = watch('email');
+
+  // Sync customerType from customer state (e.g. when summary card changes it)
+  useEffect(() => {
+    if (customer) setCustomerType(customer.customer_type);
+  }, [customer]);
+
+  // Auto-toggle SMS consent on empty↔filled transitions
+  useEffect(() => {
+    const hasValue = (watchPhone || '').replace(/\D/g, '').length > 0;
+    if (hasValue && !prevPhoneHadValue.current) {
+      setValue('sms_consent', true, { shouldDirty: true });
+    } else if (!hasValue && prevPhoneHadValue.current) {
+      setValue('sms_consent', false, { shouldDirty: true });
+    }
+    prevPhoneHadValue.current = hasValue;
+  }, [watchPhone, setValue]);
+
+  // Auto-toggle Email consent on empty↔filled transitions
+  useEffect(() => {
+    const hasValue = (watchEmail || '').trim().length > 0;
+    if (hasValue && !prevEmailHadValue.current) {
+      setValue('email_consent', true, { shouldDirty: true });
+    } else if (!hasValue && prevEmailHadValue.current) {
+      setValue('email_consent', false, { shouldDirty: true });
+    }
+    prevEmailHadValue.current = hasValue;
+  }, [watchEmail, setValue]);
+
+  // Debounced phone duplicate check (excludes self)
+  useEffect(() => {
+    if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current);
+
+    const digits = (watchPhone || '').replace(/\D/g, '');
+    if (digits.length < 10) {
+      setPhoneDup(null);
+      return;
+    }
+
+    phoneTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await adminFetch(`/api/admin/customers/check-duplicate?phone=${encodeURIComponent(watchPhone || '')}&excludeId=${id}`);
+        const json = await res.json();
+        if (json.exists && json.field === 'phone') {
+          setPhoneDup({ name: `${json.match.first_name} ${json.match.last_name}` });
+        } else {
+          setPhoneDup(null);
+        }
+      } catch {
+        setPhoneDup(null);
+      }
+    }, 500);
+
+    return () => {
+      if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current);
+    };
+  }, [watchPhone, id]);
+
+  // Debounced email duplicate check + format validation (excludes self)
+  useEffect(() => {
+    if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
+
+    const trimmed = (watchEmail || '').trim();
+    if (!trimmed) {
+      setEmailDup(null);
+      setEmailFormatError('');
+      return;
+    }
+
+    const atIdx = trimmed.indexOf('@');
+    if (atIdx === -1 || trimmed.indexOf('.', atIdx) === -1) {
+      setEmailFormatError('Please enter a valid email address');
+      setEmailDup(null);
+      return;
+    }
+    setEmailFormatError('');
+
+    emailTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await adminFetch(`/api/admin/customers/check-duplicate?email=${encodeURIComponent(trimmed)}&excludeId=${id}`);
+        const json = await res.json();
+        if (json.exists && json.field === 'email') {
+          setEmailDup({ name: `${json.match.first_name} ${json.match.last_name}` });
+        } else {
+          setEmailDup(null);
+        }
+      } catch {
+        setEmailDup(null);
+      }
+    }, 500);
+
+    return () => {
+      if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
+    };
+  }, [watchEmail, id]);
+
+  // Birthday validation
+  useEffect(() => {
+    if ((birthMonth && !birthDay) || (!birthMonth && birthDay)) {
+      setBirthdayError('Both month and day are required');
+    } else if (birthYear) {
+      const yr = parseInt(birthYear);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(yr) || yr < 1920 || yr > currentYear) {
+        setBirthdayError(`Year must be between 1920 and ${currentYear}`);
+      } else {
+        setBirthdayError('');
+      }
+    } else {
+      setBirthdayError('');
+    }
+  }, [birthMonth, birthDay, birthYear]);
+
+  // Computed error state
+  const phoneDigits = (watchPhone || '').replace(/\D/g, '');
+  const isPhoneEmpty = phoneDigits.length === 0;
+  const hasDuplicateError = !!phoneDup || !!emailDup;
+  const hasEmailFormatError = !!emailFormatError;
+  const hasBirthdayError = !!birthdayError;
+  const hasAnyError = hasDuplicateError || hasEmailFormatError || hasBirthdayError || typeError;
 
   // Vehicle form
   const vehicleForm = useForm<VehicleInput>({
@@ -191,6 +356,11 @@ export default function CustomerProfilePage() {
     }
 
     setCustomer(custRes.data);
+
+    // Initialize auto-toggle refs BEFORE reset triggers effects
+    prevPhoneHadValue.current = !!custRes.data.phone;
+    prevEmailHadValue.current = !!custRes.data.email;
+
     reset({
       first_name: custRes.data.first_name,
       last_name: custRes.data.last_name,
@@ -200,13 +370,32 @@ export default function CustomerProfilePage() {
       address_line_1: custRes.data.address_line_1 || '',
       address_line_2: custRes.data.address_line_2 || '',
       city: custRes.data.city || '',
-      state: custRes.data.state || '',
+      state: custRes.data.state || 'CA',
       zip: custRes.data.zip || '',
       notes: custRes.data.notes || '',
       tags: custRes.data.tags || [],
       sms_consent: custRes.data.sms_consent,
       email_consent: custRes.data.email_consent,
     });
+
+    // Initialize customer type
+    setCustomerType(custRes.data.customer_type);
+
+    // Initialize birthday fields from stored date
+    if (custRes.data.birthday) {
+      const bd = new Date(custRes.data.birthday + 'T00:00:00');
+      const m = bd.getMonth();
+      const d = bd.getDate();
+      const y = bd.getFullYear();
+      setBirthMonth(MONTHS[m]);
+      setBirthDay(String(d));
+      if (y !== 1900) setBirthYear(String(y));
+      else setBirthYear('');
+    } else {
+      setBirthMonth('');
+      setBirthDay('');
+      setBirthYear('');
+    }
 
     if (vehRes.data) setVehicles(vehRes.data);
     if (ledgerRes.data) setLedger(ledgerRes.data);
@@ -219,9 +408,47 @@ export default function CustomerProfilePage() {
     loadData();
   }, [loadData]);
 
+  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value;
+    const formatted = formatPhoneInput(raw);
+    setValue('phone', formatted, { shouldDirty: true });
+    if (formatted.replace(/\D/g, '').length > 0) {
+      setPhoneRequired(false);
+    }
+  }
+
+  function buildBirthdayDate(): string | null {
+    if (!birthMonth && !birthDay) return null;
+    if (!birthMonth || !birthDay) return null;
+
+    const monthNum = String(MONTHS.indexOf(birthMonth) + 1).padStart(2, '0');
+    const dayNum = String(birthDay).padStart(2, '0');
+    const yr = birthYear ? String(parseInt(birthYear)) : '1900';
+    return `${yr}-${monthNum}-${dayNum}`;
+  }
+
   // --- Info Tab: Save customer ---
   async function onSaveInfo(data: CustomerUpdateInput) {
     if (!customer) return;
+
+    // Phone required check
+    const digits = (data.phone || '').replace(/\D/g, '');
+    if (digits.length === 0) {
+      setPhoneRequired(true);
+      toast.error('Mobile number is required');
+      return;
+    }
+    setPhoneRequired(false);
+
+    // Customer type required check
+    if (!customerType) {
+      setTypeError(true);
+      toast.error('Please select a customer type');
+      return;
+    }
+
+    if (hasAnyError) return;
+
     setSaving(true);
     try {
       let phone = data.phone || null;
@@ -267,6 +494,9 @@ export default function CustomerProfilePage() {
         }
       }
 
+      // Build birthday from month/day/year fields
+      const birthday = buildBirthdayDate();
+
       const { error } = await supabase
         .from('customers')
         .update({
@@ -274,7 +504,7 @@ export default function CustomerProfilePage() {
           last_name: data.last_name,
           phone,
           email: data.email || null,
-          birthday: data.birthday || null,
+          birthday,
           address_line_1: data.address_line_1 || null,
           address_line_2: data.address_line_2 || null,
           city: data.city || null,
@@ -284,6 +514,7 @@ export default function CustomerProfilePage() {
           tags: data.tags || [],
           sms_consent: data.sms_consent,
           email_consent: data.email_consent,
+          customer_type: customerType,
         })
         .eq('id', id);
 
@@ -1049,141 +1280,216 @@ export default function CustomerProfilePage() {
               </CardContent>
             </Card>
 
+            {/* Card 1: Contact Information — 4-column grid, 2 rows */}
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle>Contact & Address</CardTitle>
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-x-4 gap-y-3 grid-cols-4">
-                  {/* Row 1: Name, Mobile, Email */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* Row 1: First Name | Last Name | Mobile | Email */}
                   <FormField label="First Name" error={errors.first_name?.message} required htmlFor="first_name">
-                    <Input id="first_name" {...register('first_name')} />
+                    <Input id="first_name" {...register('first_name')} placeholder="Jane" />
                   </FormField>
+
                   <FormField label="Last Name" error={errors.last_name?.message} required htmlFor="last_name">
-                    <Input id="last_name" {...register('last_name')} />
+                    <Input id="last_name" {...register('last_name')} placeholder="Smith" />
                   </FormField>
-                  <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
+
+                  <FormField label="Mobile" error={errors.phone?.message || (phoneRequired ? 'Mobile number is required' : undefined)} required htmlFor="phone">
                     <Input
                       id="phone"
+                      {...register('phone')}
+                      onChange={handlePhoneChange}
                       placeholder="(310) 555-1234"
-                      {...register('phone', {
-                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                          const formatted = formatPhoneInput(e.target.value);
-                          setValue('phone', formatted, { shouldDirty: true });
-                        },
-                      })}
+                      className={phoneDup || phoneRequired ? 'border-red-500' : ''}
                     />
+                    {phoneDup && (
+                      <p className="mt-1 text-xs text-red-600">
+                        Phone already belongs to {phoneDup.name}
+                      </p>
+                    )}
                   </FormField>
+
                   <FormField label="Email" error={errors.email?.message} htmlFor="email">
-                    <Input id="email" type="email" {...register('email')} />
+                    <Input
+                      id="email"
+                      type="email"
+                      {...register('email')}
+                      placeholder="jane@example.com"
+                      className={emailDup || emailFormatError ? 'border-red-500' : ''}
+                    />
+                    {emailFormatError && (
+                      <p className="mt-1 text-xs text-red-600">{emailFormatError}</p>
+                    )}
+                    {emailDup && (
+                      <p className="mt-1 text-xs text-red-600">
+                        Email already belongs to {emailDup.name}
+                      </p>
+                    )}
                   </FormField>
-                  {/* Row 2: Address, Address 2, Birthday */}
-                  <FormField label="Address" htmlFor="address_line_1">
-                    <Input id="address_line_1" {...register('address_line_1')} placeholder="Street address" />
+
+                  {/* Row 2: Address Line 1 | Address Line 2 | City | State + Zip */}
+                  <FormField label="Address Line 1" error={errors.address_line_1?.message} htmlFor="address_line_1">
+                    <Input id="address_line_1" {...register('address_line_1')} placeholder="123 Main St" />
                   </FormField>
-                  <FormField label="Address 2" htmlFor="address_line_2">
-                    <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt, suite" />
+
+                  <FormField label="Address Line 2" error={errors.address_line_2?.message} htmlFor="address_line_2">
+                    <Input id="address_line_2" {...register('address_line_2')} placeholder="Apt 4B" />
                   </FormField>
-                  <div />
-                  <FormField label="Birthday" error={errors.birthday?.message} htmlFor="birthday">
-                    <Input id="birthday" type="date" {...register('birthday')} />
+
+                  <FormField label="City" error={errors.city?.message} htmlFor="city">
+                    <Input id="city" {...register('city')} placeholder="Lomita" />
                   </FormField>
-                  {/* Row 3: City = Address width, State + ZIP = Address 2 width */}
-                  <FormField label="City" htmlFor="city">
-                    <Input id="city" {...register('city')} />
-                  </FormField>
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <FormField label="State" htmlFor="state">
-                      <Input id="state" {...register('state')} maxLength={2} placeholder="CA" />
-                    </FormField>
-                    <FormField label="ZIP" htmlFor="zip">
-                      <Input id="zip" {...register('zip')} placeholder="90717" />
-                    </FormField>
+
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormField label="State" error={errors.state?.message} htmlFor="state">
+                        <Select id="state" {...register('state')}>
+                          {US_STATES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </Select>
+                      </FormField>
+                      <FormField label="Zip Code" error={errors.zip?.message} htmlFor="zip">
+                        <Input id="zip" {...register('zip')} placeholder="90717" />
+                      </FormField>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Card 2: Marketing Info — 12-column grid */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Marketing Info</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+                  {/* Customer Type — cols 1-2 */}
+                  <div className="min-w-0 space-y-1.5 lg:col-span-2">
+                    <label className="text-sm font-medium text-ui-text">
+                      Customer Type <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-1.5">
+                      {TYPE_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setCustomerType(opt.value);
+                            setTypeError(false);
+                          }}
+                          className={`rounded-lg border-2 px-2 py-1.5 text-sm font-medium transition-all ${
+                            customerType === opt.value
+                              ? opt.activeClass
+                              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    {typeError && (
+                      <p className="text-xs text-red-600">Please select a customer type</p>
+                    )}
+                  </div>
+
+                  {/* Birthday — cols 3-6 */}
+                  <div className="space-y-1.5 lg:col-span-4">
+                    <label className="text-sm font-medium text-ui-text">Birthday</label>
+                    <div className="grid grid-cols-[3fr_4.5rem_3fr] gap-1.5 max-w-[75%]">
+                      <Select
+                        value={birthMonth}
+                        onChange={(e) => setBirthMonth(e.target.value)}
+                        className={birthdayError ? 'border-red-500' : ''}
+                      >
+                        <option value="">Month</option>
+                        {MONTHS.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </Select>
+                      <Select
+                        value={birthDay}
+                        onChange={(e) => setBirthDay(e.target.value)}
+                        className={birthdayError ? 'border-red-500' : ''}
+                      >
+                        <option value="">Day</option>
+                        {DAYS.map((d) => (
+                          <option key={d} value={String(d)}>{d}</option>
+                        ))}
+                      </Select>
+                      <Input
+                        value={birthYear}
+                        onChange={(e) => setBirthYear(e.target.value)}
+                        placeholder="Year"
+                        maxLength={4}
+                        className={birthdayError && birthYear ? 'border-red-500' : ''}
+                      />
+                    </div>
+                    {birthdayError && (
+                      <p className="text-xs text-red-600">{birthdayError}</p>
+                    )}
+                  </div>
+
+                  {/* SMS Marketing Toggle — cols 7-9 */}
+                  <div className="space-y-1.5 lg:col-span-3">
+                    <label className="text-sm font-medium text-ui-text">SMS Marketing</label>
+                    <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+                      <p className="text-sm text-gray-700 dark:text-gray-300">Allow SMS</p>
+                      <Switch
+                        checked={smsConsent ?? false}
+                        onCheckedChange={(checked) => setValue('sms_consent', checked, { shouldDirty: true })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email Marketing Toggle — cols 10-12 */}
+                  <div className="space-y-1.5 lg:col-span-3">
+                    <label className="text-sm font-medium text-ui-text">Email Marketing</label>
+                    <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+                      <p className="text-sm text-gray-700 dark:text-gray-300">Allow Email</p>
+                      <Switch
+                        checked={emailConsent ?? false}
+                        onCheckedChange={(checked) => setValue('email_consent', checked, { shouldDirty: true })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Notes & Tags */}
             <Card>
               <CardHeader>
                 <CardTitle>Notes & Tags</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-6">
-                  <FormField label="Notes" htmlFor="notes">
-                    <Textarea id="notes" {...register('notes')} rows={3} />
+                <div className="grid grid-cols-1 gap-4">
+                  <FormField label="Notes" error={errors.notes?.message} htmlFor="notes">
+                    <Textarea id="notes" {...register('notes')} placeholder="Any notes about this customer..." rows={5} />
                   </FormField>
 
                   <FormField
                     label="Tags"
                     htmlFor="tags"
-                    description="Enter tags separated by commas"
+                    description="Enter tags separated by commas (e.g. VIP, fleet, referral)"
                   >
                     <Input
                       id="tags"
                       defaultValue={customer.tags?.join(', ') || ''}
+                      placeholder="VIP, fleet, referral"
                       onChange={(e) => {
-                        const tags = e.target.value
+                        const tagStr = e.target.value;
+                        const tags = tagStr
                           .split(',')
                           .map((t) => t.trim())
                           .filter(Boolean);
                         setValue('tags', tags, { shouldDirty: true });
                       }}
                     />
-                    {customer.tags && customer.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {(watch('tags') || customer.tags).map((tag) => (
-                          <Badge key={tag} variant="secondary">{tag}</Badge>
-                        ))}
-                      </div>
-                    )}
                   </FormField>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Marketing Consent</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">SMS Marketing</p>
-                        <p className="text-xs text-gray-500">Allow promotional text messages</p>
-                      </div>
-                      <Switch
-                        checked={smsConsent ?? false}
-                        onCheckedChange={(checked) => setValue('sms_consent', checked, { shouldDirty: true })}
-                      />
-                    </div>
-                    {smsConsent && !watchPhone && (
-                      <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                        SMS consent is on but no mobile number is on file. Add a mobile number or turn this off.
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Email Marketing</p>
-                        <p className="text-xs text-gray-500">Allow promotional emails</p>
-                      </div>
-                      <Switch
-                        checked={emailConsent ?? false}
-                        onCheckedChange={(checked) => setValue('email_consent', checked, { shouldDirty: true })}
-                      />
-                    </div>
-                    {emailConsent && !watchEmail && (
-                      <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-amber-600">
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                        Email consent is on but no email address is on file. Add an email or turn this off.
-                      </div>
-                    )}
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1205,7 +1511,7 @@ export default function CustomerProfilePage() {
                 <Button type="button" variant="outline" onClick={() => router.push('/admin/customers')}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={saving || !isDirty}>
+                <Button type="submit" disabled={saving || hasAnyError || isPhoneEmpty}>
                   {saving ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>

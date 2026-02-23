@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { customerCreateSchema, type CustomerCreateInput } from '@/lib/utils/validation';
-import { normalizePhone, formatPhone, formatPhoneInput } from '@/lib/utils/format';
+import { normalizePhone, formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import type { CustomerType } from '@/lib/supabase/types';
 
 const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[] = [
@@ -32,11 +32,19 @@ const MONTHS = [
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  'DC',
+];
+
 export default function NewCustomerPage() {
   const router = useRouter();
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
-  const [phonePreview, setPhonePreview] = useState<{ normalized: string | null; formatted: string } | null>(null);
 
   // Customer type
   const [customerType, setCustomerType] = useState<CustomerType | null>(null);
@@ -72,12 +80,12 @@ export default function NewCustomerPage() {
       address_line_1: '',
       address_line_2: '',
       city: '',
-      state: '',
+      state: 'CA',
       zip: '',
       notes: '',
       tags: [],
-      sms_consent: true,
-      email_consent: true,
+      sms_consent: false,
+      email_consent: false,
     },
   });
 
@@ -85,6 +93,30 @@ export default function NewCustomerPage() {
   const emailConsent = watch('email_consent');
   const watchPhone = watch('phone');
   const watchEmail = watch('email');
+
+  // Auto-toggle SMS/Email consent on empty↔filled transitions
+  const prevPhoneHadValue = useRef(false);
+  const prevEmailHadValue = useRef(false);
+
+  useEffect(() => {
+    const hasValue = (watchPhone || '').replace(/\D/g, '').length > 0;
+    if (hasValue && !prevPhoneHadValue.current) {
+      setValue('sms_consent', true);
+    } else if (!hasValue && prevPhoneHadValue.current) {
+      setValue('sms_consent', false);
+    }
+    prevPhoneHadValue.current = hasValue;
+  }, [watchPhone, setValue]);
+
+  useEffect(() => {
+    const hasValue = (watchEmail || '').trim().length > 0;
+    if (hasValue && !prevEmailHadValue.current) {
+      setValue('email_consent', true);
+    } else if (!hasValue && prevEmailHadValue.current) {
+      setValue('email_consent', false);
+    }
+    prevEmailHadValue.current = hasValue;
+  }, [watchEmail, setValue]);
 
   // Debounced phone duplicate check
   useEffect(() => {
@@ -171,6 +203,11 @@ export default function NewCustomerPage() {
     }
   }, [birthMonth, birthDay, birthYear]);
 
+  // Phone required validation
+  const [phoneRequired, setPhoneRequired] = useState(false);
+  const phoneDigits = (watchPhone || '').replace(/\D/g, '');
+  const isPhoneEmpty = phoneDigits.length === 0;
+
   const hasDuplicateError = !!phoneDup || !!emailDup;
   const hasEmailFormatError = !!emailFormatError;
   const hasBirthdayError = !!birthdayError;
@@ -180,19 +217,8 @@ export default function NewCustomerPage() {
     const raw = e.target.value;
     const formatted = formatPhoneInput(raw);
     setValue('phone', formatted, { shouldDirty: true });
-
-    if (formatted.length >= 3) {
-      const normalized = normalizePhone(formatted);
-      if (normalized) {
-        setPhonePreview({
-          normalized,
-          formatted: formatPhone(normalized),
-        });
-      } else {
-        setPhonePreview({ normalized: null, formatted: '' });
-      }
-    } else {
-      setPhonePreview(null);
+    if (formatted.replace(/\D/g, '').length > 0) {
+      setPhoneRequired(false);
     }
   }
 
@@ -209,6 +235,15 @@ export default function NewCustomerPage() {
   }
 
   async function onSubmit(data: CustomerCreateInput) {
+    // Phone required check
+    const digits = (data.phone || '').replace(/\D/g, '');
+    if (digits.length === 0) {
+      setPhoneRequired(true);
+      toast.error('Mobile number is required');
+      return;
+    }
+    setPhoneRequired(false);
+
     if (!customerType) {
       setTypeError(true);
       toast.error('Please select a customer type');
@@ -360,25 +395,14 @@ export default function NewCustomerPage() {
                 <Input id="last_name" {...register('last_name')} placeholder="Smith" />
               </FormField>
 
-              <FormField label="Mobile" error={errors.phone?.message} htmlFor="phone">
+              <FormField label="Mobile" error={errors.phone?.message || (phoneRequired ? 'Mobile number is required' : undefined)} required htmlFor="phone">
                 <Input
                   id="phone"
                   {...register('phone')}
                   onChange={handlePhoneChange}
                   placeholder="(310) 555-1234"
-                  className={phoneDup ? 'border-red-500' : ''}
+                  className={phoneDup || phoneRequired ? 'border-red-500' : ''}
                 />
-                {phonePreview && !phoneDup && (
-                  <div className="mt-1 text-xs">
-                    {phonePreview.normalized ? (
-                      <span className="text-green-600">
-                        {phonePreview.formatted} ({phonePreview.normalized})
-                      </span>
-                    ) : (
-                      <span className="text-amber-600">Enter a valid US mobile number</span>
-                    )}
-                  </div>
-                )}
                 {phoneDup && (
                   <p className="mt-1 text-xs text-red-600">
                     Phone already belongs to {phoneDup.name}
@@ -418,65 +442,36 @@ export default function NewCustomerPage() {
               </FormField>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-ui-text">State & Zip</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <Input {...register('state')} placeholder="CA" maxLength={2} />
-                  <Input {...register('zip')} placeholder="90717" />
+                  <FormField label="State" error={errors.state?.message} htmlFor="state">
+                    <Select id="state" {...register('state')}>
+                      {US_STATES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </Select>
+                  </FormField>
+                  <FormField label="Zip Code" error={errors.zip?.message} htmlFor="zip">
+                    <Input id="zip" {...register('zip')} placeholder="90717" />
+                  </FormField>
                 </div>
-                {(errors.state?.message || errors.zip?.message) && (
-                  <p className="text-xs text-red-500">{errors.state?.message || errors.zip?.message}</p>
-                )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 2: Notes & Tags */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Notes & Tags</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-4">
-              <FormField label="Notes" error={errors.notes?.message} htmlFor="notes">
-                <Textarea id="notes" {...register('notes')} placeholder="Any notes about this customer..." rows={5} />
-              </FormField>
-
-              <FormField
-                label="Tags"
-                htmlFor="tags"
-                description="Enter tags separated by commas (e.g. VIP, fleet, referral)"
-              >
-                <Input
-                  id="tags"
-                  placeholder="VIP, fleet, referral"
-                  onChange={(e) => {
-                    const tagStr = e.target.value;
-                    const tags = tagStr
-                      .split(',')
-                      .map((t) => t.trim())
-                      .filter(Boolean);
-                    setValue('tags', tags);
-                  }}
-                />
-              </FormField>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 3: Marketing Info — 4-column grid */}
+        {/* Card 2: Marketing Info — 8-column grid */}
         <Card>
           <CardHeader>
             <CardTitle>Marketing Info</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Customer Type */}
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+              {/* Customer Type — cols 1-2 */}
+              <div className="min-w-0 space-y-1.5 lg:col-span-2">
                 <label className="text-sm font-medium text-ui-text">
                   Customer Type <span className="text-red-500">*</span>
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   {TYPE_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
@@ -485,7 +480,7 @@ export default function NewCustomerPage() {
                         setCustomerType(opt.value);
                         setTypeError(false);
                       }}
-                      className={`rounded-lg border-2 px-4 py-1.5 text-sm font-medium transition-all ${
+                      className={`rounded-lg border-2 px-2 py-1.5 text-sm font-medium transition-all ${
                         customerType === opt.value
                           ? opt.activeClass
                           : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500'
@@ -500,10 +495,10 @@ export default function NewCustomerPage() {
                 )}
               </div>
 
-              {/* Birthday — Month | Day | Year (optional) */}
-              <div className="space-y-1.5">
+              {/* Birthday — cols 3-6 */}
+              <div className="space-y-1.5 lg:col-span-4">
                 <label className="text-sm font-medium text-ui-text">Birthday</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-[3fr_4.5rem_3fr] gap-1.5 max-w-[75%]">
                   <Select
                     value={birthMonth}
                     onChange={(e) => setBirthMonth(e.target.value)}
@@ -537,8 +532,8 @@ export default function NewCustomerPage() {
                 )}
               </div>
 
-              {/* SMS Marketing Toggle */}
-              <div className="space-y-1.5">
+              {/* SMS Marketing Toggle — cols 7-9 */}
+              <div className="space-y-1.5 lg:col-span-3">
                 <label className="text-sm font-medium text-ui-text">SMS Marketing</label>
                 <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
                   <p className="text-sm text-gray-700 dark:text-gray-300">Allow SMS</p>
@@ -547,16 +542,10 @@ export default function NewCustomerPage() {
                     onCheckedChange={(checked) => setValue('sms_consent', checked)}
                   />
                 </div>
-                {smsConsent && !watchPhone && (
-                  <div className="flex items-center gap-1 text-xs text-amber-600">
-                    <AlertTriangle className="h-3 w-3 shrink-0" />
-                    No mobile number
-                  </div>
-                )}
               </div>
 
-              {/* Email Marketing Toggle */}
-              <div className="space-y-1.5">
+              {/* Email Marketing Toggle — cols 10-12 */}
+              <div className="space-y-1.5 lg:col-span-3">
                 <label className="text-sm font-medium text-ui-text">Email Marketing</label>
                 <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
                   <p className="text-sm text-gray-700 dark:text-gray-300">Allow Email</p>
@@ -565,13 +554,40 @@ export default function NewCustomerPage() {
                     onCheckedChange={(checked) => setValue('email_consent', checked)}
                   />
                 </div>
-                {emailConsent && !watchEmail && (
-                  <div className="flex items-center gap-1 text-xs text-amber-600">
-                    <AlertTriangle className="h-3 w-3 shrink-0" />
-                    No email address
-                  </div>
-                )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Notes & Tags */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Notes & Tags</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4">
+              <FormField label="Notes" error={errors.notes?.message} htmlFor="notes">
+                <Textarea id="notes" {...register('notes')} placeholder="Any notes about this customer..." rows={5} />
+              </FormField>
+
+              <FormField
+                label="Tags"
+                htmlFor="tags"
+                description="Enter tags separated by commas (e.g. VIP, fleet, referral)"
+              >
+                <Input
+                  id="tags"
+                  placeholder="VIP, fleet, referral"
+                  onChange={(e) => {
+                    const tagStr = e.target.value;
+                    const tags = tagStr
+                      .split(',')
+                      .map((t) => t.trim())
+                      .filter(Boolean);
+                    setValue('tags', tags);
+                  }}
+                />
+              </FormField>
             </div>
           </CardContent>
         </Card>
@@ -584,7 +600,7 @@ export default function NewCustomerPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={saving || hasAnyError}>
+          <Button type="submit" disabled={saving || hasAnyError || isPhoneEmpty}>
             {saving ? 'Creating...' : 'Create Customer'}
           </Button>
         </div>

@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get('phone');
     const email = searchParams.get('email');
+    const excludeId = searchParams.get('excludeId');
 
     if (!phone && !email) {
       return NextResponse.json({ exists: false });
@@ -26,11 +27,12 @@ export async function GET(request: NextRequest) {
       if (digits.length >= 10) {
         const normalized = digits.length === 10 ? `+1${digits}` : digits.length === 11 && digits[0] === '1' ? `+${digits}` : null;
         if (normalized) {
-          const { data: match } = await admin
+          let query = admin
             .from('customers')
             .select('id, first_name, last_name')
-            .eq('phone', normalized)
-            .maybeSingle();
+            .eq('phone', normalized);
+          if (excludeId) query = query.neq('id', excludeId);
+          const { data: match } = await query.maybeSingle();
 
           if (match) {
             return NextResponse.json({
@@ -47,11 +49,12 @@ export async function GET(request: NextRequest) {
     if (email) {
       const normalizedEmail = email.toLowerCase().trim();
       if (normalizedEmail.includes('@')) {
-        const { data: match } = await admin
+        let query = admin
           .from('customers')
           .select('id, first_name, last_name')
-          .ilike('email', normalizedEmail)
-          .maybeSingle();
+          .ilike('email', normalizedEmail);
+        if (excludeId) query = query.neq('id', excludeId);
+        const { data: match } = await query.maybeSingle();
 
         if (match) {
           return NextResponse.json({

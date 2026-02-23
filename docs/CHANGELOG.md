@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Admin Customer Edit Page — Card Redesign — Session D12h — 2026-02-22
+
+### Customer edit page card overhaul
+- Replaced Contact & Address, Marketing Consent, and Notes & Tags cards with layouts copied from the create page
+- Contact Information card: 4-column responsive grid, 2 rows (First/Last/Mobile/Email, Addr1/Addr2/City/State+Zip)
+- State field changed from text input to dropdown (all US states), matching create page
+- Marketing Info card: 12-column grid with Customer Type pills, Birthday (Month/Day/Year dropdowns), SMS toggle, Email toggle
+- Birthday changed from single date input to Month dropdown + Day dropdown + Year text input (optional, year 1900 sentinel)
+- Notes & Tags card: full-width notes textarea increased to 5 rows, tags description updated
+- Card order matches create page: Contact Information → Marketing Info → Notes & Tags
+- Real-time phone/email duplicate check (500ms debounce) with self-exclusion via `excludeId` query param
+- Email format validation (must have `@` and `.`)
+- Mobile number required validation
+- Customer Type required validation (Enthusiast / Professional pills)
+- Auto-toggle: clearing mobile turns SMS off, adding mobile turns SMS on (same for email)
+- Auto-toggle respects existing DB values on page load — only triggers on empty↔filled transitions during editing
+- Save button disabled while any validation error exists or mobile is empty
+- Birthday fields pre-populate from existing customer data on load
+- Customer type in Marketing Info card syncs with summary card's customer type
+- Updated check-duplicate API route to support `excludeId` for self-exclusion on edit page
+- Dark mode support on all new card elements (type pills, toggle borders, dropdown backgrounds)
+
+---
+
 ## Audit Log Cleanup + Admin Customer Create Redesign — Session D12g — 2026-02-22
 
 ### Audit log page cleanup
