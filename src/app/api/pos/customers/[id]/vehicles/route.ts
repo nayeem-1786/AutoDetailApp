@@ -53,7 +53,7 @@ export async function POST(
     const supabase = createAdminClient();
 
     const body = await request.json();
-    const { vehicle_type, size_class, year, make, model, color } = body;
+    const { vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color } = body;
 
     if (!vehicle_type) {
       return NextResponse.json(
@@ -66,8 +66,10 @@ export async function POST(
       .from('vehicles')
       .insert({
         customer_id: customerId,
+        vehicle_category: vehicle_category || 'automobile',
         vehicle_type,
         size_class: size_class || null,
+        specialty_tier: specialty_tier || null,
         year: year ? parseInt(year, 10) : null,
         make: make?.trim() || null,
         model: model?.trim() || null,

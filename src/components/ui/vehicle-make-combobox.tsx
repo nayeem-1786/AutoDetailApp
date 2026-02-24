@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown } from 'lucide-react';
+import type { VehicleCategory } from '@/lib/utils/vehicle-categories';
 
 interface VehicleMake {
   id: string;
@@ -12,41 +13,54 @@ interface VehicleMake {
 interface VehicleMakeComboboxProps {
   value: string;
   onChange: (value: string) => void;
+  category?: VehicleCategory;
   className?: string;
   disabled?: boolean;
   id?: string;
 }
 
-let cachedMakes: VehicleMake[] | null = null;
+// Cache per category
+const cachedMakesByCategory: Record<string, VehicleMake[]> = {};
 
 export function VehicleMakeCombobox({
   value,
   onChange,
+  category = 'automobile',
   className,
   disabled,
   id,
 }: VehicleMakeComboboxProps) {
-  const [makes, setMakes] = useState<VehicleMake[]>(cachedMakes ?? []);
+  const [makes, setMakes] = useState<VehicleMake[]>(cachedMakesByCategory[category] ?? []);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevCategoryRef = useRef(category);
 
-  // Fetch makes on mount (cached)
+  // Clear selection when category changes
   useEffect(() => {
-    if (cachedMakes) {
-      setMakes(cachedMakes);
+    if (prevCategoryRef.current !== category) {
+      prevCategoryRef.current = category;
+      onChange('');
+      setSearch('');
+    }
+  }, [category, onChange]);
+
+  // Fetch makes for current category
+  useEffect(() => {
+    if (cachedMakesByCategory[category]) {
+      setMakes(cachedMakesByCategory[category]);
       return;
     }
-    fetch('/api/vehicle-makes?active=true')
+    fetch(`/api/vehicle-makes?category=${category}`)
       .then((res) => res.json())
       .then((data) => {
         const list = data.makes ?? [];
-        cachedMakes = list;
+        cachedMakesByCategory[category] = list;
         setMakes(list);
       })
       .catch(() => {});
-  }, []);
+  }, [category]);
 
   // Sync search field when value prop changes externally
   useEffect(() => {

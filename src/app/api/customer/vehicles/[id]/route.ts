@@ -52,14 +52,18 @@ export async function PATCH(
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
     }
 
+    const updateData = {
+      ...parsed.data,
+      vehicle_category: parsed.data.vehicle_category ?? undefined,
+      specialty_tier: parsed.data.specialty_tier ?? undefined,
+      updated_at: new Date().toISOString(),
+    };
+
     const { data: vehicle, error } = await admin
       .from('vehicles')
-      .update({
-        ...parsed.data,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
-      .select('id, vehicle_type, size_class, year, make, model, color, created_at')
+      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color, created_at')
       .single();
 
     if (error) {

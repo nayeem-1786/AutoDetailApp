@@ -62,8 +62,10 @@ export const customerUpdateSchema = customerCreateSchema.partial();
 // Vehicle schemas
 export const vehicleSchema = z.object({
   customer_id: z.string().uuid(),
+  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft']).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']),
   size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  specialty_tier: optionalString,
   year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
   make: optionalString,
   model: optionalString,
@@ -283,8 +285,10 @@ export const bookingCustomerSchema = z.object({
 });
 
 export const bookingVehicleSchema = z.object({
+  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft']).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
   size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  specialty_tier: optionalString,
   year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
   make: optionalString,
   model: optionalString,
@@ -355,8 +359,10 @@ export const phoneOtpVerifySchema = z.object({
 
 // Customer vehicle schema (customer portal vehicle management)
 export const customerVehicleSchema = z.object({
+  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft']).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
   size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  specialty_tier: optionalString,
   year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
   make: optionalString,
   model: optionalString,

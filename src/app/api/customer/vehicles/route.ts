@@ -28,7 +28,7 @@ export async function GET() {
 
     const { data: vehicles, error } = await admin
       .from('vehicles')
-      .select('id, vehicle_type, size_class, year, make, model, color, created_at')
+      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color, created_at')
       .eq('customer_id', customer.id)
       .order('created_at', { ascending: false });
 
@@ -81,14 +81,16 @@ export async function POST(request: NextRequest) {
       .from('vehicles')
       .insert({
         customer_id: customer.id,
+        vehicle_category: parsed.data.vehicle_category ?? 'automobile',
         vehicle_type: parsed.data.vehicle_type,
         size_class: parsed.data.size_class ?? null,
+        specialty_tier: parsed.data.specialty_tier ?? null,
         year: parsed.data.year ?? null,
         make: parsed.data.make ?? null,
         model: parsed.data.model ?? null,
         color: parsed.data.color ?? null,
       })
-      .select('id, vehicle_type, size_class, year, make, model, color, created_at')
+      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color, created_at')
       .single();
 
     if (error) {

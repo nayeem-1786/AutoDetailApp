@@ -14,19 +14,24 @@ import {
   type VehicleInput,
 } from '@/lib/utils/validation';
 import {
-  VEHICLE_TYPE_LABELS,
   VEHICLE_SIZE_LABELS,
-  VEHICLE_TYPE_SIZE_CLASSES,
   TRANSACTION_STATUS_LABELS,
   QUOTE_STATUS_LABELS,
 } from '@/lib/utils/constants';
+import {
+  VEHICLE_CATEGORIES,
+  VEHICLE_CATEGORY_LABELS,
+  SPECIALTY_TIERS,
+  TIER_DROPDOWN_LABELS,
+  isSpecialtyCategory,
+  getSpecialtyTierLabel,
+  type VehicleCategory,
+} from '@/lib/utils/vehicle-categories';
 import type {
   Customer,
   Vehicle,
   LoyaltyLedger,
   Transaction,
-  VehicleType,
-  VehicleSizeClass,
   LoyaltyAction,
   Quote,
   QuoteStatus,
@@ -107,6 +112,7 @@ export default function CustomerProfilePage() {
   const [savingVehicle, setSavingVehicle] = useState(false);
   const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState(false);
+  const [vehicleCategory, setVehicleCategory] = useState<VehicleCategory>('automobile');
 
   // Loyalty adjust dialog state
   const [loyaltyDialogOpen, setLoyaltyDialogOpen] = useState(false);
@@ -294,8 +300,10 @@ export default function CustomerProfilePage() {
     resolver: formResolver(vehicleSchema),
     defaultValues: {
       customer_id: id,
+      vehicle_category: 'automobile',
       vehicle_type: 'standard',
       size_class: 'sedan',
+      specialty_tier: null,
       year: undefined,
       make: '',
       model: '',
@@ -303,17 +311,24 @@ export default function CustomerProfilePage() {
     },
   });
 
-  const watchVehicleType = vehicleForm.watch('vehicle_type');
-  const availableSizeClasses = VEHICLE_TYPE_SIZE_CLASSES[watchVehicleType] || [];
+  const isVehicleSpecialty = isSpecialtyCategory(vehicleCategory);
+  const vehicleTierLabel = TIER_DROPDOWN_LABELS[vehicleCategory];
+  const vehicleSpecialtyOptions = isVehicleSpecialty ? SPECIALTY_TIERS[vehicleCategory] : [];
+  const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van'] as const;
 
-  // Clear size_class when switching to a specialty type
-  useEffect(() => {
-    if (availableSizeClasses.length === 0) {
-      vehicleForm.setValue('size_class', null);
-    } else if (!vehicleForm.getValues('size_class')) {
-      vehicleForm.setValue('size_class', availableSizeClasses[0] as VehicleSizeClass);
-    }
-  }, [watchVehicleType, availableSizeClasses, vehicleForm]);
+  function handleVehicleCategoryChange(newCategory: VehicleCategory) {
+    setVehicleCategory(newCategory);
+    const specialty = isSpecialtyCategory(newCategory);
+    vehicleForm.setValue('vehicle_category', newCategory);
+    vehicleForm.setValue('vehicle_type', specialty ? newCategory : 'standard');
+    vehicleForm.setValue('make', '');
+    vehicleForm.setValue('size_class', null);
+    vehicleForm.setValue('specialty_tier', null);
+  }
+
+  const handleVehicleMakeChange = useCallback((val: string) => {
+    vehicleForm.setValue('make', val, { shouldDirty: true });
+  }, [vehicleForm]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -470,12 +485,22 @@ export default function CustomerProfilePage() {
   }
 
   // --- Vehicles Tab ---
+  function deriveVehicleCategory(v: Vehicle): VehicleCategory {
+    if (v.vehicle_category && v.vehicle_category !== 'automobile') return v.vehicle_category;
+    if (v.vehicle_type === 'standard') return 'automobile';
+    if (['motorcycle', 'rv', 'boat', 'aircraft'].includes(v.vehicle_type)) return v.vehicle_type as VehicleCategory;
+    return 'automobile';
+  }
+
   function openAddVehicle() {
     setEditingVehicle(null);
+    setVehicleCategory('automobile');
     vehicleForm.reset({
       customer_id: id,
+      vehicle_category: 'automobile',
       vehicle_type: 'standard',
       size_class: 'sedan',
+      specialty_tier: null,
       year: undefined,
       make: '',
       model: '',
@@ -486,10 +511,14 @@ export default function CustomerProfilePage() {
 
   function openEditVehicle(vehicle: Vehicle) {
     setEditingVehicle(vehicle);
+    const cat = deriveVehicleCategory(vehicle);
+    setVehicleCategory(cat);
     vehicleForm.reset({
       customer_id: id,
+      vehicle_category: cat,
       vehicle_type: vehicle.vehicle_type,
       size_class: vehicle.size_class,
+      specialty_tier: vehicle.specialty_tier ?? null,
       year: vehicle.year ?? undefined,
       make: vehicle.make || '',
       model: vehicle.model || '',
@@ -501,10 +530,13 @@ export default function CustomerProfilePage() {
   async function onSaveVehicle(data: VehicleInput) {
     setSavingVehicle(true);
     try {
+      const specialty = isSpecialtyCategory(vehicleCategory);
       const payload = {
         customer_id: id,
-        vehicle_type: data.vehicle_type,
-        size_class: availableSizeClasses.length > 0 ? data.size_class : null,
+        vehicle_category: vehicleCategory,
+        vehicle_type: specialty ? vehicleCategory : 'standard',
+        size_class: !specialty ? data.size_class : null,
+        specialty_tier: specialty ? (data.specialty_tier || null) : null,
         year: data.year || null,
         make: data.make || null,
         model: titleCaseField(data.model || ''),
@@ -1313,12 +1345,20 @@ export default function CustomerProfilePage() {
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <Badge variant="default">
-                              {VEHICLE_TYPE_LABELS[v.vehicle_type]}
+                              {VEHICLE_CATEGORY_LABELS[v.vehicle_category || 'automobile']}
                             </Badge>
-                            {v.size_class && (
-                              <Badge variant="secondary">
-                                {VEHICLE_SIZE_LABELS[v.size_class]}
-                              </Badge>
+                            {v.vehicle_category === 'automobile' || !v.vehicle_category ? (
+                              v.size_class && (
+                                <Badge variant="secondary">
+                                  {VEHICLE_SIZE_LABELS[v.size_class]}
+                                </Badge>
+                              )
+                            ) : (
+                              v.specialty_tier && (
+                                <Badge variant="secondary">
+                                  {getSpecialtyTierLabel(v.vehicle_category, v.specialty_tier)}
+                                </Badge>
+                              )
                             )}
                           </div>
                           {v.color && <p className="text-sm text-gray-500">Color: {v.color}</p>}
@@ -1359,37 +1399,20 @@ export default function CustomerProfilePage() {
                 onSubmit={vehicleForm.handleSubmit(onSaveVehicle)}
                 className="space-y-4"
               >
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    label="Vehicle Type"
-                    error={vehicleForm.formState.errors.vehicle_type?.message}
-                    required
-                    htmlFor="vehicle_type"
+                {/* Category Selector */}
+                <FormField label="Category" htmlFor="veh_category">
+                  <Select
+                    id="veh_category"
+                    value={vehicleCategory}
+                    onChange={(e) => handleVehicleCategoryChange(e.target.value as VehicleCategory)}
                   >
-                    <Select id="vehicle_type" {...vehicleForm.register('vehicle_type')}>
-                      {Object.entries(VEHICLE_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </Select>
-                  </FormField>
-
-                  <FormField
-                    label="Size Class"
-                    error={vehicleForm.formState.errors.size_class?.message}
-                    required={availableSizeClasses.length > 0}
-                    htmlFor="size_class"
-                  >
-                    <Select id="size_class" {...vehicleForm.register('size_class')} disabled={availableSizeClasses.length === 0}>
-                      {availableSizeClasses.length === 0 ? (
-                        <option value="">N/A</option>
-                      ) : (
-                        availableSizeClasses.map((sc) => (
-                          <option key={sc} value={sc}>{VEHICLE_SIZE_LABELS[sc]}</option>
-                        ))
-                      )}
-                    </Select>
-                  </FormField>
-                </div>
+                    {VEHICLE_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {VEHICLE_CATEGORY_LABELS[cat]}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
 
                 <div className="grid grid-cols-3 gap-3">
                   <FormField label="Year" error={vehicleForm.formState.errors.year?.message} htmlFor="veh_year">
@@ -1405,7 +1428,8 @@ export default function CustomerProfilePage() {
                     <VehicleMakeCombobox
                       id="veh_make"
                       value={vehicleForm.watch('make') || ''}
-                      onChange={(val) => vehicleForm.setValue('make', val, { shouldDirty: true })}
+                      onChange={handleVehicleMakeChange}
+                      category={vehicleCategory}
                     />
                   </FormField>
 
@@ -1414,9 +1438,28 @@ export default function CustomerProfilePage() {
                   </FormField>
                 </div>
 
-                <FormField label="Color" htmlFor="veh_color">
-                  <Input id="veh_color" {...vehicleForm.register('color')} placeholder="e.g., Silver" />
-                </FormField>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Color" htmlFor="veh_color">
+                    <Input id="veh_color" {...vehicleForm.register('color')} placeholder="e.g., Silver" />
+                  </FormField>
+
+                  <FormField label={vehicleTierLabel} htmlFor="veh_tier">
+                    {isVehicleSpecialty ? (
+                      <Select id="veh_tier" {...vehicleForm.register('specialty_tier')}>
+                        <option value="">Select {vehicleTierLabel.toLowerCase()}...</option>
+                        {vehicleSpecialtyOptions.map((opt) => (
+                          <option key={opt.key} value={opt.key}>{opt.label}</option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Select id="veh_tier" {...vehicleForm.register('size_class')}>
+                        {AUTOMOBILE_SIZE_CLASSES.map((sc) => (
+                          <option key={sc} value={sc}>{VEHICLE_SIZE_LABELS[sc]}</option>
+                        ))}
+                      </Select>
+                    )}
+                  </FormField>
+                </div>
               </form>
             </DialogContent>
             <DialogFooter>

@@ -5,25 +5,37 @@ import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { bookingCustomerSchema, bookingVehicleSchema, type BookingCustomerInput, type BookingVehicleInput } from '@/lib/utils/validation';
 import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
-import { VEHICLE_TYPE_LABELS, VEHICLE_SIZE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import {
+  VEHICLE_CATEGORIES,
+  VEHICLE_CATEGORY_LABELS,
+  SPECIALTY_TIERS,
+  TIER_DROPDOWN_LABELS,
+  isSpecialtyCategory,
+  type VehicleCategory,
+} from '@/lib/utils/vehicle-categories';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
-import type { VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
+import type { VehicleSizeClass, VehicleType, VehicleCategory as VehicleCategoryType } from '@/lib/supabase/types';
 import { z } from 'zod';
 import { Plus, Check, LogIn, X } from 'lucide-react';
 
 interface SavedVehicle {
   id: string;
   vehicle_type: VehicleType;
+  vehicle_category?: VehicleCategoryType;
   size_class: VehicleSizeClass | null;
+  specialty_tier?: string | null;
   year: number | null;
   make: string | null;
   model: string | null;
   color: string | null;
 }
+
+const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van'] as const;
 
 const customerInfoSchema = z.object({
   customer: bookingCustomerSchema,
@@ -97,8 +109,10 @@ export function StepCustomerInfo({
         email_consent: true,
       },
       vehicle: {
+        vehicle_category: (initialVehicle as BookingVehicleInput).vehicle_category ?? 'automobile',
         vehicle_type: initialVehicle.vehicle_type ?? 'standard',
         size_class: initialSizeClass ?? initialVehicle.size_class ?? null,
+        specialty_tier: (initialVehicle as BookingVehicleInput).specialty_tier ?? null,
         year: initialVehicle.year ?? undefined,
         make: initialVehicle.make ?? '',
         model: initialVehicle.model ?? '',
@@ -124,8 +138,27 @@ export function StepCustomerInfo({
   const lastLookedUpPhone = useRef<string | null>(null);
   const isPortal = savedVehicles.length > 0;
 
-  const vehicleType = watch('vehicle.vehicle_type');
-  const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[vehicleType] ?? [];
+  const [bookingVehicleCategory, setBookingVehicleCategory] = useState<VehicleCategory>(
+    (initialVehicle as BookingVehicleInput).vehicle_category ?? 'automobile'
+  );
+
+  const bookingIsSpecialty = isSpecialtyCategory(bookingVehicleCategory);
+  const bookingTierLabel = TIER_DROPDOWN_LABELS[bookingVehicleCategory];
+  const bookingSpecialtyOptions = bookingIsSpecialty ? SPECIALTY_TIERS[bookingVehicleCategory] : [];
+
+  function handleBookingCategoryChange(newCategory: VehicleCategory) {
+    setBookingVehicleCategory(newCategory);
+    const specialty = isSpecialtyCategory(newCategory);
+    setValue('vehicle.vehicle_category', newCategory, { shouldDirty: true });
+    setValue('vehicle.vehicle_type', specialty ? newCategory : 'standard', { shouldDirty: true });
+    setValue('vehicle.make', '', { shouldDirty: true });
+    setValue('vehicle.size_class', null, { shouldDirty: true });
+    setValue('vehicle.specialty_tier', null, { shouldDirty: true });
+  }
+
+  const handleBookingMakeChange = useCallback((val: string) => {
+    setValue('vehicle.make', val, { shouldDirty: true });
+  }, [setValue]);
 
   // Phone lookup function
   const doPhoneLookup = useCallback(async (phone: string) => {
@@ -223,8 +256,12 @@ export function StepCustomerInfo({
     setSelectedSavedVehicleId(v.id);
     setIsAddingNew(false);
     setVehicleError(null);
+    const cat = (v.vehicle_category || (v.vehicle_type === 'standard' ? 'automobile' : v.vehicle_type)) as VehicleCategory;
+    setBookingVehicleCategory(cat);
+    setValue('vehicle.vehicle_category', cat, { shouldDirty: true });
     setValue('vehicle.vehicle_type', v.vehicle_type, { shouldDirty: true });
     setValue('vehicle.size_class', v.size_class ?? undefined, { shouldDirty: true });
+    setValue('vehicle.specialty_tier', v.specialty_tier ?? null, { shouldDirty: true });
     setValue('vehicle.year', v.year ?? undefined, { shouldDirty: true });
     setValue('vehicle.make', v.make ?? '', { shouldDirty: true });
     setValue('vehicle.model', v.model ?? '', { shouldDirty: true });
@@ -234,12 +271,15 @@ export function StepCustomerInfo({
   function handleAddNewVehicle() {
     setSelectedSavedVehicleId(null);
     setIsAddingNew(true);
+    setBookingVehicleCategory('automobile');
     // Reset vehicle fields to defaults
     reset({
       customer: watch('customer'),
       vehicle: {
+        vehicle_category: 'automobile',
         vehicle_type: 'standard',
         size_class: null,
+        specialty_tier: null,
         year: undefined,
         make: '',
         model: '',
@@ -272,8 +312,14 @@ export function StepCustomerInfo({
 
     setVehicleError(null);
     // Title-case model + color before passing upstream
-    const vehicle = {
+    const specialty = isSpecialtyCategory(bookingVehicleCategory);
+    const vehicleType = (specialty ? bookingVehicleCategory : 'standard') as BookingVehicleInput['vehicle_type'];
+    const vehicle: BookingVehicleInput = {
       ...data.vehicle,
+      vehicle_category: bookingVehicleCategory,
+      vehicle_type: vehicleType,
+      size_class: !specialty ? data.vehicle.size_class : null,
+      specialty_tier: specialty ? (data.vehicle.specialty_tier || null) : null,
       model: titleCaseField(data.vehicle.model || ''),
       color: titleCaseField(data.vehicle.color || ''),
     };
@@ -498,46 +544,20 @@ export function StepCustomerInfo({
         {/* Vehicle form fields - shown when adding new or no saved vehicles */}
         {showVehicleForm && (
           <>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <FormField label="Vehicle Type" htmlFor="vehicle_type" labelClassName={labelCls}>
+            {/* Category Selector */}
+            <div className="mt-3">
+              <FormField label="Category" htmlFor="vehicle_category" labelClassName={labelCls}>
                 <Select
-                  id="vehicle_type"
+                  id="vehicle_category"
                   className={selectCls}
-                  {...register('vehicle.vehicle_type')}
+                  value={bookingVehicleCategory}
+                  onChange={(e) => handleBookingCategoryChange(e.target.value as VehicleCategory)}
                 >
-                  {Object.entries(VEHICLE_TYPE_LABELS).map(([val, label]) => (
-                    <option key={val} value={val}>
-                      {label}
+                  {VEHICLE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {VEHICLE_CATEGORY_LABELS[cat]}
                     </option>
                   ))}
-                </Select>
-              </FormField>
-
-              <FormField
-                label="Size Class"
-                htmlFor="size_class"
-                required={requireSizeClass && sizeClasses.length > 0}
-                error={errors.vehicle?.size_class?.message}
-                labelClassName={labelCls}
-              >
-                <Select
-                  id="size_class"
-                  className={selectCls}
-                  {...register('vehicle.size_class')}
-                  disabled={sizeClasses.length === 0}
-                >
-                  {sizeClasses.length === 0 ? (
-                    <option value="">N/A</option>
-                  ) : (
-                    <>
-                      <option value="">Select size...</option>
-                      {sizeClasses.map((sc) => (
-                        <option key={sc} value={sc}>
-                          {VEHICLE_SIZE_LABELS[sc]}
-                        </option>
-                      ))}
-                    </>
-                  )}
                 </Select>
               </FormField>
             </div>
@@ -560,8 +580,9 @@ export function StepCustomerInfo({
                 <VehicleMakeCombobox
                   id="make"
                   value={watch('vehicle.make') || ''}
-                  onChange={(val) => setValue('vehicle.make', val, { shouldDirty: true })}
+                  onChange={handleBookingMakeChange}
                   className={inputCls}
+                  category={bookingVehicleCategory}
                 />
               </FormField>
 
@@ -575,7 +596,7 @@ export function StepCustomerInfo({
               </FormField>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <FormField label="Color" htmlFor="color" labelClassName={labelCls}>
                 <Input
                   id="color"
@@ -583,6 +604,42 @@ export function StepCustomerInfo({
                   className={inputCls}
                   {...register('vehicle.color')}
                 />
+              </FormField>
+
+              <FormField
+                label={bookingTierLabel}
+                htmlFor="vehicle_tier"
+                required={requireSizeClass && !bookingIsSpecialty}
+                error={bookingIsSpecialty ? errors.vehicle?.specialty_tier?.message : errors.vehicle?.size_class?.message}
+                labelClassName={labelCls}
+              >
+                {bookingIsSpecialty ? (
+                  <Select
+                    id="vehicle_tier"
+                    className={selectCls}
+                    {...register('vehicle.specialty_tier')}
+                  >
+                    <option value="">Select {bookingTierLabel.toLowerCase()}...</option>
+                    {bookingSpecialtyOptions.map((opt) => (
+                      <option key={opt.key} value={opt.key}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Select
+                    id="vehicle_tier"
+                    className={selectCls}
+                    {...register('vehicle.size_class')}
+                  >
+                    <option value="">Select size...</option>
+                    {AUTOMOBILE_SIZE_CLASSES.map((sc) => (
+                      <option key={sc} value={sc}>
+                        {VEHICLE_SIZE_LABELS[sc]}
+                      </option>
+                    ))}
+                  </Select>
+                )}
               </FormField>
             </div>
           </>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Dialog,
   DialogClose,
@@ -16,12 +16,20 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import {
-  VEHICLE_TYPE_LABELS,
   VEHICLE_SIZE_LABELS,
-  VEHICLE_TYPE_SIZE_CLASSES,
 } from '@/lib/utils/constants';
+import {
+  VEHICLE_CATEGORIES,
+  VEHICLE_CATEGORY_LABELS,
+  SPECIALTY_TIERS,
+  TIER_DROPDOWN_LABELS,
+  isSpecialtyCategory,
+  type VehicleCategory,
+} from '@/lib/utils/vehicle-categories';
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import type { Vehicle } from '@/lib/supabase/types';
+
+const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van'] as const;
 
 interface VehicleCreateDialogProps {
   open: boolean;
@@ -36,18 +44,30 @@ export function VehicleCreateDialog({
   customerId,
   onCreated,
 }: VehicleCreateDialogProps) {
-  const [vehicleType, setVehicleType] = useState('standard');
+  const [category, setCategory] = useState<VehicleCategory>('automobile');
   const [sizeClass, setSizeClass] = useState('sedan');
+  const [specialtyTier, setSpecialtyTier] = useState('');
   const [year, setYear] = useState('');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [color, setColor] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[vehicleType] ?? [];
+  const handleMakeChange = useCallback((val: string) => {
+    setMake(val);
+  }, []);
+
+  function handleCategoryChange(newCategory: VehicleCategory) {
+    setCategory(newCategory);
+    setMake('');
+    setSizeClass('sedan');
+    setSpecialtyTier('');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const isSpecialty = isSpecialtyCategory(category);
 
     setSaving(true);
     try {
@@ -55,8 +75,10 @@ export function VehicleCreateDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vehicle_type: vehicleType,
-          size_class: sizeClasses.length > 0 ? sizeClass : null,
+          vehicle_category: category,
+          vehicle_type: isSpecialty ? category : 'standard',
+          size_class: !isSpecialty ? sizeClass : null,
+          specialty_tier: isSpecialty ? (specialtyTier || null) : null,
           year: year || null,
           make: make || null,
           model: titleCaseField(model),
@@ -82,14 +104,19 @@ export function VehicleCreateDialog({
   }
 
   function handleClose() {
-    setVehicleType('standard');
+    setCategory('automobile');
     setSizeClass('sedan');
+    setSpecialtyTier('');
     setYear('');
     setMake('');
     setModel('');
     setColor('');
     onClose();
   }
+
+  const isSpecialty = isSpecialtyCategory(category);
+  const tierLabel = TIER_DROPDOWN_LABELS[category];
+  const specialtyOptions = isSpecialty ? SPECIALTY_TIERS[category] : [];
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -99,46 +126,21 @@ export function VehicleCreateDialog({
       </DialogHeader>
       <form onSubmit={handleSubmit}>
         <DialogContent className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                Vehicle Type
-              </label>
-              <Select
-                value={vehicleType}
-                onChange={(e) => {
-                  setVehicleType(e.target.value);
-                  const classes = VEHICLE_TYPE_SIZE_CLASSES[e.target.value] ?? [];
-                  if (classes.length > 0) setSizeClass(classes[0]);
-                }}
-              >
-                {Object.entries(VEHICLE_TYPE_LABELS).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                Size Class
-              </label>
-              <Select
-                value={sizeClass}
-                onChange={(e) => setSizeClass(e.target.value)}
-                disabled={sizeClasses.length === 0}
-              >
-                {sizeClasses.length === 0 ? (
-                  <option value="">N/A</option>
-                ) : (
-                  sizeClasses.map((sc) => (
-                    <option key={sc} value={sc}>
-                      {VEHICLE_SIZE_LABELS[sc] ?? sc}
-                    </option>
-                  ))
-                )}
-              </Select>
-            </div>
+          {/* Category Selector */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+              Category
+            </label>
+            <Select
+              value={category}
+              onChange={(e) => handleCategoryChange(e.target.value as VehicleCategory)}
+            >
+              {VEHICLE_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {VEHICLE_CATEGORY_LABELS[cat]}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -162,7 +164,8 @@ export function VehicleCreateDialog({
               </label>
               <VehicleMakeCombobox
                 value={make}
-                onChange={setMake}
+                onChange={handleMakeChange}
+                category={category}
               />
             </div>
             <div>
@@ -177,15 +180,46 @@ export function VehicleCreateDialog({
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              Color
-            </label>
-            <Input
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              placeholder="e.g., Silver"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                Color
+              </label>
+              <Input
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder="e.g., Silver"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                {tierLabel}
+              </label>
+              {isSpecialty ? (
+                <Select
+                  value={specialtyTier}
+                  onChange={(e) => setSpecialtyTier(e.target.value)}
+                >
+                  <option value="">Select {tierLabel.toLowerCase()}...</option>
+                  {specialtyOptions.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Select
+                  value={sizeClass}
+                  onChange={(e) => setSizeClass(e.target.value)}
+                >
+                  {AUTOMOBILE_SIZE_CLASSES.map((sc) => (
+                    <option key={sc} value={sc}>
+                      {VEHICLE_SIZE_LABELS[sc]}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </div>
           </div>
         </DialogContent>
         <DialogFooter>

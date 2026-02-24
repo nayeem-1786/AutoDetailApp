@@ -13,6 +13,11 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { X, Plus, Search } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import {
+  VEHICLE_CATEGORIES,
+  VEHICLE_CATEGORY_LABELS,
+  type VehicleCategory,
+} from '@/lib/utils/vehicle-categories';
 
 // --- Auto-Logout Timer ---
 
@@ -28,6 +33,7 @@ interface TimeoutForm {
 interface VehicleMake {
   id: string;
   name: string;
+  category: string;
   is_active: boolean;
   sort_order: number;
 }
@@ -73,6 +79,7 @@ export default function PosSettingsPage() {
   const [addingMake, setAddingMake] = useState(false);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [makesCategory, setMakesCategory] = useState<VehicleCategory>('automobile');
 
   // Load auto-logout setting
   useEffect(() => {
@@ -95,10 +102,11 @@ export default function PosSettingsPage() {
     load();
   }, [reset]);
 
-  // Load vehicle makes
-  const loadMakes = useCallback(async () => {
+  // Load vehicle makes for active category
+  const loadMakes = useCallback(async (cat: VehicleCategory) => {
+    setMakesLoading(true);
     try {
-      const res = await adminFetch('/api/admin/vehicle-makes');
+      const res = await adminFetch(`/api/admin/vehicle-makes?category=${cat}`);
       if (res.ok) {
         const json = await res.json();
         setMakes(json.makes || []);
@@ -111,8 +119,8 @@ export default function PosSettingsPage() {
   }, []);
 
   useEffect(() => {
-    loadMakes();
-  }, [loadMakes]);
+    loadMakes(makesCategory);
+  }, [loadMakes, makesCategory]);
 
   // Auto-logout submit
   async function onSubmit(formData: TimeoutForm) {
@@ -157,7 +165,7 @@ export default function PosSettingsPage() {
       const res = await adminFetch('/api/admin/vehicle-makes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name: trimmed, category: makesCategory }),
       });
 
       if (res.status === 409) {
@@ -175,7 +183,7 @@ export default function PosSettingsPage() {
       toast.success(`Added "${titleCaseMake(trimmed)}"`);
       setNewMakeName('');
       setShowAddForm(false);
-      await loadMakes();
+      await loadMakes(makesCategory);
     } finally {
       setAddingMake(false);
     }
@@ -240,6 +248,13 @@ export default function PosSettingsPage() {
         return next;
       });
     }
+  }
+
+  function handleCategoryTab(cat: VehicleCategory) {
+    setMakesCategory(cat);
+    setSearchQuery('');
+    setShowAddForm(false);
+    setNewMakeName('');
   }
 
   // Filter makes by search
@@ -329,6 +344,24 @@ export default function PosSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Category Tabs */}
+          <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+            {VEHICLE_CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => handleCategoryTab(cat)}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  makesCategory === cat
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {VEHICLE_CATEGORY_LABELS[cat]}
+              </button>
+            ))}
+          </div>
+
           {makesLoading ? (
             <div className="flex items-center justify-center py-8">
               <Spinner size="md" />
@@ -400,7 +433,7 @@ export default function PosSettingsPage() {
                   <div className="py-8 text-center text-sm text-gray-500">
                     {searchQuery.trim()
                       ? 'No makes match your search.'
-                      : 'No vehicle makes found.'}
+                      : `No ${VEHICLE_CATEGORY_LABELS[makesCategory].toLowerCase()} makes found.`}
                   </div>
                 ) : (
                   filteredMakes.map((make) => (
@@ -440,7 +473,7 @@ export default function PosSettingsPage() {
 
               {/* Counter */}
               <p className="text-xs text-gray-500">
-                Showing {makes.length} makes ({activeCount} active)
+                Showing {makes.length} {VEHICLE_CATEGORY_LABELS[makesCategory].toLowerCase()} makes ({activeCount} active)
               </p>
             </>
           )}

@@ -4,6 +4,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Vehicle Forms: Category Selector & Dynamic Tiers — Session 2 — 2026-02-24
+
+### VehicleMakeCombobox (`src/components/ui/vehicle-make-combobox.tsx`)
+- Added `category` prop (type `VehicleCategory`, default `'automobile'`)
+- Fetch URL now includes `?category={category}` filter
+- Per-category caching (replaces single global cache)
+- Clears selected make when category changes
+
+### All 4 Vehicle Forms Updated
+Each form now has: Category dropdown (first field) + dynamic Size/Tier dropdown (last field)
+
+**Forms updated:**
+1. `src/app/admin/customers/[id]/page.tsx` — Admin customer vehicle dialog
+2. `src/app/pos/components/vehicle-create-dialog.tsx` — POS vehicle create dialog
+3. `src/components/account/vehicle-form-dialog.tsx` — Customer portal vehicle form
+4. `src/components/booking/step-customer-info.tsx` — Booking wizard vehicle section
+
+**Behavior:**
+- Category defaults to "Automobile"
+- When category changes: clears make, clears size/tier, updates vehicle_type
+- Automobile: shows existing Size Class dropdown (Sedan / Truck-SUV / SUV-Van)
+- Specialty categories: shows category-specific tier dropdown from `SPECIALTY_TIERS`
+- Tier dropdown label changes per category: "Type" (motorcycle), "Length" (RV/boat), "Class" (aircraft)
+- Edit mode: derives category from `vehicle_category` field, populates tier correctly
+
+### Validation Schemas Updated (`src/lib/utils/validation.ts`)
+- `vehicleSchema`, `bookingVehicleSchema`, `customerVehicleSchema` all now include `vehicle_category` and `specialty_tier` fields
+
+### Vehicle CRUD API Routes Updated
+- `src/app/api/pos/customers/[id]/vehicles/route.ts` — POST accepts `vehicle_category` and `specialty_tier`
+- `src/app/api/customer/vehicles/route.ts` — GET returns new fields, POST accepts new fields
+- `src/app/api/customer/vehicles/[id]/route.ts` — PATCH accepts new fields, returns new fields
+- `src/app/api/book/route.ts` — Vehicle creation includes `vehicle_category` and `specialty_tier`
+
+### Admin Vehicle Makes UI (`src/app/admin/settings/pos-settings/page.tsx`)
+- Added category tab row: Automobile | Motorcycle | RV | Boat | Aircraft
+- Each tab filters displayed makes by category
+- "Add Make" creates with current tab's category
+- Search filters within active category
+- Counter shows category-specific label
+
+---
+
 ## POS Specialty Vehicle Pricing Auto-Resolution — Session 3 — 2026-02-24
 
 ### ServicePricingPicker (`src/app/pos/components/service-pricing-picker.tsx`)

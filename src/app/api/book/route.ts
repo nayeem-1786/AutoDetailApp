@@ -227,8 +227,10 @@ export async function POST(request: NextRequest) {
           .from('vehicles')
           .insert({
             customer_id: customerId,
+            vehicle_category: data.vehicle.vehicle_category || 'automobile',
             vehicle_type: data.vehicle.vehicle_type || 'standard',
             size_class: data.vehicle.size_class || null,
+            specialty_tier: data.vehicle.specialty_tier || null,
             year: data.vehicle.year || null,
             make: data.vehicle.make || null,
             model: data.vehicle.model || null,

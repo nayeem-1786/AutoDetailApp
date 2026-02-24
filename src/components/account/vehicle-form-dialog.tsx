@@ -1,10 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { customerVehicleSchema, type CustomerVehicleInput } from '@/lib/utils/validation';
-import { VEHICLE_TYPE_LABELS, VEHICLE_SIZE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import {
+  VEHICLE_CATEGORIES,
+  VEHICLE_CATEGORY_LABELS,
+  SPECIALTY_TIERS,
+  TIER_DROPDOWN_LABELS,
+  isSpecialtyCategory,
+  type VehicleCategory,
+} from '@/lib/utils/vehicle-categories';
 import {
   Dialog,
   DialogHeader,
@@ -21,13 +29,17 @@ import { FormField } from '@/components/ui/form-field';
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import { toast } from 'sonner';
 
+const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van'] as const;
+
 interface VehicleFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vehicle?: {
     id: string;
     vehicle_type: string;
+    vehicle_category?: string;
     size_class: string | null;
+    specialty_tier?: string | null;
     year: number | null;
     make: string | null;
     model: string | null;
@@ -44,6 +56,7 @@ export function VehicleFormDialog({
 }: VehicleFormDialogProps) {
   const isEdit = !!vehicle;
   const [saving, setSaving] = useState(false);
+  const [category, setCategory] = useState<VehicleCategory>('automobile');
 
   const {
     register,
@@ -55,8 +68,10 @@ export function VehicleFormDialog({
   } = useForm<CustomerVehicleInput>({
     resolver: formResolver(customerVehicleSchema),
     defaultValues: {
+      vehicle_category: 'automobile',
       vehicle_type: 'standard',
       size_class: null,
+      specialty_tier: null,
       year: null,
       make: '',
       model: '',
@@ -64,23 +79,35 @@ export function VehicleFormDialog({
     },
   });
 
-  const watchVehicleType = watch('vehicle_type');
-  const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[watchVehicleType] ?? [];
+  // Derive category from vehicle_category or vehicle_type for edit mode
+  function deriveCategory(v: NonNullable<typeof vehicle>): VehicleCategory {
+    if (v.vehicle_category && v.vehicle_category !== 'automobile') return v.vehicle_category as VehicleCategory;
+    if (v.vehicle_type === 'standard') return 'automobile';
+    if (['motorcycle', 'rv', 'boat', 'aircraft'].includes(v.vehicle_type)) return v.vehicle_type as VehicleCategory;
+    return 'automobile';
+  }
 
   useEffect(() => {
     if (open && vehicle) {
+      const cat = deriveCategory(vehicle);
+      setCategory(cat);
       reset({
+        vehicle_category: cat,
         vehicle_type: vehicle.vehicle_type as CustomerVehicleInput['vehicle_type'],
         size_class: (vehicle.size_class as CustomerVehicleInput['size_class']) ?? null,
+        specialty_tier: vehicle.specialty_tier ?? null,
         year: vehicle.year ?? null,
         make: vehicle.make ?? '',
         model: vehicle.model ?? '',
         color: vehicle.color ?? '',
       });
     } else if (open) {
+      setCategory('automobile');
       reset({
+        vehicle_category: 'automobile',
         vehicle_type: 'standard',
         size_class: null,
+        specialty_tier: null,
         year: null,
         make: '',
         model: '',
@@ -88,6 +115,24 @@ export function VehicleFormDialog({
       });
     }
   }, [open, vehicle, reset]);
+
+  const handleMakeChange = useCallback((val: string) => {
+    setValue('make', val, { shouldDirty: true });
+  }, [setValue]);
+
+  function handleCategoryChange(newCategory: VehicleCategory) {
+    setCategory(newCategory);
+    const isSpecialty = isSpecialtyCategory(newCategory);
+    setValue('vehicle_category', newCategory, { shouldDirty: true });
+    setValue('vehicle_type', isSpecialty ? newCategory : 'standard', { shouldDirty: true });
+    setValue('make', '', { shouldDirty: true });
+    setValue('size_class', null, { shouldDirty: true });
+    setValue('specialty_tier', null, { shouldDirty: true });
+  }
+
+  const isSpecialty = isSpecialtyCategory(category);
+  const tierLabel = TIER_DROPDOWN_LABELS[category];
+  const specialtyOptions = isSpecialty ? SPECIALTY_TIERS[category] : [];
 
   const onSubmit = async (data: CustomerVehicleInput) => {
     setSaving(true);
@@ -103,6 +148,10 @@ export function VehicleFormDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
+          vehicle_category: category,
+          vehicle_type: isSpecialty ? category : 'standard',
+          size_class: !isSpecialty ? data.size_class : null,
+          specialty_tier: isSpecialty ? (data.specialty_tier || null) : null,
           model: titleCaseField(data.model || ''),
           color: titleCaseField(data.color || ''),
         }),
@@ -134,44 +183,20 @@ export function VehicleFormDialog({
       </DialogHeader>
       <DialogContent>
         <form id="vehicle-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              label="Vehicle Type"
-              required
-              error={errors.vehicle_type?.message}
-              htmlFor="vehicle_type"
+          {/* Category Selector */}
+          <FormField label="Category" htmlFor="vehicle_category">
+            <Select
+              id="vehicle_category"
+              value={category}
+              onChange={(e) => handleCategoryChange(e.target.value as VehicleCategory)}
             >
-              <Select id="vehicle_type" {...register('vehicle_type')}>
-                {Object.entries(VEHICLE_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-
-            <FormField
-              label="Size Class"
-              error={errors.size_class?.message}
-              required={sizeClasses.length > 0}
-              htmlFor="size_class"
-            >
-              <Select id="size_class" {...register('size_class')} disabled={sizeClasses.length === 0}>
-                {sizeClasses.length === 0 ? (
-                  <option value="">N/A</option>
-                ) : (
-                  <>
-                    <option value="">Select size...</option>
-                    {sizeClasses.map((sc) => (
-                      <option key={sc} value={sc}>
-                        {VEHICLE_SIZE_LABELS[sc]}
-                      </option>
-                    ))}
-                  </>
-                )}
-              </Select>
-            </FormField>
-          </div>
+              {VEHICLE_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {VEHICLE_CATEGORY_LABELS[cat]}
+                </option>
+              ))}
+            </Select>
+          </FormField>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <FormField label="Year" error={errors.year?.message} htmlFor="vehicle_year">
@@ -187,7 +212,8 @@ export function VehicleFormDialog({
               <VehicleMakeCombobox
                 id="vehicle_make"
                 value={watch('make') || ''}
-                onChange={(val) => setValue('make', val, { shouldDirty: true })}
+                onChange={handleMakeChange}
+                category={category}
               />
             </FormField>
 
@@ -200,13 +226,41 @@ export function VehicleFormDialog({
             </FormField>
           </div>
 
-          <FormField label="Color" error={errors.color?.message} htmlFor="vehicle_color">
-            <Input
-              id="vehicle_color"
-              placeholder="e.g., Silver"
-              {...register('color')}
-            />
-          </FormField>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Color" error={errors.color?.message} htmlFor="vehicle_color">
+              <Input
+                id="vehicle_color"
+                placeholder="e.g., Silver"
+                {...register('color')}
+              />
+            </FormField>
+
+            <FormField
+              label={tierLabel}
+              error={isSpecialty ? errors.specialty_tier?.message : errors.size_class?.message}
+              htmlFor="vehicle_tier"
+            >
+              {isSpecialty ? (
+                <Select id="vehicle_tier" {...register('specialty_tier')}>
+                  <option value="">Select {tierLabel.toLowerCase()}...</option>
+                  {specialtyOptions.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Select id="vehicle_tier" {...register('size_class')}>
+                  <option value="">Select size...</option>
+                  {AUTOMOBILE_SIZE_CLASSES.map((sc) => (
+                    <option key={sc} value={sc}>
+                      {VEHICLE_SIZE_LABELS[sc]}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </FormField>
+          </div>
         </form>
       </DialogContent>
       <DialogFooter>
