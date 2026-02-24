@@ -164,6 +164,7 @@ export function CatalogPanel() {
   }
 
   const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
+  const vehicleSpecialtyTier = ticket.vehicle?.specialty_tier ?? null;
 
   if (loading) {
     return (
@@ -220,6 +221,7 @@ export function CatalogPanel() {
           onClose={() => setPickerService(null)}
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
+          vehicleSpecialtyTier={vehicleSpecialtyTier}
           onSelect={handlePricingSelect}
         />
       )}

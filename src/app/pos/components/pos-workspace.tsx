@@ -151,6 +151,7 @@ export function PosWorkspace() {
   }
 
   const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
+  const vehicleSpecialtyTier = ticket.vehicle?.specialty_tier ?? null;
   const isGlobalSearch = search && tab === 'register';
 
   return (
@@ -248,6 +249,7 @@ export function PosWorkspace() {
           onClose={() => setPickerService(null)}
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
+          vehicleSpecialtyTier={vehicleSpecialtyTier}
           onSelect={handlePricingSelect}
         />
       )}

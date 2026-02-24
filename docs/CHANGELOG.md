@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## POS Specialty Vehicle Pricing Auto-Resolution — Session 3 — 2026-02-24
+
+### ServicePricingPicker (`src/app/pos/components/service-pricing-picker.tsx`)
+- Added `vehicleSpecialtyTier` prop to `ServicePricingPickerProps`
+- When `pricing_model === 'specialty'` and vehicle has a matching `specialty_tier`, the corresponding tier button is highlighted with blue styling (`border-blue-200 bg-blue-50/50`) and "Matched to vehicle" label
+- Staff must still tap to confirm — no auto-submit
+- Non-specialty services ignore the new prop entirely
+
+### ServiceDetailDialog (`src/app/pos/components/service-detail-dialog.tsx`)
+- Added `vehicleSpecialtyTierOverride` optional prop
+- Auto-selects matching specialty tier in the tier list (same behavior as vehicle-size auto-selection)
+- Shows "Matched to vehicle" hint text for specialty matches
+
+### Specialty Tier Threading (5 rendering locations updated)
+- `register-tab.tsx` — derives `vehicleSpecialtyTier` from `ticket.vehicle?.specialty_tier`
+- `catalog-panel.tsx` — same pattern
+- `pos-workspace.tsx` — same pattern
+- `catalog-browser.tsx` — added `vehicleSpecialtyTierOverride` prop, passes through to picker and detail dialog
+- `quotes/quote-builder.tsx` — derives from `quote.vehicle?.specialty_tier`, passes through
+
+### Verified (no changes needed)
+- **POS services route** (`/api/pos/services/route.ts`): `tier_name` already in pricing join select
+- **Transaction item recording**: `tierName` captured from `pricing.tier_label || pricing.tier_name` in ticket-reducer; maps to `tier_name` in transaction_items. `vehicle_size_class` remains `null` for specialty vehicles (correct).
+- **`resolveServicePrice`** (`pos/utils/pricing.ts`): Specialty tiers have `is_vehicle_size_aware: false`, so returns `pricing.price` directly (correct).
+
+---
+
 ## Vehicle Category Expansion Schema — Session 1 — 2026-02-24
 
 ### Migration: `20260224000001_vehicle_category_expansion.sql`

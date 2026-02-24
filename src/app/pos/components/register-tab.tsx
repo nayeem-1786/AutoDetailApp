@@ -34,6 +34,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   const keypadRef = useRef<HTMLDivElement>(null);
 
   const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
+  const vehicleSpecialtyTier = ticket.vehicle?.specialty_tier ?? null;
   const dollars = cents / 100;
   const display = dollars.toFixed(2);
 
@@ -290,6 +291,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           onClose={() => setPickerService(null)}
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
+          vehicleSpecialtyTier={vehicleSpecialtyTier}
           onSelect={handlePricingSelect}
         />
       )}

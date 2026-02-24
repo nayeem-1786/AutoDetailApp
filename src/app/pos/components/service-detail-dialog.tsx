@@ -19,9 +19,11 @@ interface ServiceDetailDialogProps {
   onAdd?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
   /** Override vehicle size class */
   vehicleSizeOverride?: VehicleSizeClass | null;
+  /** Override specialty tier */
+  vehicleSpecialtyTierOverride?: string | null;
 }
 
-export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride }: ServiceDetailDialogProps) {
+export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride }: ServiceDetailDialogProps) {
   const { ticket, dispatch: ticketDispatch } = useTicket();
   const dispatch = onAdd ? undefined : ticketDispatch;
   const pricing = service.pricing ?? [];
@@ -55,9 +57,19 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
   const isVehicleSizeTiers = tiers.length > 1
     && tiers.every((t) => VEHICLE_SIZE_CLASSES.has(t.tier_name));
+
+  // Specialty tier matching
+  const vehicleSpecialtyTier = vehicleSpecialtyTierOverride !== undefined
+    ? vehicleSpecialtyTierOverride
+    : (ticket.vehicle?.specialty_tier ?? null);
+  const isSpecialtyService = service.pricing_model === 'specialty';
+  const specialtyMatchIdx = isSpecialtyService && vehicleSpecialtyTier
+    ? tiers.findIndex((t) => t.tier_name === vehicleSpecialtyTier)
+    : -1;
+
   const autoMatchIdx = isVehicleSizeTiers && vehicleSizeClass
     ? tiers.findIndex((t) => t.tier_name === vehicleSizeClass)
-    : -1;
+    : specialtyMatchIdx;
 
   const [selectedTierIdx, setSelectedTierIdx] = useState(0);
   const [perUnitQty, setPerUnitQty] = useState(1);
@@ -301,7 +313,9 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
               </div>
               {autoMatchIdx >= 0 && (
                 <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                  Auto-selected based on vehicle size
+                  {specialtyMatchIdx >= 0
+                    ? 'Matched to vehicle'
+                    : 'Auto-selected based on vehicle size'}
                 </p>
               )}
             </div>

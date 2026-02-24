@@ -21,6 +21,7 @@ interface ServicePricingPickerProps {
   onClose: () => void;
   service: CatalogService;
   vehicleSizeClass: VehicleSizeClass | null;
+  vehicleSpecialtyTier: string | null;
   onSelect: (pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
 }
 
@@ -29,6 +30,7 @@ export function ServicePricingPicker({
   onClose,
   service,
   vehicleSizeClass,
+  vehicleSpecialtyTier,
   onSelect,
 }: ServicePricingPickerProps) {
   const pricing = service.pricing ?? [];
@@ -64,6 +66,11 @@ export function ServicePricingPicker({
         {vehicleSizeClass && (
           <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
             Prices shown for {VEHICLE_SIZE_LABELS[vehicleSizeClass]}
+          </p>
+        )}
+        {service.pricing_model === 'specialty' && vehicleSpecialtyTier && (
+          <p className="mb-2 text-xs text-blue-600 dark:text-blue-400">
+            Vehicle tier will be highlighted below
           </p>
         )}
 
@@ -120,6 +127,15 @@ export function ServicePricingPicker({
                     ? VEHICLE_SIZE_LABELS[vehicleSizeClass]
                     : null;
 
+                // Specialty tier matching: highlight when vehicle's specialty_tier matches this tier
+                const isSpecialtyMatch =
+                  service.pricing_model === 'specialty' &&
+                  vehicleSpecialtyTier != null &&
+                  tier.tier_name === vehicleSpecialtyTier;
+
+                const isHighlighted =
+                  (vehicleSizeClass && tier.is_vehicle_size_aware) || isSpecialtyMatch;
+
                 return (
                   <button
                     key={tier.id}
@@ -127,7 +143,7 @@ export function ServicePricingPicker({
                     className={cn(
                       'flex items-center justify-between rounded-lg border p-4 text-left transition-all',
                       'min-h-[56px] active:scale-[0.99] active:bg-gray-50 dark:active:bg-gray-800',
-                      vehicleSizeClass && tier.is_vehicle_size_aware
+                      isHighlighted
                         ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm dark:hover:shadow-gray-950/30'
                     )}
@@ -139,6 +155,11 @@ export function ServicePricingPicker({
                       {sizeLabel && (
                         <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
                           {sizeLabel}
+                        </span>
+                      )}
+                      {isSpecialtyMatch && (
+                        <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
+                          Matched to vehicle
                         </span>
                       )}
                     </div>

@@ -29,11 +29,13 @@ interface CatalogBrowserProps {
   onAddService?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
   /** Override vehicle size class (for quote builder where vehicle is in a different context) */
   vehicleSizeOverride?: VehicleSizeClass | null;
+  /** Override specialty tier (for quote builder where vehicle is in a different context) */
+  vehicleSpecialtyTierOverride?: string | null;
   /** Set of service IDs already on the ticket — shows checkmark indicator */
   addedServiceIds?: Set<string>;
 }
 
-export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride, addedServiceIds }: CatalogBrowserProps) {
+export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride, vehicleSpecialtyTierOverride, addedServiceIds }: CatalogBrowserProps) {
   const { products, services } = useCatalog();
   const { ticket, dispatch: ticketDispatch } = useTicket();
   const hasCallbacks = !!onAddProduct || !!onAddService;
@@ -47,6 +49,9 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   const vehicleSizeClass = vehicleSizeOverride !== undefined
     ? vehicleSizeOverride
     : (ticket.vehicle?.size_class ?? null);
+  const vehicleSpecialtyTier = vehicleSpecialtyTierOverride !== undefined
+    ? vehicleSpecialtyTierOverride
+    : (ticket.vehicle?.specialty_tier ?? null);
 
   // Build categories with counts and image
   const categories = useMemo(() => {
@@ -235,6 +240,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
           onClose={() => setPickerService(null)}
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
+          vehicleSpecialtyTier={vehicleSpecialtyTier}
           onSelect={handlePricingSelect}
         />
       )}
@@ -252,6 +258,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
           onClose={() => setDetailService(null)}
           onAdd={onAddService}
           vehicleSizeOverride={vehicleSizeOverride}
+          vehicleSpecialtyTierOverride={vehicleSpecialtyTierOverride}
         />
       )}
     </>

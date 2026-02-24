@@ -117,6 +117,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
   }, [quoteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicleSizeClass = quote.vehicle?.size_class ?? null;
+  const vehicleSpecialtyTier = quote.vehicle?.specialty_tier ?? null;
 
   // Track which services are already on the ticket for visual indicators
   const addedServiceIds = useMemo(
@@ -301,6 +302,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
               onAddProduct={handleAddProduct}
               onAddService={handleAddService}
               vehicleSizeOverride={vehicleSizeClass}
+              vehicleSpecialtyTierOverride={vehicleSpecialtyTier}
               addedServiceIds={addedServiceIds}
             />
           )}
@@ -317,6 +319,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           onClose={() => setPickerService(null)}
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
+          vehicleSpecialtyTier={vehicleSpecialtyTier}
           onSelect={handlePricingSelect}
         />
       )}
