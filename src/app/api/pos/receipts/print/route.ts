@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       .from('transactions')
       .select(`
         *,
-        customer:customers(first_name, last_name, phone),
+        customer:customers(first_name, last_name, phone, email, customer_type, created_at),
         employee:employees(first_name, last_name),
         vehicle:vehicles(year, make, model, color),
         items:transaction_items(*),

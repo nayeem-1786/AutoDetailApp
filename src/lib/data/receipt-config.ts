@@ -1,6 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ---------------------------------------------------------------------------
+// CustomTextZone — a configurable text block placed on receipts
+// ---------------------------------------------------------------------------
+
+export interface CustomTextZone {
+  id: string;
+  placement: 'below_header' | 'above_footer' | 'below_footer';
+  content: string;
+  enabled: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // MergedReceiptConfig — the shape consumed by receipt templates
 // ---------------------------------------------------------------------------
 
@@ -16,6 +27,7 @@ export interface MergedReceiptConfig {
   logo_alignment: 'left' | 'center' | 'right';
   custom_text: string | null;
   custom_text_placement: 'below_header' | 'above_footer' | 'below_footer';
+  custom_text_zones: CustomTextZone[];
 }
 
 // ---------------------------------------------------------------------------
@@ -35,6 +47,7 @@ interface ReceiptConfig {
   logo_alignment: 'left' | 'center' | 'right';
   custom_text: string | null;
   custom_text_placement: 'below_header' | 'above_footer' | 'below_footer';
+  custom_text_zones: CustomTextZone[];
 }
 
 const DEFAULT_RECEIPT_CONFIG: ReceiptConfig = {
@@ -50,7 +63,24 @@ const DEFAULT_RECEIPT_CONFIG: ReceiptConfig = {
   logo_alignment: 'center',
   custom_text: null,
   custom_text_placement: 'below_footer',
+  custom_text_zones: [],
 };
+
+// Default zones for fresh installs (no custom_text and no zones configured)
+const DEFAULT_ZONES: CustomTextZone[] = [
+  {
+    id: 'default-footer-1',
+    placement: 'below_footer',
+    content: 'Thank you for your business!\nYour Service Advisor, {staff_first_name}, Thanks You!',
+    enabled: true,
+  },
+  {
+    id: 'default-footer-2',
+    placement: 'below_footer',
+    content: 'Tell Us About Your Recent Visit\nLeave us a Review on Yelp or Google!',
+    enabled: true,
+  },
+];
 
 // ---------------------------------------------------------------------------
 // fetchReceiptConfig
@@ -86,6 +116,22 @@ export async function fetchReceiptConfig(
     ...(typeof raw === 'object' && raw !== null ? (raw as Partial<ReceiptConfig>) : {}),
   };
 
+  // Migrate legacy single custom_text to zones if zones array is empty/missing
+  let zones: CustomTextZone[] = Array.isArray(rc.custom_text_zones) ? rc.custom_text_zones : [];
+  if (zones.length === 0 && rc.custom_text) {
+    zones = [{
+      id: 'migrated-1',
+      placement: rc.custom_text_placement || 'below_footer',
+      content: rc.custom_text,
+      enabled: true,
+    }];
+  }
+
+  // Default zones for fresh installs (no custom_text and no zones)
+  if (zones.length === 0 && !rc.custom_text) {
+    zones = DEFAULT_ZONES;
+  }
+
   // Parse business address
   const rawAddr = settings.business_address;
   const addr =
@@ -111,6 +157,7 @@ export async function fetchReceiptConfig(
     logo_alignment: rc.logo_alignment || 'center',
     custom_text: rc.custom_text,
     custom_text_placement: rc.custom_text_placement || 'below_footer',
+    custom_text_zones: zones,
   };
 
   // Printer IP: receipt_config.printer_ip wins, fall back to legacy star_printer_ip

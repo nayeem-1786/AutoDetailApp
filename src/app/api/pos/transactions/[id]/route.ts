@@ -45,7 +45,7 @@ export async function GET(
       .from('transactions')
       .select(`
         *,
-        customer:customers(id, first_name, last_name, phone, email),
+        customer:customers(id, first_name, last_name, phone, email, customer_type, created_at),
         vehicle:vehicles(id, year, make, model, color, size_class),
         employee:employees(id, first_name, last_name),
         items:transaction_items(*),

@@ -4,6 +4,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Receipt Enhancement — Info Section, Multi-Zone Custom Text, Shortcodes — Session D14 — 2026-02-23
+
+### Receipt Info Section Redesign
+- 4-line layout: Receipt # + date/time, Customer Type + name, Phone + Email, Vehicle + Customer Since
+- Employee name removed from info section (available via `{staff_first_name}` shortcode in footer zones)
+- `ReceiptTransaction.customer` expanded with `email`, `customer_type`, `created_at` fields
+- All 5 receipt API routes updated to include new customer fields from DB
+
+### Multi-Zone Custom Text with Shortcodes
+- New `CustomTextZone` type: `id`, `placement` (below_header/above_footer/below_footer), `content`, `enabled`
+- `custom_text_zones[]` added to `receipt_config` JSONB (no new DB fields)
+- `resolveShortcodes()` function: 17 shortcodes for customer, staff, transaction, vehicle, business data
+- Hardcoded "Thank you for your business!" removed — replaced with configurable default zones
+- Legacy `custom_text` backward compatibility preserved via auto-migration
+- Default zones seeded for fresh installs
+
+### Admin Receipt Settings UI
+- Single custom text textarea replaced with multi-zone editor
+- Each zone: enable/disable toggle, placement dropdown, content textarea, remove button
+- Clickable shortcode reference chips insert at cursor position
+- Preview updated with sample customer data (email, type, created_at)
+
+### Files Modified
+- `src/app/pos/lib/receipt-template.ts` — ReceiptTransaction, both renderers, resolveShortcodes
+- `src/lib/data/receipt-config.ts` — CustomTextZone type, MergedReceiptConfig, migration logic
+- `src/app/admin/settings/receipt-printer/page.tsx` — zones editor UI
+- `src/app/api/pos/receipts/print/route.ts` — expanded customer select
+- `src/app/api/pos/receipts/email/route.ts` — expanded customer select
+- `src/app/api/pos/receipts/sms/route.ts` — expanded customer select
+- `src/app/api/pos/transactions/[id]/route.ts` — expanded customer select
+- `src/app/api/customer/transactions/[id]/route.ts` — expanded customer select + object
+- `docs/dev/DB_SCHEMA.md` — receipt_config JSONB structure documented
+
+---
+
 ## Database Schema Documentation — 2026-02-23
 
 - Added `docs/dev/DB_SCHEMA.md` — comprehensive database schema reference (70+ tables, all columns, JSONB structures, receipt system architecture)

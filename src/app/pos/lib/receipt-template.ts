@@ -1,4 +1,4 @@
-import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
+import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
 
 interface ReceiptItem {
   item_name: string;
@@ -27,7 +27,14 @@ export interface ReceiptTransaction {
   loyalty_points_redeemed?: number;
   tip_amount: number;
   total_amount: number;
-  customer?: { first_name: string; last_name: string; phone?: string | null } | null;
+  customer?: {
+    first_name: string;
+    last_name: string;
+    phone?: string | null;
+    email?: string | null;
+    customer_type?: string | null;
+    created_at?: string | null;
+  } | null;
   employee?: { first_name: string; last_name: string } | null;
   vehicle?: { year?: number | null; make?: string | null; model?: string | null; color?: string | null } | null;
   items: ReceiptItem[];
@@ -58,7 +65,80 @@ const FALLBACK_CONFIG: MergedReceiptConfig = {
   logo_alignment: 'center',
   custom_text: null,
   custom_text_placement: 'below_footer',
+  custom_text_zones: [],
 };
+
+/**
+ * Resolve {shortcode} placeholders in text using transaction + config data.
+ */
+export function resolveShortcodes(
+  text: string,
+  tx: ReceiptTransaction,
+  config: MergedReceiptConfig
+): string {
+  const customer = tx.customer;
+  const vehicle = tx.vehicle;
+
+  let customerSince = '';
+  if (customer?.created_at) {
+    const d = new Date(customer.created_at);
+    const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    customerSince = `${month} ${d.getFullYear()}`;
+  }
+
+  const vehicleStr = vehicle
+    ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
+    : '';
+
+  const replacements: Record<string, string> = {
+    '{customer_name}': customer ? `${customer.first_name} ${customer.last_name}` : '',
+    '{customer_first_name}': customer?.first_name || '',
+    '{customer_phone}': customer?.phone || '',
+    '{customer_email}': customer?.email || '',
+    '{customer_type}': customer?.customer_type === 'professional' ? 'Professional' : 'Enthusiast',
+    '{customer_since}': customerSince,
+    '{staff_name}': tx.employee ? `${tx.employee.first_name} ${tx.employee.last_name}` : '',
+    '{staff_first_name}': tx.employee?.first_name || '',
+    '{receipt_number}': tx.receipt_number || '',
+    '{transaction_date}': new Date(tx.transaction_date).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    }),
+    '{total_amount}': `$${tx.total_amount.toFixed(2)}`,
+    '{vehicle}': vehicleStr,
+    '{business_name}': config.name,
+    '{business_phone}': config.phone,
+    '{business_email}': config.email || '',
+    '{business_address}': config.address,
+    '{business_website}': config.website || '',
+  };
+
+  let result = text;
+  for (const [key, value] of Object.entries(replacements)) {
+    result = result.replaceAll(key, value);
+  }
+  return result;
+}
+
+/**
+ * Get enabled zones for a specific placement, with shortcodes resolved.
+ */
+function getZonesForPlacement(
+  config: MergedReceiptConfig,
+  tx: ReceiptTransaction,
+  placement: CustomTextZone['placement']
+): string[] {
+  // If custom_text_zones exist, use them
+  if (config.custom_text_zones.length > 0) {
+    return config.custom_text_zones
+      .filter(z => z.enabled && z.placement === placement && z.content.trim())
+      .map(z => resolveShortcodes(z.content, tx, config));
+  }
+  // Fallback to legacy single custom_text
+  if (config.custom_text && config.custom_text_placement === placement) {
+    return [config.custom_text];
+  }
+  return [];
+}
 
 /**
  * Generate a structured receipt from transaction data.
@@ -88,37 +168,63 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
 
   lines.push({ type: 'divider' });
 
-  // Custom text below header
-  if (c.custom_text && c.custom_text_placement === 'below_header') {
-    lines.push({ type: 'text', text: c.custom_text });
+  // Custom text zones: below_header
+  const belowHeaderZones = getZonesForPlacement(c, tx, 'below_header');
+  for (const text of belowHeaderZones) {
+    lines.push({ type: 'text', text });
+  }
+  if (belowHeaderZones.length > 0) {
     lines.push({ type: 'divider' });
   }
 
-  // Receipt number & date
+  // Receipt number & date with time
   lines.push({
     type: 'columns',
     left: `Receipt #${tx.receipt_number || 'N/A'}`,
-    right: new Date(tx.transaction_date).toLocaleDateString(),
+    right: new Date(tx.transaction_date).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    }),
   });
 
-  // Customer (left) + Employee name (right) on same line
-  const customerStr = tx.customer ? `Customer: ${tx.customer.first_name} ${tx.customer.last_name}` : '';
-  const employeeStr = tx.employee ? tx.employee.first_name : '';
-  if (customerStr || employeeStr) {
+  // Customer type + name
+  if (tx.customer) {
+    const typeLabel = tx.customer.customer_type === 'professional' ? 'Professional' : 'Enthusiast';
     lines.push({
       type: 'columns',
-      left: customerStr,
-      right: employeeStr,
+      left: `${typeLabel}: ${tx.customer.first_name} ${tx.customer.last_name}`,
+      right: '',
     });
   }
 
-  // Vehicle
-  if (tx.vehicle) {
-    const v = [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model]
-      .filter(Boolean)
-      .join(' ');
-    if (v) {
-      lines.push({ type: 'text', text: `Vehicle: ${v}` });
+  // Phone + Email
+  if (tx.customer && (tx.customer.phone || tx.customer.email)) {
+    lines.push({
+      type: 'columns',
+      left: tx.customer.phone || '',
+      right: tx.customer.email || '',
+    });
+  }
+
+  // Vehicle + Customer Since
+  if (tx.vehicle || tx.customer?.created_at) {
+    const v = tx.vehicle
+      ? [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model].filter(Boolean).join(' ')
+      : '';
+    const vehicleStr = v ? `Vehicle: ${v}` : '';
+
+    let sinceStr = '';
+    if (tx.customer?.created_at) {
+      const d = new Date(tx.customer.created_at);
+      const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+      sinceStr = `Customer Since: ${month} ${d.getFullYear()}`;
+    }
+
+    if (vehicleStr || sinceStr) {
+      lines.push({
+        type: 'columns',
+        left: vehicleStr,
+        right: sinceStr,
+      });
     }
   }
 
@@ -221,18 +327,20 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     lines.push({ type: 'image', url: c.logo_url, width: c.logo_width, alignment: c.logo_alignment });
   }
 
-  // Custom text above footer
-  if (c.custom_text && c.custom_text_placement === 'above_footer') {
+  // Custom text zones: above_footer
+  const aboveFooterZones = getZonesForPlacement(c, tx, 'above_footer');
+  for (const text of aboveFooterZones) {
     lines.push({ type: 'spacer' });
-    lines.push({ type: 'text', text: c.custom_text });
+    lines.push({ type: 'text', text });
   }
 
-  lines.push({ type: 'spacer' });
-  lines.push({ type: 'text', text: 'Thank you for your business!' });
-
-  // Custom text below footer
-  if (c.custom_text && c.custom_text_placement === 'below_footer') {
-    lines.push({ type: 'text', text: c.custom_text });
+  // Custom text zones: below_footer
+  const belowFooterZones = getZonesForPlacement(c, tx, 'below_footer');
+  if (belowFooterZones.length > 0) {
+    lines.push({ type: 'spacer' });
+    for (const text of belowFooterZones) {
+      lines.push({ type: 'text', text });
+    }
   }
 
   lines.push({ type: 'spacer' });
@@ -316,7 +424,6 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     .map((item) => {
       const txCell = item.tax_amount > 0 ? 'TX' : '';
       if (item.quantity > 1) {
-        // Multi-qty: name on own row (full width), qty + price + TX on next row
         return `<tr>
           <td colspan="3" style="padding:4px 0 0;font-size:14px;">${esc(item.item_name)}</td>
         </tr>
@@ -326,7 +433,6 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
           <td style="padding:0 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
         </tr>`;
       }
-      // Single qty: name + price + TX on one row
       return `<tr>
         <td style="padding:4px 0;font-size:14px;">${esc(item.item_name)}</td>
         <td style="padding:4px 0;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
@@ -358,23 +464,37 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     })
     .join('');
 
-  // Build logo HTML — placed outside the centered header div when needed,
-  // so we use explicit text-align to control horizontal position.
   const logoAlign = c.logo_alignment || 'center';
   const logoHtml = c.logo_url
     ? `<div style="text-align:${logoAlign};margin:8px 0;"><img src="${esc(c.logo_url)}" alt="" style="display:inline-block;width:${c.logo_width}px;max-width:100%;height:auto;" /></div>`
     : '';
 
-  // Contact lines — wrapped in <a> tags with explicit color to prevent
-  // email clients from auto-linking as blue text (invisible on dark mode)
   const linkStyle = 'color:#444444;text-decoration:none;';
   const emailLine = c.email ? `<div style="font-size:13px;"><a href="mailto:${esc(c.email)}" style="${linkStyle}">${esc(c.email)}</a></div>` : '';
   const websiteLine = c.website ? `<div style="font-size:13px;"><a href="${esc(c.website)}" style="${linkStyle}">${esc(c.website)}</a></div>` : '';
 
-  // Custom text HTML
-  const customTextHtml = c.custom_text
-    ? `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(c.custom_text)}</div>`
+  // Build zone HTML for each placement
+  const belowHeaderZones = getZonesForPlacement(c, tx, 'below_header');
+  const belowHeaderHtml = belowHeaderZones.length > 0
+    ? belowHeaderZones.map(t => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`).join('') + '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">'
     : '';
+
+  const aboveFooterZones = getZonesForPlacement(c, tx, 'above_footer');
+  const aboveFooterHtml = aboveFooterZones.length > 0
+    ? aboveFooterZones.map(t => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`).join('')
+    : '';
+
+  const belowFooterZones = getZonesForPlacement(c, tx, 'below_footer');
+  const belowFooterHtml = belowFooterZones.length > 0
+    ? belowFooterZones.map(t => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`).join('')
+    : '';
+
+  // Customer Since string for HTML
+  let customerSinceStr = '';
+  if (tx.customer?.created_at) {
+    const d = new Date(tx.customer.created_at);
+    customerSinceStr = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() + ' ' + d.getFullYear();
+  }
 
   return `<!DOCTYPE html>
 <html>
@@ -409,7 +529,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
 
-  ${c.custom_text && c.custom_text_placement === 'below_header' ? customTextHtml + '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">' : ''}
+  ${belowHeaderHtml}
 
   <!-- Receipt info -->
   <table style="width:100%;font-size:14px;margin-bottom:4px;">
@@ -417,13 +537,18 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       <td>Receipt #${esc(tx.receipt_number || 'N/A')}</td>
       <td style="text-align:right;">${esc(date)}</td>
     </tr>
+    ${tx.customer ? `<tr>
+      <td colspan="2">${esc(tx.customer.customer_type === 'professional' ? 'Professional' : 'Enthusiast')}: ${esc(tx.customer.first_name)} ${esc(tx.customer.last_name)}</td>
+    </tr>` : ''}
+    ${tx.customer && (tx.customer.phone || tx.customer.email) ? `<tr>
+      <td>${tx.customer.phone ? esc(tx.customer.phone) : ''}</td>
+      <td style="text-align:right;">${tx.customer.email ? esc(tx.customer.email) : ''}</td>
+    </tr>` : ''}
+    ${vehicleStr || customerSinceStr ? `<tr>
+      <td>${vehicleStr ? `Vehicle: ${esc(vehicleStr)}` : ''}</td>
+      <td style="text-align:right;">${customerSinceStr ? `Customer Since: ${esc(customerSinceStr)}` : ''}</td>
+    </tr>` : ''}
   </table>
-
-  ${tx.customer || tx.employee ? `<table style="width:100%;font-size:14px;"><tr>
-      <td>${tx.customer ? `Customer: ${esc(tx.customer.first_name)} ${esc(tx.customer.last_name)}` : ''}</td>
-      <td style="text-align:right;">${tx.employee ? esc(tx.employee.first_name) : ''}</td>
-    </tr></table>` : ''}
-  ${vehicleStr ? `<div style="font-size:14px;">Vehicle: ${esc(vehicleStr)}</div>` : ''}
 
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
 
@@ -455,14 +580,10 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   </table>
 
   ${c.logo_placement === 'above_footer' ? logoHtml : ''}
-  ${c.custom_text && c.custom_text_placement === 'above_footer' ? customTextHtml : ''}
+  ${aboveFooterHtml}
 
-  <!-- Footer -->
-  <div style="text-align:center;margin-top:20px;font-size:14px;color:#333;">
-    Thank you for your business!
-  </div>
-
-  ${c.custom_text && c.custom_text_placement === 'below_footer' ? customTextHtml : ''}
+  <!-- Footer zones -->
+  ${belowFooterHtml}
 </div>
 </body>
 </html>`;

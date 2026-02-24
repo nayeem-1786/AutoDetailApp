@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,11 +10,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Upload, Trash2, Image as ImageIcon, Eye } from 'lucide-react';
+import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X } from 'lucide-react';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
-import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
+import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
+
+const SHORTCODES = [
+  '{customer_name}', '{customer_first_name}', '{customer_type}', '{customer_phone}',
+  '{customer_email}', '{customer_since}', '{staff_name}', '{staff_first_name}',
+  '{receipt_number}', '{transaction_date}', '{total_amount}', '{vehicle}',
+  '{business_name}', '{business_phone}', '{business_email}', '{business_website}',
+] as const;
 
 interface ReceiptConfigState {
   printer_ip: string;
@@ -29,6 +37,7 @@ interface ReceiptConfigState {
   logo_alignment: 'left' | 'center' | 'right';
   custom_text: string;
   custom_text_placement: 'below_header' | 'above_footer' | 'below_footer';
+  custom_text_zones: CustomTextZone[];
 }
 
 interface BusinessDefaults {
@@ -52,7 +61,24 @@ const INITIAL_CONFIG: ReceiptConfigState = {
   logo_alignment: 'center',
   custom_text: '',
   custom_text_placement: 'below_footer',
+  custom_text_zones: [],
 };
+
+// Default zones for fresh installs
+const DEFAULT_ZONES: CustomTextZone[] = [
+  {
+    id: 'default-footer-1',
+    placement: 'below_footer',
+    content: 'Thank you for your business!\nYour Service Advisor, {staff_first_name}, Thanks You!',
+    enabled: true,
+  },
+  {
+    id: 'default-footer-2',
+    placement: 'below_footer',
+    content: 'Tell Us About Your Recent Visit\nLeave us a Review on Yelp or Google!',
+    enabled: true,
+  },
+];
 
 export default function ReceiptPrinterPage() {
   const [loading, setLoading] = useState(true);
@@ -67,6 +93,7 @@ export default function ReceiptPrinterPage() {
     business_website: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const zoneTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   useEffect(() => {
     async function loadSettings() {
@@ -127,6 +154,27 @@ export default function ReceiptPrinterPage() {
       // Legacy migration: if star_printer_ip exists and receipt_config has no printer_ip
       const legacyIp = (settings.star_printer_ip as string) || '';
 
+      // Parse zones
+      let zones: CustomTextZone[] = Array.isArray(rc.custom_text_zones)
+        ? (rc.custom_text_zones as CustomTextZone[])
+        : [];
+
+      // Migrate legacy single custom_text to zones
+      const legacyText = (rc.custom_text as string) || '';
+      if (zones.length === 0 && legacyText) {
+        zones = [{
+          id: 'migrated-1',
+          placement: (rc.custom_text_placement as CustomTextZone['placement']) || 'below_footer',
+          content: legacyText,
+          enabled: true,
+        }];
+      }
+
+      // Default zones for fresh installs
+      if (zones.length === 0 && !legacyText) {
+        zones = DEFAULT_ZONES;
+      }
+
       setConfig({
         printer_ip: (rc.printer_ip as string) || legacyIp || '',
         override_name: (rc.override_name as string) || '',
@@ -138,8 +186,9 @@ export default function ReceiptPrinterPage() {
         logo_width: (rc.logo_width as number) || 200,
         logo_placement: (rc.logo_placement as ReceiptConfigState['logo_placement']) || 'above_name',
         logo_alignment: (rc.logo_alignment as ReceiptConfigState['logo_alignment']) || 'center',
-        custom_text: (rc.custom_text as string) || '',
+        custom_text: legacyText,
         custom_text_placement: (rc.custom_text_placement as ReceiptConfigState['custom_text_placement']) || 'below_footer',
+        custom_text_zones: zones,
       });
 
       setLoading(false);
@@ -152,11 +201,62 @@ export default function ReceiptPrinterPage() {
     setConfig((prev) => ({ ...prev, [key]: value }));
   }
 
+  // --- Zone management ---
+  const updateZone = useCallback((zoneId: string, updates: Partial<CustomTextZone>) => {
+    setConfig((prev) => ({
+      ...prev,
+      custom_text_zones: prev.custom_text_zones.map(z =>
+        z.id === zoneId ? { ...z, ...updates } : z
+      ),
+    }));
+  }, []);
+
+  function addZone() {
+    const newZone: CustomTextZone = {
+      id: `zone-${Date.now()}`,
+      placement: 'below_footer',
+      content: '',
+      enabled: true,
+    };
+    setConfig((prev) => ({
+      ...prev,
+      custom_text_zones: [...prev.custom_text_zones, newZone],
+    }));
+  }
+
+  function removeZone(zoneId: string) {
+    setConfig((prev) => ({
+      ...prev,
+      custom_text_zones: prev.custom_text_zones.filter(z => z.id !== zoneId),
+    }));
+  }
+
+  function insertShortcode(zoneId: string, shortcode: string) {
+    const textarea = zoneTextareaRefs.current[zoneId];
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentContent = config.custom_text_zones.find(z => z.id === zoneId)?.content || '';
+    const newContent = currentContent.slice(0, start) + shortcode + currentContent.slice(end);
+
+    updateZone(zoneId, { content: newContent });
+
+    // Restore cursor position after React re-render
+    requestAnimationFrame(() => {
+      const newPos = start + shortcode.length;
+      textarea.focus();
+      textarea.setSelectionRange(newPos, newPos);
+    });
+  }
+
   async function handleSave() {
     setSaving(true);
     const supabase = createClient();
 
-    // Build the receipt_config JSONB value — convert empty strings to null
+    // Sync legacy custom_text from first zone for backward compat
+    const firstEnabledZone = config.custom_text_zones.find(z => z.enabled && z.content.trim());
+
     const configValue = {
       printer_ip: config.printer_ip || null,
       override_name: config.override_name || null,
@@ -168,8 +268,9 @@ export default function ReceiptPrinterPage() {
       logo_width: config.logo_width,
       logo_placement: config.logo_placement,
       logo_alignment: config.logo_alignment,
-      custom_text: config.custom_text || null,
-      custom_text_placement: config.custom_text_placement,
+      custom_text: firstEnabledZone?.content || null,
+      custom_text_placement: firstEnabledZone?.placement || config.custom_text_placement,
+      custom_text_zones: config.custom_text_zones,
     };
 
     const { error } = await supabase
@@ -195,7 +296,6 @@ export default function ReceiptPrinterPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate type and size
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
       toast.error('Only PNG, JPG, and WebP files are supported');
       return;
@@ -207,7 +307,6 @@ export default function ReceiptPrinterPage() {
 
     setUploading(true);
 
-    // Upload via server API route (handles bucket creation + service-role auth)
     const formData = new FormData();
     formData.append('file', file);
 
@@ -231,7 +330,6 @@ export default function ReceiptPrinterPage() {
     }
     setUploading(false);
 
-    // Reset file input so re-uploading the same file triggers onChange
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -244,7 +342,6 @@ export default function ReceiptPrinterPage() {
   const [previewHtml, setPreviewHtml] = useState('');
 
   function handlePreview() {
-    // Build a MergedReceiptConfig from current form state + business defaults
     const merged: MergedReceiptConfig = {
       name: config.override_name || defaults.business_name || 'Your Business Name',
       phone: config.override_phone || defaults.business_phone || '(310) 555-1234',
@@ -257,9 +354,9 @@ export default function ReceiptPrinterPage() {
       logo_alignment: config.logo_alignment,
       custom_text: config.custom_text || null,
       custom_text_placement: config.custom_text_placement,
+      custom_text_zones: config.custom_text_zones,
     };
 
-    // Sample transaction for preview
     const sampleTx = {
       receipt_number: '10042',
       transaction_date: new Date().toISOString(),
@@ -268,7 +365,14 @@ export default function ReceiptPrinterPage() {
       discount_amount: 0,
       tip_amount: 20.00,
       total_amount: 177.68,
-      customer: { first_name: 'John', last_name: 'Doe', phone: '+13105551234' },
+      customer: {
+        first_name: 'Jane',
+        last_name: 'Smith',
+        phone: '(310) 555-0100',
+        email: 'jane@example.com',
+        customer_type: 'enthusiast',
+        created_at: '2023-06-15T00:00:00Z',
+      },
       employee: { first_name: 'Joselyn', last_name: 'Reyes' },
       vehicle: { year: 2024, make: 'Toyota', model: 'Camry', color: 'Black' },
       items: [
@@ -508,37 +612,89 @@ export default function ReceiptPrinterPage() {
         </CardContent>
       </Card>
 
-      {/* Custom Text */}
+      {/* Custom Text Zones */}
       <Card>
         <CardHeader>
-          <CardTitle>Custom Text</CardTitle>
+          <CardTitle>Custom Text Zones</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-500">
-            Add a disclaimer, promotion, or return policy that prints on every receipt.
+            Add text blocks that appear on every receipt. Use {'{shortcodes}'} to insert dynamic data. You can add multiple zones at different positions.
           </p>
 
-          <FormField label="Text" htmlFor="custom_text">
-            <Textarea
-              id="custom_text"
-              rows={3}
-              placeholder="e.g. All sales final. Thank you for your business!"
-              value={config.custom_text}
-              onChange={(e) => updateConfig('custom_text', e.target.value)}
-            />
-          </FormField>
+          {config.custom_text_zones.length === 0 && (
+            <p className="text-sm italic text-gray-400">No zones configured. Add one below.</p>
+          )}
 
-          <FormField label="Placement" htmlFor="custom_text_placement">
-            <Select
-              id="custom_text_placement"
-              value={config.custom_text_placement}
-              onChange={(e) => updateConfig('custom_text_placement', e.target.value as ReceiptConfigState['custom_text_placement'])}
-            >
-              <option value="below_header">Below Header</option>
-              <option value="above_footer">Above Footer</option>
-              <option value="below_footer">Below Footer</option>
-            </Select>
-          </FormField>
+          <div className="space-y-4">
+            {config.custom_text_zones.map((zone, index) => (
+              <div
+                key={zone.id}
+                className={`rounded-lg border p-4 ${zone.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'}`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">Zone {index + 1}</span>
+                    <Switch
+                      checked={zone.enabled}
+                      onCheckedChange={(checked) => updateZone(zone.id, { enabled: checked })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeZone(zone.id)}
+                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500"
+                    title="Remove zone"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mb-3">
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Placement</label>
+                  <Select
+                    value={zone.placement}
+                    onChange={(e) => updateZone(zone.id, { placement: e.target.value as CustomTextZone['placement'] })}
+                  >
+                    <option value="below_header">Below Header</option>
+                    <option value="above_footer">Above Footer</option>
+                    <option value="below_footer">Below Footer</option>
+                  </Select>
+                </div>
+
+                <div className="mb-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Content</label>
+                  <Textarea
+                    ref={(el) => { zoneTextareaRefs.current[zone.id] = el; }}
+                    rows={3}
+                    className="font-mono text-sm"
+                    placeholder="e.g. Thank you, {customer_first_name}!"
+                    value={zone.content}
+                    onChange={(e) => updateZone(zone.id, { content: e.target.value })}
+                  />
+                </div>
+
+                {/* Shortcode chips */}
+                <div className="flex flex-wrap gap-1">
+                  {SHORTCODES.map((sc) => (
+                    <button
+                      key={sc}
+                      type="button"
+                      onClick={() => insertShortcode(zone.id, sc)}
+                      className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+                    >
+                      {sc}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Button variant="outline" size="sm" onClick={addZone}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Zone
+          </Button>
         </CardContent>
       </Card>
 

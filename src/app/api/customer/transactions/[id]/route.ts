@@ -22,7 +22,7 @@ export async function GET(
 
     const { data: customer } = await admin
       .from('customers')
-      .select('id, first_name, last_name, phone')
+      .select('id, first_name, last_name, phone, email, customer_type, created_at')
       .eq('auth_user_id', user.id)
       .single();
 
@@ -65,6 +65,9 @@ export async function GET(
         first_name: customer.first_name,
         last_name: customer.last_name,
         phone: customer.phone,
+        email: customer.email,
+        customer_type: customer.customer_type,
+        created_at: customer.created_at,
       },
     };
 
