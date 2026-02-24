@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Logo Area Size + Helper Text Fix — Session D14d — 2026-02-23
+
+### Fixes
+- Logo preview/upload container set to `w-full min-h-[200px]` to fill column and span the height of the 5 input rows
+- Empty-state dashed border area also sized to `min-h-[200px]` for consistency
+- Logo `<img>` uses `max-h-full max-w-full object-contain` to scale within container
+- Helper text split into two lines with `<br />`
+
+### Files Modified
+- `src/app/admin/settings/receipt-printer/page.tsx` — logo container sizing, helper text line break
+
+---
+
 ## Receipt Header & Logo Card — Layout Fix — Session D14c — 2026-02-23
 
 ### Fixes

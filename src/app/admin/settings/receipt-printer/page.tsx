@@ -498,13 +498,13 @@ export default function ReceiptPrinterPage() {
                 onChange={handleLogoUpload}
               />
               {config.logo_url ? (
-                <div className="space-y-3 text-center">
-                  <div className="rounded border border-gray-200 bg-gray-50 p-2">
+                <div className="w-full space-y-3 text-center">
+                  <div className="flex min-h-[200px] w-full items-center justify-center rounded border border-gray-200 bg-gray-50 p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={config.logo_url}
                       alt="Receipt logo preview"
-                      className="mx-auto max-h-48 object-contain"
+                      className="max-h-full max-w-full object-contain"
                       style={{ maxWidth: `${config.logo_width}px` }}
                     />
                   </div>
@@ -526,7 +526,7 @@ export default function ReceiptPrinterPage() {
                 </div>
               ) : (
                 <div className="w-full space-y-3 text-center">
-                  <div className="flex h-32 items-center justify-center rounded border-2 border-dashed border-gray-300 bg-gray-50">
+                  <div className="flex min-h-[200px] w-full items-center justify-center rounded border-2 border-dashed border-gray-300 bg-gray-50">
                     <div className="text-center">
                       <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
                       <p className="mt-1 text-sm text-gray-400">No logo</p>
@@ -544,7 +544,8 @@ export default function ReceiptPrinterPage() {
                 </div>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                Upload a high-contrast PNG or JPG (max 2MB). Dark logos on white background work best for thermal printing.
+                Upload a high-contrast PNG or JPG (max 2MB).<br />
+                Dark logos on white background work best for thermal printing.
               </p>
             </div>
 
