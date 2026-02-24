@@ -4,6 +4,36 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Vehicle Categories Table, API Routes & Bug Fixes — Session 6 — 2026-02-24
+
+### Database: `vehicle_categories` Table
+- New table with 5 seeded categories (automobile, motorcycle, rv, boat, aircraft)
+- Admin-editable metadata: `display_name`, `description`, `image_url`, `image_alt`, `display_order`, `is_active`
+- `key` column is immutable — categories cannot be added or removed
+- RLS: public read for active categories, authenticated read for all, admin full access
+- Reuses shared `update_updated_at()` trigger function
+
+### API Routes
+- `GET /api/vehicle-categories` — Public list of active categories (booking flow)
+- `GET /api/admin/vehicle-categories` — Admin list of all categories (including inactive)
+- `PATCH /api/admin/vehicle-categories/[id]` — Update category metadata (rejects `key` changes)
+- `POST /api/admin/vehicle-categories/[id]/image` — Upload category image to `cms-assets` storage
+- `DELETE /api/admin/vehicle-categories/[id]/image` — Remove category image from storage
+
+### Types
+- Added `VehicleCategoryRecord` interface to `src/lib/supabase/types.ts`
+
+### Bug Fix: Edit Mode Year "Other" Not Pre-Populated
+- When a vehicle had a year outside the dropdown range (e.g., 1965), reopening the form showed the year field blank
+- Fix: All 4 vehicle forms now auto-detect "Other" mode on edit initialization when year is not in `getVehicleYearOptions()` (1980–currentYear+2)
+- Files fixed: admin customer page, POS vehicle dialog, customer portal vehicle dialog, booking step
+
+### Bug Fix: POS Compatibility Warning Capitalization
+- Vehicle category was displayed lowercase (e.g., "a motorcycle" instead of "a **Motorcycle**")
+- Fix: Uses `VEHICLE_CATEGORY_LABELS` for proper display name, all three emphasized terms (service name, compatible types, vehicle category) now use consistent bold + high-contrast text color styling
+
+---
+
 ## Vehicle Form Polish, POS Edits, Compatibility Warnings & Validation — Session 5 — 2026-02-24
 
 ### Vehicle Categories Helpers (`src/lib/utils/vehicle-categories.ts`)

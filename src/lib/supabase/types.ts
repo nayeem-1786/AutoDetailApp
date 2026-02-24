@@ -1519,6 +1519,20 @@ export interface AuditLogEntry {
   source: string;
 }
 
+// Vehicle Categories (admin-editable metadata for the fixed 5 categories)
+export interface VehicleCategoryRecord {
+  id: string;
+  key: string;
+  display_name: string;
+  description: string | null;
+  image_url: string | null;
+  image_alt: string | null;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }

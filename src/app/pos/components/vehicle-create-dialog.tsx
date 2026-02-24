@@ -67,11 +67,15 @@ export function VehicleCreateDialog({
       setCategory(cat);
       setSizeClass(editVehicle.size_class || 'sedan');
       setSpecialtyTier(editVehicle.specialty_tier || '');
-      setYear(editVehicle.year?.toString() || '');
+      const yearStr = editVehicle.year?.toString() || '';
+      setYear(yearStr);
       setMake(editVehicle.make || '');
       setModel(editVehicle.model || '');
       setColor(editVehicle.color || '');
-      setYearOtherMode(false);
+      // Auto-detect "Other" mode if year is outside the dropdown range
+      const yearNum = editVehicle.year;
+      const yearOptions = getVehicleYearOptions();
+      setYearOtherMode(!!yearNum && !yearOptions.includes(yearNum));
       setErrors({});
     } else if (open && !editVehicle) {
       handleReset();

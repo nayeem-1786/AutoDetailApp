@@ -341,13 +341,13 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
               </h2>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              <strong>{compatWarning.service.name}</strong> is designed for{' '}
-              <strong>{getCompatibleTypesLabel(compatWarning.service)}</strong>.
+              <strong className="text-gray-900 dark:text-gray-100">{compatWarning.service.name}</strong> is designed for{' '}
+              <strong className="text-gray-900 dark:text-gray-100">{getCompatibleTypesLabel(compatWarning.service)}</strong>.
               The vehicle on this ticket is{' '}
-              {ticket.vehicle?.vehicle_category && ticket.vehicle.vehicle_category !== 'automobile'
-                ? `a ${VEHICLE_CATEGORY_LABELS[(ticket.vehicle.vehicle_category || 'automobile') as VehicleCategory]?.toLowerCase()}`
-                : `an ${VEHICLE_CATEGORY_LABELS[(ticket.vehicle?.vehicle_category || 'automobile') as VehicleCategory]?.toLowerCase()}`
-              }. Add anyway?
+              {ticket.vehicle?.vehicle_category && ticket.vehicle.vehicle_category !== 'automobile' ? 'a ' : 'an '}
+              <strong className="text-gray-900 dark:text-gray-100">
+                {VEHICLE_CATEGORY_LABELS[(ticket.vehicle?.vehicle_category || 'automobile') as VehicleCategory]}
+              </strong>. Add anyway?
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <Button variant="outline" onClick={() => setCompatWarning(null)}>Cancel</Button>

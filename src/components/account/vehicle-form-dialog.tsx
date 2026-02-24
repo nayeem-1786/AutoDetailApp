@@ -93,7 +93,9 @@ export function VehicleFormDialog({
     if (open && vehicle) {
       const cat = deriveCategory(vehicle);
       setCategory(cat);
-      setYearOtherMode(false);
+      // Auto-detect "Other" mode if year is outside the dropdown range
+      const yearOptions = getVehicleYearOptions();
+      setYearOtherMode(!!vehicle.year && !yearOptions.includes(vehicle.year));
       reset({
         vehicle_category: cat,
         vehicle_type: vehicle.vehicle_type as CustomerVehicleInput['vehicle_type'],

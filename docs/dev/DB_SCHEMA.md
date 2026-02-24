@@ -1163,6 +1163,22 @@ UNIQUE constraint on (service_id, tier_name). Index on service_id.
 
 ## Reference Data
 
+### vehicle_categories
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| key | TEXT | NOT NULL, UNIQUE | Immutable: automobile, motorcycle, rv, boat, aircraft |
+| display_name | TEXT | NOT NULL | Admin-editable display label |
+| description | TEXT | | |
+| image_url | TEXT | | Card image for booking flow category picker |
+| image_alt | TEXT | | Alt text for the image |
+| display_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | Controls visibility in booking flow |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+Fixed set of 5 categories — cannot be added or removed. Only metadata is editable. Seeded with automobile (1), motorcycle (2), rv (3), boat (4), aircraft (5). RLS: anon read active, authenticated read all, admin write. Trigger: update_updated_at().
+
 ### vehicle_makes
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|

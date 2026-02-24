@@ -260,6 +260,9 @@ export function StepCustomerInfo({
     setVehicleError(null);
     const cat = (v.vehicle_category || (v.vehicle_type === 'standard' ? 'automobile' : v.vehicle_type)) as VehicleCategory;
     setBookingVehicleCategory(cat);
+    // Auto-detect "Other" mode if year is outside the dropdown range
+    const yearOptions = getVehicleYearOptions();
+    setYearOtherMode(!!v.year && !yearOptions.includes(v.year));
     setValue('vehicle.vehicle_category', cat, { shouldDirty: true });
     setValue('vehicle.vehicle_type', v.vehicle_type, { shouldDirty: true });
     setValue('vehicle.size_class', v.size_class ?? undefined, { shouldDirty: true });

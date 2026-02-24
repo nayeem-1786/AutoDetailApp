@@ -514,7 +514,9 @@ export default function CustomerProfilePage() {
 
   function openEditVehicle(vehicle: Vehicle) {
     setEditingVehicle(vehicle);
-    setYearOtherMode(false);
+    // Auto-detect "Other" mode if year is outside the dropdown range
+    const yearOptions = getVehicleYearOptions();
+    setYearOtherMode(!!vehicle.year && !yearOptions.includes(vehicle.year));
     const cat = deriveVehicleCategory(vehicle);
     setVehicleCategory(cat);
     vehicleForm.reset({

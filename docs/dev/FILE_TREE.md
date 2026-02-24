@@ -142,6 +142,13 @@ src/app/api/admin/settings/shipping/test-connection/route.ts
 src/app/api/admin/settings/shipping/validate-address/route.ts
 ```
 
+### Admin — Vehicle Categories
+```
+src/app/api/admin/vehicle-categories/route.ts
+src/app/api/admin/vehicle-categories/[id]/route.ts
+src/app/api/admin/vehicle-categories/[id]/image/route.ts
+```
+
 ### Admin — Vehicle Makes
 ```
 src/app/api/admin/vehicle-makes/route.ts
@@ -358,6 +365,11 @@ src/app/api/webhooks/mailgun/route.ts
 src/app/api/webhooks/stripe/route.ts
 src/app/api/webhooks/twilio/inbound/route.ts
 src/app/api/webhooks/twilio/status/route.ts
+```
+
+### Vehicle Categories (Public)
+```
+src/app/api/vehicle-categories/route.ts
 ```
 
 ### Vehicle Makes (Public)
@@ -1035,6 +1047,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260222000004_customer_phone_email_unique.sql
 20260223000001_create_vehicle_makes.sql
 20260224000001_vehicle_category_expansion.sql
+20260224000002_create_vehicle_categories.sql
 ```
 
 ---
