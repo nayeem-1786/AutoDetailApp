@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Receipt Info Line Reorder + Zone Separators — Session D14e — 2026-02-23
+
+### Receipt Info Section Reorder
+- Line 2: "First Last, Enthusiast" (left) + Phone (right) — was "Enthusiast: First Last" full-width
+- Line 3: Email (left) + "Customer Since: Jun 2023" (right) — was Phone + Email
+- Line 4: Vehicle centered — was left-aligned with Customer Since on right
+- Customer Since month changed from uppercase ("JUN") to title case ("Jun") in both renderers
+
+### Zone Separators
+- Added dotted divider between custom text zones at all three placements (below_header, above_footer, below_footer)
+- Uses existing `{ type: 'divider' }` in thermal and `<hr>` dashed border in HTML
+- Extracted `zoneDivider` and `zoneDiv` helpers in HTML renderer to reduce duplication
+
+### Files Modified
+- `src/app/pos/lib/receipt-template.ts` — both `generateReceiptLines()` and `generateReceiptHtml()`
+
+---
+
 ## Logo Area Size + Helper Text Fix — Session D14d — 2026-02-23
 
 ### Fixes

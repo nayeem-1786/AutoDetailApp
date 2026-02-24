@@ -170,8 +170,9 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
 
   // Custom text zones: below_header
   const belowHeaderZones = getZonesForPlacement(c, tx, 'below_header');
-  for (const text of belowHeaderZones) {
-    lines.push({ type: 'text', text });
+  for (let i = 0; i < belowHeaderZones.length; i++) {
+    if (i > 0) lines.push({ type: 'divider' });
+    lines.push({ type: 'text', text: belowHeaderZones[i] });
   }
   if (belowHeaderZones.length > 0) {
     lines.push({ type: 'divider' });
@@ -186,45 +187,36 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     }),
   });
 
-  // Customer type + name
+  // Customer name + type, phone
   if (tx.customer) {
     const typeLabel = tx.customer.customer_type === 'professional' ? 'Professional' : 'Enthusiast';
     lines.push({
       type: 'columns',
-      left: `${typeLabel}: ${tx.customer.first_name} ${tx.customer.last_name}`,
-      right: '',
+      left: `${tx.customer.first_name} ${tx.customer.last_name}, ${typeLabel}`,
+      right: tx.customer.phone || '',
     });
   }
 
-  // Phone + Email
-  if (tx.customer && (tx.customer.phone || tx.customer.email)) {
-    lines.push({
-      type: 'columns',
-      left: tx.customer.phone || '',
-      right: tx.customer.email || '',
-    });
-  }
-
-  // Vehicle + Customer Since
-  if (tx.vehicle || tx.customer?.created_at) {
-    const v = tx.vehicle
-      ? [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model].filter(Boolean).join(' ')
-      : '';
-    const vehicleStr = v ? `Vehicle: ${v}` : '';
-
+  // Email + Customer Since
+  if (tx.customer && (tx.customer.email || tx.customer.created_at)) {
     let sinceStr = '';
-    if (tx.customer?.created_at) {
+    if (tx.customer.created_at) {
       const d = new Date(tx.customer.created_at);
-      const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+      const month = d.toLocaleDateString('en-US', { month: 'short' });
       sinceStr = `Customer Since: ${month} ${d.getFullYear()}`;
     }
+    lines.push({
+      type: 'columns',
+      left: tx.customer.email || '',
+      right: sinceStr,
+    });
+  }
 
-    if (vehicleStr || sinceStr) {
-      lines.push({
-        type: 'columns',
-        left: vehicleStr,
-        right: sinceStr,
-      });
+  // Vehicle (centered)
+  if (tx.vehicle) {
+    const v = [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model].filter(Boolean).join(' ');
+    if (v) {
+      lines.push({ type: 'text', text: `Vehicle: ${v}` });
     }
   }
 
@@ -329,17 +321,19 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
 
   // Custom text zones: above_footer
   const aboveFooterZones = getZonesForPlacement(c, tx, 'above_footer');
-  for (const text of aboveFooterZones) {
-    lines.push({ type: 'spacer' });
-    lines.push({ type: 'text', text });
+  for (let i = 0; i < aboveFooterZones.length; i++) {
+    if (i === 0) lines.push({ type: 'spacer' });
+    else lines.push({ type: 'divider' });
+    lines.push({ type: 'text', text: aboveFooterZones[i] });
   }
 
   // Custom text zones: below_footer
   const belowFooterZones = getZonesForPlacement(c, tx, 'below_footer');
   if (belowFooterZones.length > 0) {
     lines.push({ type: 'spacer' });
-    for (const text of belowFooterZones) {
-      lines.push({ type: 'text', text });
+    for (let i = 0; i < belowFooterZones.length; i++) {
+      if (i > 0) lines.push({ type: 'divider' });
+      lines.push({ type: 'text', text: belowFooterZones[i] });
     }
   }
 
@@ -474,26 +468,29 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   const websiteLine = c.website ? `<div style="font-size:13px;"><a href="${esc(c.website)}" style="${linkStyle}">${esc(c.website)}</a></div>` : '';
 
   // Build zone HTML for each placement
+  const zoneDivider = '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">';
+  const zoneDiv = (t: string) => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`;
+
   const belowHeaderZones = getZonesForPlacement(c, tx, 'below_header');
   const belowHeaderHtml = belowHeaderZones.length > 0
-    ? belowHeaderZones.map(t => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`).join('') + '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">'
+    ? belowHeaderZones.map(zoneDiv).join(zoneDivider) + zoneDivider
     : '';
 
   const aboveFooterZones = getZonesForPlacement(c, tx, 'above_footer');
   const aboveFooterHtml = aboveFooterZones.length > 0
-    ? aboveFooterZones.map(t => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`).join('')
+    ? aboveFooterZones.map(zoneDiv).join(zoneDivider)
     : '';
 
   const belowFooterZones = getZonesForPlacement(c, tx, 'below_footer');
   const belowFooterHtml = belowFooterZones.length > 0
-    ? belowFooterZones.map(t => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`).join('')
+    ? belowFooterZones.map(zoneDiv).join(zoneDivider)
     : '';
 
   // Customer Since string for HTML
   let customerSinceStr = '';
   if (tx.customer?.created_at) {
     const d = new Date(tx.customer.created_at);
-    customerSinceStr = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() + ' ' + d.getFullYear();
+    customerSinceStr = d.toLocaleDateString('en-US', { month: 'short' }) + ' ' + d.getFullYear();
   }
 
   return `<!DOCTYPE html>
@@ -538,15 +535,15 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       <td style="text-align:right;">${esc(date)}</td>
     </tr>
     ${tx.customer ? `<tr>
-      <td colspan="2">${esc(tx.customer.customer_type === 'professional' ? 'Professional' : 'Enthusiast')}: ${esc(tx.customer.first_name)} ${esc(tx.customer.last_name)}</td>
+      <td>${esc(tx.customer.first_name)} ${esc(tx.customer.last_name)}, ${esc(tx.customer.customer_type === 'professional' ? 'Professional' : 'Enthusiast')}</td>
+      <td style="text-align:right;">${tx.customer.phone ? esc(tx.customer.phone) : ''}</td>
     </tr>` : ''}
-    ${tx.customer && (tx.customer.phone || tx.customer.email) ? `<tr>
-      <td>${tx.customer.phone ? esc(tx.customer.phone) : ''}</td>
-      <td style="text-align:right;">${tx.customer.email ? esc(tx.customer.email) : ''}</td>
-    </tr>` : ''}
-    ${vehicleStr || customerSinceStr ? `<tr>
-      <td>${vehicleStr ? `Vehicle: ${esc(vehicleStr)}` : ''}</td>
+    ${tx.customer && (tx.customer.email || customerSinceStr) ? `<tr>
+      <td>${tx.customer.email ? esc(tx.customer.email) : ''}</td>
       <td style="text-align:right;">${customerSinceStr ? `Customer Since: ${esc(customerSinceStr)}` : ''}</td>
+    </tr>` : ''}
+    ${vehicleStr ? `<tr>
+      <td colspan="2" style="text-align:center;">Vehicle: ${esc(vehicleStr)}</td>
     </tr>` : ''}
   </table>
 
