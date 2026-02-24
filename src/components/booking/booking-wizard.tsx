@@ -745,6 +745,7 @@ export function BookingWizard({
             categories={categories}
             selectedServiceId={state.service?.id ?? null}
             onSelect={handleServiceSelect}
+            vehicleCategory={(state.vehicle?.vehicle_category as import('@/lib/utils/vehicle-categories').VehicleCategory) ?? null}
           />
           {editEntryStep === 1 && (
             <div className="mt-4">

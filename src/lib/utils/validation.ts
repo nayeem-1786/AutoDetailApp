@@ -62,14 +62,18 @@ export const customerUpdateSchema = customerCreateSchema.partial();
 // Vehicle schemas
 export const vehicleSchema = z.object({
   customer_id: z.string().uuid(),
-  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft']).default('automobile'),
+  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft'], {
+    error: 'Please select a vehicle category',
+  }).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']),
-  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van'], {
+    error: 'Please select a size class',
+  }).optional().nullable(),
   specialty_tier: optionalString,
-  year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
-  make: optionalString,
-  model: optionalString,
-  color: optionalString,
+  year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
+  make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
+  model: z.string().min(1, 'Please enter a model').optional().nullable(),
+  color: z.string().min(1, 'Please enter a color').optional().nullable(),
   vin: optionalString,
   license_plate: optionalString,
   notes: optionalString,
@@ -285,14 +289,18 @@ export const bookingCustomerSchema = z.object({
 });
 
 export const bookingVehicleSchema = z.object({
-  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft']).default('automobile'),
+  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft'], {
+    error: 'Please select a vehicle category',
+  }).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
-  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van'], {
+    error: 'Please select a size class',
+  }).optional().nullable(),
   specialty_tier: optionalString,
-  year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
-  make: optionalString,
-  model: optionalString,
-  color: optionalString,
+  year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
+  make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
+  model: z.string().min(1, 'Please enter a model').optional().nullable(),
+  color: z.string().min(1, 'Please enter a color').optional().nullable(),
 });
 
 export const bookingAddonSchema = z.object({
@@ -359,14 +367,18 @@ export const phoneOtpVerifySchema = z.object({
 
 // Customer vehicle schema (customer portal vehicle management)
 export const customerVehicleSchema = z.object({
-  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft']).default('automobile'),
+  vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft'], {
+    error: 'Please select a vehicle category',
+  }).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
-  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van'], {
+    error: 'Please select a size class',
+  }).optional().nullable(),
   specialty_tier: optionalString,
-  year: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
-  make: optionalString,
-  model: optionalString,
-  color: optionalString,
+  year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
+  make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
+  model: z.string().min(1, 'Please enter a model').optional().nullable(),
+  color: z.string().min(1, 'Please enter a color').optional().nullable(),
 });
 
 // Customer signup schema (customer portal registration)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogClose,
@@ -23,6 +23,7 @@ import {
   VEHICLE_CATEGORY_LABELS,
   SPECIALTY_TIERS,
   TIER_DROPDOWN_LABELS,
+  MODEL_PLACEHOLDERS,
   isSpecialtyCategory,
   type VehicleCategory,
 } from '@/lib/utils/vehicle-categories';
@@ -36,6 +37,8 @@ interface VehicleCreateDialogProps {
   onClose: () => void;
   customerId: string;
   onCreated: (vehicle: Vehicle) => void;
+  /** When set, pre-populates the form for editing */
+  editVehicle?: Vehicle | null;
 }
 
 export function VehicleCreateDialog({
@@ -43,7 +46,9 @@ export function VehicleCreateDialog({
   onClose,
   customerId,
   onCreated,
+  editVehicle,
 }: VehicleCreateDialogProps) {
+  const isEdit = !!editVehicle;
   const [category, setCategory] = useState<VehicleCategory>('automobile');
   const [sizeClass, setSizeClass] = useState('sedan');
   const [specialtyTier, setSpecialtyTier] = useState('');
@@ -52,9 +57,30 @@ export function VehicleCreateDialog({
   const [model, setModel] = useState('');
   const [color, setColor] = useState('');
   const [saving, setSaving] = useState(false);
+  const [yearOtherMode, setYearOtherMode] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Pre-populate form when editing
+  useEffect(() => {
+    if (open && editVehicle) {
+      const cat = (editVehicle.vehicle_category || (editVehicle.vehicle_type === 'standard' ? 'automobile' : editVehicle.vehicle_type)) as VehicleCategory;
+      setCategory(cat);
+      setSizeClass(editVehicle.size_class || 'sedan');
+      setSpecialtyTier(editVehicle.specialty_tier || '');
+      setYear(editVehicle.year?.toString() || '');
+      setMake(editVehicle.make || '');
+      setModel(editVehicle.model || '');
+      setColor(editVehicle.color || '');
+      setYearOtherMode(false);
+      setErrors({});
+    } else if (open && !editVehicle) {
+      handleReset();
+    }
+  }, [open, editVehicle]);
 
   const handleMakeChange = useCallback((val: string) => {
     setMake(val);
+    if (val) setErrors((prev) => ({ ...prev, make: '' }));
   }, []);
 
   function handleCategoryChange(newCategory: VehicleCategory) {
@@ -62,48 +88,86 @@ export function VehicleCreateDialog({
     setMake('');
     setSizeClass('sedan');
     setSpecialtyTier('');
+    setErrors({});
+  }
+
+  function validate(): boolean {
+    const newErrors: Record<string, string> = {};
+    if (!year) newErrors.year = 'Please select a year';
+    if (yearOtherMode && year) {
+      const yr = parseInt(year);
+      if (isNaN(yr) || yr < 1900 || yr > new Date().getFullYear() + 2) {
+        newErrors.year = 'Please enter a valid 4-digit year';
+      }
+    }
+    if (!make) newErrors.make = 'Please select or enter a make';
+    if (!model.trim()) newErrors.model = 'Please enter a model';
+    if (!color.trim()) newErrors.color = 'Please enter a color';
+    const isSpecialty = isSpecialtyCategory(category);
+    if (isSpecialty && !specialtyTier) {
+      const tierLabel = TIER_DROPDOWN_LABELS[category].toLowerCase();
+      newErrors.tier = `Please select a ${tierLabel}`;
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validate()) return;
 
     const isSpecialty = isSpecialtyCategory(category);
 
     setSaving(true);
     try {
-      const res = await posFetch(`/api/pos/customers/${customerId}/vehicles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vehicle_category: category,
-          vehicle_type: isSpecialty ? category : 'standard',
-          size_class: !isSpecialty ? sizeClass : null,
-          specialty_tier: isSpecialty ? (specialtyTier || null) : null,
-          year: year || null,
-          make: make || null,
-          model: titleCaseField(model),
-          color: titleCaseField(color),
-        }),
-      });
+      const url = isEdit
+        ? `/api/pos/customers/${customerId}/vehicles`
+        : `/api/pos/customers/${customerId}/vehicles`;
+
+      const body = {
+        vehicle_category: category,
+        vehicle_type: isSpecialty ? category : 'standard',
+        size_class: !isSpecialty ? sizeClass : null,
+        specialty_tier: isSpecialty ? (specialtyTier || null) : null,
+        year: year || null,
+        make: make || null,
+        model: titleCaseField(model),
+        color: titleCaseField(color),
+      };
+
+      let res: Response;
+      if (isEdit) {
+        res = await posFetch(`/api/pos/customers/${customerId}/vehicles`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, vehicle_id: editVehicle!.id }),
+        });
+      } else {
+        res = await posFetch(`/api/pos/customers/${customerId}/vehicles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      }
 
       const json = await res.json();
 
       if (!res.ok) {
-        toast.error(json.error || 'Failed to create vehicle');
+        toast.error(json.error || `Failed to ${isEdit ? 'update' : 'create'} vehicle`);
         return;
       }
 
-      toast.success('Vehicle added');
+      toast.success(isEdit ? 'Vehicle updated' : 'Vehicle added');
       onCreated(json.data as Vehicle);
       handleClose();
     } catch {
-      toast.error('Failed to create vehicle');
+      toast.error(`Failed to ${isEdit ? 'update' : 'create'} vehicle`);
     } finally {
       setSaving(false);
     }
   }
 
-  function handleClose() {
+  function handleReset() {
     setCategory('automobile');
     setSizeClass('sedan');
     setSpecialtyTier('');
@@ -111,6 +175,12 @@ export function VehicleCreateDialog({
     setMake('');
     setModel('');
     setColor('');
+    setYearOtherMode(false);
+    setErrors({});
+  }
+
+  function handleClose() {
+    handleReset();
     onClose();
   }
 
@@ -122,7 +192,7 @@ export function VehicleCreateDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogClose onClose={handleClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
-        <DialogTitle>Add Vehicle</DialogTitle>
+        <DialogTitle>{isEdit ? 'Edit Vehicle' : 'Add Vehicle'}</DialogTitle>
       </DialogHeader>
       <form onSubmit={handleSubmit}>
         <DialogContent className="flex flex-col gap-3">
@@ -148,15 +218,49 @@ export function VehicleCreateDialog({
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Year
               </label>
-              <Select
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-              >
-                <option value="">Year...</option>
-                {getVehicleYearOptions().map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </Select>
+              {yearOtherMode ? (
+                <>
+                  <Input
+                    value={year}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                      setYear(v);
+                      if (v) setErrors((prev) => ({ ...prev, year: '' }));
+                    }}
+                    placeholder="Enter year (e.g., 1965)"
+                    className={errors.year ? 'border-red-500' : ''}
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setYearOtherMode(false); setYear(''); }}
+                    className="mt-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Back to list
+                  </button>
+                </>
+              ) : (
+                <Select
+                  value={year}
+                  onChange={(e) => {
+                    if (e.target.value === 'other') {
+                      setYearOtherMode(true);
+                      setYear('');
+                    } else {
+                      setYear(e.target.value);
+                      if (e.target.value) setErrors((prev) => ({ ...prev, year: '' }));
+                    }
+                  }}
+                  className={errors.year ? 'border-red-500' : ''}
+                >
+                  <option value="">Year...</option>
+                  {getVehicleYearOptions().map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                  <option value="other">Other</option>
+                </Select>
+              )}
+              {errors.year && <p className="mt-1 text-xs text-red-500">{errors.year}</p>}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -166,7 +270,9 @@ export function VehicleCreateDialog({
                 value={make}
                 onChange={handleMakeChange}
                 category={category}
+                hasError={!!errors.make}
               />
+              {errors.make && <p className="mt-1 text-xs text-red-500">{errors.make}</p>}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -174,9 +280,14 @@ export function VehicleCreateDialog({
               </label>
               <Input
                 value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g., Camry"
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  if (e.target.value.trim()) setErrors((prev) => ({ ...prev, model: '' }));
+                }}
+                placeholder={MODEL_PLACEHOLDERS[category]}
+                className={errors.model ? 'border-red-500' : ''}
               />
+              {errors.model && <p className="mt-1 text-xs text-red-500">{errors.model}</p>}
             </div>
           </div>
 
@@ -187,26 +298,38 @@ export function VehicleCreateDialog({
               </label>
               <Input
                 value={color}
-                onChange={(e) => setColor(e.target.value)}
+                onChange={(e) => {
+                  setColor(e.target.value);
+                  if (e.target.value.trim()) setErrors((prev) => ({ ...prev, color: '' }));
+                }}
                 placeholder="e.g., Silver"
+                className={errors.color ? 'border-red-500' : ''}
               />
+              {errors.color && <p className="mt-1 text-xs text-red-500">{errors.color}</p>}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 {tierLabel}
               </label>
               {isSpecialty ? (
-                <Select
-                  value={specialtyTier}
-                  onChange={(e) => setSpecialtyTier(e.target.value)}
-                >
-                  <option value="">Select {tierLabel.toLowerCase()}...</option>
-                  {specialtyOptions.map((opt) => (
-                    <option key={opt.key} value={opt.key}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </Select>
+                <>
+                  <Select
+                    value={specialtyTier}
+                    onChange={(e) => {
+                      setSpecialtyTier(e.target.value);
+                      if (e.target.value) setErrors((prev) => ({ ...prev, tier: '' }));
+                    }}
+                    className={errors.tier ? 'border-red-500' : ''}
+                  >
+                    <option value="">Select {tierLabel.toLowerCase()}...</option>
+                    {specialtyOptions.map((opt) => (
+                      <option key={opt.key} value={opt.key}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                  {errors.tier && <p className="mt-1 text-xs text-red-500">{errors.tier}</p>}
+                </>
               ) : (
                 <Select
                   value={sizeClass}
@@ -228,7 +351,7 @@ export function VehicleCreateDialog({
           </Button>
           <Button type="submit" disabled={saving}>
             {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-            Add Vehicle
+            {isEdit ? 'Save Changes' : `Add ${VEHICLE_CATEGORY_LABELS[category]}`}
           </Button>
         </DialogFooter>
       </form>

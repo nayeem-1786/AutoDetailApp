@@ -11,6 +11,7 @@ import {
   VEHICLE_CATEGORY_LABELS,
   SPECIALTY_TIERS,
   TIER_DROPDOWN_LABELS,
+  MODEL_PLACEHOLDERS,
   isSpecialtyCategory,
   type VehicleCategory,
 } from '@/lib/utils/vehicle-categories';
@@ -141,6 +142,7 @@ export function StepCustomerInfo({
   const [bookingVehicleCategory, setBookingVehicleCategory] = useState<VehicleCategory>(
     (initialVehicle as BookingVehicleInput).vehicle_category ?? 'automobile'
   );
+  const [yearOtherMode, setYearOtherMode] = useState(false);
 
   const bookingIsSpecialty = isSpecialtyCategory(bookingVehicleCategory);
   const bookingTierLabel = TIER_DROPDOWN_LABELS[bookingVehicleCategory];
@@ -564,16 +566,45 @@ export function StepCustomerInfo({
 
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               <FormField label="Year" htmlFor="year" labelClassName={labelCls}>
-                <Select
-                  id="year"
-                  className={selectCls}
-                  {...register('vehicle.year')}
-                >
-                  <option value="">Year...</option>
-                  {getVehicleYearOptions().map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </Select>
+                {yearOtherMode ? (
+                  <>
+                    <Input
+                      id="year"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Enter year (e.g., 1965)"
+                      className={inputCls}
+                      {...register('vehicle.year')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setYearOtherMode(false); setValue('vehicle.year', undefined); }}
+                      className="mt-1 text-xs text-site-text-muted hover:text-site-text transition-colors"
+                    >
+                      Back to list
+                    </button>
+                  </>
+                ) : (
+                  <Select
+                    id="year"
+                    className={selectCls}
+                    {...register('vehicle.year', {
+                      onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                        if (e.target.value === 'other') {
+                          setYearOtherMode(true);
+                          setValue('vehicle.year', undefined);
+                        }
+                      },
+                    })}
+                  >
+                    <option value="">Year...</option>
+                    {getVehicleYearOptions().map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                    <option value="other">Other</option>
+                  </Select>
+                )}
               </FormField>
 
               <FormField label="Make" htmlFor="make" labelClassName={labelCls}>
@@ -589,7 +620,7 @@ export function StepCustomerInfo({
               <FormField label="Model" htmlFor="model" labelClassName={labelCls}>
                 <Input
                   id="model"
-                  placeholder="e.g., Camry"
+                  placeholder={MODEL_PLACEHOLDERS[bookingVehicleCategory]}
                   className={inputCls}
                   {...register('vehicle.model')}
                 />

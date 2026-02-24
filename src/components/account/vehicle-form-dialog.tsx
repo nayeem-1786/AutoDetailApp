@@ -10,6 +10,7 @@ import {
   VEHICLE_CATEGORY_LABELS,
   SPECIALTY_TIERS,
   TIER_DROPDOWN_LABELS,
+  MODEL_PLACEHOLDERS,
   isSpecialtyCategory,
   type VehicleCategory,
 } from '@/lib/utils/vehicle-categories';
@@ -57,6 +58,7 @@ export function VehicleFormDialog({
   const isEdit = !!vehicle;
   const [saving, setSaving] = useState(false);
   const [category, setCategory] = useState<VehicleCategory>('automobile');
+  const [yearOtherMode, setYearOtherMode] = useState(false);
 
   const {
     register,
@@ -91,6 +93,7 @@ export function VehicleFormDialog({
     if (open && vehicle) {
       const cat = deriveCategory(vehicle);
       setCategory(cat);
+      setYearOtherMode(false);
       reset({
         vehicle_category: cat,
         vehicle_type: vehicle.vehicle_type as CustomerVehicleInput['vehicle_type'],
@@ -103,6 +106,7 @@ export function VehicleFormDialog({
       });
     } else if (open) {
       setCategory('automobile');
+      setYearOtherMode(false);
       reset({
         vehicle_category: 'automobile',
         vehicle_type: 'standard',
@@ -200,12 +204,45 @@ export function VehicleFormDialog({
 
           <div className="grid gap-4 sm:grid-cols-3">
             <FormField label="Year" error={errors.year?.message} htmlFor="vehicle_year">
-              <Select id="vehicle_year" {...register('year')}>
-                <option value="">Year...</option>
-                {getVehicleYearOptions().map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </Select>
+              {yearOtherMode ? (
+                <>
+                  <Input
+                    id="vehicle_year"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Enter year (e.g., 1965)"
+                    className={errors.year ? 'border-red-500' : ''}
+                    {...register('year')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setYearOtherMode(false); setValue('year', null); }}
+                    className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Back to list
+                  </button>
+                </>
+              ) : (
+                <Select
+                  id="vehicle_year"
+                  className={errors.year ? 'border-red-500' : ''}
+                  {...register('year', {
+                    onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                      if (e.target.value === 'other') {
+                        setYearOtherMode(true);
+                        setValue('year', null);
+                      }
+                    },
+                  })}
+                >
+                  <option value="">Year...</option>
+                  {getVehicleYearOptions().map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                  <option value="other">Other</option>
+                </Select>
+              )}
             </FormField>
 
             <FormField label="Make" error={errors.make?.message} htmlFor="vehicle_make">
@@ -214,13 +251,15 @@ export function VehicleFormDialog({
                 value={watch('make') || ''}
                 onChange={handleMakeChange}
                 category={category}
+                hasError={!!errors.make}
               />
             </FormField>
 
             <FormField label="Model" error={errors.model?.message} htmlFor="vehicle_model">
               <Input
                 id="vehicle_model"
-                placeholder="e.g., Camry"
+                placeholder={MODEL_PLACEHOLDERS[category]}
+                className={errors.model ? 'border-red-500' : ''}
                 {...register('model')}
               />
             </FormField>
@@ -231,6 +270,7 @@ export function VehicleFormDialog({
               <Input
                 id="vehicle_color"
                 placeholder="e.g., Silver"
+                className={errors.color ? 'border-red-500' : ''}
                 {...register('color')}
               />
             </FormField>
@@ -241,7 +281,11 @@ export function VehicleFormDialog({
               htmlFor="vehicle_tier"
             >
               {isSpecialty ? (
-                <Select id="vehicle_tier" {...register('specialty_tier')}>
+                <Select
+                  id="vehicle_tier"
+                  className={errors.specialty_tier ? 'border-red-500' : ''}
+                  {...register('specialty_tier')}
+                >
                   <option value="">Select {tierLabel.toLowerCase()}...</option>
                   {specialtyOptions.map((opt) => (
                     <option key={opt.key} value={opt.key}>
@@ -250,7 +294,11 @@ export function VehicleFormDialog({
                   ))}
                 </Select>
               ) : (
-                <Select id="vehicle_tier" {...register('size_class')}>
+                <Select
+                  id="vehicle_tier"
+                  className={errors.size_class ? 'border-red-500' : ''}
+                  {...register('size_class')}
+                >
                   <option value="">Select size...</option>
                   {AUTOMOBILE_SIZE_CLASSES.map((sc) => (
                     <option key={sc} value={sc}>
@@ -268,7 +316,7 @@ export function VehicleFormDialog({
           Cancel
         </Button>
         <Button type="submit" form="vehicle-form" disabled={saving}>
-          {saving ? 'Saving...' : isEdit ? 'Update' : 'Add Vehicle'}
+          {saving ? 'Saving...' : isEdit ? 'Save Changes' : `Add ${VEHICLE_CATEGORY_LABELS[category]}`}
         </Button>
       </DialogFooter>
     </Dialog>

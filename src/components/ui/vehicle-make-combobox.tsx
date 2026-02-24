@@ -17,6 +17,7 @@ interface VehicleMakeComboboxProps {
   className?: string;
   disabled?: boolean;
   id?: string;
+  hasError?: boolean;
 }
 
 // Cache per category
@@ -29,10 +30,12 @@ export function VehicleMakeCombobox({
   className,
   disabled,
   id,
+  hasError,
 }: VehicleMakeComboboxProps) {
   const [makes, setMakes] = useState<VehicleMake[]>(cachedMakesByCategory[category] ?? []);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(value || '');
+  const [isOtherMode, setIsOtherMode] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const prevCategoryRef = useRef(category);
@@ -43,6 +46,7 @@ export function VehicleMakeCombobox({
       prevCategoryRef.current = category;
       onChange('');
       setSearch('');
+      setIsOtherMode(false);
     }
   }, [category, onChange]);
 
@@ -65,23 +69,32 @@ export function VehicleMakeCombobox({
   // Sync search field when value prop changes externally
   useEffect(() => {
     setSearch(value || '');
-  }, [value]);
+    // If the value is set to something not in the makes list, enter other mode
+    if (value && makes.length > 0) {
+      const inList = makes.some((m) => m.name.toLowerCase() === value.toLowerCase());
+      if (!inList) {
+        setIsOtherMode(true);
+      }
+    }
+  }, [value, makes]);
 
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
-        // If user typed something not in the list, revert to current value
-        const match = makes.find((m) => m.name.toLowerCase() === search.toLowerCase());
-        if (!match) {
-          setSearch(value || '');
+        if (!isOtherMode) {
+          // If user typed something not in the list, revert to current value
+          const match = makes.find((m) => m.name.toLowerCase() === search.toLowerCase());
+          if (!match) {
+            setSearch(value || '');
+          }
         }
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [makes, search, value]);
+  }, [makes, search, value, isOtherMode]);
 
   const filtered = search
     ? makes.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
@@ -91,24 +104,49 @@ export function VehicleMakeCombobox({
     setSearch(name);
     onChange(name);
     setOpen(false);
+    setIsOtherMode(false);
+  }
+
+  function handleSelectOther() {
+    setIsOtherMode(true);
+    setOpen(false);
+    setSearch('');
+    onChange('');
+    // Focus the input after switching to other mode
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  function handleBackToList() {
+    setIsOtherMode(false);
+    setSearch(value || '');
+    onChange('');
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     setSearch(e.target.value);
-    if (!open) setOpen(true);
+    if (isOtherMode) {
+      // In "Other" mode, directly set the value
+      onChange(e.target.value);
+    } else {
+      if (!open) setOpen(true);
+    }
   }
 
   function handleInputFocus() {
-    setOpen(true);
+    if (!isOtherMode) {
+      setOpen(true);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') {
       setOpen(false);
-      setSearch(value || '');
+      if (!isOtherMode) {
+        setSearch(value || '');
+      }
       inputRef.current?.blur();
     }
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isOtherMode) {
       e.preventDefault();
       // Auto-select first match
       if (filtered.length === 1) {
@@ -118,6 +156,36 @@ export function VehicleMakeCombobox({
         if (exact) handleSelect(exact.name);
       }
     }
+  }
+
+  // Other mode: free text input
+  if (isOtherMode) {
+    return (
+      <div ref={containerRef}>
+        <input
+          ref={inputRef}
+          id={id}
+          type="text"
+          value={search}
+          onChange={handleInputChange}
+          disabled={disabled}
+          placeholder="Enter make name..."
+          autoComplete="off"
+          className={cn(
+            'flex h-9 w-full rounded-md border border-ui-input-border bg-ui-input-bg px-3 py-1 text-sm text-ui-text shadow-sm transition-colors placeholder:text-ui-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+            hasError && 'border-red-500 focus-visible:ring-red-500',
+            className
+          )}
+        />
+        <button
+          type="button"
+          onClick={handleBackToList}
+          className="mt-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          Back to list
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -136,6 +204,7 @@ export function VehicleMakeCombobox({
           autoComplete="off"
           className={cn(
             'flex h-9 w-full rounded-md border border-ui-input-border bg-ui-input-bg px-3 py-1 pr-8 text-sm text-ui-text shadow-sm transition-colors placeholder:text-ui-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+            hasError && 'border-red-500 focus-visible:ring-red-500',
             className
           )}
         />
@@ -146,7 +215,7 @@ export function VehicleMakeCombobox({
         <div className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-ui-input-border bg-ui-input-bg shadow-lg">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-ui-placeholder">
-              No matching makes found. Ask your admin to add it in POS Settings.
+              No matching makes found.
             </div>
           ) : (
             filtered.map((m) => (
@@ -163,6 +232,14 @@ export function VehicleMakeCombobox({
               </button>
             ))
           )}
+          {/* Always show "Other" at the bottom */}
+          <button
+            type="button"
+            onClick={handleSelectOther}
+            className="flex w-full items-center border-t border-ui-input-border px-3 py-1.5 text-left text-sm text-ui-placeholder hover:bg-ui-ring/10 transition-colors"
+          >
+            Other (type custom make)
+          </button>
         </div>
       )}
     </div>

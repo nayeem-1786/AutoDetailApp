@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         flat_price,
         pricing_model,
         base_duration_minutes,
+        vehicle_compatibility,
         pricing:service_pricing(tier_name, price, display_order)
       `)
       .eq('is_active', true)

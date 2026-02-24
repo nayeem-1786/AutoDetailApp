@@ -70,6 +70,26 @@ export const TIER_DROPDOWN_LABELS: Record<VehicleCategory, string> = {
 };
 
 /**
+ * Dynamic model placeholder based on category.
+ */
+export const MODEL_PLACEHOLDERS: Record<VehicleCategory, string> = {
+  automobile: 'e.g., Camry',
+  motorcycle: 'e.g., Sportster',
+  rv: 'e.g., View 24D',
+  boat: 'e.g., Catalina 275',
+  aircraft: 'e.g., Skyhawk 172',
+};
+
+/**
+ * Maps vehicle_category to the corresponding vehicle_compatibility JSONB value.
+ * The DB uses "standard" in service vehicle_compatibility for automobiles,
+ * but "automobile" as the vehicle_category value.
+ */
+export function categoryToCompatibilityKey(category: VehicleCategory): string {
+  return category === 'automobile' ? 'standard' : category;
+}
+
+/**
  * Check if a category is a specialty (non-automobile) category.
  */
 export function isSpecialtyCategory(category: VehicleCategory): category is Exclude<VehicleCategory, 'automobile'> {

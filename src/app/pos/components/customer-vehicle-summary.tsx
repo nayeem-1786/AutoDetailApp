@@ -1,8 +1,9 @@
 'use client';
 
-import { User, Car, X, ChevronRight } from 'lucide-react';
+import { User, Car, X, ChevronRight, Pencil } from 'lucide-react';
 import { formatPhone } from '@/lib/utils/format';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_CATEGORY_LABELS } from '@/lib/utils/vehicle-categories';
 import { CustomerTypeBadge } from './customer-type-badge';
 import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
@@ -13,6 +14,7 @@ interface CustomerVehicleSummaryProps {
   onChangeVehicle: () => void;
   onClear: () => void;
   onCustomerTypeChanged?: (newType: CustomerType | null) => void;
+  onEditVehicle?: () => void;
 }
 
 export function CustomerVehicleSummary({
@@ -22,6 +24,7 @@ export function CustomerVehicleSummary({
   onChangeVehicle,
   onClear,
   onCustomerTypeChanged,
+  onEditVehicle,
 }: CustomerVehicleSummaryProps) {
   if (!customer) {
     // Guest state -- show "Add Customer" button
@@ -46,6 +49,10 @@ export function CustomerVehicleSummary({
 
   const sizeLabel = vehicle?.size_class
     ? VEHICLE_SIZE_LABELS[vehicle.size_class]
+    : null;
+
+  const categoryLabel = vehicle?.vehicle_category && vehicle.vehicle_category !== 'automobile'
+    ? VEHICLE_CATEGORY_LABELS[vehicle.vehicle_category as keyof typeof VEHICLE_CATEGORY_LABELS]
     : null;
 
   return (
@@ -80,22 +87,36 @@ export function CustomerVehicleSummary({
       </div>
 
       {/* Vehicle row */}
-      <button
-        onClick={onChangeVehicle}
-        className="mt-1 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-      >
-        <Car className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
-        {vehicleLabel ? (
-          <>
-            <span>{vehicleLabel}</span>
-            {sizeLabel && (
-              <span className="text-xs text-gray-400 dark:text-gray-500">({sizeLabel})</span>
-            )}
-          </>
-        ) : (
-          <span className="text-gray-400 dark:text-gray-500">Tap to select vehicle</span>
+      <div className="mt-1 flex items-center gap-1">
+        <button
+          onClick={onChangeVehicle}
+          className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+        >
+          <Car className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+          {vehicleLabel ? (
+            <>
+              <span>{vehicleLabel}</span>
+              {categoryLabel && (
+                <span className="text-xs text-gray-400 dark:text-gray-500">({categoryLabel})</span>
+              )}
+              {!categoryLabel && sizeLabel && (
+                <span className="text-xs text-gray-400 dark:text-gray-500">({sizeLabel})</span>
+              )}
+            </>
+          ) : (
+            <span className="text-gray-400 dark:text-gray-500">Tap to select vehicle</span>
+          )}
+        </button>
+        {vehicle && onEditVehicle && (
+          <button
+            onClick={onEditVehicle}
+            className="ml-1 rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-400"
+            title="Edit vehicle"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
         )}
-      </button>
+      </div>
     </div>
   );
 }

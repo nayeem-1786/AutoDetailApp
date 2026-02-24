@@ -23,6 +23,7 @@ import {
   VEHICLE_CATEGORY_LABELS,
   SPECIALTY_TIERS,
   TIER_DROPDOWN_LABELS,
+  MODEL_PLACEHOLDERS,
   isSpecialtyCategory,
   getSpecialtyTierLabel,
   type VehicleCategory,
@@ -113,6 +114,7 @@ export default function CustomerProfilePage() {
   const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState(false);
   const [vehicleCategory, setVehicleCategory] = useState<VehicleCategory>('automobile');
+  const [yearOtherMode, setYearOtherMode] = useState(false);
 
   // Loyalty adjust dialog state
   const [loyaltyDialogOpen, setLoyaltyDialogOpen] = useState(false);
@@ -495,6 +497,7 @@ export default function CustomerProfilePage() {
   function openAddVehicle() {
     setEditingVehicle(null);
     setVehicleCategory('automobile');
+    setYearOtherMode(false);
     vehicleForm.reset({
       customer_id: id,
       vehicle_category: 'automobile',
@@ -511,6 +514,7 @@ export default function CustomerProfilePage() {
 
   function openEditVehicle(vehicle: Vehicle) {
     setEditingVehicle(vehicle);
+    setYearOtherMode(false);
     const cat = deriveVehicleCategory(vehicle);
     setVehicleCategory(cat);
     vehicleForm.reset({
@@ -1416,12 +1420,43 @@ export default function CustomerProfilePage() {
 
                 <div className="grid grid-cols-3 gap-3">
                   <FormField label="Year" error={vehicleForm.formState.errors.year?.message} htmlFor="veh_year">
-                    <Select id="veh_year" {...vehicleForm.register('year')}>
-                      <option value="">Year...</option>
-                      {getVehicleYearOptions().map((y) => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </Select>
+                    {yearOtherMode ? (
+                      <>
+                        <Input
+                          id="veh_year"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="Enter year (e.g., 1965)"
+                          {...vehicleForm.register('year')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { setYearOtherMode(false); vehicleForm.setValue('year', undefined); }}
+                          className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          Back to list
+                        </button>
+                      </>
+                    ) : (
+                      <Select
+                        id="veh_year"
+                        {...vehicleForm.register('year', {
+                          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                            if (e.target.value === 'other') {
+                              setYearOtherMode(true);
+                              vehicleForm.setValue('year', undefined);
+                            }
+                          },
+                        })}
+                      >
+                        <option value="">Year...</option>
+                        {getVehicleYearOptions().map((y) => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                        <option value="other">Other</option>
+                      </Select>
+                    )}
                   </FormField>
 
                   <FormField label="Make" error={vehicleForm.formState.errors.make?.message} htmlFor="veh_make">
@@ -1434,7 +1469,7 @@ export default function CustomerProfilePage() {
                   </FormField>
 
                   <FormField label="Model" error={vehicleForm.formState.errors.model?.message} htmlFor="veh_model">
-                    <Input id="veh_model" {...vehicleForm.register('model')} placeholder="e.g., Camry" />
+                    <Input id="veh_model" {...vehicleForm.register('model')} placeholder={MODEL_PLACEHOLDERS[vehicleCategory]} />
                   </FormField>
                 </div>
 
@@ -1467,7 +1502,7 @@ export default function CustomerProfilePage() {
                 Cancel
               </Button>
               <Button type="submit" form="vehicle-form" disabled={savingVehicle}>
-                {savingVehicle ? 'Saving...' : editingVehicle ? 'Update Vehicle' : 'Add Vehicle'}
+                {savingVehicle ? 'Saving...' : editingVehicle ? 'Save Changes' : `Add ${VEHICLE_CATEGORY_LABELS[vehicleCategory]}`}
               </Button>
             </DialogFooter>
           </Dialog>

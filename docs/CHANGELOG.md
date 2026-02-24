@@ -4,6 +4,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Vehicle Form Polish, POS Edits, Compatibility Warnings & Validation — Session 5 — 2026-02-24
+
+### Vehicle Categories Helpers (`src/lib/utils/vehicle-categories.ts`)
+- Added `MODEL_PLACEHOLDERS` — per-category model input placeholder text (e.g., "e.g., Camry" for automobile)
+- Added `categoryToCompatibilityKey()` — maps `automobile` → `standard` for `vehicle_compatibility` JSONB matching
+
+### VehicleMakeCombobox (`src/components/ui/vehicle-make-combobox.tsx`)
+- Added permanent "Other (type custom make)" option at bottom of dropdown
+- In Other mode: free-text input with "Back to list" button
+- Added `hasError` prop for red border styling on validation errors
+
+### Validation Schemas (`src/lib/utils/validation.ts`)
+- Human-readable error messages for `vehicleSchema`, `bookingVehicleSchema`, `customerVehicleSchema`
+- Year, make, model, color fields now show friendly validation errors
+- Fixed Zod 4 API: `required_error`/`invalid_type_error` → `error`
+
+### All 4 Vehicle Forms Updated
+- **Dynamic model placeholder**: Changes per vehicle category (e.g., "e.g., Sportster" for motorcycle)
+- **Dynamic submit button**: "Add {Category}" in create mode, "Save Changes" in edit mode
+- **Year "Other" option**: Select dropdown includes "Other" at bottom → switches to free-text input with "Back to list"
+
+**Forms updated:**
+1. `src/app/admin/customers/[id]/page.tsx` — Admin customer vehicle dialog
+2. `src/app/pos/components/vehicle-create-dialog.tsx` — POS vehicle create/edit dialog
+3. `src/components/account/vehicle-form-dialog.tsx` — Customer portal vehicle form
+4. `src/components/booking/step-customer-info.tsx` — Booking wizard vehicle section
+
+### POS Vehicle Edit
+- **CustomerVehicleSummary**: Added pencil icon button next to vehicle label → opens edit dialog
+- **VehicleCreateDialog**: Now supports `editVehicle` prop — pre-populates form, PATCH on save
+- **ticket-panel.tsx**: Wired up `editingVehicle` state and edit flow
+- **API route**: Added `PATCH /api/pos/customers/[id]/vehicles` handler for vehicle updates
+
+### Vehicle/Service Compatibility Warning (POS)
+- **catalog-browser.tsx**: Added `isServiceCompatible()` and `getCompatibleTypesLabel()` helpers
+- Tapping an incompatible service shows warning dialog: "Service is designed for {types}. Add anyway?"
+- "Cancel" and "Add Anyway" buttons — user can override the warning
+- **API route**: Added `vehicle_compatibility` to POS services select query
+
+### Booking Flow Compatibility Badges (`step-service-select.tsx`)
+- When vehicle category is known (editing from review step):
+  - Services with explicit compatibility that matches: green checkmark + "Recommended for your {category}"
+  - Incompatible services: reduced opacity + "Designed for {compatible types}" note
+  - Universal services (no restrictions): shown normally, no badge
+- When no vehicle selected: all services shown normally with no badges
+
+---
+
 ## Documentation Corrections & Comprehensive Update — Session 4 — 2026-02-24
 
 ### DB_SCHEMA.md — Critical Corrections

@@ -53,6 +53,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
@@ -240,6 +241,12 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           }}
           onClear={handleClearCustomer}
           onCustomerTypeChanged={handleCustomerTypeChanged}
+          onEditVehicle={() => {
+            if (ticket.vehicle) {
+              setEditingVehicle(ticket.vehicle);
+              setShowVehicleCreate(true);
+            }
+          }}
         />
       </div>
 
@@ -506,13 +513,23 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         </Dialog>
       )}
 
-      {/* Vehicle Create Dialog */}
+      {/* Vehicle Create/Edit Dialog */}
       {ticket.customer && (
         <VehicleCreateDialog
           open={showVehicleCreate}
-          onClose={() => setShowVehicleCreate(false)}
+          onClose={() => { setShowVehicleCreate(false); setEditingVehicle(null); }}
           customerId={ticket.customer.id}
-          onCreated={handleVehicleCreated}
+          onCreated={(vehicle) => {
+            if (editingVehicle) {
+              // Editing existing vehicle — update on ticket
+              dispatch({ type: 'SET_VEHICLE', vehicle });
+              setShowVehicleCreate(false);
+              setEditingVehicle(null);
+            } else {
+              handleVehicleCreated(vehicle);
+            }
+          }}
+          editVehicle={editingVehicle}
         />
       )}
 

@@ -2,23 +2,27 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { Clock, Truck, Check, Car, Sparkles, Shield, Paintbrush } from 'lucide-react';
+import { Clock, Truck, Check, Car, Sparkles, Shield, Paintbrush, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { categoryToCompatibilityKey, VEHICLE_CATEGORY_LABELS, type VehicleCategory } from '@/lib/utils/vehicle-categories';
 import type { BookableCategory, BookableService } from '@/lib/data/booking';
 
 interface StepServiceSelectProps {
   categories: BookableCategory[];
   selectedServiceId: string | null;
   onSelect: (service: BookableService) => void;
+  /** Vehicle category for compatibility badges (available when editing from review) */
+  vehicleCategory?: VehicleCategory | null;
 }
 
 export function StepServiceSelect({
   categories,
   selectedServiceId,
   onSelect,
+  vehicleCategory,
 }: StepServiceSelectProps) {
   const [activeCategory, setActiveCategory] = useState(
     () => {
@@ -91,6 +95,7 @@ export function StepServiceSelect({
                   categoryName={cat.category.name}
                   isSelected={service.id === pendingServiceId}
                   onClick={() => handleCardClick(service)}
+                  vehicleCategory={vehicleCategory}
                 />
               ))}
             </div>
@@ -120,13 +125,33 @@ function ServiceCard({
   categoryName,
   isSelected,
   onClick,
+  vehicleCategory,
 }: {
   service: BookableService;
   categoryName: string;
   isSelected: boolean;
   onClick: () => void;
+  vehicleCategory?: VehicleCategory | null;
 }) {
   const { priceLabel, originalPrice, isOnSale } = getServicePriceDisplay(service);
+
+  // Compatibility check when vehicle category is known
+  const compat = service.vehicle_compatibility;
+  const hasVehicle = !!vehicleCategory;
+  let isCompatible = true;
+  let compatLabel = '';
+
+  if (hasVehicle && compat && compat.length > 0) {
+    const compatKey = categoryToCompatibilityKey(vehicleCategory);
+    isCompatible = (compat as string[]).includes(compatKey);
+    if (!isCompatible) {
+      const labels = compat.map((key: string) => {
+        if (key === 'standard') return VEHICLE_CATEGORY_LABELS.automobile;
+        return VEHICLE_CATEGORY_LABELS[key as VehicleCategory] || key;
+      });
+      compatLabel = labels.join(', ');
+    }
+  }
 
   return (
     <button
@@ -136,7 +161,8 @@ function ServiceCard({
         'flex w-full items-center gap-4 rounded-lg border p-3 sm:p-4 text-left transition-all',
         isSelected
           ? 'border-lime bg-lime/5 ring-1 ring-lime'
-          : 'border-site-border hover:border-lime/50 hover:shadow-sm'
+          : 'border-site-border hover:border-lime/50 hover:shadow-sm',
+        hasVehicle && !isCompatible && !isSelected && 'opacity-60'
       )}
     >
       {/* Thumbnail */}
@@ -205,6 +231,19 @@ function ServiceCard({
             </span>
           )}
         </div>
+
+        {/* Compatibility badge — only show when service has explicit restrictions */}
+        {hasVehicle && isCompatible && compat && compat.length > 0 && (
+          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400">
+            <CheckCircle2 className="h-3 w-3" />
+            <span>Recommended for your {VEHICLE_CATEGORY_LABELS[vehicleCategory].toLowerCase()}</span>
+          </div>
+        )}
+        {hasVehicle && !isCompatible && (
+          <div className="mt-1.5 text-[11px] text-site-text-muted">
+            Designed for {compatLabel}
+          </div>
+        )}
       </div>
     </button>
   );
