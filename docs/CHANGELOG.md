@@ -4,6 +4,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## POS Settings Page + Vehicle Makes Management — Session D14f — 2026-02-23
+
+### POS Settings Page
+- Renamed `/admin/settings/pos-idle-timeout` → `/admin/settings/pos-settings`
+- Page title changed from "POS Idle Timeout" → "POS Settings"
+- Card title changed from "Auto-Logout Timer" → "POS Auto-Logout Timer"
+- Updated settings hub card label, description, and href
+
+### Vehicle Makes Table
+- New `vehicle_makes` table with 45 seeded common makes (migration `20260223000001`)
+- RLS: authenticated read, admin-only write
+- Admin CRUD API: `GET/POST/PATCH/DELETE /api/admin/vehicle-makes`
+- Public read-only API: `GET /api/vehicle-makes` (active makes for combobox)
+- Delete protection: blocks delete if vehicles reference the make name
+
+### Vehicle Makes UI Card
+- Added "Vehicle Makes" card below POS Auto-Logout Timer on POS Settings page
+- Search filter, inline add form with title-case auto-formatting
+- Active/inactive toggle per make, delete with confirmation
+- Counter showing total and active make counts
+
+### Files Created
+- `supabase/migrations/20260223000001_create_vehicle_makes.sql`
+- `src/app/api/admin/vehicle-makes/route.ts`
+- `src/app/api/vehicle-makes/route.ts`
+
+### Files Modified
+- `src/app/admin/settings/pos-idle-timeout/page.tsx` → `src/app/admin/settings/pos-settings/page.tsx`
+- `src/app/admin/settings/page.tsx` — updated href and label
+- `docs/dev/DB_SCHEMA.md` — added vehicle_makes table
+- `docs/dev/FILE_TREE.md` — updated paths
+
+---
+
 ## Receipt Info Line Reorder + Zone Separators — Session D14e — 2026-02-23
 
 ### Receipt Info Section Reorder

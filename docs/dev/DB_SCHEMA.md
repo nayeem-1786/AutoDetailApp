@@ -1132,6 +1132,21 @@
 
 ---
 
+## Reference Data
+
+### vehicle_makes
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| name | TEXT | UNIQUE, NOT NULL | |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+Seeded with 45 common makes. Used in POS, admin, booking, and customer portal vehicle dropdowns. RLS: authenticated read, admin-only write.
+
+---
+
 ## Key Triggers
 
 | Trigger | Table | Function |

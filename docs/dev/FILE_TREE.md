@@ -142,6 +142,11 @@ src/app/api/admin/settings/shipping/test-connection/route.ts
 src/app/api/admin/settings/shipping/validate-address/route.ts
 ```
 
+### Admin — Vehicle Makes
+```
+src/app/api/admin/vehicle-makes/route.ts
+```
+
 ### Admin — Staff & Roles
 ```
 src/app/api/admin/staff/[id]/permissions/route.ts
@@ -355,6 +360,11 @@ src/app/api/webhooks/twilio/inbound/route.ts
 src/app/api/webhooks/twilio/status/route.ts
 ```
 
+### Vehicle Makes (Public)
+```
+src/app/api/vehicle-makes/route.ts
+```
+
 ### Other
 ```
 src/app/api/gallery/route.ts
@@ -481,7 +491,7 @@ src/app/admin/settings/messaging/page.tsx
 src/app/admin/settings/mobile-zones/page.tsx
 src/app/admin/settings/notifications/page.tsx
 src/app/admin/settings/pos-favorites/page.tsx
-src/app/admin/settings/pos-idle-timeout/page.tsx
+src/app/admin/settings/pos-settings/page.tsx
 src/app/admin/settings/pos-security/page.tsx
 src/app/admin/settings/receipt-printer/page.tsx
 src/app/admin/settings/reviews/page.tsx
@@ -1021,6 +1031,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260222000002_create_audit_log.sql
 20260222000003_fix_audit_log_schema.sql
 20260222000004_customer_phone_email_unique.sql
+20260223000001_create_vehicle_makes.sql
 ```
 
 ---

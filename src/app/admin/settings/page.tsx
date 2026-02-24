@@ -83,9 +83,9 @@ const settingsGroups: SettingsGroup[] = [
         roles: ['super_admin'],
       },
       {
-        title: 'POS Idle Timeout',
-        description: 'Set how long the POS stays active before auto-logout.',
-        href: '/admin/settings/pos-idle-timeout',
+        title: 'POS Settings',
+        description: 'Configure POS auto-logout, vehicle makes, and other POS options.',
+        href: '/admin/settings/pos-settings',
         icon: Timer,
         roles: ['super_admin'],
       },
