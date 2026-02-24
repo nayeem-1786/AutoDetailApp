@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Receipt Header & Logo Card Merge — Session D14b — 2026-02-23
+
+### Layout Change
+- Merged separate "Receipt Header" and "Logo" cards into single "Receipt Header & Logo" card
+- 8-column grid layout: override inputs (col-span-3) | logo preview (col-span-2) | logo controls (col-span-3)
+- Responsive: stacks to single column on mobile
+- Logo width changed from range slider to number input with "px" suffix
+- "Mobile" label renamed to "Phone"
+- Helper text moved to card description
+- Hidden file input consolidated to single instance outside conditional branches
+- Logo remove button styled with red text
+
+### Files Modified
+- `src/app/admin/settings/receipt-printer/page.tsx` — merged two cards into one with grid layout
+
+---
+
 ## Receipt Enhancement — Info Section, Multi-Zone Custom Text, Shortcodes — Session D14 — 2026-02-23
 
 ### Receipt Info Section Redesign

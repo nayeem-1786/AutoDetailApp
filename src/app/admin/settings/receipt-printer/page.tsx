@@ -428,95 +428,87 @@ export default function ReceiptPrinterPage() {
         </CardContent>
       </Card>
 
-      {/* Receipt Header Overrides */}
+      {/* Receipt Header & Logo */}
       <Card>
         <CardHeader>
-          <CardTitle>Receipt Header</CardTitle>
+          <CardTitle>Receipt Header & Logo</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-gray-500">
-            Leave blank to use the value from your Business Profile. Fill in to override on receipts only.
+        <CardContent>
+          <p className="mb-4 text-sm text-gray-500">
+            Configure receipt branding. Leave blank to use your Business Profile values.
           </p>
 
-          <FormField label="Business Name" htmlFor="override_name">
-            <Input
-              id="override_name"
-              placeholder={defaults.business_name || 'Business Profile value'}
-              value={config.override_name}
-              onChange={(e) => updateConfig('override_name', e.target.value)}
-            />
-          </FormField>
+          <div className="grid grid-cols-8 gap-6">
+            {/* Left — Override text inputs */}
+            <div className="col-span-8 space-y-4 sm:col-span-3">
+              <FormField label="Business Name" htmlFor="override_name">
+                <Input
+                  id="override_name"
+                  placeholder={defaults.business_name || 'Business Profile value'}
+                  value={config.override_name}
+                  onChange={(e) => updateConfig('override_name', e.target.value)}
+                />
+              </FormField>
 
-          <FormField label="Mobile" htmlFor="override_phone">
-            <Input
-              id="override_phone"
-              placeholder={defaults.business_phone || 'Business Profile value'}
-              value={config.override_phone}
-              onChange={(e) => updateConfig('override_phone', e.target.value)}
-            />
-          </FormField>
+              <FormField label="Phone" htmlFor="override_phone">
+                <Input
+                  id="override_phone"
+                  placeholder={defaults.business_phone || 'Business Profile value'}
+                  value={config.override_phone}
+                  onChange={(e) => updateConfig('override_phone', e.target.value)}
+                />
+              </FormField>
 
-          <FormField label="Address" htmlFor="override_address">
-            <Input
-              id="override_address"
-              placeholder={defaults.business_address || 'Business Profile value'}
-              value={config.override_address}
-              onChange={(e) => updateConfig('override_address', e.target.value)}
-            />
-          </FormField>
+              <FormField label="Address" htmlFor="override_address">
+                <Input
+                  id="override_address"
+                  placeholder={defaults.business_address || 'Business Profile value'}
+                  value={config.override_address}
+                  onChange={(e) => updateConfig('override_address', e.target.value)}
+                />
+              </FormField>
 
-          <FormField label="Email" htmlFor="override_email">
-            <Input
-              id="override_email"
-              type="email"
-              placeholder={defaults.business_email || 'Business Profile value'}
-              value={config.override_email}
-              onChange={(e) => updateConfig('override_email', e.target.value)}
-            />
-          </FormField>
+              <FormField label="Email" htmlFor="override_email">
+                <Input
+                  id="override_email"
+                  type="email"
+                  placeholder={defaults.business_email || 'Business Profile value'}
+                  value={config.override_email}
+                  onChange={(e) => updateConfig('override_email', e.target.value)}
+                />
+              </FormField>
 
-          <FormField label="Website" htmlFor="override_website">
-            <Input
-              id="override_website"
-              placeholder={defaults.business_website || 'Business Profile value'}
-              value={config.override_website}
-              onChange={(e) => updateConfig('override_website', e.target.value)}
-            />
-          </FormField>
-        </CardContent>
-      </Card>
+              <FormField label="Website" htmlFor="override_website">
+                <Input
+                  id="override_website"
+                  placeholder={defaults.business_website || 'Business Profile value'}
+                  value={config.override_website}
+                  onChange={(e) => updateConfig('override_website', e.target.value)}
+                />
+              </FormField>
+            </div>
 
-      {/* Logo */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Logo</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-gray-500">
-            Upload a high-contrast PNG or JPG (max 2MB). Dark logos on white background work best for thermal printing.
-          </p>
-
-          <div className="grid gap-6 sm:grid-cols-2">
-            {/* Left: logo preview + upload */}
-            <div className="space-y-3">
+            {/* Middle — Logo preview + upload */}
+            <div className="col-span-8 flex flex-col items-center justify-center sm:col-span-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleLogoUpload}
+              />
               {config.logo_url ? (
-                <div className="space-y-3">
+                <div className="space-y-3 text-center">
                   <div className="rounded border border-gray-200 bg-gray-50 p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={config.logo_url}
                       alt="Receipt logo preview"
-                      style={{ maxWidth: `${config.logo_width}px`, height: 'auto' }}
+                      className="mx-auto max-h-48 object-contain"
+                      style={{ maxWidth: `${config.logo_width}px` }}
                     />
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={handleLogoUpload}
-                    />
+                  <div className="flex justify-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -524,63 +516,50 @@ export default function ReceiptPrinterPage() {
                       disabled={uploading}
                     >
                       <Upload className="mr-1.5 h-4 w-4" />
-                      {uploading ? 'Uploading...' : 'Replace Logo'}
+                      {uploading ? 'Uploading...' : 'Replace'}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleRemoveLogo}>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={handleRemoveLogo}>
                       <Trash2 className="mr-1.5 h-4 w-4" />
                       Remove
                     </Button>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="w-full space-y-3 text-center">
                   <div className="flex h-32 items-center justify-center rounded border-2 border-dashed border-gray-300 bg-gray-50">
                     <div className="text-center">
                       <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
-                      <p className="mt-1 text-sm text-gray-400">No logo uploaded</p>
+                      <p className="mt-1 text-sm text-gray-400">No logo</p>
                     </div>
                   </div>
-                  <div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={handleLogoUpload}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      <Upload className="mr-1.5 h-4 w-4" />
-                      {uploading ? 'Uploading...' : 'Upload Logo'}
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <Upload className="mr-1.5 h-4 w-4" />
+                    {uploading ? 'Uploading...' : 'Upload Logo'}
+                  </Button>
                 </div>
               )}
             </div>
 
-            {/* Right: width, position, alignment */}
-            <div className="space-y-4">
-              <FormField
-                label="Width"
-                description="100 – 400 px"
-                htmlFor="logo_width"
-              >
-                <div className="flex items-center gap-3">
+            {/* Right — Logo controls */}
+            <div className="col-span-8 space-y-4 sm:col-span-3">
+              <FormField label="Width" htmlFor="logo_width">
+                <div className="relative">
                   <Input
                     id="logo_width"
-                    type="range"
+                    type="number"
                     min={100}
                     max={400}
                     step={10}
                     value={config.logo_width}
                     onChange={(e) => updateConfig('logo_width', Number(e.target.value))}
-                    className="flex-1"
+                    className="pr-10"
                   />
-                  <span className="w-12 text-right text-sm font-medium text-gray-700">{config.logo_width}px</span>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">px</span>
                 </div>
               </FormField>
 
