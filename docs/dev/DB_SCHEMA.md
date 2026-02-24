@@ -1,7 +1,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
 > Auto-generated from `supabase/migrations/*.sql`  
-> Last updated: Feb 23, 2026
+> Last updated: Feb 24, 2026
 
 ---
 
@@ -124,14 +124,41 @@
 | updated_at | TIMESTAMPTZ | | |
 
 ### service_pricing
+
+**Row-based tier system.** Each service has N rows — one per pricing tier. The `price` column is the primary price for every tier. The `vehicle_size_*` columns are ONLY used when `is_vehicle_size_aware = true` (currently only Hot Shampoo Extraction's "Complete Interior" scope tier — a nested pricing edge case).
+
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK | |
-| price | DECIMAL(10,2) | NOT NULL | Base price |
-| vehicle_size_sedan_price | DECIMAL(10,2) | | |
-| vehicle_size_truck_suv_price | DECIMAL(10,2) | | |
-| vehicle_size_suv_van_price | DECIMAL(10,2) | | |
-| created_at | TIMESTAMPTZ | | |
+| service_id | UUID | NOT NULL, FK → services(id) ON DELETE CASCADE | |
+| tier_name | TEXT | NOT NULL | e.g. 'sedan', 'rv_up_to_24', 'aircraft_2_4' |
+| tier_label | TEXT | | Display label e.g. 'Sedan', "Up to 24'", '2-4 Seater' |
+| price | DECIMAL(10,2) | NOT NULL | Primary price for this tier |
+| display_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| is_vehicle_size_aware | BOOLEAN | NOT NULL, DEFAULT false | Only for scope tiers that ALSO vary by automobile size |
+| vehicle_size_sedan_price | DECIMAL(10,2) | | Only used when is_vehicle_size_aware = true |
+| vehicle_size_truck_suv_price | DECIMAL(10,2) | | Only used when is_vehicle_size_aware = true |
+| vehicle_size_suv_van_price | DECIMAL(10,2) | | Only used when is_vehicle_size_aware = true |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+UNIQUE constraint on (service_id, tier_name). Index on service_id.
+
+**Tier examples by pricing model:**
+- `vehicle_size`: 3 rows per service — `sedan`, `truck_suv_2row`, `suv_3row_van`
+- `scope`: N rows with named tiers — `floor_mats`, `per_row`, `carpet_mats`, `complete`
+- `specialty`: 2-3 rows with category-specific tier_names — `standard_cruiser`, `rv_up_to_24`, `boat_21_26`, `aircraft_2_4`, etc.
+- `flat`, `per_unit`, `custom`: No rows in service_pricing — price stored on `services` table directly
+
+### Pricing Models Reference
+
+| Model | Price Storage | Price Resolution |
+|-------|-------------|-----------------|
+| `vehicle_size` | 3 rows in `service_pricing` (sedan, truck_suv_2row, suv_3row_van) | Match vehicle's `vehicle_type` to `tier_name` |
+| `scope` | N rows in `service_pricing` with named tiers | Staff selects scope tier. If `is_vehicle_size_aware`, sub-prices from vehicle_size columns |
+| `specialty` | 2-3 rows in `service_pricing` with category-specific tier_names | Match vehicle's `specialty_tier` to `tier_name`, or staff selects manually |
+| `per_unit` | `per_unit_price` on `services` table | Multiply by quantity selected by staff |
+| `flat` | `flat_price` on `services` table | Direct — single price regardless of vehicle |
+| `custom` | `custom_starting_price` on `services` table | Starting price shown, staff enters final after inspection |
 
 ### packages
 | Column | Type | Constraints | Notes |
@@ -1165,7 +1192,7 @@ UNIQUE constraint on (name, category). Honda can exist as both automobile and mo
 
 - **user_role**: super_admin, admin, cashier, detailer
 - **employee_status**: active, inactive, terminated
-- **vehicle_type**: standard, truck_suv, suv_van, motorcycle, rv, boat
+- **vehicle_type**: standard, truck_suv, suv_van, motorcycle, rv, boat, aircraft — For automobiles, stores the pricing size tier (standard/truck_suv/suv_van). For specialty vehicles, stores the category name (motorcycle/rv/boat/aircraft) and the actual pricing tier is in `vehicles.specialty_tier`.
 - **vehicle_size_class**: sedan, truck_suv, suv_van
 - **transaction_status**: open, completed, voided, refunded
 - **transaction_item_type**: product, service, package

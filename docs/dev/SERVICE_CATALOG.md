@@ -1,8 +1,8 @@
 # Service Catalog — Single Source of Truth
 
 > **Project:** Auto Detail (Smart Detail Auto Spa & Supplies)
-> **Last Updated:** 2026-02-01
-> **Status:** Approved — Owner reviewed and confirmed 2026-02-01
+> **Last Updated:** 2026-02-24
+> **Status:** Approved — Owner reviewed and confirmed 2026-02-01. Updated 2026-02-24 with vehicle category expansion corrections.
 
 > **Prerequisites:** See [`CONVENTIONS.md`](./CONVENTIONS.md) for component APIs, auth patterns, and project conventions.
 
@@ -46,7 +46,7 @@ These vehicles use their own pricing structures and are NOT classified into Seda
 | Motorcycle | Standard/Cruiser, Touring/Bagger |
 | RV/Motorhome | Up to 24', 25-35', 36'+ |
 | Boat | Up to 20', 21-26', 27-32'+ |
-| Aircraft | 2-4 Seater, 6-8 Seater, Turboprop/Jet (Quote) |
+| Aircraft | 2-4 Seater, 6-8 Seater, Turboprop/Jet |
 
 ---
 
@@ -554,7 +554,7 @@ Comprehensive interior service using only aviation-approved products. Includes b
 | Pricing Model | `specialty` |
 | 2-4 Seater | $850 |
 | 6-8 Seater | $1,250 |
-| Turboprop/Jet | Quote |
+| Turboprop/Jet | $2,000 |
 | Duration | 6-8 hours |
 | Mobile Available | No |
 | Classification | Primary (Standalone) |
@@ -571,7 +571,7 @@ Fuselage, wings, and belly wash using aviation-approved products. Contamination 
 | Pricing Model | `specialty` |
 | 2-4 Seater | $575 |
 | 6-8 Seater | $975 |
-| Turboprop/Jet | Quote |
+| Turboprop/Jet | $1,500 |
 | Duration | 3-6 hours |
 | Mobile Available | No |
 | Classification | Primary (Standalone) |
@@ -655,13 +655,20 @@ Some services require another service to be completed first.
 
 ## Vehicle Compatibility Matrix
 
-Defines which services can be performed on which vehicle types.
+Defines which services can be performed on which vehicle types. Stored in `services.vehicle_compatibility` JSONB column.
+
+**`vehicle_compatibility` JSONB values:**
+- Services 1-23: `["standard"]` — automobile only
+- Service 24 (Motorcycle Detail): `["motorcycle"]`
+- Services 25-26 (RV Interior/Exterior): `["rv"]`
+- Services 27-28 (Boat Interior/Exterior): `["boat"]`
+- Services 29-30 (Aircraft Interior/Exterior): `["aircraft"]`
 
 **Legend:** Yes = Available | No = Not applicable
 
 ### Standard Vehicle Services (Sedan, Truck/SUV, SUV/Van)
 
-All 30 services are available on standard vehicles (services #1-23). Specialty vehicle services (#24-30) are not applicable to standard vehicles.
+All services #1-23 are available on standard vehicles. Specialty vehicle services (#24-30) are not applicable to standard vehicles.
 
 ### Specialty Vehicle Add-On Rules
 
@@ -762,7 +769,7 @@ Defines where each service can be booked or purchased.
 - Excessive Cleaning Fee is a staff-assessed surcharge — never appears as a bookable option on any channel
 - Flood Damage / Mold Extraction requires in-person inspection — customer can call to discuss, staff creates a quote, but customer cannot self-book online
 - Online booking for Ceramic Shields must include Paint Correction (prerequisite enforced)
-- "Quote" pricing (Turboprop/Jet aircraft) channels to the quote system rather than direct booking
+- Aircraft Turboprop/Jet has fixed pricing ($2,000 interior / $1,500 exterior) — bookable on all channels like other specialty services
 
 ---
 

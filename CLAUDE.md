@@ -87,6 +87,7 @@ The full database schema is documented in `docs/dev/DB_SCHEMA.md`. This file con
 - **POS auth expiry**: 3 layers — (1) `posFetch()` in `pos-fetch.ts` catches 401 → redirect to `/pos/login?reason=session_expired`, (2) global error listeners in `pos-shell.tsx` catch Stripe SDK auth errors → redirect, (3) login page shows session expired toast on `?reason=session_expired`
 - **POS has TWO timeout systems**: Idle timeout (Admin > Settings, transparent overlay, PIN re-entry, session alive) vs JWT token expiry (12hr hardcoded, full redirect to login, session dead). Both are needed.
 - **Stripe Terminal in PWA**: Requires pfSense DNS exception — `private-domain: "stripe-terminal-local-reader.net"` in Unbound custom options. Without this, iPad Safari PWA can't resolve Stripe's local reader DNS (desktop browsers bypass via DoH).
+- **Vehicle categories**: 5 categories — automobile, motorcycle, rv, boat, aircraft. Constants in `src/lib/utils/vehicle-categories.ts`. Specialty vehicle pricing tiers map to `service_pricing.tier_name` via `vehicles.specialty_tier`. Automobiles use `vehicle_type` for pricing resolution instead.
 
 ## Current Phase
 

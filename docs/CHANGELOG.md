@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Documentation Corrections & Comprehensive Update — Session 4 — 2026-02-24
+
+### DB_SCHEMA.md — Critical Corrections
+- **Fixed `service_pricing` table**: Was missing `service_id`, `tier_name`, `tier_label`, `display_order`, `is_vehicle_size_aware` columns. Now fully documented with row-based tier system explanation.
+- **Added Pricing Models Reference table**: Documents all 6 pricing models with storage location and resolution logic.
+- **Fixed `vehicle_type` enum**: Added missing `aircraft` value. Added note explaining dual usage (automobile size tier vs. specialty category name).
+
+### SERVICE_CATALOG.md — Corrections
+- **Fixed Aircraft Turboprop/Jet pricing**: Changed from "Quote" to actual seed data prices ($2,000 interior / $1,500 exterior).
+- **Added `vehicle_compatibility` JSONB values**: Explicit per-service documentation (services 1-23: `["standard"]`, 24: `["motorcycle"]`, etc.).
+- **Updated Channel Availability note**: Removed outdated "Quote pricing channels to quote system" reference for aircraft.
+
+### FILE_TREE.md
+- Verified all files from Sessions 1-3 already present. Updated last-updated date.
+
+### CLAUDE.md
+- Added vehicle category system to Key Patterns section.
+
+---
+
 ## Vehicle Forms: Category Selector & Dynamic Tiers — Session 2 — 2026-02-24
 
 ### VehicleMakeCombobox (`src/components/ui/vehicle-make-combobox.tsx`)

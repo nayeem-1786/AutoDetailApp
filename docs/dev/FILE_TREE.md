@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-22 (from `find` output)
+> **Last updated:** 2026-02-24 (verified after vehicle category expansion Sessions 1-3)
 
 ---
 
