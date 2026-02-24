@@ -440,7 +440,7 @@ export default function ReceiptPrinterPage() {
 
           <div className="grid grid-cols-8 gap-6">
             {/* Left — Override text inputs */}
-            <div className="col-span-8 space-y-4 sm:col-span-3">
+            <div className="col-span-8 space-y-4 md:col-span-3">
               <FormField label="Business Name" htmlFor="override_name">
                 <Input
                   id="override_name"
@@ -489,7 +489,7 @@ export default function ReceiptPrinterPage() {
             </div>
 
             {/* Middle — Logo preview + upload */}
-            <div className="col-span-8 flex flex-col items-center justify-center sm:col-span-2">
+            <div className="col-span-8 flex flex-col items-center justify-center md:col-span-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -543,23 +543,26 @@ export default function ReceiptPrinterPage() {
                   </Button>
                 </div>
               )}
+              <p className="mt-3 text-xs text-muted-foreground">
+                Upload a high-contrast PNG or JPG (max 2MB). Dark logos on white background work best for thermal printing.
+              </p>
             </div>
 
             {/* Right — Logo controls */}
-            <div className="col-span-8 space-y-4 sm:col-span-3">
+            <div className="col-span-8 space-y-4 md:col-span-2">
               <FormField label="Width" htmlFor="logo_width">
-                <div className="relative">
+                <div className="flex items-center gap-3">
                   <Input
                     id="logo_width"
-                    type="number"
+                    type="range"
                     min={100}
                     max={400}
                     step={10}
                     value={config.logo_width}
                     onChange={(e) => updateConfig('logo_width', Number(e.target.value))}
-                    className="pr-10"
+                    className="flex-1"
                   />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">px</span>
+                  <span className="w-12 text-right text-sm font-medium text-gray-700">{config.logo_width}px</span>
                 </div>
               </FormField>
 

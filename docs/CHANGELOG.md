@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Receipt Header & Logo Card — Layout Fix — Session D14c — 2026-02-23
+
+### Fixes
+- Changed grid proportions from 3-2-3 to 3-3-2 (logo column wider, controls column narrower)
+- Restored Width control to range slider (was incorrectly changed to number input in D14b)
+- Changed responsive breakpoint from `sm` to `md` for better tablet/mobile stacking
+- Added logo helper text below upload buttons: high-contrast PNG/JPG recommendation
+
+### Files Modified
+- `src/app/admin/settings/receipt-printer/page.tsx` — grid proportions, slider restore, helper text
+
+---
+
 ## Receipt Header & Logo Card Merge — Session D14b — 2026-02-23
 
 ### Layout Change
