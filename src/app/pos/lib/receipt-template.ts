@@ -6,6 +6,7 @@ interface ReceiptItem {
   unit_price: number;
   total_price: number;
   tax_amount: number;
+  item_type?: string | null;
 }
 
 interface ReceiptPayment {
@@ -69,6 +70,14 @@ const FALLBACK_CONFIG: MergedReceiptConfig = {
 };
 
 /**
+ * Build a vehicle description string: "Year Color Make Model"
+ */
+function buildVehicleDesc(v: ReceiptTransaction['vehicle']): string {
+  if (!v) return '';
+  return [v.year, v.color, v.make, v.model].filter(Boolean).join(' ');
+}
+
+/**
  * Resolve {shortcode} placeholders in text using transaction + config data.
  */
 export function resolveShortcodes(
@@ -77,7 +86,6 @@ export function resolveShortcodes(
   config: MergedReceiptConfig
 ): string {
   const customer = tx.customer;
-  const vehicle = tx.vehicle;
 
   let customerSince = '';
   if (customer?.created_at) {
@@ -86,9 +94,7 @@ export function resolveShortcodes(
     customerSince = `${month} ${d.getFullYear()}`;
   }
 
-  const vehicleStr = vehicle
-    ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
-    : '';
+  const vehicleStr = buildVehicleDesc(tx.vehicle);
 
   const replacements: Record<string, string> = {
     '{customer_name}': customer ? `${customer.first_name} ${customer.last_name}` : '',
@@ -212,20 +218,16 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     });
   }
 
-  // Vehicle (centered)
-  if (tx.vehicle) {
-    const v = [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model].filter(Boolean).join(' ');
-    if (v) {
-      lines.push({ type: 'text', text: `Vehicle: ${v}` });
-    }
-  }
-
   lines.push({ type: 'divider' });
+
+  // Build vehicle description for line items
+  const vehicleDesc = buildVehicleDesc(tx.vehicle);
 
   // Items layout:
   //   qty > 1: line 1 = item name (full width, wraps if long)
   //            line 2 = indented qty + price + TX
   //   qty = 1: single line = name + price + TX
+  //   Services get an indented vehicle description line below
   for (const item of tx.items) {
     const price = `$${item.total_price.toFixed(2)}`;
     const txCol = item.tax_amount > 0 ? ' TX' : '   ';
@@ -242,6 +244,11 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
         left: item.item_name,
         right: `${price}${txCol}`,
       });
+    }
+
+    // Vehicle description under service line items
+    if (item.item_type === 'service' && vehicleDesc) {
+      lines.push({ type: 'text', text: `   ${vehicleDesc}` });
     }
   }
 
@@ -410,15 +417,15 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     minute: '2-digit',
   });
 
-  const vehicleStr = tx.vehicle
-    ? [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model].filter(Boolean).join(' ')
-    : '';
+  // Build vehicle description for line items
+  const vehicleDesc = buildVehicleDesc(tx.vehicle);
 
   const itemRows = tx.items
     .map((item) => {
       const txCell = item.tax_amount > 0 ? 'TX' : '';
+      let rows = '';
       if (item.quantity > 1) {
-        return `<tr>
+        rows += `<tr>
           <td colspan="3" style="padding:4px 0 0;font-size:14px;">${esc(item.item_name)}</td>
         </tr>
         <tr>
@@ -426,12 +433,22 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
           <td style="padding:0 0 4px;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
           <td style="padding:0 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
         </tr>`;
-      }
-      return `<tr>
+      } else {
+        rows += `<tr>
         <td style="padding:4px 0;font-size:14px;">${esc(item.item_name)}</td>
         <td style="padding:4px 0;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
         <td style="padding:4px 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
       </tr>`;
+      }
+
+      // Vehicle description under service line items
+      if (item.item_type === 'service' && vehicleDesc) {
+        rows += `<tr>
+        <td colspan="3" style="padding:0 0 4px 12px;font-size:13px;color:#666;">${esc(vehicleDesc)}</td>
+      </tr>`;
+      }
+
+      return rows;
     })
     .join('');
 
@@ -528,7 +545,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 
   ${belowHeaderHtml}
 
-  <!-- Receipt info -->
+  <!-- Receipt info (3 lines: receipt#/date, name/phone, email/since) -->
   <table style="width:100%;font-size:14px;margin-bottom:4px;">
     <tr>
       <td>Receipt #${esc(tx.receipt_number || 'N/A')}</td>
@@ -541,9 +558,6 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     ${tx.customer && (tx.customer.email || customerSinceStr) ? `<tr>
       <td>${tx.customer.email ? esc(tx.customer.email) : ''}</td>
       <td style="text-align:right;">${customerSinceStr ? `Customer Since: ${esc(customerSinceStr)}` : ''}</td>
-    </tr>` : ''}
-    ${vehicleStr ? `<tr>
-      <td colspan="2" style="text-align:center;">Vehicle: ${esc(vehicleStr)}</td>
     </tr>` : ''}
   </table>
 

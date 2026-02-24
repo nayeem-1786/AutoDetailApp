@@ -20,6 +20,7 @@ import {
   VEHICLE_SIZE_LABELS,
   VEHICLE_TYPE_SIZE_CLASSES,
 } from '@/lib/utils/constants';
+import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import type { Vehicle } from '@/lib/supabase/types';
 
 interface VehicleCreateDialogProps {
@@ -58,8 +59,8 @@ export function VehicleCreateDialog({
           size_class: sizeClasses.length > 0 ? sizeClass : null,
           year: year || null,
           make: make || null,
-          model: model || null,
-          color: color || null,
+          model: titleCaseField(model),
+          color: titleCaseField(color),
         }),
       });
 
@@ -101,7 +102,7 @@ export function VehicleCreateDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                Type
+                Vehicle Type
               </label>
               <Select
                 value={vehicleType}
@@ -118,23 +119,26 @@ export function VehicleCreateDialog({
                 ))}
               </Select>
             </div>
-            {sizeClasses.length > 0 && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Size Class
-                </label>
-                <Select
-                  value={sizeClass}
-                  onChange={(e) => setSizeClass(e.target.value)}
-                >
-                  {sizeClasses.map((sc) => (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                Size Class
+              </label>
+              <Select
+                value={sizeClass}
+                onChange={(e) => setSizeClass(e.target.value)}
+                disabled={sizeClasses.length === 0}
+              >
+                {sizeClasses.length === 0 ? (
+                  <option value="">N/A</option>
+                ) : (
+                  sizeClasses.map((sc) => (
                     <option key={sc} value={sc}>
                       {VEHICLE_SIZE_LABELS[sc] ?? sc}
                     </option>
-                  ))}
-                </Select>
-              </div>
-            )}
+                  ))
+                )}
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -142,27 +146,23 @@ export function VehicleCreateDialog({
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Year
               </label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+              <Select
                 value={year}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9]/g, '');
-                  setYear(v);
-                }}
-                placeholder="2024"
-                maxLength={4}
-              />
+                onChange={(e) => setYear(e.target.value)}
+              >
+                <option value="">Year...</option>
+                {getVehicleYearOptions().map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </Select>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Make
               </label>
-              <Input
+              <VehicleMakeCombobox
                 value={make}
-                onChange={(e) => setMake(e.target.value)}
-                placeholder="Toyota"
+                onChange={setMake}
               />
             </div>
             <div>
@@ -172,7 +172,7 @@ export function VehicleCreateDialog({
               <Input
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="Camry"
+                placeholder="e.g., Camry"
               />
             </div>
           </div>
@@ -184,7 +184,7 @@ export function VehicleCreateDialog({
             <Input
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              placeholder="Black"
+              placeholder="e.g., Silver"
             />
           </div>
         </DialogContent>

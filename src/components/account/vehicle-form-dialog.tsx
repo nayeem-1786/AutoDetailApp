@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { customerVehicleSchema, type CustomerVehicleInput } from '@/lib/utils/validation';
-import { VEHICLE_TYPE_LABELS, VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_TYPE_LABELS, VEHICLE_SIZE_LABELS, VEHICLE_TYPE_SIZE_CLASSES } from '@/lib/utils/constants';
 import {
   Dialog,
   DialogHeader,
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
+import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import { toast } from 'sonner';
 
 interface VehicleFormDialogProps {
@@ -48,6 +49,8 @@ export function VehicleFormDialog({
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CustomerVehicleInput>({
     resolver: formResolver(customerVehicleSchema),
@@ -60,6 +63,9 @@ export function VehicleFormDialog({
       color: '',
     },
   });
+
+  const watchVehicleType = watch('vehicle_type');
+  const sizeClasses = VEHICLE_TYPE_SIZE_CLASSES[watchVehicleType] ?? [];
 
   useEffect(() => {
     if (open && vehicle) {
@@ -95,7 +101,11 @@ export function VehicleFormDialog({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          model: titleCaseField(data.model || ''),
+          color: titleCaseField(data.color || ''),
+        }),
       });
 
       if (!res.ok) {
@@ -143,41 +153,48 @@ export function VehicleFormDialog({
             <FormField
               label="Size Class"
               error={errors.size_class?.message}
+              required={sizeClasses.length > 0}
               htmlFor="size_class"
             >
-              <Select id="size_class" {...register('size_class')}>
-                <option value="">Select size...</option>
-                {Object.entries(VEHICLE_SIZE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
+              <Select id="size_class" {...register('size_class')} disabled={sizeClasses.length === 0}>
+                {sizeClasses.length === 0 ? (
+                  <option value="">N/A</option>
+                ) : (
+                  <>
+                    <option value="">Select size...</option>
+                    {sizeClasses.map((sc) => (
+                      <option key={sc} value={sc}>
+                        {VEHICLE_SIZE_LABELS[sc]}
+                      </option>
+                    ))}
+                  </>
+                )}
               </Select>
             </FormField>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <FormField label="Year" error={errors.year?.message} htmlFor="vehicle_year">
-              <Input
-                id="vehicle_year"
-                type="number"
-                placeholder="2024"
-                {...register('year')}
-              />
+              <Select id="vehicle_year" {...register('year')}>
+                <option value="">Year...</option>
+                {getVehicleYearOptions().map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </Select>
             </FormField>
 
             <FormField label="Make" error={errors.make?.message} htmlFor="vehicle_make">
-              <Input
+              <VehicleMakeCombobox
                 id="vehicle_make"
-                placeholder="Toyota"
-                {...register('make')}
+                value={watch('make') || ''}
+                onChange={(val) => setValue('make', val, { shouldDirty: true })}
               />
             </FormField>
 
             <FormField label="Model" error={errors.model?.message} htmlFor="vehicle_model">
               <Input
                 id="vehicle_model"
-                placeholder="Camry"
+                placeholder="e.g., Camry"
                 {...register('model')}
               />
             </FormField>
@@ -186,7 +203,7 @@ export function VehicleFormDialog({
           <FormField label="Color" error={errors.color?.message} htmlFor="vehicle_color">
             <Input
               id="vehicle_color"
-              placeholder="Silver"
+              placeholder="e.g., Silver"
               {...register('color')}
             />
           </FormField>

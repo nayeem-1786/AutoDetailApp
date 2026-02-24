@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
+import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import type { VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
 import { z } from 'zod';
 import { Plus, Check, LogIn, X } from 'lucide-react';
@@ -270,8 +271,14 @@ export function StepCustomerInfo({
     }
 
     setVehicleError(null);
+    // Title-case model + color before passing upstream
+    const vehicle = {
+      ...data.vehicle,
+      model: titleCaseField(data.vehicle.model || ''),
+      color: titleCaseField(data.vehicle.color || ''),
+    };
     // All online bookings are enthusiasts by default
-    onContinue(data.customer, data.vehicle);
+    onContinue(data.customer, vehicle);
   }
 
   const hasSavedVehicles = savedVehicles.length > 0;
@@ -490,26 +497,26 @@ export function StepCustomerInfo({
 
         {/* Vehicle form fields - shown when adding new or no saved vehicles */}
         {showVehicleForm && (
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <FormField label="Vehicle Type" htmlFor="vehicle_type" labelClassName={labelCls}>
-              <Select
-                id="vehicle_type"
-                className={selectCls}
-                {...register('vehicle.vehicle_type')}
-              >
-                {Object.entries(VEHICLE_TYPE_LABELS).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+          <>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <FormField label="Vehicle Type" htmlFor="vehicle_type" labelClassName={labelCls}>
+                <Select
+                  id="vehicle_type"
+                  className={selectCls}
+                  {...register('vehicle.vehicle_type')}
+                >
+                  {Object.entries(VEHICLE_TYPE_LABELS).map(([val, label]) => (
+                    <option key={val} value={val}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
 
-            {sizeClasses.length > 0 && (
               <FormField
                 label="Size Class"
                 htmlFor="size_class"
-                required={requireSizeClass}
+                required={requireSizeClass && sizeClasses.length > 0}
                 error={errors.vehicle?.size_class?.message}
                 labelClassName={labelCls}
               >
@@ -517,55 +524,68 @@ export function StepCustomerInfo({
                   id="size_class"
                   className={selectCls}
                   {...register('vehicle.size_class')}
+                  disabled={sizeClasses.length === 0}
                 >
-                  <option value="">Select size...</option>
-                  {sizeClasses.map((sc) => (
-                    <option key={sc} value={sc}>
-                      {VEHICLE_SIZE_LABELS[sc]}
-                    </option>
+                  {sizeClasses.length === 0 ? (
+                    <option value="">N/A</option>
+                  ) : (
+                    <>
+                      <option value="">Select size...</option>
+                      {sizeClasses.map((sc) => (
+                        <option key={sc} value={sc}>
+                          {VEHICLE_SIZE_LABELS[sc]}
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </Select>
+              </FormField>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <FormField label="Year" htmlFor="year" labelClassName={labelCls}>
+                <Select
+                  id="year"
+                  className={selectCls}
+                  {...register('vehicle.year')}
+                >
+                  <option value="">Year...</option>
+                  {getVehicleYearOptions().map((y) => (
+                    <option key={y} value={y}>{y}</option>
                   ))}
                 </Select>
               </FormField>
-            )}
 
-            <FormField label="Year" htmlFor="year" labelClassName={labelCls}>
-              <Input
-                id="year"
-                type="number"
-                inputMode="numeric"
-                placeholder="2024"
-                className={inputCls}
-                {...register('vehicle.year')}
-              />
-            </FormField>
+              <FormField label="Make" htmlFor="make" labelClassName={labelCls}>
+                <VehicleMakeCombobox
+                  id="make"
+                  value={watch('vehicle.make') || ''}
+                  onChange={(val) => setValue('vehicle.make', val, { shouldDirty: true })}
+                  className={inputCls}
+                />
+              </FormField>
 
-            <FormField label="Make" htmlFor="make" labelClassName={labelCls}>
-              <Input
-                id="make"
-                placeholder="Toyota"
-                className={inputCls}
-                {...register('vehicle.make')}
-              />
-            </FormField>
+              <FormField label="Model" htmlFor="model" labelClassName={labelCls}>
+                <Input
+                  id="model"
+                  placeholder="e.g., Camry"
+                  className={inputCls}
+                  {...register('vehicle.model')}
+                />
+              </FormField>
+            </div>
 
-            <FormField label="Model" htmlFor="model" labelClassName={labelCls}>
-              <Input
-                id="model"
-                placeholder="Camry"
-                className={inputCls}
-                {...register('vehicle.model')}
-              />
-            </FormField>
-
-            <FormField label="Color" htmlFor="color" labelClassName={labelCls}>
-              <Input
-                id="color"
-                placeholder="White"
-                className={inputCls}
-                {...register('vehicle.color')}
-              />
-            </FormField>
-          </div>
+            <div className="mt-4">
+              <FormField label="Color" htmlFor="color" labelClassName={labelCls}>
+                <Input
+                  id="color"
+                  placeholder="e.g., Silver"
+                  className={inputCls}
+                  {...register('vehicle.color')}
+                />
+              </FormField>
+            </div>
+          </>
         )}
       </div>
 

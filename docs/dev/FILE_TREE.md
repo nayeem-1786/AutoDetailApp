@@ -738,6 +738,7 @@ src/components/ui/table.tsx
 src/components/ui/tabs.tsx
 src/components/ui/textarea.tsx
 src/components/ui/toggle-pill.tsx
+src/components/ui/vehicle-make-combobox.tsx
 ```
 
 ### Admin Components

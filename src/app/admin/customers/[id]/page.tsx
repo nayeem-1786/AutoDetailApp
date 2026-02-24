@@ -59,6 +59,7 @@ import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Rece
 import Link from 'next/link';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import { Pagination } from '@/components/ui/pagination';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { ReceiptDialog } from '@/components/admin/receipt-dialog';
@@ -299,9 +300,6 @@ export default function CustomerProfilePage() {
       make: '',
       model: '',
       color: '',
-      vin: '',
-      license_plate: '',
-      notes: '',
     },
   });
 
@@ -482,9 +480,6 @@ export default function CustomerProfilePage() {
       make: '',
       model: '',
       color: '',
-      vin: '',
-      license_plate: '',
-      notes: '',
     });
     setVehicleDialogOpen(true);
   }
@@ -499,9 +494,6 @@ export default function CustomerProfilePage() {
       make: vehicle.make || '',
       model: vehicle.model || '',
       color: vehicle.color || '',
-      vin: vehicle.vin || '',
-      license_plate: vehicle.license_plate || '',
-      notes: vehicle.notes || '',
     });
     setVehicleDialogOpen(true);
   }
@@ -515,11 +507,8 @@ export default function CustomerProfilePage() {
         size_class: availableSizeClasses.length > 0 ? data.size_class : null,
         year: data.year || null,
         make: data.make || null,
-        model: data.model || null,
-        color: data.color || null,
-        vin: data.vin || null,
-        license_plate: data.license_plate || null,
-        notes: data.notes || null,
+        model: titleCaseField(data.model || ''),
+        color: titleCaseField(data.color || ''),
         is_incomplete: !data.make || !data.model,
       };
 
@@ -1333,9 +1322,6 @@ export default function CustomerProfilePage() {
                             )}
                           </div>
                           {v.color && <p className="text-sm text-gray-500">Color: {v.color}</p>}
-                          {v.license_plate && <p className="text-sm text-gray-500">Plate: {v.license_plate}</p>}
-                          {v.vin && <p className="font-mono text-xs text-gray-400">VIN: {v.vin}</p>}
-                          {v.notes && <p className="text-xs text-gray-500 italic">{v.notes}</p>}
                         </div>
                         <div className="flex gap-1">
                           <Button
@@ -1373,71 +1359,63 @@ export default function CustomerProfilePage() {
                 onSubmit={vehicleForm.handleSubmit(onSaveVehicle)}
                 className="space-y-4"
               >
-                <FormField
-                  label="Vehicle Type"
-                  error={vehicleForm.formState.errors.vehicle_type?.message}
-                  required
-                  htmlFor="vehicle_type"
-                >
-                  <Select id="vehicle_type" {...vehicleForm.register('vehicle_type')}>
-                    {Object.entries(VEHICLE_TYPE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </Select>
-                </FormField>
-
-                {availableSizeClasses.length > 0 && (
+                <div className="grid grid-cols-2 gap-3">
                   <FormField
-                    label="Size Class"
-                    error={vehicleForm.formState.errors.size_class?.message}
+                    label="Vehicle Type"
+                    error={vehicleForm.formState.errors.vehicle_type?.message}
                     required
-                    htmlFor="size_class"
+                    htmlFor="vehicle_type"
                   >
-                    <Select id="size_class" {...vehicleForm.register('size_class')}>
-                      {availableSizeClasses.map((sc) => (
-                        <option key={sc} value={sc}>{VEHICLE_SIZE_LABELS[sc]}</option>
+                    <Select id="vehicle_type" {...vehicleForm.register('vehicle_type')}>
+                      {Object.entries(VEHICLE_TYPE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
                       ))}
                     </Select>
                   </FormField>
-                )}
+
+                  <FormField
+                    label="Size Class"
+                    error={vehicleForm.formState.errors.size_class?.message}
+                    required={availableSizeClasses.length > 0}
+                    htmlFor="size_class"
+                  >
+                    <Select id="size_class" {...vehicleForm.register('size_class')} disabled={availableSizeClasses.length === 0}>
+                      {availableSizeClasses.length === 0 ? (
+                        <option value="">N/A</option>
+                      ) : (
+                        availableSizeClasses.map((sc) => (
+                          <option key={sc} value={sc}>{VEHICLE_SIZE_LABELS[sc]}</option>
+                        ))
+                      )}
+                    </Select>
+                  </FormField>
+                </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <FormField label="Year" error={vehicleForm.formState.errors.year?.message} htmlFor="veh_year">
-                    <Input
-                      id="veh_year"
-                      type="number"
-                      min="1900"
-                      max="2100"
-                      {...vehicleForm.register('year')}
-                      placeholder="2024"
-                    />
+                    <Select id="veh_year" {...vehicleForm.register('year')}>
+                      <option value="">Year...</option>
+                      {getVehicleYearOptions().map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </Select>
                   </FormField>
 
                   <FormField label="Make" error={vehicleForm.formState.errors.make?.message} htmlFor="veh_make">
-                    <Input id="veh_make" {...vehicleForm.register('make')} placeholder="Toyota" />
+                    <VehicleMakeCombobox
+                      id="veh_make"
+                      value={vehicleForm.watch('make') || ''}
+                      onChange={(val) => vehicleForm.setValue('make', val, { shouldDirty: true })}
+                    />
                   </FormField>
 
                   <FormField label="Model" error={vehicleForm.formState.errors.model?.message} htmlFor="veh_model">
-                    <Input id="veh_model" {...vehicleForm.register('model')} placeholder="Camry" />
+                    <Input id="veh_model" {...vehicleForm.register('model')} placeholder="e.g., Camry" />
                   </FormField>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField label="Color" htmlFor="veh_color">
-                    <Input id="veh_color" {...vehicleForm.register('color')} placeholder="Black" />
-                  </FormField>
-
-                  <FormField label="License Plate" htmlFor="license_plate">
-                    <Input id="license_plate" {...vehicleForm.register('license_plate')} placeholder="ABC1234" />
-                  </FormField>
-                </div>
-
-                <FormField label="VIN" htmlFor="vin">
-                  <Input id="vin" {...vehicleForm.register('vin')} placeholder="17-character VIN" />
-                </FormField>
-
-                <FormField label="Notes" htmlFor="veh_notes">
-                  <Textarea id="veh_notes" {...vehicleForm.register('notes')} rows={2} placeholder="Any notes about this vehicle..." />
+                <FormField label="Color" htmlFor="veh_color">
+                  <Input id="veh_color" {...vehicleForm.register('color')} placeholder="e.g., Silver" />
                 </FormField>
               </form>
             </DialogContent>

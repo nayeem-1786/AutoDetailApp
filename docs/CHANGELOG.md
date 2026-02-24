@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Standardize Vehicle Forms + Receipt Vehicle Line Items — Session D14g — 2026-02-23
+
+### Vehicle Form Standardization
+- All 4 vehicle forms (Admin, POS, Customer Portal, Booking) now have identical 6 fields:
+  - Vehicle Type (select), Size Class (select), Year (select dropdown, current+2 down to 1980), Make (searchable combobox from vehicle_makes table), Model (text), Color (text)
+- Layout standardized: Row 1 = Type + Size Class (50/50), Row 2 = Year + Make + Model (33/33/33), Row 3 = Color (full width)
+- License Plate, VIN, and Notes removed from all form UIs (DB columns preserved)
+- Make field is now a strict combobox — only allows selection from the vehicle_makes table, no free text
+- Model and Color fields auto title-case on save
+- Year dropdown dynamically calculates range: `new Date().getFullYear() + 2` down to 1980
+- Size Class dropdown shows "N/A" and is disabled for non-standard vehicle types (motorcycle, RV, boat, aircraft)
+
+### New Component
+- `src/components/ui/vehicle-make-combobox.tsx` — reusable searchable combobox for vehicle makes
+  - Fetches from `/api/vehicle-makes` with client-side caching
+  - Client-side filtering as user types
+  - Strict selection only (no free text entry)
+  - Empty state: "No matching makes found. Ask your admin to add it in POS Settings."
+  - Also exports `getVehicleYearOptions()` and `titleCaseField()` utilities
+
+### Receipt Template — Vehicle Under Service Line Items
+- Removed vehicle line from receipt info section (info section now 3 lines: receipt#/date, name/phone, email/since)
+- Vehicle description now appears indented under each service line item (not products)
+  - Format: `{year} {color} {make} {model}` (e.g., "2027 Silver Honda Accord")
+  - Both thermal (generateReceiptLines) and HTML (generateReceiptHtml) renderers updated
+- Added `item_type` to `ReceiptItem` interface to distinguish services from products
+- Updated `{vehicle}` shortcode in `resolveShortcodes()` to include color
+- Receipt preview sample data updated (2027 Silver Honda Accord, items include item_type)
+
+### Files Modified
+- `src/app/admin/customers/[id]/page.tsx` — Admin vehicle form standardized
+- `src/app/pos/components/vehicle-create-dialog.tsx` — POS vehicle form standardized
+- `src/components/account/vehicle-form-dialog.tsx` — Customer Portal vehicle form standardized
+- `src/components/booking/step-customer-info.tsx` — Booking vehicle form standardized
+- `src/app/pos/lib/receipt-template.ts` — Vehicle moved from info to line items, shortcode updated
+- `src/app/admin/settings/receipt-printer/page.tsx` — Sample preview data updated
+
+### Files Created
+- `src/components/ui/vehicle-make-combobox.tsx`
+
+---
+
 ## POS Settings Page + Vehicle Makes Management — Session D14f — 2026-02-23
 
 ### POS Settings Page
