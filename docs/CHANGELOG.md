@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Database Schema Documentation — 2026-02-23
+
+- Added `docs/dev/DB_SCHEMA.md` — comprehensive database schema reference (70+ tables, all columns, JSONB structures, receipt system architecture)
+- Updated CLAUDE.md with Database Schema Reference section and rules for database field management
+- Updated FILE_TREE.md with DB_SCHEMA.md entry
+
+---
+
 ## Receipt Dialog Extraction + Transaction Page Overhaul + # Column Restyling — Session D13b — 2026-02-23
 
 ### Shared Receipt Dialog Component

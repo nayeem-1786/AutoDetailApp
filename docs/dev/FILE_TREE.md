@@ -1030,6 +1030,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 ```
 docs/CHANGELOG.md
 docs/dev/ARCHITECTURE.md
+docs/dev/DB_SCHEMA.md          # Full database schema reference (70+ tables)
 docs/dev/CONVENTIONS.md
 docs/dev/DASHBOARD_RULES.md
 docs/dev/DATA_MIGRATION_RULES.md

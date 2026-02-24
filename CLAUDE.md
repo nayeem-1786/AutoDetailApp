@@ -54,6 +54,22 @@ src/
 └── types/               — TypeScript definitions
 ```
 
+## Database Schema Reference
+
+The full database schema is documented in `docs/dev/DB_SCHEMA.md`. This file contains:
+- All table definitions with column types, constraints, and notes
+- JSONB structures (e.g., `receipt_config` in `business_settings`)
+- Key triggers, enums, and relationships
+- Receipt system architecture and file locations
+
+### Rules for Database Changes
+
+1. **Always check `docs/dev/DB_SCHEMA.md` first** before creating new fields or tables. Reuse existing fields whenever possible to avoid inflating the database and duplicating data.
+2. **If a new field IS needed**, create a proper migration in `supabase/migrations/` and update `docs/dev/DB_SCHEMA.md` to reflect the change.
+3. **If a new table IS needed**, document it fully in `docs/dev/DB_SCHEMA.md` with all columns, types, constraints, and notes.
+4. **JSONB fields** (like `receipt_config`, `business_settings.value`) should be extended before creating new columns — check if the data logically belongs in an existing JSONB structure.
+5. **Never guess** what fields exist — always verify against `docs/dev/DB_SCHEMA.md` or the actual migrations.
+
 ## Key Patterns
 
 - Server components by default; `'use client'` only when state/interactivity needed
@@ -165,6 +181,7 @@ Read the relevant doc when working on that system:
 
 | System | Location |
 |--------|----------|
+| **Database schema** | **`docs/dev/DB_SCHEMA.md`** |
 | Architecture & deployment | `docs/dev/ARCHITECTURE.md` |
 | Coding conventions | `docs/dev/CONVENTIONS.md` |
 | Theme & design tokens | `docs/dev/DESIGN_SYSTEM.md` |
