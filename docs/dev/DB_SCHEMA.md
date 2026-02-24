@@ -55,6 +55,8 @@
 | id | UUID | PK | |
 | customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE CASCADE | |
 | vehicle_type | vehicle_type (enum) | NOT NULL, DEFAULT 'standard' | |
+| vehicle_category | TEXT | NOT NULL, DEFAULT 'automobile', CHECK IN (automobile, motorcycle, rv, boat, aircraft) | |
+| specialty_tier | TEXT | CHECK valid tier keys or NULL | NULL for automobiles; maps to service_pricing.tier_name |
 | year | INTEGER | | |
 | make | TEXT | | |
 | model | TEXT | | |
@@ -1138,12 +1140,13 @@
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK, default gen_random_uuid() | |
-| name | TEXT | UNIQUE, NOT NULL | |
+| name | TEXT | NOT NULL | |
+| category | TEXT | NOT NULL, DEFAULT 'automobile', CHECK IN (automobile, motorcycle, rv, boat, aircraft) | |
 | is_active | BOOLEAN | NOT NULL, DEFAULT true | |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
-Seeded with 45 common makes. Used in POS, admin, booking, and customer portal vehicle dropdowns. RLS: authenticated read, admin-only write.
+UNIQUE constraint on (name, category). Honda can exist as both automobile and motorcycle. Seeded with 45 automobile + 42 specialty makes (12 motorcycle, 10 RV, 10 boat, 10 aircraft). RLS: authenticated read, admin-only write.
 
 ---
 

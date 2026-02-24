@@ -89,11 +89,15 @@ export interface Customer {
   updated_at: string;
 }
 
+export type VehicleCategory = 'automobile' | 'motorcycle' | 'rv' | 'boat' | 'aircraft';
+
 export interface Vehicle {
   id: string;
   customer_id: string;
   vehicle_type: VehicleType;
+  vehicle_category: VehicleCategory;
   size_class: VehicleSizeClass | null;
+  specialty_tier: string | null;
   year: number | null;
   make: string | null;
   model: string | null;
@@ -104,6 +108,15 @@ export interface Vehicle {
   is_incomplete: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface VehicleMake {
+  id: string;
+  name: string;
+  category: VehicleCategory;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface Vendor {

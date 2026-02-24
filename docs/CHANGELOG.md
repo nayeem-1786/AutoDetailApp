@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Vehicle Category Expansion Schema — Session 1 — 2026-02-24
+
+### Migration: `20260224000001_vehicle_category_expansion.sql`
+- Added `vehicle_category` column to `vehicles` table (TEXT, NOT NULL, DEFAULT 'automobile', CHECK constraint)
+- Added `specialty_tier` column to `vehicles` table (TEXT, nullable, CHECK constraint matching service_pricing tier_name values)
+- Added `category` column to `vehicle_makes` table (TEXT, NOT NULL, DEFAULT 'automobile', CHECK constraint)
+- Changed `vehicle_makes` unique constraint from `UNIQUE(name)` to `UNIQUE(name, category)` — allows Honda in both automobile and motorcycle
+- Seeded 42 specialty vehicle makes: 12 motorcycle, 10 RV, 10 boat, 10 aircraft
+- Added indexes: `idx_vehicles_vehicle_category`, `idx_vehicle_makes_category`
+
+### New File: `src/lib/utils/vehicle-categories.ts`
+- `VEHICLE_CATEGORIES` const array and `VehicleCategory` type
+- `VEHICLE_CATEGORY_LABELS` display labels
+- `SPECIALTY_TIERS` tier definitions per category (key maps to `service_pricing.tier_name`)
+- `TIER_DROPDOWN_LABELS` per-category dropdown labels
+- `isSpecialtyCategory()` and `getSpecialtyTierLabel()` helpers
+
+### Updated Files
+- `src/lib/supabase/types.ts` — Added `VehicleCategory` type, `VehicleMake` interface, added `vehicle_category` and `specialty_tier` to `Vehicle` interface
+- `src/app/api/vehicle-makes/route.ts` — Added optional `?category=` query param (default: 'automobile')
+- `src/app/api/admin/vehicle-makes/route.ts` — GET: optional `?category=` filter, returns `category` field. POST: accepts `category` in body. PATCH: allows updating `category`, handles composite unique violation (23505). Added KTM to ACRONYMS list.
+- `docs/dev/DB_SCHEMA.md` — Updated vehicles and vehicle_makes table schemas
+- `docs/dev/FILE_TREE.md` — Added new migration and constants file
+
+---
+
 ## Standardize Vehicle Forms + Receipt Vehicle Line Items — Session D14g — 2026-02-23
 
 ### Vehicle Form Standardization

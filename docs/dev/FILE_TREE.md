@@ -699,6 +699,7 @@ src/lib/utils/sms.ts
 src/lib/utils/template.ts
 src/lib/utils/ticker-sections.ts
 src/lib/utils/validation.ts
+src/lib/utils/vehicle-categories.ts
 src/lib/utils/webhook.ts
 ```
 
@@ -1033,6 +1034,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260222000003_fix_audit_log_schema.sql
 20260222000004_customer_phone_email_unique.sql
 20260223000001_create_vehicle_makes.sql
+20260224000001_vehicle_category_expansion.sql
 ```
 
 ---
