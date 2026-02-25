@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Step 3 Booking Bug Fixes — Session 14D — 2026-02-25
+
+### Fix: Mobile Auth Modal, Phone Format, Pay-on-Site, Auth State, Cancellation Policy
+
+**Bug 1 — Mobile auth modal not usable**
+- AuthSheet: Added `max-h-[90vh]` on mobile (was uncapped), drag handle bar at top of bottom sheet
+- Mobile: `inset-x-0 bottom-0 rounded-t-2xl`; Desktop: centered dialog `max-w-md max-h-[85vh]`
+- Auto-focus on all modal screens: phone input, OTP code (via requestAnimationFrame), email input, profile first name
+
+**Bug 2 — Phone display in E.164 format**
+- Imported `formatPhone` in InlineAuth — "Booking as" line now shows `(424) 363-7450` instead of `+14243637450`
+
+**Bug 3 — "Not you?" / "Sign out" order + missing back button**
+- "Not you?" now appears above "Sign out" (more common action first, destructive second)
+- Tapping "Not you?" shows auth selection with "Back" button — does NOT clear authenticated state
+- User data preserved until they explicitly start a new sign-in/sign-up flow
+- Uses `showAuthSwitch` local state flag
+
+**Bug 4 — "Booking as" not appearing after login**
+- `handleAuthSuccess` now calls `onAuthComplete` in catch block too (with empty fallback data)
+- Sheet closes before profile fetch starts (loading spinner shows in-place)
+- `showAuthSwitch` reset on auth success to ensure clean state
+
+**Bug 5 — Cancellation policy shown for all payment options**
+- Warning now only renders when `paymentOption === 'pay_on_site'`
+- Hidden for Pay in Full and Deposit
+
+**Bug 6 — Pay on Site stuck on "Processing"**
+- Root cause 1: `buildVehicle()` sent empty strings for make/model/color — Zod `.min(1)` rejected them. Fixed to send `null`
+- Root cause 2: `handleBookingSubmit` didn't `await` async `onConfirm` — errors weren't caught, `submitting` never reset. Now uses `async/await` with `try/finally`
+- Updated `onConfirm` prop type to `void | Promise<void>`
+
+**Bug 7 — StepPayment remount concern (verified OK)**
+- Payment intents only created when `showPaymentForm` is true (user clicks "Pay & Book"), not on option toggle
+- Orphaned intents expire after 7 days and cost nothing — no action needed
+
+### Files Changed
+- `src/components/booking/inline-auth.tsx` — mobile bottom sheet, drag handle, auto-focus, phone format, "Not you?" with back button, auth state fix
+- `src/components/booking/step-confirm-book.tsx` — cancellation policy conditional, buildVehicle null fields, async submit with try/finally
+
+---
+
 ## Step 3 UX Overhaul — Session 14C — 2026-02-25
 
 ### Feature: Inline Auth, Unified Payment, Collapsed Coupon, Merged Consent, Footer Hide

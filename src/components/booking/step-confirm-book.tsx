@@ -82,7 +82,7 @@ export interface StepConfirmBookProps {
   paymentOption: 'full' | 'deposit' | 'pay_on_site' | null;
   onPaymentOptionChange: (option: 'full' | 'deposit' | 'pay_on_site') => void;
   // Actions
-  onConfirm: (customer: BookingCustomerInput, vehicle: BookingVehicleInput, paymentIntentId?: string) => void;
+  onConfirm: (customer: BookingCustomerInput, vehicle: BookingVehicleInput, paymentIntentId?: string) => void | Promise<void>;
   onBack: () => void;
   // Auto-apply URL coupon
   autoApplyCouponOnMount?: boolean;
@@ -291,15 +291,15 @@ export function StepConfirmBook({
       vehicle_type: specialty ? cat : 'standard',
       size_class: selectedSizeClass ?? null,
       specialty_tier: null,
-      year: undefined,
-      make: '',
-      model: '',
-      color: '',
+      year: null,
+      make: null,
+      model: null,
+      color: null,
     } as BookingVehicleInput;
   }
 
   // --- Submit ---
-  function handleBookingSubmit() {
+  async function handleBookingSubmit() {
     if (!agreedToAll || !customerData) return;
 
     const customer: BookingCustomerInput = {
@@ -322,9 +322,10 @@ export function StepConfirmBook({
     setError(null);
     try {
       const vehicle = buildVehicle();
-      onConfirm(customer, vehicle);
+      await onConfirm(customer, vehicle);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
       setSubmitting(false);
     }
   }
@@ -806,20 +807,22 @@ export function StepConfirmBook({
                     </div>
                   )}
 
-                  {/* Cancellation Disclaimer */}
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-400 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-medium text-amber-300">Cancellation & No-Show Policy</p>
-                        <p className="text-xs text-amber-400 mt-0.5">
-                          {cancellationFeeEnabled
-                            ? <>Cancellations must be made at least 24 hours before your appointment. Late cancellations or no-shows will be charged a <span className="font-semibold">$50 fee</span>.</>
-                            : 'Cancellations must be made at least 24 hours before your appointment.'}
-                        </p>
+                  {/* Cancellation Disclaimer — only for Pay on Site */}
+                  {paymentOption === 'pay_on_site' && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-400 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-medium text-amber-300">Cancellation & No-Show Policy</p>
+                          <p className="text-xs text-amber-400 mt-0.5">
+                            {cancellationFeeEnabled
+                              ? <>Cancellations must be made at least 24 hours before your appointment. Late cancellations or no-shows will be charged a <span className="font-semibold">$50 fee</span>.</>
+                              : 'Cancellations must be made at least 24 hours before your appointment.'}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Stripe Payment Form (inline, directly below payment options) */}
                   {showPaymentForm && needsStripePayment && (

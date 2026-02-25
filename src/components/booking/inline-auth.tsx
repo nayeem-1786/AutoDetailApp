@@ -14,12 +14,12 @@ import {
   type PhoneOtpVerifyInput,
   type CustomerSignupInput,
 } from '@/lib/utils/validation';
-import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
+import { formatPhoneInput, normalizePhone, formatPhone } from '@/lib/utils/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
-import { LogIn, UserPlus, X } from 'lucide-react';
+import { LogIn, UserPlus, X, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 
 // --- Types ---
@@ -113,11 +113,15 @@ function AuthSheet({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      {/* Content: bottom sheet on mobile, centered dialog on desktop */}
+      {/* Mobile: bottom sheet | Desktop: centered dialog */}
       <div className="absolute inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md">
-        <div className="rounded-t-2xl sm:rounded-2xl bg-brand-dark border border-site-border max-h-[85vh] overflow-y-auto">
+        <div className="rounded-t-2xl sm:rounded-2xl bg-brand-dark border border-site-border max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+          {/* Drag handle (mobile only) */}
+          <div className="sm:hidden flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+          </div>
           {/* Header */}
-          <div className="sticky top-0 flex items-center justify-between p-4 border-b border-site-border bg-brand-dark rounded-t-2xl sm:rounded-t-2xl z-10">
+          <div className="sticky top-0 flex items-center justify-between px-4 py-3 sm:p-4 border-b border-site-border bg-brand-dark z-10">
             <h3 className="text-lg font-semibold text-site-text">{title}</h3>
             <button
               type="button"
@@ -129,7 +133,7 @@ function AuthSheet({
             </button>
           </div>
           {/* Body */}
-          <div className="p-6">
+          <div className="p-5 sm:p-6">
             {children}
           </div>
         </div>
@@ -606,6 +610,7 @@ function SignInFlow({
               id="inline-signin-email"
               type="email"
               autoComplete="email"
+              autoFocus
               placeholder="you@example.com"
               className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime"
               {...emailForm.register('email')}
@@ -687,6 +692,7 @@ function SignInFlow({
                   id="inline-reset-email"
                   type="email"
                   autoComplete="email"
+                  autoFocus
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="you@example.com"
@@ -736,6 +742,14 @@ function SignUpFlow({
   const [loading, setLoading] = useState(false);
   const [otpPhone, setOtpPhone] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const otpInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus OTP input
+  useEffect(() => {
+    if (mode === 'phone-verify') {
+      requestAnimationFrame(() => otpInputRef.current?.focus());
+    }
+  }, [mode]);
 
   // Cooldown timer
   useEffect(() => {
@@ -1064,6 +1078,8 @@ function SignUpFlow({
 
   const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime';
 
+  const { ref: signupOtpCodeRef, ...signupOtpCodeField } = otpVerifyForm.register('code');
+
   return (
     <div className="space-y-5">
       {error && (
@@ -1152,7 +1168,11 @@ function SignUpFlow({
               maxLength={6}
               placeholder="000000"
               className={`text-center text-lg tracking-[0.3em] ${inputCls}`}
-              {...otpVerifyForm.register('code')}
+              {...signupOtpCodeField}
+              ref={(el) => {
+                signupOtpCodeRef(el);
+                otpInputRef.current = el;
+              }}
             />
           </FormField>
 
@@ -1266,6 +1286,7 @@ function SignUpFlow({
               <Input
                 id="inline-full-first-name"
                 placeholder="John"
+                autoFocus
                 className={inputCls}
                 {...fullForm.register('first_name')}
               />
@@ -1384,10 +1405,14 @@ export function InlineAuth({
 }: InlineAuthProps) {
   const [sheetOpen, setSheetOpen] = useState<'signin' | 'signup' | null>(null);
   const [fetchingProfile, setFetchingProfile] = useState(false);
+  // Bug 3: "Not you?" shows auth selection with back button, preserving user data
+  const [showAuthSwitch, setShowAuthSwitch] = useState(false);
 
   // After auth success: fetch customer profile + vehicles
   const handleAuthSuccess = useCallback(async () => {
+    setSheetOpen(null);
     setFetchingProfile(true);
+    setShowAuthSwitch(false);
     try {
       const [profileRes, vehiclesRes] = await Promise.all([
         fetch('/api/customer/profile'),
@@ -1412,37 +1437,122 @@ export function InlineAuth({
         vehicles = vehicleData.data || vehicleData || [];
       }
 
-      setSheetOpen(null);
+      // Always call onAuthComplete even if fetches partially failed
       onAuthComplete({ customer, vehicles });
     } catch {
-      // Still close sheet, use whatever data we got
-      setSheetOpen(null);
+      // Still try to notify parent with empty data so UI updates
+      onAuthComplete({ customer: { first_name: '', last_name: '', phone: '', email: '' }, vehicles: [] });
     } finally {
       setFetchingProfile(false);
     }
   }, [onAuthComplete]);
 
-  // Already authenticated — show compact info line
+  // Already authenticated — show compact info line (or auth switch screen)
   if (isAuthenticated && customerData) {
+    // Bug 3: If user tapped "Not you?", show auth selection with back button
+    if (showAuthSwitch) {
+      return (
+        <>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowAuthSwitch(false)}
+              className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-site-text transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSheetOpen('signin')}
+              className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
+                  <LogIn className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-site-text">Returning Customer?</p>
+                  <p className="text-xs text-site-text-muted">Sign in with your phone or email</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSheetOpen('signup')}
+              className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
+                  <UserPlus className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-site-text">New here?</p>
+                  <p className="text-xs text-site-text-muted">Create an account to get started</p>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Sign In Sheet */}
+          <AuthSheet
+            open={sheetOpen === 'signin'}
+            onClose={() => setSheetOpen(null)}
+            title="Sign In"
+          >
+            <SignInFlow
+              onSuccess={handleAuthSuccess}
+              onSwitchToSignUp={() => setSheetOpen('signup')}
+              businessName={businessName}
+            />
+          </AuthSheet>
+
+          {/* Sign Up Sheet */}
+          <AuthSheet
+            open={sheetOpen === 'signup'}
+            onClose={() => setSheetOpen(null)}
+            title="Create Account"
+          >
+            <SignUpFlow
+              onSuccess={handleAuthSuccess}
+              onSwitchToSignIn={() => setSheetOpen('signin')}
+              businessName={businessName}
+            />
+          </AuthSheet>
+        </>
+      );
+    }
+
     const { first_name, last_name, phone, email } = customerData.customer;
     return (
       <div className="rounded-lg border border-lime/30 bg-lime/5 p-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-site-text">
               Booking as: {first_name} {last_name}
             </p>
             <p className="text-xs text-site-text-muted truncate" suppressHydrationWarning>
-              {phone}{phone && email ? ' \u00b7 ' : ''}{email}
+              {phone ? formatPhone(phone) : ''}{phone && email ? ' \u00b7 ' : ''}{email}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="flex-shrink-0 text-xs text-site-text-muted hover:text-site-text transition-colors"
-          >
-            Not you? Sign out
-          </button>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowAuthSwitch(true)}
+              className="text-xs text-site-text-muted hover:text-site-text transition-colors"
+            >
+              Not you?
+            </button>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     );
