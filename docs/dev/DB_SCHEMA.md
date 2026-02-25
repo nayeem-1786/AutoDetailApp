@@ -109,8 +109,12 @@
 | name | TEXT | UNIQUE, NOT NULL | |
 | slug | TEXT | UNIQUE, NOT NULL | |
 | description | TEXT | | |
+| display_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
+
+**Current categories (6):** Express & Detail Services, Paint Correction & Restoration, Ceramic Coatings, Exterior Enhancements, Interior Enhancements, Specialty Vehicles. (Precision Express and Signature Detail were merged into "Express & Detail Services" in Session 9.)
 
 ### services
 | Column | Type | Constraints | Notes |

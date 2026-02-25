@@ -163,6 +163,9 @@ export function BookingWizard({
       config: rebookData && rebookService
         ? {
             tier_name: rebookData.tier_name ?? null,
+            tier_label: rebookData.tier_name
+              ? (rebookService.service_pricing.find((t) => t.tier_name === rebookData.tier_name)?.tier_label ?? null)
+              : null,
             price: 0,
             is_mobile: rebookData.is_mobile,
             mobile_zone_id: rebookData.mobile_zone_id ?? null,
@@ -324,8 +327,13 @@ export function BookingWizard({
       })
       .filter(Boolean) as ConfigureResult['addons'];
 
+    // Find tier_label from the matching tier
+    const matchedTier = tier_name ? tiers.find((t) => t.tier_name === tier_name) : null;
+    const tier_label = matchedTier?.tier_label ?? null;
+
     return {
       tier_name,
+      tier_label,
       price,
       size_class,
       is_mobile: false,
@@ -885,7 +893,7 @@ export function BookingWizard({
           <StepReview
             serviceName={state.service.name}
             serviceId={state.service.id}
-            tierName={state.config.tier_name}
+            tierName={state.config.tier_label ?? state.config.tier_name}
             price={state.config.price}
             date={state.date}
             time={state.time}

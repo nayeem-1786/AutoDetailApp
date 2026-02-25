@@ -4,6 +4,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Category Merge, Booking/Review Fixes, Bug Fixes — Session 9 — 2026-02-24
+
+### Database: Merge Service Categories
+- Merged "Precision Express" and "Signature Detail" into "Express & Detail Services"
+- Signature Complete Detail moved to merged category with display_order=3
+- Remaining categories reordered to close the gap (6 categories instead of 7)
+- Migration: `supabase/migrations/20260224000003_merge_express_signature_categories.sql`
+
+### Fix: Make "Other" Value Persisting in Edit Mode
+- VehicleMakeCombobox now properly detects custom "Other" values when editing vehicles
+- Added explicit Other-mode detection in both the fetch callback and cache path
+- Sync effect now also resets `isOtherMode` to `false` when value IS in the makes list
+- Fixes blank Make field when editing vehicles with custom make values
+
+### Fix: Vehicle Category Image Upload Limit
+- Increased max file size from 5MB to 10MB for vehicle category images
+- Updated both server-side API route and client-side admin validation
+
+### Fix: Step 4 Field Ordering
+- Moved Vehicle Details section above SMS/email consent checkboxes
+- New order: Contact Details → Vehicle Details → Consent Checkboxes
+
+### Fix: Step 5 Review — Category-Aware Vehicle Icon
+- Vehicle icon now matches the vehicle category (Car, Bike, Truck, Ship, Plane)
+- Previously always showed Car icon regardless of vehicle type
+
+### Fix: Step 5 Review — Tier Display Label
+- Added `tier_label` field to `ConfigureResult` interface
+- Review step now shows human-readable tier labels (e.g., "2-4 Seater") instead of raw tier keys (e.g., "aircraft_2_4")
+- Tier label populated from `service_pricing.tier_label` when user selects a tier in Step 2
+
+---
+
 ## Booking Category Picker & Service Filtering — Session 8 — 2026-02-24
 
 ### Vehicle Category Picker in Booking Step 1

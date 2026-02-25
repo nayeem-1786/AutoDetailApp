@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
 const BUCKET = 'cms-assets';
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // POST /api/admin/vehicle-categories/[id]/image — Upload category image
@@ -48,7 +48,7 @@ export async function POST(
   // Validate file size
   if (file.size > MAX_SIZE) {
     return NextResponse.json(
-      { error: 'File must be under 5MB' },
+      { error: 'Image must be under 10MB' },
       { status: 400 }
     );
   }

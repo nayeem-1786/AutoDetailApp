@@ -50,10 +50,26 @@ export function VehicleMakeCombobox({
     }
   }, [category, onChange]);
 
+  // Check if current value needs "Other" mode based on makes list
+  function detectOtherMode(currentValue: string, makesList: VehicleMake[]) {
+    if (currentValue && makesList.length > 0) {
+      const inList = makesList.some((m) => m.name.toLowerCase() === currentValue.toLowerCase());
+      if (!inList) {
+        setIsOtherMode(true);
+        setSearch(currentValue);
+      } else {
+        setIsOtherMode(false);
+      }
+    }
+  }
+
   // Fetch makes for current category
   useEffect(() => {
     if (cachedMakesByCategory[category]) {
-      setMakes(cachedMakesByCategory[category]);
+      const cached = cachedMakesByCategory[category];
+      setMakes(cached);
+      // Re-check Other mode when cached makes are set (value may already be populated)
+      detectOtherMode(value, cached);
       return;
     }
     fetch(`/api/vehicle-makes?category=${category}`)
@@ -62,8 +78,11 @@ export function VehicleMakeCombobox({
         const list = data.makes ?? [];
         cachedMakesByCategory[category] = list;
         setMakes(list);
+        // Check Other mode after fetch completes — value may have been set before makes loaded
+        detectOtherMode(value, list);
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
   // Sync search field when value prop changes externally
@@ -74,7 +93,11 @@ export function VehicleMakeCombobox({
       const inList = makes.some((m) => m.name.toLowerCase() === value.toLowerCase());
       if (!inList) {
         setIsOtherMode(true);
+      } else {
+        setIsOtherMode(false);
       }
+    } else if (!value) {
+      setIsOtherMode(false);
     }
   }, [value, makes]);
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { CalendarDays, Clock, Truck, User, Car, Tag, CheckCircle2, Info, Gift, Coins, AlertTriangle, Pencil } from 'lucide-react';
+import { CalendarDays, Clock, Truck, User, Car, Bike, Ship, Plane, Tag, CheckCircle2, Info, Gift, Coins, AlertTriangle, Pencil } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -377,7 +377,15 @@ export function StepReview({
 
           {/* Vehicle */}
           <div className={`${!isPortal ? 'mt-3 pt-3 border-t border-site-border' : 'mt-2'} flex items-center gap-2 text-sm text-site-text`}>
-            <Car className="h-4 w-4 text-site-text-muted" />
+            {(() => {
+              const cat = vehicle.vehicle_category ?? (vehicle.vehicle_type === 'standard' ? 'automobile' : vehicle.vehicle_type);
+              const IconComponent = cat === 'motorcycle' ? Bike
+                : cat === 'rv' ? Truck
+                : cat === 'boat' ? Ship
+                : cat === 'aircraft' ? Plane
+                : Car;
+              return <IconComponent className="h-4 w-4 text-site-text-muted" />;
+            })()}
             <span>
               {[
                 vehicle.year,

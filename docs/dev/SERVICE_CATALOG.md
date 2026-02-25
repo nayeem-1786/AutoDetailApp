@@ -67,9 +67,9 @@ Every service in the catalog uses one of these six pricing models. The model det
 
 ## Service Categories & Complete Catalog
 
-### Category 1: Precision Express
+### Category 1: Express & Detail Services
 
-Quick-turnaround services for customers who need their vehicle presentable fast.
+Express washes, interior cleans, and full signature detailing services. (Merged from "Precision Express" and "Signature Detail" in Session 9.)
 
 #### 1. Express Exterior Wash
 
@@ -101,12 +101,6 @@ Complete vacuum of all surfaces including trunk. All interior surfaces wiped, cu
 | Classification | Primary (Standalone) |
 | Tax | No (service) |
 
----
-
-### Category 2: Signature Detail
-
-The flagship comprehensive service.
-
 #### 3. Signature Complete Detail
 
 Full interior and exterior rejuvenation. Interior: deep vacuum, all surfaces cleaned and conditioned, vents and crevices detailed, interior dressing. Exterior: spot-free RO water pre-rinse, hand wash, door jambs, wheel wells, premium liquid wax hand-applied.
@@ -128,7 +122,7 @@ Full interior and exterior rejuvenation. Interior: deep vacuum, all surfaces cle
 
 ---
 
-### Category 3: Paint Correction & Restoration
+### Category 2: Paint Correction & Restoration
 
 Professional machine polishing to restore paint finish. These services require controlled environment — not available as mobile service.
 
@@ -173,7 +167,7 @@ Professional machine polishing to restore paint finish. These services require c
 
 ---
 
-### Category 4: Ceramic Coatings
+### Category 3: Ceramic Coatings
 
 Professional-grade ceramic coating application. Creates an invisible shield against UV, contaminants, and environmental damage. Requires controlled environment — not available as mobile service.
 
@@ -229,7 +223,7 @@ Premium ceramic protection with maximum longevity and enhanced hydrophobic prope
 
 ---
 
-### Category 5: Exterior Enhancements
+### Category 4: Exterior Enhancements
 
 Add-on and standalone services focused on exterior surfaces.
 
@@ -343,7 +337,7 @@ Specialized treatment to dissolve mineral deposits from glass and paint surfaces
 
 ---
 
-### Category 6: Interior Enhancements
+### Category 5: Interior Enhancements
 
 Add-on services focused on interior surfaces. Most require a primary service; Hot Shampoo Extraction and Organic Stain Treatment can also be booked standalone.
 
@@ -462,7 +456,7 @@ Comprehensive extraction and treatment for water-damaged vehicles. Eliminates mo
 
 ---
 
-### Category 7: Specialty Vehicles
+### Category 6: Specialty Vehicles
 
 Services designed for non-standard vehicles with vehicle-type-specific sizing and pricing. Motorcycle, Boat, and Aircraft services are comprehensive — no standard add-ons offered. RV services support standard add-ons (see [Vehicle Compatibility Matrix](#vehicle-compatibility-matrix)).
 

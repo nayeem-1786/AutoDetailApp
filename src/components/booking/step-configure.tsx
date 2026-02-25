@@ -16,6 +16,7 @@ import type { MobileZone, ServicePricing, VehicleSizeClass } from '@/lib/supabas
 
 export interface ConfigureResult {
   tier_name: string | null;
+  tier_label: string | null;
   price: number;
   size_class: VehicleSizeClass | null;
   is_mobile: boolean;
@@ -108,8 +109,10 @@ export function StepConfigure({
 
   function handleContinue() {
     if (!canContinue) return;
+    const tierLabel = tier?.tier_label ?? null;
     onContinue({
       tier_name: selectedTier,
+      tier_label: tierLabel,
       price,
       size_class: sizeClass,
       is_mobile: isMobile,

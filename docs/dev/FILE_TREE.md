@@ -1048,6 +1048,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260223000001_create_vehicle_makes.sql
 20260224000001_vehicle_category_expansion.sql
 20260224000002_create_vehicle_categories.sql
+20260224000003_merge_express_signature_categories.sql
 ```
 
 ---

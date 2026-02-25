@@ -511,30 +511,6 @@ export function StepCustomerInfo({
           </div>
         )}
 
-        {/* Consent Checkboxes */}
-        <div className="mt-5 space-y-3">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
-              {...register('customer.sms_consent')}
-            />
-            <span className="text-xs text-site-text-secondary">
-              I agree to receive text messages from {businessName} including appointment reminders and updates. Msg &amp; data rates may apply. Reply STOP to opt out.
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
-              {...register('customer.email_consent')}
-            />
-            <span className="text-xs text-site-text-secondary">
-              I agree to receive emails from {businessName} including appointment confirmations and promotional offers.
-            </span>
-          </label>
-        </div>
       </div>
 
       {/* Vehicle Info */}
@@ -732,6 +708,31 @@ export function StepCustomerInfo({
             </div>
           </>
         )}
+      </div>
+
+      {/* Consent Checkboxes */}
+      <div className="mt-6 space-y-3">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
+            {...register('customer.sms_consent')}
+          />
+          <span className="text-xs text-site-text-secondary">
+            I agree to receive text messages from {businessName} including appointment reminders and updates. Msg &amp; data rates may apply. Reply STOP to opt out.
+          </span>
+        </label>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
+            {...register('customer.email_consent')}
+          />
+          <span className="text-xs text-site-text-secondary">
+            I agree to receive emails from {businessName} including appointment confirmations and promotional offers.
+          </span>
+        </label>
       </div>
 
       {/* Navigation */}
