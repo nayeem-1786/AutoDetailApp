@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-24 (verified after vehicle category expansion Sessions 1-3)
+> **Last updated:** 2026-02-25 (Session 10 — category merge cleanup migration added)
 
 ---
 
@@ -1049,6 +1049,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260224000001_vehicle_category_expansion.sql
 20260224000002_create_vehicle_categories.sql
 20260224000003_merge_express_signature_categories.sql
+20260225000001_cleanup_category_merge.sql
 ```
 
 ---

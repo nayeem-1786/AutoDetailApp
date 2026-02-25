@@ -4,13 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Category Merge Cleanup & Dead Button Removal — Session 10 — 2026-02-25
+
+### Database: Clean Up Failed Category Merge
+- Session 9's SQL migration (`20260224000003`) ran but was out of sync with the owner's manual Admin UI changes
+- Owner had already created "Express & Detail Services - 2" via Admin > Catalog > Categories and moved the 3 services there
+- Corrective migration (`20260225000001_cleanup_category_merge.sql`) cleans up the duplicate:
+  - Deleted orphaned "Express & Detail Services" (empty, from migration rename of Precision Express)
+  - Renamed "Express & Detail Services - 2" → "Express & Detail Services" (slug normalized)
+  - Fixed service display_order within merged category (1=Express Exterior Wash, 2=Express Interior Clean, 3=Signature Complete Detail)
+  - Reordered all categories to 1-based display_order with no gaps
+- **Lesson**: Service category management should be done through the Admin UI, not SQL migrations
+
+### Removed: "Book Another Service" Button
+- Removed the "Book Another Service" button from the booking confirmation page (`booking-confirmation.tsx`)
+- The "View My Appointments" button (portal users only) remains
+
+---
+
 ## Category Merge, Booking/Review Fixes, Bug Fixes — Session 9 — 2026-02-24
 
 ### Database: Merge Service Categories
 - Merged "Precision Express" and "Signature Detail" into "Express & Detail Services"
 - Signature Complete Detail moved to merged category with display_order=3
 - Remaining categories reordered to close the gap (6 categories instead of 7)
-- Migration: `supabase/migrations/20260224000003_merge_express_signature_categories.sql`
+- Migration: `supabase/migrations/20260224000003_merge_express_signature_categories.sql` (applied but see Session 10 for cleanup)
 
 ### Fix: Make "Other" Value Persisting in Edit Mode
 - VehicleMakeCombobox now properly detects custom "Other" values when editing vehicles

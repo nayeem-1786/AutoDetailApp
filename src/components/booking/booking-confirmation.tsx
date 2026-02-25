@@ -140,20 +140,15 @@ export function BookingConfirmation({
         </dl>
       </div>
 
-      <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-        {isPortal && (
+      {isPortal && (
+        <div className="mt-8 flex justify-center">
           <Link href="/account">
             <Button className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
               View My Appointments
             </Button>
           </Link>
-        )}
-        <Link href="/book">
-          <Button variant="outline" className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
-            Book Another Service
-          </Button>
-        </Link>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

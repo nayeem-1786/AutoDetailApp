@@ -26,6 +26,7 @@
 11. **Component Reuse** — Before writing ANY new component, search /src/components for existing reusable components.
 12. **File paths**: Exact file paths are in docs/dev/FILE_TREE.md. Read it before modifying any files. Never guess paths.
 13. **FILE_TREE.md**: If a session creates new files in API routes, admin pages, lib modules, components, POS components, or migrations, update `docs/dev/FILE_TREE.md` with the new paths before committing.
+14. **Service category management** (create, rename, merge, reorder) should be done through the Admin UI, not SQL migrations. The admin already supports full category CRUD.
 
 ## Project Structure
 
