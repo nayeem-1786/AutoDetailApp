@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Booking Wizard Step 1 Redesign — Session 14 — 2026-02-25
+
+### Feature: Merge Service Select + Configure into Step 1
+- **Merged** `step-service-select.tsx` and `step-configure.tsx` into a single unified Step 1 ("Choose Your Detail")
+- **Two-column layout** (desktop ≥ 1024px): services on left, sticky sidebar with configure panel + price summary on right
+- **Accordion pattern** (mobile < 1024px): clicking a service card expands inline configure panel below the card
+- **Vehicle category bottom sheet**: replaced 5-image card row with text link ("Detailing a motorcycle, RV, boat, or aircraft? Change vehicle type") that opens a bottom sheet (mobile) / centered dialog (desktop)
+- **Add-ons section**: shows top 3 by display_order, then "Show X more add-ons" expandable link
+- **Mobile service text link**: replaced prominent Switch toggle with "Need us to come to you? Add mobile service →" text link that expands address/zone fields when clicked
+- **Sticky footer** (mobile): running total + Continue button fixed at bottom
+- **Step count reduced**: wizard now has 4 steps (Service, Schedule, Info, Review) + optional Payment, down from 5+1
+- **Wider container**: Step 1 uses `max-w-6xl` for the two-column layout; other steps remain `max-w-3xl`
+- **All pricing logic preserved**: flat, vehicle_size, scope, specialty, per_unit — all work identically
+- **URL state sync**: updated for new step numbering, all params preserved
+- **Rebook/pre-select/edit-from-review flows**: all work correctly with new step structure
+
+### Files Changed
+- `src/components/booking/step-service-select.tsx` — complete rewrite (absorbs all configure functionality)
+- `src/components/booking/step-indicator.tsx` — removed "Configure" step label
+- `src/components/booking/booking-wizard.tsx` — removed StepConfigure, renumbered all steps, wider container for step 1
+- `src/components/booking/step-configure.tsx` — **deprecated** (no longer imported, types now exported from step-service-select)
+
+---
+
 ## Combo Pricing Visual UI — Session 13 — 2026-02-25
 
 ### Enhancement: Combo Pricing Strikethrough & Savings Badges

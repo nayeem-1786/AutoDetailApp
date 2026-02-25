@@ -5,7 +5,6 @@ import { Check } from 'lucide-react';
 
 const DEFAULT_STEPS = [
   { label: 'Service' },
-  { label: 'Configure' },
   { label: 'Schedule' },
   { label: 'Info' },
   { label: 'Review' },
@@ -13,7 +12,6 @@ const DEFAULT_STEPS = [
 
 const STEPS_WITH_PAYMENT = [
   { label: 'Service' },
-  { label: 'Configure' },
   { label: 'Schedule' },
   { label: 'Info' },
   { label: 'Review' },
