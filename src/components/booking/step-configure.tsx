@@ -227,11 +227,19 @@ export function StepConfigure({
                 const addonSvc = suggestion.addon_service;
                 if (!addonSvc) return null;
 
-                const addonPrice =
-                  suggestion.combo_price ??
-                  addonSvc.flat_price ??
-                  getAddonMinPrice(addonSvc);
-                if (addonPrice == null) return null;
+                // Standalone price (what customer would pay booking this add-on alone)
+                const standalonePrice = addonSvc.flat_price ?? getAddonMinPrice(addonSvc);
+                if (standalonePrice == null) return null;
+
+                // Combo price (discounted price when bundled with this primary service)
+                const comboPrice = suggestion.combo_price;
+
+                // The actual price to charge (combo if available, otherwise standalone)
+                const addonPrice = comboPrice ?? standalonePrice;
+
+                // Is there a real discount?
+                const hasDiscount = comboPrice != null && comboPrice < standalonePrice;
+                const savings = hasDiscount ? standalonePrice - comboPrice : 0;
 
                 const isSelected = selectedAddons.some(
                   (a) => a.service_id === addonSvc.id
@@ -267,9 +275,25 @@ export function StepConfigure({
                       )}
                     </div>
                     <div className="ml-3 flex items-center gap-2">
-                      <span className="text-sm font-medium text-site-text whitespace-nowrap">
-                        +{formatCurrency(addonPrice)}
-                      </span>
+                      {hasDiscount ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-site-text-muted line-through">
+                              {formatCurrency(standalonePrice)}
+                            </span>
+                            <span className="text-sm font-semibold text-lime whitespace-nowrap">
+                              +{formatCurrency(addonPrice)}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-medium text-lime/80">
+                            Save {formatCurrency(savings)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-medium text-site-text whitespace-nowrap">
+                          +{formatCurrency(addonPrice)}
+                        </span>
+                      )}
                       <div
                         className={cn(
                           'h-5 w-5 rounded border flex items-center justify-center transition-colors flex-shrink-0',
@@ -299,14 +323,38 @@ export function StepConfigure({
                 {formatCurrency(price)}
               </span>
             </div>
-            {selectedAddons.map((addon) => (
-              <div key={addon.service_id} className="flex justify-between">
-                <span className="text-site-text-secondary">{addon.name}</span>
-                <span className="font-medium text-site-text">
-                  {formatCurrency(addon.price)}
-                </span>
-              </div>
-            ))}
+            {selectedAddons.map((addon) => {
+              const suggestion = service.service_addon_suggestions.find(
+                (s) => s.addon_service?.id === addon.service_id
+              );
+              const originalPrice = suggestion?.addon_service
+                ? (suggestion.addon_service.flat_price ?? getAddonMinPrice(suggestion.addon_service))
+                : null;
+              const showSavings = originalPrice != null && addon.price < originalPrice;
+
+              return (
+                <div key={addon.service_id} className="flex justify-between">
+                  <span className="text-site-text-secondary">
+                    {addon.name}
+                    {showSavings && (
+                      <span className="ml-1 text-xs text-lime/80">
+                        (save {formatCurrency(originalPrice - addon.price)})
+                      </span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {showSavings && (
+                      <span className="text-xs text-site-text-muted line-through">
+                        {formatCurrency(originalPrice)}
+                      </span>
+                    )}
+                    <span className="font-medium text-site-text">
+                      {formatCurrency(addon.price)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
             {mobileSurcharge > 0 && (
               <div className="flex justify-between">
                 <span className="text-site-text-secondary">Mobile surcharge</span>

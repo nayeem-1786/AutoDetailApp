@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Combo Pricing Visual UI — Session 13 — 2026-02-25
+
+### Enhancement: Combo Pricing Strikethrough & Savings Badges
+- Add-on cards now show strikethrough original price + green combo price + "Save $XX" badge when `combo_price` is set and less than standalone price
+- Add-ons without combo pricing (NULL or equal to standalone) display unchanged
+- Sticky price footer shows per-addon savings: "(save $XX)" label + strikethrough original price next to each combo-priced addon
+- No state, interface, or API changes — purely visual presentation layer
+- File changed: `src/components/booking/step-configure.tsx`
+
+---
+
 ## Seed Add-On Suggestions & Combo Pricing — Session 12 — 2026-02-25
 
 ### Seed: 28 Add-On Suggestion Rows with Combo Pricing
