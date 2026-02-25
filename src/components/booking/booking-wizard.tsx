@@ -6,9 +6,7 @@ import { cn } from '@/lib/utils/cn';
 import { StepIndicator } from './step-indicator';
 import { StepServiceSelect, type ConfigureResult } from './step-service-select';
 import { StepSchedule } from './step-schedule';
-import { StepCustomerInfo } from './step-customer-info';
-import { StepReview } from './step-review';
-import { StepPayment } from './step-payment';
+import { StepConfirmBook } from './step-confirm-book';
 import { BookingConfirmation } from './booking-confirmation';
 import { Button } from '@/components/ui/button';
 import type { BookableCategory, BookableService, BusinessHours, BookingConfig, RebookData } from '@/lib/data/booking';
@@ -103,12 +101,10 @@ interface ConfirmationData {
   customerEmail: string | null;
 }
 
-// Step mapping (after merging service select + configure):
+// Step mapping (3-step wizard):
 // Step 1: Service Select + Configure
 // Step 2: Schedule
-// Step 3: Customer Info
-// Step 4: Review
-// Step 5: Payment (optional)
+// Step 3: Confirm & Book (customer info + order summary + coupon/loyalty + payment)
 
 export function BookingWizard({
   categories,
@@ -198,7 +194,7 @@ export function BookingWizard({
     const defaultStep = rebookService ? 2 : 1;
 
     // If no URL step param or rebook mode, use defaults
-    if (!urlStep || isNaN(urlStep) || urlStep < 1 || urlStep > 5 || rebookData) {
+    if (!urlStep || isNaN(urlStep) || urlStep < 1 || urlStep > 3 || rebookData) {
       return { step: defaultStep, state: baseState };
     }
 
@@ -228,9 +224,9 @@ export function BookingWizard({
           return { step: 2, state: restoredState };
         }
 
-        // Step 3+: need config + date + time
+        // Step 3: need config + date + time
         if (urlDate && urlTime) {
-          return { step: Math.min(urlStep, 3), state: restoredState };
+          return { step: 3, state: restoredState };
         }
 
         // Have config but no date/time — go to step 2
@@ -421,12 +417,6 @@ export function BookingWizard({
     goToStep(targetStep);
   }
 
-  // --- Edit from Review step ---
-  function handleEditFromReview(targetStep: number) {
-    setEditEntryStep(targetStep);
-    goToStep(targetStep);
-  }
-
   // If booking confirmed, show confirmation screen
   if (confirmation) {
     return (
@@ -477,74 +467,39 @@ export function BookingWizard({
       ...state,
       service,
       config,
-      // When editing from review, preserve date/time; otherwise reset
+      // When editing from step 3, preserve date/time; otherwise reset
       date: editEntryStep !== null ? state.date : null,
       time: editEntryStep !== null ? state.time : null,
     };
     setState(newState);
 
     if (editEntryStep !== null) {
-      // Editing from review — go back to review
+      // Editing from step 3 — go back to step 3
       setEditEntryStep(null);
-      goToStep(4, newState);
+      goToStep(3, newState);
     } else {
       goToStep(2, newState);
     }
   }
 
-  // Step 2: Schedule
-  function handleScheduleContinue(date: string, time: string) {
+  // Step 2: Schedule → advance to Step 3
+  // Fetch customer check / coupons / loyalty data before entering step 3
+  async function handleScheduleContinue(date: string, time: string) {
     const newState = { ...state, date, time };
     setState(newState);
+
     if (editEntryStep !== null) {
       setEditEntryStep(null);
-      goToStep(4, newState);
-    } else {
       goToStep(3, newState);
+      return;
     }
-  }
 
-  // Step 3: Customer info
-  async function handleCustomerContinue(
-    customer: BookingCustomerInput,
-    vehicle: BookingVehicleInput
-  ) {
-    setState((prev) => ({ ...prev, customer, vehicle }));
-
-    if (!isPortal) {
-      try {
-        const res = await fetch('/api/book/check-customer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: customer.phone,
-            email: customer.email,
-            service_id: state.service?.id,
-            addon_ids: state.config?.addons?.map((a) => a.service_id) || [],
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setState((prev) => ({
-            ...prev,
-            isExistingCustomer: data.isExisting,
-            availableCoupons: data.availableCoupons || [],
-          }));
-        }
-      } catch (err) {
-        console.error('Failed to check customer:', err);
-        setState((prev) => ({
-          ...prev,
-          isExistingCustomer: false,
-          availableCoupons: [],
-        }));
-      }
-    } else {
+    // Fetch customer data for step 3
+    if (isPortal) {
       try {
         const couponParams = new URLSearchParams();
-        if (state.service?.id) couponParams.set('service_id', state.service.id);
-        const addonServiceIds = state.config?.addons?.map((a) => a.service_id) || [];
+        if (newState.service?.id) couponParams.set('service_id', newState.service.id);
+        const addonServiceIds = newState.config?.addons?.map((a) => a.service_id) || [];
         if (addonServiceIds.length > 0) couponParams.set('addon_ids', addonServiceIds.join(','));
         const couponUrl = `/api/customer/coupons${couponParams.toString() ? `?${couponParams.toString()}` : ''}`;
 
@@ -566,29 +521,60 @@ export function BookingWizard({
           loyaltyBalance = data.balance || 0;
         }
 
-        setState((prev) => ({
-          ...prev,
+        const updatedState = {
+          ...newState,
           availableCoupons: coupons,
           loyaltyPointsBalance: loyaltyBalance,
-        }));
+        };
+        setState(updatedState);
+        goToStep(3, updatedState);
       } catch (err) {
         console.error('Failed to fetch customer data:', err);
+        goToStep(3, newState);
+      }
+    } else {
+      // For guest bookings, customer check happens via phone lookup inside step-confirm-book
+      // We also do check-customer when they fill in phone/email on the confirm page
+      goToStep(3, newState);
+    }
+  }
+
+  // Step 3: Confirm & Book — receives customer + vehicle + optional paymentIntentId
+  async function handleConfirmBook(
+    customer: BookingCustomerInput,
+    vehicle: BookingVehicleInput,
+    paymentIntentId?: string
+  ) {
+    // Update state with customer/vehicle
+    const updatedState = { ...state, customer, vehicle, paymentIntentId: paymentIntentId ?? null };
+    setState(updatedState);
+
+    // If guest booking and we haven't checked customer yet, do it now for the API call
+    if (!isPortal && !state.isExistingCustomer) {
+      try {
+        const res = await fetch('/api/book/check-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: customer.phone,
+            email: customer.email,
+            service_id: state.service?.id,
+            addon_ids: state.config?.addons?.map((a) => a.service_id) || [],
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          updatedState.isExistingCustomer = data.isExisting;
+          setState((prev) => ({ ...prev, isExistingCustomer: data.isExisting }));
+        }
+      } catch {
+        // Continue even if check fails
       }
     }
 
-    setEditEntryStep(null);
-    goToStep(4, { ...state, customer, vehicle, date: state.date, time: state.time });
-  }
-
-  // Step 4: Review
-  function handleReviewContinue() {
-    if (state.paymentOption === 'pay_on_site') {
-      handleConfirm();
-    } else if (requirePayment) {
-      goToStep(5);
-    } else {
-      handleConfirm();
-    }
+    // Submit booking
+    await handleConfirm(customer, vehicle, paymentIntentId);
   }
 
   function handlePaymentOptionChange(option: 'deposit' | 'pay_on_site') {
@@ -637,16 +623,14 @@ export function BookingWizard({
     });
   }
 
-  // Step 5: Payment success
-  function handlePaymentSuccess(paymentIntentId: string) {
-    setState((prev) => ({ ...prev, paymentIntentId }));
-    handleConfirm(paymentIntentId);
-  }
-
   // Final: Confirm booking
-  async function handleConfirm(paymentIntentId?: string) {
-    const { service, config, date, time, customer, vehicle, paymentOption, appliedCoupon, loyaltyPointsToUse } = state;
-    if (!service || !config || !date || !time || !customer || !vehicle) {
+  async function handleConfirm(
+    customer: BookingCustomerInput,
+    vehicle: BookingVehicleInput,
+    paymentIntentId?: string
+  ) {
+    const { service, config, date, time, paymentOption, appliedCoupon, loyaltyPointsToUse } = state;
+    if (!service || !config || !date || !time) {
       throw new Error('Missing booking data');
     }
 
@@ -758,11 +742,22 @@ export function BookingWizard({
     return null;
   }
 
+  // Build order summary for step 2
+  const orderSummary = state.service && state.config ? {
+    serviceName: state.service.name,
+    tierName: state.config.tier_label ?? state.config.tier_name ?? null,
+    price: state.config.price,
+    addons: (state.config.addons ?? []).map(a => ({ name: a.name, price: a.price })),
+    mobileSurcharge: state.config.mobile_surcharge ?? 0,
+    total: (state.config.price) +
+      (state.config.addons ?? []).reduce((s, a) => s + a.price, 0) +
+      (state.config.mobile_surcharge ?? 0),
+  } : undefined;
+
   return (
-    <div className={cn('mx-auto', step === 1 ? 'max-w-6xl' : 'max-w-3xl')}>
+    <div className={cn('mx-auto', step === 1 ? 'max-w-6xl' : 'max-w-5xl')}>
       <StepIndicator
         currentStep={step}
-        requirePayment={requirePayment}
         onStepClick={handleStepClick}
       />
 
@@ -782,10 +777,10 @@ export function BookingWizard({
             <div className="mt-4">
               <Button
                 variant="outline"
-                onClick={() => { setEditEntryStep(null); goToStep(4); }}
+                onClick={() => { setEditEntryStep(null); goToStep(3); }}
                 className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
               >
-                Back to Review
+                Back to Booking
               </Button>
             </div>
           )}
@@ -800,158 +795,66 @@ export function BookingWizard({
           initialDate={state.date}
           initialTime={state.time}
           onContinue={handleScheduleContinue}
-          onBack={() => editEntryStep === 2 ? (setEditEntryStep(null), goToStep(4)) : goToStep(1)}
+          onBack={() => editEntryStep === 2 ? (setEditEntryStep(null), goToStep(3)) : goToStep(1)}
+          orderSummary={orderSummary}
         />
       )}
 
-      {step === 3 && (
-        <StepCustomerInfo
-          initialCustomer={
-            state.customer ??
-            (customerData
-              ? {
-                  first_name: customerData.customer.first_name,
-                  last_name: customerData.customer.last_name,
-                  phone: customerData.customer.phone ?? '',
-                  email: customerData.customer.email ?? '',
-                }
-              : rebookData
-                ? {
-                    first_name: rebookData.customer.first_name,
-                    last_name: rebookData.customer.last_name,
-                    phone: rebookData.customer.phone ?? '',
-                    email: rebookData.customer.email ?? '',
-                  }
-                : {})
-          }
-          initialVehicle={
-            state.vehicle ??
-            (rebookData?.vehicle
-              ? {
-                  vehicle_type: rebookData.vehicle.vehicle_type,
-                  size_class: rebookData.vehicle.size_class,
-                  year: rebookData.vehicle.year,
-                  make: rebookData.vehicle.make,
-                  model: rebookData.vehicle.model,
-                  color: rebookData.vehicle.color,
-                }
-              : {})
-          }
-          requireSizeClass={
-            state.service?.pricing_model === 'vehicle_size' ||
-            (state.service?.pricing_model === 'scope' &&
-              state.config?.size_class !== null &&
-              state.config?.size_class !== undefined)
-          }
-          initialSizeClass={state.config?.size_class ?? null}
-          savedVehicles={customerData?.vehicles ?? []}
-          onContinue={handleCustomerContinue}
-          onBack={() => editEntryStep === 3 ? (setEditEntryStep(null), goToStep(4)) : goToStep(2)}
-          defaultVehicleCategory={state.selectedCategory}
-          selectedService={state.service}
-          onBackToServices={() => { goToStep(1); }}
-        />
-      )}
-
-      {step === 4 &&
+      {step === 3 &&
         state.service &&
         state.config &&
         state.date &&
-        state.time &&
-        state.customer &&
-        state.vehicle && (
-          <StepReview
+        state.time && (
+          <StepConfirmBook
             serviceName={state.service.name}
             serviceId={state.service.id}
             tierName={state.config.tier_label ?? state.config.tier_name}
             price={state.config.price}
-            date={state.date}
-            time={state.time}
             durationMinutes={totalDuration}
             isMobile={state.config.is_mobile}
             mobileAddress={state.config.mobile_address}
             mobileSurcharge={state.config.mobile_surcharge}
-            customer={state.customer}
-            vehicle={state.vehicle}
             addons={state.config.addons as BookingAddonInput[]}
-            couponCode={couponCode ?? null}
-            onConfirm={handleReviewContinue}
-            onBack={() => goToStep(3)}
-            confirmButtonText={
-              state.paymentOption === 'pay_on_site'
-                ? 'Confirm Booking'
-                : requirePayment
-                  ? 'Continue to Payment'
-                  : 'Confirm Booking'
+            date={state.date}
+            time={state.time}
+            initialCustomer={
+              state.customer ??
+              (customerData
+                ? {
+                    first_name: customerData.customer.first_name,
+                    last_name: customerData.customer.last_name,
+                    phone: customerData.customer.phone ?? '',
+                    email: customerData.customer.email ?? '',
+                  }
+                : rebookData
+                  ? {
+                      first_name: rebookData.customer.first_name,
+                      last_name: rebookData.customer.last_name,
+                      phone: rebookData.customer.phone ?? '',
+                      email: rebookData.customer.email ?? '',
+                    }
+                  : {})
             }
-            isPortal={isPortal}
-            isExistingCustomer={state.isExistingCustomer ?? false}
-            paymentOption={state.paymentOption}
-            onPaymentOptionChange={handlePaymentOptionChange}
+            couponCode={couponCode ?? null}
             appliedCoupon={state.appliedCoupon}
             onCouponApply={handleCouponApply}
             availableCoupons={state.availableCoupons}
-            requirePayment={requirePayment}
+            isPortal={isPortal}
+            isExistingCustomer={state.isExistingCustomer ?? false}
             loyaltyPointsBalance={state.loyaltyPointsBalance}
             loyaltyPointsToUse={state.loyaltyPointsToUse}
             onLoyaltyPointsChange={handleLoyaltyPointsChange}
-            onEditService={() => handleEditFromReview(1)}
-            onEditSchedule={() => handleEditFromReview(2)}
-            onEditInfo={() => handleEditFromReview(3)}
+            requirePayment={requirePayment}
+            paymentOption={state.paymentOption}
+            onPaymentOptionChange={handlePaymentOptionChange}
+            onConfirm={handleConfirmBook}
+            onBack={() => goToStep(2)}
             autoApplyCouponOnMount={!!couponCode && !urlCouponAttempted}
             onCouponAutoApplyAttempted={() => setUrlCouponAttempted(true)}
+            vehicleCategory={state.selectedCategory}
+            selectedSizeClass={state.config.size_class ?? null}
           />
         )}
-
-      {step === 5 && state.config && (() => {
-          const loyaltyDiscount = state.loyaltyPointsToUse * 0.05;
-
-          const grandTotal = Math.max(0,
-            state.config.price +
-            state.config.addons.reduce((sum, a) => sum + a.price, 0) +
-            (state.config.mobile_surcharge ?? 0) -
-            (state.appliedCoupon?.discount ?? 0) -
-            loyaltyDiscount
-          );
-
-          const STRIPE_MINIMUM = 0.50;
-          if (grandTotal < STRIPE_MINIMUM) {
-            return (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-                  <p className="text-sm font-medium text-green-400">
-                    {grandTotal <= 0
-                      ? 'Your discounts cover the full amount - no payment required!'
-                      : `Remaining balance of $${grandTotal.toFixed(2)} is below minimum - no payment required!`}
-                  </p>
-                </div>
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => goToStep(4)} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
-                    Back
-                  </Button>
-                  <Button onClick={() => handleConfirm()} className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
-                    Complete Booking
-                  </Button>
-                </div>
-              </div>
-            );
-          }
-
-          const isFullPayment = grandTotal < 100;
-          const paymentAmount = isFullPayment ? grandTotal : 50;
-          const remainingAmount = grandTotal - paymentAmount;
-
-          return (
-            <StepPayment
-              amount={paymentAmount}
-              totalAmount={grandTotal}
-              remainingAmount={remainingAmount}
-              isDeposit={!isFullPayment}
-              onPaymentSuccess={handlePaymentSuccess}
-              onBack={() => goToStep(4)}
-            />
-          );
-        })()}
     </div>
   );
 }

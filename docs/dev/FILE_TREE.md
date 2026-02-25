@@ -840,11 +840,12 @@ src/components/account/vehicle-form-dialog.tsx
 ```
 src/components/booking/booking-confirmation.tsx
 src/components/booking/booking-wizard.tsx
-src/components/booking/step-configure.tsx
-src/components/booking/step-customer-info.tsx
+src/components/booking/step-configure.tsx          (deprecated — absorbed by step-service-select)
+src/components/booking/step-confirm-book.tsx        (merged confirm & book page — Step 3)
+src/components/booking/step-customer-info.tsx       (deprecated — contact fields moved to step-confirm-book)
 src/components/booking/step-indicator.tsx
 src/components/booking/step-payment.tsx
-src/components/booking/step-review.tsx
+src/components/booking/step-review.tsx              (deprecated — moved to step-confirm-book)
 src/components/booking/step-schedule.tsx
 src/components/booking/step-service-select.tsx
 ```

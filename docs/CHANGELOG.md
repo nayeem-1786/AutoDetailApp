@@ -4,6 +4,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Booking Wizard Steps 2-3 Redesign — Session 14B — 2026-02-25
+
+### Feature: Merge Steps 2-6 into Steps 2-3 with Unified Confirm & Book Page
+
+**Step Indicator (3 steps)**
+- Rewrote `step-indicator.tsx` to always show exactly 3 steps: Service, Schedule, Confirm
+- Removed `DEFAULT_STEPS`, `STEPS_WITH_PAYMENT`, and `requirePayment` prop entirely
+- Desktop: 3 numbered circles with labels + connecting lines
+- Mobile: "Step X of 3: Label" + 3 dots
+
+**Step 2 — "Pick Your Time" (two-column desktop)**
+- Added `orderSummary` prop to `step-schedule.tsx`
+- Desktop (lg:): two-column layout — calendar + time slots on left, sticky order summary on right
+- Mobile: single column (order summary hidden — same as before)
+- Calendar/time grid changed from `lg:grid-cols-2` to `md:grid-cols-2` for better responsive behavior
+
+**Step 3 — "Confirm & Book" (new file)**
+- Created `step-confirm-book.tsx` merging functionality from:
+  - `step-customer-info.tsx` (contact fields only — first name, last name, phone, email + consent)
+  - `step-review.tsx` (order summary, coupon/loyalty, payment options, terms)
+  - `step-payment.tsx` (Stripe Elements inline)
+- **No vehicle fields** — vehicle type determined by category selected in Step 1
+- **Collapsible order summary on mobile**: compact bar with total + chevron, tapping expands line items
+- **Desktop two-column**: customer info + coupon/loyalty + payment on left, sticky order summary on right
+- **Single CTA**: "Book My Detail" (or "Pay $XX & Book My Detail" when payment required)
+- **Inline Stripe**: when payment is needed and deposit selected, Stripe Elements render inside the page (not a separate step)
+- Preserved all: coupon validation, available coupons display, loyalty points slider, payment option logic, phone lookup + welcome back notification, consent checkboxes, terms agreement, cancellation fee feature flag
+
+**Booking Wizard Updates**
+- Removed `StepCustomerInfo` and `StepReview` imports from `booking-wizard.tsx`
+- Step 2 `handleScheduleContinue` now fetches customer coupons/loyalty data before advancing to step 3
+- New `handleConfirmBook` receives customer + vehicle + optional paymentIntentId from step 3
+- Container width changed from `max-w-3xl` to `max-w-5xl` for steps 2-3 (two-column layouts)
+- URL state restoration max step capped at 3
+- "Back to Review" button renamed to "Back to Booking"
+
+**Deprecated files** (no longer imported):
+- `step-customer-info.tsx` — contact fields moved to step-confirm-book
+- `step-review.tsx` — order summary + coupon + loyalty + payment options moved to step-confirm-book
+
+### Files Changed
+- `src/components/booking/step-indicator.tsx` — rewritten for 3 steps
+- `src/components/booking/step-schedule.tsx` — added orderSummary prop + two-column desktop
+- `src/components/booking/step-confirm-book.tsx` — **NEW** (merged confirm & book page)
+- `src/components/booking/booking-wizard.tsx` — replaced steps 3-5 with single step 3
+
+---
+
 ## Booking Wizard Step 1 Redesign — Session 14 — 2026-02-25
 
 ### Feature: Merge Service Select + Configure into Step 1
