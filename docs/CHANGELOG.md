@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Admin Vehicle Categories Tab — Session 7 — 2026-02-24
+
+### Vehicle Categories Tab (`src/app/admin/catalog/categories/page.tsx`)
+- Added third "Vehicle Categories" tab to Admin > Catalog > Categories page
+- Displays 5 fixed vehicle categories as horizontal cards with image thumbnails
+- Each card shows: image (or placeholder Lucide icon), display name, system key badge, description, display order, active/inactive status badge, edit button
+- Inactive categories rendered with dimmed opacity for visual distinction
+- No create or delete actions — categories are fixed
+
+### Vehicle Category Edit Dialog
+- Image upload section: preview, upload button (JPEG/PNG/WebP, 5MB max), remove button
+- Image requirements hint: "Recommended: 800x600px, landscape orientation"
+- Read-only key badge with "System identifier — cannot be changed" note
+- Editable fields: Display Name (required), Description, Image Alt Text, Active toggle (Switch), Display Order
+- Save calls PATCH `/api/admin/vehicle-categories/[id]`
+- Image upload/remove calls POST/DELETE `/api/admin/vehicle-categories/[id]/image`
+- Uses `adminFetch()` for session expiry handling
+
+---
+
 ## Vehicle Categories Table, API Routes & Bug Fixes — Session 6 — 2026-02-24
 
 ### Database: `vehicle_categories` Table

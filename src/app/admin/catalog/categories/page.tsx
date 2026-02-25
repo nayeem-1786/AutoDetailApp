@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, type ComponentType } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 import { productCategorySchema, type ProductCategoryInput } from '@/lib/utils/validation';
-import type { ProductCategory, ServiceCategory } from '@/lib/supabase/types';
+import type { ProductCategory, ServiceCategory, VehicleCategoryRecord } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -25,10 +27,19 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Car, Bike, Truck, Ship, Plane, Upload, ImageOff } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
-type CategoryType = 'product' | 'service';
+type CategoryType = 'product' | 'service' | 'vehicle';
+
+// Placeholder icons for vehicle categories without images
+const VEHICLE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
+  automobile: Car,
+  motorcycle: Bike,
+  rv: Truck,
+  boat: Ship,
+  aircraft: Plane,
+};
 
 // Service category form uses the same shape as product category
 const serviceCategorySchema = productCategorySchema;
@@ -42,7 +53,23 @@ export default function CategoriesPage() {
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [productCounts, setProductCounts] = useState<Record<string, number>>({});
   const [serviceCounts, setServiceCounts] = useState<Record<string, number>>({});
+  const [vehicleCategories, setVehicleCategories] = useState<VehicleCategoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Vehicle edit dialog state
+  const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<VehicleCategoryRecord | null>(null);
+  const [vehicleForm, setVehicleForm] = useState({
+    display_name: '',
+    description: '',
+    image_alt: '',
+    is_active: true,
+    display_order: 0,
+  });
+  const [savingVehicle, setSavingVehicle] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [removingImage, setRemovingImage] = useState(false);
+  const vehicleFileRef = useRef<HTMLInputElement>(null);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -131,6 +158,17 @@ export default function CategoriesPage() {
         }
       }
       setServiceCounts(sMap);
+
+      // Fetch vehicle categories via admin API
+      try {
+        const vcRes = await adminFetch('/api/admin/vehicle-categories');
+        const vcJson = await vcRes.json();
+        if (vcRes.ok && vcJson.data) {
+          setVehicleCategories(vcJson.data);
+        }
+      } catch (vcErr) {
+        console.error('Failed to load vehicle categories:', vcErr);
+      }
     } catch (err) {
       console.error('Failed to load categories:', err);
       toast.error('Failed to load categories');
@@ -244,6 +282,114 @@ export default function CategoriesPage() {
     }
   }
 
+  // Vehicle category functions
+  function openVehicleEdit(vc: VehicleCategoryRecord) {
+    setEditingVehicle(vc);
+    setVehicleForm({
+      display_name: vc.display_name,
+      description: vc.description || '',
+      image_alt: vc.image_alt || '',
+      is_active: vc.is_active,
+      display_order: vc.display_order,
+    });
+    setVehicleDialogOpen(true);
+  }
+
+  async function saveVehicle() {
+    if (!editingVehicle) return;
+    if (!vehicleForm.display_name.trim()) {
+      toast.error('Display name is required');
+      return;
+    }
+
+    setSavingVehicle(true);
+    try {
+      const res = await adminFetch(`/api/admin/vehicle-categories/${editingVehicle.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: vehicleForm.display_name.trim(),
+          description: vehicleForm.description.trim() || null,
+          image_alt: vehicleForm.image_alt.trim() || null,
+          is_active: vehicleForm.is_active,
+          display_order: vehicleForm.display_order,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to save');
+
+      toast.success('Vehicle category updated');
+      setVehicleDialogOpen(false);
+      setEditingVehicle(null);
+      await loadData();
+    } catch (err) {
+      console.error('Save vehicle category error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to save vehicle category');
+    } finally {
+      setSavingVehicle(false);
+    }
+  }
+
+  async function handleVehicleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!editingVehicle || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Only JPEG, PNG, and WebP files are supported');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File must be under 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await adminFetch(`/api/admin/vehicle-categories/${editingVehicle.id}/image`, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Upload failed');
+
+      // Update the editing vehicle with the new image
+      setEditingVehicle(json.data);
+      toast.success('Image uploaded');
+      await loadData();
+    } catch (err) {
+      console.error('Image upload error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+      // Reset file input
+      if (vehicleFileRef.current) vehicleFileRef.current.value = '';
+    }
+  }
+
+  async function handleVehicleImageRemove() {
+    if (!editingVehicle) return;
+    setRemovingImage(true);
+    try {
+      const res = await adminFetch(`/api/admin/vehicle-categories/${editingVehicle.id}/image`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to remove image');
+
+      setEditingVehicle(json.data);
+      toast.success('Image removed');
+      await loadData();
+    } catch (err) {
+      console.error('Image remove error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to remove image');
+    } finally {
+      setRemovingImage(false);
+    }
+  }
+
   function makeCategoryColumns(type: CategoryType): ColumnDef<ProductCategory | ServiceCategory, unknown>[] {
     const counts = type === 'product' ? productCounts : serviceCounts;
     const itemLabel = type === 'product' ? 'Products' : 'Services';
@@ -330,7 +476,7 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Categories"
-        description="Manage product and service categories"
+        description="Manage product, service, and vehicle categories"
       />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CategoryType)}>
@@ -340,6 +486,9 @@ export default function CategoriesPage() {
           </TabsTrigger>
           <TabsTrigger value="service">
             Service Categories ({serviceCategories.length})
+          </TabsTrigger>
+          <TabsTrigger value="vehicle">
+            Vehicle Categories ({vehicleCategories.length})
           </TabsTrigger>
         </TabsList>
 
@@ -384,7 +533,211 @@ export default function CategoriesPage() {
             }
           />
         </TabsContent>
+
+        <TabsContent value="vehicle">
+          <p className="mb-4 text-sm text-ui-text-muted">
+            These 5 vehicle categories are fixed and control what appears in the booking flow.
+            Edit display settings, images, and active status below.
+          </p>
+          <div className="space-y-3">
+            {vehicleCategories.map((vc) => {
+              const IconComponent = VEHICLE_ICONS[vc.key] || Car;
+              return (
+                <div
+                  key={vc.id}
+                  className={`flex items-center gap-4 rounded-lg border border-ui-border bg-ui-bg p-4 transition-opacity ${
+                    !vc.is_active ? 'opacity-50' : ''
+                  }`}
+                >
+                  {/* Image / Placeholder */}
+                  <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-ui-bg-muted">
+                    {vc.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={vc.image_url}
+                        alt={vc.image_alt || vc.display_name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <IconComponent className="h-8 w-8 text-ui-text-muted" />
+                    )}
+                  </div>
+
+                  {/* Details */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">{vc.display_name}</span>
+                      <Badge variant="secondary">
+                        <span className="font-mono text-[10px]">{vc.key}</span>
+                      </Badge>
+                    </div>
+                    {vc.description && (
+                      <p className="mt-0.5 text-sm text-ui-text-muted truncate">{vc.description}</p>
+                    )}
+                  </div>
+
+                  {/* Order */}
+                  <div className="hidden sm:block text-sm text-ui-text-muted">
+                    Order: {vc.display_order}
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    {vc.is_active ? (
+                      <Badge variant="success">Active</Badge>
+                    ) : (
+                      <Badge variant="secondary">Inactive</Badge>
+                    )}
+                  </div>
+
+                  {/* Edit */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openVehicleEdit(vc)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {/* Vehicle Category Edit Dialog */}
+      <Dialog open={vehicleDialogOpen} onOpenChange={setVehicleDialogOpen}>
+        <DialogClose onClose={() => setVehicleDialogOpen(false)} />
+        <DialogHeader>
+          <DialogTitle>Edit Vehicle Category</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          <div className="space-y-4">
+            {/* Image Upload Section */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ui-text">Image</label>
+              <div className="flex items-start gap-4">
+                <div className="flex h-24 w-36 shrink-0 items-center justify-center overflow-hidden rounded-md border border-ui-border bg-ui-bg-muted">
+                  {editingVehicle?.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={editingVehicle.image_url}
+                      alt={editingVehicle.image_alt || editingVehicle.display_name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <ImageOff className="h-8 w-8 text-ui-text-muted" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input
+                    ref={vehicleFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleVehicleImageUpload}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => vehicleFileRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                  </Button>
+                  {editingVehicle?.image_url && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleVehicleImageRemove}
+                      disabled={removingImage}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      {removingImage ? 'Removing...' : 'Remove Image'}
+                    </Button>
+                  )}
+                  <p className="text-xs text-ui-text-muted">Recommended: 800x600px, landscape orientation</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Key (read-only) */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ui-text">Key</label>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">
+                  <span className="font-mono">{editingVehicle?.key}</span>
+                </Badge>
+                <span className="text-xs text-ui-text-muted">System identifier — cannot be changed</span>
+              </div>
+            </div>
+
+            {/* Display Name */}
+            <FormField label="Display Name" required htmlFor="vc-name">
+              <Input
+                id="vc-name"
+                value={vehicleForm.display_name}
+                onChange={(e) => setVehicleForm((f) => ({ ...f, display_name: e.target.value }))}
+                placeholder="e.g. Automobile"
+              />
+            </FormField>
+
+            {/* Description */}
+            <FormField label="Description" htmlFor="vc-desc">
+              <Textarea
+                id="vc-desc"
+                value={vehicleForm.description}
+                onChange={(e) => setVehicleForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="e.g. Cars, trucks, SUVs, and vans"
+                rows={2}
+              />
+            </FormField>
+
+            {/* Image Alt Text */}
+            <FormField label="Image Alt Text" htmlFor="vc-alt" description="Accessibility text for the image">
+              <Input
+                id="vc-alt"
+                value={vehicleForm.image_alt}
+                onChange={(e) => setVehicleForm((f) => ({ ...f, image_alt: e.target.value }))}
+                placeholder="e.g. Automobile category"
+              />
+            </FormField>
+
+            {/* Active Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-ui-text">Active</label>
+                <p className="text-xs text-ui-text-muted">Controls visibility in the booking flow</p>
+              </div>
+              <Switch
+                checked={vehicleForm.is_active}
+                onCheckedChange={(checked) => setVehicleForm((f) => ({ ...f, is_active: checked }))}
+              />
+            </div>
+
+            {/* Display Order */}
+            <FormField label="Display Order" htmlFor="vc-order" description="Lower numbers appear first">
+              <Input
+                id="vc-order"
+                type="number"
+                min="0"
+                value={vehicleForm.display_order}
+                onChange={(e) => setVehicleForm((f) => ({ ...f, display_order: parseInt(e.target.value) || 0 }))}
+              />
+            </FormField>
+          </div>
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setVehicleDialogOpen(false)} disabled={savingVehicle}>
+            Cancel
+          </Button>
+          <Button onClick={saveVehicle} disabled={savingVehicle}>
+            {savingVehicle ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </Dialog>
 
       {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
