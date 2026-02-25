@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { formatCurrency, formatDate, formatTime } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatTime, formatPhone } from '@/lib/utils/format';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { isSpecialtyCategory, type VehicleCategory } from '@/lib/utils/vehicle-categories';
@@ -305,7 +305,7 @@ export function StepConfirmBook({
     const customer: BookingCustomerInput = {
       first_name: customerData.customer.first_name,
       last_name: customerData.customer.last_name,
-      phone: customerData.customer.phone,
+      phone: formatPhone(customerData.customer.phone),
       email: customerData.customer.email,
       sms_consent: true,
       email_consent: true,
@@ -334,7 +334,7 @@ export function StepConfirmBook({
     const customer: BookingCustomerInput = {
       first_name: customerData.customer.first_name,
       last_name: customerData.customer.last_name,
-      phone: customerData.customer.phone,
+      phone: formatPhone(customerData.customer.phone),
       email: customerData.customer.email,
       sms_consent: true,
       email_consent: true,
