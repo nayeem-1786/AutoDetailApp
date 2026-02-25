@@ -4,6 +4,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Booking Category Picker & Service Filtering — Session 8 — 2026-02-24
+
+### Vehicle Category Picker in Booking Step 1
+- Added 5 image cards (automobile, motorcycle, rv, boat, aircraft) above the service list at `/book` Step 1
+- Cards show category image with dark gradient overlay and white text; fallback Lucide icons for categories without images
+- Active card highlighted with lime border/ring and checkmark badge
+- Automobile pre-selected by default
+- Desktop: 5 cards in a row (flex-1 equal width). Mobile: horizontal scroll with fixed-width cards
+- Category selection resets service, config, date/time — stays on Step 1
+
+### Service Filtering by Vehicle Compatibility
+- Services filtered client-side using `vehicle_compatibility` JSONB array on each service
+- `categoryToCompatibilityKey()` maps vehicle categories to compatibility keys (automobile → 'standard', others → category name)
+- Empty categories auto-hidden when no compatible services exist
+- Active service category tab resets to first available when filtered list changes
+- Empty state message when no services available for selected vehicle type
+
+### Category Pre-fill at Step 4 (Customer/Vehicle Info)
+- Vehicle category dropdown at Step 4 pre-filled from Step 1 category picker selection
+- Vehicle type field auto-set to match category (e.g., motorcycle → 'motorcycle', automobile → 'standard')
+
+### Compatibility Warning Dialog at Step 4
+- When customer's vehicle category doesn't match the selected service's `vehicle_compatibility`, a warning dialog appears before proceeding
+- Dialog shows: service name, compatible vehicle types, customer's vehicle category
+- Two actions: "Go Back to Services" (returns to Step 1) and "Continue Anyway" (proceeds to Step 5)
+
+### Saved Vehicle Category Badges
+- Saved vehicle pills for logged-in customers now show category label for non-matching vehicles
+- Non-matching saved vehicles rendered with reduced opacity for visual distinction
+
+### URL State Sync
+- `?category=` URL param persists selected vehicle category across refresh/sharing
+- Only added when not the default ('automobile')
+
+### Customer Vehicle Query Updated
+- Vehicle queries for logged-in customers and campaign deep-links now include `vehicle_category` and `specialty_tier` fields
+- `CustomerDataProp` interface updated to include these fields
+
+---
+
 ## Admin Vehicle Categories Tab — Session 7 — 2026-02-24
 
 ### Vehicle Categories Tab (`src/app/admin/catalog/categories/page.tsx`)

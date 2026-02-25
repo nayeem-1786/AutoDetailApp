@@ -1,28 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { Clock, Truck, Check, Car, Sparkles, Shield, Paintbrush, CheckCircle2 } from 'lucide-react';
+import { Clock, Truck, Check, Car, Sparkles, Shield, Paintbrush, Bike, Ship, Plane } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { categoryToCompatibilityKey, VEHICLE_CATEGORY_LABELS, type VehicleCategory } from '@/lib/utils/vehicle-categories';
+import { type VehicleCategory } from '@/lib/utils/vehicle-categories';
 import type { BookableCategory, BookableService } from '@/lib/data/booking';
+import type { VehicleCategoryRecord } from '@/lib/supabase/types';
+
+// Fallback icons for categories without images
+const CATEGORY_FALLBACK_ICONS: Record<string, typeof Car> = {
+  automobile: Car,
+  motorcycle: Bike,
+  rv: Truck,
+  boat: Ship,
+  aircraft: Plane,
+};
+
+const CATEGORY_FALLBACK_COLORS: Record<string, string> = {
+  automobile: 'bg-blue-600',
+  motorcycle: 'bg-orange-600',
+  rv: 'bg-emerald-600',
+  boat: 'bg-cyan-600',
+  aircraft: 'bg-violet-600',
+};
 
 interface StepServiceSelectProps {
   categories: BookableCategory[];
   selectedServiceId: string | null;
   onSelect: (service: BookableService) => void;
-  /** Vehicle category for compatibility badges (available when editing from review) */
   vehicleCategory?: VehicleCategory | null;
+  vehicleCategories?: VehicleCategoryRecord[];
+  selectedCategoryKey?: string;
+  onCategoryChange?: (key: string) => void;
 }
 
 export function StepServiceSelect({
   categories,
   selectedServiceId,
   onSelect,
-  vehicleCategory,
+  vehicleCategories = [],
+  selectedCategoryKey = 'automobile',
+  onCategoryChange,
 }: StepServiceSelectProps) {
   const [activeCategory, setActiveCategory] = useState(
     () => {
@@ -36,10 +58,17 @@ export function StepServiceSelect({
     }
   );
 
+  // Reset active service category tab when filtered categories change
+  useEffect(() => {
+    const hasActive = categories.some((c) => c.category.id === activeCategory);
+    if (!hasActive && categories.length > 0) {
+      setActiveCategory(categories[0].category.id);
+    }
+  }, [categories, activeCategory]);
+
   const [pendingServiceId, setPendingServiceId] = useState<string | null>(selectedServiceId);
 
   function handleCardClick(service: BookableService) {
-    // Toggle selection — clicking same service deselects
     if (pendingServiceId === service.id) {
       setPendingServiceId(null);
     } else {
@@ -49,7 +78,6 @@ export function StepServiceSelect({
 
   function handleContinue() {
     if (!pendingServiceId) return;
-    // Find the service across all categories
     for (const cat of categories) {
       const svc = cat.services.find((s) => s.id === pendingServiceId);
       if (svc) {
@@ -61,6 +89,70 @@ export function StepServiceSelect({
 
   return (
     <div>
+      {/* Vehicle Category Picker */}
+      {vehicleCategories.length > 0 && onCategoryChange && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-site-text">
+            What would you like detailed?
+          </h2>
+          <p className="mt-1 text-sm text-site-text-secondary">
+            Select your vehicle type to see available services.
+          </p>
+
+          {/* Desktop: 5 cards in a row. Mobile: horizontal scroll */}
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-2 sm:overflow-visible sm:pb-0">
+            {vehicleCategories.map((vc) => {
+              const isActive = selectedCategoryKey === vc.key;
+              const FallbackIcon = CATEGORY_FALLBACK_ICONS[vc.key] ?? Car;
+              const fallbackBg = CATEGORY_FALLBACK_COLORS[vc.key] ?? 'bg-gray-600';
+
+              return (
+                <button
+                  key={vc.id}
+                  type="button"
+                  onClick={() => onCategoryChange(vc.key)}
+                  className={cn(
+                    'relative flex-shrink-0 w-[130px] sm:w-0 sm:flex-1 overflow-hidden rounded-lg border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-lime',
+                    isActive
+                      ? 'border-lime ring-1 ring-lime shadow-lg shadow-lime/10'
+                      : 'border-site-border hover:border-site-text-muted/40'
+                  )}
+                >
+                  <div className="aspect-[4/3] relative">
+                    {vc.image_url ? (
+                      <img
+                        src={vc.image_url}
+                        alt={vc.image_alt || vc.display_name}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className={cn('absolute inset-0 flex items-center justify-center', fallbackBg)}>
+                        <FallbackIcon className="h-10 w-10 text-white/80" />
+                      </div>
+                    )}
+                    {/* Dark gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    {/* Label */}
+                    <div className="absolute inset-x-0 bottom-0 p-2">
+                      <span className="text-sm font-bold text-white drop-shadow-md">
+                        {vc.display_name}
+                      </span>
+                    </div>
+                    {/* Active checkmark */}
+                    {isActive && (
+                      <div className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary shadow">
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Service List */}
       <h2 className="text-xl font-semibold text-site-text">
         Choose Your Service
       </h2>
@@ -68,40 +160,47 @@ export function StepServiceSelect({
         Select the detailing service you&apos;d like to book.
       </p>
 
-      <Tabs
-        value={activeCategory}
-        onValueChange={setActiveCategory}
-        className="mt-6"
-      >
-        <TabsList className="flex-wrap bg-brand-surface dark:bg-brand-surface">
-          {categories.map((cat) => (
-            <TabsTrigger
-              key={cat.category.id}
-              value={cat.category.id}
-              className="data-[state=active]:bg-brand-grey data-[state=active]:text-site-text data-[state=active]:shadow-none text-site-text-muted hover:text-site-text dark:data-[state=active]:bg-brand-grey dark:data-[state=active]:text-site-text dark:text-site-text-muted dark:hover:text-site-text"
-            >
-              {cat.category.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {categories.length === 0 ? (
+        <div className="mt-6 rounded-lg border border-site-border bg-brand-surface p-8 text-center">
+          <p className="text-sm text-site-text-muted">
+            No services are available for this vehicle type yet. Please try a different category.
+          </p>
+        </div>
+      ) : (
+        <Tabs
+          value={activeCategory}
+          onValueChange={setActiveCategory}
+          className="mt-6"
+        >
+          <TabsList className="flex-wrap bg-brand-surface dark:bg-brand-surface">
+            {categories.map((cat) => (
+              <TabsTrigger
+                key={cat.category.id}
+                value={cat.category.id}
+                className="data-[state=active]:bg-brand-grey data-[state=active]:text-site-text data-[state=active]:shadow-none text-site-text-muted hover:text-site-text dark:data-[state=active]:bg-brand-grey dark:data-[state=active]:text-site-text dark:text-site-text-muted dark:hover:text-site-text"
+              >
+                {cat.category.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        {categories.map((cat) => (
-          <TabsContent key={cat.category.id} value={cat.category.id}>
-            <div className="space-y-3">
-              {cat.services.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  service={service}
-                  categoryName={cat.category.name}
-                  isSelected={service.id === pendingServiceId}
-                  onClick={() => handleCardClick(service)}
-                  vehicleCategory={vehicleCategory}
-                />
-              ))}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+          {categories.map((cat) => (
+            <TabsContent key={cat.category.id} value={cat.category.id}>
+              <div className="space-y-3">
+                {cat.services.map((service) => (
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    categoryName={cat.category.name}
+                    isSelected={service.id === pendingServiceId}
+                    onClick={() => handleCardClick(service)}
+                  />
+                ))}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
 
       <div className="mt-6 flex justify-end">
         <Button
@@ -125,33 +224,13 @@ function ServiceCard({
   categoryName,
   isSelected,
   onClick,
-  vehicleCategory,
 }: {
   service: BookableService;
   categoryName: string;
   isSelected: boolean;
   onClick: () => void;
-  vehicleCategory?: VehicleCategory | null;
 }) {
   const { priceLabel, originalPrice, isOnSale } = getServicePriceDisplay(service);
-
-  // Compatibility check when vehicle category is known
-  const compat = service.vehicle_compatibility;
-  const hasVehicle = !!vehicleCategory;
-  let isCompatible = true;
-  let compatLabel = '';
-
-  if (hasVehicle && compat && compat.length > 0) {
-    const compatKey = categoryToCompatibilityKey(vehicleCategory);
-    isCompatible = (compat as string[]).includes(compatKey);
-    if (!isCompatible) {
-      const labels = compat.map((key: string) => {
-        if (key === 'standard') return VEHICLE_CATEGORY_LABELS.automobile;
-        return VEHICLE_CATEGORY_LABELS[key as VehicleCategory] || key;
-      });
-      compatLabel = labels.join(', ');
-    }
-  }
 
   return (
     <button
@@ -162,7 +241,6 @@ function ServiceCard({
         isSelected
           ? 'border-lime bg-lime/5 ring-1 ring-lime'
           : 'border-site-border hover:border-lime/50 hover:shadow-sm',
-        hasVehicle && !isCompatible && !isSelected && 'opacity-60'
       )}
     >
       {/* Thumbnail */}
@@ -231,19 +309,6 @@ function ServiceCard({
             </span>
           )}
         </div>
-
-        {/* Compatibility badge — only show when service has explicit restrictions */}
-        {hasVehicle && isCompatible && compat && compat.length > 0 && (
-          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400">
-            <CheckCircle2 className="h-3 w-3" />
-            <span>Recommended for your {VEHICLE_CATEGORY_LABELS[vehicleCategory].toLowerCase()}</span>
-          </div>
-        )}
-        {hasVehicle && !isCompatible && (
-          <div className="mt-1.5 text-[11px] text-site-text-muted">
-            Designed for {compatLabel}
-          </div>
-        )}
       </div>
     </button>
   );

@@ -12,8 +12,9 @@ import { StepPayment } from './step-payment';
 import { BookingConfirmation } from './booking-confirmation';
 import { Button } from '@/components/ui/button';
 import type { BookableCategory, BookableService, BusinessHours, BookingConfig, RebookData } from '@/lib/data/booking';
-import type { MobileZone, VehicleSizeClass, VehicleType } from '@/lib/supabase/types';
+import type { MobileZone, VehicleSizeClass, VehicleType, VehicleCategoryRecord, VehicleCategory as VehicleCategoryType } from '@/lib/supabase/types';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
+import { categoryToCompatibilityKey, type VehicleCategory } from '@/lib/utils/vehicle-categories';
 
 interface CustomerDataProp {
   customer: {
@@ -25,7 +26,9 @@ interface CustomerDataProp {
   vehicles: {
     id: string;
     vehicle_type: VehicleType;
+    vehicle_category?: VehicleCategoryType;
     size_class: VehicleSizeClass | null;
+    specialty_tier?: string | null;
     year: number | null;
     make: string | null;
     model: string | null;
@@ -42,6 +45,7 @@ interface BookingWizardProps {
   rebookData?: RebookData | null;
   customerData?: CustomerDataProp | null;
   couponCode?: string | null;
+  vehicleCategories?: VehicleCategoryRecord[];
 }
 
 interface AvailableCoupon {
@@ -66,6 +70,7 @@ interface AppliedCoupon {
 }
 
 interface BookingState {
+  selectedCategory: string;
   service: BookableService | null;
   config: ConfigureResult | null;
   date: string | null;
@@ -107,6 +112,7 @@ export function BookingWizard({
   rebookData,
   customerData,
   couponCode,
+  vehicleCategories = [],
 }: BookingWizardProps) {
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
@@ -146,11 +152,13 @@ export function BookingWizard({
     const urlDate = searchParams.get('date');
     const urlTime = searchParams.get('time');
     const urlAddons = searchParams.get('addons');
+    const urlCategory = searchParams.get('category') ?? 'automobile';
 
     const service = rebookService ?? preSelectedService;
 
     // Base state
     const baseState: BookingState = {
+      selectedCategory: urlCategory,
       service: service,
       config: rebookData && rebookService
         ? {
@@ -367,6 +375,11 @@ export function BookingWizard({
       params.set('coupon', couponCode);
     }
 
+    // Vehicle category (only if not default)
+    if (newState.selectedCategory && newState.selectedCategory !== 'automobile') {
+      params.set('category', newState.selectedCategory);
+    }
+
     // Preserve rebook param
     const currentRebook = searchParams.get('rebook');
     if (currentRebook) {
@@ -429,6 +442,33 @@ export function BookingWizard({
       />
     );
   }
+
+  // Category change handler — resets service/config/schedule when category changes
+  function handleCategoryChange(categoryKey: string) {
+    const newState: BookingState = {
+      ...state,
+      selectedCategory: categoryKey,
+      service: null,
+      config: null,
+      date: null,
+      time: null,
+    };
+    setState(newState);
+    // Stay on step 1 — services will re-filter
+    updateUrl(1, newState);
+  }
+
+  // Filter services by selected vehicle category
+  const compatibilityKey = categoryToCompatibilityKey(state.selectedCategory as VehicleCategory);
+  const filteredCategories = categories
+    .map((cat) => ({
+      ...cat,
+      services: cat.services.filter((svc) => {
+        const compat = svc.vehicle_compatibility as string[];
+        return compat && compat.length > 0 ? compat.includes(compatibilityKey) : true;
+      }),
+    }))
+    .filter((cat) => cat.services.length > 0);
 
   // Step 1: Select service
   function handleServiceSelect(service: BookableService) {
@@ -742,10 +782,13 @@ export function BookingWizard({
       {step === 1 && (
         <>
           <StepServiceSelect
-            categories={categories}
+            categories={filteredCategories}
             selectedServiceId={state.service?.id ?? null}
             onSelect={handleServiceSelect}
-            vehicleCategory={(state.vehicle?.vehicle_category as import('@/lib/utils/vehicle-categories').VehicleCategory) ?? null}
+            vehicleCategory={state.selectedCategory as VehicleCategory}
+            vehicleCategories={vehicleCategories}
+            selectedCategoryKey={state.selectedCategory}
+            onCategoryChange={handleCategoryChange}
           />
           {editEntryStep === 1 && (
             <div className="mt-4">
@@ -826,6 +869,9 @@ export function BookingWizard({
           savedVehicles={customerData?.vehicles ?? []}
           onContinue={handleCustomerContinue}
           onBack={() => editEntryStep === 4 ? (setEditEntryStep(null), goToStep(5)) : goToStep(3)}
+          defaultVehicleCategory={state.selectedCategory}
+          selectedService={state.service}
+          onBackToServices={() => { goToStep(1); }}
         />
       )}
 

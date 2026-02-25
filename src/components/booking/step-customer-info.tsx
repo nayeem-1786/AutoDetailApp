@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { bookingCustomerSchema, bookingVehicleSchema, type BookingCustomerInput, type BookingVehicleInput } from '@/lib/utils/validation';
+import { cn } from '@/lib/utils/cn';
 import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import {
@@ -13,6 +14,7 @@ import {
   TIER_DROPDOWN_LABELS,
   MODEL_PLACEHOLDERS,
   isSpecialtyCategory,
+  categoryToCompatibilityKey,
   type VehicleCategory,
 } from '@/lib/utils/vehicle-categories';
 import { Button } from '@/components/ui/button';
@@ -21,8 +23,9 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import type { VehicleSizeClass, VehicleType, VehicleCategory as VehicleCategoryType } from '@/lib/supabase/types';
+import type { BookableService } from '@/lib/data/booking';
 import { z } from 'zod';
-import { Plus, Check, LogIn, X } from 'lucide-react';
+import { Plus, Check, LogIn, X, AlertTriangle } from 'lucide-react';
 
 interface SavedVehicle {
   id: string;
@@ -53,6 +56,9 @@ interface StepCustomerInfoProps {
   savedVehicles?: SavedVehicle[];
   onContinue: (customer: BookingCustomerInput, vehicle: BookingVehicleInput) => void;
   onBack: () => void;
+  defaultVehicleCategory?: string;
+  selectedService?: BookableService | null;
+  onBackToServices?: () => void;
 }
 
 // Check if a phone string has 10 digits (valid US number)
@@ -69,6 +75,9 @@ export function StepCustomerInfo({
   savedVehicles = [],
   onContinue,
   onBack,
+  defaultVehicleCategory,
+  selectedService,
+  onBackToServices,
 }: StepCustomerInfoProps) {
   // Format initial phone from E.164 to display format if needed
   const formatInitialPhone = (phone: string | undefined): string => {
@@ -110,8 +119,8 @@ export function StepCustomerInfo({
         email_consent: true,
       },
       vehicle: {
-        vehicle_category: (initialVehicle as BookingVehicleInput).vehicle_category ?? 'automobile',
-        vehicle_type: initialVehicle.vehicle_type ?? 'standard',
+        vehicle_category: (initialVehicle as BookingVehicleInput).vehicle_category ?? (defaultVehicleCategory as VehicleCategory) ?? 'automobile',
+        vehicle_type: initialVehicle.vehicle_type ?? (defaultVehicleCategory && defaultVehicleCategory !== 'automobile' ? defaultVehicleCategory as BookingVehicleInput['vehicle_type'] : 'standard'),
         size_class: initialSizeClass ?? initialVehicle.size_class ?? null,
         specialty_tier: (initialVehicle as BookingVehicleInput).specialty_tier ?? null,
         year: initialVehicle.year ?? undefined,
@@ -128,6 +137,9 @@ export function StepCustomerInfo({
   const [isAddingNew, setIsAddingNew] = useState(savedVehicles.length === 0);
   // Vehicle selection error state
   const [vehicleError, setVehicleError] = useState<string | null>(null);
+  // Compatibility warning state
+  const [showCompatWarning, setShowCompatWarning] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<CustomerInfoFormData | null>(null);
 
   // --- Phone lookup state ---
   const [phoneLookup, setPhoneLookup] = useState<{
@@ -140,7 +152,7 @@ export function StepCustomerInfo({
   const isPortal = savedVehicles.length > 0;
 
   const [bookingVehicleCategory, setBookingVehicleCategory] = useState<VehicleCategory>(
-    (initialVehicle as BookingVehicleInput).vehicle_category ?? 'automobile'
+    (initialVehicle as BookingVehicleInput).vehicle_category ?? (defaultVehicleCategory as VehicleCategory) ?? 'automobile'
   );
   const [yearOtherMode, setYearOtherMode] = useState(false);
 
@@ -299,27 +311,10 @@ export function StepCustomerInfo({
     return v.color ? `${label} (${v.color})` : label;
   }
 
-  function onSubmit(data: CustomerInfoFormData) {
-    // Validate vehicle selection
-    // If user has saved vehicles and hasn't selected one OR isn't adding new, show error
-    if (hasSavedVehicles && !selectedSavedVehicleId && !isAddingNew) {
-      setVehicleError('Please select a vehicle or add a new one');
-      return;
-    }
-
-    // If adding new vehicle, require vehicle_type at minimum
-    if (isAddingNew || !hasSavedVehicles) {
-      if (!data.vehicle.vehicle_type) {
-        setVehicleError('Please select a vehicle type');
-        return;
-      }
-    }
-
-    setVehicleError(null);
-    // Title-case model + color before passing upstream
+  function buildVehicleFromForm(data: CustomerInfoFormData): BookingVehicleInput {
     const specialty = isSpecialtyCategory(bookingVehicleCategory);
     const vehicleType = (specialty ? bookingVehicleCategory : 'standard') as BookingVehicleInput['vehicle_type'];
-    const vehicle: BookingVehicleInput = {
+    return {
       ...data.vehicle,
       vehicle_category: bookingVehicleCategory,
       vehicle_type: vehicleType,
@@ -328,8 +323,57 @@ export function StepCustomerInfo({
       model: titleCaseField(data.vehicle.model || ''),
       color: titleCaseField(data.vehicle.color || ''),
     };
-    // All online bookings are enthusiasts by default
+  }
+
+  function checkCompatibility(vehicleCat: VehicleCategory): boolean {
+    if (!selectedService) return true;
+    const serviceCompat = selectedService.vehicle_compatibility as string[] | null;
+    if (!serviceCompat || serviceCompat.length === 0) return true;
+    const compatKey = categoryToCompatibilityKey(vehicleCat);
+    return serviceCompat.includes(compatKey);
+  }
+
+  function onSubmit(data: CustomerInfoFormData) {
+    // Validate vehicle selection
+    if (hasSavedVehicles && !selectedSavedVehicleId && !isAddingNew) {
+      setVehicleError('Please select a vehicle or add a new one');
+      return;
+    }
+
+    if (isAddingNew || !hasSavedVehicles) {
+      if (!data.vehicle.vehicle_type) {
+        setVehicleError('Please select a vehicle type');
+        return;
+      }
+    }
+
+    setVehicleError(null);
+
+    // Check compatibility before proceeding
+    if (!checkCompatibility(bookingVehicleCategory)) {
+      setPendingSubmitData(data);
+      setShowCompatWarning(true);
+      return;
+    }
+
+    const vehicle = buildVehicleFromForm(data);
     onContinue(data.customer, vehicle);
+  }
+
+  function handleCompatWarningContinue() {
+    if (!pendingSubmitData) return;
+    setShowCompatWarning(false);
+    const vehicle = buildVehicleFromForm(pendingSubmitData);
+    onContinue(pendingSubmitData.customer, vehicle);
+    setPendingSubmitData(null);
+  }
+
+  function handleCompatWarningGoBack() {
+    setShowCompatWarning(false);
+    setPendingSubmitData(null);
+    if (onBackToServices) {
+      onBackToServices();
+    }
   }
 
   const hasSavedVehicles = savedVehicles.length > 0;
@@ -514,19 +558,29 @@ export function StepCustomerInfo({
             <div className="flex flex-wrap gap-2">
               {savedVehicles.map((v) => {
                 const isSelected = selectedSavedVehicleId === v.id;
+                const vCat = (v.vehicle_category || (v.vehicle_type === 'standard' ? 'automobile' : v.vehicle_type)) as VehicleCategory;
+                const matchesSelectedCategory = defaultVehicleCategory ? vCat === defaultVehicleCategory : true;
+
                 return (
                   <button
                     key={v.id}
                     type="button"
                     onClick={() => handleSelectSavedVehicle(v)}
-                    className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                    className={cn(
+                      'flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
                       isSelected
                         ? 'border-lime bg-brand-surface text-lime'
-                        : 'border-site-border bg-brand-surface text-site-text-secondary hover:bg-brand-surface'
-                    }`}
+                        : 'border-site-border bg-brand-surface text-site-text-secondary hover:bg-brand-surface',
+                      !matchesSelectedCategory && !isSelected && 'opacity-60'
+                    )}
                   >
                     {isSelected && <Check className="h-4 w-4" />}
-                    {formatVehicleLabel(v)}
+                    <span>{formatVehicleLabel(v)}</span>
+                    {!matchesSelectedCategory && (
+                      <span className="text-[10px] text-site-text-muted">
+                        ({VEHICLE_CATEGORY_LABELS[vCat]})
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -687,6 +741,52 @@ export function StepCustomerInfo({
         </Button>
         <Button type="submit" className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">Continue</Button>
       </div>
+
+      {/* Compatibility Warning Dialog */}
+      {showCompatWarning && selectedService && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-lg border border-site-border bg-brand-dark p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-site-text">
+                Vehicle Doesn&apos;t Match Service
+              </h3>
+            </div>
+            <p className="mt-4 text-sm text-site-text-secondary">
+              You selected <span className="font-semibold text-site-text">{selectedService.name}</span>, which is designed for{' '}
+              <span className="font-semibold text-site-text">
+                {((selectedService.vehicle_compatibility as string[]) ?? []).map((key: string) => {
+                  if (key === 'standard') return 'Automobile';
+                  return VEHICLE_CATEGORY_LABELS[key as VehicleCategory] || key;
+                }).join(', ')}
+              </span>.
+              Your vehicle is a <span className="font-semibold text-site-text">{VEHICLE_CATEGORY_LABELS[bookingVehicleCategory]}</span>.
+            </p>
+            <p className="mt-2 text-sm text-site-text-muted">
+              Would you like to go back and choose a different service?
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCompatWarningContinue}
+                className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
+              >
+                Continue Anyway
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCompatWarningGoBack}
+                className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+              >
+                Go Back to Services
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

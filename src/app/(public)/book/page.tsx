@@ -12,11 +12,13 @@ import {
 import { getCustomerFromSession } from '@/lib/auth/customer-helpers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createAnonClient } from '@/lib/supabase/anon';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getCmsToggles } from '@/lib/data/cms';
 import { AdZone } from '@/components/public/cms/ad-zone';
+import type { VehicleCategoryRecord } from '@/lib/supabase/types';
 
 export async function generateMetadata(): Promise<Metadata> {
   const [businessInfo, seoOverrides] = await Promise.all([
@@ -44,13 +46,30 @@ interface BookPageProps {
 export default async function BookPage({ searchParams }: BookPageProps) {
   const params = await searchParams;
 
-  const [categories, mobileZones, businessHours, bookingConfig, cmsToggles] =
+  // Fetch vehicle categories using anon client (public data, no auth needed)
+  async function getVehicleCategories(): Promise<VehicleCategoryRecord[]> {
+    let supabase;
+    try {
+      supabase = await createClient();
+    } catch {
+      supabase = createAnonClient();
+    }
+    const { data } = await supabase
+      .from('vehicle_categories')
+      .select('id, key, display_name, description, image_url, image_alt, display_order')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+    return (data ?? []) as VehicleCategoryRecord[];
+  }
+
+  const [categories, mobileZones, businessHours, bookingConfig, cmsToggles, vehicleCategories] =
     await Promise.all([
       getBookableServices(),
       getMobileZones(),
       getBusinessHours(),
       getBookingConfig(),
       getCmsToggles(),
+      getVehicleCategories(),
     ]);
 
   // Pre-select service if ?service=slug is provided
@@ -74,7 +93,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       // Fetch customer's vehicles
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select('id, vehicle_type, size_class, year, make, model, color')
+        .select('id, vehicle_type, vehicle_category, size_class, specialty_tier, year, make, model, color')
         .eq('customer_id', customer.id)
         .order('created_at', { ascending: false });
 
@@ -106,7 +125,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       if (cust) {
         const { data: vehicles } = await adminClient
           .from('vehicles')
-          .select('id, vehicle_type, size_class, year, make, model, color')
+          .select('id, vehicle_type, vehicle_category, size_class, specialty_tier, year, make, model, color')
           .eq('customer_id', cust.id)
           .order('created_at', { ascending: false });
         campaignCustomerData = {
@@ -155,6 +174,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
               rebookData={rebookData}
               customerData={customerData ?? campaignCustomerData}
               couponCode={params.coupon ?? null}
+              vehicleCategories={vehicleCategories}
             />
           </div>
         </div>
