@@ -4,6 +4,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Step 3 UX Overhaul — Session 14C — 2026-02-25
+
+### Feature: Inline Auth, Unified Payment, Collapsed Coupon, Merged Consent, Footer Hide
+
+**Change 1 — Merged consent checkboxes**
+- Replaced three separate checkboxes (SMS consent, email consent, Terms & Conditions) with a single "I agree to all" checkbox
+- Combined agreement text: SMS/email marketing consent + Terms & Conditions link
+- `agreedToAll` state replaces `sms_consent`, `email_consent`, and `termsAccepted`
+
+**Change 2 — Coupon section collapsed by default**
+- Coupon section now renders as a compact "Have a coupon code?" header, collapsed by default
+- Shows green savings badge when a coupon is applied (e.g., "Saving $25.00")
+- Auto-expands when URL coupon fails validation (so user sees the error)
+
+**Change 3 — "Pay in Full" payment option**
+- Added "Pay in Full" as default payment option alongside Deposit ($50) and Pay on Site
+- Type changed from `'deposit' | 'pay_on_site'` to `'full' | 'deposit' | 'pay_on_site'`
+- `bookingSubmitSchema` already supported `'full'` — no validation change needed
+- StepPayment component remounts via `key` prop when switching between full/deposit amounts
+
+**Change 4 — Co-located payment + Stripe**
+- Payment options and Stripe Elements now render in one unified "Payment" section
+- Stripe card form appears inline below the selected radio option (full or deposit)
+- Hidden when "Pay on Site" selected
+
+**Change 5 — Footer hidden on /book**
+- Created `ConditionalFooter` client component (`src/components/public/conditional-footer.tsx`)
+- Wraps `SiteFooter` in public layout — returns null when `pathname.startsWith('/book')`
+
+**Change 6 — Inline auth (sign-in / sign-up)**
+- Created `InlineAuth` component (`src/components/booking/inline-auth.tsx`) with:
+  - `SignInFlow`: phone OTP (with checkExists pre-check, staff guard, link-by-phone) + email/password + forgot password
+  - `SignUpFlow`: phone OTP → profile completion, or full email/password registration
+  - `AuthSheet`: bottom sheet (mobile) / centered dialog (desktop) with backdrop
+- Unauthenticated state shows two buttons: "Returning Customer? Sign in" / "New here? Create Account"
+- Authenticated state shows: "Booking as: Name · Phone · Email [Not you? Sign out]"
+- Removed raw customer form fields (react-hook-form, bookingCustomerSchema, phone lookup)
+- `booking-wizard.tsx`: added `handleAuthComplete` (fetches coupons/loyalty after auth) and `handleSignOut`
+
+**Change 7 — FILE_TREE.md customer-facing pages audit**
+- Added Customer-Facing Pages section to FILE_TREE.md: Public Site, Customer Auth, Customer Portal, Standalone pages
+- Added `inline-auth.tsx` and `conditional-footer.tsx` to component listings
+
+### Files Changed
+- `src/components/booking/step-confirm-book.tsx` — rewritten (inline auth, merged consent, collapsed coupon, unified payment)
+- `src/components/booking/booking-wizard.tsx` — added auth state, "Pay in Full" option, handleAuthComplete/handleSignOut
+- `src/components/booking/inline-auth.tsx` — **NEW** (sign-in/sign-up bottom sheet)
+- `src/components/public/conditional-footer.tsx` — **NEW** (hides footer on /book)
+- `src/app/(public)/layout.tsx` — wrapped SiteFooter with ConditionalFooter
+- `docs/dev/FILE_TREE.md` — added customer-facing pages section + new components
+
+---
+
 ## Booking Wizard Steps 2-3 Redesign — Session 14B — 2026-02-25
 
 ### Feature: Merge Steps 2-6 into Steps 2-3 with Unified Confirm & Book Page

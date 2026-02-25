@@ -9,10 +9,12 @@ import { StepSchedule } from './step-schedule';
 import { StepConfirmBook } from './step-confirm-book';
 import { BookingConfirmation } from './booking-confirmation';
 import { Button } from '@/components/ui/button';
+import type { AuthCustomerData } from './inline-auth';
 import type { BookableCategory, BookableService, BusinessHours, BookingConfig, RebookData } from '@/lib/data/booking';
 import type { MobileZone, VehicleSizeClass, VehicleType, VehicleCategoryRecord, VehicleCategory as VehicleCategoryType } from '@/lib/supabase/types';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
 import { categoryToCompatibilityKey, type VehicleCategory } from '@/lib/utils/vehicle-categories';
+import { createClient } from '@/lib/supabase/client';
 
 interface CustomerDataProp {
   customer: {
@@ -77,7 +79,7 @@ interface BookingState {
   vehicle: BookingVehicleInput | null;
   paymentIntentId: string | null;
   isExistingCustomer: boolean | null;
-  paymentOption: 'deposit' | 'pay_on_site' | null;
+  paymentOption: 'full' | 'deposit' | 'pay_on_site' | null;
   appliedCoupon: AppliedCoupon | null;
   availableCoupons: AvailableCoupon[];
   loyaltyPointsBalance: number;
@@ -141,8 +143,46 @@ export function BookingWizard({
     return null;
   }
 
-  // Whether this is a portal booking (logged-in customer)
-  const isPortal = !!customerData;
+  // Whether this is a portal booking (logged-in customer) — starts from server data,
+  // but can become true when user authenticates inline
+  const [isPortalDynamic, setIsPortalDynamic] = useState(!!customerData);
+
+  // Auth customer data — set by inline auth in step 3, or from portal customer data
+  const [authCustomerData, setAuthCustomerData] = useState<AuthCustomerData | null>(
+    customerData
+      ? {
+          customer: {
+            first_name: customerData.customer.first_name,
+            last_name: customerData.customer.last_name,
+            phone: customerData.customer.phone ?? '',
+            email: customerData.customer.email ?? '',
+          },
+          vehicles: customerData.vehicles.map((v) => ({
+            id: v.id,
+            vehicle_type: v.vehicle_type,
+            vehicle_category: v.vehicle_category,
+            size_class: v.size_class,
+            specialty_tier: v.specialty_tier,
+            year: v.year,
+            make: v.make,
+            model: v.model,
+            color: v.color,
+          })),
+        }
+      : rebookData
+        ? {
+            customer: {
+              first_name: rebookData.customer.first_name,
+              last_name: rebookData.customer.last_name,
+              phone: rebookData.customer.phone ?? '',
+              email: rebookData.customer.email ?? '',
+            },
+            vehicles: [],
+          }
+        : null
+  );
+
+  const isPortal = isPortalDynamic;
 
   // Whether payment is required for online bookings
   const requirePayment = bookingConfig.require_payment;
@@ -577,8 +617,65 @@ export function BookingWizard({
     await handleConfirm(customer, vehicle, paymentIntentId);
   }
 
-  function handlePaymentOptionChange(option: 'deposit' | 'pay_on_site') {
+  function handlePaymentOptionChange(option: 'full' | 'deposit' | 'pay_on_site') {
     setState((prev) => ({ ...prev, paymentOption: option }));
+  }
+
+  // Handle inline auth completion — fetch coupons & loyalty for the newly authenticated customer
+  async function handleAuthComplete(data: AuthCustomerData) {
+    setAuthCustomerData(data);
+    setIsPortalDynamic(true);
+    setState((prev) => ({ ...prev, isExistingCustomer: true }));
+
+    // Fetch coupons and loyalty for the authenticated customer
+    try {
+      const couponParams = new URLSearchParams();
+      if (state.service?.id) couponParams.set('service_id', state.service.id);
+      const addonServiceIds = state.config?.addons?.map((a) => a.service_id) || [];
+      if (addonServiceIds.length > 0) couponParams.set('addon_ids', addonServiceIds.join(','));
+      const couponUrl = `/api/customer/coupons${couponParams.toString() ? `?${couponParams.toString()}` : ''}`;
+
+      const [couponsRes, loyaltyRes] = await Promise.all([
+        fetch(couponUrl),
+        fetch('/api/customer/loyalty'),
+      ]);
+
+      let coupons: AvailableCoupon[] = [];
+      let loyaltyBalance = 0;
+
+      if (couponsRes.ok) {
+        const couponsData = await couponsRes.json();
+        coupons = couponsData.data || [];
+      }
+
+      if (loyaltyRes.ok) {
+        const loyaltyData = await loyaltyRes.json();
+        loyaltyBalance = loyaltyData.balance || 0;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        availableCoupons: coupons,
+        loyaltyPointsBalance: loyaltyBalance,
+      }));
+    } catch {
+      // Non-critical — continue without coupons/loyalty
+    }
+  }
+
+  // Handle sign out from inline auth
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setAuthCustomerData(null);
+    setIsPortalDynamic(false);
+    setState((prev) => ({
+      ...prev,
+      isExistingCustomer: null,
+      availableCoupons: [],
+      loyaltyPointsBalance: 0,
+      loyaltyPointsToUse: 0,
+    }));
   }
 
   function handleCouponApply(coupon: AppliedCoupon | null) {
@@ -642,14 +739,22 @@ export function BookingWizard({
       (appliedCoupon?.discount ?? 0) -
       loyaltyDiscount;
 
-    const isFullPayment = grandTotal < 100;
-    const depositAmount = paymentIntentId ? (isFullPayment ? grandTotal : 50) : undefined;
-
     const STRIPE_MINIMUM = 0.50;
     const discountsCoverAmount = grandTotal < STRIPE_MINIMUM;
+
+    // Determine effective payment option and deposit amount
     const effectivePaymentOption = discountsCoverAmount
       ? 'full'
-      : paymentOption ?? (paymentIntentId ? (isFullPayment ? 'full' : 'deposit') : 'pay_on_site');
+      : paymentOption ?? (paymentIntentId ? 'full' : 'pay_on_site');
+
+    let depositAmount: number | undefined;
+    if (paymentIntentId) {
+      if (effectivePaymentOption === 'full') {
+        depositAmount = grandTotal;
+      } else if (effectivePaymentOption === 'deposit') {
+        depositAmount = 50;
+      }
+    }
 
     const body = {
       service_id: service.id,
@@ -706,7 +811,7 @@ export function BookingWizard({
             : null;
 
     const amountCharged = paymentIntentId
-      ? (isFullPayment || discountsCoverAmount ? grandTotal : 50)
+      ? (effectivePaymentOption === 'full' || discountsCoverAmount ? grandTotal : 50)
       : 0;
 
     setConfirmation({
@@ -817,30 +922,15 @@ export function BookingWizard({
             addons={state.config.addons as BookingAddonInput[]}
             date={state.date}
             time={state.time}
-            initialCustomer={
-              state.customer ??
-              (customerData
-                ? {
-                    first_name: customerData.customer.first_name,
-                    last_name: customerData.customer.last_name,
-                    phone: customerData.customer.phone ?? '',
-                    email: customerData.customer.email ?? '',
-                  }
-                : rebookData
-                  ? {
-                      first_name: rebookData.customer.first_name,
-                      last_name: rebookData.customer.last_name,
-                      phone: rebookData.customer.phone ?? '',
-                      email: rebookData.customer.email ?? '',
-                    }
-                  : {})
-            }
             couponCode={couponCode ?? null}
             appliedCoupon={state.appliedCoupon}
             onCouponApply={handleCouponApply}
             availableCoupons={state.availableCoupons}
             isPortal={isPortal}
             isExistingCustomer={state.isExistingCustomer ?? false}
+            customerData={authCustomerData}
+            onAuthComplete={handleAuthComplete}
+            onSignOut={handleSignOut}
             loyaltyPointsBalance={state.loyaltyPointsBalance}
             loyaltyPointsToUse={state.loyaltyPointsToUse}
             onLoyaltyPointsChange={handleLoyaltyPointsChange}

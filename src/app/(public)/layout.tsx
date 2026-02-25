@@ -1,5 +1,6 @@
 import { SiteHeader } from '@/components/public/site-header';
 import { SiteFooter } from '@/components/public/site-footer';
+import { ConditionalFooter } from '@/components/public/conditional-footer';
 import { ThemeProvider } from '@/components/public/cms/theme-provider';
 import { TopBarTickerFiltered, LayoutSectionTickers } from '@/components/public/cms/announcement-ticker';
 import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrapper';
@@ -43,7 +44,9 @@ export default async function PublicLayout({
           <SiteHeader navItems={headerNav} />
           <main className="min-h-[calc(100vh-4rem)]">{children}</main>
           {showSectionTickers && <LayoutSectionTickers tickers={sectionTickers} options={tickerOptions.section} />}
-          <SiteFooter footerData={footerData} />
+          <ConditionalFooter footerData={footerData}>
+            <SiteFooter footerData={footerData} />
+          </ConditionalFooter>
           <CartDrawer />
         </div>
       </CartProviderWrapper>

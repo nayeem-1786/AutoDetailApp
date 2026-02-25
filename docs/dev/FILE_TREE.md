@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-25 (Session 10 — category merge cleanup migration added)
+> **Last updated:** 2026-02-25 (Session 14C — booking step 3 UX overhaul, inline auth, conditional footer)
 
 ---
 
@@ -550,6 +550,61 @@ src/app/admin/website/tickers/page.tsx
 
 ---
 
+## Customer-Facing Pages
+
+### Public Site (`src/app/(public)/`)
+```
+src/app/(public)/layout.tsx              — Public layout (header, footer, tickers, theme)
+src/app/(public)/page.tsx                — Homepage
+src/app/(public)/services/page.tsx       — Service category listing
+src/app/(public)/services/[categorySlug]/page.tsx
+src/app/(public)/services/[categorySlug]/[serviceSlug]/page.tsx
+src/app/(public)/products/page.tsx       — Product category listing
+src/app/(public)/products/[categorySlug]/page.tsx
+src/app/(public)/products/[categorySlug]/[productSlug]/page.tsx
+src/app/(public)/gallery/page.tsx        — Photo gallery
+src/app/(public)/areas/page.tsx          — Service areas
+src/app/(public)/areas/[citySlug]/page.tsx
+src/app/(public)/cart/page.tsx           — Shopping cart
+src/app/(public)/checkout/page.tsx       — Checkout
+src/app/(public)/checkout/confirmation/page.tsx
+src/app/(public)/terms/page.tsx          — Terms & conditions
+src/app/(public)/book/page.tsx           — Booking wizard
+src/app/(public)/p/[...slug]/page.tsx    — CMS dynamic pages
+```
+
+### Customer Auth (`src/app/(customer-auth)/`)
+```
+src/app/(customer-auth)/layout.tsx
+src/app/(customer-auth)/signin/page.tsx
+src/app/(customer-auth)/signin/reset-password/page.tsx
+src/app/(customer-auth)/signup/page.tsx
+```
+
+### Customer Portal (`src/app/(account)/`)
+```
+src/app/(account)/layout.tsx
+src/app/(account)/account/page.tsx           — Dashboard / overview
+src/app/(account)/account/services/page.tsx  — Service history
+src/app/(account)/account/orders/page.tsx    — Order history
+src/app/(account)/account/vehicles/page.tsx  — My vehicles
+src/app/(account)/account/loyalty/page.tsx   — Loyalty points
+src/app/(account)/account/coupons/page.tsx   — My coupons
+src/app/(account)/account/settings/page.tsx  — Profile settings
+```
+
+### Standalone Public Pages
+```
+src/app/quote/[token]/page.tsx           — Public quote view/accept
+src/app/q/[token]/page.tsx               — Short quote URL redirect
+src/app/s/[code]/page.tsx                — Short link redirect
+src/app/authorize/[token]/page.tsx       — Job authorization (approve/decline)
+src/app/jobs/[token]/photos/page.tsx     — Customer photo upload for jobs
+src/app/unsubscribe/[customerId]/page.tsx — Email/SMS unsubscribe
+```
+
+---
+
 ## Lib Modules (`src/lib/`)
 
 ### Auth
@@ -806,6 +861,7 @@ src/components/public/scroll-reveal.tsx
 src/components/public/service-card.tsx
 src/components/public/service-category-card.tsx
 src/components/public/service-pricing-display.tsx
+src/components/public/conditional-footer.tsx
 src/components/public/site-footer.tsx
 src/components/public/site-header.tsx
 src/components/public/theme-toggle-initializer.tsx
@@ -840,9 +896,10 @@ src/components/account/vehicle-form-dialog.tsx
 ```
 src/components/booking/booking-confirmation.tsx
 src/components/booking/booking-wizard.tsx
-src/components/booking/step-configure.tsx          (deprecated — absorbed by step-service-select)
+src/components/booking/inline-auth.tsx              (sign-in/sign-up bottom sheet for Step 3)
+src/components/booking/step-configure.tsx           (deprecated — absorbed by step-service-select)
 src/components/booking/step-confirm-book.tsx        (merged confirm & book page — Step 3)
-src/components/booking/step-customer-info.tsx       (deprecated — contact fields moved to step-confirm-book)
+src/components/booking/step-customer-info.tsx       (deprecated — contact fields moved to inline-auth)
 src/components/booking/step-indicator.tsx
 src/components/booking/step-payment.tsx
 src/components/booking/step-review.tsx              (deprecated — moved to step-confirm-book)
