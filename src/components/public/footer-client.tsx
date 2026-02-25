@@ -16,6 +16,7 @@ interface FooterClientProps {
   footerData: FooterData;
   phone: string; // Pre-formatted phone number
   reviews: ReviewBadge[];
+  year: number;
 }
 
 const trustBadges = [
@@ -25,7 +26,7 @@ const trustBadges = [
   { icon: Clock, label: '100% Satisfaction' },
 ] as const;
 
-export function FooterClient({ footerData, phone, reviews }: FooterClientProps) {
+export function FooterClient({ footerData, phone, reviews, year }: FooterClientProps) {
   const { sections, columns, bottomLinks, cities, businessInfo } = footerData;
 
   const mainSection = sections.find((s) => s.section_key === 'main');
@@ -77,6 +78,7 @@ export function FooterClient({ footerData, phone, reviews }: FooterClientProps) 
         <BottomBarSection
           links={bottomLinks}
           businessName={businessInfo.name}
+          year={year}
         />
       )}
     </footer>
@@ -179,6 +181,7 @@ function FooterColumnRenderer({
       {column.content_type === 'html' && column.html_content && (
         <div
           className="text-sm text-site-text-muted space-y-2 [&_a]:text-lime [&_a]:hover:underline"
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: column.html_content }}
         />
       )}
@@ -389,11 +392,12 @@ function ServiceAreasSection({
 function BottomBarSection({
   links,
   businessName,
+  year,
 }: {
   links: FooterBottomLink[];
   businessName: string;
+  year: number;
 }) {
-  const year = new Date().getFullYear();
 
   return (
     <div className="border-t border-site-border-light">

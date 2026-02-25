@@ -28,6 +28,7 @@ export async function SiteFooter({ footerData }: SiteFooterProps) {
       footerData={footerData}
       phone={formatPhone(footerData.businessInfo.phone)}
       reviews={reviewBadges}
+      year={new Date().getFullYear()}
     />
   );
 }
