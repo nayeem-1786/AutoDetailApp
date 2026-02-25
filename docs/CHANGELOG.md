@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Seed Add-On Suggestions & Combo Pricing — Session 12 — 2026-02-25
+
+### Seed: 28 Add-On Suggestion Rows with Combo Pricing
+- Seeded `service_addon_suggestions` table with 28 rows across 11 primary services
+- Combo pricing strategy: ~20% discount (Headlight/Trim: $125→$100, Engine Bay/Paint Decon: $175→$140, Pet Hair/Leather/Ozone: $75→$60)
+- Hot Shampoo Extraction has no combo price (NULL) — multi-tier scope pricing, owner configures per-tier discounts in admin
+- Migration: `supabase/migrations/20260225000002_seed_addon_suggestions.sql`
+- Idempotent: DELETE + INSERT with safety checks for all 19 service names
+
+---
+
 ## Confetti Animation on Booking Confirmation — Session 11 — 2026-02-25
 
 ### Enhancement: Booking Confirmation Confetti

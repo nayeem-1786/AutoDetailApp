@@ -856,96 +856,94 @@ When a primary service is selected at POS, booking, or by the voice agent, the s
 
 ### Suggestion Map
 
-Below defines which add-ons are suggested for each primary service. **Combo prices are TBD** — structure is established, specific discounts to be configured in admin.
+Below defines which add-ons are suggested for each primary service. **28 rows seeded** via migration `20260225000002` with ~20% combo discounts. Additional suggestions can be added via Admin > Catalog > Services > [service] > Add-Ons tab.
 
 #### Express Exterior Wash → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Paint Decontamination & Protection | $175 | TBD | Natural upgrade from basic wash |
-| 2 | Headlight Restoration | $125 | TBD | While vehicle is being serviced |
-| 3 | Trim Restoration | $125 | TBD | Complementary exterior work |
-| 4 | Water Spot Removal | $125 | TBD | Common exterior issue |
-| 5 | Engine Bay Detail | $175 | TBD | While hood is accessible |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Trim Restoration | $125 | $100 | Save $25 |
 
 #### Express Interior Clean → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Hot Shampoo - Floor Mats | $75 | TBD | Most common interior upgrade |
-| 2 | Hot Shampoo - Complete Interior | $350 | TBD | Full extraction upsell |
-| 3 | Pet Hair/Dander Removal | $75 | TBD | Common need with interior clean |
-| 4 | Leather Conditioning | $75 | TBD | Protect after cleaning |
-| 5 | Ozone Odor Treatment | $75 | TBD | Freshness upgrade |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Hot Shampoo Extraction | $75-$450 | — | Multi-tier, configure in admin |
+| 2 | Pet Hair & Dander Removal | $75 | $60 | Save $15 |
+| 3 | Leather Conditioning | $75 | $60 | Save $15 |
 
 #### Signature Complete Detail → Suggested Add-Ons
 
-Since this is both interior and exterior, it gets suggestions from both sides.
-
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Hot Shampoo - Complete Interior | $350 | TBD | Top revenue upsell |
-| 2 | Paint Decontamination & Protection | $175 | TBD | Protection upgrade |
-| 3 | Engine Bay Detail | $175 | TBD | Complete the full detail |
-| 4 | Headlight Restoration | $125 | TBD | While vehicle is in shop |
-| 5 | Leather Conditioning | $75 | TBD | Protect leather after cleaning |
-| 6 | Pet Hair/Dander Removal | $75 | TBD | Common need |
-| 7 | Ozone Odor Treatment | $75 | TBD | Freshness upgrade |
-| 8 | Trim Restoration | $125 | TBD | Exterior enhancement |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Engine Bay Detail | $175 | $140 | Save $35 |
+| 2 | Paint Decontamination & Protection | $175 | $140 | Save $35 |
+| 3 | Headlight Restoration | $125 | $100 | Save $25 |
 
 #### Single-Stage Polish → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Ceramic Shield (upsell to Primary) | varies | — | Natural next step after correction |
-| 2 | Headlight Restoration | $125 | TBD | Restore all exterior clarity |
-| 3 | Trim Restoration | $125 | TBD | Complete exterior refresh |
-| 4 | Water Spot Removal | $125 | TBD | Address all paint issues together |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Trim Restoration | $125 | $100 | Save $25 |
 
 #### 3-Stage Paint Correction → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Ceramic Shield (upsell to Primary) | varies | — | Protect the corrected paint |
-| 2 | Headlight Restoration | $125 | TBD | Restore all exterior clarity |
-| 3 | Trim Restoration | $125 | TBD | Complete exterior refresh |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Trim Restoration | $125 | $100 | Save $25 |
 
 Note: Paint Decontamination & Protection is already **included** in 3-Stage — system must NOT suggest it as an add-on.
 
-#### Ceramic Shield (any tier) → Suggested Add-Ons
+#### 1-Year Ceramic Shield → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Headlight Restoration | $125 | TBD | While vehicle is in shop for extended work |
-| 2 | Trim Restoration | $125 | TBD | Complete the exterior transformation |
-| 3 | Engine Bay Detail | $175 | TBD | Thorough top-to-bottom service |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Engine Bay Detail | $175 | $140 | Save $35 |
+| 3 | Trim Restoration | $125 | $100 | Save $25 |
+
+#### 3-Year Ceramic Shield → Suggested Add-Ons
+
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Engine Bay Detail | $175 | $140 | Save $35 |
+| 3 | Trim Restoration | $125 | $100 | Save $25 |
+
+#### 5-Year Ceramic Shield Plus → Suggested Add-Ons
+
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Engine Bay Detail | $175 | $140 | Save $35 |
+| 3 | Trim Restoration | $125 | $100 | Save $25 |
 
 Note: Paint Correction is a **prerequisite**, not a suggestion — handled by prerequisite enforcement.
 
-#### Booster Detail → Suggested Add-Ons
+#### Booster Detail for Ceramic Coated Vehicles → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Headlight Restoration | $125 | TBD | Maintain all exterior clarity |
-| 2 | Trim Restoration | $125 | TBD | Complete exterior refresh |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Trim Restoration | $125 | $100 | Save $25 |
 
 #### RV Interior Clean → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Hot Shampoo Extraction | $75-$350 | TBD | Deep clean RV upholstery |
-| 2 | Pet Hair/Dander Removal | $75 | TBD | Common need for RV travelers with pets |
-| 3 | Ozone Odor Treatment | $75 | TBD | Eliminate RV odors |
-| 4 | Leather Conditioning | $75 | TBD | Protect RV leather seating |
-| 5 | Organic Stain Treatment | $175 | TBD | Address organic stains in living space |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Hot Shampoo Extraction | $75-$450 | — | Multi-tier, configure in admin |
+| 2 | Pet Hair & Dander Removal | $75 | $60 | Save $15 |
+| 3 | Ozone Odor Treatment | $75 | $60 | Save $15 |
 
 #### RV Exterior Wash → Suggested Add-Ons
 
-| Priority | Add-On | Standard Price | Combo Price | Rationale |
-|:--------:|--------|---------------|-------------|-----------|
-| 1 | Headlight Restoration | $125 | TBD | RV headlights prone to yellowing |
-| 2 | Trim Restoration | $125 | TBD | Restore exterior trim |
-| 3 | Water Spot Removal | $125 | TBD | Common RV exterior issue |
+| Priority | Add-On | Standard Price | Combo Price | Savings |
+|:--------:|--------|---------------|-------------|---------|
+| 1 | Headlight Restoration | $125 | $100 | Save $25 |
+| 2 | Trim Restoration | $125 | $100 | Save $25 |
 
 #### Motorcycle, Boat & Aircraft Services → No Add-Ons
 
@@ -989,32 +987,22 @@ The suggestion system is fully configurable in the admin panel:
 - Online booking displays the same savings information
 - Receipt shows: service name, combo price paid, and savings amount
 
-### Combo Price Template (To Be Completed)
+### Combo Price Summary (Seeded)
 
-All combo prices below are **TBD** — to be set by owner in admin panel after launch. The platform will support these combinations from day one with configurable pricing.
+28 combo pairings seeded via migration `20260225000002`. ~20% discount strategy:
 
-| Primary Service | Add-On | Standard | Combo | Savings |
+| Add-On | Standard | Combo | Savings | Discount |
 |---|---|---|---|---|
-| Express Interior | Hot Shampoo (Floor Mats) | $75 | $__ | $__ |
-| Express Interior | Hot Shampoo (Complete) | $350 | $__ | $__ |
-| Express Interior | Pet Hair Removal | $75 | $__ | $__ |
-| Express Interior | Leather Conditioning | $75 | $__ | $__ |
-| Express Interior | Ozone Treatment | $75 | $__ | $__ |
-| Signature Complete | Hot Shampoo (Complete) | $350 | $__ | $__ |
-| Signature Complete | Paint Decon & Protection | $175 | $__ | $__ |
-| Signature Complete | Engine Bay Detail | $175 | $__ | $__ |
-| Signature Complete | Headlight Restoration | $125 | $__ | $__ |
-| Signature Complete | Leather Conditioning | $75 | $__ | $__ |
-| Single-Stage Polish | Headlight Restoration | $125 | $__ | $__ |
-| Single-Stage Polish | Trim Restoration | $125 | $__ | $__ |
-| 3-Stage Correction | Headlight Restoration | $125 | $__ | $__ |
-| 3-Stage Correction | Trim Restoration | $125 | $__ | $__ |
-| Ceramic Shield (any) | Headlight Restoration | $125 | $__ | $__ |
-| Ceramic Shield (any) | Trim Restoration | $125 | $__ | $__ |
-| Express Exterior | Paint Decon & Protection | $175 | $__ | $__ |
-| Express Exterior | Headlight Restoration | $125 | $__ | $__ |
-| Express Exterior | Trim Restoration | $125 | $__ | $__ |
-| Express Exterior | Engine Bay Detail | $175 | $__ | $__ |
+| Headlight Restoration | $125 | $100 | $25 | 20% |
+| Trim Restoration | $125 | $100 | $25 | 20% |
+| Engine Bay Detail | $175 | $140 | $35 | 20% |
+| Paint Decon & Protection | $175 | $140 | $35 | 20% |
+| Pet Hair & Dander Removal | $75 | $60 | $15 | 20% |
+| Leather Conditioning | $75 | $60 | $15 | 20% |
+| Ozone Odor Treatment | $75 | $60 | $15 | 20% |
+| Hot Shampoo Extraction | $75-$450 | — | — | Owner configures per-tier in admin |
+
+All combo prices are editable via Admin > Catalog > Services > [service] > Add-Ons tab.
 
 ---
 
@@ -1162,7 +1150,7 @@ Anonymous visitors (Supabase `anon` role) can read active services, categories, 
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | Combo prices for all primary+add-on pairs | TBD — owner to configure in admin post-launch |
+| 1 | Combo prices for all primary+add-on pairs | Done — 28 rows seeded with ~20% discounts. Hot Shampoo per-tier combos TBD by owner in admin. |
 
 ---
 

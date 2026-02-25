@@ -1,7 +1,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
 > Auto-generated from `supabase/migrations/*.sql`  
-> Last updated: Feb 24, 2026
+> Last updated: Feb 25, 2026
 
 ---
 
@@ -55,8 +55,6 @@
 | id | UUID | PK | |
 | customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE CASCADE | |
 | vehicle_type | vehicle_type (enum) | NOT NULL, DEFAULT 'standard' | |
-| vehicle_category | TEXT | NOT NULL, DEFAULT 'automobile', CHECK IN (automobile, motorcycle, rv, boat, aircraft) | |
-| specialty_tier | TEXT | CHECK valid tier keys or NULL | NULL for automobiles; maps to service_pricing.tier_name |
 | year | INTEGER | | |
 | make | TEXT | | |
 | model | TEXT | | |
@@ -86,6 +84,10 @@
 | name | TEXT | NOT NULL | |
 | description | TEXT | | |
 | cost_price | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | |
+| retail_price | DECIMAL(10,2) | | Used as standard price reference |
+| sale_price | DECIMAL(10,2) | DEFAULT NULL | CHECK: sale_price < retail_price. Added via `20260219000009` |
+| sale_starts_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
+| sale_ends_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
 | quantity_on_hand | INTEGER | NOT NULL, DEFAULT 0 | |
 | image_url | TEXT | | Synced from product_images primary |
 | created_at | TIMESTAMPTZ | | |
@@ -109,60 +111,111 @@
 | name | TEXT | UNIQUE, NOT NULL | |
 | slug | TEXT | UNIQUE, NOT NULL | |
 | description | TEXT | | |
-| display_order | INTEGER | NOT NULL, DEFAULT 0 | |
 | is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| display_order | INTEGER | NOT NULL, DEFAULT 0 | |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
-
-**Current categories (6):** Express & Detail Services, Paint Correction & Restoration, Ceramic Coatings, Exterior Enhancements, Interior Enhancements, Specialty Vehicles. (Precision Express and Signature Detail merged into "Express & Detail Services" — owner performed via Admin UI, cleaned up in Session 10.)
 
 ### services
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| id | UUID | PK | |
+| id | UUID | PK, default gen_random_uuid() | |
 | name | TEXT | NOT NULL | |
 | description | TEXT | | |
-| mobile_eligible | BOOLEAN | NOT NULL, DEFAULT false | |
-| vehicle_compatibility | JSONB | DEFAULT '["standard"]' | Array of vehicle_type values |
-| created_at | TIMESTAMPTZ | | |
-| updated_at | TIMESTAMPTZ | | |
+| category_id | UUID | FK → service_categories(id) ON DELETE SET NULL | |
+| pricing_model | pricing_model (enum) | NOT NULL | flat, vehicle_size, scope, specialty, per_unit, custom |
+| classification | service_classification (enum) | NOT NULL, DEFAULT 'primary' | primary, addon_only, both |
+| base_duration_minutes | INTEGER | NOT NULL, DEFAULT 60 | |
+| flat_price | DECIMAL(10,2) | | For pricing_model = 'flat' |
+| custom_starting_price | DECIMAL(10,2) | | For pricing_model = 'custom' |
+| per_unit_price | DECIMAL(10,2) | | For pricing_model = 'per_unit' |
+| per_unit_max | INTEGER | | Max units for per_unit |
+| per_unit_label | TEXT | | e.g. 'panel', 'seat' |
+| mobile_eligible | BOOLEAN | NOT NULL, DEFAULT false | Can be performed at customer location |
+| online_bookable | BOOLEAN | NOT NULL, DEFAULT true | Available for online scheduling |
+| staff_assessed | BOOLEAN | NOT NULL, DEFAULT false | Requires staff evaluation for pricing |
+| is_taxable | BOOLEAN | NOT NULL, DEFAULT false | Services generally not taxed |
+| vehicle_compatibility | JSONB | NOT NULL, DEFAULT '["standard"]' | Array of vehicle_type values |
+| special_requirements | TEXT | | E.g. "Aviation-approved products only" |
+| image_url | TEXT | | Supabase storage URL |
+| image_alt | TEXT | | Alt text for image |
+| sale_starts_at | TIMESTAMPTZ | DEFAULT NULL | Shared sale date range for all tiers. Added via `20260219000009` |
+| sale_ends_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| display_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:** category_id, pricing_model, classification, is_active
+
+**Sale pricing note:** `sale_starts_at` / `sale_ends_at` on `services` define the sale window for ALL tiers. The actual sale prices per tier are stored on `service_pricing.sale_price`. Flat-priced services (pricing_model = 'flat') have NO sale_price mechanism — they have no `service_pricing` rows and no sale_price column on `services` itself. To discount flat-priced add-ons, use `service_addon_suggestions.combo_price` instead.
 
 ### service_pricing
-
-**Row-based tier system.** Each service has N rows — one per pricing tier. The `price` column is the primary price for every tier. The `vehicle_size_*` columns are ONLY used when `is_vehicle_size_aware = true` (currently only Hot Shampoo Extraction's "Complete Interior" scope tier — a nested pricing edge case).
-
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| id | UUID | PK | |
+| id | UUID | PK, default gen_random_uuid() | |
 | service_id | UUID | NOT NULL, FK → services(id) ON DELETE CASCADE | |
-| tier_name | TEXT | NOT NULL | e.g. 'sedan', 'rv_up_to_24', 'aircraft_2_4' |
-| tier_label | TEXT | | Display label e.g. 'Sedan', "Up to 24'", '2-4 Seater' |
-| price | DECIMAL(10,2) | NOT NULL | Primary price for this tier |
+| tier_name | TEXT | NOT NULL | e.g. 'sedan', 'truck_suv_2row', scope tier names, specialty tier names |
+| tier_label | TEXT | | Display label e.g. 'Floor Mats Only', 'Per Row' |
+| price | DECIMAL(10,2) | NOT NULL | Standard price for this tier |
+| sale_price | DECIMAL(10,2) | DEFAULT NULL | CHECK: sale_price < price. Added via `20260219000009` |
 | display_order | INTEGER | NOT NULL, DEFAULT 0 | |
-| is_vehicle_size_aware | BOOLEAN | NOT NULL, DEFAULT false | Only for scope tiers that ALSO vary by automobile size |
-| vehicle_size_sedan_price | DECIMAL(10,2) | | Only used when is_vehicle_size_aware = true |
-| vehicle_size_truck_suv_price | DECIMAL(10,2) | | Only used when is_vehicle_size_aware = true |
-| vehicle_size_suv_van_price | DECIMAL(10,2) | | Only used when is_vehicle_size_aware = true |
+| is_vehicle_size_aware | BOOLEAN | NOT NULL, DEFAULT false | For scope tiers that vary by vehicle size |
+| vehicle_size_sedan_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
+| vehicle_size_truck_suv_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
+| vehicle_size_suv_van_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
-UNIQUE constraint on (service_id, tier_name). Index on service_id.
+**UNIQUE:** (service_id, tier_name)
+**Index:** service_id
 
-**Tier examples by pricing model:**
-- `vehicle_size`: 3 rows per service — `sedan`, `truck_suv_2row`, `suv_3row_van`
-- `scope`: N rows with named tiers — `floor_mats`, `per_row`, `carpet_mats`, `complete`
-- `specialty`: 2-3 rows with category-specific tier_names — `standard_cruiser`, `rv_up_to_24`, `boat_21_26`, `aircraft_2_4`, etc.
-- `flat`, `per_unit`, `custom`: No rows in service_pricing — price stored on `services` table directly
+**Pricing model → tier usage:**
+- `vehicle_size`: 3 rows per service (sedan, truck_suv_2row, suv_3row_van)
+- `scope`: N rows per service (custom tier names like 'floor_mats', 'complete_interior')
+- `specialty`: N rows per service (vehicle-type tiers like 'single_engine', 'turboprop')
+- `flat` / `per_unit` / `custom`: NO rows in service_pricing (price lives on `services` table)
 
-### Pricing Models Reference
+### service_addon_suggestions
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| primary_service_id | UUID | NOT NULL, FK → services(id) ON DELETE CASCADE | The primary service being booked |
+| addon_service_id | UUID | NOT NULL, FK → services(id) ON DELETE CASCADE | The suggested add-on service |
+| combo_price | DECIMAL(10,2) | DEFAULT NULL | Reduced price when paired (null = use add-on's standard price) |
+| display_order | INTEGER | NOT NULL, DEFAULT 0 | Lower = higher priority |
+| auto_suggest | BOOLEAN | NOT NULL, DEFAULT true | Show automatically during booking/POS |
+| is_seasonal | BOOLEAN | NOT NULL, DEFAULT false | Only suggest during specific dates |
+| seasonal_start | DATE | | Start date for seasonal suggestion |
+| seasonal_end | DATE | | End date for seasonal suggestion |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
-| Model | Price Storage | Price Resolution |
-|-------|-------------|-----------------|
-| `vehicle_size` | 3 rows in `service_pricing` (sedan, truck_suv_2row, suv_3row_van) | Match vehicle's `vehicle_type` to `tier_name` |
-| `scope` | N rows in `service_pricing` with named tiers | Staff selects scope tier. If `is_vehicle_size_aware`, sub-prices from vehicle_size columns |
-| `specialty` | 2-3 rows in `service_pricing` with category-specific tier_names | Match vehicle's `specialty_tier` to `tier_name`, or staff selects manually |
-| `per_unit` | `per_unit_price` on `services` table | Multiply by quantity selected by staff |
-| `flat` | `flat_price` on `services` table | Direct — single price regardless of vehicle |
-| `custom` | `custom_starting_price` on `services` table | Starting price shown, staff enters final after inspection |
+**UNIQUE:** (primary_service_id, addon_service_id)
+**CHECK:** primary_service_id != addon_service_id
+**Indexes:** primary_service_id, addon_service_id
+
+**Admin UI:** Fully managed via Admin > Catalog > Services > [service] > Add-Ons tab. Supports create/edit/delete of suggestions with combo_price, auto_suggest toggle, seasonal date ranges, and display ordering. Add-on service dropdown filters to classification = 'addon_only' or 'both' only.
+
+**Combo pricing note:** This is the ONLY mechanism for discounting flat-priced add-on services. The `combo_price` is contextual — it applies only when the specific primary + add-on pair are on the same ticket.
+
+**Seeded data (28 rows):** Combo prices set at ~20% discount: Headlight/Trim $100 (from $125), Engine Bay/Paint Decon $140 (from $175), Pet Hair/Leather/Ozone $60 (from $75). Hot Shampoo Extraction has NULL combo_price (multi-tier scope pricing — owner configures per-tier discounts in admin). All rows have `auto_suggest = true`. Seeded via migration `20260225000002`.
+
+### service_prerequisites
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| service_id | UUID | NOT NULL, FK → services(id) ON DELETE CASCADE | The service being booked |
+| prerequisite_service_id | UUID | NOT NULL, FK → services(id) ON DELETE CASCADE | The required service |
+| enforcement | prerequisite_enforcement (enum) | NOT NULL | required_same_ticket, required_history, recommended |
+| history_window_days | INTEGER | | For required_history: how recent (e.g. 30 days) |
+| warning_message | TEXT | | Custom message shown when prerequisite not met |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Admin UI:** Managed via Admin > Catalog > Services > [service] > Prerequisites tab.
+
+**Enforcement types:**
+- `required_same_ticket` — Must be on the same ticket
+- `required_history` — Must exist in vehicle's service history within `history_window_days`
+- `recommended` — System shows warning but allows proceeding
 
 ### packages
 | Column | Type | Constraints | Notes |
@@ -361,6 +414,7 @@ UNIQUE constraint on (service_id, tier_name). Index on service_id.
 | target_customer_type | TEXT | CHECK ('enthusiast','professional') | |
 | campaign_id | UUID | FK → campaigns(id) | |
 | customer_id | UUID | FK → customers(id) | Customer-specific coupon |
+| combinable_with_sales | BOOLEAN | NOT NULL, DEFAULT true | Added via `20260219000009` |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
@@ -831,216 +885,41 @@ UNIQUE constraint on (service_id, tier_name). Index on service_id.
 |--------|------|-------------|-------|
 | id | UUID | PK | |
 | entity_type | TEXT | NOT NULL | |
-| entity_id | UUID | NOT NULL | |
-| action | TEXT | NOT NULL | |
-| qbo_id | TEXT | | |
-| status | TEXT | NOT NULL, DEFAULT 'pending' | |
-| error_message | TEXT | | |
-| request_payload | JSONB | | |
-| response_payload | JSONB | | |
-| created_at | TIMESTAMPTZ | | |
-| duration_ms | INTEGER | | |
 
 ---
 
-## Website / CMS
+## Website CMS
 
-### website_pages
+### cms_pages
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK | |
+| slug | TEXT | UNIQUE, NOT NULL | |
 | title | TEXT | NOT NULL | |
-| slug | TEXT | NOT NULL, UNIQUE | |
-| page_template | TEXT | CHECK ('content','landing','blank') | |
-| parent_id | UUID | FK → website_pages(id) | |
-| content | TEXT | DEFAULT '' | Rich HTML content |
-| is_published | BOOLEAN | NOT NULL, DEFAULT false | |
-| show_in_nav | BOOLEAN | NOT NULL, DEFAULT false | |
-| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
-| meta_title | TEXT | | |
-| meta_description | TEXT | | |
-| og_image_url | TEXT | | |
-| created_at | TIMESTAMPTZ | | |
-| updated_at | TIMESTAMPTZ | | |
-
-### website_navigation
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
 | placement | TEXT | CHECK ('header','footer_quick_links','footer_services') | |
-| label | TEXT | NOT NULL | |
-| url | TEXT | NOT NULL, DEFAULT '#' | |
-| page_id | UUID | FK → website_pages(id) | |
-| parent_id | UUID | FK → website_navigation(id) | |
-| footer_column_id | UUID | FK → footer_columns(id) | Added later |
-| target | TEXT | CHECK ('_self','_blank') | |
-| icon | TEXT | | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
-| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
-| created_at | TIMESTAMPTZ | | |
-
-### page_content_blocks
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
-| page_path | TEXT | NOT NULL | |
-| page_type | TEXT | NOT NULL | |
-| block_type | TEXT | CHECK ('rich_text','faq','features_list','cta','testimonial_highlight') | |
-| title | TEXT | | |
-| content | TEXT | NOT NULL | |
-| sort_order | INT | NOT NULL, DEFAULT 0 | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
-| ai_generated | BOOLEAN | NOT NULL, DEFAULT false | |
-| ai_last_generated_at | TIMESTAMPTZ | | |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
-### page_seo
+### homepage_config
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK | |
-| page_path | TEXT | UNIQUE, NOT NULL | |
 | page_type | TEXT | CHECK (homepage, service_category, etc.) | |
-| seo_title | TEXT | | |
-| meta_description | TEXT | | |
-| meta_keywords | TEXT | | |
-| og_title | TEXT | | |
-| og_description | TEXT | | |
-| og_image_url | TEXT | | |
-| canonical_url | TEXT | | |
-| robots_directive | TEXT | DEFAULT 'index,follow' | |
-| structured_data_overrides | JSONB | | |
-| focus_keyword | TEXT | | |
-| internal_links | JSONB | | |
-| is_auto_generated | BOOLEAN | NOT NULL, DEFAULT false | |
-| created_at | TIMESTAMPTZ | | |
-
-### city_landing_pages
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
-| city_name | TEXT | NOT NULL | |
-| slug | TEXT | UNIQUE, NOT NULL | |
-| state | TEXT | NOT NULL, DEFAULT 'CA' | |
-| distance_miles | DECIMAL | | |
-| heading | TEXT | | |
-| intro_text | TEXT | | |
 | service_highlights | JSONB | | |
-| local_landmarks | TEXT | | |
-| meta_title | TEXT | | |
-| meta_description | TEXT | | |
-| focus_keywords | TEXT | | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
-| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
-
-### hero_slides
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
-| title | TEXT | | |
-| subtitle | TEXT | | |
-| cta_text | TEXT | | |
-| cta_url | TEXT | | |
-| content_type | TEXT | CHECK ('image','video','before_after') | |
-| image_url | TEXT | | |
-| image_url_mobile | TEXT | | |
-| image_alt | TEXT | | |
-| video_url | TEXT | | |
-| video_thumbnail_url | TEXT | | |
-| before_image_url | TEXT | | |
-| after_image_url | TEXT | | |
-| before_label | TEXT | DEFAULT 'Before' | |
-| after_label | TEXT | DEFAULT 'After' | |
-| overlay_opacity | INTEGER | DEFAULT 40, CHECK 0-100 | |
-| text_alignment | TEXT | CHECK ('left','center','right') | |
-| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
-| created_at | TIMESTAMPTZ | | |
-| updated_at | TIMESTAMPTZ | | |
-
-### announcement_tickers
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
-| message | TEXT | NOT NULL | |
-| link_url | TEXT | | |
-| link_text | TEXT | | |
-| placement | TEXT | CHECK ('top_bar','section') | |
-| section_position | TEXT | | Changed from INT to TEXT |
-| bg_color | TEXT | DEFAULT '#1e3a5f' | |
-| text_color | TEXT | DEFAULT '#ffffff' | |
-| scroll_speed | TEXT | CHECK ('slow','normal','fast') | |
-| font_size | TEXT | CHECK ('xs','sm','base','lg') | |
-| target_pages | JSONB | DEFAULT '["all"]' | |
-| starts_at | TIMESTAMPTZ | | |
-| ends_at | TIMESTAMPTZ | | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
-| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
-| created_at | TIMESTAMPTZ | | |
-| updated_at | TIMESTAMPTZ | | |
-
-### seasonal_themes
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
-| name | TEXT | NOT NULL | |
-| slug | TEXT | UNIQUE, NOT NULL | |
-| description | TEXT | | |
-| color_overrides | JSONB | DEFAULT '{}' | |
-| gradient_overrides | JSONB | DEFAULT '{}' | |
-| particle_effect | TEXT | CHECK ('snowfall','fireworks','confetti','hearts','leaves','stars','sparkles') | |
-| particle_intensity | INTEGER | DEFAULT 50, CHECK 0-100 | |
-| particle_color | TEXT | | |
-
-### site_theme_settings
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
-| name | TEXT | NOT NULL, DEFAULT 'Custom Theme' | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT false | |
-| mode | TEXT | CHECK ('dark','light') | |
-| color_page_bg | TEXT | | |
-| color_card_bg | TEXT | | |
-| color_header_bg | TEXT | | |
-| color_footer_bg | TEXT | | |
-| color_section_alt_bg | TEXT | | |
-| color_text_primary | TEXT | | |
-| color_text_secondary | TEXT | | |
-| color_text_muted | TEXT | | |
-| color_text_on_primary | TEXT | | |
 
 ### ad_creatives
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK | |
-| name | TEXT | NOT NULL | |
-| image_url | TEXT | NOT NULL | |
-| image_url_mobile | TEXT | | |
-| link_url | TEXT | | |
-| alt_text | TEXT | | |
-| ad_size | TEXT | CHECK (standard IAB sizes) | |
-| starts_at | TIMESTAMPTZ | | |
-| ends_at | TIMESTAMPTZ | | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
-| impression_count | INTEGER | NOT NULL, DEFAULT 0 | |
-| click_count | INTEGER | NOT NULL, DEFAULT 0 | |
 | created_at | TIMESTAMPTZ | | |
-| updated_at | TIMESTAMPTZ | | |
 
 ### ad_placements
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK | |
-| ad_creative_id | UUID | NOT NULL, FK → ad_creatives(id) ON DELETE CASCADE | |
-| page_path | TEXT | NOT NULL | |
-| zone_id | TEXT | NOT NULL | |
-| device | TEXT | CHECK ('all','desktop','mobile') | |
-| priority | INTEGER | NOT NULL, DEFAULT 0 | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
 | created_at | TIMESTAMPTZ | | |
-| updated_at | TIMESTAMPTZ | | |
 
 ### ad_events
 | Column | Type | Constraints | Notes |
@@ -1167,33 +1046,16 @@ UNIQUE constraint on (service_id, tier_name). Index on service_id.
 
 ## Reference Data
 
-### vehicle_categories
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK, default gen_random_uuid() | |
-| key | TEXT | NOT NULL, UNIQUE | Immutable: automobile, motorcycle, rv, boat, aircraft |
-| display_name | TEXT | NOT NULL | Admin-editable display label |
-| description | TEXT | | |
-| image_url | TEXT | | Card image for booking flow category picker |
-| image_alt | TEXT | | Alt text for the image |
-| display_order | INTEGER | NOT NULL, DEFAULT 0 | |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | Controls visibility in booking flow |
-| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
-| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
-
-Fixed set of 5 categories — cannot be added or removed. Only metadata is editable. Seeded with automobile (1), motorcycle (2), rv (3), boat (4), aircraft (5). RLS: anon read active, authenticated read all, admin write. Trigger: update_updated_at().
-
 ### vehicle_makes
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK, default gen_random_uuid() | |
-| name | TEXT | NOT NULL | |
-| category | TEXT | NOT NULL, DEFAULT 'automobile', CHECK IN (automobile, motorcycle, rv, boat, aircraft) | |
+| name | TEXT | UNIQUE, NOT NULL | |
 | is_active | BOOLEAN | NOT NULL, DEFAULT true | |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
-UNIQUE constraint on (name, category). Honda can exist as both automobile and motorcycle. Seeded with 45 automobile + 42 specialty makes (12 motorcycle, 10 RV, 10 boat, 10 aircraft). RLS: authenticated read, admin-only write.
+Seeded with 45 common makes. Used in POS, admin, booking, and customer portal vehicle dropdowns. RLS: authenticated read, admin-only write.
 
 ---
 
@@ -1212,8 +1074,11 @@ UNIQUE constraint on (name, category). Honda can exist as both automobile and mo
 
 - **user_role**: super_admin, admin, cashier, detailer
 - **employee_status**: active, inactive, terminated
-- **vehicle_type**: standard, truck_suv, suv_van, motorcycle, rv, boat, aircraft — For automobiles, stores the pricing size tier (standard/truck_suv/suv_van). For specialty vehicles, stores the category name (motorcycle/rv/boat/aircraft) and the actual pricing tier is in `vehicles.specialty_tier`.
-- **vehicle_size_class**: sedan, truck_suv, suv_van
+- **vehicle_type**: standard, motorcycle, rv, boat, aircraft
+- **vehicle_size_class**: sedan, truck_suv_2row, suv_3row_van
+- **pricing_model**: flat, vehicle_size, scope, specialty, per_unit, custom
+- **service_classification**: primary, addon_only, both
+- **prerequisite_enforcement**: required_same_ticket, required_history, recommended
 - **transaction_status**: open, completed, voided, refunded
 - **transaction_item_type**: product, service, package
 - **payment_method**: cash, card, split

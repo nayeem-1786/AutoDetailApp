@@ -1050,6 +1050,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260224000002_create_vehicle_categories.sql
 20260224000003_merge_express_signature_categories.sql
 20260225000001_cleanup_category_merge.sql
+20260225000002_seed_addon_suggestions.sql
 ```
 
 ---
