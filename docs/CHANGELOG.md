@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Confetti Animation on Booking Confirmation — Session 11 — 2026-02-25
+
+### Enhancement: Booking Confirmation Confetti
+- Added `canvas-confetti` animation to the booking confirmation view
+- 10-second dual-cannon burst (left + right) with decaying particle count
+- Confetti renders behind content (`zIndex: 0`), card content elevated with `relative z-10`
+- Cleanup on unmount via `clearInterval`
+
+---
+
 ## Category Merge Cleanup & Dead Button Removal — Session 10 — 2026-02-25
 
 ### Database: Clean Up Failed Category Merge

@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import confetti from 'canvas-confetti';
 import { CheckCircle, CalendarDays, Clock, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils/format';
@@ -67,8 +69,41 @@ export function BookingConfirmation({
 }: BookingConfirmationProps) {
   const footnote = getPaymentFootnote(paymentOption, amountCharged, grandTotal, appointment.total);
 
+  useEffect(() => {
+    const duration = 10 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+    const randomInRange = (min: number, max: number) =>
+      Math.random() * (max - min) + min;
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+      });
+
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+      });
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="mx-auto max-w-lg text-center">
+    <div className="relative z-10 mx-auto max-w-lg text-center">
       <div className="mb-6 flex justify-center">
         <CheckCircle className="h-16 w-16 text-green-500" />
       </div>
