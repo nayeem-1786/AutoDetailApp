@@ -1432,7 +1432,7 @@ export function InlineAuth({
             <p className="text-sm font-medium text-site-text">
               Booking as: {first_name} {last_name}
             </p>
-            <p className="text-xs text-site-text-muted truncate">
+            <p className="text-xs text-site-text-muted truncate" suppressHydrationWarning>
               {phone}{phone && email ? ' \u00b7 ' : ''}{email}
             </p>
           </div>
