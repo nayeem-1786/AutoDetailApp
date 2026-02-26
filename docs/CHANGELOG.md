@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Hamburger Logout Preserves Page, Separate "Not You?" from Sign-Out — 2026-02-25
+
+### Fix: hamburger logout stays on current page, "Not you?" no longer signs out
+
+**Fix 1 — Hamburger "Log Out" navigated to homepage, losing booking progress**
+- Changed `window.location.href = '/'` to `window.location.reload()` in `handleSignOut`
+- On `/book`, the page reloads with URL params intact (`?step=3&service=...&date=...&time=...`), so the booking wizard can restore selections
+- On any other page, reloading is functionally equivalent to navigating to `/` — header updates to show "Sign In"
+
+**Fix 2 — "Not you?" and "Sign out" had identical behavior**
+- Added separate `handleNotYouClick` handler that clears local booking auth data only (ref, state, view) without calling `onSignOut`
+- "Not you?" → clears booking auth, returns to buttons view, Supabase session stays alive, hamburger still shows "Hi, [name]"
+- "Sign out" → clears booking auth AND Supabase session, header updates to "Sign In"
+
+**Files modified:**
+- `src/components/public/header-client.tsx` — `reload()` instead of `href = '/'`
+- `src/components/booking/inline-auth.tsx` — separate `handleNotYouClick` handler
+
+---
+
 ## iOS Contact Suggestions & OTP Auto-Focus — 2026-02-25
 
 ### Fix: iOS contact suggestions on returning customer phone, OTP auto-focus on both auth flows

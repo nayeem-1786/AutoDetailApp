@@ -99,7 +99,7 @@ export function HeaderClient({
     } catch (err) {
       console.error('Sign out error:', err);
     } finally {
-      window.location.href = '/';
+      window.location.reload();
     }
   }, []);
 

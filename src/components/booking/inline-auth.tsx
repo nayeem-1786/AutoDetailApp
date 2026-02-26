@@ -1524,7 +1524,16 @@ export function InlineAuth({
     }
   }, [onAuthComplete]);
 
-  // Handle "Not you?" or "Sign out" — clear auth and return to buttons
+  // "Not you?" — clear booking auth only, keep Supabase session alive
+  const handleNotYouClick = useCallback(() => {
+    localAuthRef.current = null;
+    setLocalAuthData(null);
+    setSwitchPhone('');
+    setView('buttons');
+    // Do NOT call onSignOut — user stays authenticated site-wide
+  }, []);
+
+  // "Sign out" — full sign-out: clear booking auth AND Supabase session
   const handleSignOutClick = useCallback(() => {
     // Clear local state immediately (synchronous — prevents iOS touch event cancellation)
     localAuthRef.current = null;
@@ -1569,7 +1578,7 @@ export function InlineAuth({
           <div className="flex flex-col items-end gap-1 shrink-0">
             <button
               type="button"
-              onClick={handleSignOutClick}
+              onClick={handleNotYouClick}
               className="text-xs text-site-text-muted hover:text-site-text transition-colors"
             >
               Not you?
