@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Minus, Plus, StickyNote, Trash2, Sparkles, ChevronDown } from 'lucide-react';
+import { Minus, Plus, StickyNote, Trash2, Sparkles, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { TicketItem } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
@@ -12,12 +12,13 @@ import type { AddonSuggestionEntry } from '../hooks/use-addon-suggestions';
 
 interface TicketItemRowProps {
   item: TicketItem;
+  childItems?: TicketItem[];
   addonSuggestions?: AddonSuggestionEntry[];
   ticketServiceIds?: Set<string>;
   onAddonClick?: (addonServiceId: string) => void;
 }
 
-export function TicketItemRow({ item, addonSuggestions = [], ticketServiceIds, onAddonClick }: TicketItemRowProps) {
+export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketServiceIds, onAddonClick }: TicketItemRowProps) {
   const { dispatch } = useTicket();
   const { services } = useCatalog();
   const [editing, setEditing] = useState(false);
@@ -295,6 +296,34 @@ export function TicketItemRow({ item, addonSuggestions = [], ticketServiceIds, o
           >
             Cancel
           </button>
+        </div>
+      )}
+
+      {/* Child addon items — rendered indented under this parent */}
+      {childItems && childItems.length > 0 && (
+        <div className="ml-3 mt-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2.5">
+          {childItems.map((child) => (
+            <div key={child.id} className="flex items-center justify-between py-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">&darr;</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                  {child.itemName}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400">
+                  ${child.totalPrice.toFixed(2)}
+                </span>
+                <button
+                  onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: child.id })}
+                  className="h-7 w-7 flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
+                  aria-label={`Remove ${child.itemName}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

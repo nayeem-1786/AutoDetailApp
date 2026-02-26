@@ -83,6 +83,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           perUnitLabel: null,
           perUnitPrice: null,
           perUnitMax: null,
+          parentItemId: null,
         } as TicketItem));
 
         const loadState: QuoteState = {

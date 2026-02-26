@@ -61,6 +61,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [addonPickerService, setAddonPickerService] = useState<CatalogService | null>(null);
+  const [addonParentItemId, setAddonParentItemId] = useState<string | null>(null);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
@@ -88,7 +89,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
   // Swipe-to-delete undo state
   const undoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const pendingUndoRef = useRef<{ item: TicketItem; index: number } | null>(null);
+  const pendingUndoRef = useRef<{ item: TicketItem; index: number; children: { item: TicketItem; index: number }[] } | null>(null);
 
   const handleSwipeRemove = useCallback(
     (itemId: string) => {
@@ -97,26 +98,43 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       if (index === -1) return;
       const item = ticket.items[index];
 
-      // Store for undo
-      pendingUndoRef.current = { item, index };
+      // Also capture child addons (for parent items) so undo restores them too
+      const children = ticket.items
+        .map((i, idx) => ({ item: i, index: idx }))
+        .filter((entry) => entry.item.parentItemId === itemId);
 
-      // Remove from ticket
+      // Store for undo
+      pendingUndoRef.current = { item, index, children };
+
+      // Remove from ticket (cascade deletes children via reducer)
       dispatch({ type: 'REMOVE_ITEM', itemId });
 
       // Clear any existing undo timer
       if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
 
       // Show undo toast
-      toast(`${item.itemName} removed`, {
+      const label = children.length > 0
+        ? `${item.itemName} + ${children.length} add-on${children.length !== 1 ? 's' : ''} removed`
+        : `${item.itemName} removed`;
+      toast(label, {
         action: {
           label: 'Undo',
           onClick: () => {
             if (pendingUndoRef.current?.item.id === itemId) {
+              // Restore parent first
               dispatch({
                 type: 'RESTORE_ITEM',
                 item: pendingUndoRef.current.item,
                 index: pendingUndoRef.current.index,
               });
+              // Restore each child addon
+              for (const child of pendingUndoRef.current.children) {
+                dispatch({
+                  type: 'RESTORE_ITEM',
+                  item: child.item,
+                  index: child.index,
+                });
+              }
               pendingUndoRef.current = null;
             }
           },
@@ -297,27 +315,36 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           ) : (
             <div className="py-2">
               <SwipeableCartList>
-                {ticket.items.map((item) => (
-                  <SwipeableCartItemWrapper key={item.id} itemId={item.id}>
-                    <SwipeableCartItem
-                      itemId={item.id}
-                      itemName={item.itemName}
-                      disabled={checkoutOpen}
-                      onRemove={handleSwipeRemove}
-                      onUndo={handleSwipeUndo}
-                    >
-                      <TicketItemRow
-                        item={item}
-                        addonSuggestions={item.serviceId ? (suggestionsMap.get(item.serviceId) ?? []) : []}
-                        ticketServiceIds={ticketServiceIds}
-                        onAddonClick={(addonServiceId) => {
-                          const svc = services.find((s) => s.id === addonServiceId);
-                          if (svc) setAddonPickerService(svc);
-                        }}
-                      />
-                    </SwipeableCartItem>
-                  </SwipeableCartItemWrapper>
-                ))}
+                {ticket.items
+                  .filter((i) => !i.parentItemId)
+                  .map((item) => {
+                    const children = ticket.items.filter((i) => i.parentItemId === item.id);
+                    return (
+                      <SwipeableCartItemWrapper key={item.id} itemId={item.id}>
+                        <SwipeableCartItem
+                          itemId={item.id}
+                          itemName={item.itemName}
+                          disabled={checkoutOpen}
+                          onRemove={handleSwipeRemove}
+                          onUndo={handleSwipeUndo}
+                        >
+                          <TicketItemRow
+                            item={item}
+                            childItems={children}
+                            addonSuggestions={item.serviceId ? (suggestionsMap.get(item.serviceId) ?? []) : []}
+                            ticketServiceIds={ticketServiceIds}
+                            onAddonClick={(addonServiceId) => {
+                              const svc = services.find((s) => s.id === addonServiceId);
+                              if (svc) {
+                                setAddonPickerService(svc);
+                                setAddonParentItemId(item.id);
+                              }
+                            }}
+                          />
+                        </SwipeableCartItem>
+                      </SwipeableCartItemWrapper>
+                    );
+                  })}
               </SwipeableCartList>
             </div>
           )}
@@ -563,7 +590,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         <ServiceDetailDialog
           service={addonPickerService}
           open={!!addonPickerService}
-          onClose={() => setAddonPickerService(null)}
+          onClose={() => { setAddonPickerService(null); setAddonParentItemId(null); }}
+          parentItemId={addonParentItemId ?? undefined}
         />
       )}
 

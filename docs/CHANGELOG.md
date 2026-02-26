@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## POS Nested Addon Display — 2026-02-26
+
+### feat(pos): addon services render as indented children under parent service
+
+When a staff member taps an addon suggestion on a ticket service item, the addon now appears as visually nested, indented text underneath the parent service — not as a separate top-level line item.
+
+**Changes:**
+- Added `parentItemId` field to `TicketItem` interface for parent/child relationship tracking
+- Updated `ADD_SERVICE` action (both ticket and quote) to accept optional `parentItemId`
+- Reducer inserts child addons immediately after the parent (grouped together)
+- `REMOVE_ITEM` cascade-deletes children when a parent is removed
+- `TicketItemRow` renders child addons with indented styling: border-left connector, smaller text, inline X remove button
+- Children appear between the parent item and the "add-ons available" toggle
+- Swipe-to-delete on parent restores both parent + children on undo
+- `ServiceDetailDialog` passes `parentItemId` through to dispatch when opened from addon suggestion
+- Top-level item list in `ticket-panel.tsx` filters out children (they render inside their parent's row)
+
+**Files modified:**
+- `src/app/pos/types.ts` — `parentItemId` on TicketItem, ADD_SERVICE action types
+- `src/app/pos/context/ticket-reducer.ts` — parent-aware insertion, cascade delete
+- `src/app/pos/context/quote-reducer.ts` — same changes for quotes
+- `src/app/pos/components/ticket-item-row.tsx` — child addon rendering
+- `src/app/pos/components/ticket-panel.tsx` — top-level filtering, addon parent tracking, undo with children
+- `src/app/pos/components/service-detail-dialog.tsx` — parentItemId prop
+- `src/app/pos/jobs/page.tsx` — parentItemId: null on TicketItem construction
+- `src/app/pos/components/quotes/quote-builder.tsx` — parentItemId: null on TicketItem construction
+
+---
+
 ## POS Addon Suggestions + Coupon Layout Fix — 2026-02-26
 
 ### fix(pos): vertical addon rows, viewport-level dialog, shared coupon+discount row

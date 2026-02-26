@@ -109,6 +109,7 @@ export default function JobsPage() {
           perUnitLabel: null,
           perUnitPrice: null,
           perUnitMax: null,
+          parentItemId: null,
         };
       });
 

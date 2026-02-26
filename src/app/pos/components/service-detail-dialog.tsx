@@ -21,9 +21,11 @@ interface ServiceDetailDialogProps {
   vehicleSizeOverride?: VehicleSizeClass | null;
   /** Override specialty tier */
   vehicleSpecialtyTierOverride?: string | null;
+  /** When set, the added service becomes a child addon of this parent item */
+  parentItemId?: string;
 }
 
-export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride }: ServiceDetailDialogProps) {
+export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride, parentItemId }: ServiceDetailDialogProps) {
   const { ticket, dispatch: ticketDispatch } = useTicket();
   const dispatch = onAdd ? undefined : ticketDispatch;
   const pricing = service.pricing ?? [];
@@ -121,6 +123,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
           pricing: syntheticPricing,
           vehicleSizeClass,
           perUnitQty,
+          parentItemId,
         });
         toast.success(`Added ${service.name}`);
       }
@@ -140,6 +143,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         service,
         pricing: selectedTier,
         vehicleSizeClass,
+        parentItemId,
       });
       toast.success(`Added ${service.name}`);
     }

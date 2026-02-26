@@ -98,6 +98,7 @@ export function quoteReducer(
           perUnitLabel: null,
           perUnitPrice: null,
           perUnitMax: null,
+          parentItemId: null,
         };
         items = [...state.items, newItem];
       }
@@ -105,7 +106,7 @@ export function quoteReducer(
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass, perUnitQty } = action;
+      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId } = action;
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
       const unitPrice = isPerUnit
         ? service.per_unit_price! * perUnitQty
@@ -130,7 +131,23 @@ export function quoteReducer(
         perUnitLabel: isPerUnit ? (service.per_unit_label ?? null) : null,
         perUnitPrice: isPerUnit ? service.per_unit_price! : null,
         perUnitMax: isPerUnit ? (service.per_unit_max ?? null) : null,
+        parentItemId: parentItemId ?? null,
       };
+
+      // If this is a child addon, insert immediately after the parent's last child
+      if (parentItemId) {
+        const items = [...state.items];
+        const parentIdx = items.findIndex((i) => i.id === parentItemId);
+        if (parentIdx >= 0) {
+          let insertIdx = parentIdx + 1;
+          while (insertIdx < items.length && items[insertIdx].parentItemId === parentItemId) {
+            insertIdx++;
+          }
+          items.splice(insertIdx, 0, newItem);
+          return recalculateTotals({ ...state, items });
+        }
+      }
+
       return recalculateTotals({
         ...state,
         items: [...state.items, newItem],
@@ -158,6 +175,7 @@ export function quoteReducer(
         perUnitLabel: null,
         perUnitPrice: null,
         perUnitMax: null,
+        parentItemId: null,
       };
       return recalculateTotals({
         ...state,
@@ -208,7 +226,10 @@ export function quoteReducer(
     }
 
     case 'REMOVE_ITEM': {
-      const items = state.items.filter((i) => i.id !== action.itemId);
+      // Remove the item AND any children whose parentItemId matches
+      const items = state.items.filter(
+        (i) => i.id !== action.itemId && i.parentItemId !== action.itemId
+      );
       return recalculateTotals({ ...state, items });
     }
 
