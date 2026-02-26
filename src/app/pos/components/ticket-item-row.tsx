@@ -3,27 +3,28 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Minus, Plus, StickyNote, Trash2, Sparkles, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import type { TicketItem } from '../types';
+import type { TicketItem, CatalogService } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import { useTicket } from '../context/ticket-context';
 import { useCatalog } from '../hooks/use-catalog';
+import { ServiceDetailDialog } from './service-detail-dialog';
 import type { AddonSuggestionEntry } from '../hooks/use-addon-suggestions';
 
 interface TicketItemRowProps {
   item: TicketItem;
   addonSuggestions?: AddonSuggestionEntry[];
   ticketServiceIds?: Set<string>;
-  onAddonClick?: (addonServiceId: string) => void;
 }
 
-export function TicketItemRow({ item, addonSuggestions = [], ticketServiceIds, onAddonClick }: TicketItemRowProps) {
+export function TicketItemRow({ item, addonSuggestions = [], ticketServiceIds }: TicketItemRowProps) {
   const { dispatch } = useTicket();
   const { services } = useCatalog();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteValue, setNoteValue] = useState(item.notes ?? '');
+  const [pickerService, setPickerService] = useState<CatalogService | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const noteInputRef = useRef<HTMLInputElement>(null);
 
@@ -316,41 +317,44 @@ export function TicketItemRow({ item, addonSuggestions = [], ticketServiceIds, o
           </button>
 
           {addonsExpanded && (
-            <div className="mt-1 space-y-1">
+            <div className="mt-1 flex gap-2 overflow-x-auto pb-1.5 scrollbar-hide">
               {availableAddons.map((addon) => {
                 const addonService = services.find((s) => s.id === addon.addonServiceId);
                 const standalonePrice = addonService?.flat_price
                   ?? addonService?.pricing?.[0]?.price
                   ?? null;
                 const comboPrice = addon.comboPrice;
-                const savings = standalonePrice != null && comboPrice != null && standalonePrice > comboPrice
+                const savings = standalonePrice != null && comboPrice != null
                   ? standalonePrice - comboPrice
                   : null;
 
                 return (
                   <button
                     key={addon.addonServiceId}
-                    onClick={() => onAddonClick?.(addon.addonServiceId)}
-                    className="flex w-full items-center justify-between rounded-md border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20 px-2.5 py-1.5 text-left transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/40 active:scale-[0.99]"
+                    onClick={() => {
+                      const svc = services.find((s) => s.id === addon.addonServiceId);
+                      if (svc) setPickerService(svc);
+                    }}
+                    className="flex shrink-0 flex-col items-start rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-left transition-colors hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/40 active:scale-[0.98]"
                   >
-                    <span className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate mr-2">
+                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100 max-w-[160px] truncate">
                       {addon.addonServiceName}
                     </span>
-                    <div className="flex shrink-0 items-center gap-1.5">
+                    <div className="mt-0.5 flex items-center gap-1.5">
                       {comboPrice != null && (
                         <span className="text-xs font-semibold text-green-600 dark:text-green-400">
                           ${comboPrice.toFixed(0)}
                         </span>
                       )}
-                      {standalonePrice != null && savings != null && savings > 0 && (
-                        <>
-                          <span className="text-[10px] text-gray-400 dark:text-gray-500 line-through">
-                            ${standalonePrice.toFixed(0)}
-                          </span>
-                          <span className="text-[10px] font-medium text-green-600 dark:text-green-400">
-                            Save ${savings.toFixed(0)}
-                          </span>
-                        </>
+                      {standalonePrice != null && comboPrice != null && standalonePrice > comboPrice && (
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 line-through">
+                          ${standalonePrice.toFixed(0)}
+                        </span>
+                      )}
+                      {savings != null && savings > 0 && (
+                        <span className="text-[10px] font-medium text-green-600 dark:text-green-400">
+                          Save ${savings.toFixed(0)}
+                        </span>
                       )}
                     </div>
                   </button>
@@ -359,6 +363,15 @@ export function TicketItemRow({ item, addonSuggestions = [], ticketServiceIds, o
             </div>
           )}
         </div>
+      )}
+
+      {/* Service detail dialog for adding addon */}
+      {pickerService && (
+        <ServiceDetailDialog
+          service={pickerService}
+          open={!!pickerService}
+          onClose={() => setPickerService(null)}
+        />
       )}
     </div>
   );
