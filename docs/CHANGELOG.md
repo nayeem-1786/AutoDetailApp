@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Supabase AbortError — Web Locks Singleton — 2026-02-26
+
+### fix(auth): store Supabase browser client on window to survive HMR
+
+After dev server restarts or HMR, Next.js re-executes modules and the module-level `let client = null` singleton would reset, creating a new Supabase client that fights the orphaned instance for the same Web Lock → `AbortError: signal is aborted without reason` → white screen.
+
+**Fix:** Store the browser client on `window.__supabase_browser_client` instead of a module-level variable. `window` survives HMR, so the same client instance is reused across hot reloads.
+
+**File modified:**
+- `src/lib/supabase/client.ts`
+
+---
+
 ## Auth Resilience — Eliminate White Screen of Death — 2026-02-26
 
 ### fix(auth): prevent white screen on stale session cookies
