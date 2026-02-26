@@ -349,7 +349,7 @@ export function HeaderClient({
                   </Link>
                   <button
                     type="button"
-                    onClick={async () => { setMobileOpen(false); await handleSignOut(); }}
+                    onClick={() => handleSignOut()}
                     className="flex w-full items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
                   >
                     <LogOut className="w-4 h-4" />

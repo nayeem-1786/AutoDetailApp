@@ -5,6 +5,38 @@ import { customerProfileSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const admin = createAdminClient();
+    const { data: customer } = await admin
+      .from('customers')
+      .select('first_name, last_name, phone, email')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: 'Customer record not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(customer);
+  } catch (err) {
+    console.error('Profile fetch error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();

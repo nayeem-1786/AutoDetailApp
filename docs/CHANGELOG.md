@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CRITICAL: Mobile Logout, Empty Booking-As Data, Sign-Out Resilience — 2026-02-25
+
+### Fix (critical): mobile logout iOS touch event, empty booking-as profile fetch, sign-out resilience
+
+**Fix 1 — Mobile logout not working on iOS Safari**
+- Root cause: `setMobileOpen(false)` triggers CSS grid-row transition that collapses the mobile menu. iOS Safari cancels remaining JS execution when a touch target's ancestor transitions to `overflow: hidden` / height 0
+- `await handleSignOut()` never ran after `setMobileOpen(false)`
+- Fix: removed `setMobileOpen(false)` and async/await — just call `handleSignOut()` directly. The function ends with `window.location.href = '/'` which inherently closes the menu
+
+**Fix 2 — "Booking as:" shows empty customer data**
+- Root cause: `/api/customer/profile` route only had a PATCH handler — no GET handler. `handleAuthSuccess` in `inline-auth.tsx` fetches `GET /api/customer/profile` which returned 405 Method Not Allowed
+- `profileRes.ok` was false → customer data fell back to empty strings `{ first_name: '', last_name: '', phone: '', email: '' }`
+- Fix: added GET handler to `/api/customer/profile/route.ts` that returns `{ first_name, last_name, phone, email }` for the authenticated user
+- Also added 100ms initial delay + retry logic with 500ms delay for auth cookie timing issues
+
+**Fix 3 — Sign-out handler resilience in booking form**
+- `handleSignOutClick` used `await onSignOut()` which could be interrupted by iOS touch event cancellation
+- Fix: made handler synchronous — clears local React state immediately (ref, state, view) then fires `onSignOut()` asynchronously via `Promise.resolve().catch()`
+- UI transitions to buttons view instantly; session cleanup happens in background
+
+**Files modified:**
+- `src/components/public/header-client.tsx` — mobile logout handler
+- `src/app/api/customer/profile/route.ts` — added GET handler
+- `src/components/booking/inline-auth.tsx` — auth success retry logic, sign-out handler
+
+---
+
 ## Phone Display — Only Business Numbers Are Clickable — 2026-02-25
 
 ### Fix: phone links only on business numbers, customer phones as plain text spans

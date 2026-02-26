@@ -1452,6 +1452,9 @@ export function InlineAuth({
     setSwitchPhone('');
     setFetchingProfile(true);
     try {
+      // Small delay to ensure Supabase session cookie is fully set
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const [profileRes, vehiclesRes] = await Promise.all([
         fetch('/api/customer/profile'),
         fetch('/api/customer/vehicles'),
@@ -1475,6 +1478,21 @@ export function InlineAuth({
         vehicles = vehicleData.data || vehicleData || [];
       }
 
+      // If profile returned empty data, retry once after a longer delay (auth timing issue)
+      if (!customer.first_name && !customer.phone && !profileRes.ok) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const retryRes = await fetch('/api/customer/profile');
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          customer = {
+            first_name: retryData.first_name || '',
+            last_name: retryData.last_name || '',
+            phone: retryData.phone || '',
+            email: retryData.email || '',
+          };
+        }
+      }
+
       const data = { customer, vehicles };
       localAuthRef.current = data;
       setLocalAuthData(data);
@@ -1490,12 +1508,15 @@ export function InlineAuth({
   }, [onAuthComplete]);
 
   // Handle "Not you?" or "Sign out" — clear auth and return to buttons
-  const handleSignOutClick = useCallback(async () => {
+  const handleSignOutClick = useCallback(() => {
+    // Clear local state immediately (synchronous — prevents iOS touch event cancellation)
     localAuthRef.current = null;
     setLocalAuthData(null);
     setSwitchPhone('');
-    await onSignOut();
     setView('buttons');
+
+    // Fire sign-out asynchronously — don't block the UI
+    Promise.resolve(onSignOut()).catch((err: unknown) => console.error('Sign out error:', err));
   }, [onSignOut]);
 
   // Switch to sign-in from sign-up (with optional phone pre-fill)
