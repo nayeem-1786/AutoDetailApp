@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix iOS Showing "Passwords" Instead of Contact Suggestions — Session 14K — 2026-02-25
+
+### fix(booking): replace form with div on phone input to show iOS contacts instead of Passwords
+
+- Replaced `<form>` with `<div>` for the phone mode block in `SignInFlow` to prevent iOS Safari from classifying it as a login form
+- Changed Continue button from `type="submit"` to `type="button"` with `onClick` handler
+- Added `onKeyDown` Enter key handler to the phone input to preserve desktop Enter-to-submit
+- Changed `autoComplete="tel"` to `autoComplete="tel-national"` to better trigger iOS contact suggestions
+- Only the phone mode form was changed — email and OTP forms remain as `<form>` elements
+
+**File modified:** `src/components/booking/inline-auth.tsx`
+
+---
+
 ## Clear Booking State After Successful Booking — Session 14J — 2026-02-25
 
 ### fix(booking): clear URL state after successful booking
