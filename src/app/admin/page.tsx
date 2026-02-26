@@ -273,7 +273,7 @@ export default function AdminDashboard() {
 
       {/* Low Stock Alert banner */}
       {!loading && (stockAlerts.lowStock > 0 || stockAlerts.outOfStock > 0) && (
-        <Link href="/admin/catalog/products?stock=low-stock">
+        <Link href="/admin/catalog/products?stock=low-stock" className="block">
           <div className="cursor-pointer rounded-lg border border-amber-200 bg-amber-50 p-4 transition-shadow hover:shadow-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

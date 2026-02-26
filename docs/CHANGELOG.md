@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Stock Alert Card Spacing on Admin Dashboard — 2026-02-25
+
+- Added `className="block"` to the Stock Alert `<Link>` on the admin dashboard
+- The `space-y-6` wrapper uses CSS margin-top on siblings, but `<a>` is inline by default — margin doesn't apply to inline elements
+- `block` makes it a block element so the gap renders correctly
+
+**File modified:** `src/app/admin/page.tsx`
+
+---
+
 ## Fix iOS Showing "Passwords" Instead of Contact Suggestions — Session 14K — 2026-02-25
 
 ### fix(booking): replace form with div on phone input to show iOS contacts instead of Passwords
