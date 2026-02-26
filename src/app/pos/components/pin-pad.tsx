@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Delete } from 'lucide-react';
 
@@ -19,7 +20,7 @@ const KEYS = [
   ['.', '0', 'backspace'],
 ];
 
-export function PinPad({
+export const PinPad = memo(function PinPad({
   onDigit,
   onBackspace,
   onAction,
@@ -92,4 +93,4 @@ export function PinPad({
       )}
     </div>
   );
-}
+});

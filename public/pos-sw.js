@@ -1,5 +1,5 @@
-const CACHE_NAME = 'pos-cache-v3';
-const DATA_CACHE_NAME = 'pos-data-v3';
+const CACHE_NAME = 'pos-cache-v4';
+const DATA_CACHE_NAME = 'pos-data-v4';
 
 // App shell assets to pre-cache
 const APP_SHELL = [
@@ -82,54 +82,44 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // POS pages — stale-while-revalidate
+  // POS pages — network-first with offline fallback
   if (url.pathname.startsWith('/pos')) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        const networkFetch = fetch(request)
-          .then((response) => {
-            if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-            }
-            return response;
-          })
-          .catch(() => null);
-
-        if (cached) {
-          networkFetch;
-          return cached;
-        }
-
-        return networkFetch.then((response) => {
-          if (response) return response;
-          return caches.match('/pos/offline');
-        });
-      })
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request).then((cached) => {
+            return cached || caches.match('/pos/offline');
+          });
+        })
     );
     return;
   }
 
-  // Static assets — cache first
+  // Static assets — network-first (hashed filenames handle versioning)
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/icons/') ||
     url.pathname.match(/\.(js|css|png|jpg|jpeg|webp|svg|woff2?)$/)
   ) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        return (
-          cached ||
-          fetch(request).then((response) => {
-            if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-            }
-            return response;
-          })
-        );
-      })
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
+    return;
   }
 
   // Everything else: don't call respondWith — browser handles natively

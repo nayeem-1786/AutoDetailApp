@@ -59,7 +59,7 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
     [onSuccess]
   );
 
-  function handleDigit(d: string) {
+  const handleDigit = useCallback((d: string) => {
     if (d === '.' || submittingRef.current) return;
 
     const current = digitsRef.current;
@@ -73,15 +73,15 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
     if (next.length === 4) {
       handleSubmit(next);
     }
-  }
+  }, [handleSubmit]);
 
-  function handleBackspace() {
+  const handleBackspace = useCallback(() => {
     if (submittingRef.current) return;
     const next = digitsRef.current.slice(0, -1);
     digitsRef.current = next;
     setDigits(next);
     setError(null);
-  }
+  }, []);
 
   const content = (
     <div className="w-full max-w-sm px-4">
@@ -117,7 +117,7 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
           <div
             key={i}
             className={cn(
-              'h-4 w-4 rounded-full border-2 transition-all duration-150',
+              'h-4 w-4 rounded-full border-2 transition-colors duration-100',
               i < digits.length
                 ? 'border-white bg-white'
                 : 'border-gray-600 bg-transparent'

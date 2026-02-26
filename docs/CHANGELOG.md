@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## POS PIN Pad Performance + PWA Service Worker Fix — 2026-02-26
+
+### perf(pos): memoize PIN pad, network-first service worker
+
+**PIN Pad lag fix:**
+- Wrapped `PinPad` component with `React.memo` to prevent re-renders when parent state changes
+- Converted `handleDigit` and `handleBackspace` to `useCallback` in `PinScreen` so function refs are stable across renders
+- Changed dot indicator transition from `transition-all duration-150` to `transition-colors duration-100` — only color changes, no unnecessary GPU work
+
+**PWA stale asset fix:**
+- Changed POS pages from stale-while-revalidate to **network-first** with offline fallback — always serves latest HTML when online
+- Changed static assets from cache-first to **network-first** — eliminates stale chunk serving after rebuilds
+- Bumped cache version to v4 to force eviction of all old cached assets
+
+**Files modified:**
+- `src/app/pos/components/pin-pad.tsx` — `React.memo` wrapper
+- `src/app/pos/components/pin-screen.tsx` — `useCallback` handlers, transition fix
+- `public/pos-sw.js` — network-first strategy, cache v4
+
+---
+
 ## Auth Troubleshooting Docs, Login Flash Fix, Orphan Cleanup — 2026-02-26
 
 ### docs: comprehensive auth troubleshooting guide + fix login flash + cleanup orphaned code
