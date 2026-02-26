@@ -444,7 +444,12 @@ function SignInFlow({
 
       {/* Phone Input */}
       {mode === 'phone' && (
-        <div className="space-y-5">
+        <form
+          autoComplete="off"
+          data-form-type="other"
+          onSubmit={(e) => { e.preventDefault(); phoneForm.handleSubmit(sendOtp)(); }}
+          className="space-y-5"
+        >
           <FormField
             label="Mobile"
             required
@@ -454,7 +459,7 @@ function SignInFlow({
             <Input
               id="inline-phone"
               type="tel"
-              autoComplete="tel-national"
+              autoComplete="tel"
               inputMode="tel"
               autoFocus
               placeholder="(310) 555-1234"
@@ -462,12 +467,6 @@ function SignInFlow({
               data-form-type="other"
               data-1p-ignore
               data-lpignore="true"
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  phoneForm.handleSubmit(sendOtp)();
-                }
-              }}
               {...phoneForm.register('phone', {
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                   const formatted = formatPhoneInput(e.target.value);
@@ -481,8 +480,7 @@ function SignInFlow({
           </FormField>
 
           <Button
-            type="button"
-            onClick={phoneForm.handleSubmit(sendOtp)}
+            type="submit"
             disabled={loading}
             className="site-btn-primary w-full py-3 text-sm font-semibold"
           >
@@ -502,7 +500,7 @@ function SignInFlow({
           >
             Use email instead
           </button>
-        </div>
+        </form>
       )}
 
       {/* OTP Verification */}

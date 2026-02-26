@@ -21,6 +21,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - Changed "Welcome Back" heading to "Enter your details" (removes auth-associated heading text)
 - Email/OTP input IDs intentionally kept as `inline-signin-*` — those modes benefit from password/OTP autofill
 
+### fix(booking): restore form wrapper for iOS contact autofill
+
+- Restored `<form>` wrapper around phone input — iOS needs a `<form>` context to trigger QuickType contact suggestions
+- Added `autoComplete="off"` and `data-form-type="other"` on the `<form>` to prevent login classification
+- Changed input `autoComplete` from `tel-national` back to `tel` (more widely recognized token for contact autofill)
+- Restored `type="submit"` on Continue button and moved submit handler to `<form onSubmit>`
+- Removed manual `onKeyDown` Enter handler (native form submission handles it now)
+- Combined with the auth-signal removal (no "signin" IDs, no auth text), iOS should now classify this as a contact form, not a login form
+
 **File modified:** `src/components/booking/inline-auth.tsx`
 
 ---
