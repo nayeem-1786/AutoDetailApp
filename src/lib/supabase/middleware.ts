@@ -29,18 +29,9 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    return { user, supabaseResponse };
-  } catch (error) {
-    // Auth call failed (network error, Supabase outage, etc.)
-    // Do NOT delete cookies — the session may still be valid.
-    // Return user as null so the caller can redirect to login if needed.
-    console.warn('[middleware] Auth getUser() error (session preserved):', error instanceof Error ? error.message : error);
-
-    return { user: null, supabaseResponse };
-  }
+  return { user, supabaseResponse };
 }

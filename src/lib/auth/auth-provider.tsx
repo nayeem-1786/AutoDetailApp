@@ -92,24 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    // Get initial session — wrapped in catch to handle stale/corrupt cookies
-    supabase.auth
-      .getSession()
-      .then(({ data: { session: s } }: { data: { session: Session | null } }) => {
-        setSession(s);
-        setUser(s?.user ?? null);
-        if (s?.user) {
-          loadEmployeeData(s.user.id).finally(() => setLoading(false));
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch((error: unknown) => {
-        console.warn('[auth] getSession failed:', error instanceof Error ? error.message : error);
-        // Do NOT call signOut() — the session may be valid but temporarily unreachable.
-        // Just mark as not loading so the UI can render (middleware handles redirect).
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
+      setSession(s);
+      setUser(s?.user ?? null);
+      if (s?.user) {
+        loadEmployeeData(s.user.id).finally(() => setLoading(false));
+      } else {
         setLoading(false);
-      });
+      }
+    });
 
     // Listen for auth changes
     const {
@@ -118,10 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        loadEmployeeData(s.user.id).catch((error: unknown) => {
-          console.warn('[auth] loadEmployeeData failed:', error instanceof Error ? error.message : error);
-          // Employee data load failed but session is valid — don't destroy it.
-        });
+        loadEmployeeData(s.user.id);
       } else {
         setEmployee(null);
         setPermissions([]);
@@ -159,10 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
         }
       } catch (err) {
-        // Network error during validation — do NOT destroy the session.
-        // The session may still be valid; we just couldn't verify it this time.
-        // Next interval or focus event will retry.
-        console.warn('[auth] Session validation network error (will retry):', err instanceof Error ? err.message : err);
+        console.error('Session validation error:', err);
       }
     };
 

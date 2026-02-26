@@ -4,23 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Fix Auth Login Loop — 2026-02-26
+## Revert Auth Files to Pre-Resilience State — 2026-02-26
 
-### fix(auth): remove destructive signOut calls from error handlers
+### fix(auth): revert auth-provider and supabase middleware to pre-resilience state — fixes login loop
 
-Login was looping — after entering credentials, the page redirected back to `/login` with form cleared. Root cause: overly aggressive error handling was destroying valid sessions on transient errors.
+The "auth resilience" session introduced `.catch()` blocks and try/catch wrappers that caused an infinite login loop. After entering valid credentials, the user got redirected back to `/login` repeatedly.
 
-**What was wrong:**
-- `middleware.ts` catch block deleted all `sb-*` cookies on ANY `getUser()` error
-- `auth-provider.tsx` had three separate catch blocks calling `supabase.auth.signOut()` on transient errors — permanently invalidating sessions on Supabase's servers even when the session was actually valid
+**Root cause chain:**
+1. Login succeeds → browser navigates to `/admin` → middleware returns 200
+2. AuthProvider calls `getSession()` → it throws (AbortError from Web Locks)
+3. The `.catch()` block sets `loading = false` with `employee = null`
+4. `AdminContent` useEffect: `!loading && !employee` → `router.push('/login')` → LOOP
 
-**Philosophy change:**
-- Before: Any error → immediately destroy session → redirect to login
-- After: Transient errors → log and retry, preserve session. Only redirect when Supabase explicitly says session is invalid (no `signOut()` needed — it's already invalid)
+**Fix:** Reverted both files to their exact pre-resilience state — no try/catch, no `.catch()`, no signOut in error handlers.
 
-**Files modified:**
-- `src/lib/supabase/middleware.ts` — removed cookie deletion from catch block
-- `src/lib/auth/auth-provider.tsx` — removed `signOut()` from getSession catch, onAuthStateChange outer try/catch, and validateSession catch
+**Files reverted:**
+- `src/lib/supabase/middleware.ts` — removed try/catch around `getUser()`
+- `src/lib/auth/auth-provider.tsx` — removed `.catch()` on `getSession()`, removed `.catch()` on `loadEmployeeData()` in auth state change listener
 
 ---
 
