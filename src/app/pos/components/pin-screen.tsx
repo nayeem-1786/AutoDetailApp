@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
@@ -19,12 +19,15 @@ interface PinScreenProps {
 export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProps) {
   const { info: businessInfo } = useBusinessInfo();
   const [digits, setDigits] = useState('');
+  const digitsRef = useRef('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [shake, setShake] = useState(false);
 
   const handleSubmit = useCallback(
     async (pin: string) => {
+      submittingRef.current = true;
       setSubmitting(true);
       setError(null);
 
@@ -44,10 +47,12 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
         onSuccess(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Invalid PIN');
+        digitsRef.current = '';
         setDigits('');
         setShake(true);
         setTimeout(() => setShake(false), 500);
       } finally {
+        submittingRef.current = false;
         setSubmitting(false);
       }
     },
@@ -55,22 +60,26 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
   );
 
   function handleDigit(d: string) {
-    if (d === '.' || submitting) return;
-    const next = digits + d;
-    if (next.length > 4) return;
+    if (d === '.' || submittingRef.current) return;
 
+    const current = digitsRef.current;
+    if (current.length >= 4) return;
+
+    const next = current + d;
+    digitsRef.current = next;
     setDigits(next);
     setError(null);
 
     if (next.length === 4) {
-      // Brief delay so user sees all 4 dots fill before submit
-      setTimeout(() => handleSubmit(next), 200);
+      handleSubmit(next);
     }
   }
 
   function handleBackspace() {
-    if (submitting) return;
-    setDigits(digits.slice(0, -1));
+    if (submittingRef.current) return;
+    const next = digitsRef.current.slice(0, -1);
+    digitsRef.current = next;
+    setDigits(next);
     setError(null);
   }
 

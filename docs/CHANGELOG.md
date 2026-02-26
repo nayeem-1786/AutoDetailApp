@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix POS PIN Pad Slow/Dropped Keystrokes — 2026-02-25
+
+### fix(pos): use ref for PIN digits to support fast keystroke entry
+
+- Added `digitsRef` and `submittingRef` to track current values synchronously (no stale closure)
+- `handleDigit` reads from `digitsRef.current` instead of `digits` state, preventing dropped keystrokes when tapping faster than React re-renders
+- `handleBackspace` also uses the ref for consistency
+- Removed 200ms `setTimeout` before submit — PIN now submits immediately when 4th digit entered
+- `handleSubmit` clears `digitsRef` on error and manages `submittingRef` for double-submit prevention
+
+**File modified:** `src/app/pos/components/pin-screen.tsx`
+
+---
+
 ## Fix: Stock Alert Card Spacing on Admin Dashboard — 2026-02-25
 
 - Added `className="block"` to the Stock Alert `<Link>` on the admin dashboard
