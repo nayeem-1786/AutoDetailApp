@@ -1122,6 +1122,7 @@ docs/dev/DATA_MIGRATION_RULES.md
 docs/dev/DESIGN_SYSTEM.md
 docs/dev/FILE_TREE.md          ← this file
 docs/dev/POS_SECURITY.md
+docs/dev/TROUBLESHOOTING.md
 docs/dev/QBO_INTEGRATION.md
 docs/dev/SERVICE_CATALOG.md
 docs/manual/README.md

@@ -97,7 +97,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">{businessInfo?.name || 'Staff Login'}</CardTitle>
+          <CardTitle className="text-2xl">{businessInfo?.name || '\u00A0'}</CardTitle>
           <CardDescription>Sign in to your staff account</CardDescription>
         </CardHeader>
         <CardContent>

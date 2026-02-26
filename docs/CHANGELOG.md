@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Auth Troubleshooting Docs, Login Flash Fix, Orphan Cleanup — 2026-02-26
+
+### docs: comprehensive auth troubleshooting guide + fix login flash + cleanup orphaned code
+
+1. **Troubleshooting doc** (`docs/dev/TROUBLESHOOTING.md`) — Added complete "Auth Login Loop / Infinite Spinner After Login" section documenting root cause (Supabase Web Locks API), investigation timeline, what fixed it (custom `lock` bypass in `client.ts`), `onAuthStateChange` loading fallback, key lessons, and quick diagnostic commands.
+
+2. **Login flash fix** (`src/app/(auth)/login/page.tsx`) — Replaced `'Staff Login'` fallback in `<CardTitle>` with `'\u00A0'` (non-breaking space). Eliminates the jarring flash of "Staff Login" before `useBusinessInfo()` resolves with the actual business name.
+
+3. **Error boundary cleanup** (`src/app/admin/admin-shell.tsx`) — Changed `AdminErrorBoundary` heading from "Session Error" to "Something went wrong" (more generic). Removed cookie-clearing logic from the "Go to Login" button — error boundaries shouldn't destroy cookies.
+
+4. **getSession catch safety** (`src/lib/auth/auth-provider.tsx`) — Added `setLoading(false)` to `getSession().catch()` so loading flips to false even if `onAuthStateChange` also fails.
+
+---
+
 ## Revert Auth Files to Pre-Resilience State — 2026-02-26
 
 ### fix(auth): revert auth-provider and supabase middleware to pre-resilience state — fixes login loop

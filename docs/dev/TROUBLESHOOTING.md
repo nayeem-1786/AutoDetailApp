@@ -149,4 +149,111 @@ npm run dev
 
 ---
 
+## Auth Login Loop / Infinite Spinner After Login
+
+### Symptoms
+One or more of these after entering valid credentials on `/login`:
+- Page redirects back to `/login` with form cleared — infinite loop, no error message
+- Page navigates to `/admin` but shows a white screen with a spinning loader forever
+- Browser console shows: `AbortError: signal is aborted without reason` from `@supabase/auth-js/dist/module/lib/locks.js`
+- Server terminal shows repeated `GET /admin 200` requests but page never renders
+
+### Root Cause: Supabase Web Locks API
+
+Supabase's auth client uses `navigator.locks.request()` (Web Locks API) to coordinate auth state across browser tabs. In Next.js dev mode, this causes `AbortError` because:
+
+1. The lock acquisition has a timeout — if `getSession()` and `signInWithPassword()` compete for the same lock, one times out
+2. HMR module re-execution can create orphaned lock holders
+3. The AbortError propagates as an unhandled promise rejection, preventing `loading` from ever becoming `false`
+
+When `loading` stays `true`, AdminContent shows a spinner forever. If error handlers call `signOut()` or delete cookies in response, it creates a login loop instead.
+
+### Investigation Timeline
+
+**What we tried (did NOT work):**
+
+1. **Clearing cookies manually** — Temporarily fixed symptoms but issue returned on every server restart or rebuild
+2. **Auth resilience session** — Added try/catch with `signOut()` in error handlers across `auth-provider.tsx` and `lib/supabase/middleware.ts`. This made things WORSE:
+   - `signOut()` is nuclear — it invalidates the session on Supabase's servers, not just locally
+   - Catch blocks in `onAuthStateChange` fired during the `SIGNED_IN` event itself, killing the session that was just created
+   - Middleware catch block deleted `sb-*` cookies, so the next request had no session
+   - Result: credentials accepted → session created → immediately destroyed → redirect to login → loop
+3. **Removing `signOut()` from error handlers** — Stopped the loop but revealed the underlying spinner issue: `getSession()` throws → `loading` never becomes `false`
+4. **Adding `setLoading(false)` to `onAuthStateChange`** — Correct idea but AbortError still prevented `getSession()` from completing, and the error itself crashed the React tree
+
+**Files examined during investigation:**
+- `src/lib/supabase/client.ts` — Browser Supabase client singleton
+- `src/lib/supabase/middleware.ts` — Server-side session refresh
+- `src/lib/auth/auth-provider.tsx` — Client-side auth state management
+- `src/app/admin/admin-shell.tsx` — Admin layout with auth guard
+- `src/app/(auth)/login/page.tsx` — Login form
+- `src/app/auth/callback/route.ts` — OAuth callback handler
+- `src/middleware.ts` — Root Next.js middleware
+- `node_modules/@supabase/auth-js/dist/module/lib/locks.js` — Supabase lock implementation
+
+**What actually fixed it:**
+
+Disabled Web Locks entirely by providing a custom `lock` function in the Supabase client config:
+
+```ts
+// src/lib/supabase/client.ts
+const client = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<unknown>) => {
+        return await fn();
+      },
+    },
+  }
+);
+```
+
+This replaces `navigator.locks.request()` with a pass-through that executes the function directly. Web Locks exist to coordinate across multiple browser tabs, but in a single-tab admin/POS setup they cause more problems than they solve.
+
+### Additional Required Fix
+
+`onAuthStateChange` in the original code never called `setLoading(false)`, relying entirely on `getSession()` to flip it. This is fragile — if `getSession()` fails for any reason, `loading` stays `true` forever. The fix adds `setLoading(false)` as a fallback in `onAuthStateChange` and a `.catch()` on `getSession()` to silence errors:
+
+```ts
+// In getSession().then(...)
+.catch((error: unknown) => {
+  console.warn('[auth] getSession error:', error instanceof Error ? error.message : error);
+});
+
+// In onAuthStateChange — both branches:
+if (s?.user) {
+  loadEmployeeData(s.user.id).finally(() => setLoading(false));
+} else {
+  // ... clear state ...
+  setLoading(false);
+}
+```
+
+### Key Lessons
+
+1. **Never call `signOut()` in error handlers** — it's a server-side session invalidation, not local cleanup. Only call it when the user explicitly clicks "Sign Out"
+2. **Never delete `sb-*` cookies in middleware catch blocks** — the session may be valid but temporarily unreachable
+3. **`loading` state must have a guaranteed path to `false`** — relying on a single async call without a fallback creates permanent spinners
+4. **Supabase Web Locks are problematic in Next.js dev mode** — the custom `lock` bypass is safe for single-tab usage
+5. **Supabase egress limits cause `fetch failed` errors** that masquerade as auth bugs — always check the Supabase dashboard usage page first
+
+### Quick Diagnostic
+
+```bash
+# 1. Is Supabase reachable?
+curl -s -o /dev/null -w "%{http_code}" "$(grep NEXT_PUBLIC_SUPABASE_URL .env.local | cut -d= -f2)/rest/v1/" -H "apikey: $(grep NEXT_PUBLIC_SUPABASE_ANON_KEY .env.local | cut -d= -f2)"
+# Should return 200
+
+# 2. Check browser console for AbortError
+# If present → Web Locks issue → verify client.ts has the lock bypass
+
+# 3. Check server terminal during login
+# GET /admin 200 = middleware found user (client-side issue)
+# GET /login 302 = middleware rejected user (server-side issue)
+```
+
+---
+
 *Last updated: 2026-02-26*

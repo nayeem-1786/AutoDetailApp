@@ -304,20 +304,13 @@ class AdminErrorBoundary extends React.Component<
       return (
         <div className="flex min-h-screen items-center justify-center bg-gray-50">
           <div className="mx-4 max-w-md text-center">
-            <h2 className="text-lg font-semibold text-gray-900">Session Error</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Something went wrong</h2>
             <p className="mt-2 text-sm text-gray-600">
-              Your session has expired or encountered an error. Please log in again.
+              An unexpected error occurred. Please try again or log in.
             </p>
             <div className="mt-4 flex justify-center gap-3">
               <button
                 onClick={() => {
-                  // Clear all Supabase cookies
-                  document.cookie.split(';').forEach((c) => {
-                    const name = c.trim().split('=')[0];
-                    if (name.startsWith('sb-')) {
-                      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-                    }
-                  });
                   window.location.href = '/login';
                 }}
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"

@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [supabase]
   );
 
-  useEffect(() => {
+useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
       setSession(s);
@@ -101,6 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setLoading(false);
       }
+    })
+    .catch((error: unknown) => {
+      console.warn('[auth] getSession error:', error instanceof Error ? error.message : error);
+      // Ensure loading flips to false even if onAuthStateChange also fails
+      setLoading(false);
     });
 
     // Listen for auth changes
@@ -110,13 +115,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        loadEmployeeData(s.user.id);
+        loadEmployeeData(s.user.id).finally(() => setLoading(false));
       } else {
         setEmployee(null);
         setPermissions([]);
         setIsSuper(false);
         setCanAccessPos(false);
         setRoleName('');
+        setLoading(false);
       }
     });
 
