@@ -673,8 +673,13 @@ export function BookingWizard({
 
   // Handle sign out from inline auth
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    }
+    // ALWAYS reset state, even if signOut fails
     setAuthCustomerData(null);
     setIsPortalDynamic(false);
     setState((prev) => ({

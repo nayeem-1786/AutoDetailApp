@@ -93,9 +93,14 @@ export function HeaderClient({
   }, []);
 
   const handleSignOut = useCallback(async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = '/';
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    } finally {
+      window.location.href = '/';
+    }
   }, []);
 
   return (
@@ -344,7 +349,7 @@ export function HeaderClient({
                   </Link>
                   <button
                     type="button"
-                    onClick={() => { setMobileOpen(false); handleSignOut(); }}
+                    onClick={async () => { setMobileOpen(false); await handleSignOut(); }}
                     className="flex w-full items-center gap-2.5 py-3 px-3 text-site-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
                   >
                     <LogOut className="w-4 h-4" />

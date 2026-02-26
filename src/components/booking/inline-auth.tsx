@@ -82,7 +82,7 @@ async function checkExists(params: { phone?: string; email?: string }): Promise<
 }
 
 // --- Shared input class ---
-const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime';
+const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime text-base sm:text-sm';
 
 // --- Sign In Flow ---
 
@@ -437,7 +437,7 @@ function SignInFlow({
 
       {/* Phone Input */}
       {mode === 'phone' && (
-        <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5">
+        <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5" data-form-type="other" autoComplete="off">
           <FormField
             label="Mobile"
             required
@@ -451,6 +451,9 @@ function SignInFlow({
               autoFocus
               placeholder="(310) 555-1234"
               className={inputCls}
+              data-form-type="other"
+              data-1p-ignore
+              data-lpignore="true"
               {...phoneForm.register('phone', {
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                   const formatted = formatPhoneInput(e.target.value);
@@ -1244,7 +1247,7 @@ function SignUpFlow({
               id="inline-otp-phone"
               value={formatPhone(otpPhone)}
               readOnly
-              className="bg-brand-dark text-site-text-muted border-site-border"
+              className="bg-brand-dark text-site-text-muted border-site-border text-base sm:text-sm"
             />
           </FormField>
 
@@ -1440,6 +1443,7 @@ export function InlineAuth({
   const [view, setView] = useState<AuthView>('buttons');
   const [switchPhone, setSwitchPhone] = useState('');
   const [fetchingProfile, setFetchingProfile] = useState(false);
+  const localAuthRef = useRef<AuthCustomerData | null>(null);
   const [localAuthData, setLocalAuthData] = useState<AuthCustomerData | null>(null);
 
   // After auth success: fetch customer profile + vehicles
@@ -1472,10 +1476,12 @@ export function InlineAuth({
       }
 
       const data = { customer, vehicles };
+      localAuthRef.current = data;
       setLocalAuthData(data);
       onAuthComplete(data);
     } catch {
       const fallback: AuthCustomerData = { customer: { first_name: '', last_name: '', phone: '', email: '' }, vehicles: [] };
+      localAuthRef.current = fallback;
       setLocalAuthData(fallback);
       onAuthComplete(fallback);
     } finally {
@@ -1485,6 +1491,7 @@ export function InlineAuth({
 
   // Handle "Not you?" or "Sign out" — clear auth and return to buttons
   const handleSignOutClick = useCallback(async () => {
+    localAuthRef.current = null;
     setLocalAuthData(null);
     setSwitchPhone('');
     await onSignOut();
@@ -1504,8 +1511,8 @@ export function InlineAuth({
   }, []);
 
   // Already authenticated — show compact info line
-  const effectiveData = customerData || localAuthData;
-  if ((isAuthenticated || !!localAuthData) && effectiveData) {
+  const effectiveData = customerData || localAuthData || localAuthRef.current;
+  if ((isAuthenticated || !!localAuthData || !!localAuthRef.current) && effectiveData) {
     const { first_name, last_name, phone, email } = effectiveData.customer;
     return (
       <div className="rounded-lg border border-lime/30 bg-lime/5 p-4">
@@ -1515,8 +1522,8 @@ export function InlineAuth({
             <p className="text-sm font-medium text-site-text">
               Booking as: {first_name} {last_name}
             </p>
-            <p className="mt-0.5 text-xs text-site-text-muted truncate" suppressHydrationWarning>
-              {phone ? formatPhone(phone) : ''}{phone && email ? ' · ' : ''}{email}
+            <p className="mt-0.5 text-xs text-site-text-muted truncate">
+              {phone ? <a href={`tel:${phone}`} className="hover:underline">{formatPhone(phone)}</a> : ''}{phone && email ? ' · ' : ''}{email}
             </p>
           </div>
 

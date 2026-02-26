@@ -4,6 +4,53 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CRITICAL: iOS Hydration Mismatch Root Cause, Logout, Auth Resilience, Zoom Prevention, Step 1 Labels — Session 14H — 2026-02-25
+
+### Fix (critical): Booking flow stability on iOS Safari
+
+**Fix 1 — iOS hydration mismatch root cause (format-detection meta)**
+- iOS Safari auto-converts phone-number-shaped text into `<a href="tel:...">` links before React hydrates
+- This creates a structural DOM mismatch that destroys the entire component tree
+- Added `format-detection: telephone=no` meta tag to root layout metadata
+- Wrapped phone number in "Booking as" line inside explicit `<a href="tel:...">` so server/client DOM match
+- Removed unnecessary `suppressHydrationWarning` that only masks text mismatches, not structural ones
+
+**Fix 2 — Logout handlers resilient with try/catch/finally**
+- Header `handleSignOut`: wrapped in try/catch/finally so redirect always happens even if `signOut()` throws
+- Mobile menu logout now properly awaits `handleSignOut`
+- Booking wizard `handleSignOut`: wrapped in try/catch so state always resets even if `signOut()` fails
+
+**Fix 3 — Auth state resilience with useRef backup**
+- Added `localAuthRef` in `InlineAuth` that persists auth data across tree regeneration
+- `handleAuthSuccess` stores data in both state and ref
+- `effectiveData` falls back to ref if state was wiped by hydration recovery
+- "Booking as" display now survives component tree regeneration
+
+**Fix 4 — Auth state sync verification (Fix 4 from session spec)**
+- Verified `onAuthStateChange` listener from 14G is correctly implemented in `header-client.tsx`
+- With hydration fix in place, the listener subscription is no longer destroyed by tree regeneration
+
+**Fix 5 — iOS zoom prevention on input fields**
+- Added `text-base sm:text-sm` to shared `inputCls` used by all inline auth inputs
+- `text-base` = 16px on mobile prevents iOS auto-zoom; `sm:text-sm` = 14px on desktop for normal sizing
+- Applied to read-only phone display input separately (different class)
+- OTP inputs already use `text-lg` (18px) so they were already safe
+
+**Fix 6 — iOS contact suggestions for "Returning Customer" phone input**
+- Added `data-form-type="other"` to sign-in phone form to prevent iOS from detecting it as a login form
+- Added `data-1p-ignore` and `data-lpignore="true"` to phone input to suppress password managers
+- Added `autoComplete="off"` on the form element
+- iOS should now show contact phone suggestions instead of "Passwords"
+
+**Fix 7 — Step 1 label text and color changes**
+- "Vehicle Size" → "Choose Vehicle Size" in lime green (`text-lime`)
+- "Add-ons (optional)" → "Choose Add-ons (optional)" in lime green (`text-lime`)
+- Applied to both `vehicle_size` and `scope`/`specialty` pricing model vehicle size sections
+
+**Files modified:** `layout.tsx`, `header-client.tsx`, `booking-wizard.tsx`, `inline-auth.tsx`, `step-service-select.tsx`
+
+---
+
 ## Auth State Sync, Deposit Logic, Loyalty Payment Polish — Session 14G — 2026-02-25
 
 ### Fix: Auth state sync between booking flow and site header, deposit visibility for returning customers, loyalty points payment logic, OTP auto-focus, layout polish

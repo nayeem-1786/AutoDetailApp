@@ -25,6 +25,9 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || SITE_URL),
     title: businessInfo.name,
     description: `${businessInfo.name} — management platform`,
+    other: {
+      'format-detection': 'telephone=no',
+    },
   };
 }
 

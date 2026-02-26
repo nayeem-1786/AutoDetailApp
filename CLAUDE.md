@@ -27,6 +27,8 @@
 12. **File paths**: Exact file paths are in docs/dev/FILE_TREE.md. Read it before modifying any files. Never guess paths.
 13. **FILE_TREE.md**: If a session creates new files in API routes, admin pages, lib modules, components, POS components, or migrations, update `docs/dev/FILE_TREE.md` with the new paths before committing.
 14. **Service category management** (create, rename, merge, reorder) should be done through the Admin UI, not SQL migrations. The admin already supports full category CRUD.
+15. **iOS format-detection**: Root layout includes `format-detection: telephone=no` meta tag. Never render phone numbers as plain text in customer-facing components — always wrap in `<a href="tel:...">` to prevent iOS Safari from auto-linking and causing hydration mismatches.
+16. **iOS input zoom prevention**: All text inputs in customer-facing forms must use `text-base sm:text-sm` to prevent iOS auto-zoom on focus (iOS zooms inputs with font-size < 16px).
 
 ## Project Structure
 

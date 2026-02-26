@@ -255,8 +255,8 @@ export function StepServiceSelect({
         {/* Add-ons */}
         {addonSuggestions.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-site-text">
-              Add-ons <span className="font-normal text-site-text-muted">(optional)</span>
+            <h3 className="text-sm font-semibold text-lime">
+              Choose Add-ons <span className="font-normal text-site-text-muted">(optional)</span>
             </h3>
             <div className="mt-2 space-y-2">
               {visibleAddons.map((suggestion) => {
@@ -913,8 +913,8 @@ function PricingSelector({
     case 'vehicle_size':
       return (
         <div>
-          <h3 className="text-sm font-semibold text-site-text-secondary">
-            Vehicle Size
+          <h3 className="text-sm font-semibold text-lime">
+            Choose Vehicle Size
           </h3>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {tiers.map((tier) => {
@@ -996,8 +996,8 @@ function PricingSelector({
             if (!current?.is_vehicle_size_aware) return null;
             return (
               <div>
-                <h3 className="text-sm font-semibold text-site-text-secondary">
-                  Vehicle Size
+                <h3 className="text-sm font-semibold text-lime">
+                  Choose Vehicle Size
                 </h3>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {(['sedan', 'truck_suv_2row', 'suv_3row_van'] as const).map((sc) => {
