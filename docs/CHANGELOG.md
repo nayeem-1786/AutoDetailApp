@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phone Display — Only Business Numbers Are Clickable — 2026-02-25
+
+### Fix: phone links only on business numbers, customer phones as plain text spans
+
+- Audited all `tel:` links across codebase — 14 instances total
+- 13 are business phone numbers (header, footer, CTA, quotes, authorize, terms, areas, account shell, appointment edit) → kept as `<a href="tel:...">`
+- 1 was customer's own phone in "Booking as" line (`inline-auth.tsx`) → changed from `<a href="tel:...">` to `<span>` wrapper
+- OTP confirmation text already uses `<span>` wrappers — no change needed
+- `format-detection: telephone=no` meta tag prevents iOS from auto-linking any phone text, so `<span>` is safe
+
+**Files modified:** `inline-auth.tsx`
+
+---
+
 ## CRITICAL: iOS Hydration Mismatch Root Cause, Logout, Auth Resilience, Zoom Prevention, Step 1 Labels — Session 14H — 2026-02-25
 
 ### Fix (critical): Booking flow stability on iOS Safari

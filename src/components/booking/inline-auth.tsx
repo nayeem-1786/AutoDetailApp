@@ -1523,7 +1523,7 @@ export function InlineAuth({
               Booking as: {first_name} {last_name}
             </p>
             <p className="mt-0.5 text-xs text-site-text-muted truncate">
-              {phone ? <a href={`tel:${phone}`} className="hover:underline">{formatPhone(phone)}</a> : ''}{phone && email ? ' · ' : ''}{email}
+              {phone ? <span>{formatPhone(phone)}</span> : ''}{phone && email ? ' · ' : ''}{email}
             </p>
           </div>
 
