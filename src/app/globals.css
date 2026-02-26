@@ -645,6 +645,10 @@ h1, h2, h3 {
 .public-theme::-webkit-scrollbar-thumb { background: var(--color-brand-grey-light); border-radius: 4px; }
 .public-theme::-webkit-scrollbar-thumb:hover { background: var(--color-lime); }
 
+/* Hidden scrollbar utility — for horizontal swipeable strips */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Pulse animation — uses accent RGB var */
 @keyframes lime-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(var(--theme-accent-glow-rgb), 0.3); }

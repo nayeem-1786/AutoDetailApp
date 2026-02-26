@@ -1,24 +1,40 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Minus, Plus, StickyNote, Trash2 } from 'lucide-react';
-import type { TicketItem } from '../types';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Minus, Plus, StickyNote, Trash2, Sparkles, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+import type { TicketItem, CatalogService } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import { useTicket } from '../context/ticket-context';
+import { useCatalog } from '../hooks/use-catalog';
+import { ServiceDetailDialog } from './service-detail-dialog';
+import type { AddonSuggestionEntry } from '../hooks/use-addon-suggestions';
 
 interface TicketItemRowProps {
   item: TicketItem;
+  addonSuggestions?: AddonSuggestionEntry[];
+  ticketServiceIds?: Set<string>;
 }
 
-export function TicketItemRow({ item }: TicketItemRowProps) {
+export function TicketItemRow({ item, addonSuggestions = [], ticketServiceIds }: TicketItemRowProps) {
   const { dispatch } = useTicket();
+  const { services } = useCatalog();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteValue, setNoteValue] = useState(item.notes ?? '');
+  const [pickerService, setPickerService] = useState<CatalogService | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const noteInputRef = useRef<HTMLInputElement>(null);
+
+  // Filter out addons already on the ticket
+  const availableAddons = useMemo(
+    () => addonSuggestions.filter((a) => !ticketServiceIds?.has(a.addonServiceId)),
+    [addonSuggestions, ticketServiceIds]
+  );
+
+  const [addonsExpanded, setAddonsExpanded] = useState(availableAddons.length > 0);
 
   useEffect(() => {
     if (editing) {
@@ -281,6 +297,81 @@ export function TicketItemRow({ item }: TicketItemRowProps) {
             Cancel
           </button>
         </div>
+      )}
+
+      {/* Inline addon suggestions — only for service items with available addons */}
+      {item.itemType === 'service' && availableAddons.length > 0 && (
+        <div className="mt-1.5">
+          <button
+            onClick={() => setAddonsExpanded(!addonsExpanded)}
+            className="flex items-center gap-1.5 py-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+          >
+            <Sparkles className="h-3 w-3" />
+            <span className="font-medium">
+              {availableAddons.length} add-on{availableAddons.length !== 1 ? 's' : ''} available
+            </span>
+            <ChevronDown className={cn(
+              'h-3 w-3 transition-transform',
+              addonsExpanded && 'rotate-180'
+            )} />
+          </button>
+
+          {addonsExpanded && (
+            <div className="mt-1 flex gap-2 overflow-x-auto pb-1.5 scrollbar-hide">
+              {availableAddons.map((addon) => {
+                const addonService = services.find((s) => s.id === addon.addonServiceId);
+                const standalonePrice = addonService?.flat_price
+                  ?? addonService?.pricing?.[0]?.price
+                  ?? null;
+                const comboPrice = addon.comboPrice;
+                const savings = standalonePrice != null && comboPrice != null
+                  ? standalonePrice - comboPrice
+                  : null;
+
+                return (
+                  <button
+                    key={addon.addonServiceId}
+                    onClick={() => {
+                      const svc = services.find((s) => s.id === addon.addonServiceId);
+                      if (svc) setPickerService(svc);
+                    }}
+                    className="flex shrink-0 flex-col items-start rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-left transition-colors hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/40 active:scale-[0.98]"
+                  >
+                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100 max-w-[160px] truncate">
+                      {addon.addonServiceName}
+                    </span>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      {comboPrice != null && (
+                        <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                          ${comboPrice.toFixed(0)}
+                        </span>
+                      )}
+                      {standalonePrice != null && comboPrice != null && standalonePrice > comboPrice && (
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 line-through">
+                          ${standalonePrice.toFixed(0)}
+                        </span>
+                      )}
+                      {savings != null && savings > 0 && (
+                        <span className="text-[10px] font-medium text-green-600 dark:text-green-400">
+                          Save ${savings.toFixed(0)}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Service detail dialog for adding addon */}
+      {pickerService && (
+        <ServiceDetailDialog
+          service={pickerService}
+          open={!!pickerService}
+          onClose={() => setPickerService(null)}
+        />
       )}
     </div>
   );

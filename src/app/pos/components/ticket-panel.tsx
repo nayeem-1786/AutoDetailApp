@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect, type UIEvent } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, type UIEvent } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -29,7 +29,7 @@ import { VehicleCreateDialog } from './vehicle-create-dialog';
 import { CouponInput } from './coupon-input';
 import { LoyaltyPanel } from './loyalty-panel';
 import { CustomerTypePrompt } from './customer-type-prompt';
-import { AddonSuggestions } from './addon-suggestions';
+import { useAddonSuggestions } from '../hooks/use-addon-suggestions';
 import {
   SwipeableCartItem,
   SwipeableCartList,
@@ -50,6 +50,11 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const { ticket, dispatch } = useTicket();
   const { isOpen: checkoutOpen } = useCheckout();
   const { services } = useCatalog();
+  const { suggestionsMap } = useAddonSuggestions();
+  const ticketServiceIds = useMemo(
+    () => new Set(ticket.items.filter((i) => i.serviceId).map((i) => i.serviceId!)),
+    [ticket.items]
+  );
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
@@ -299,7 +304,11 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                       onRemove={handleSwipeRemove}
                       onUndo={handleSwipeUndo}
                     >
-                      <TicketItemRow item={item} />
+                      <TicketItemRow
+                        item={item}
+                        addonSuggestions={item.serviceId ? (suggestionsMap.get(item.serviceId) ?? []) : []}
+                        ticketServiceIds={ticketServiceIds}
+                      />
                     </SwipeableCartItem>
                   </SwipeableCartItemWrapper>
                 ))}
@@ -314,13 +323,6 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           style={{ opacity: showBottomFade ? 1 : 0 }}
         />
       </div>
-
-      {/* Add-on Suggestions */}
-      {ticket.items.some((i) => i.itemType === 'service') && (
-        <div className="shrink-0">
-          <AddonSuggestions />
-        </div>
-      )}
 
       {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (

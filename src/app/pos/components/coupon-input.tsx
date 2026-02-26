@@ -12,6 +12,7 @@ export function CouponInput() {
   const { ticket, dispatch } = useTicket();
   const [code, setCode] = useState('');
   const [validating, setValidating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   async function handleValidate() {
     if (!code.trim()) return;
@@ -56,6 +57,7 @@ export function CouponInput() {
         },
       });
 
+      setExpanded(false);
       if (json.data.warning) {
         toast.warning(json.data.warning);
       } else {
@@ -97,7 +99,20 @@ export function CouponInput() {
     );
   }
 
-  // Show input
+  // Show collapsed link (matches "Add Discount" style)
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+      >
+        <Tag className="h-4 w-4" />
+        Add Coupon
+      </button>
+    );
+  }
+
+  // Show expanded input
   return (
     <div className="flex gap-2">
       <Input
@@ -105,8 +120,13 @@ export function CouponInput() {
         onChange={(e) => setCode(e.target.value.toUpperCase())}
         placeholder="Coupon code"
         className="min-h-[44px] text-sm"
+        autoFocus
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleValidate();
+          if (e.key === 'Escape') {
+            setExpanded(false);
+            setCode('');
+          }
         }}
       />
       <Button
@@ -120,6 +140,16 @@ export function CouponInput() {
         ) : (
           'Apply'
         )}
+      </Button>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setExpanded(false);
+          setCode('');
+        }}
+        className="min-h-[44px] shrink-0 px-2"
+      >
+        <X className="h-3.5 w-3.5" />
       </Button>
     </div>
   );

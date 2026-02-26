@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## POS: Inline Addon Suggestions + Collapsible Coupon — 2026-02-25
+
+### feat(pos): inline addon suggestions per ticket item + collapsible coupon input
+
+**Inline addon suggestions:**
+- Removed standalone `AddonSuggestions` panel from below the ticket items scroll area
+- Each service line item now shows its own addon suggestions inline via `TicketItemRow`
+- Addons auto-expand when a service is first added to the ticket
+- Addon chips show savings pricing: "$140 ~~$175~~ Save $35"
+- Tapping a chip opens the `ServiceDetailDialog` for the addon service
+- Adding an addon removes it from the parent's chip list; when all addons added, section disappears
+- Each service shows only its own configured addons (not aggregated)
+
+**Collapsible coupon input:**
+- Coupon input now collapsed by default, showing "Add Coupon" link (matches "Add Discount" style)
+- Tap to expand input; Escape key or X button to collapse
+- Applied coupon green pill display unchanged
+
+**Files modified:**
+- `src/app/pos/components/ticket-panel.tsx` — removed AddonSuggestions block, passes addon data to TicketItemRow
+- `src/app/pos/components/ticket-item-row.tsx` — added inline addon expansion with savings pricing + ServiceDetailDialog
+- `src/app/pos/components/coupon-input.tsx` — added collapsed/expanded state
+- `src/app/globals.css` — added `.scrollbar-hide` utility for horizontal swipeable strips
+
+---
+
 ## Fix POS PIN Pad Slow/Dropped Keystrokes — 2026-02-25
 
 ### fix(pos): use ref for PIN digits to support fast keystroke entry
