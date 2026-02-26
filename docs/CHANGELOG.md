@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Inline Collapsible Auth Replaces Bottom Sheet — Session 14E — 2026-02-25
+
+### Refactor: Replace bottom sheet auth with inline collapsible sections in booking Step 3
+
+**Root cause**: Bottom sheet modal (`position: fixed`) is fundamentally broken on iOS Safari — keyboard opens, visual viewport resizes, but fixed elements stay pinned to layout viewport causing horizontal overflow. Swipe-to-dismiss and tap-backdrop-to-close don't work. OTP auto-focus unreliable inside modal. State sync between modal and parent fragile.
+
+**Solution**: Removed bottom sheet/modal entirely. Auth UI now renders as inline collapsible sections within the normal page flow.
+
+**Changes to `inline-auth.tsx`** (full rewrite):
+- Removed `AuthSheet` overlay component (position: fixed, backdrop, z-index, body scroll lock)
+- New `AuthView` state machine: `'buttons' | 'sign-in' | 'sign-up'` — renders inline, no overlay
+- Buttons view: two card-style buttons ("Returning Customer?" / "New Here?") expand inline
+- Sign-in/sign-up views: rendered in bordered container with "Back" button, section heading
+- Added `initialPhone` prop to `SignInFlow` for phone pre-fill on "Sign in instead" redirect
+- Modified `SignUpFlow.onSwitchToSignIn` to pass phone number for pre-fill
+- "Not you?" and "Sign out" both clear auth and return to buttons view (no intermediate state)
+- OTP confirmation text now shows formatted phone via `formatPhone()`
+- Profile completion shows formatted phone in read-only field
+
+**Bugs fixed**:
+| # | Bug | Fix |
+|---|-----|-----|
+| 1 | Modal overflows on iOS when keyboard opens | Eliminated — inline section, no fixed positioning |
+| 2 | Swipe-to-dismiss and tap-backdrop don't work | Eliminated — no overlay exists |
+| 3 | "Sign in here" link goes to wrong view | State swap within inline component with phone pre-fill |
+| 4 | OTP input not auto-focused inside modal | autoFocus works natively inline, requestAnimationFrame for OTP |
+| 5 | Returning customer "Booking as" not showing until refresh | Direct state flow — onAuthComplete updates parent immediately |
+
+**No changes needed**: `step-confirm-book.tsx`, `booking-wizard.tsx` — props interface unchanged.
+
+---
+
 ## Step 3 Booking Bug Fixes — Session 14D — 2026-02-25
 
 ### Fix: Mobile Auth Modal, Phone Format, Pay-on-Site, Auth State, Cancellation Policy

@@ -896,7 +896,7 @@ src/components/account/vehicle-form-dialog.tsx
 ```
 src/components/booking/booking-confirmation.tsx
 src/components/booking/booking-wizard.tsx
-src/components/booking/inline-auth.tsx              (sign-in/sign-up bottom sheet for Step 3)
+src/components/booking/inline-auth.tsx              (inline collapsible sign-in/sign-up for Step 3)
 src/components/booking/step-configure.tsx           (deprecated — absorbed by step-service-select)
 src/components/booking/step-confirm-book.tsx        (merged confirm & book page — Step 3)
 src/components/booking/step-customer-info.tsx       (deprecated — contact fields moved to inline-auth)

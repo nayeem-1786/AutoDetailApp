@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
-import { LogIn, UserPlus, X, ArrowLeft } from 'lucide-react';
+import { LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 
 // --- Types ---
@@ -81,76 +81,20 @@ async function checkExists(params: { phone?: string; email?: string }): Promise<
   }
 }
 
-// --- Sheet/Dialog Overlay ---
-
-function AuthSheet({
-  open,
-  onClose,
-  title,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  // Prevent body scroll when open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
-
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      {/* Mobile: bottom sheet | Desktop: centered dialog */}
-      <div className="absolute inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md">
-        <div className="rounded-t-2xl sm:rounded-2xl bg-brand-dark border border-site-border max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
-          {/* Drag handle (mobile only) */}
-          <div className="sm:hidden flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-          </div>
-          {/* Header */}
-          <div className="sticky top-0 flex items-center justify-between px-4 py-3 sm:p-4 border-b border-site-border bg-brand-dark z-10">
-            <h3 className="text-lg font-semibold text-site-text">{title}</h3>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-site-text-muted hover:text-site-text transition-colors"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          {/* Body */}
-          <div className="p-5 sm:p-6">
-            {children}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// --- Shared input class ---
+const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime';
 
 // --- Sign In Flow ---
 
 type SignInMode = 'phone' | 'otp' | 'email';
 
 function SignInFlow({
+  initialPhone,
   onSuccess,
   onSwitchToSignUp,
   businessName,
 }: {
+  initialPhone?: string;
   onSuccess: () => void;
   onSwitchToSignUp: () => void;
   businessName: string;
@@ -181,6 +125,7 @@ function SignInFlow({
 
   const phoneForm = useForm<PhoneOtpSendInput>({
     resolver: formResolver(phoneOtpSendSchema),
+    defaultValues: { phone: initialPhone || '' },
   });
 
   const otpForm = useForm<PhoneOtpVerifyInput>({
@@ -501,7 +446,7 @@ function SignInFlow({
               autoComplete="tel"
               autoFocus
               placeholder="(310) 555-1234"
-              className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime"
+              className={inputCls}
               {...phoneForm.register('phone', {
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                   const formatted = formatPhoneInput(e.target.value);
@@ -543,7 +488,7 @@ function SignInFlow({
         <form onSubmit={otpForm.handleSubmit(verifyOtp)} className="space-y-5">
           <div className="text-center">
             <p className="text-sm text-site-text-muted">
-              We sent a 6-digit code to <span className="font-medium text-site-text">{otpPhone}</span>
+              We sent a 6-digit code to <span className="font-medium text-site-text">{formatPhone(otpPhone)}</span>
             </p>
           </div>
 
@@ -560,7 +505,7 @@ function SignInFlow({
               autoComplete="one-time-code"
               maxLength={6}
               placeholder="000000"
-              className="text-center text-lg tracking-[0.3em] border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime"
+              className={`text-center text-lg tracking-[0.3em] ${inputCls}`}
               {...otpCodeField}
               ref={(el) => {
                 otpCodeRef(el);
@@ -612,7 +557,7 @@ function SignInFlow({
               autoComplete="email"
               autoFocus
               placeholder="you@example.com"
-              className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime"
+              className={inputCls}
               {...emailForm.register('email')}
             />
           </FormField>
@@ -628,7 +573,7 @@ function SignInFlow({
               type="password"
               autoComplete="current-password"
               placeholder="Enter your password"
-              className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime"
+              className={inputCls}
               {...emailForm.register('password')}
             />
           </FormField>
@@ -696,7 +641,7 @@ function SignInFlow({
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime"
+                  className={inputCls}
                 />
               </FormField>
 
@@ -733,7 +678,7 @@ function SignUpFlow({
   businessName,
 }: {
   onSuccess: () => void;
-  onSwitchToSignIn: () => void;
+  onSwitchToSignIn: (phone?: string) => void;
   businessName: string;
 }) {
   const [mode, setMode] = useState<SignUpMode>('phone-otp');
@@ -796,12 +741,11 @@ function SignUpFlow({
             This phone number is already linked to an account.{' '}
             <button
               type="button"
-              onClick={onSwitchToSignIn}
+              onClick={() => onSwitchToSignIn(data.phone)}
               className="font-medium text-lime hover:text-lime-400 underline"
             >
-              Sign in here
-            </button>{' '}
-            instead.
+              Sign in instead &rarr;
+            </button>
           </>
         );
       } else {
@@ -810,7 +754,7 @@ function SignUpFlow({
             Welcome back! We already have your info on file.{' '}
             <button
               type="button"
-              onClick={onSwitchToSignIn}
+              onClick={() => onSwitchToSignIn(data.phone)}
               className="font-medium text-lime hover:text-lime-400 underline"
             >
               Sign in here
@@ -953,12 +897,11 @@ function SignUpFlow({
             This email is already linked to an account.{' '}
             <button
               type="button"
-              onClick={onSwitchToSignIn}
+              onClick={() => onSwitchToSignIn(data.phone)}
               className="font-medium text-lime hover:text-lime-400 underline"
             >
-              Sign in here
-            </button>{' '}
-            instead.
+              Sign in instead &rarr;
+            </button>
           </>
         );
       } else {
@@ -967,7 +910,7 @@ function SignUpFlow({
             Welcome back! We already have your info on file.{' '}
             <button
               type="button"
-              onClick={onSwitchToSignIn}
+              onClick={() => onSwitchToSignIn(data.phone)}
               className="font-medium text-lime hover:text-lime-400 underline"
             >
               Sign in here
@@ -990,12 +933,11 @@ function SignUpFlow({
               This phone number is already linked to an account.{' '}
               <button
                 type="button"
-                onClick={onSwitchToSignIn}
+                onClick={() => onSwitchToSignIn(data.phone)}
                 className="font-medium text-lime hover:text-lime-400 underline"
               >
-                Sign in here
-              </button>{' '}
-              instead.
+                Sign in instead &rarr;
+              </button>
             </>
           );
         } else {
@@ -1004,7 +946,7 @@ function SignUpFlow({
               Welcome back! We already have your info on file.{' '}
               <button
                 type="button"
-                onClick={onSwitchToSignIn}
+                onClick={() => onSwitchToSignIn(data.phone)}
                 className="font-medium text-lime hover:text-lime-400 underline"
               >
                 Sign in here
@@ -1031,12 +973,11 @@ function SignUpFlow({
             This email is already linked to an account.{' '}
             <button
               type="button"
-              onClick={onSwitchToSignIn}
+              onClick={() => onSwitchToSignIn(data.phone)}
               className="font-medium text-lime hover:text-lime-400 underline"
             >
-              Sign in here
-            </button>{' '}
-            instead.
+              Sign in instead &rarr;
+            </button>
           </>
         );
       } else if (signUpError.message.includes('rate') || signUpError.message.includes('too many')) {
@@ -1075,8 +1016,6 @@ function SignUpFlow({
 
     onSuccess();
   };
-
-  const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime';
 
   const { ref: signupOtpCodeRef, ...signupOtpCodeField } = otpVerifyForm.register('code');
 
@@ -1150,7 +1089,7 @@ function SignUpFlow({
         <form onSubmit={otpVerifyForm.handleSubmit(verifyOtp)} className="space-y-5">
           <div className="text-center">
             <p className="text-sm text-site-text-muted">
-              We sent a 6-digit code to <span className="font-medium text-site-text">{otpPhone}</span>
+              We sent a 6-digit code to <span className="font-medium text-site-text">{formatPhone(otpPhone)}</span>
             </p>
           </div>
 
@@ -1207,10 +1146,14 @@ function SignUpFlow({
       {/* Post-OTP Profile Completion */}
       {mode === 'otp-profile' && (
         <form onSubmit={otpProfileForm.handleSubmit(onOtpProfileSubmit)} className="space-y-5">
+          <p className="text-sm text-site-text-muted">
+            Phone verified! Complete your profile to finish signing up.
+          </p>
+
           <FormField label="Mobile" htmlFor="inline-otp-phone">
             <Input
               id="inline-otp-phone"
-              value={otpPhone}
+              value={formatPhone(otpPhone)}
               readOnly
               className="bg-brand-dark text-site-text-muted border-site-border"
             />
@@ -1396,6 +1339,8 @@ function SignUpFlow({
 
 // --- Main InlineAuth Component ---
 
+type AuthView = 'buttons' | 'sign-in' | 'sign-up';
+
 export function InlineAuth({
   onAuthComplete,
   isAuthenticated,
@@ -1403,16 +1348,15 @@ export function InlineAuth({
   onSignOut,
   businessName,
 }: InlineAuthProps) {
-  const [sheetOpen, setSheetOpen] = useState<'signin' | 'signup' | null>(null);
+  const [view, setView] = useState<AuthView>('buttons');
+  const [switchPhone, setSwitchPhone] = useState('');
   const [fetchingProfile, setFetchingProfile] = useState(false);
-  // Bug 3: "Not you?" shows auth selection with back button, preserving user data
-  const [showAuthSwitch, setShowAuthSwitch] = useState(false);
 
   // After auth success: fetch customer profile + vehicles
   const handleAuthSuccess = useCallback(async () => {
-    setSheetOpen(null);
+    setView('buttons');
+    setSwitchPhone('');
     setFetchingProfile(true);
-    setShowAuthSwitch(false);
     try {
       const [profileRes, vehiclesRes] = await Promise.all([
         fetch('/api/customer/profile'),
@@ -1437,122 +1381,60 @@ export function InlineAuth({
         vehicles = vehicleData.data || vehicleData || [];
       }
 
-      // Always call onAuthComplete even if fetches partially failed
       onAuthComplete({ customer, vehicles });
     } catch {
-      // Still try to notify parent with empty data so UI updates
       onAuthComplete({ customer: { first_name: '', last_name: '', phone: '', email: '' }, vehicles: [] });
     } finally {
       setFetchingProfile(false);
     }
   }, [onAuthComplete]);
 
-  // Already authenticated — show compact info line (or auth switch screen)
+  // Handle "Not you?" or "Sign out" — clear auth and return to buttons
+  const handleSignOutClick = useCallback(() => {
+    setView('buttons');
+    setSwitchPhone('');
+    onSignOut();
+  }, [onSignOut]);
+
+  // Switch to sign-in from sign-up (with optional phone pre-fill)
+  const handleSwitchToSignIn = useCallback((phone?: string) => {
+    setSwitchPhone(phone || '');
+    setView('sign-in');
+  }, []);
+
+  // Switch to sign-up from sign-in
+  const handleSwitchToSignUp = useCallback(() => {
+    setSwitchPhone('');
+    setView('sign-up');
+  }, []);
+
+  // Already authenticated — show compact info line
   if (isAuthenticated && customerData) {
-    // Bug 3: If user tapped "Not you?", show auth selection with back button
-    if (showAuthSwitch) {
-      return (
-        <>
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setShowAuthSwitch(false)}
-              className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-site-text transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSheetOpen('signin')}
-              className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
-                  <LogIn className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-site-text">Returning Customer?</p>
-                  <p className="text-xs text-site-text-muted">Sign in with your phone or email</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSheetOpen('signup')}
-              className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
-                  <UserPlus className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-site-text">New here?</p>
-                  <p className="text-xs text-site-text-muted">Create an account to get started</p>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* Sign In Sheet */}
-          <AuthSheet
-            open={sheetOpen === 'signin'}
-            onClose={() => setSheetOpen(null)}
-            title="Sign In"
-          >
-            <SignInFlow
-              onSuccess={handleAuthSuccess}
-              onSwitchToSignUp={() => setSheetOpen('signup')}
-              businessName={businessName}
-            />
-          </AuthSheet>
-
-          {/* Sign Up Sheet */}
-          <AuthSheet
-            open={sheetOpen === 'signup'}
-            onClose={() => setSheetOpen(null)}
-            title="Create Account"
-          >
-            <SignUpFlow
-              onSuccess={handleAuthSuccess}
-              onSwitchToSignIn={() => setSheetOpen('signin')}
-              businessName={businessName}
-            />
-          </AuthSheet>
-        </>
-      );
-    }
-
     const { first_name, last_name, phone, email } = customerData.customer;
     return (
       <div className="rounded-lg border border-lime/30 bg-lime/5 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-site-text">
-              Booking as: {first_name} {last_name}
-            </p>
-            <p className="text-xs text-site-text-muted truncate" suppressHydrationWarning>
-              {phone ? formatPhone(phone) : ''}{phone && email ? ' \u00b7 ' : ''}{email}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowAuthSwitch(true)}
-              className="text-xs text-site-text-muted hover:text-site-text transition-colors"
-            >
-              Not you?
-            </button>
-            <button
-              type="button"
-              onClick={onSignOut}
-              className="text-xs text-red-400 hover:text-red-300 transition-colors"
-            >
-              Sign out
-            </button>
-          </div>
+        <p className="text-sm font-medium text-site-text">
+          Booking as: {first_name} {last_name}
+        </p>
+        <p className="mt-0.5 text-xs text-site-text-muted truncate" suppressHydrationWarning>
+          {phone ? formatPhone(phone) : ''}{phone && email ? ' \u00b7 ' : ''}{email}
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSignOutClick}
+            className="text-xs text-site-text-muted hover:text-site-text transition-colors"
+          >
+            Not you?
+          </button>
+          <span className="text-xs text-site-text-faint">&middot;</span>
+          <button
+            type="button"
+            onClick={handleSignOutClick}
+            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     );
@@ -1568,68 +1450,87 @@ export function InlineAuth({
     );
   }
 
-  // Not authenticated — show sign in / sign up buttons
+  // Not authenticated — show inline auth based on view
   return (
-    <>
-      <div className="space-y-3">
-        <button
-          type="button"
-          onClick={() => setSheetOpen('signin')}
-          className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
-              <LogIn className="h-5 w-5" />
+    <div className="transition-all duration-200">
+      {/* STATE 1: Two buttons — Returning Customer? / New Here? */}
+      {view === 'buttons' && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setView('sign-in')}
+            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
+                <LogIn className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-site-text">Returning Customer?</p>
+                <p className="text-xs text-site-text-muted">Sign in with your phone or email</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-site-text">Returning Customer?</p>
-              <p className="text-xs text-site-text-muted">Sign in with your phone or email</p>
-            </div>
-          </div>
-        </button>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setSheetOpen('signup')}
-          className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
-              <UserPlus className="h-5 w-5" />
+          <button
+            type="button"
+            onClick={() => setView('sign-up')}
+            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
+                <UserPlus className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-site-text">New here?</p>
+                <p className="text-xs text-site-text-muted">Create an account to get started</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-site-text">New here?</p>
-              <p className="text-xs text-site-text-muted">Create an account to get started</p>
-            </div>
-          </div>
-        </button>
-      </div>
+          </button>
+        </div>
+      )}
 
-      {/* Sign In Sheet */}
-      <AuthSheet
-        open={sheetOpen === 'signin'}
-        onClose={() => setSheetOpen(null)}
-        title="Sign In"
-      >
-        <SignInFlow
-          onSuccess={handleAuthSuccess}
-          onSwitchToSignUp={() => setSheetOpen('signup')}
-          businessName={businessName}
-        />
-      </AuthSheet>
+      {/* STATE 2A: Sign In — inline expanded section */}
+      {view === 'sign-in' && (
+        <div className="rounded-xl border border-site-border p-5 sm:p-6">
+          <button
+            type="button"
+            onClick={() => { setView('buttons'); setSwitchPhone(''); }}
+            className="flex items-center gap-1.5 text-sm text-site-text-dim hover:text-site-text transition-colors mb-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+          <h3 className="text-lg font-semibold text-site-text mb-5">Sign In</h3>
+          <SignInFlow
+            key={`signin-${switchPhone}`}
+            initialPhone={switchPhone}
+            onSuccess={handleAuthSuccess}
+            onSwitchToSignUp={handleSwitchToSignUp}
+            businessName={businessName}
+          />
+        </div>
+      )}
 
-      {/* Sign Up Sheet */}
-      <AuthSheet
-        open={sheetOpen === 'signup'}
-        onClose={() => setSheetOpen(null)}
-        title="Create Account"
-      >
-        <SignUpFlow
-          onSuccess={handleAuthSuccess}
-          onSwitchToSignIn={() => setSheetOpen('signin')}
-          businessName={businessName}
-        />
-      </AuthSheet>
-    </>
+      {/* STATE 2B: Sign Up — inline expanded section */}
+      {view === 'sign-up' && (
+        <div className="rounded-xl border border-site-border p-5 sm:p-6">
+          <button
+            type="button"
+            onClick={() => { setView('buttons'); setSwitchPhone(''); }}
+            className="flex items-center gap-1.5 text-sm text-site-text-dim hover:text-site-text transition-colors mb-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+          <h3 className="text-lg font-semibold text-site-text mb-5">Create Account</h3>
+          <SignUpFlow
+            onSuccess={handleAuthSuccess}
+            onSwitchToSignIn={handleSwitchToSignIn}
+            businessName={businessName}
+          />
+        </div>
+      )}
+    </div>
   );
 }
