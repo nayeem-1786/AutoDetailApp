@@ -197,6 +197,7 @@ Read the relevant doc when working on that system:
 | QuickBooks integration | `docs/dev/QBO_INTEGRATION.md` |
 | Service catalog | `docs/dev/SERVICE_CATALOG.md` |
 | Data migrations | `docs/dev/DATA_MIGRATION_RULES.md` |
+| Troubleshooting (WSOD, auth, build) | `docs/dev/TROUBLESHOOTING.md` |
 | Version history | `docs/CHANGELOG.md` |
 | Roadmap & specs | `docs/planning/` |
 | System audits | `docs/audits/` |
