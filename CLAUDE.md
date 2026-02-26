@@ -13,6 +13,8 @@
 
 ## Critical Rules
 
+- CRITICAL: Do NOT upgrade Next.js version. Currently pinned to 15.3.3. Next.js 16 requires major migration (async params, proxy.ts, caching changes). Only upgrade when explicitly instructed.
+
 1. **Timezone**: All scheduling, cron, logs, and time displays use `America/Los_Angeles` (PST). Never UTC.
 2. **Internal cron only**: ALL scheduling via `src/lib/cron/scheduler.ts` + `src/instrumentation.ts`. NEVER suggest n8n, Vercel Cron, or external schedulers.
 3. **Hostinger only**: Deployed on dedicated Hostinger server. Never reference or suggest Vercel.
@@ -29,6 +31,7 @@
 14. **Service category management** (create, rename, merge, reorder) should be done through the Admin UI, not SQL migrations. The admin already supports full category CRUD.
 15. **iOS format-detection**: Root layout includes `format-detection: telephone=no` meta tag. Never render phone numbers as plain text in customer-facing components — always wrap in `<a href="tel:...">` to prevent iOS Safari from auto-linking and causing hydration mismatches.
 16. **iOS input zoom prevention**: All text inputs in customer-facing forms must use `text-base sm:text-sm` to prevent iOS auto-zoom on focus (iOS zooms inputs with font-size < 16px).
+17. **Schema reference**: Read `docs/dev/DB_SCHEMA.md` when session touches pricing, services, or booking.
 
 ## Project Structure
 
