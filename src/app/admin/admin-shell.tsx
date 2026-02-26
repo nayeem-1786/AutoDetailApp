@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -279,6 +280,69 @@ function CommandPalette({
       </div>
     </div>
   );
+}
+
+class AdminErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[AdminErrorBoundary] Caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="mx-4 max-w-md text-center">
+            <h2 className="text-lg font-semibold text-gray-900">Session Error</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Your session has expired or encountered an error. Please log in again.
+            </p>
+            <div className="mt-4 flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  // Clear all Supabase cookies
+                  document.cookie.split(';').forEach((c) => {
+                    const name = c.trim().split('=')[0];
+                    if (name.startsWith('sb-')) {
+                      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+                    }
+                  });
+                  window.location.href = '/login';
+                }}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Go to Login
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Retry
+              </button>
+            </div>
+            {process.env.NODE_ENV === 'development' && this.state.error && (
+              <pre className="mt-4 max-h-32 overflow-auto rounded bg-red-50 p-3 text-left text-xs text-red-700">
+                {this.state.error.message}
+              </pre>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function AdminContent({ children }: { children: React.ReactNode }) {
@@ -746,12 +810,14 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <PermissionProvider>
-        <FeatureFlagProvider>
-          <AdminContent>{children}</AdminContent>
-        </FeatureFlagProvider>
-      </PermissionProvider>
-    </AuthProvider>
+    <AdminErrorBoundary>
+      <AuthProvider>
+        <PermissionProvider>
+          <FeatureFlagProvider>
+            <AdminContent>{children}</AdminContent>
+          </FeatureFlagProvider>
+        </PermissionProvider>
+      </AuthProvider>
+    </AdminErrorBoundary>
   );
 }

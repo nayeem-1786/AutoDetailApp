@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Auth Resilience — Eliminate White Screen of Death — 2026-02-26
+
+### fix(auth): prevent white screen on stale session cookies
+
+When the dev server restarts, rebuilds, or deploys, stale Supabase session cookies could crash the entire React tree. Added three layers of defense:
+
+**Fix 1: Server-side middleware (`middleware.ts`)**
+- Wrapped `supabase.auth.getUser()` in try/catch
+- On failure: clears all `sb-*` cookies and returns unauthenticated (middleware redirects to `/login`)
+
+**Fix 2: Client-side auth provider (`auth-provider.tsx`)**
+- Added `.catch()` to `getSession()` — clears state + force sign-out on corrupt session
+- Added try/catch to `onAuthStateChange` callback — catches errors during auth event processing
+- Added `.catch()` to `loadEmployeeData()` call in auth change handler
+- Enhanced `validateSession` catch block — now clears state and redirects to `/login?reason=session_expired`
+
+**Fix 3: Error boundary (`admin-shell.tsx`)**
+- Added `AdminErrorBoundary` class component wrapping outside `AuthProvider`
+- Shows "Session Error" page with "Go to Login" and "Retry" buttons
+- Clears `sb-*` cookies before redirecting to login
+- Shows error message in development mode
+
+**Files modified:**
+- `src/lib/supabase/middleware.ts`
+- `src/lib/auth/auth-provider.tsx`
+- `src/app/admin/admin-shell.tsx`
+
+---
+
 ## POS: Inline Addon Suggestions + Collapsible Coupon — 2026-02-25
 
 ### feat(pos): inline addon suggestions per ticket item + collapsible coupon input

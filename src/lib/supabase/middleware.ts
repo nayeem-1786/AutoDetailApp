@@ -29,9 +29,24 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  return { user, supabaseResponse };
+    return { user, supabaseResponse };
+  } catch (error) {
+    // Stale/corrupt session cookie — clear all sb-* cookies and return as unauthenticated
+    // This prevents the white screen of death on server restart/deploy
+    console.warn('[middleware] Auth session error, clearing cookies:', error instanceof Error ? error.message : error);
+
+    // Delete all Supabase cookies from the response
+    request.cookies.getAll().forEach((cookie) => {
+      if (cookie.name.startsWith('sb-')) {
+        supabaseResponse.cookies.delete(cookie.name);
+      }
+    });
+
+    return { user: null, supabaseResponse };
+  }
 }

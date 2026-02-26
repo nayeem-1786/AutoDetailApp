@@ -92,31 +92,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        loadEmployeeData(s.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        loadEmployeeData(s.user.id);
-      } else {
+    // Get initial session — wrapped in catch to handle stale/corrupt cookies
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: s } }: { data: { session: Session | null } }) => {
+        setSession(s);
+        setUser(s?.user ?? null);
+        if (s?.user) {
+          loadEmployeeData(s.user.id).finally(() => setLoading(false));
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn('[auth] getSession failed, clearing session:', error instanceof Error ? error.message : error);
+        // Clear local state — user will see login redirect
+        setSession(null);
+        setUser(null);
         setEmployee(null);
         setPermissions([]);
         setIsSuper(false);
         setCanAccessPos(false);
         setRoleName('');
+        setLoading(false);
+        // Force sign out to clear the corrupt cookie
+        supabase.auth.signOut().catch(() => {});
+      });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {
+      try {
+        setSession(s);
+        setUser(s?.user ?? null);
+        if (s?.user) {
+          loadEmployeeData(s.user.id).catch((error: unknown) => {
+            console.warn('[auth] loadEmployeeData failed:', error instanceof Error ? error.message : error);
+          });
+        } else {
+          setEmployee(null);
+          setPermissions([]);
+          setIsSuper(false);
+          setCanAccessPos(false);
+          setRoleName('');
+        }
+      } catch (error) {
+        console.warn('[auth] onAuthStateChange error, clearing session:', error instanceof Error ? error.message : error);
+        setSession(null);
+        setUser(null);
+        setEmployee(null);
+        setPermissions([]);
+        setIsSuper(false);
+        setCanAccessPos(false);
+        setRoleName('');
+        supabase.auth.signOut().catch(() => {});
       }
     });
 
@@ -148,7 +178,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
         }
       } catch (err) {
-        console.error('Session validation error:', err);
+        console.warn('[auth] Session validation failed, redirecting to login:', err instanceof Error ? err.message : err);
+        // Clear local state
+        setSession(null);
+        setUser(null);
+        setEmployee(null);
+        setPermissions([]);
+        setIsSuper(false);
+        setCanAccessPos(false);
+        setRoleName('');
+        // Force sign out to clear corrupt cookie, then redirect
+        await supabase.auth.signOut().catch(() => {});
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/admin';
+        window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
       }
     };
 
