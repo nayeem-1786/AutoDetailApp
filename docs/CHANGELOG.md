@@ -4,6 +4,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## POS: Addon/Coupon/Discount Layout Fixes — 2026-02-25
+
+### fix(pos): vertical addon rows, viewport-level dialog, shared coupon+discount row
+
+**Addon chips → vertical stacked rows:**
+- Replaced horizontal scrolling chip container with vertical full-width rows
+- Eliminates gesture conflict between horizontal scroll and swipe-to-delete on iPad
+- Each addon row shows: name (left), combo price + strikethrough + savings (right)
+
+**ServiceDetailDialog moved to viewport level:**
+- Removed `pickerService` state and `ServiceDetailDialog` from `ticket-item-row.tsx`
+- Added `onAddonClick` callback prop to `TicketItemRow`
+- `ticket-panel.tsx` now owns `addonPickerService` state and renders `ServiceDetailDialog` at panel level
+- Dialog no longer constrained by ticket panel's overflow/stacking context
+
+**Coupon + Discount share same row:**
+- "Add Coupon" and "Add Discount" now render on same line (opposite ends) when both collapsed
+- Different icons: `TicketPercent` for coupon, `Tag` for discount
+- `CouponInput` accepts `renderCollapsedInline` prop for inline companion element
+- When coupon expands or is applied, discount link moves to its own row
+
+---
+
 ## POS: Inline Addon Suggestions + Collapsible Coupon — 2026-02-25
 
 ### feat(pos): inline addon suggestions per ticket item + collapsible coupon input

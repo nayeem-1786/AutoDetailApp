@@ -29,13 +29,14 @@ import { VehicleCreateDialog } from './vehicle-create-dialog';
 import { CouponInput } from './coupon-input';
 import { LoyaltyPanel } from './loyalty-panel';
 import { CustomerTypePrompt } from './customer-type-prompt';
+import { ServiceDetailDialog } from './service-detail-dialog';
 import { useAddonSuggestions } from '../hooks/use-addon-suggestions';
 import {
   SwipeableCartItem,
   SwipeableCartList,
   SwipeableCartItemWrapper,
 } from './swipeable-cart-item';
-import type { TicketItem } from '../types';
+import type { TicketItem, CatalogService } from '../types';
 import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
 interface TicketPanelProps {
@@ -59,6 +60,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [addonPickerService, setAddonPickerService] = useState<CatalogService | null>(null);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
@@ -308,6 +310,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                         item={item}
                         addonSuggestions={item.serviceId ? (suggestionsMap.get(item.serviceId) ?? []) : []}
                         ticketServiceIds={ticketServiceIds}
+                        onAddonClick={(addonServiceId) => {
+                          const svc = services.find((s) => s.id === addonServiceId);
+                          if (svc) setAddonPickerService(svc);
+                        }}
                       />
                     </SwipeableCartItem>
                   </SwipeableCartItemWrapper>
@@ -327,7 +333,28 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (
         <div className="shrink-0 space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
-          <CouponInput />
+          {/* When both coupon and discount are collapsed, render on same row */}
+          {!ticket.coupon && !ticket.manualDiscount && !showDiscountForm ? (
+            <CouponInput
+              renderCollapsedInline={
+                canManualDiscount
+                  ? (
+                    <button
+                      onClick={() => setShowDiscountForm(true)}
+                      className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      <Tag className="h-4 w-4" />
+                      Add Discount
+                    </button>
+                  )
+                  : undefined
+              }
+            />
+          ) : (
+            /* Coupon applied or expanded — full width on its own row */
+            <CouponInput />
+          )}
+
           <LoyaltyPanel />
 
           {/* Manual Discount — permission gated */}
@@ -431,7 +458,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                     </Button>
                   </div>
                 </div>
-              ) : (
+              ) : ticket.coupon ? (
+                /* Add Discount on its own row when coupon is applied */
                 <button
                   onClick={() => setShowDiscountForm(true)}
                   className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -439,7 +467,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                   <Tag className="h-4 w-4" />
                   Add Discount
                 </button>
-              )}
+              ) : null}
             </>
           )}
         </div>
@@ -547,6 +575,15 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
               dispatch({ type: 'SET_CUSTOMER', customer: { ...ticket.customer, customer_type: newType } });
             }
           }}
+        />
+      )}
+
+      {/* Addon suggestion detail dialog — rendered at panel level for full viewport */}
+      {addonPickerService && (
+        <ServiceDetailDialog
+          service={addonPickerService}
+          open={!!addonPickerService}
+          onClose={() => setAddonPickerService(null)}
         />
       )}
     </div>

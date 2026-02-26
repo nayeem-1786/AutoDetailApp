@@ -3,12 +3,16 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tag, X, Loader2 } from 'lucide-react';
+import { Tag, X, Loader2, TicketPercent } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import { useTicket } from '../context/ticket-context';
 
-export function CouponInput() {
+interface CouponInputProps {
+  renderCollapsedInline?: React.ReactNode;
+}
+
+export function CouponInput({ renderCollapsedInline }: CouponInputProps) {
   const { ticket, dispatch } = useTicket();
   const [code, setCode] = useState('');
   const [validating, setValidating] = useState(false);
@@ -99,14 +103,28 @@ export function CouponInput() {
     );
   }
 
-  // Show collapsed link (matches "Add Discount" style)
+  // Show collapsed link — optionally inline with another element
   if (!expanded) {
+    if (renderCollapsedInline) {
+      return (
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setExpanded(true)}
+            className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <TicketPercent className="h-4 w-4" />
+            Add Coupon
+          </button>
+          {renderCollapsedInline}
+        </div>
+      );
+    }
     return (
       <button
         onClick={() => setExpanded(true)}
         className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
       >
-        <Tag className="h-4 w-4" />
+        <TicketPercent className="h-4 w-4" />
         Add Coupon
       </button>
     );
