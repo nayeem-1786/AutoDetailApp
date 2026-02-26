@@ -1,10 +1,22 @@
 'use client';
 
+import { useContext } from 'react';
 import { ShoppingBag } from 'lucide-react';
-import { useCart } from '@/lib/contexts/cart-context';
+import { CartContext } from '@/lib/contexts/cart-context';
 
 export function CartIconButton() {
-  const { itemCount, toggleCart } = useCart();
+  const ctx = useContext(CartContext);
+
+  // Gracefully handle missing CartProvider (HMR edge cases, error boundaries)
+  if (!ctx) {
+    return (
+      <span className="relative flex items-center justify-center h-10 w-10 rounded-xl text-site-text-muted">
+        <ShoppingBag className="h-5 w-5" />
+      </span>
+    );
+  }
+
+  const { itemCount, toggleCart } = ctx;
 
   return (
     <button

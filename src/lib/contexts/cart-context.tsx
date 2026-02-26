@@ -140,7 +140,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 // Context
 // ---------------------------------------------------------------------------
 
-const CartContext = createContext<CartContextType | null>(null);
+export const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, {
