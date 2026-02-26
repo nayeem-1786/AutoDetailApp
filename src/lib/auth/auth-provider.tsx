@@ -105,48 +105,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch((error: unknown) => {
-        console.warn('[auth] getSession failed, clearing session:', error instanceof Error ? error.message : error);
-        // Clear local state — user will see login redirect
-        setSession(null);
-        setUser(null);
-        setEmployee(null);
-        setPermissions([]);
-        setIsSuper(false);
-        setCanAccessPos(false);
-        setRoleName('');
+        console.warn('[auth] getSession failed:', error instanceof Error ? error.message : error);
+        // Do NOT call signOut() — the session may be valid but temporarily unreachable.
+        // Just mark as not loading so the UI can render (middleware handles redirect).
         setLoading(false);
-        // Force sign out to clear the corrupt cookie
-        supabase.auth.signOut().catch(() => {});
       });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {
-      try {
-        setSession(s);
-        setUser(s?.user ?? null);
-        if (s?.user) {
-          loadEmployeeData(s.user.id).catch((error: unknown) => {
-            console.warn('[auth] loadEmployeeData failed:', error instanceof Error ? error.message : error);
-          });
-        } else {
-          setEmployee(null);
-          setPermissions([]);
-          setIsSuper(false);
-          setCanAccessPos(false);
-          setRoleName('');
-        }
-      } catch (error) {
-        console.warn('[auth] onAuthStateChange error, clearing session:', error instanceof Error ? error.message : error);
-        setSession(null);
-        setUser(null);
+      setSession(s);
+      setUser(s?.user ?? null);
+      if (s?.user) {
+        loadEmployeeData(s.user.id).catch((error: unknown) => {
+          console.warn('[auth] loadEmployeeData failed:', error instanceof Error ? error.message : error);
+          // Employee data load failed but session is valid — don't destroy it.
+        });
+      } else {
         setEmployee(null);
         setPermissions([]);
         setIsSuper(false);
         setCanAccessPos(false);
         setRoleName('');
-        supabase.auth.signOut().catch(() => {});
       }
     });
 
@@ -178,19 +159,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
         }
       } catch (err) {
-        console.warn('[auth] Session validation failed, redirecting to login:', err instanceof Error ? err.message : err);
-        // Clear local state
-        setSession(null);
-        setUser(null);
-        setEmployee(null);
-        setPermissions([]);
-        setIsSuper(false);
-        setCanAccessPos(false);
-        setRoleName('');
-        // Force sign out to clear corrupt cookie, then redirect
-        await supabase.auth.signOut().catch(() => {});
-        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/admin';
-        window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
+        // Network error during validation — do NOT destroy the session.
+        // The session may still be valid; we just couldn't verify it this time.
+        // Next interval or focus event will retry.
+        console.warn('[auth] Session validation network error (will retry):', err instanceof Error ? err.message : err);
       }
     };
 

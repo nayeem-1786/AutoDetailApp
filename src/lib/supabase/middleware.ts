@@ -36,16 +36,10 @@ export async function updateSession(request: NextRequest) {
 
     return { user, supabaseResponse };
   } catch (error) {
-    // Stale/corrupt session cookie — clear all sb-* cookies and return as unauthenticated
-    // This prevents the white screen of death on server restart/deploy
-    console.warn('[middleware] Auth session error, clearing cookies:', error instanceof Error ? error.message : error);
-
-    // Delete all Supabase cookies from the response
-    request.cookies.getAll().forEach((cookie) => {
-      if (cookie.name.startsWith('sb-')) {
-        supabaseResponse.cookies.delete(cookie.name);
-      }
-    });
+    // Auth call failed (network error, Supabase outage, etc.)
+    // Do NOT delete cookies — the session may still be valid.
+    // Return user as null so the caller can redirect to login if needed.
+    console.warn('[middleware] Auth getUser() error (session preserved):', error instanceof Error ? error.message : error);
 
     return { user: null, supabaseResponse };
   }

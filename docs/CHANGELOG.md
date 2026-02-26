@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix Auth Login Loop — 2026-02-26
+
+### fix(auth): remove destructive signOut calls from error handlers
+
+Login was looping — after entering credentials, the page redirected back to `/login` with form cleared. Root cause: overly aggressive error handling was destroying valid sessions on transient errors.
+
+**What was wrong:**
+- `middleware.ts` catch block deleted all `sb-*` cookies on ANY `getUser()` error
+- `auth-provider.tsx` had three separate catch blocks calling `supabase.auth.signOut()` on transient errors — permanently invalidating sessions on Supabase's servers even when the session was actually valid
+
+**Philosophy change:**
+- Before: Any error → immediately destroy session → redirect to login
+- After: Transient errors → log and retry, preserve session. Only redirect when Supabase explicitly says session is invalid (no `signOut()` needed — it's already invalid)
+
+**Files modified:**
+- `src/lib/supabase/middleware.ts` — removed cookie deletion from catch block
+- `src/lib/auth/auth-provider.tsx` — removed `signOut()` from getSession catch, onAuthStateChange outer try/catch, and validateSession catch
+
+---
+
 ## POS Nested Addon Display — 2026-02-26
 
 ### feat(pos): addon services render as indented children under parent service
