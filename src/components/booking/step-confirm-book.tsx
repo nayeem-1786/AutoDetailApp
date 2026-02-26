@@ -920,7 +920,7 @@ export function StepConfirmBook({
                       type="button"
                       onClick={handleBookingSubmit}
                       disabled={!canSubmit}
-                      className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+                      className="hidden lg:inline-flex bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
                     >
                       {submitting ? (
                         <>
@@ -932,6 +932,9 @@ export function StepConfirmBook({
                       )}
                     </Button>
                   </div>
+
+                  {/* Mobile spacer for sticky footer */}
+                  <div className="h-24 lg:hidden" />
                 </>
               )}
             </>
@@ -948,6 +951,33 @@ export function StepConfirmBook({
           </div>
         </div>
       </div>
+
+      {/* Mobile sticky footer */}
+      {isAuthenticated && !showPaymentForm && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-site-border bg-brand-surface px-4 py-3">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs text-site-text-muted">Total</p>
+              <p className="text-lg font-bold text-site-text">{formatCurrency(grandTotal)}</p>
+            </div>
+            <Button
+              type="button"
+              onClick={handleBookingSubmit}
+              disabled={!canSubmit}
+              className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+            >
+              {submitting ? (
+                <>
+                  <Spinner size="sm" className="text-white" />
+                  Processing...
+                </>
+              ) : (
+                getCtaText()
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Mobile Sticky Footer for Booking Steps 2 & 3 — Session 14I — 2026-02-25
+
+### feat(booking): add mobile sticky footer to Steps 2 and 3
+
+Matches Step 1's existing sticky footer pattern for consistent mobile UX.
+
+**Step 2 (step-schedule.tsx)**
+- Added fixed sticky footer on mobile (`lg:hidden`) with Total price + Continue button
+- Hid inline Continue button on mobile (`hidden lg:inline-flex`), kept Back visible
+- Added `h-24` spacer so content doesn't hide behind sticky bar
+- Footer only renders when `orderSummary` is available
+
+**Step 3 (step-confirm-book.tsx)**
+- Added fixed sticky footer on mobile with Total price + dynamic CTA ("Book My Detail" / "Pay $X & Book My Detail" / "Processing...")
+- Hid inline CTA button on mobile (`hidden lg:inline-flex`), kept Back visible
+- Added `h-24` spacer inside the `!showPaymentForm` block
+- Footer wrapped in `isAuthenticated && !showPaymentForm` — hidden during auth flow and Stripe payment form
+
+**Files modified:**
+- `src/components/booking/step-schedule.tsx`
+- `src/components/booking/step-confirm-book.tsx`
+
+---
+
 ## Hamburger Logout Preserves Page, Separate "Not You?" from Sign-Out — 2026-02-25
 
 ### Fix: hamburger logout stays on current page, "Not you?" no longer signs out
