@@ -4,6 +4,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Auth State Sync, Deposit Logic, Loyalty Payment Polish — Session 14G — 2026-02-25
+
+### Fix: Auth state sync between booking flow and site header, deposit visibility for returning customers, loyalty points payment logic, OTP auto-focus, layout polish
+
+**Fix 1 — Auth state sync between booking flow and site header**
+- Added Supabase `onAuthStateChange` listener in `HeaderClient` that updates displayed customer name in real-time
+- Staff accounts (employees table) are excluded from public header display
+- Header now reflects sign-in/sign-out from booking flow without requiring full page reload
+
+**Fix 2 — Await sign-out before allowing re-login**
+- Made `handleSignOutClick` async in `InlineAuth` — awaits `onSignOut()` before transitioning UI to buttons view
+- Eliminates race condition where re-login could start before sign-out completes
+
+**Fix 3 — "Not you? / Sign out" two-column layout**
+- Updated authenticated state render: "Booking as" + contact details on left, "Not you?" above "Sign out" stacked on right
+
+**Fix 4 — OTP input auto-focus on iOS Safari**
+- Applied double-RAF pattern for reliable auto-focus on both `SignInFlow` and `SignUpFlow` OTP inputs
+
+**Fix 5 — Remove deposit option for returning customers**
+- Added `hasTransactionHistory` flag (derived from `lifetime_spend > 0` via `/api/customer/loyalty`)
+- Deposit option hidden for existing customers who have completed at least 1 transaction
+- Auto-switches to "Pay in Full" if customer was on deposit and becomes ineligible
+
+**Fix 6 — Hide payment section when loyalty points cover full amount**
+- When `grandTotal <= 0` (points cover everything), entire payment options section is hidden
+- CTA button text changes to "Confirm Booking" (no payment language)
+- `canSubmit` no longer requires a payment option when points cover the order
+
+**Fix 7 — Adjusted labels when loyalty points partially cover order**
+- "Pay in Full" → "Pay Balance in Full — $X now" when loyalty discount active
+- "Pay on Site" → "Pay Balance on Site" when loyalty discount active
+- Deposit option hidden when loyalty points are in use
+- Auto-switch from deposit to full when loyalty slider is engaged
+
+**Fix 8 — Loyalty points slider label**
+- Changed from "Points to use:" to "Adjust slider to use Points:"
+- Slider uses `flex-1 min-w-0` for responsive sizing with longer label
+
+**Files changed**: `src/components/public/header-client.tsx`, `src/components/booking/inline-auth.tsx`, `src/components/booking/step-confirm-book.tsx`, `src/components/booking/booking-wizard.tsx`, `src/app/api/customer/loyalty/route.ts`
+
+---
+
 ## Auth State Sync + Streamline Existing-Phone Sign-In — Session 14F — 2026-02-25
 
 ### Fix: "Booking as" state sync for all sign-in paths + streamline existing-phone flow

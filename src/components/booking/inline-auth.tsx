@@ -50,7 +50,7 @@ export interface InlineAuthProps {
   onAuthComplete: (data: AuthCustomerData) => void;
   isAuthenticated: boolean;
   customerData: AuthCustomerData | null;
-  onSignOut: () => void;
+  onSignOut: () => void | Promise<void>;
   businessName: string;
 }
 
@@ -109,10 +109,14 @@ function SignInFlow({
   const [resetSent, setResetSent] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus OTP input
+  // Auto-focus OTP input (double-RAF for iOS Safari)
   useEffect(() => {
     if (mode === 'otp') {
-      requestAnimationFrame(() => otpInputRef.current?.focus());
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          otpInputRef.current?.focus();
+        });
+      });
     }
   }, [mode]);
 
@@ -690,10 +694,14 @@ function SignUpFlow({
   const [phoneExists, setPhoneExists] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus OTP input
+  // Auto-focus OTP input (double-RAF for iOS Safari)
   useEffect(() => {
     if (mode === 'phone-verify') {
-      requestAnimationFrame(() => otpInputRef.current?.focus());
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          otpInputRef.current?.focus();
+        });
+      });
     }
   }, [mode]);
 
@@ -1476,11 +1484,11 @@ export function InlineAuth({
   }, [onAuthComplete]);
 
   // Handle "Not you?" or "Sign out" — clear auth and return to buttons
-  const handleSignOutClick = useCallback(() => {
-    setView('buttons');
-    setSwitchPhone('');
+  const handleSignOutClick = useCallback(async () => {
     setLocalAuthData(null);
-    onSignOut();
+    setSwitchPhone('');
+    await onSignOut();
+    setView('buttons');
   }, [onSignOut]);
 
   // Switch to sign-in from sign-up (with optional phone pre-fill)
@@ -1501,28 +1509,34 @@ export function InlineAuth({
     const { first_name, last_name, phone, email } = effectiveData.customer;
     return (
       <div className="rounded-lg border border-lime/30 bg-lime/5 p-4">
-        <p className="text-sm font-medium text-site-text">
-          Booking as: {first_name} {last_name}
-        </p>
-        <p className="mt-0.5 text-xs text-site-text-muted truncate" suppressHydrationWarning>
-          {phone ? formatPhone(phone) : ''}{phone && email ? ' \u00b7 ' : ''}{email}
-        </p>
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSignOutClick}
-            className="text-xs text-site-text-muted hover:text-site-text transition-colors"
-          >
-            Not you?
-          </button>
-          <span className="text-xs text-site-text-faint">&middot;</span>
-          <button
-            type="button"
-            onClick={handleSignOutClick}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors"
-          >
-            Sign out
-          </button>
+        <div className="flex items-start justify-between gap-4">
+          {/* Left: Customer info */}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-site-text">
+              Booking as: {first_name} {last_name}
+            </p>
+            <p className="mt-0.5 text-xs text-site-text-muted truncate" suppressHydrationWarning>
+              {phone ? formatPhone(phone) : ''}{phone && email ? ' · ' : ''}{email}
+            </p>
+          </div>
+
+          {/* Right: Actions stacked */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={handleSignOutClick}
+              className="text-xs text-site-text-muted hover:text-site-text transition-colors"
+            >
+              Not you?
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOutClick}
+              className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     );

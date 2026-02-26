@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-25 (Session 14C — booking step 3 UX overhaul, inline auth, conditional footer)
+> **Last updated:** 2026-02-25 (Session 14G — auth sync, deposit logic, loyalty payment polish)
 
 ---
 
@@ -897,14 +897,11 @@ src/components/account/vehicle-form-dialog.tsx
 src/components/booking/booking-confirmation.tsx
 src/components/booking/booking-wizard.tsx
 src/components/booking/inline-auth.tsx              (inline collapsible sign-in/sign-up for Step 3)
-src/components/booking/step-configure.tsx           (deprecated — absorbed by step-service-select)
 src/components/booking/step-confirm-book.tsx        (merged confirm & book page — Step 3)
-src/components/booking/step-customer-info.tsx       (deprecated — contact fields moved to inline-auth)
 src/components/booking/step-indicator.tsx
 src/components/booking/step-payment.tsx
-src/components/booking/step-review.tsx              (deprecated — moved to step-confirm-book)
 src/components/booking/step-schedule.tsx
-src/components/booking/step-service-select.tsx
+src/components/booking/step-service-select.tsx      (merged service select + configure — Step 1)
 ```
 
 ### Quote Components

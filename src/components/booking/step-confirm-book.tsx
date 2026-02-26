@@ -70,6 +70,7 @@ export interface StepConfirmBookProps {
   // Auth / Customer
   isPortal: boolean;
   isExistingCustomer: boolean;
+  hasTransactionHistory: boolean;
   customerData: AuthCustomerData | null;
   onAuthComplete: (data: AuthCustomerData) => void;
   onSignOut: () => void;
@@ -112,6 +113,7 @@ export function StepConfirmBook({
   availableCoupons,
   isPortal,
   isExistingCustomer,
+  hasTransactionHistory,
   customerData,
   onAuthComplete,
   onSignOut,
@@ -189,10 +191,21 @@ export function StepConfirmBook({
   const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
   const loyaltyPointsValue = loyaltyPointsBalance * REDEEM_RATE;
 
+  // Loyalty-related flags
+  const hasLoyaltyDiscount = loyaltyPointsToUse > 0 && loyaltyDiscount > 0;
+  const pointsCoverOrder = grandTotal <= 0;
+
   // Determine if Stripe needed
   const STRIPE_MINIMUM = 0.50;
   const discountsCoverAmount = grandTotal < STRIPE_MINIMUM;
-  const needsStripePayment = requirePayment && paymentOption !== 'pay_on_site' && paymentOption !== null && !discountsCoverAmount && grandTotal > 0;
+  const needsStripePayment = requirePayment && paymentOption !== 'pay_on_site' && paymentOption !== null && !discountsCoverAmount && grandTotal > 0 && !pointsCoverOrder;
+
+  // Auto-switch from deposit when it becomes hidden (returning customer or loyalty active)
+  useEffect(() => {
+    if ((hasTransactionHistory || hasLoyaltyDiscount) && paymentOption === 'deposit') {
+      onPaymentOptionChange('full');
+    }
+  }, [hasTransactionHistory, hasLoyaltyDiscount, paymentOption, onPaymentOptionChange]);
 
   // --- Coupon ---
   async function handleApplyCoupon(code: string) {
@@ -348,6 +361,7 @@ export function StepConfirmBook({
   const getCtaText = () => {
     if (submitting) return null;
     if (needsStripePayment && showPaymentForm) return null;
+    if (pointsCoverOrder) return 'Confirm Booking';
     if (requirePayment && paymentOption !== 'pay_on_site' && !discountsCoverAmount && paymentAmount > 0) {
       return `Pay ${formatCurrency(paymentAmount)} & Book My Detail`;
     }
@@ -355,7 +369,7 @@ export function StepConfirmBook({
   };
 
   const canSubmit = agreedToAll && !submitting && isAuthenticated &&
-    (requirePayment ? (discountsCoverAmount || paymentOption !== null) : true);
+    (pointsCoverOrder || (requirePayment ? (discountsCoverAmount || paymentOption !== null) : true));
 
   // Reset payment form when switching payment options
   const handlePaymentOptionSwitch = (option: 'full' | 'deposit' | 'pay_on_site') => {
@@ -649,7 +663,9 @@ export function StepConfirmBook({
                   {maxLoyaltyPointsUsable > 0 ? (
                     <div className="mt-3">
                       <div className="flex items-center gap-3">
-                        <label className="text-sm text-site-text-secondary">Points to use:</label>
+                        <label className="text-xs font-medium text-site-text-muted whitespace-nowrap shrink-0">
+                          Adjust slider to use Points:
+                        </label>
                         <input
                           type="range"
                           min={0}
@@ -657,9 +673,9 @@ export function StepConfirmBook({
                           step={REDEEM_MINIMUM}
                           value={loyaltyPointsToUse}
                           onChange={(e) => onLoyaltyPointsChange(Number(e.target.value))}
-                          className="flex-1 h-2 bg-brand-surface rounded-lg appearance-none cursor-pointer accent-amber-500"
+                          className="flex-1 min-w-0 h-2 bg-brand-surface rounded-lg appearance-none cursor-pointer accent-amber-500"
                         />
-                        <span className="text-sm font-medium text-site-text w-20 text-right">
+                        <span className="text-xs font-semibold text-site-text whitespace-nowrap shrink-0">
                           {loyaltyPointsToUse.toLocaleString()} pts
                         </span>
                       </div>
@@ -705,16 +721,14 @@ export function StepConfirmBook({
               )}
 
               {/* Section 4: Payment (unified: options + cancellation + Stripe) */}
-              {requirePayment && (
+              {requirePayment && !pointsCoverOrder && (
                 <div className="rounded-lg border border-site-border p-4 space-y-4">
                   <h3 className="text-sm font-semibold text-site-text-secondary">Payment</h3>
 
                   {discountsCoverAmount ? (
                     <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
                       <p className="text-sm font-medium text-green-400">
-                        {grandTotal <= 0
-                          ? 'Your discounts cover the full amount — no payment required!'
-                          : `Remaining balance of ${formatCurrency(grandTotal)} is below minimum — no payment required!`}
+                        Remaining balance of {formatCurrency(grandTotal)} is below minimum — no payment required!
                       </p>
                     </div>
                   ) : (
@@ -737,16 +751,20 @@ export function StepConfirmBook({
                         />
                         <div className="flex-1">
                           <p className="text-sm font-medium text-site-text">
-                            Pay in Full — {formatCurrency(grandTotal)} now
+                            {hasLoyaltyDiscount
+                              ? `Pay Balance in Full — ${formatCurrency(grandTotal)} now`
+                              : `Pay in Full — ${formatCurrency(grandTotal)} now`}
                           </p>
                           <p className="text-xs text-site-text-muted">
-                            Pay the full amount now and you&apos;re all set
+                            {hasLoyaltyDiscount
+                              ? 'Pay the remaining balance now after points redemption'
+                              : "Pay the full amount now and you\u2019re all set"}
                           </p>
                         </div>
                       </label>
 
-                      {/* Deposit option — only for services >= $100 */}
-                      {!isFullPaymentRequired && (
+                      {/* Deposit option — hidden for: orders < $100, returning customers, loyalty active */}
+                      {!isFullPaymentRequired && !hasTransactionHistory && !hasLoyaltyDiscount && (
                         <label
                           className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                             paymentOption === 'deposit'
@@ -791,9 +809,13 @@ export function StepConfirmBook({
                             className="mt-0.5 h-4 w-4 text-lime focus:ring-lime"
                           />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-site-text">Pay on Site</p>
+                            <p className="text-sm font-medium text-site-text">
+                              {hasLoyaltyDiscount ? 'Pay Balance on Site' : 'Pay on Site'}
+                            </p>
                             <p className="text-xs text-site-text-muted">
-                              No payment now — pay when we&apos;re done
+                              {hasLoyaltyDiscount
+                                ? "Pay the remaining balance when we\u2019re done"
+                                : "No payment now — pay when we\u2019re done"}
                             </p>
                           </div>
                         </label>
@@ -836,6 +858,15 @@ export function StepConfirmBook({
                       onBack={() => setShowPaymentForm(false)}
                     />
                   )}
+                </div>
+              )}
+
+              {/* Points cover full order — no payment needed */}
+              {requirePayment && pointsCoverOrder && (
+                <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                  <p className="text-sm font-medium text-green-400">
+                    Your loyalty points cover the full amount — no payment required!
+                  </p>
                 </div>
               )}
 

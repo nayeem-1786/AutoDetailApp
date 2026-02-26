@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const { data: customer } = await admin
       .from('customers')
-      .select('id, loyalty_points_balance')
+      .select('id, loyalty_points_balance, lifetime_spend')
       .eq('auth_user_id', user.id)
       .single();
 
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
       balance: customer.loyalty_points_balance,
       entries: entries ?? [],
       total: count ?? 0,
+      hasTransactionHistory: (customer.lifetime_spend ?? 0) > 0,
     });
   } catch (err) {
     console.error('Loyalty GET error:', err);

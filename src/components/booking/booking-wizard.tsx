@@ -84,6 +84,7 @@ interface BookingState {
   availableCoupons: AvailableCoupon[];
   loyaltyPointsBalance: number;
   loyaltyPointsToUse: number;
+  hasTransactionHistory: boolean;
 }
 
 interface ConfirmationData {
@@ -228,6 +229,7 @@ export function BookingWizard({
       availableCoupons: [],
       loyaltyPointsBalance: 0,
       loyaltyPointsToUse: 0,
+      hasTransactionHistory: false,
     };
 
     // Default step: rebook → step 2 (schedule), otherwise step 1
@@ -550,6 +552,7 @@ export function BookingWizard({
 
         let coupons: AvailableCoupon[] = [];
         let loyaltyBalance = 0;
+        let hasHistory = false;
 
         if (couponsRes.ok) {
           const data = await couponsRes.json();
@@ -559,12 +562,14 @@ export function BookingWizard({
         if (loyaltyRes.ok) {
           const data = await loyaltyRes.json();
           loyaltyBalance = data.balance || 0;
+          hasHistory = data.hasTransactionHistory || false;
         }
 
         const updatedState = {
           ...newState,
           availableCoupons: coupons,
           loyaltyPointsBalance: loyaltyBalance,
+          hasTransactionHistory: hasHistory,
         };
         setState(updatedState);
         goToStep(3, updatedState);
@@ -642,6 +647,7 @@ export function BookingWizard({
 
       let coupons: AvailableCoupon[] = [];
       let loyaltyBalance = 0;
+      let hasHistory = false;
 
       if (couponsRes.ok) {
         const couponsData = await couponsRes.json();
@@ -651,12 +657,14 @@ export function BookingWizard({
       if (loyaltyRes.ok) {
         const loyaltyData = await loyaltyRes.json();
         loyaltyBalance = loyaltyData.balance || 0;
+        hasHistory = loyaltyData.hasTransactionHistory || false;
       }
 
       setState((prev) => ({
         ...prev,
         availableCoupons: coupons,
         loyaltyPointsBalance: loyaltyBalance,
+        hasTransactionHistory: hasHistory,
       }));
     } catch {
       // Non-critical — continue without coupons/loyalty
@@ -928,6 +936,7 @@ export function BookingWizard({
             availableCoupons={state.availableCoupons}
             isPortal={isPortal}
             isExistingCustomer={state.isExistingCustomer ?? false}
+            hasTransactionHistory={state.hasTransactionHistory}
             customerData={authCustomerData}
             onAuthComplete={handleAuthComplete}
             onSignOut={handleSignOut}

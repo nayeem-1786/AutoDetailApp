@@ -29,12 +29,52 @@ export function HeaderClient({
   const [scrolled, setScrolled] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [displayName, setDisplayName] = useState(customerName);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Sync auth state changes (e.g., sign-in/out from booking flow) to header
+  useEffect(() => {
+    const supabase = createClient();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: { user: { id: string } } | null) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setDisplayName(null);
+        return;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        try {
+          // Skip staff accounts — don't show staff name in public header
+          const { data: emp } = await supabase
+            .from('employees')
+            .select('id')
+            .eq('auth_user_id', session.user.id)
+            .single();
+
+          if (emp) return;
+
+          const { data: cust } = await supabase
+            .from('customers')
+            .select('first_name')
+            .eq('auth_user_id', session.user.id)
+            .single();
+
+          if (cust) {
+            setDisplayName(cust.first_name);
+          }
+        } catch {
+          // Non-critical — header will sync on next page load
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -166,7 +206,7 @@ export function HeaderClient({
           {/* Right side */}
           <div className="flex items-center gap-3">
             {/* Account — desktop */}
-            {customerName ? (
+            {displayName ? (
               <div
                 className="relative hidden lg:block"
                 onMouseEnter={openUserDropdown}
@@ -176,7 +216,7 @@ export function HeaderClient({
                   type="button"
                   className="inline-flex items-center gap-1 text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
                 >
-                  Hi, {customerName}
+                  Hi, {displayName}
                   <ChevronDown
                     className={`w-3.5 h-3.5 transition-transform duration-200 ${
                       userDropdownOpen ? 'rotate-180' : ''
@@ -289,10 +329,10 @@ export function HeaderClient({
 
             {/* Account — mobile */}
             <div className="pt-2 border-t border-site-border space-y-1">
-              {customerName ? (
+              {displayName ? (
                 <>
                   <p className="px-3 pt-1 text-xs font-medium text-site-text-dim">
-                    Hi, {customerName}
+                    Hi, {displayName}
                   </p>
                   <Link
                     href="/account"
