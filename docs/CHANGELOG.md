@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## POS Addon Suggestions + Coupon Layout Fix — 2026-02-26
+
+### fix(pos): vertical addon rows, viewport-level dialog, shared coupon+discount row
+
+Three corrective fixes for the previous addon suggestions implementation:
+
+**Fix 1: Addon chips → vertical rows**
+- Replaced horizontal scrolling chip container with vertically stacked full-width rows
+- Eliminates gesture conflict between horizontal scroll and swipe-to-delete on iPad
+- Each addon shows name (left) and combo price / savings (right) on one line
+
+**Fix 2: ServiceDetailDialog at viewport level**
+- Moved `pickerService` state and `<ServiceDetailDialog>` from `ticket-item-row.tsx` up to `ticket-panel.tsx`
+- Dialog now renders at the ticket panel level, not inside the 380px sidebar scroll area
+- Added `onAddonClick` callback prop to `TicketItemRow`
+
+**Fix 3: Coupon + Discount share same row**
+- `CouponInput` accepts `renderCollapsedInline` prop for inline "Add Discount" button
+- When both are collapsed: "Add Coupon" (TicketPercent icon) and "Add Discount" (Tag icon) on same row, opposite ends
+- When coupon is expanded/applied: discount link moves to its own row below
+- Different icons: TicketPercent for coupon, Tag for discount
+
+**Files modified:**
+- `src/app/pos/components/ticket-item-row.tsx`
+- `src/app/pos/components/ticket-panel.tsx`
+- `src/app/pos/components/coupon-input.tsx`
+
+---
+
 ## Fix Supabase AbortError — Web Locks Singleton — 2026-02-26
 
 ### fix(auth): store Supabase browser client on window to survive HMR

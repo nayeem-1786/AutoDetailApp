@@ -28,6 +28,7 @@ import { VehicleSelector } from './vehicle-selector';
 import { VehicleCreateDialog } from './vehicle-create-dialog';
 import { CouponInput } from './coupon-input';
 import { LoyaltyPanel } from './loyalty-panel';
+import { ServiceDetailDialog } from './service-detail-dialog';
 import { CustomerTypePrompt } from './customer-type-prompt';
 import { useAddonSuggestions } from '../hooks/use-addon-suggestions';
 import {
@@ -35,7 +36,7 @@ import {
   SwipeableCartList,
   SwipeableCartItemWrapper,
 } from './swipeable-cart-item';
-import type { TicketItem } from '../types';
+import type { TicketItem, CatalogService } from '../types';
 import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
 interface TicketPanelProps {
@@ -59,6 +60,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [addonPickerService, setAddonPickerService] = useState<CatalogService | null>(null);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
@@ -308,6 +310,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                         item={item}
                         addonSuggestions={item.serviceId ? (suggestionsMap.get(item.serviceId) ?? []) : []}
                         ticketServiceIds={ticketServiceIds}
+                        onAddonClick={(addonServiceId) => {
+                          const svc = services.find((s) => s.id === addonServiceId);
+                          if (svc) setAddonPickerService(svc);
+                        }}
                       />
                     </SwipeableCartItem>
                   </SwipeableCartItemWrapper>
@@ -327,7 +333,21 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (
         <div className="shrink-0 space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
-          <CouponInput />
+          <CouponInput
+            renderCollapsedInline={
+              canManualDiscount && !ticket.manualDiscount && !showDiscountForm
+                ? (
+                  <button
+                    onClick={() => setShowDiscountForm(true)}
+                    className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <Tag className="h-4 w-4" />
+                    Add Discount
+                  </button>
+                )
+                : undefined
+            }
+          />
           <LoyaltyPanel />
 
           {/* Manual Discount — permission gated */}
@@ -432,13 +452,16 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={() => setShowDiscountForm(true)}
-                  className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  <Tag className="h-4 w-4" />
-                  Add Discount
-                </button>
+                /* Standalone "Add Discount" — only when coupon IS applied (otherwise rendered inline) */
+                ticket.coupon && (
+                  <button
+                    onClick={() => setShowDiscountForm(true)}
+                    className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <Tag className="h-4 w-4" />
+                    Add Discount
+                  </button>
+                )
               )}
             </>
           )}
@@ -532,6 +555,15 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
             }
           }}
           editVehicle={editingVehicle}
+        />
+      )}
+
+      {/* Service Detail Dialog — for addon suggestions (rendered at viewport level) */}
+      {addonPickerService && (
+        <ServiceDetailDialog
+          service={addonPickerService}
+          open={!!addonPickerService}
+          onClose={() => setAddonPickerService(null)}
         />
       )}
 
