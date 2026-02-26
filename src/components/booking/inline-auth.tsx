@@ -687,6 +687,7 @@ function SignUpFlow({
   const [loading, setLoading] = useState(false);
   const [otpPhone, setOtpPhone] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [phoneExists, setPhoneExists] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus OTP input
@@ -735,34 +736,8 @@ function SignUpFlow({
 
     const phoneCheck = await checkExists({ phone: data.phone });
     if (phoneCheck.exists) {
-      if (phoneCheck.hasAuthAccount) {
-        setError(
-          <>
-            This phone number is already linked to an account.{' '}
-            <button
-              type="button"
-              onClick={() => onSwitchToSignIn(data.phone)}
-              className="font-medium text-lime hover:text-lime-400 underline"
-            >
-              Sign in instead &rarr;
-            </button>
-          </>
-        );
-      } else {
-        setHint(
-          <>
-            Welcome back! We already have your info on file.{' '}
-            <button
-              type="button"
-              onClick={() => onSwitchToSignIn(data.phone)}
-              className="font-medium text-lime hover:text-lime-400 underline"
-            >
-              Sign in here
-            </button>{' '}
-            to access your account.
-          </>
-        );
-      }
+      setPhoneExists(true);
+      setError('This phone number is already linked to an account.');
       setLoading(false);
       return;
     }
@@ -783,6 +758,41 @@ function SignUpFlow({
     setOtpPhone(data.phone);
     otpVerifyForm.setValue('phone', data.phone);
     setResendCooldown(60);
+    setMode('phone-verify');
+    setLoading(false);
+  };
+
+  // Sign In Instead: send OTP directly and skip to verification
+  const handleSignInInstead = async () => {
+    const phone = phoneForm.getValues('phone');
+    setLoading(true);
+    setError(null);
+    setHint(null);
+
+    const e164 = normalizePhone(phone);
+    if (!e164) {
+      setError('Please enter a valid 10-digit phone number.');
+      setLoading(false);
+      return;
+    }
+
+    const supabase = createClient();
+    const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
+
+    if (otpError) {
+      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
+      } else {
+        setError('Failed to send verification code. Please try again.');
+      }
+      setLoading(false);
+      return;
+    }
+
+    setOtpPhone(phone);
+    otpVerifyForm.setValue('phone', phone);
+    setResendCooldown(60);
+    setError(null);
     setMode('phone-verify');
     setLoading(false);
   };
@@ -818,6 +828,63 @@ function SignUpFlow({
         setError('Something went wrong verifying your code. Please try again.');
       }
       setLoading(false);
+      return;
+    }
+
+    // Sign-in-instead path: do sign-in-style verification then call success
+    if (phoneExists) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+        if (emp) {
+          await supabase.auth.signOut();
+          setError('This phone number is linked to a staff account. Please use a different number.');
+          setLoading(false);
+          return;
+        }
+
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+        if (!cust) {
+          try {
+            const linkRes = await fetch('/api/customer/link-by-phone', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: normalizePhone(data.phone) }),
+            });
+            const linkData = await linkRes.json();
+            if (linkData.success) {
+              onSuccess();
+              return;
+            }
+            if (linkData.error === 'This phone number is already linked to another account') {
+              await supabase.auth.signOut();
+              setError('This phone number is already linked to another account.');
+              setLoading(false);
+              return;
+            }
+            if (!linkData.found) {
+              onSwitchToSignIn();
+              return;
+            }
+            setError('Something went wrong linking your account. Please try again.');
+            setLoading(false);
+            return;
+          } catch {
+            setError('Something went wrong linking your account. Please try again.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+      onSuccess();
       return;
     }
 
@@ -1055,17 +1122,23 @@ function SignUpFlow({
                     shouldDirty: true,
                     shouldValidate: false,
                   });
+                  if (phoneExists) {
+                    setPhoneExists(false);
+                    setError(null);
+                    setHint(null);
+                  }
                 },
               })}
             />
           </FormField>
 
           <Button
-            type="submit"
+            type={phoneExists ? 'button' : 'submit'}
+            onClick={phoneExists ? handleSignInInstead : undefined}
             disabled={loading}
             className="site-btn-primary w-full py-3 text-sm font-semibold"
           >
-            {loading ? <Spinner size="sm" /> : 'Continue'}
+            {loading ? <Spinner size="sm" /> : phoneExists ? 'Sign In Instead' : 'Continue'}
           </Button>
 
           <div className="flex items-center gap-3">
@@ -1076,10 +1149,18 @@ function SignUpFlow({
 
           <button
             type="button"
-            onClick={() => { setMode('full'); setError(null); setHint(null); }}
+            onClick={() => {
+              if (phoneExists) {
+                onSwitchToSignIn();
+              } else {
+                setMode('full');
+                setError(null);
+                setHint(null);
+              }
+            }}
             className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
           >
-            Sign up with email
+            {phoneExists ? 'Sign in with email' : 'Sign up with email'}
           </button>
         </form>
       )}
@@ -1126,7 +1207,7 @@ function SignUpFlow({
           <div className="flex items-center justify-between text-sm">
             <button
               type="button"
-              onClick={() => { setMode('phone-otp'); setError(null); setHint(null); otpVerifyForm.reset(); }}
+              onClick={() => { setMode('phone-otp'); setError(null); setHint(null); setPhoneExists(false); otpVerifyForm.reset(); }}
               className="text-site-text-muted hover:text-site-text"
             >
               Change number
@@ -1351,6 +1432,7 @@ export function InlineAuth({
   const [view, setView] = useState<AuthView>('buttons');
   const [switchPhone, setSwitchPhone] = useState('');
   const [fetchingProfile, setFetchingProfile] = useState(false);
+  const [localAuthData, setLocalAuthData] = useState<AuthCustomerData | null>(null);
 
   // After auth success: fetch customer profile + vehicles
   const handleAuthSuccess = useCallback(async () => {
@@ -1381,9 +1463,13 @@ export function InlineAuth({
         vehicles = vehicleData.data || vehicleData || [];
       }
 
-      onAuthComplete({ customer, vehicles });
+      const data = { customer, vehicles };
+      setLocalAuthData(data);
+      onAuthComplete(data);
     } catch {
-      onAuthComplete({ customer: { first_name: '', last_name: '', phone: '', email: '' }, vehicles: [] });
+      const fallback: AuthCustomerData = { customer: { first_name: '', last_name: '', phone: '', email: '' }, vehicles: [] };
+      setLocalAuthData(fallback);
+      onAuthComplete(fallback);
     } finally {
       setFetchingProfile(false);
     }
@@ -1393,6 +1479,7 @@ export function InlineAuth({
   const handleSignOutClick = useCallback(() => {
     setView('buttons');
     setSwitchPhone('');
+    setLocalAuthData(null);
     onSignOut();
   }, [onSignOut]);
 
@@ -1409,8 +1496,9 @@ export function InlineAuth({
   }, []);
 
   // Already authenticated — show compact info line
-  if (isAuthenticated && customerData) {
-    const { first_name, last_name, phone, email } = customerData.customer;
+  const effectiveData = customerData || localAuthData;
+  if ((isAuthenticated || !!localAuthData) && effectiveData) {
+    const { first_name, last_name, phone, email } = effectiveData.customer;
     return (
       <div className="rounded-lg border border-lime/30 bg-lime/5 p-4">
         <p className="text-sm font-medium text-site-text">

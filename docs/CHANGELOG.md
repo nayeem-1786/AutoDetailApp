@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Auth State Sync + Streamline Existing-Phone Sign-In — Session 14F — 2026-02-25
+
+### Fix: "Booking as" state sync for all sign-in paths + streamline existing-phone flow
+
+**Bug 1 — "Booking as" not appearing after sign-in-instead flow**
+- Root cause: Parent re-render timing — `onAuthComplete` updates parent state, but InlineAuth relied solely on parent prop propagation which could lag
+- Fix: Added `localAuthData` state in InlineAuth as local backup. Set immediately when profile fetch completes, before calling `onAuthComplete`. Render uses `customerData || localAuthData` as effective data source
+- Cleared on sign-out via `handleSignOutClick`
+- Now works for ALL auth paths: direct sign-in, direct sign-up, sign-in-instead redirect
+
+**Change 2 — Streamline existing-phone sign-in UX**
+- Old flow: Error → "Sign in instead →" link → navigate to sign-in phone view → re-enter phone → Continue → OTP (5 steps, 2 redundant)
+- New flow: Error → "Sign In Instead" button → OTP sent immediately → enter code (3 steps)
+- Added `phoneExists` state in `SignUpFlow` — tracks when phone already exists in DB
+- `sendOtp`: sets `phoneExists=true` with plain text error (no inline link)
+- "Continue" button becomes "Sign In Instead" button (same position, same styling)
+- `handleSignInInstead`: sends OTP directly via `signInWithOtp`, skips sign-in phone view, jumps straight to OTP verification
+- `verifyOtp`: when `phoneExists=true`, performs sign-in-style verification (staff guard + customer check + link-by-phone) then calls `onSuccess()`
+- Phone edit resets: onChange handler clears `phoneExists`, error, and hint when user modifies phone number
+- "Change number" in OTP view also resets `phoneExists`
+- "Sign up with email" becomes "Sign in with email" when `phoneExists=true` — navigates to sign-in flow
+
+**Files changed**: `src/components/booking/inline-auth.tsx`
+
+---
+
 ## Inline Collapsible Auth Replaces Bottom Sheet — Session 14E — 2026-02-25
 
 ### Refactor: Replace bottom sheet auth with inline collapsible sections in booking Step 3
