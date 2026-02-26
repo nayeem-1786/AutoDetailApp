@@ -109,14 +109,21 @@ function SignInFlow({
   const [resetSent, setResetSent] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus OTP input (double-RAF for iOS Safari)
+  // Auto-focus OTP input — aggressive strategy for iOS Safari
   useEffect(() => {
     if (mode === 'otp') {
+      const tryFocus = () => otpInputRef.current?.focus();
+
       requestAnimationFrame(() => {
+        tryFocus();
         requestAnimationFrame(() => {
-          otpInputRef.current?.focus();
+          tryFocus();
         });
       });
+
+      // Final fallback with delay — catches edge cases on slow iOS devices
+      const timer = setTimeout(tryFocus, 300);
+      return () => clearTimeout(timer);
     }
   }, [mode]);
 
@@ -437,7 +444,7 @@ function SignInFlow({
 
       {/* Phone Input */}
       {mode === 'phone' && (
-        <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5" data-form-type="other" autoComplete="off">
+        <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5" autoComplete="off" data-form-type="other" data-lpignore="true" data-1p-ignore>
           <FormField
             label="Mobile"
             required
@@ -448,6 +455,7 @@ function SignInFlow({
               id="inline-signin-phone"
               type="tel"
               autoComplete="tel"
+              inputMode="tel"
               autoFocus
               placeholder="(310) 555-1234"
               className={inputCls}
@@ -510,6 +518,7 @@ function SignInFlow({
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
+              autoFocus
               maxLength={6}
               placeholder="000000"
               className={`text-center text-lg tracking-[0.3em] ${inputCls}`}
@@ -697,14 +706,21 @@ function SignUpFlow({
   const [phoneExists, setPhoneExists] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus OTP input (double-RAF for iOS Safari)
+  // Auto-focus OTP input — aggressive strategy for iOS Safari
   useEffect(() => {
     if (mode === 'phone-verify') {
+      const tryFocus = () => otpInputRef.current?.focus();
+
       requestAnimationFrame(() => {
+        tryFocus();
         requestAnimationFrame(() => {
-          otpInputRef.current?.focus();
+          tryFocus();
         });
       });
+
+      // Final fallback with delay — catches edge cases on slow iOS devices
+      const timer = setTimeout(tryFocus, 300);
+      return () => clearTimeout(timer);
     }
   }, [mode]);
 
@@ -1193,6 +1209,7 @@ function SignUpFlow({
           >
             <Input
               id="inline-signup-otp"
+              autoFocus
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -1631,7 +1648,7 @@ export function InlineAuth({
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <h3 className="text-lg font-semibold text-site-text mb-5">Sign In</h3>
+          <h3 className="text-lg font-semibold text-site-text mb-5">Welcome Back</h3>
           <SignInFlow
             key={`signin-${switchPhone}`}
             initialPhone={switchPhone}

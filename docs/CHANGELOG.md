@@ -4,6 +4,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## iOS Contact Suggestions & OTP Auto-Focus — 2026-02-25
+
+### Fix: iOS contact suggestions on returning customer phone, OTP auto-focus on both auth flows
+
+**Fix 1 — iOS showing "Passwords" instead of contact phone numbers on returning customer flow**
+- Root cause: iOS Safari uses heading text to detect login forms. The "Sign In" heading triggered the password manager overlay, overriding `autoComplete="tel"`
+- Changed heading from "Sign In" to "Welcome Back" to avoid iOS login form detection
+- Added `inputMode="tel"` to sign-in phone input (reinforces tel keyboard)
+- Added `data-lpignore="true"` and `data-1p-ignore` to the form element (not just the input)
+- Email/password form already uses conditional rendering (`{mode === 'email' && ...}`) so it's fully unmounted when phone mode is active — no fix needed there
+
+**Fix 2 — OTP input cursor not appearing after entering phone number**
+- Both SignInFlow and SignUpFlow OTP inputs failed to auto-focus on iOS Safari
+- Root cause: single or double `requestAnimationFrame` not always sufficient — input may not be in DOM yet during view transitions on slow iOS devices
+- Replaced double-RAF with triple-attempt strategy: double-RAF (immediate + next frame) + `setTimeout(300ms)` fallback
+- Added `autoFocus` prop to both OTP `<Input>` elements as belt-and-suspenders
+- Applied to both `mode === 'otp'` (SignInFlow) and `mode === 'phone-verify'` (SignUpFlow)
+
+**Files modified:** `src/components/booking/inline-auth.tsx`
+
+---
+
 ## CRITICAL: Mobile Logout, Empty Booking-As Data, Sign-Out Resilience — 2026-02-25
 
 ### Fix (critical): mobile logout iOS touch event, empty booking-as profile fetch, sign-out resilience
