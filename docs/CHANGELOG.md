@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Clear Booking State After Successful Booking — Session 14J — 2026-02-25
+
+### fix(booking): clear URL state after successful booking
+
+- After `setConfirmation()`, call `window.history.replaceState(null, '', window.location.pathname)` to strip all query params
+- Prevents browser refresh from restoring Step 3 with stale booking data after a completed booking
+- Refresh now lands on clean Step 1 as expected
+
+**File modified:** `src/components/booking/booking-wizard.tsx`
+
+---
+
 ## Mobile Sticky Footer for Booking Steps 2 & 3 — Session 14I — 2026-02-25
 
 ### feat(booking): add mobile sticky footer to Steps 2 and 3

@@ -837,6 +837,9 @@ export function BookingWizard({
       grandTotal,
       customerEmail: customer.email,
     });
+
+    // Clear URL params so refresh doesn't restore the booking form
+    window.history.replaceState(null, '', window.location.pathname);
   }
 
   // Compute duration for scheduling
