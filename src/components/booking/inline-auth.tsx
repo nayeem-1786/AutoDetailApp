@@ -449,10 +449,10 @@ function SignInFlow({
             label="Mobile"
             required
             error={phoneForm.formState.errors.phone?.message}
-            htmlFor="inline-signin-phone"
+            htmlFor="inline-phone"
           >
             <Input
-              id="inline-signin-phone"
+              id="inline-phone"
               type="tel"
               autoComplete="tel-national"
               inputMode="tel"
@@ -500,7 +500,7 @@ function SignInFlow({
             onClick={() => { setMode('email'); setError(null); }}
             className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
           >
-            Sign in with email
+            Use email instead
           </button>
         </div>
       )}
@@ -1664,7 +1664,7 @@ export function InlineAuth({
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <h3 className="text-lg font-semibold text-site-text mb-5">Welcome Back</h3>
+          <h3 className="text-lg font-semibold text-site-text mb-5">Enter your details</h3>
           <SignInFlow
             key={`signin-${switchPhone}`}
             initialPhone={switchPhone}

@@ -14,6 +14,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - Changed `autoComplete="tel"` to `autoComplete="tel-national"` to better trigger iOS contact suggestions
 - Only the phone mode form was changed — email and OTP forms remain as `<form>` elements
 
+### fix(booking): remove remaining iOS auth-detection signals from phone input
+
+- Renamed phone input ID from `inline-signin-phone` to `inline-phone` (removes "signin" keyword iOS uses for login heuristics)
+- Changed "Sign in with email" button text to "Use email instead" (removes auth-associated language)
+- Changed "Welcome Back" heading to "Enter your details" (removes auth-associated heading text)
+- Email/OTP input IDs intentionally kept as `inline-signin-*` — those modes benefit from password/OTP autofill
+
 **File modified:** `src/components/booking/inline-auth.tsx`
 
 ---
