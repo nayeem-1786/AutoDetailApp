@@ -4,15 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## CMS Phase D Bug Fixes: Team Grid API, Button Types, Confirm Dialogs — 2026-02-27
+## CMS Phase D Bug Fixes: Team Grid Save Flow, Button Types, Confirm Dialogs — 2026-02-27
 
-### fix: team_grid editor uses DB, button type sweep, confirm dialogs replaced
+### fix: team-grid per-member save, remove save bio, fix parent save button
 
-**Bug 1 — Team Grid Editor Rewrite (CRITICAL):**
+**Team Grid Save Flow Fix:**
+- Replaced "Save Bio" button with "Save Member" button per card — saves all fields (name, role, bio, photo, years, certs, slug) via `PATCH /api/admin/team-members/[id]`
+- Removed auto-save on blur/change for individual fields — all changes saved explicitly via "Save Member"
+- Slug auto-regenerated from name on save
+- Validation: name and role required before save, inline errors shown
+- AI Generate Bio now updates local state only — user clicks "Save Member" to persist
+- Parent "Save Block" button hidden for team_grid blocks (shows "Team members save individually" instead); still appears if block title is edited
+
+**Bug 2 — Team Grid Editor Rewrite (from prior session):**
 - `team-grid-editor.tsx` fully rewritten to CRUD against `team_members` API
 - No longer reads/writes inline JSON — uses DB table directly
-- Auto-save pattern: add/edit/delete/reorder all save immediately via API
-- Individual "Save Bio" button for HTML bio field
 - Expand/collapse cards, drag-drop reorder, AI bio generation preserved
 - Block content marker: `{ "source": "team_members_table" }`
 

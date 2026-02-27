@@ -680,28 +680,35 @@ function BlockRow({
             pageType={pageType}
           />
 
-          {/* Save / Cancel */}
+          {/* Save — for team_grid, only show when title changed; members save individually */}
           <div className="flex items-center justify-end gap-2 pt-2">
+            {block.block_type === 'team_grid' && !dirty && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 mr-auto">
+                Team members save individually
+              </span>
+            )}
             {dirty && (
               <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">
                 Unsaved changes
               </span>
             )}
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSave}
-              disabled={!dirty || isSaving}
-            >
-              {isSaving ? (
-                <>
-                  <Spinner size="sm" className="mr-1" />
-                  Saving...
-                </>
-              ) : (
-                'Save Block'
-              )}
-            </Button>
+            {(block.block_type !== 'team_grid' || dirty) && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={!dirty || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Spinner size="sm" className="mr-1" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Block'
+                )}
+              </Button>
+            )}
           </div>
         </div>
       )}

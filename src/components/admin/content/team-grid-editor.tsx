@@ -37,6 +37,16 @@ export interface TeamGridMember {
   is_active?: boolean;
 }
 
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export function TeamGridEditor() {
   const [members, setMembers] = useState<TeamGridMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,8 +100,8 @@ export function TeamGridEditor() {
       if (!res.ok) throw new Error('Failed');
       const json = await res.json();
       if (json.data?.content) {
-        await saveMember(member.id, { bio: json.data.content });
-        toast.success('Bio generated');
+        updateMemberLocal(member.id, { bio: json.data.content });
+        toast.success('Bio generated — click Save Member to keep');
       }
     } catch {
       toast.error('Failed to generate bio');
@@ -131,7 +141,7 @@ export function TeamGridEditor() {
     }
   };
 
-  const saveMember = async (id: string, updates: Partial<TeamGridMember>) => {
+  const saveMember = async (id: string, updates: Partial<TeamGridMember>): Promise<boolean> => {
     setSavingId(id);
     try {
       const res = await adminFetch(`/api/admin/team-members/${id}`, {
@@ -147,8 +157,10 @@ export function TeamGridEditor() {
       setMembers((prev) =>
         prev.map((m) => (m.id === id ? json.data : m))
       );
+      return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
+      return false;
     } finally {
       setSavingId(null);
     }
@@ -257,17 +269,33 @@ export function TeamGridEditor() {
     }
   };
 
-  // Save field on blur
+  // Validate on blur (no auto-save — user clicks "Save Member")
   const handleFieldBlur = (memberId: string, field: string, value: string) => {
     validateField(memberId, field, value);
-    const member = members.find((m) => m.id === memberId);
-    if (!member) return;
+  };
 
-    // Only save if value actually changed from what we have
-    const currentVal = member[field as keyof TeamGridMember];
-    if (value !== currentVal && value.trim()) {
-      saveMember(memberId, { [field]: value });
+  // Save all member fields at once
+  const handleSaveMember = async (member: TeamGridMember) => {
+    // Validate required fields
+    if (!member.name.trim() || !member.role.trim()) {
+      const newErrors: Record<string, string> = {};
+      if (!member.name.trim()) newErrors.name = 'Name is required';
+      if (!member.role.trim()) newErrors.role = 'Role is required';
+      setErrors((prev) => ({ ...prev, [member.id]: { ...(prev[member.id] || {}), ...newErrors } }));
+      toast.error('Please fill in required fields');
+      return;
     }
+
+    const ok = await saveMember(member.id, {
+      name: member.name,
+      slug: toSlug(member.name),
+      role: member.role,
+      bio: member.bio,
+      photo_url: member.photo_url,
+      years_of_service: member.years_of_service,
+      certifications: member.certifications,
+    });
+    if (ok) toast.success('Member saved');
   };
 
   // -------------------------------------------------------------------------
@@ -369,7 +397,6 @@ export function TeamGridEditor() {
                   value={member.photo_url}
                   onChange={(url) => {
                     updateMemberLocal(member.id, { photo_url: url });
-                    saveMember(member.id, { photo_url: url });
                   }}
                   label="Photo"
                   placeholder="Upload team member photo"
@@ -441,23 +468,6 @@ export function TeamGridEditor() {
                     placeholder="Write a bio for this team member..."
                     rows={8}
                   />
-                  <div className="flex justify-end mt-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => saveMember(member.id, { bio: member.bio })}
-                      disabled={savingId === member.id}
-                    >
-                      {savingId === member.id ? (
-                        <>
-                          <Spinner size="sm" className="mr-1" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Bio'
-                      )}
-                    </Button>
-                  </div>
                 </div>
 
                 {/* Years of Service */}
@@ -472,10 +482,6 @@ export function TeamGridEditor() {
                           : null,
                       })
                     }
-                    onBlur={(e) => {
-                      const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                      saveMember(member.id, { years_of_service: val });
-                    }}
                     min={0}
                     placeholder="e.g. 5"
                     className="block w-32 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -487,7 +493,6 @@ export function TeamGridEditor() {
                   value={member.certifications}
                   onChange={(certs) => {
                     updateMemberLocal(member.id, { certifications: certs });
-                    saveMember(member.id, { certifications: certs });
                   }}
                 />
 
@@ -497,6 +502,25 @@ export function TeamGridEditor() {
                     URL slug: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/team/{member.slug}</code>
                   </div>
                 )}
+
+                {/* Save Member */}
+                <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleSaveMember(member)}
+                    disabled={savingId === member.id}
+                  >
+                    {savingId === member.id ? (
+                      <>
+                        <Spinner size="sm" className="mr-1" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Member'
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
