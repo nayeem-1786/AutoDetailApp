@@ -4,6 +4,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Overhaul Phase C.2: Terms Sections, Gallery, AI Prompts, Markdown Migration — 2026-02-27
+
+### feat: terms_sections + gallery editors/renderers, AI for all blocks, markdown→HTML migration
+
+**New admin editors:**
+- `TermsSectionsEditor` (`src/components/admin/content/terms-sections-editor.tsx`) — effective date picker, generate-default-sections button (9 standard sections), expandable section cards with drag-drop, active/inactive toggle, title validation, PageHtmlEditor for content, AI generate section button
+- `GalleryEditor` (`src/components/admin/content/gallery-editor.tsx`) — image grid with ImageUploadField, caption/alt text inputs, drag-drop reorder
+
+**Admin wiring (content-block-editor.tsx):**
+- Replaced terms_sections and gallery placeholders with real editors
+- Rich text blocks now use PageHtmlEditor (was MarkdownEditor)
+- CTA editor: added AI Generate Content button (`mode: cta_content`)
+- Testimonial editor: added AI Generate Content button (`mode: testimonial_content`)
+
+**AI generation for all block types (ai-content-writer.ts + ai-generate/route.ts):**
+- Added `callClaudeForText()` for field-level AI generation
+- 5 new specialized modes: `team_bio`, `credential_description`, `terms_section`, `cta_content`, `testimonial_content`
+- Team Grid: AI Generate Bio button (requires name + role)
+- Credentials: AI Generate Description button (requires title)
+- Terms Sections: AI Generate Section button (requires section title)
+- CTA: AI Generate Content button
+- Testimonial: AI Generate Content button
+
+**Public renderers (content-block-renderer.tsx):**
+- `TermsSectionsBlock` — async server component, numbered active sections, effective date display, contact footer via `getBusinessInfo()`
+- `GalleryBlock` → `GalleryLightbox` client component — responsive photo grid (1/2/3 cols), fullscreen lightbox overlay with keyboard navigation (arrows + Escape), image counter, body scroll lock
+- `RichTextBlock` updated to detect HTML vs markdown content with `legacyMarkdownToHtml` fallback
+
+**Markdown → HTML migration (C.7):**
+- Created `/api/admin/cms/migrate-markdown` — one-time migration endpoint with dry-run support (default), converts rich_text blocks from markdown to HTML using `marked` library
+- Deleted `src/components/admin/content/markdown-editor.tsx` — no longer referenced anywhere in src/
+- Installed `marked@17.x` for robust markdown-to-HTML conversion
+- Public renderer retains `legacyMarkdownToHtml` fallback for any unmigrated content
+
+---
+
 ## CMS Overhaul Phase C.1: Team Grid + Credentials Block Types — 2026-02-27
 
 ### feat: team_grid + credentials editors, public renderers, team detail page

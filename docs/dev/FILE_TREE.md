@@ -72,6 +72,7 @@ src/app/api/admin/cms/catalog/products/route.ts
 src/app/api/admin/cms/catalog/services/route.ts
 src/app/api/admin/cms/content/[id]/route.ts
 src/app/api/admin/cms/content/ai-generate/route.ts
+src/app/api/admin/cms/migrate-markdown/route.ts
 src/app/api/admin/cms/content/reorder/route.ts
 src/app/api/admin/cms/content/route.ts
 src/app/api/admin/cms/hero/[id]/route.ts
@@ -819,7 +820,8 @@ src/components/ui/vehicle-make-combobox.tsx
 src/components/admin/content/content-block-editor.tsx
 src/components/admin/content/credentials-editor.tsx
 src/components/admin/content/faq-editor.tsx
-src/components/admin/content/markdown-editor.tsx
+src/components/admin/content/gallery-editor.tsx
+src/components/admin/content/terms-sections-editor.tsx
 src/components/admin/content/page-html-editor.tsx
 src/components/admin/content/team-grid-editor.tsx
 src/components/admin/drag-drop-reorder.tsx
@@ -854,6 +856,7 @@ src/components/public/cms/particle-canvas.tsx
 src/components/public/cms/section-ticker-slot.tsx
 src/components/public/cms/theme-provider.tsx
 src/components/public/content-block-renderer.tsx
+src/components/public/gallery-lightbox.tsx
 src/components/public/cta-section.tsx
 src/components/public/footer-client.tsx
 src/components/public/header-client.tsx

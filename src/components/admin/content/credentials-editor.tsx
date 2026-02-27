@@ -42,6 +42,35 @@ function generateId(): string {
 export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, Record<string, string>>>({});
+  const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
+
+  const handleAiGenerateDescription = async (cred: CredentialItem) => {
+    if (!cred.title.trim()) {
+      toast.error('Enter a title first');
+      return;
+    }
+    setAiLoadingId(cred.id);
+    try {
+      const res = await adminFetch('/api/admin/cms/content/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'credential_description',
+          credentialTitle: cred.title,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const json = await res.json();
+      if (json.data?.content) {
+        updateCredential(cred.id, { description: json.data.content });
+        toast.success('Description generated');
+      }
+    } catch {
+      toast.error('Failed to generate description');
+    } finally {
+      setAiLoadingId(null);
+    }
+  };
 
   const handleReorder = useCallback(
     (reordered: CredentialItem[]) => {
@@ -211,7 +240,26 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
                 </FormField>
 
                 {/* Description */}
-                <FormField label="Description">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Description
+                    </label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAiGenerateDescription(cred)}
+                      disabled={aiLoadingId === cred.id || !cred.title.trim()}
+                      className="h-7 text-xs"
+                    >
+                      {aiLoadingId === cred.id ? (
+                        <Spinner size="sm" className="mr-1" />
+                      ) : (
+                        <Sparkles className="mr-1 h-3 w-3" />
+                      )}
+                      AI Generate Description
+                    </Button>
+                  </div>
                   <PageHtmlEditor
                     value={cred.description}
                     onChange={(val) => updateCredential(cred.id, { description: val })}
@@ -219,7 +267,7 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
                     placeholder="Describe this credential or certification..."
                     rows={6}
                   />
-                </FormField>
+                </div>
               </div>
             )}
           </div>
