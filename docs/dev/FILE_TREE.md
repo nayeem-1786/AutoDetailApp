@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-27 (CMS Overhaul Phase C.0 — expand block type constraint)
+> **Last updated:** 2026-02-27 (CMS Overhaul Phase C.1 — team_grid + credentials block types)
 
 ---
 
@@ -570,6 +570,7 @@ src/app/(public)/checkout/page.tsx       — Checkout
 src/app/(public)/checkout/confirmation/page.tsx
 src/app/(public)/terms/page.tsx          — Terms & conditions
 src/app/(public)/book/page.tsx           — Booking wizard
+src/app/(public)/team/[memberSlug]/page.tsx — Team member detail page
 src/app/(public)/p/[...slug]/page.tsx    — CMS dynamic pages
 ```
 
@@ -816,9 +817,11 @@ src/components/ui/vehicle-make-combobox.tsx
 ### Admin Components
 ```
 src/components/admin/content/content-block-editor.tsx
+src/components/admin/content/credentials-editor.tsx
 src/components/admin/content/faq-editor.tsx
 src/components/admin/content/markdown-editor.tsx
 src/components/admin/content/page-html-editor.tsx
+src/components/admin/content/team-grid-editor.tsx
 src/components/admin/drag-drop-reorder.tsx
 src/components/admin/html-editor-toolbar.tsx
 src/components/admin/html-image-manager.tsx

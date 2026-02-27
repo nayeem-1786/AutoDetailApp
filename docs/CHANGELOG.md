@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Overhaul Phase C.1: Team Grid + Credentials Block Types — 2026-02-27
+
+### feat: team_grid + credentials editors, public renderers, team detail page
+
+**New admin editors:**
+- `TeamGridEditor` (`src/components/admin/content/team-grid-editor.tsx`) — expandable member cards with photo (ImageUploadField), name/role (validated), bio (PageHtmlEditor with AI), years of service, certifications (tag input), drag-drop reorder
+- `CredentialsEditor` (`src/components/admin/content/credentials-editor.tsx`) — expandable cards with badge image (ImageUploadField), title (validated), description (PageHtmlEditor with AI), drag-drop reorder
+
+**Admin wiring:**
+- `content-block-editor.tsx` — replaced team_grid and credentials placeholders with real editors; imports parse/serialize helpers
+
+**Public renderers (content-block-renderer.tsx):**
+- `TeamGridBlock` — responsive grid (1/2/3 columns), circular photos with initials fallback, name, lime-colored role, bio (3-line clamp), certification badge pills, linked cards to `/team/{slug}`
+- `CredentialsBlock` — responsive grid, badge images (80px), title, description
+
+**Team member detail page:**
+- `src/app/(public)/team/[memberSlug]/page.tsx` — full member profile with large photo, name, role, years of service, certification badges, full bio HTML
+- SEO: `generateMetadata()` with title/description, `generateStaticParams()` for pre-rendering
+- JSON-LD Person schema with worksFor LocalBusiness
+- Data source: queries `page_content_blocks` for `block_type = 'team_grid'`, parses content JSON to find member by slug (Phase D will swap to `team_members` table)
+
+**TypeScript verification:**
+- All 9 block_type locations (renderer switch, editor switch, preview helper, options list, default content, AI route, AI system prompt, DB constraint, TS types) verified consistent — zero new errors
+
+---
+
 ## CMS Overhaul Phase C.0: Expand Block Types — 2026-02-27
 
 ### feat: Add team_grid, credentials, terms_sections, gallery block types

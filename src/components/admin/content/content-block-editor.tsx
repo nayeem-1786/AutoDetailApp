@@ -23,9 +23,22 @@ import {
   Users,
   Award,
   Images,
+  Sparkles,
 } from 'lucide-react';
-import { MarkdownEditor } from './markdown-editor';
 import { FaqEditor, parseFaqContent, serializeFaqContent } from './faq-editor';
+import { TermsSectionsEditor } from './terms-sections-editor';
+import { GalleryEditor } from './gallery-editor';
+import { PageHtmlEditor } from './page-html-editor';
+import {
+  TeamGridEditor,
+  parseTeamGridContent,
+  serializeTeamGridContent,
+} from './team-grid-editor';
+import {
+  CredentialsEditor,
+  parseCredentialsContent,
+  serializeCredentialsContent,
+} from './credentials-editor';
 import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
 import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
 
@@ -111,9 +124,9 @@ export function ContentBlockEditor({
         : blockType === 'credentials'
         ? '[]'
         : blockType === 'terms_sections'
-        ? '[]'
+        ? JSON.stringify({ effective_date: null, sections: [] })
         : blockType === 'gallery'
-        ? '[]'
+        ? JSON.stringify({ images: [] })
         : '';
 
       const res = await adminFetch('/api/admin/cms/content', {
@@ -409,6 +422,8 @@ export function ContentBlockEditor({
               onAiGenerateFaq={() => handleAiGenerateFaq(block)}
               dragProps={getDragProps(block.id)}
               onDragDone={saveBlockOrder}
+              pagePath={pagePath}
+              pageType={pageType}
             />
           ))}
         </div>
@@ -459,6 +474,8 @@ interface BlockRowProps {
     onDrop: (e: React.DragEvent) => void;
   };
   onDragDone: () => void;
+  pagePath?: string;
+  pageType?: string;
 }
 
 function BlockRow({
@@ -474,6 +491,8 @@ function BlockRow({
   onAiGenerateFaq,
   dragProps,
   onDragDone,
+  pagePath,
+  pageType,
 }: BlockRowProps) {
   const [localTitle, setLocalTitle] = useState(block.title ?? '');
   const [localContent, setLocalContent] = useState(block.content);
@@ -596,6 +615,8 @@ function BlockRow({
             isAiLoading={isAiLoading}
             onAiImprove={onAiImprove}
             onAiGenerateFaq={onAiGenerateFaq}
+            pagePath={pagePath}
+            pageType={pageType}
           />
 
           {/* Save / Cancel */}
@@ -637,6 +658,8 @@ function BlockContentEditor({
   isAiLoading,
   onAiImprove,
   onAiGenerateFaq,
+  pagePath,
+  pageType,
 }: {
   blockType: ContentBlockType;
   content: string;
@@ -644,19 +667,21 @@ function BlockContentEditor({
   isAiLoading: boolean;
   onAiImprove: () => void;
   onAiGenerateFaq: () => void;
+  pagePath?: string;
+  pageType?: string;
 }) {
   switch (blockType) {
     case 'rich_text':
       return (
         <div>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-            Content (Markdown)
+            Content (HTML)
           </label>
-          <MarkdownEditor
+          <PageHtmlEditor
             value={content}
             onChange={onChange}
-            onAiImprove={onAiImprove}
-            aiLoading={isAiLoading}
+            rows={12}
+            placeholder="Write your content in HTML..."
           />
         </div>
       );
@@ -687,20 +712,77 @@ function BlockContentEditor({
       );
 
     case 'cta':
-      return <CtaEditor content={content} onChange={onChange} />;
+      return (
+        <CtaEditor
+          content={content}
+          onChange={onChange}
+          isAiLoading={isAiLoading}
+          onAiGenerate={onAiImprove}
+          pagePath={pagePath}
+          pageType={pageType}
+        />
+      );
 
     case 'testimonial_highlight':
-      return <TestimonialEditor content={content} onChange={onChange} />;
+      return (
+        <TestimonialEditor
+          content={content}
+          onChange={onChange}
+          isAiLoading={isAiLoading}
+          onAiGenerate={onAiImprove}
+          pagePath={pagePath}
+          pageType={pageType}
+        />
+      );
 
     case 'team_grid':
+      return (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Team Members
+          </label>
+          <TeamGridEditor
+            value={parseTeamGridContent(content)}
+            onChange={(members) => onChange(serializeTeamGridContent(members))}
+          />
+        </div>
+      );
+
     case 'credentials':
+      return (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Credentials &amp; Certifications
+          </label>
+          <CredentialsEditor
+            value={parseCredentialsContent(content)}
+            onChange={(creds) => onChange(serializeCredentialsContent(creds))}
+          />
+        </div>
+      );
+
     case 'terms_sections':
+      return (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Terms &amp; Conditions Sections
+          </label>
+          <TermsSectionsEditor
+            content={content}
+            onChange={onChange}
+            pagePath={pagePath}
+            pageType={pageType}
+          />
+        </div>
+      );
+
     case 'gallery':
       return (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 text-center">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Editor coming soon — this block type will be available after the next update.
-          </p>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Gallery Images
+          </label>
+          <GalleryEditor content={content} onChange={onChange} />
         </div>
       );
 
@@ -829,10 +911,19 @@ function FeaturesListEditor({
 function CtaEditor({
   content,
   onChange,
+  isAiLoading,
+  onAiGenerate,
+  pagePath,
+  pageType,
 }: {
   content: string;
   onChange: (val: string) => void;
+  isAiLoading?: boolean;
+  onAiGenerate?: () => void;
+  pagePath?: string;
+  pageType?: string;
 }) {
+  const [aiLoading, setAiLoading] = useState(false);
   let data = { heading: '', description: '', button_text: 'Book Now', button_url: '/book' };
   try {
     const parsed = JSON.parse(content);
@@ -845,11 +936,59 @@ function CtaEditor({
     onChange(JSON.stringify({ ...data, [field]: value }));
   };
 
+  const handleAiGenerate = async () => {
+    setAiLoading(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/content/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'cta_content',
+          pagePath: pagePath || '/',
+          pageType: pageType || 'custom',
+          existingHeading: data.heading,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const json = await res.json();
+      const generated = json.data?.content;
+      if (generated) {
+        try {
+          const parsed = JSON.parse(generated);
+          onChange(JSON.stringify({ ...data, ...parsed }));
+          toast.success('CTA content generated');
+        } catch {
+          toast.error('Invalid AI response');
+        }
+      }
+    } catch {
+      toast.error('Failed to generate CTA content');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
-      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-        Call to Action
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+          Call to Action
+        </label>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAiGenerate}
+          disabled={aiLoading || isAiLoading}
+          className="h-7 text-xs"
+        >
+          {aiLoading ? (
+            <Spinner size="sm" className="mr-1" />
+          ) : (
+            <Sparkles className="mr-1 h-3 w-3" />
+          )}
+          AI Generate
+        </Button>
+      </div>
       <div>
         <input
           type="text"
@@ -899,10 +1038,19 @@ function CtaEditor({
 function TestimonialEditor({
   content,
   onChange,
+  isAiLoading,
+  onAiGenerate,
+  pagePath,
+  pageType,
 }: {
   content: string;
   onChange: (val: string) => void;
+  isAiLoading?: boolean;
+  onAiGenerate?: () => void;
+  pagePath?: string;
+  pageType?: string;
 }) {
+  const [aiLoading, setAiLoading] = useState(false);
   let data = { quote: '', author: '', rating: 5, source: '' };
   try {
     const parsed = JSON.parse(content);
@@ -915,11 +1063,58 @@ function TestimonialEditor({
     onChange(JSON.stringify({ ...data, [field]: value }));
   };
 
+  const handleAiGenerate = async () => {
+    setAiLoading(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/content/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'testimonial_content',
+          pagePath: pagePath || '/',
+          pageType: pageType || 'custom',
+        }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const json = await res.json();
+      const generated = json.data?.content;
+      if (generated) {
+        try {
+          const parsed = JSON.parse(generated);
+          onChange(JSON.stringify({ ...data, ...parsed }));
+          toast.success('Testimonial content generated');
+        } catch {
+          toast.error('Invalid AI response');
+        }
+      }
+    } catch {
+      toast.error('Failed to generate testimonial');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
-      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-        Testimonial
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+          Testimonial
+        </label>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAiGenerate}
+          disabled={aiLoading || isAiLoading}
+          className="h-7 text-xs"
+        >
+          {aiLoading ? (
+            <Spinner size="sm" className="mr-1" />
+          ) : (
+            <Sparkles className="mr-1 h-3 w-3" />
+          )}
+          AI Generate
+        </Button>
+      </div>
       <div>
         <textarea
           value={data.quote}
@@ -1019,16 +1214,18 @@ function getContentPreview(block: PageContentBlock): string {
   }
   if (block.block_type === 'terms_sections') {
     try {
-      const items = JSON.parse(block.content);
-      return Array.isArray(items) ? `${items.length} section${items.length !== 1 ? 's' : ''}` : '';
+      const parsed = JSON.parse(block.content);
+      const sections = Array.isArray(parsed) ? parsed : (parsed?.sections ?? []);
+      return `${sections.length} section${sections.length !== 1 ? 's' : ''}`;
     } catch {
       return '';
     }
   }
   if (block.block_type === 'gallery') {
     try {
-      const items = JSON.parse(block.content);
-      return Array.isArray(items) ? `${items.length} image${items.length !== 1 ? 's' : ''}` : '';
+      const parsed = JSON.parse(block.content);
+      const images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
+      return `${images.length} image${images.length !== 1 ? 's' : ''}`;
     } catch {
       return '';
     }

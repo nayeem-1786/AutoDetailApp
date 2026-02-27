@@ -8,6 +8,11 @@ import {
   getBusinessContext,
   buildCityContext,
   buildServiceContext,
+  generateTeamBio,
+  generateCredentialDescription,
+  generateTermsSection,
+  generateCtaContent,
+  generateTestimonialContent,
   type ContentWriterContext,
   type ContentWriterResult,
 } from '@/lib/services/ai-content-writer';
@@ -19,7 +24,9 @@ import type { ContentBlockType } from '@/lib/supabase/types';
 // ---------------------------------------------------------------------------
 
 interface GenerateRequest {
-  mode: 'full_page' | 'single_block' | 'improve' | 'batch_cities';
+  mode: 'full_page' | 'single_block' | 'improve' | 'batch_cities'
+    | 'team_bio' | 'credential_description' | 'terms_section'
+    | 'cta_content' | 'testimonial_content';
   pagePath?: string;
   pageType?: string;
   blockType?: ContentBlockType;
@@ -27,7 +34,13 @@ interface GenerateRequest {
   additionalInstructions?: string;
   focusKeywords?: string[];
   targetWordCount?: number;
-  autoSave?: boolean; // If true, save blocks to DB immediately
+  autoSave?: boolean;
+  // Specialized mode context
+  memberName?: string;
+  memberRole?: string;
+  credentialTitle?: string;
+  sectionTitle?: string;
+  existingHeading?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -44,6 +57,66 @@ export async function POST(request: NextRequest) {
 
   if (!mode) {
     return NextResponse.json({ error: 'mode is required' }, { status: 400 });
+  }
+
+  // ---------------------------------------------------------------------------
+  // SPECIALIZED MODES — return raw content, not structured blocks
+  // ---------------------------------------------------------------------------
+
+  const SPECIALIZED_MODES = ['team_bio', 'credential_description', 'terms_section', 'cta_content', 'testimonial_content'] as const;
+  type SpecializedMode = typeof SPECIALIZED_MODES[number];
+
+  if (SPECIALIZED_MODES.includes(mode as SpecializedMode)) {
+    try {
+      const biz = await getBusinessContext();
+      let content: string;
+
+      switch (mode as SpecializedMode) {
+        case 'team_bio':
+          if (!body.memberName || !body.memberRole) {
+            return NextResponse.json({ error: 'memberName and memberRole are required' }, { status: 400 });
+          }
+          content = await generateTeamBio(body.memberName, body.memberRole, biz.businessName);
+          break;
+
+        case 'credential_description':
+          if (!body.credentialTitle) {
+            return NextResponse.json({ error: 'credentialTitle is required' }, { status: 400 });
+          }
+          content = await generateCredentialDescription(body.credentialTitle, biz.businessName);
+          break;
+
+        case 'terms_section':
+          if (!body.sectionTitle) {
+            return NextResponse.json({ error: 'sectionTitle is required' }, { status: 400 });
+          }
+          content = await generateTermsSection(
+            body.sectionTitle,
+            biz.businessName,
+            biz.businessPhone,
+            '' // email not in biz context, but OK
+          );
+          break;
+
+        case 'cta_content':
+          content = await generateCtaContent(biz.businessName, body.existingHeading);
+          break;
+
+        case 'testimonial_content':
+          content = await generateTestimonialContent(biz.businessName);
+          break;
+
+        default:
+          return NextResponse.json({ error: 'Invalid specialized mode' }, { status: 400 });
+      }
+
+      return NextResponse.json({ data: { content } });
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : 'AI generation failed' },
+        { status: 500 }
+      );
+    }
   }
 
   const biz = await getBusinessContext();

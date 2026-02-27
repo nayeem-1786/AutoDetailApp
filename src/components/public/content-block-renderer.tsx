@@ -1,5 +1,8 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle, Star, Quote } from 'lucide-react';
+import { getBusinessInfo } from '@/lib/data/business';
+import { GalleryLightbox } from './gallery-lightbox';
 import type { PageContentBlock } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -44,8 +47,11 @@ function parseJsonContent<T>(content: string): T | null {
 // ---------------------------------------------------------------------------
 
 function RichTextBlock({ block }: { block: PageContentBlock }) {
-  // Simple markdown-to-HTML conversion for headings, bold, italic, links, lists
-  const html = markdownToHtml(block.content);
+  // Content is stored as HTML (after C.7 migration).
+  // For legacy markdown content that wasn't migrated, do a simple fallback conversion.
+  const content = block.content.trim();
+  const isHtml = content.startsWith('<') || content.includes('</');
+  const html = isHtml ? content : legacyMarkdownToHtml(content);
 
   return (
     <div className="content-block">
@@ -230,6 +236,322 @@ function TestimonialBlock({ block }: { block: PageContentBlock }) {
 }
 
 // ---------------------------------------------------------------------------
+// Team Grid Block
+// ---------------------------------------------------------------------------
+
+interface TeamGridMember {
+  id: string;
+  name: string;
+  role: string;
+  bio: string;
+  photo_url: string;
+  slug: string;
+  years_of_service: number | null;
+  certifications: string[];
+  sort_order: number;
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() || '?';
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function TeamGridBlock({ block }: { block: PageContentBlock }) {
+  const members = parseJsonContent<TeamGridMember[]>(block.content);
+  if (!members || members.length === 0) return null;
+
+  const visibleMembers = members
+    .filter((m) => m.name.trim())
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  if (visibleMembers.length === 0) return null;
+
+  return (
+    <div className="content-block">
+      {block.title && (
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-8">
+          {block.title}
+        </h2>
+      )}
+      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        {visibleMembers.map((member) => (
+          <Link
+            key={member.id}
+            href={`/team/${member.slug}`}
+            className="group flex flex-col items-center text-center rounded-2xl border border-site-border bg-brand-surface p-6 hover:border-lime/30 transition-colors"
+          >
+            {/* Photo or initials */}
+            {member.photo_url ? (
+              <div className="relative h-32 w-32 overflow-hidden rounded-full mb-4">
+                <Image
+                  src={member.photo_url}
+                  alt={member.name}
+                  fill
+                  className="object-cover"
+                  sizes="128px"
+                />
+              </div>
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center rounded-full bg-lime/10 text-lime text-3xl font-bold mb-4">
+                {getInitials(member.name)}
+              </div>
+            )}
+
+            {/* Name */}
+            <h3 className="text-base font-bold text-site-text group-hover:text-lime transition-colors">
+              {member.name}
+            </h3>
+
+            {/* Role */}
+            <p className="mt-1 text-sm font-medium text-lime">
+              {member.role}
+            </p>
+
+            {/* Bio (truncated) */}
+            {member.bio && (
+              <div
+                className="mt-3 text-sm leading-relaxed text-site-text-muted line-clamp-3"
+                dangerouslySetInnerHTML={{ __html: member.bio }}
+              />
+            )}
+
+            {/* Certifications */}
+            {member.certifications.length > 0 && (
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                {member.certifications.map((cert) => (
+                  <span
+                    key={cert}
+                    className="inline-block rounded-full bg-lime/10 border border-lime/20 px-2 py-0.5 text-[10px] font-medium text-lime"
+                  >
+                    {cert}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Credentials Block
+// ---------------------------------------------------------------------------
+
+interface CredentialItem {
+  id: string;
+  title: string;
+  description: string;
+  image_url: string;
+  sort_order: number;
+}
+
+function CredentialsBlock({ block }: { block: PageContentBlock }) {
+  const credentials = parseJsonContent<CredentialItem[]>(block.content);
+  if (!credentials || credentials.length === 0) return null;
+
+  const visibleCredentials = credentials
+    .filter((c) => c.title.trim())
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  if (visibleCredentials.length === 0) return null;
+
+  return (
+    <div className="content-block">
+      {block.title && (
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-8">
+          {block.title}
+        </h2>
+      )}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {visibleCredentials.map((cred) => (
+          <div
+            key={cred.id}
+            className="flex flex-col items-center text-center rounded-2xl border border-site-border bg-brand-surface p-6"
+          >
+            {/* Badge image */}
+            {cred.image_url && (
+              <div className="relative h-20 w-20 mb-4 flex-shrink-0">
+                <Image
+                  src={cred.image_url}
+                  alt={cred.title}
+                  fill
+                  className="object-contain"
+                  sizes="80px"
+                />
+              </div>
+            )}
+
+            {/* Title */}
+            <h3 className="text-base font-semibold text-site-text">
+              {cred.title}
+            </h3>
+
+            {/* Description */}
+            {cred.description && (
+              <div
+                className="mt-2 text-sm leading-relaxed text-site-text-muted"
+                dangerouslySetInnerHTML={{ __html: cred.description }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Terms Sections Block
+// ---------------------------------------------------------------------------
+
+interface TermsSection {
+  id: string;
+  title: string;
+  content: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+interface TermsSectionsData {
+  effective_date: string | null;
+  sections: TermsSection[];
+}
+
+async function TermsSectionsBlock({ block }: { block: PageContentBlock }) {
+  let data: TermsSectionsData;
+  try {
+    const parsed = JSON.parse(block.content);
+    // Handle legacy array format
+    if (Array.isArray(parsed)) {
+      data = { effective_date: null, sections: parsed };
+    } else {
+      data = {
+        effective_date: parsed.effective_date ?? null,
+        sections: Array.isArray(parsed.sections) ? parsed.sections : [],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  const activeSections = data.sections
+    .filter((s) => s.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  if (activeSections.length === 0) return null;
+
+  const biz = await getBusinessInfo();
+
+  return (
+    <div className="content-block">
+      {block.title && (
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-6">
+          {block.title}
+        </h2>
+      )}
+
+      {data.effective_date && (
+        <p className="text-sm text-site-text-muted mb-8">
+          Effective Date:{' '}
+          {new Date(data.effective_date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </p>
+      )}
+
+      <div className="space-y-10">
+        {activeSections.map((section, idx) => (
+          <div key={section.id}>
+            <h3 className="font-display text-xl font-semibold text-site-text">
+              {idx + 1}. {section.title}
+            </h3>
+            {section.content ? (
+              <div
+                className="mt-3 text-sm leading-relaxed text-site-text-muted prose prose-invert prose-sm max-w-none prose-p:text-site-text-muted prose-li:text-site-text-muted prose-a:text-lime"
+                dangerouslySetInnerHTML={{ __html: section.content }}
+              />
+            ) : (
+              <p className="mt-3 text-sm leading-relaxed text-site-text-muted">
+                {section.title}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-16 border-t border-site-border pt-8">
+        <p className="text-xs text-site-text-muted">
+          If you have questions about these terms, please contact us at{' '}
+          {biz.email ? (
+            <a href={`mailto:${biz.email}`} className="text-lime hover:underline">
+              {biz.email}
+            </a>
+          ) : (
+            <a href={`tel:${biz.phone}`} className="text-lime hover:underline">
+              {biz.phone}
+            </a>
+          )}
+          .
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Gallery Block
+// ---------------------------------------------------------------------------
+
+interface GalleryImage {
+  id: string;
+  image_url: string;
+  caption: string;
+  alt_text: string;
+  sort_order: number;
+}
+
+interface GalleryData {
+  images: GalleryImage[];
+}
+
+function GalleryBlock({ block }: { block: PageContentBlock }) {
+  let data: GalleryData;
+  try {
+    const parsed = JSON.parse(block.content);
+    if (Array.isArray(parsed)) {
+      data = { images: parsed };
+    } else {
+      data = { images: Array.isArray(parsed.images) ? parsed.images : [] };
+    }
+  } catch {
+    return null;
+  }
+
+  const visibleImages = data.images
+    .filter((img) => img.image_url)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  if (visibleImages.length === 0) return null;
+
+  return (
+    <div className="content-block">
+      {block.title && (
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-8">
+          {block.title}
+        </h2>
+      )}
+      <GalleryLightbox images={visibleImages} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Placeholder Block — stub for block types awaiting full renderers
 // ---------------------------------------------------------------------------
 
@@ -262,10 +584,13 @@ export function ContentBlockRenderer({ block }: { block: PageContentBlock }) {
     case 'testimonial_highlight':
       return <TestimonialBlock block={block} />;
     case 'team_grid':
+      return <TeamGridBlock block={block} />;
     case 'credentials':
+      return <CredentialsBlock block={block} />;
     case 'terms_sections':
+      return <TermsSectionsBlock block={block} />;
     case 'gallery':
-      return <PlaceholderBlock block={block} />;
+      return <GalleryBlock block={block} />;
     default:
       return null;
   }
@@ -289,10 +614,10 @@ export function ContentBlocks({ blocks }: { blocks: PageContentBlock[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Simple Markdown → HTML converter (no heavy dependencies)
+// Legacy Markdown → HTML converter (fallback for unmigrated content)
 // ---------------------------------------------------------------------------
 
-function markdownToHtml(md: string): string {
+function legacyMarkdownToHtml(md: string): string {
   let html = md;
 
   // Escape HTML entities first

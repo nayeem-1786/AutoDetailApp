@@ -332,6 +332,91 @@ function buildImprovePrompt(ctx: ContentWriterContext): string {
 }
 
 // ---------------------------------------------------------------------------
+// Specialized AI generation — returns raw content (not structured blocks)
+// Used for individual field generation: bios, descriptions, terms, CTAs, etc.
+// ---------------------------------------------------------------------------
+
+const SPECIALIZED_SYSTEM_PROMPT = `You are a professional copywriter for a premium mobile auto detailing business in the South Bay / Los Angeles area. Write clear, professional content. Return ONLY the requested output format with no additional text.`;
+
+async function callClaudeForText(
+  userPrompt: string,
+  maxTokens: number = 1500
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is not configured');
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: maxTokens,
+      system: SPECIALIZED_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('AI generation failed:', error);
+    throw new Error(`AI generation failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data.content?.[0]?.text;
+  if (!text) throw new Error('Empty AI response');
+  return text.replace(/```json\s*/g, '').replace(/```html\s*/g, '').replace(/```\s*/g, '').trim();
+}
+
+export async function generateTeamBio(
+  memberName: string,
+  memberRole: string,
+  businessName: string
+): Promise<string> {
+  const prompt = `Write a professional, warm 2-3 paragraph bio for ${memberName}, who works as ${memberRole} at ${businessName}. Highlight expertise in auto detailing, customer service, and professionalism. Write in third person. Return HTML formatted content only (use <p> tags for paragraphs).`;
+  return callClaudeForText(prompt);
+}
+
+export async function generateCredentialDescription(
+  credentialTitle: string,
+  businessName: string
+): Promise<string> {
+  const prompt = `Write a brief 2-3 sentence description for the credential/certification: "${credentialTitle}". Explain what it means and why it matters for ${businessName}'s auto detailing customers. Return HTML formatted content only (use <p> tags).`;
+  return callClaudeForText(prompt);
+}
+
+export async function generateTermsSection(
+  sectionTitle: string,
+  businessName: string,
+  businessPhone: string,
+  businessEmail: string
+): Promise<string> {
+  const prompt = `Write a professional terms and conditions section for "${sectionTitle}" for ${businessName}, a mobile auto detailing service. Contact: ${businessPhone || 'N/A'}, ${businessEmail || 'N/A'}. Write clear, specific language appropriate for a service business. Include relevant protections for both the business and customer. Return HTML formatted content only (use <p> and <ul>/<li> tags as needed).`;
+  return callClaudeForText(prompt);
+}
+
+export async function generateCtaContent(
+  businessName: string,
+  existingHeading?: string
+): Promise<string> {
+  const prompt = `Write a compelling call-to-action for ${businessName}, a premium mobile auto detailing service.${existingHeading ? ` Current heading: "${existingHeading}".` : ''} Generate a short punchy heading (under 10 words), a brief description (1-2 sentences), and button text (2-4 words). Return ONLY a JSON object: {"heading": "...", "description": "...", "button_text": "...", "button_url": "/book"}`;
+  return callClaudeForText(prompt);
+}
+
+export async function generateTestimonialContent(
+  businessName: string
+): Promise<string> {
+  const prompt = `Write a realistic, positive customer testimonial for ${businessName}, a mobile auto detailing service. Include a quote (2-3 sentences about their detailing experience), customer first name only, star rating (4 or 5), and source (e.g., "Google Review"). Return ONLY a JSON object: {"quote": "...", "author": "...", "rating": 5, "source": "..."}`;
+  return callClaudeForText(prompt);
+}
+
+// ---------------------------------------------------------------------------
 // Master function — routes to the right generator
 // ---------------------------------------------------------------------------
 
