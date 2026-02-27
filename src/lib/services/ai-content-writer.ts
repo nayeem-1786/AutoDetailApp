@@ -72,6 +72,10 @@ BLOCK TYPE RULES:
 - "features_list": Return a JSON array of objects with "title" and "description" keys.
 - "cta": Return a JSON object with "heading", "description", "button_text", and "button_url" keys.
 - "testimonial_highlight": Return a JSON object with "quote", "author", "rating", and "source" keys.
+- "team_grid": Return a JSON array of objects with "name", "role", "bio", and optional "photo_url" and "badges" (string array) keys.
+- "credentials": Return a JSON array of objects with "title", "description", and optional "image_url" keys.
+- "terms_sections": Return a JSON array of objects with "heading", "body" (HTML string), "is_active" (boolean), and "sort_order" (number) keys.
+- "gallery": Return a JSON array of objects with "image_url", "alt_text", and optional "caption" keys.
 
 LOCAL SEO CONTEXT:
 - Business serves the South Bay / Los Angeles area

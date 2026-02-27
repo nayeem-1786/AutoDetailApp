@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-26 (CMS Overhaul Phase B — shared components, hooks)
+> **Last updated:** 2026-02-27 (CMS Overhaul Phase C.0 — expand block type constraint)
 
 ---
 
@@ -1112,6 +1112,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260224000003_merge_express_signature_categories.sql
 20260225000001_cleanup_category_merge.sql
 20260225000002_seed_addon_suggestions.sql
+20260226000001_expand_block_type_constraint.sql
 ```
 
 ---

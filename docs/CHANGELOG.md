@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Overhaul Phase C.0: Expand Block Types — 2026-02-27
+
+### feat: Add team_grid, credentials, terms_sections, gallery block types
+
+**Database:**
+- Migration `20260226000001_expand_block_type_constraint.sql` — drops and recreates `chk_block_type` CHECK constraint to allow 9 block types (was 5)
+
+**TypeScript:**
+- Updated `ContentBlockType` union in `src/lib/supabase/types.ts` with 4 new types
+
+**Admin UI — ContentBlockEditor:**
+- Added 4 new buttons to the add-block row: Team Grid (Users icon), Credentials (Award icon), Terms Sections (FileText icon), Gallery (Images icon)
+- New block types show "Editor coming soon" placeholder when expanded (editors will be built in C1/C2)
+- `getContentPreview` updated with member/credential/section/image counts for new types
+
+**Public renderer:**
+- Added `PlaceholderBlock` stub for new block types — renders title only, prevents crash
+
+**AI Content Writer:**
+- Added block type rules for new types in system prompt so AI generation knows the JSON schemas
+
+**No changes to content API routes** — POST/PATCH handlers pass `block_type` through to DB; the CHECK constraint is the validation layer.
+
+---
+
 ## CMS Overhaul Phase B: Shared Components — 2026-02-26
 
 ### feat: ImageUploadField, DragDropReorder, InlineValidation, UnsavedChangesGuard

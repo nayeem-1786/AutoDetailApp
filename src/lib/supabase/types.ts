@@ -1261,7 +1261,16 @@ export interface CityLandingPage {
   updated_at: string;
 }
 
-export type ContentBlockType = 'rich_text' | 'faq' | 'features_list' | 'cta' | 'testimonial_highlight';
+export type ContentBlockType =
+  | 'rich_text'
+  | 'faq'
+  | 'features_list'
+  | 'cta'
+  | 'testimonial_highlight'
+  | 'team_grid'
+  | 'credentials'
+  | 'terms_sections'
+  | 'gallery';
 
 export interface PageContentBlock {
   id: string;

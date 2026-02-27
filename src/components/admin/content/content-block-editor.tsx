@@ -20,6 +20,9 @@ import {
   CheckCircle,
   MessageSquare,
   Quote,
+  Users,
+  Award,
+  Images,
 } from 'lucide-react';
 import { MarkdownEditor } from './markdown-editor';
 import { FaqEditor, parseFaqContent, serializeFaqContent } from './faq-editor';
@@ -42,6 +45,10 @@ const BLOCK_TYPE_OPTIONS: { value: ContentBlockType; label: string; icon: React.
   { value: 'features_list', label: 'Features List', icon: CheckCircle },
   { value: 'cta', label: 'Call to Action', icon: MessageSquare },
   { value: 'testimonial_highlight', label: 'Testimonial', icon: Quote },
+  { value: 'team_grid', label: 'Team Grid', icon: Users },
+  { value: 'credentials', label: 'Credentials', icon: Award },
+  { value: 'terms_sections', label: 'Terms Sections', icon: FileText },
+  { value: 'gallery', label: 'Gallery', icon: Images },
 ];
 
 function getBlockTypeLabel(type: ContentBlockType): string {
@@ -99,6 +106,14 @@ export function ContentBlockEditor({
         ? JSON.stringify({ heading: '', description: '', button_text: 'Book Now', button_url: '/book' })
         : blockType === 'testimonial_highlight'
         ? JSON.stringify({ quote: '', author: '', rating: 5, source: '' })
+        : blockType === 'team_grid'
+        ? '[]'
+        : blockType === 'credentials'
+        ? '[]'
+        : blockType === 'terms_sections'
+        ? '[]'
+        : blockType === 'gallery'
+        ? '[]'
         : '';
 
       const res = await adminFetch('/api/admin/cms/content', {
@@ -677,6 +692,18 @@ function BlockContentEditor({
     case 'testimonial_highlight':
       return <TestimonialEditor content={content} onChange={onChange} />;
 
+    case 'team_grid':
+    case 'credentials':
+    case 'terms_sections':
+    case 'gallery':
+      return (
+        <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Editor coming soon — this block type will be available after the next update.
+          </p>
+        </div>
+      );
+
     default:
       return (
         <textarea
@@ -970,6 +997,38 @@ function getContentPreview(block: PageContentBlock): string {
     try {
       const data = JSON.parse(block.content);
       return data.heading || '';
+    } catch {
+      return '';
+    }
+  }
+  if (block.block_type === 'team_grid') {
+    try {
+      const items = JSON.parse(block.content);
+      return Array.isArray(items) ? `${items.length} member${items.length !== 1 ? 's' : ''}` : '';
+    } catch {
+      return '';
+    }
+  }
+  if (block.block_type === 'credentials') {
+    try {
+      const items = JSON.parse(block.content);
+      return Array.isArray(items) ? `${items.length} credential${items.length !== 1 ? 's' : ''}` : '';
+    } catch {
+      return '';
+    }
+  }
+  if (block.block_type === 'terms_sections') {
+    try {
+      const items = JSON.parse(block.content);
+      return Array.isArray(items) ? `${items.length} section${items.length !== 1 ? 's' : ''}` : '';
+    } catch {
+      return '';
+    }
+  }
+  if (block.block_type === 'gallery') {
+    try {
+      const items = JSON.parse(block.content);
+      return Array.isArray(items) ? `${items.length} image${items.length !== 1 ? 's' : ''}` : '';
     } catch {
       return '';
     }

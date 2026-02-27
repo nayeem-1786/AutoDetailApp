@@ -230,6 +230,22 @@ function TestimonialBlock({ block }: { block: PageContentBlock }) {
 }
 
 // ---------------------------------------------------------------------------
+// Placeholder Block — stub for block types awaiting full renderers
+// ---------------------------------------------------------------------------
+
+function PlaceholderBlock({ block }: { block: PageContentBlock }) {
+  return (
+    <div className="content-block">
+      {block.title && (
+        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-6">
+          {block.title}
+        </h2>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Master Renderer
 // ---------------------------------------------------------------------------
 
@@ -245,6 +261,11 @@ export function ContentBlockRenderer({ block }: { block: PageContentBlock }) {
       return <CtaBlock block={block} />;
     case 'testimonial_highlight':
       return <TestimonialBlock block={block} />;
+    case 'team_grid':
+    case 'credentials':
+    case 'terms_sections':
+    case 'gallery':
+      return <PlaceholderBlock block={block} />;
     default:
       return null;
   }
