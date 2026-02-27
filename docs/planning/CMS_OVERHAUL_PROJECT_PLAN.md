@@ -629,14 +629,14 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 
 ---
 
-## 9. Phase D — Migration + Cleanup
+## 9. Phase D — Migration + Cleanup + UX Fixes
 
 > **Type:** 2 Claude Code sessions (sequential — D1 must complete before D2)
-> **Prerequisite:** Phase C complete
-> **Output:** All content migrated, old tabs removed, public frontend updated
+> **Prerequisite:** Phase C complete, markdown migration run
+> **Output:** All content migrated, old tabs removed, public frontend updated, UX bugs fixed
 >
-> **Session D1:** D.1 → D.2 → D.3 → D.4 → D.5
-> **Session D2:** D.6 → D.7 → D.8 → D.9 → D.10 → D.11
+> **Session D1:** D.1 → D.2 → D.3 → D.4 → D.5 → D.6 → D.7
+> **Session D2:** D.8 → D.9 → D.10 → D.11 → D.12 → D.13 → D.14 → D.15
 
 ### Task D.1 — Create Team Members Table
 
@@ -691,15 +691,16 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 - [ ] Remove the `getDefaultSections()` fallback (default sections should have been seeded in migration D.3)
 - [ ] Verify SEO metadata is populated (from `website_pages.meta_title` / `meta_description`)
 
-### Task D.6 — Create Team Detail Page
+### Task D.6 — Update Team Detail Page Data Source
 
-- [ ] Create `src/app/(public)/team/[memberSlug]/page.tsx`
-- [ ] Query `team_members` table by slug
+- [ ] Update `src/app/(public)/team/[memberSlug]/page.tsx` (created in Phase C1)
+- [ ] Change data source: instead of searching through content block JSON, query `team_members` table directly by slug
+- [ ] `getActiveTeamMembers()` for `generateStaticParams()`
+- [ ] `getTeamMemberBySlug(slug)` for page data
 - [ ] Render: full bio (HTML), large photo, years of service, certification badges
 - [ ] Back link to About page
 - [ ] SEO metadata (auto-generated from member name + role + business name)
 - [ ] JSON-LD Person schema
-- [ ] `generateStaticParams()` for build-time pre-rendering of active members
 - [ ] 404 handling for invalid slugs
 
 ### Task D.7 — Remove Old Admin Tabs & Update Sidebar
@@ -726,7 +727,7 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 > Use audit §14 deletion checklist as guide
 
 - [ ] Delete `src/components/admin/content/markdown-editor.tsx` (if not already removed in C.7)
-- [ ] Remove any markdown parsing dependencies (`marked`, `markdown-it`, etc.) if no longer used anywhere
+- [ ] Remove any markdown parsing dependencies (`marked`, `markdown-it`, etc.) if no longer used anywhere (keep `marked` if still used by the migrate-markdown endpoint)
 - [ ] Clean up orphaned imports across codebase (grep for imports referencing deleted files)
 - [ ] Run full build (`next build`) to catch any broken imports or references
 - [ ] Fix the Terms permission bug: current route uses `cms.seo.manage` — new Terms page in Pages system uses `cms.pages.manage` (audit §3)
@@ -742,18 +743,75 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 - [ ] Remove `business_settings` key: `terms_effective_date`
 - [ ] Write SQL migration for cleanup
 
-### Task D.11 — Final Validation & Regression Testing
+### Task D.11 — Fix AI Content Generation Context
 
+The AI content generator for `single_block` and `improve` modes currently assumes city page context ("Unknown City" filler, outputs markdown). Fix to be context-aware.
+
+- [ ] Read `src/lib/services/ai-content-writer.ts` and `src/app/api/admin/cms/content/ai-generate/route.ts`
+- [ ] Update the AI generate API route: when called from a page (not a city), pass the page's title, meta_description, and a summary of existing block content as context
+- [ ] Update `single_block` and `improve` prompts:
+  - Auto-inject page title + meta description + existing content as context
+  - If page title is empty/generic AND no meta description exists → show a dialog/toast asking the user to provide a topic before generating. The API should return a `{ needsContext: true }` response, and the frontend should prompt the user for a topic/keywords before retrying.
+  - Output **HTML**, not markdown
+- [ ] Update city-specific AI modes (`full_page`, `batch_cities`) to remain city-focused — these should still pull city name + focus_keywords
+- [ ] Ensure all AI responses return HTML content that works with PageHtmlEditor
+- [ ] Test: create a new page "FAQ", add a rich_text block, click AI → should generate FAQ-related HTML content using the page title as context, NOT "Unknown City" filler
+
+### Task D.12 — Increase Image Upload Limit to 10MB
+
+- [ ] Update `src/app/api/admin/upload/content-image/route.ts`: change max file size from 5MB to 10MB
+- [ ] Update `src/components/admin/image-upload-field.tsx`: change the 5MB validation check and error message to 10MB
+- [ ] Update any hardcoded "5MB" strings in error messages or comments
+- [ ] Verify upload of a 7MB image succeeds
+
+### Task D.13 — Auto-Draft Page Creation
+
+Currently, `/admin/website/pages/new` requires saving the page before the Content Blocks card appears. Fix: auto-create a draft page on load.
+
+- [ ] Read `src/app/admin/website/pages/new/page.tsx`
+- [ ] On component mount (useEffect), immediately POST to the pages API to create a draft record:
+  - `title`: "Untitled Page"
+  - `slug`: auto-generated unique slug (e.g., `untitled-{timestamp}` or `untitled-{uuid-prefix}`)
+  - `is_published`: false
+  - `page_template`: "content" (default)
+- [ ] After creation, redirect to `/admin/website/pages/{id}` (the edit page) — this already shows all cards including Content Blocks
+- [ ] The edit page (`pages/[id]/page.tsx`) already handles everything: title editing, slug editing, publishing, content blocks. No changes needed there.
+- [ ] Handle cleanup: add a scheduled cleanup or a cleanup on page load that deletes draft pages older than 24 hours that still have title "Untitled Page" and no content blocks. Implement as a check in the pages list API or a utility function.
+- [ ] The "New Page" button in the pages list should trigger this flow — click → create draft → redirect to edit page
+- [ ] Remove `src/app/admin/website/pages/new/page.tsx` after migration (all "new" flows redirect to edit page with auto-created draft)
+
+### Task D.14 — Fix Button type="button" in Block Editors
+
+Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger form submit instead of their click handler because they lack `type="button"`.
+
+- [ ] Search all block editor components for `<button` and `<Button` elements that are NOT submit buttons
+- [ ] Add `type="button"` to every action button inside:
+  - `content-block-editor.tsx` — any add/remove/expand/collapse buttons
+  - `team-grid-editor.tsx` — Add Member, Remove Member, Add Certification, Remove Certification
+  - `credentials-editor.tsx` — Add Credential, Remove Credential
+  - `terms-sections-editor.tsx` — Add Section, Remove Section, Generate Default Sections
+  - `gallery-editor.tsx` — Add Image, Remove Image
+  - `faq-editor.tsx` — Add FAQ Item, Remove FAQ Item (pre-existing bug)
+  - Any other editor with action buttons
+- [ ] Also check `features-list-editor` (if it exists as a separate component)
+- [ ] Verify: clicking "Add Feature" in a Features List block creates a new feature entry, does NOT trigger page save
+- [ ] Verify: clicking "Add FAQ" in a FAQ block creates a new FAQ item, does NOT trigger page save
+
+### Task D.15 — Final Validation & Regression Testing
+
+- [ ] Test creating a new page → should auto-create draft and redirect to edit page with all cards visible
 - [ ] Test creating a new page with each block type
 - [ ] Test editing the migrated About page (team_grid + credentials blocks)
 - [ ] Test editing the migrated Terms page (terms_sections block)
 - [ ] Test homepage: team section renders correctly from new `team_members` table
 - [ ] Test `/terms`: renders correctly from new data source
-- [ ] Test `/team/[memberSlug]`: detail pages work
-- [ ] Test AI generation on all block types
+- [ ] Test `/team/[memberSlug]`: detail pages work with data from `team_members` table
+- [ ] Test AI generation on a non-city page → should produce relevant HTML content using page context, NOT "Unknown City" markdown
+- [ ] Test AI generation on a city page → should still use city-specific context
+- [ ] Test image upload with a 7MB file → should succeed
+- [ ] Test "Add Feature"/"Add FAQ" buttons → should add items, not trigger page save
 - [ ] Test validation on all forms (Layer 1, 2, 3)
 - [ ] Test unsaved changes warning
-- [ ] Test image upload on all ImageUploadField instances
 - [ ] Test drag-and-drop reorder on all sortable lists
 - [ ] Verify no broken links or missing images on public site
 - [ ] Verify admin sidebar: About & Terms entries removed, remaining items ordered correctly
@@ -764,6 +822,10 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 - [ ] Old admin tabs deleted
 - [ ] Old API routes deleted
 - [ ] Public frontend renders correctly from new data sources
+- [ ] AI generates context-aware HTML content (not markdown, not "Unknown City")
+- [ ] Image upload accepts up to 10MB
+- [ ] New page creation auto-drafts with all cards visible
+- [ ] Action buttons in block editors don't trigger form submit
 - [ ] No regressions in existing functionality
 - [ ] All `business_settings` migration keys cleaned up
 - [ ] Update CHANGELOG.md, CLAUDE.md, FILE_TREE.md, DB_SCHEMA.md
@@ -833,6 +895,29 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 - [ ] Dark/light mode consistency across all public pages
 - [ ] Theme import/export capability
 - [ ] **This is a separate project scope — do not bundle with Phases A–D**
+
+### E.8 — Pages Editor Cleanup + Navigation Sync
+
+**Pages editor changes:**
+- [ ] Remove "Parent Page" dropdown from `pages/[id]/page.tsx` and `pages/new/page.tsx` — the field saves to DB but nothing reads it (no URL effect, no nav effect)
+- [ ] Move Published toggle and Show in Navigation toggle **side by side** into the space freed by removing Parent Page dropdown. Both toggles fit in the same row.
+- [ ] Wire "Show in Navigation" as a sync shortcut:
+  - Toggle ON → auto-create a nav item in `website_nav_items` with `placement: 'header'`, `label: page.title`, `url: /p/{slug}`, `page_id: page.id`
+  - Toggle OFF → delete the associated nav item where `page_id = page.id`
+  - If a nav item already exists for this page (created manually via Navigation page), toggling reflects its current state
+- [ ] Remove `parent_id` column from `website_pages` if no other code references it (or leave column, just remove UI)
+
+**Navigation page enhancements:**
+- [ ] Drag-to-indent: drag an item slightly right onto another to nest it as a child (visual indent zone)
+- [ ] Support recursive nesting beyond 1 level if needed (update `getChildren` to be recursive, update render)
+- [ ] Visual tree connector lines instead of just `└` character
+- [ ] "Add All Published Pages" bulk button — creates nav items for all published pages not yet in nav
+- [ ] Refactor to use shared `useDragDropReorder` hook from Phase B
+
+**Architectural notes:**
+- Navigation system already supports: parent_id nesting, placement tabs (header/footer), 3 link types (custom/page/builtin), inline editing, active toggle, drag reorder
+- URLs stay flat — nesting is for nav dropdown menu structure only, NOT URL paths
+- `/p/{slug}` always resolves to just the slug, regardless of nav hierarchy
 
 ---
 
@@ -954,6 +1039,10 @@ These bugs prompted this overhaul. All will be resolved by the architecture chan
 | Team member Photo URL field doesn't display images | Raw URL text input, no image preview, possible URL issues | Phase B: ImageUploadField replaces all URL inputs. Phase C: team_grid block uses ImageUploadField |
 | No team member detail page exists | Never built — no route for individual staff profiles | Phase C: `/team/[memberSlug]` route with full bio, photo, badges |
 | Content editors are inconsistent — some have HTML editor + AI, others have plain textarea | Each page was built independently without shared components | Phase B: shared components. Phase C: all blocks use same editor patterns |
+| AI generates "Unknown City" markdown for non-city pages | `single_block` and `improve` modes assume city page context. Output format is markdown not HTML | Phase D.11: AI context fix — auto-inject page title/meta, output HTML |
+| "Add Feature" / "Add FAQ" buttons trigger page save instead of adding items | Buttons lack `type="button"`, defaulting to `type="submit"` which fires parent form handler | Phase D.14: sweep all block editors for missing `type="button"` |
+| New page requires save before Content Blocks card appears | Content blocks live in separate table, need page record to exist first. Architecture limitation. | Phase D.13: auto-draft page creation on `/pages/new` load |
+| Parent Page dropdown has no effect | Saves `parent_id` to DB but nothing reads it — no URL effect, no nav effect | Phase E.8: remove dropdown, navigation owns hierarchy |
 
 ---
 
@@ -978,6 +1067,13 @@ These bugs prompted this overhaul. All will be resolved by the architecture chan
 | **Homepage stays separate** | Widget assembly (15 sections, 12 CMS-driven). Not a content page. Only 3 hardcoded items — optional Phase E fix | 2026-02-27 |
 | **Seasonal Themes: no changes needed** | Fully self-contained per audit. Only benefit: ImageUploadField for hero_bg_image_url (Phase E.4) | 2026-02-27 |
 | **Website admin menu: flat reorder, remove About & Terms** | 11 items after cleanup. Flat list reordered logically (Pages first). Owner can revisit grouping later | 2026-02-27 |
+| **AI context: auto-inject page context, ask if insufficient** | AI should use page title + meta + existing content as context. Only prompt user if page is empty with no title. Output HTML, not markdown | 2026-02-27 |
+| **Image upload: 10MB limit** | 5MB too restrictive for high-res photos. 10MB covers most use cases without server strain | 2026-02-27 |
+| **Auto-draft on new page** | Create draft record on `/pages/new` load so all cards (including Content Blocks) are immediately visible. Orphan cleanup for abandoned drafts. Best UX pattern (WordPress/Notion style) | 2026-02-27 |
+| **Remove Parent Page from Pages editor** | Field saves to DB but nothing reads it — no URL effect, no nav effect. Dead feature. Remove UI, keep column for now | 2026-02-27 |
+| **Keep Show in Nav as sync shortcut** | Toggle ON auto-creates header nav item, OFF removes it. Convenience shortcut that syncs with Navigation page | 2026-02-27 |
+| **Flat URLs — nesting is nav-only** | Nesting in Navigation creates dropdown menus, NOT nested URL paths. `/p/{slug}` always resolves by slug alone. No redirect maintenance burden | 2026-02-27 |
+| **Navigation enhancement deferred to Phase E** | Nav page already 80% built (parent nesting, placements, 3 link types, drag reorder). Drag-to-indent and sync improvements are UX polish, not blocking | 2026-02-27 |
 
 ---
 
@@ -998,6 +1094,10 @@ These items are explicitly excluded from Phases B–D:
 - Scheduled publishing (publish at future date)
 - Content workflow / approval system
 - Website admin menu grouping (flat reorder only — grouping deferred)
+- Navigation page drag-to-indent enhancement (Phase E.8)
+- Nested URL paths based on parent pages (URLs stay flat, nesting is nav-only)
+- Pages editor "Parent Page" dropdown removal (Phase E.8)
+- Preview mode (Phase E.1)
 
 ---
 
@@ -1008,12 +1108,14 @@ When picking up this project:
 1. **Always read `CLAUDE.md` and `docs/dev/FILE_TREE.md` first** — never guess file paths
 2. **Check `docs/dev/DB_SCHEMA.md`** before creating new DB fields/tables — reuse existing fields first
 3. **Phase A audit is complete** — see `docs/planning/CMS_OVERHAUL_AUDIT.md` for detailed findings
-4. **All architecture decisions are finalized** — see Post-Audit Decisions table and Design Decisions Log
-5. **Correct table names:** `website_pages` (not cms_pages), `page_content_blocks` (not cms_page_content_blocks), `city_landing_pages` (not seo_cities)
-6. **HTML editor everywhere** — all content blocks use PageHtmlEditor, not MarkdownEditor. Existing markdown content must be migrated to HTML
-7. **Each phase has a checkpoint** — do not start the next phase until the checkpoint is verified
-8. **Session prompts must end with:** update CHANGELOG.md, CLAUDE.md, and FILE_TREE.md (if new routes/pages/lib/components/migrations created), then `git add -A && git commit && git push && rm -rf .next`
-9. **All cron/scheduling is internal** — never suggest n8n, Vercel Cron, or external schedulers
-10. **Timezone is PST** — `America/Los_Angeles`, not UTC
-11. **Deployed on Hostinger** — not Vercel. Never reference Vercel
-12. **Never provide patch code or quick fixes** — always provide fully thought-out solutions considering all scenarios and edge cases
+4. **Phase B + C complete** — shared components built, all 9 block types have editors + renderers, markdown migrated to HTML, MarkdownEditor deleted
+5. **All architecture decisions are finalized** — see Post-Audit Decisions table and Design Decisions Log
+6. **Correct table names:** `website_pages` (not cms_pages), `page_content_blocks` (not cms_page_content_blocks), `city_landing_pages` (not seo_cities)
+7. **HTML editor everywhere** — all content blocks use PageHtmlEditor, not MarkdownEditor. Markdown content already migrated to HTML.
+8. **Each phase has a checkpoint** — do not start the next phase until the checkpoint is verified
+9. **Session end:** update CHANGELOG.md, CLAUDE.md (if structure changed), and FILE_TREE.md (if new routes/pages/lib/components/migrations created), then `git add -A && git commit && git push && rm -rf .next`. After commit print: `⚠️ Session complete. Run: npm run dev`
+10. **All cron/scheduling is internal** — never suggest n8n, Vercel Cron, or external schedulers
+11. **Timezone is PST** — `America/Los_Angeles`, not UTC
+12. **Deployed on Hostinger** — not Vercel. Never reference Vercel
+13. **Never provide patch code or quick fixes** — always provide fully thought-out solutions considering all scenarios and edge cases
+14. **Button type="button"** — all non-submit buttons in forms must have `type="button"` to prevent accidental form submission

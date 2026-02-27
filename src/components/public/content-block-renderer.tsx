@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle, Star, Quote } from 'lucide-react';
 import { getBusinessInfo } from '@/lib/data/business';
+import { getActiveTeamMembers } from '@/lib/data/team-members';
 import { GalleryLightbox } from './gallery-lightbox';
 import type { PageContentBlock } from '@/lib/supabase/types';
 
@@ -258,13 +259,39 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function TeamGridBlock({ block }: { block: PageContentBlock }) {
-  const members = parseJsonContent<TeamGridMember[]>(block.content);
-  if (!members || members.length === 0) return null;
-
-  const visibleMembers = members
-    .filter((m) => m.name.trim())
-    .sort((a, b) => a.sort_order - b.sort_order);
+async function TeamGridBlock({ block }: { block: PageContentBlock }) {
+  // Check if this block sources from the team_members table
+  let visibleMembers: TeamGridMember[];
+  try {
+    const parsed = JSON.parse(block.content);
+    if (parsed && typeof parsed === 'object' && parsed.source === 'team_members_table') {
+      // Read from team_members table
+      const dbMembers = await getActiveTeamMembers();
+      visibleMembers = dbMembers.map((m) => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        bio: m.bio || '',
+        photo_url: m.photo_url || '',
+        slug: m.slug,
+        years_of_service: m.years_of_service,
+        certifications: m.certifications,
+        sort_order: m.sort_order,
+      }));
+    } else if (Array.isArray(parsed)) {
+      visibleMembers = parsed
+        .filter((m: TeamGridMember) => m.name?.trim())
+        .sort((a: TeamGridMember, b: TeamGridMember) => a.sort_order - b.sort_order);
+    } else {
+      return null;
+    }
+  } catch {
+    const members = parseJsonContent<TeamGridMember[]>(block.content);
+    if (!members || members.length === 0) return null;
+    visibleMembers = members
+      .filter((m) => m.name.trim())
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }
 
   if (visibleMembers.length === 0) return null;
 

@@ -144,6 +144,16 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'FileText',
       },
       {
+        label: 'City Pages',
+        href: '/admin/website/seo/cities',
+        icon: 'MapPin',
+      },
+      {
+        label: 'Hero',
+        href: '/admin/website/hero',
+        icon: 'Image',
+      },
+      {
         label: 'Navigation',
         href: '/admin/website/navigation',
         icon: 'PanelTop',
@@ -152,11 +162,6 @@ export const SIDEBAR_NAV: NavItem[] = [
         label: 'Footer',
         href: '/admin/website/footer',
         icon: 'Rows3',
-      },
-      {
-        label: 'Hero',
-        href: '/admin/website/hero',
-        icon: 'Image',
       },
       {
         label: 'Tickers',
@@ -169,6 +174,11 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'RectangleHorizontal',
       },
       {
+        label: 'Catalog Display',
+        href: '/admin/website/catalog',
+        icon: 'LayoutGrid',
+      },
+      {
         label: 'Theme & Styles',
         href: '/admin/website/theme-settings',
         icon: 'Paintbrush',
@@ -179,29 +189,9 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'Palette',
       },
       {
-        label: 'About & Team',
-        href: '/admin/website/about',
-        icon: 'Users',
-      },
-      {
-        label: 'Catalog Display',
-        href: '/admin/website/catalog',
-        icon: 'LayoutGrid',
-      },
-      {
         label: 'SEO',
         href: '/admin/website/seo',
         icon: 'Search',
-      },
-      {
-        label: 'City Pages',
-        href: '/admin/website/seo/cities',
-        icon: 'MapPin',
-      },
-      {
-        label: 'Terms & Conditions',
-        href: '/admin/website/terms',
-        icon: 'FileText',
       },
     ],
   },

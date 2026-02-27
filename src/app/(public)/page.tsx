@@ -7,7 +7,7 @@ import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
-import { getTeamData } from '@/lib/data/team';
+import { getActiveTeamMembers, getCredentials } from '@/lib/data/team-members';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles } from '@/lib/data/cms';
@@ -69,11 +69,12 @@ const differentiators = [
 ] as const;
 
 export default async function HomePage() {
-  const [categories, businessInfo, reviews, teamData, heroSlides, heroConfig, cmsToggles] = await Promise.all([
+  const [categories, businessInfo, reviews, teamMembers, credentials, heroSlides, heroConfig, cmsToggles] = await Promise.all([
     getServiceCategories(),
     getBusinessInfo(),
     getReviewData(),
-    getTeamData(),
+    getActiveTeamMembers(),
+    getCredentials(),
     getActiveHeroSlides(),
     getHeroCarouselConfig(),
     getCmsToggles(),
@@ -177,7 +178,7 @@ export default async function HomePage() {
       </section>
 
       {/* Meet the Team */}
-      {teamData.members.length > 0 && (
+      {teamMembers.length > 0 && (
         <section className="bg-brand-black section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <HomeAnimations type="section-header">
@@ -185,16 +186,11 @@ export default async function HomePage() {
                 <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                   Meet the Team
                 </h2>
-                {teamData.aboutText && (
-                  <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
-                    {teamData.aboutText}
-                  </p>
-                )}
               </div>
             </HomeAnimations>
 
             <HomeAnimations type="stagger-grid" className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {teamData.members.map((member, i) => {
+              {teamMembers.map((member) => {
                 const initials = member.name
                   .split(' ')
                   .map(n => n[0])
@@ -203,11 +199,11 @@ export default async function HomePage() {
                   .slice(0, 2);
 
                 return (
-                  <div key={i} className="text-center">
+                  <div key={member.id} className="text-center">
                     <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-brand-surface border border-site-border flex items-center justify-center">
-                      {member.photoUrl ? (
+                      {member.photo_url ? (
                         <Image
-                          src={member.photoUrl}
+                          src={member.photo_url}
                           alt={member.name}
                           width={128}
                           height={128}
@@ -235,15 +231,15 @@ export default async function HomePage() {
               })}
             </HomeAnimations>
 
-            {teamData.credentials.length > 0 && (
+            {credentials.length > 0 && (
               <HomeAnimations type="section-header">
                 <div className="mt-12 border-t border-site-border pt-8">
                   <div className="flex flex-wrap justify-center gap-8 items-center">
-                    {teamData.credentials.map((cred, i) => (
-                      <div key={i} className="flex items-center gap-3 text-center">
-                        {cred.imageUrl && (
+                    {credentials.map((cred) => (
+                      <div key={cred.id} className="flex items-center gap-3 text-center">
+                        {cred.image_url && (
                           <Image
-                            src={cred.imageUrl}
+                            src={cred.image_url}
                             alt={cred.title}
                             width={80}
                             height={48}

@@ -1,7 +1,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
-> Auto-generated from `supabase/migrations/*.sql`  
-> Last updated: Feb 25, 2026
+> Auto-generated from `supabase/migrations/*.sql`
+> Last updated: Feb 27, 2026
 
 ---
 
@@ -932,6 +932,25 @@
 | zone_id | TEXT | | |
 | ip_hash | TEXT | | |
 | created_at | TIMESTAMPTZ | | |
+
+### team_members
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| name | TEXT | NOT NULL | |
+| slug | TEXT | UNIQUE, NOT NULL | Auto-generated from name (kebab-case) |
+| role | TEXT | NOT NULL | |
+| bio | TEXT | | HTML content |
+| photo_url | TEXT | | |
+| years_of_service | INTEGER | | |
+| certifications | JSONB | DEFAULT '[]' | Array of strings |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Auto-updated via trigger |
+
+**RLS:** Public read (active only), authenticated full access.
+**Migrated from:** `business_settings.team_members` JSON array.
 
 ---
 

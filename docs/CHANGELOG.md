@@ -4,6 +4,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Overhaul Phase D.1: Data Migration, Public Route Updates, Admin Cleanup — 2026-02-27
+
+### feat: team_members table, About + Terms data migration, public routes updated, admin tabs removed
+
+**Database:**
+- Created `team_members` table with full schema (name, slug, role, bio, photo_url, years_of_service, certifications, sort_order, is_active)
+- RLS: public read (active only), authenticated full access
+- `updated_at` trigger, indexes on slug and active+sort_order
+- Migration: `20260227000001_create_team_members.sql`
+
+**API Routes (new):**
+- `src/app/api/admin/team-members/route.ts` — GET (list all), POST (create with auto-slug)
+- `src/app/api/admin/team-members/[id]/route.ts` — GET, PATCH, DELETE
+- `src/app/api/admin/team-members/reorder/route.ts` — PATCH (batch sort_order)
+- `src/app/api/admin/cms/migrate-data/route.ts` — One-time migration endpoint (idempotent)
+- All use permission: `cms.pages.manage`
+
+**Data Layer:**
+- `src/lib/data/team-members.ts` — `getActiveTeamMembers()`, `getTeamMemberBySlug()`, `getAllTeamMembers()`, `getCredentials()`
+- Uses React `cache()` wrappers
+
+**Data Migration (executed):**
+- About page → `website_pages` (slug: "about", published)
+- Team members → `team_members` table (from `business_settings.team_members` JSON)
+- Team grid → `page_content_blocks` (block_type: team_grid, source: team_members_table)
+- Credentials → `page_content_blocks` (block_type: credentials)
+- Terms page → `website_pages` (slug: "terms", published)
+- Terms sections → `page_content_blocks` (block_type: terms_sections, 9 sections)
+
+**Public Route Updates:**
+- Homepage (`page.tsx`): Replaced `getTeamData()` with `getActiveTeamMembers()` + `getCredentials()` from team-members.ts
+- Terms (`terms/page.tsx`): Now reads from `website_pages` + `page_content_blocks` instead of `business_settings`
+- Team detail (`team/[memberSlug]/page.tsx`): Now queries `team_members` table via `getTeamMemberBySlug()`
+- Content block renderer: `TeamGridBlock` now supports `{ source: "team_members_table" }` content format
+
+**Admin Cleanup:**
+- Deleted `src/app/admin/website/about/page.tsx`
+- Deleted `src/app/admin/website/terms/page.tsx`
+- Sidebar: Removed "About & Team" and "Terms & Conditions" entries
+- Sidebar: Reordered Website children (Pages, City Pages, Hero, Navigation, Footer, Tickers, Ads, Catalog Display, Theme & Styles, Seasonal Themes, SEO)
+
+---
+
 ## CMS Overhaul Phase C.2: Terms Sections, Gallery, AI Prompts, Markdown Migration — 2026-02-27
 
 ### feat: terms_sections + gallery editors/renderers, AI for all blocks, markdown→HTML migration

@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-27 (CMS Overhaul Phase C.1 — team_grid + credentials block types)
+> **Last updated:** 2026-02-27 (CMS Overhaul Phase D.1 — team_members table, data migration, admin cleanup)
 
 ---
 
@@ -61,7 +61,6 @@ src/app/api/admin/upload/content-image/route.ts
 
 ### Admin — CMS
 ```
-src/app/api/admin/cms/about/route.ts
 src/app/api/admin/cms/ads/analytics/route.ts
 src/app/api/admin/cms/ads/creatives/[id]/route.ts
 src/app/api/admin/cms/ads/creatives/route.ts
@@ -71,6 +70,7 @@ src/app/api/admin/cms/ads/zones/route.ts
 src/app/api/admin/cms/catalog/products/route.ts
 src/app/api/admin/cms/catalog/services/route.ts
 src/app/api/admin/cms/content/[id]/route.ts
+src/app/api/admin/cms/migrate-data/route.ts
 src/app/api/admin/cms/content/ai-generate/route.ts
 src/app/api/admin/cms/migrate-markdown/route.ts
 src/app/api/admin/cms/content/reorder/route.ts
@@ -94,7 +94,6 @@ src/app/api/admin/cms/seo/pages/[encodedPath]/route.ts
 src/app/api/admin/cms/seo/pages/route.ts
 src/app/api/admin/cms/site-theme/reset/route.ts
 src/app/api/admin/cms/site-theme/route.ts
-src/app/api/admin/cms/terms/route.ts
 src/app/api/admin/cms/themes/[id]/activate/route.ts
 src/app/api/admin/cms/themes/[id]/deactivate/route.ts
 src/app/api/admin/cms/themes/[id]/route.ts
@@ -141,6 +140,13 @@ src/app/api/admin/settings/shipping/carriers/route.ts
 src/app/api/admin/settings/shipping/route.ts
 src/app/api/admin/settings/shipping/test-connection/route.ts
 src/app/api/admin/settings/shipping/validate-address/route.ts
+```
+
+### Admin — Team Members
+```
+src/app/api/admin/team-members/route.ts
+src/app/api/admin/team-members/[id]/route.ts
+src/app/api/admin/team-members/reorder/route.ts
 ```
 
 ### Admin — Vehicle Categories
@@ -528,7 +534,6 @@ src/app/admin/transactions/page.tsx
 ### Website (CMS)
 ```
 src/app/admin/website/page.tsx
-src/app/admin/website/about/page.tsx
 src/app/admin/website/ads/creatives/[id]/page.tsx
 src/app/admin/website/ads/page.tsx
 src/app/admin/website/catalog/page.tsx
@@ -541,7 +546,6 @@ src/app/admin/website/pages/new/page.tsx
 src/app/admin/website/pages/page.tsx
 src/app/admin/website/seo/cities/page.tsx
 src/app/admin/website/seo/page.tsx
-src/app/admin/website/terms/page.tsx
 src/app/admin/website/theme-settings/page.tsx
 src/app/admin/website/themes/[id]/page.tsx
 src/app/admin/website/themes/page.tsx
@@ -644,6 +648,7 @@ src/lib/data/receipt-config.ts
 src/lib/data/reviews.ts
 src/lib/data/services.ts
 src/lib/data/team.ts
+src/lib/data/team-members.ts
 src/lib/data/vehicle-count.ts
 src/lib/data/website-pages.ts
 ```
@@ -1119,6 +1124,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260225000001_cleanup_category_merge.sql
 20260225000002_seed_addon_suggestions.sql
 20260226000001_expand_block_type_constraint.sql
+20260227000001_create_team_members.sql
 ```
 
 ---

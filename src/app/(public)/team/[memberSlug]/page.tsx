@@ -3,86 +3,20 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ArrowLeft } from 'lucide-react';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
+import { getActiveTeamMembers, getTeamMemberBySlug } from '@/lib/data/team-members';
 import { SITE_URL } from '@/lib/utils/constants';
 
 export const revalidate = 300;
 
 // ---------------------------------------------------------------------------
 // /team/[memberSlug] — Team member detail page
-// Data source: team_grid content blocks in page_content_blocks
-// (Will be swapped to team_members table in Phase D)
+// Data source: team_members table
 // ---------------------------------------------------------------------------
-
-interface TeamGridMember {
-  id: string;
-  name: string;
-  role: string;
-  bio: string;
-  photo_url: string;
-  slug: string;
-  years_of_service: number | null;
-  certifications: string[];
-  sort_order: number;
-}
 
 type PageProps = {
   params: Promise<{ memberSlug: string }>;
 };
-
-// ---------------------------------------------------------------------------
-// Data fetching — find member from team_grid content blocks
-// ---------------------------------------------------------------------------
-
-async function getAllTeamMembers(): Promise<TeamGridMember[]> {
-  const supabase = createAdminClient();
-
-  const { data: blocks } = await supabase
-    .from('page_content_blocks')
-    .select('content')
-    .eq('block_type', 'team_grid')
-    .eq('is_active', true);
-
-  if (!blocks) return [];
-
-  const members: TeamGridMember[] = [];
-  for (const block of blocks) {
-    try {
-      const parsed = JSON.parse(block.content);
-      if (Array.isArray(parsed)) {
-        for (const item of parsed) {
-          if (item.name?.trim() && item.slug) {
-            members.push({
-              id: item.id || '',
-              name: item.name || '',
-              role: item.role || '',
-              bio: item.bio || '',
-              photo_url: item.photo_url || '',
-              slug: item.slug || '',
-              years_of_service: item.years_of_service ?? null,
-              certifications: Array.isArray(item.certifications)
-                ? item.certifications
-                : [],
-              sort_order: item.sort_order ?? 0,
-            });
-          }
-        }
-      }
-    } catch {
-      // skip malformed blocks
-    }
-  }
-
-  return members;
-}
-
-async function getMemberBySlug(
-  slug: string
-): Promise<TeamGridMember | null> {
-  const members = await getAllTeamMembers();
-  return members.find((m) => m.slug === slug) ?? null;
-}
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -100,7 +34,7 @@ function stripHtml(html: string): string {
 // ---------------------------------------------------------------------------
 
 export async function generateStaticParams() {
-  const members = await getAllTeamMembers();
+  const members = await getActiveTeamMembers();
   return members.map((m) => ({ memberSlug: m.slug }));
 }
 
@@ -112,11 +46,11 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { memberSlug } = await params;
-  const member = await getMemberBySlug(memberSlug);
+  const member = await getTeamMemberBySlug(memberSlug);
   if (!member) return {};
 
   const biz = await getBusinessInfo();
-  const bioText = stripHtml(member.bio);
+  const bioText = member.bio ? stripHtml(member.bio) : '';
   const description = bioText
     ? bioText.slice(0, 160) + (bioText.length > 160 ? '...' : '')
     : `${member.name} is a ${member.role} at ${biz.name}.`;
@@ -139,7 +73,7 @@ export async function generateMetadata({
 
 export default async function TeamMemberPage({ params }: PageProps) {
   const { memberSlug } = await params;
-  const member = await getMemberBySlug(memberSlug);
+  const member = await getTeamMemberBySlug(memberSlug);
 
   if (!member) {
     notFound();
