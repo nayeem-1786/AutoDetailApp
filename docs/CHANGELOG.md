@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Overhaul Phase B: Shared Components — 2026-02-26
+
+### feat: ImageUploadField, DragDropReorder, InlineValidation, UnsavedChangesGuard
+
+**New shared components:**
+- `ImageUploadField` (`src/components/admin/image-upload-field.tsx`) — single-image upload with drag-drop, preview, remove, error states. Wraps existing `/api/admin/upload/content-image/` API
+- `DragDropItem` wrapper (`src/components/admin/drag-drop-reorder.tsx`) — optional visual wrapper with GripVertical handle and up/down arrow buttons
+- `SectionErrorBadge` (`src/components/ui/section-error-badge.tsx`) — red dot + count for card/section headers
+
+**New hooks:**
+- `useDragDropReorder` (`src/lib/hooks/use-drag-drop-reorder.ts`) — generic HTML5 DnD reorder hook with optimistic state updates
+- `useFormValidation` (`src/lib/hooks/use-form-validation.ts`) — field-level errors, section error counts, toast summary + auto-scroll to first error
+- `useUnsavedChanges` (`src/lib/hooks/use-unsaved-changes.ts`) — beforeunload dialog + popstate navigation guard
+
+**Enhanced existing components:**
+- `FormField` (`src/components/ui/form-field.tsx`) — when `error` prop is set, child inputs/textareas/selects automatically get `border-red-500` via Tailwind descendant selectors. Added `data-field-error` attribute for scroll-to-error targeting
+
+**Pages editor integration (both edit + new):**
+- Replaced OG Image URL text input with ImageUploadField
+- Added `useFormValidation` with title (required) and slug (required, valid chars) rules
+- Added `SectionErrorBadge` to Settings and SEO card headers
+- Added `useUnsavedChanges` guard (edit page tracks dirty state vs last saved values)
+- Improved error toasts: API error messages now shown when available
+
+**Refactored to shared DnD hook:**
+- `ContentBlockEditor` — replaced local dragIdx/handleDragStart/handleDragOver/handleDragEnd with `useDragDropReorder` hook
+- `Footer editor` — replaced local dragColId/handleColDragStart/handleColDragOver/handleColDrop with `useDragDropReorder` hook
+
+**Slug auto-generator verified:** `toSlug()` correctly handles special chars (commas, em dashes), multiple spaces, and empty strings. `slugTouched` state prevents auto-generation after manual edit.
+
+---
+
 ## POS PIN Pad Performance + PWA Service Worker Fix — 2026-02-26
 
 ### perf(pos): memoize PIN pad, network-first service worker

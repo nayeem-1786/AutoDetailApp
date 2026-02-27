@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, ExternalLink, Sparkles } from 'lucide-react';
@@ -8,8 +8,13 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
+import { FormField } from '@/components/ui/form-field';
+import { SectionErrorBadge } from '@/components/ui/section-error-badge';
 import { PageHtmlEditor } from '@/components/admin/content/page-html-editor';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
+import { ImageUploadField } from '@/components/admin/image-upload-field';
+import { useFormValidation } from '@/lib/hooks/use-form-validation';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { WebsitePage, PageTemplate } from '@/lib/supabase/types';
 
@@ -34,6 +39,30 @@ export default function EditPagePage() {
   const [seoGenerating, setSeoGenerating] = useState(false);
   const [seoGenerated, setSeoGenerated] = useState(false);
 
+  // Track saved values for dirty detection
+  const savedValuesRef = useRef({
+    title: '', slug: '', pageTemplate: 'content' as PageTemplate,
+    parentId: '', content: '', isPublished: false, showInNav: false,
+    metaTitle: '', metaDescription: '', ogImageUrl: '',
+  });
+
+  const isDirty = loading ? false : (
+    title !== savedValuesRef.current.title ||
+    slug !== savedValuesRef.current.slug ||
+    pageTemplate !== savedValuesRef.current.pageTemplate ||
+    parentId !== savedValuesRef.current.parentId ||
+    content !== savedValuesRef.current.content ||
+    isPublished !== savedValuesRef.current.isPublished ||
+    showInNav !== savedValuesRef.current.showInNav ||
+    metaTitle !== savedValuesRef.current.metaTitle ||
+    metaDescription !== savedValuesRef.current.metaDescription ||
+    ogImageUrl !== savedValuesRef.current.ogImageUrl
+  );
+
+  // Validation & unsaved changes
+  const { errors, validateAndToast, clearAll } = useFormValidation();
+  useUnsavedChanges(isDirty);
+
   const loadPage = useCallback(async () => {
     try {
       const [pageRes, pagesRes] = await Promise.all([
@@ -56,6 +85,14 @@ export default function EditPagePage() {
         setMetaTitle(p.meta_title || '');
         setMetaDescription(p.meta_description || '');
         setOgImageUrl(p.og_image_url || '');
+
+        savedValuesRef.current = {
+          title: p.title, slug: p.slug, pageTemplate: p.page_template,
+          parentId: p.parent_id || '', content: p.content || '',
+          isPublished: p.is_published, showInNav: p.show_in_nav,
+          metaTitle: p.meta_title || '', metaDescription: p.meta_description || '',
+          ogImageUrl: p.og_image_url || '',
+        };
       } else {
         toast.error('Page not found');
         router.push('/admin/website/pages');
@@ -105,10 +142,25 @@ export default function EditPagePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      toast.error('Title is required');
-      return;
-    }
+
+    const valid = validateAndToast([
+      {
+        field: 'settings.title',
+        value: title,
+        validate: (v) => (typeof v === 'string' && v.trim() ? null : 'Page title is required'),
+      },
+      {
+        field: 'settings.slug',
+        value: slug,
+        validate: (v) => {
+          if (typeof v !== 'string' || !v.trim()) return 'Slug is required';
+          if (/[^a-z0-9-]/.test(v.trim())) return 'Slug contains invalid characters (use lowercase letters, numbers, and hyphens)';
+          return null;
+        },
+      },
+    ]);
+
+    if (!valid) return;
 
     setSaving(true);
     try {
@@ -132,6 +184,12 @@ export default function EditPagePage() {
       const json = await res.json();
       if (res.ok) {
         toast.success('Page saved');
+        clearAll();
+        savedValuesRef.current = {
+          title: title.trim(), slug: slug.trim(), pageTemplate,
+          parentId, content, isPublished, showInNav,
+          metaTitle, metaDescription, ogImageUrl,
+        };
       } else {
         toast.error(json.error || 'Failed to save page');
       }
@@ -176,19 +234,20 @@ export default function EditPagePage() {
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Page Settings */}
         <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Page Settings</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">Page Settings</h2>
+            <SectionErrorBadge sectionPrefix="settings" errors={errors} />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <FormField label="Title" required error={errors['settings.title']}>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+            </FormField>
+            <FormField label="Slug" required error={errors['settings.slug']}>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-gray-400">/p/</span>
                 <input
@@ -198,7 +257,7 @@ export default function EditPagePage() {
                   className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 />
               </div>
-            </div>
+            </FormField>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Template</label>
               <select
@@ -254,7 +313,10 @@ export default function EditPagePage() {
         {/* SEO */}
         <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">SEO</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">SEO</h2>
+              <SectionErrorBadge sectionPrefix="seo" errors={errors} />
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -303,16 +365,13 @@ export default function EditPagePage() {
               />
               <CharCount value={metaDescription} max={160} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">OG Image URL</label>
-              <input
-                type="url"
-                value={ogImageUrl}
-                onChange={(e) => setOgImageUrl(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                placeholder="https://..."
-              />
-            </div>
+            <ImageUploadField
+              label="OG Image"
+              value={ogImageUrl}
+              onChange={setOgImageUrl}
+              folder="og-images"
+              placeholder="Upload an image for social sharing"
+            />
           </div>
         </div>
 

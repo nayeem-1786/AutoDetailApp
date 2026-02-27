@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { MarkdownEditor } from './markdown-editor';
 import { FaqEditor, parseFaqContent, serializeFaqContent } from './faq-editor';
+import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
 import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -59,7 +60,6 @@ export function ContentBlockEditor({
   const [addingType, setAddingType] = useState<ContentBlockType | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiBlockId, setAiBlockId] = useState<string | null>(null);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   // -----------------------------------------------------------------------
   // Load blocks
@@ -173,26 +173,19 @@ export function ContentBlockEditor({
   };
 
   // -----------------------------------------------------------------------
-  // Reorder (drag & drop)
+  // Reorder (drag & drop) — using shared hook
   // -----------------------------------------------------------------------
 
-  const handleDragStart = (idx: number) => {
-    setDragIdx(idx);
-  };
+  const handleReorder = useCallback((reorderedBlocks: PageContentBlock[]) => {
+    setBlocks(reorderedBlocks);
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent, idx: number) => {
-    e.preventDefault();
-    if (dragIdx === null || dragIdx === idx) return;
-    const reordered = [...blocks];
-    const [moved] = reordered.splice(dragIdx, 1);
-    reordered.splice(idx, 0, moved);
-    setBlocks(reordered);
-    setDragIdx(idx);
-  };
+  const { getDragProps, isDragging: isDragActive } = useDragDropReorder({
+    items: blocks,
+    onReorder: handleReorder,
+  });
 
-  const handleDragEnd = async () => {
-    setDragIdx(null);
-    // Save new order
+  const saveBlockOrder = useCallback(async () => {
     try {
       await adminFetch('/api/admin/cms/content/reorder', {
         method: 'PATCH',
@@ -204,9 +197,9 @@ export function ContentBlockEditor({
       });
     } catch {
       toast.error('Failed to save order');
-      loadBlocks(); // Revert
+      loadBlocks();
     }
-  };
+  }, [blocks, pagePath, loadBlocks]);
 
   // -----------------------------------------------------------------------
   // AI Generate full page content
@@ -384,14 +377,14 @@ export function ContentBlockEditor({
         </div>
       ) : (
         <div className="space-y-2">
-          {blocks.map((block, idx) => (
+          {blocks.map((block) => (
             <BlockRow
               key={block.id}
               block={block}
               isExpanded={expandedId === block.id}
               isSaving={savingId === block.id}
               isAiLoading={aiBlockId === block.id}
-              isDragging={dragIdx === idx}
+              isDragging={isDragActive(block.id)}
               onToggleExpand={() =>
                 setExpandedId(expandedId === block.id ? null : block.id)
               }
@@ -399,9 +392,8 @@ export function ContentBlockEditor({
               onDelete={() => handleDeleteBlock(block.id)}
               onAiImprove={() => handleAiImproveBlock(block)}
               onAiGenerateFaq={() => handleAiGenerateFaq(block)}
-              onDragStart={() => handleDragStart(idx)}
-              onDragOver={(e) => handleDragOver(e, idx)}
-              onDragEnd={handleDragEnd}
+              dragProps={getDragProps(block.id)}
+              onDragDone={saveBlockOrder}
             />
           ))}
         </div>
@@ -444,9 +436,14 @@ interface BlockRowProps {
   onDelete: () => void;
   onAiImprove: () => void;
   onAiGenerateFaq: () => void;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
+  dragProps: {
+    draggable: true;
+    onDragStart: (e: React.DragEvent) => void;
+    onDragOver: (e: React.DragEvent) => void;
+    onDragEnd: () => void;
+    onDrop: (e: React.DragEvent) => void;
+  };
+  onDragDone: () => void;
 }
 
 function BlockRow({
@@ -460,9 +457,8 @@ function BlockRow({
   onDelete,
   onAiImprove,
   onAiGenerateFaq,
-  onDragStart,
-  onDragOver,
-  onDragEnd,
+  dragProps,
+  onDragDone,
 }: BlockRowProps) {
   const [localTitle, setLocalTitle] = useState(block.title ?? '');
   const [localContent, setLocalContent] = useState(block.content);
@@ -484,10 +480,11 @@ function BlockRow({
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
+      {...dragProps}
+      onDragEnd={() => {
+        dragProps.onDragEnd();
+        onDragDone();
+      }}
       className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-opacity ${
         isDragging ? 'opacity-50' : ''
       }`}

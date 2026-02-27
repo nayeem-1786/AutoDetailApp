@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { HtmlEditorToolbar } from '@/components/admin/html-editor-toolbar';
+import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
 import type {
   FooterSection,
   FooterColumn,
@@ -360,7 +361,6 @@ function MainFooterPanel({
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [newColumnType, setNewColumnType] = useState<'links' | 'html' | 'business_info'>('links');
-  const [dragColId, setDragColId] = useState<string | null>(null);
   const { isSubmitting, execute } = useAsyncAction();
 
   const addColumn = async () => {
@@ -500,52 +500,37 @@ function MainFooterPanel({
     });
   };
 
-  // Drag & drop reorder columns
-  const handleColDragStart = (e: React.DragEvent, id: string) => {
-    setDragColId(id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
+  // Drag & drop reorder columns — using shared hook
+  const handleColReorder = useCallback(
+    (reorderedCols: ColumnWithLinks[]) => {
+      const otherCols = columns.filter((c) => c.section_id !== sectionId);
+      const withSortOrder = reorderedCols.map((c, i) => ({ ...c, sort_order: i }));
+      setColumns([...otherCols, ...withSortOrder]);
+    },
+    [columns, sectionId, setColumns]
+  );
 
-  const handleColDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
+  const { getDragProps: getColDragProps, isDragging: isColDragging } = useDragDropReorder({
+    items: columns,
+    onReorder: handleColReorder,
+  });
 
-  const handleColDrop = async (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!dragColId || dragColId === targetId) return;
+  const saveColumnOrder = useCallback(async () => {
+    const sectionCols = columns
+      .filter((c) => c.section_id === sectionId)
+      .sort((a, b) => a.sort_order - b.sort_order);
 
     execute(async () => {
-      const oldCols = [...columns];
-      const allCols = columns.filter((c) => c.section_id === sectionId);
-      const otherCols = columns.filter((c) => c.section_id !== sectionId);
-
-      const dragIdx = allCols.findIndex((c) => c.id === dragColId);
-      const targetIdx = allCols.findIndex((c) => c.id === targetId);
-      if (dragIdx === -1 || targetIdx === -1) return;
-
-      const newCols = [...allCols];
-      const [moved] = newCols.splice(dragIdx, 1);
-      newCols.splice(targetIdx, 0, moved);
-
-      const reorderedWithSort = newCols.map((c, i) => ({ ...c, sort_order: i }));
-      setColumns([...otherCols, ...reorderedWithSort]);
-      setDragColId(null);
-
       const res = await adminFetch('/api/admin/footer/columns/reorder', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: reorderedWithSort.map((c) => ({ id: c.id, sort_order: c.sort_order })),
+          items: sectionCols.map((c) => ({ id: c.id, sort_order: c.sort_order })),
         }),
       });
-
-      if (!res.ok) {
-        setColumns(oldCols);
-        toast.error('Failed to reorder');
-      }
+      if (!res.ok) toast.error('Failed to reorder');
     });
-  };
+  }, [columns, sectionId, execute]);
 
   // Content type options for new columns — exclude 'brand' if one already exists
   const contentTypeOptions: { value: 'links' | 'html' | 'business_info'; label: string }[] = [
@@ -678,9 +663,9 @@ function MainFooterPanel({
                 onDelete={() => deleteColumn(col)}
                 onToggleEnabled={() => toggleColumnEnabled(col)}
                 onUpdateConfig={(newConfig) => updateColumnConfig(col, newConfig)}
-                onDragStart={(e) => handleColDragStart(e, col.id)}
-                onDragOver={handleColDragOver}
-                onDrop={(e) => handleColDrop(e, col.id)}
+                dragProps={getColDragProps(col.id)}
+                isDragging={isColDragging(col.id)}
+                onDragDone={saveColumnOrder}
                 parentSubmitting={isSubmitting}
               />
             ))}
@@ -707,9 +692,9 @@ function ColumnCard({
   onDelete,
   onToggleEnabled,
   onUpdateConfig,
-  onDragStart,
-  onDragOver,
-  onDrop,
+  dragProps,
+  isDragging,
+  onDragDone,
   parentSubmitting,
 }: {
   column: ColumnWithLinks;
@@ -717,9 +702,15 @@ function ColumnCard({
   onDelete: () => void;
   onToggleEnabled: () => void;
   onUpdateConfig: (config: Record<string, unknown>) => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
+  dragProps: {
+    draggable: true;
+    onDragStart: (e: React.DragEvent) => void;
+    onDragOver: (e: React.DragEvent) => void;
+    onDragEnd: () => void;
+    onDrop: (e: React.DragEvent) => void;
+  };
+  isDragging: boolean;
+  onDragDone: () => void;
   parentSubmitting?: boolean;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -759,11 +750,12 @@ function ColumnCard({
 
   return (
     <div
-      className="bg-white rounded-lg border border-gray-200 overflow-hidden"
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      className={`bg-white rounded-lg border border-gray-200 overflow-hidden transition-opacity ${isDragging ? 'opacity-50' : ''}`}
+      {...dragProps}
+      onDragEnd={() => {
+        dragProps.onDragEnd();
+        onDragDone();
+      }}
     >
       {/* Column header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">

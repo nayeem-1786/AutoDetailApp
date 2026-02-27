@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-25 (Session 14G — auth sync, deposit logic, loyalty payment polish)
+> **Last updated:** 2026-02-26 (CMS Overhaul Phase B — shared components, hooks)
 
 ---
 
@@ -650,9 +650,12 @@ src/lib/data/website-pages.ts
 ```
 src/lib/hooks/use-async-action.ts
 src/lib/hooks/use-business-info.ts
+src/lib/hooks/use-drag-drop-reorder.ts
 src/lib/hooks/use-feature-flag.ts
+src/lib/hooks/use-form-validation.ts
 src/lib/hooks/use-online-status.ts
 src/lib/hooks/use-permission.ts
+src/lib/hooks/use-unsaved-changes.ts
 ```
 
 ### Migration
@@ -796,6 +799,7 @@ src/components/ui/label.tsx
 src/components/ui/page-header.tsx
 src/components/ui/pagination.tsx
 src/components/ui/search-input.tsx
+src/components/ui/section-error-badge.tsx
 src/components/ui/select.tsx
 src/components/ui/send-method-dialog.tsx
 src/components/ui/skeleton.tsx
@@ -815,9 +819,11 @@ src/components/admin/content/content-block-editor.tsx
 src/components/admin/content/faq-editor.tsx
 src/components/admin/content/markdown-editor.tsx
 src/components/admin/content/page-html-editor.tsx
+src/components/admin/drag-drop-reorder.tsx
 src/components/admin/html-editor-toolbar.tsx
 src/components/admin/html-image-manager.tsx
 src/components/admin/icon-picker.tsx
+src/components/admin/image-upload-field.tsx
 src/components/admin/receipt-dialog.tsx
 src/components/admin/toolbar-items/accordion-dialog.tsx
 src/components/admin/toolbar-items/button-dialog.tsx
@@ -1127,6 +1133,7 @@ docs/dev/QBO_INTEGRATION.md
 docs/dev/SERVICE_CATALOG.md
 docs/manual/README.md
 docs/manual/website/README.md
+docs/planning/CMS_OVERHAUL_PROJECT_PLAN.md
 docs/planning/COUPONS.md
 docs/planning/iPAD.md
 docs/planning/MEMORY.md

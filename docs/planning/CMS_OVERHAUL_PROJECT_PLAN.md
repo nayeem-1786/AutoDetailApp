@@ -2,7 +2,9 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Status:** Pre-Audit Planning Complete
+> **Updated:** 2026-02-27 (Post-Audit)
+> **Status:** Phase A Audit Complete — Ready for Phase B
+> **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
 ---
@@ -102,16 +104,41 @@ Every page uses the same editor. The editor has:
 
 ### Content Block Types
 
+**Existing (from audit):**
+
+| Block Type | Content Format | Editor | Renderer | Has AI? |
+|---|---|---|---|---|
+| `rich_text` | Markdown string | `MarkdownEditor` | `RichTextBlock` (md→HTML) | ✅ (improve) |
+| `faq` | JSON array `[{question, answer}]` | `FaqEditor` | `FaqBlock` (details/summary + FAQ schema) | ✅ (generate) |
+| `features_list` | JSON array `[{title, description}]` | `FeaturesListEditor` | `FeaturesListBlock` (2-col grid) | ✅ (improve) |
+| `cta` | JSON `{heading, description, button_text, button_url}` | `CtaEditor` | `CtaBlock` (gradient banner) | ❌ |
+| `testimonial_highlight` | JSON `{quote, author, rating, source}` | `TestimonialEditor` | `TestimonialBlock` (blockquote + stars) | ❌ |
+
+**New block types to add (Phase C):**
+
 | Block Type | What it renders | Replaces | Has AI? |
 |---|---|---|---|
-| `html` | Rich HTML content section | Already exists ✅ | ✅ |
-| `faq` | FAQ accordion | Already exists ✅ | ✅ |
 | `team_grid` | Team member cards (photo upload, name, role, bio, badges) | About page team section | ✅ per bio |
 | `credentials` | Awards/certifications grid (image, title, description) | About page credentials section | ✅ per description |
 | `terms_sections` | Numbered T&C sections with active toggles + effective date | Entire Terms editor | ✅ per section |
-| `city_info` | City name, state, service area, local content | Cities page | ✅ |
 | `gallery` | Photo gallery grid | Future use | ❌ |
-| `cta` | Call-to-action banner with button | Future use | ✅ |
+
+**DB constraint requires migration:** Current CHECK constraint limits `block_type` to 5 values. ALTER TABLE needed before new block types can be added (Phase C.0).
+
+### ⚠️ DECISION: HTML Editor Standardization
+
+**All content blocks will migrate from MarkdownEditor to PageHtmlEditor (HTML editor).** Rationale:
+
+- One editor component everywhere = consistent behavior, one rendering path, one set of bugs
+- HTML editor already has toolbar, image insertion (HtmlImageManager), and AI generation
+- Business users shouldn't need to learn Markdown syntax for SEO content
+- Removes the markdown-to-HTML conversion step on the public renderer
+- Existing markdown content in `rich_text` and `features_list` blocks must be migrated to HTML as part of Phase C
+
+**Affected components:**
+- `src/components/admin/content/markdown-editor.tsx` — to be replaced/removed
+- `src/components/public/content-block-renderer.tsx` — `RichTextBlock` no longer needs `markdownToHtml()`, renders HTML directly
+- All existing `rich_text` block content in DB needs one-time markdown→HTML conversion
 
 ### Migration Map
 
@@ -121,7 +148,11 @@ Every page uses the same editor. The editor has:
 | Admin > Website > About (team members) | Page (`/p/about`) → `team_grid` content block |
 | Admin > Website > About (credentials) | Page (`/p/about`) → `credentials` content block |
 | Admin > Website > Terms | Page (`/p/terms`) → `terms_sections` content block |
-| Admin > Website > SEO > Cities | Pages (`/p/areas/{city}`) → `city_info` content block each |
+| Homepage team data source | `getTeamData()` → new `team_members` table query (same rendering, new data source) |
+
+**NOT migrating:**
+- **City pages** — STAY in `city_landing_pages` table with their own admin page. Already integrate with ContentBlockEditor. Geo fields (distance, state, sort_order) don't fit generic Pages model. Content blocks on city pages will benefit from the enhanced block types and keyword-aware AI generation.
+- **Homepage** — STAYS as a separate widget assembly. Only action: update team data source from `business_settings` JSON to `team_members` table. Optionally move 3 hardcoded items to `business_settings` later.
 
 ### What STAYS Separate (Appearance & Layout Widgets)
 
@@ -132,16 +163,22 @@ These are layout widgets, not pages. They remain as their own admin tabs:
 - **Footer** — column layout, links, brand section
 - **Tickers** — announcement bar messages
 - **Theme Settings** — colors, fonts, layout variables (dark/light mode)
-- **Seasonal Themes** — time-based theme activations/deactivations (separate from base theme settings)
+- **Seasonal Themes** — time-based theme activations/deactivations (fully self-contained per audit)
 - **Ads** — promotional placements
 - **Catalog Display** — service/product toggle settings
+- **City Pages** — own DB table, geo fields, already uses ContentBlockEditor
 
-### Post-Audit Decisions (TBD)
+### Post-Audit Decisions (Resolved)
 
-These decisions are deferred until the Phase A audit provides full context:
-
-- **Website admin menu structure** — flat list vs. grouped sub-menus (e.g., "Appearance" grouping for Hero/Tickers/Nav/Footer/Themes). Decide after audit reveals the full scope of remaining tabs.
-- **Homepage management** — whether the homepage should join the Pages system or remain a separate composed layout of widgets. Depends on audit findings about how the homepage is currently built (hardcoded sections vs. CMS-driven content blocks).
+| Decision | Outcome | Rationale |
+|---|---|---|
+| Homepage management | **Keep separate** | Widget assembly (15 sections, 12 CMS-driven), not a content page. Only 3 hardcoded items — move to `business_settings` later |
+| Website admin menu | **Flat list, reorder logically** — Pages first, remove About & Terms | 11 items after cleanup. Owner to decide on grouping later if desired |
+| City pages | **Stay separate** | Own DB table with geo fields, already uses ContentBlockEditor. Enhanced with keyword-aware AI |
+| Editor standardization | **HTML editor everywhere** | Remove MarkdownEditor from content blocks. One editor, one rendering path |
+| `/p/` prefix | **Keep** | Safety from route collisions. Important pages get dedicated route files (e.g., `/terms`, `/about`) |
+| `/terms` route | **Keep alive, change data source** | High risk of breaking existing links. Route reads from Pages system instead of `business_settings` |
+| Seasonal Themes | **No changes needed** | Fully self-contained per audit. Only benefit: ImageUploadField for `hero_bg_image_url` (Phase E) |
 
 ---
 
@@ -151,20 +188,27 @@ These decisions are deferred until the Phase A audit provides full context:
 
 | Component | Source / Status | Used Where |
 |---|---|---|
-| **ImageUploadField** | Extract from Products image upload; uses existing `/api/admin/upload/content-image/` | Team photos, credential images, hero slides, OG images, ad creatives — ALL image fields |
-| **DragDropReorder** | Extract from Footer editor (already has working drag-and-drop) | Content blocks, team members, credentials, terms sections, FAQ items, any ordered list |
-| **InlineValidation** | New — extends existing `FormField` component if it supports error states | Every form field across all editors |
-| **UnsavedChangesGuard** | New — `beforeunload` listener + navigation prompt | Every editor page |
-| **SlugAutoGenerator** | New — title → kebab-case slug with manual override | Page editor settings card |
+| **ImageUploadField** | New — wraps existing `/api/admin/upload/content-image/` API. Reference `MultiImageUpload` for upload logic, but this is a single-image component | Team photos, credential images, OG images — 5 URL fields to replace (see audit §10) |
+| **DragDropReorder** | Extract from `footer/page.tsx` — native HTML5 DnD, moderate effort (~4-6 hrs). Create `useDragDropReorder` hook + `<DragDropItem>` wrapper | Content blocks, team members, credentials, terms sections, FAQ items |
+| **InlineValidation** | `FormField` already supports `error` prop (✅ confirmed by audit). Need to: pass `border-red-500` to Input children, create `use-form-validation` hook | Every form field across all editors |
+| **UnsavedChangesGuard** | New — zero `beforeunload` handling exists anywhere (confirmed by audit) | Every editor page |
+| **SlugAutoGenerator** | Pages editor already auto-generates slug from title. Verify edge cases (special chars, dupes) | Page editor settings card |
 
 ### Components to Reuse As-Is
 
 | Component | Current Location | Already Used In |
 |---|---|---|
-| **PageHtmlEditor** | `src/components/admin/content/page-html-editor.tsx` | Pages editor |
+| **PageHtmlEditor** | `src/components/admin/content/page-html-editor.tsx` | Pages editor — will become THE editor for all content blocks |
 | **HtmlEditorToolbar** | `src/components/admin/html-editor-toolbar.tsx` | Pages editor, Footer editor |
-| **ContentBlockEditor** | `src/components/admin/content/content-block-editor.tsx` | Pages editor |
-| **AI Content Writer** | `src/lib/services/ai-content-writer.ts` | Pages editor AI button |
+| **ContentBlockEditor** | `src/components/admin/content/content-block-editor.tsx` | Pages editor, City pages (via modal) |
+| **AI Content Writer** | `src/lib/services/ai-content-writer.ts` | Pages editor, City pages (4 modes: full_page, single_block, improve, batch_cities) |
+| **HtmlImageManager** | `src/components/admin/html-image-manager.tsx` | HTML editor image insertion (upload + library browse) |
+
+### Components to Remove (Phase C/D)
+
+| Component | Current Location | Replaced By |
+|---|---|---|
+| **MarkdownEditor** | `src/components/admin/content/markdown-editor.tsx` | PageHtmlEditor in all content blocks |
 
 ---
 
@@ -376,33 +420,41 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 
 ## 7. Phase B — Shared Components
 
-> **Type:** Claude Code session(s)
-> **Prerequisite:** Phase A audit complete
-> **Output:** Reusable components ready for use in Phases C–D
+> **Type:** 1 Claude Code session (sequential — each task builds on previous)
+> **Prerequisite:** Phase A audit complete ✅
+> **Output:** Reusable components integrated into the existing Pages editor
 
 ### Task B.1 — ImageUploadField Component
 
 - [ ] Create `src/components/admin/image-upload-field.tsx`
+- [ ] Reference `MultiImageUpload` (`src/app/admin/catalog/components/multi-image-upload.tsx`) for upload logic patterns
+- [ ] Reference `HtmlImageManager` (`src/components/admin/html-image-manager.tsx`) for the `cms-assets` bucket upload
 - [ ] Wraps the existing upload API (`/api/admin/upload/content-image/`)
-- [ ] Props: `value` (current URL), `onChange` (new URL), `label`, `placeholder`, `error`
+- [ ] Props: `value` (current URL), `onChange` (new URL), `label`, `placeholder`, `error`, `folder` (storage path prefix)
 - [ ] UI: shows current image preview if URL exists, upload button, remove button
 - [ ] Handles file selection, upload progress indicator, error states
 - [ ] Supports drag-and-drop file onto the component
+- [ ] Storage: `cms-assets` bucket, path format `content-images/{folder}/{timestamp}-{random}.{ext}`
+- [ ] Accepted types: PNG, JPG, WebP, GIF, AVIF, SVG. Max 5MB.
 - [ ] Replace OG Image URL field in Pages editor as first adoption (verify it works)
 
-### Task B.2 — DragDropReorder Component
+### Task B.2 — DragDropReorder Hook + Wrapper
 
-- [ ] Extract drag-and-drop logic from Footer editor into `src/components/admin/drag-drop-reorder.tsx`
-- [ ] Generic wrapper: accepts children, provides drag handles, fires `onReorder(newOrder)` callback
+- [ ] Extract drag-and-drop logic from `src/app/admin/website/footer/page.tsx` (native HTML5 DnD, no external library)
+- [ ] Create `src/lib/hooks/use-drag-drop-reorder.ts` — handles index swapping, state management, `onReorder` callback
+- [ ] Create `src/components/admin/drag-drop-reorder.tsx` — `<DragDropItem>` wrapper that applies drag attrs, visual feedback (ring-2 ring-blue-500, opacity-50 on source, cursor-grab/grabbing)
 - [ ] Must work for: content blocks, team members, credentials, terms sections, FAQ items
 - [ ] Preserve the existing arrow-button fallback for accessibility
-- [ ] Test with existing Footer to ensure no regression
+- [ ] Update Footer editor to use the new shared hook/wrapper — verify no regression
+- [ ] Update ContentBlockEditor to use new hook/wrapper (it already has native DnD — swap implementation)
 
 ### Task B.3 — InlineValidation System
 
-- [ ] Audit `src/components/ui/form-field.tsx` for existing error support (from Phase A findings)
-- [ ] If needed, extend FormField with `error?: string` prop → red border + error text below
-- [ ] Create `src/lib/hooks/use-form-validation.ts` — hook that manages error state for complex forms
+- [ ] `FormField` already supports `error` prop (confirmed by audit: shows red `text-xs text-red-500` text below field)
+- [ ] BUT: `FormField` does NOT pass red border to Input children — need to add `border-red-500` class injection when `error` is set
+- [ ] Option A: Extend FormField to clone children with `className` including `border-red-500` when error exists
+- [ ] Option B: Add `error` boolean prop to `Input` component for red border styling
+- [ ] Create `src/lib/hooks/use-form-validation.ts` — hook for complex forms:
   - `setFieldError(fieldPath, message)` — set error on a specific field
   - `clearFieldError(fieldPath)` — clear error when field is corrected
   - `validateAll(rules)` — run all validations, return boolean, set all errors
@@ -416,24 +468,29 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 ### Task B.4 — UnsavedChangesGuard
 
 - [ ] Create `src/lib/hooks/use-unsaved-changes.ts`
+- [ ] Zero `beforeunload` handling exists anywhere in admin (confirmed by audit) — this is brand new
 - [ ] Tracks dirty state (form values changed since last save/load)
 - [ ] Adds `beforeunload` event listener when dirty
 - [ ] Intercepts Next.js router navigation when dirty (shows confirm dialog)
 - [ ] Resets dirty state on successful save
 - [ ] Apply to Pages editor as first adoption
 
-### Task B.5 — SlugAutoGenerator
+### Task B.5 — SlugAutoGenerator Verification
 
-- [ ] Add auto-slug logic to Pages editor: on title change, if slug hasn't been manually edited, auto-generate kebab-case slug
-- [ ] Use a `slugManuallyEdited` flag — once user edits slug field directly, stop auto-generating
-- [ ] Handle edge cases: special characters, multiple spaces, leading/trailing dashes
-- [ ] Apply to both "new page" and "edit page" flows (new pages auto-generate, existing pages don't override)
+- [ ] Pages editor already auto-generates slug from title (confirmed by audit)
+- [ ] Verify edge cases: special characters, multiple spaces, leading/trailing dashes, slug uniqueness
+- [ ] Verify the `slugManuallyEdited` flag behavior — once user edits slug field directly, stop auto-generating
+- [ ] Verify both "new page" and "edit page" flows (new pages auto-generate, existing pages don't override)
+- [ ] Fix any issues found
 
 ### Task B.6 — Update Existing Pages Editor with New Components
 
-- [ ] Replace OG Image URL text input → ImageUploadField
-- [ ] Add InlineValidation to all required fields (title, slug)
+- [ ] Replace OG Image URL text input → ImageUploadField (both `pages/[id]/page.tsx` and `pages/new/page.tsx`)
+- [ ] Add InlineValidation to all required fields (title, slug) — replace current toast-only validation
 - [ ] Add UnsavedChangesGuard
+- [ ] Verify SlugAutoGenerator works correctly
+- [ ] Verify all existing functionality still works (save, load, publish toggle, show in nav toggle, content blocks, AI generation)
+- [ ] Fix generic error toast messages to include API error details where available
 - [ ] Add SlugAutoGenerator
 - [ ] Verify all existing functionality still works
 - [ ] Fix any toast messages that don't accurately describe the situation
@@ -448,109 +505,122 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 
 ---
 
-## 8. Phase C — New Block Types + AI
+## 8. Phase C — New Block Types + Editor Standardization
 
-> **Type:** Claude Code session(s) — may be parallelizable
+> **Type:** 2 Claude Code sessions (partially parallel after C.0)
 > **Prerequisite:** Phase B shared components complete
-> **Output:** All new content block types with admin editors, public renderers, and AI
+> **Output:** All new content block types, HTML editor standardized, AI prompts updated
+>
+> **Session C1:** C.0 → C.1 (team_grid) → C.2 (credentials) → C.6 (TypeScript types)
+> **Session C2:** C.3 (terms_sections) → C.4 (gallery) → C.5 (AI prompts) → C.7 (markdown→HTML migration)
+
+### Task C.0 — DB Migration: Expand block_type CHECK + TypeScript
+
+- [ ] ALTER TABLE `page_content_blocks` DROP existing CHECK constraint on `block_type`
+- [ ] ADD new CHECK constraint allowing: `rich_text`, `faq`, `features_list`, `cta`, `testimonial_highlight`, `team_grid`, `credentials`, `terms_sections`, `gallery`
+- [ ] Update `ContentBlockType` in `src/lib/supabase/types.ts` to include new types
+- [ ] Update the add-block button row in `content-block-editor.tsx` to include new block type options
+- [ ] Write as a proper SQL migration file
 
 ### Task C.1 — Team Grid Block
 
 **Admin Editor:**
 - [ ] Create `team_grid` block type in ContentBlockEditor
-- [ ] Each team member card: ImageUploadField for photo, name (required), role (required), bio (HtmlContentEditor with AI "Generate Bio" button)
-- [ ] Add fields: `years_of_service` (number), `certifications` (text array for badge icons)
+- [ ] Each team member card: ImageUploadField for photo, name (required), role (required), bio (PageHtmlEditor with AI "Generate Bio" button)
+- [ ] Add fields: `years_of_service` (number), `certifications` (text array for badge labels)
 - [ ] DragDropReorder for member ordering within the block
 - [ ] InlineValidation on name and role fields
 - [ ] "Add Member" button, "Remove Member" with confirm
+- [ ] Auto-generate `memberSlug` from name (kebab-case)
 
 **Public Renderer:**
 - [ ] Team member cards in responsive grid (1 col mobile, 2 col tablet, 3-4 col desktop)
-- [ ] Each card: photo, name, role, truncated bio, badges
+- [ ] Each card: photo (or initials fallback like current homepage), name, role, truncated bio, certification badges
 - [ ] Each card links to detail page: `/team/{memberSlug}`
-- [ ] Auto-generate memberSlug from name (kebab-case)
 
 **Team Member Detail Page:**
-- [ ] Create route: `/team/[memberSlug]/page.tsx` (dedicated route outside /p/ catch-all)
+- [ ] Create route: `src/app/(public)/team/[memberSlug]/page.tsx` (dedicated route outside /p/ catch-all)
 - [ ] Full bio (rendered HTML), large photo, years of service, certification badges
 - [ ] Back link to parent About page
 - [ ] SEO metadata (auto-generated from member name + role + business name)
+- [ ] JSON-LD Person schema
 
 ### Task C.2 — Credentials Block
 
 **Admin Editor:**
 - [ ] Create `credentials` block type in ContentBlockEditor
-- [ ] Each credential card: ImageUploadField for badge/logo, title (required), description (with AI "Generate Description" button)
+- [ ] Each credential card: ImageUploadField for badge/logo, title (required), description (PageHtmlEditor with AI "Generate Description")
 - [ ] DragDropReorder for credential ordering
 - [ ] InlineValidation on title field
 
 **Public Renderer:**
-- [ ] Credentials/awards in responsive grid with image + title + description
-- [ ] Clean card layout matching site theme
+- [ ] Credentials/awards in responsive grid with image (80px like current) + title + description
+- [ ] Match current homepage credential rendering style
 
 ### Task C.3 — Terms Sections Block
 
 **Admin Editor:**
 - [ ] Create `terms_sections` block type in ContentBlockEditor
 - [ ] Block-level field: effective date (date picker)
-- [ ] Each section: title (required), content (HtmlContentEditor with AI "Generate Section" button), active toggle
+- [ ] Each section: title (required), content (PageHtmlEditor with AI "Generate Section"), active toggle (`<Switch>`)
 - [ ] DragDropReorder for section ordering
 - [ ] Numbered sections (auto-numbered in display order)
 - [ ] InlineValidation on title and content
+- [ ] Include the 9 default sections from current fallback logic as a "Generate Default Sections" button
 
 **Public Renderer:**
 - [ ] Numbered sections with titles
 - [ ] Effective date displayed at top
 - [ ] Inactive sections hidden from public view
+- [ ] Footer note with contact info (preserve current pattern)
 - [ ] Clean legal document styling
 
-### Task C.4 — City Info Block
-
-**Admin Editor:**
-- [ ] Create `city_info` block type in ContentBlockEditor
-- [ ] Fields: city name, state, service area description (HtmlContentEditor with AI "Generate City Content")
-- [ ] Optional: service radius, map embed
-- [ ] InlineValidation on city name
-
-**Public Renderer:**
-- [ ] City name as heading
-- [ ] Service area content rendered as HTML
-- [ ] Consistent with other city/area pages
-
-### Task C.5 — Gallery Block
+### Task C.4 — Gallery Block
 
 **Admin Editor:**
 - [ ] Create `gallery` block type in ContentBlockEditor
 - [ ] Multi-image upload using ImageUploadField (add multiple)
-- [ ] Caption per image (optional)
+- [ ] Caption per image (optional), alt text per image
 - [ ] DragDropReorder for image ordering
 
 **Public Renderer:**
 - [ ] Responsive photo grid with lightbox on click
 - [ ] Captions displayed below images
 
-### Task C.6 — CTA Block
+### Task C.5 — AI Prompts for All Block Types
 
-**Admin Editor:**
-- [ ] Create `cta` block type in ContentBlockEditor
-- [ ] Fields: headline, body text (HtmlContentEditor with AI "Generate CTA"), button text, button URL, background style
-- [ ] InlineValidation on headline and button text
-
-**Public Renderer:**
-- [ ] Full-width banner with headline, body, and CTA button
-- [ ] Styled according to site theme
-
-### Task C.7 — AI Prompts for All Block Types
-
-- [ ] Create block-type-specific prompt templates in `ai-content-writer.ts` (or new file)
-- [ ] Each prompt includes: business name, business type, relevant context (member name, city name, etc.)
+- [ ] Extend `src/lib/services/ai-content-writer.ts` with block-type-specific prompt templates
+- [ ] Each prompt includes: business name, business type, relevant context (member name/role for bios, city name + focus_keywords for city content)
+- [ ] Add AI button to `cta` and `testimonial_highlight` blocks (currently have none per audit)
 - [ ] Test AI generation for each block type
 - [ ] Ensure AI button UX is consistent across all blocks (same Sparkles icon, same loading state)
 
+### Task C.6 — TypeScript Type Updates
+
+- [ ] Verify `ContentBlockType` union in `src/lib/supabase/types.ts` matches the new CHECK constraint
+- [ ] Update any type guards or switch statements that match on `block_type`
+- [ ] Update public `content-block-renderer.tsx` to handle all new block types
+- [ ] Ensure no `default` case silently swallows unknown block types
+
+### Task C.7 — Markdown → HTML Editor Migration
+
+- [ ] Replace `MarkdownEditor` with `PageHtmlEditor` in the `rich_text` block editor within `content-block-editor.tsx`
+- [ ] Replace `MarkdownEditor` with `PageHtmlEditor` in `features_list` block editor (for description fields)
+- [ ] Write a one-time data migration script: convert all existing markdown content in `page_content_blocks` (where `block_type = 'rich_text'` or `'features_list'`) from markdown to HTML
+  - Use a markdown→HTML conversion library (e.g., `marked` or `markdown-it`) in the migration script
+  - Preserve all formatting: headings, bold, italic, links, lists, images
+  - Run in dry-run mode first to verify output
+- [ ] Update `content-block-renderer.tsx`: `RichTextBlock` no longer needs `markdownToHtml()` — render HTML directly via `dangerouslySetInnerHTML` (same as other HTML content)
+- [ ] Remove `MarkdownEditor` component (`src/components/admin/content/markdown-editor.tsx`) after all references are eliminated
+- [ ] Remove any markdown parsing dependencies if no longer used elsewhere
+- [ ] Verify all existing content blocks render correctly after migration
+
 ### Post-Phase C Checkpoint
 
-- [ ] All block types working in the content block editor
+- [ ] All new block types working in the content block editor
 - [ ] All block types rendering correctly on public frontend
+- [ ] All content blocks use HTML editor (no more MarkdownEditor)
+- [ ] Existing markdown content migrated to HTML with no rendering regressions
 - [ ] AI generation working for each block type
 - [ ] Team member detail page working at `/team/[memberSlug]`
 - [ ] Validation working on all new block type fields
@@ -561,111 +631,141 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 
 ## 9. Phase D — Migration + Cleanup
 
-> **Type:** Claude Code session(s)
+> **Type:** 2 Claude Code sessions (sequential — D1 must complete before D2)
 > **Prerequisite:** Phase C complete
 > **Output:** All content migrated, old tabs removed, public frontend updated
+>
+> **Session D1:** D.1 → D.2 → D.3 → D.4 → D.5
+> **Session D2:** D.6 → D.7 → D.8 → D.9 → D.10 → D.11
 
 ### Task D.1 — Create Team Members Table
 
-- [ ] Create migration: `team_members` table with proper relational schema
+- [ ] Create migration: `team_members` table
   - `id` (uuid, PK)
-  - `name` (text, required)
-  - `slug` (text, unique, auto-generated from name)
-  - `role` (text, required)
+  - `name` (text, NOT NULL)
+  - `slug` (text, UNIQUE, NOT NULL — auto-generated from name, kebab-case)
+  - `role` (text, NOT NULL)
   - `bio` (text — HTML content)
-  - `photo_url` (text, nullable)
+  - `photo_url` (text, nullable — existing URLs will be preserved as-is)
   - `years_of_service` (integer, nullable)
-  - `certifications` (jsonb — array of badge objects)
-  - `sort_order` (integer)
-  - `is_active` (boolean, default true)
+  - `certifications` (jsonb — array of strings for badge labels)
+  - `sort_order` (integer, NOT NULL, DEFAULT 0)
+  - `is_active` (boolean, NOT NULL, DEFAULT true)
   - `created_at`, `updated_at` timestamps
-- [ ] Add RLS policies
-- [ ] Add to DB_SCHEMA.md
+- [ ] Add RLS policies (match existing patterns)
+- [ ] Add to `docs/dev/DB_SCHEMA.md`
 
 ### Task D.2 — Migrate About Page Data
 
-- [ ] Create a page record in `cms_pages`: title="About", slug="about", published=true
-- [ ] Migrate `about_text` from `business_settings` → page's main HTML content field
-- [ ] Migrate `team_members` JSON from `business_settings` → `team_members` table rows
-- [ ] Migrate `credentials` JSON from `business_settings` → `credentials` content block on the page
-- [ ] Create `team_grid` content block on the page (references team_members table)
-- [ ] Write migration SQL that preserves existing data
-- [ ] Verify public rendering matches current output
+- [ ] Create a page record in `website_pages`: title="About Us", slug="about", page_template="content", is_published=true
+- [ ] Migrate `about_text` from `business_settings` → page's `content` field (convert plain text → HTML: wrap paragraphs in `<p>` tags, preserve `whitespace-pre-line` formatting)
+- [ ] Migrate `team_members` JSON array from `business_settings` → `team_members` table rows (one row per member, preserve sort order from array index)
+- [ ] Migrate `credentials` JSON array from `business_settings` → `credentials` content block on the About page (store as block content JSON)
+- [ ] Create `team_grid` content block on the About page (content JSON references team_members table data)
+- [ ] Write migration SQL that preserves all existing data including photo URLs and image URLs
+- [ ] Handle naming: `business_settings` stores `photo_url` (snake_case), `team.ts` converts to `photoUrl` (camelCase) — new table uses snake_case consistently
 
 ### Task D.3 — Migrate Terms Page Data
 
-- [ ] Create a page record in `cms_pages`: title="Terms & Conditions", slug="terms", published=true
-- [ ] Migrate terms sections data → `terms_sections` content block on the page
-- [ ] Migrate effective date → block-level metadata
+- [ ] Create a page record in `website_pages`: title="Terms & Conditions", slug="terms", page_template="content", is_published=true
+- [ ] Migrate `terms_and_conditions` JSON array from `business_settings` → `terms_sections` content block on the Terms page
+- [ ] Migrate `terms_effective_date` from `business_settings` → embed in block content JSON metadata
+- [ ] Convert terms section `content` from plain text to HTML (wrap in `<p>` tags)
+- [ ] Include the 9 default fallback sections in the migration if no custom terms exist
 - [ ] Write migration SQL
-- [ ] Update public `/terms` route to read from new location (or redirect to `/p/terms`)
 
-### Task D.4 — Migrate City Pages Data
+### Task D.4 — Update Homepage Team Data Source
 
-- [ ] For each existing city: create a page record in `cms_pages` with slug=`areas/{city-slug}`
-- [ ] Migrate city-specific content → `city_info` content block on each page
-- [ ] Write migration SQL
-- [ ] Update public `/areas/[citySlug]` route to read from new location (or redirect to `/p/areas/{slug}`)
+- [ ] Update `src/app/(public)/page.tsx`: replace `getTeamData()` import from `@/lib/data/team` with new query to `team_members` table
+- [ ] Create new data layer function (e.g., in `src/lib/data/team-members.ts`): `getActiveTeamMembers()` — queries `team_members` table, returns active members ordered by `sort_order`
+- [ ] Ensure data shape matches what the homepage rendering expects (or update rendering to match new shape)
+- [ ] Verify: circular photo (128px) or initials fallback, name, role (lime), bio (2-line clamp) — all still work
+- [ ] Verify: credentials rendering still works (now coming from content block on About page, but homepage may need separate query)
 
-### Task D.5 — Update Public Frontend Routing
+### Task D.5 — Update Public `/terms` Route
 
-- [ ] Ensure `/p/about` renders correctly with team grid + credentials blocks
-- [ ] Ensure `/p/terms` renders correctly with terms sections block
-- [ ] Ensure `/p/areas/{city}` renders correctly with city info block
-- [ ] Set up redirects from old routes (`/terms` → `/p/terms`, etc.) if URL structure changes
-- [ ] Fix any hardcoded strings on public pages (e.g., "Meet the Team" → use page title/headline from CMS)
-- [ ] Verify team member detail pages work at `/team/[memberSlug]`
+- [ ] Keep `src/app/(public)/terms/page.tsx` at `/terms` — do NOT redirect to `/p/terms`
+- [ ] Change data source: instead of reading `terms_and_conditions` + `terms_effective_date` from `business_settings`, read from the `terms_sections` content block on the Terms page in `website_pages`
+- [ ] Create data layer function: query `website_pages` where slug="terms", then query `page_content_blocks` where page references that page
+- [ ] Preserve existing rendering: numbered sections, effective date at top, inactive hidden, footer note with contact info
+- [ ] Remove the `getDefaultSections()` fallback (default sections should have been seeded in migration D.3)
+- [ ] Verify SEO metadata is populated (from `website_pages.meta_title` / `meta_description`)
 
-### Task D.6 — Remove Old Admin Tabs & Update Sidebar
+### Task D.6 — Create Team Detail Page
 
-- [ ] Remove `src/app/admin/website/about/page.tsx` (or redirect to the migrated page in Pages)
-- [ ] Remove `src/app/admin/website/terms/page.tsx` (or redirect to the migrated page in Pages)
-- [ ] Remove city page CRUD from SEO section (keep SEO settings, remove city page management)
-- [ ] Update admin sidebar navigation config to remove old entries
-- [ ] Update admin sidebar to reflect final menu structure decided post-audit
-- [ ] Add redirects from old admin URLs to new Pages locations (in case of bookmarks)
+- [ ] Create `src/app/(public)/team/[memberSlug]/page.tsx`
+- [ ] Query `team_members` table by slug
+- [ ] Render: full bio (HTML), large photo, years of service, certification badges
+- [ ] Back link to About page
+- [ ] SEO metadata (auto-generated from member name + role + business name)
+- [ ] JSON-LD Person schema
+- [ ] `generateStaticParams()` for build-time pre-rendering of active members
+- [ ] 404 handling for invalid slugs
 
-### Task D.7 — Deprecate & Remove Old API Routes
+### Task D.7 — Remove Old Admin Tabs & Update Sidebar
 
-- [ ] Remove `/api/admin/cms/about` route and handler
-- [ ] Remove `/api/admin/cms/terms` route and handler
-- [ ] Remove `/api/admin/cms/seo/cities` CRUD routes (keep SEO-only endpoints if still needed)
-- [ ] Verify no external consumers (n8n workflows, webhooks) depend on these routes before deletion
-- [ ] Remove corresponding data access files if fully replaced
+- [ ] Delete `src/app/admin/website/about/page.tsx`
+- [ ] Delete `src/app/admin/website/terms/page.tsx`
+- [ ] Update `src/lib/auth/roles.ts` (lines 137-206) — remove from `SIDEBAR_NAV` Website children:
+  ```
+  { label: 'About & Team', href: '/admin/website/about', icon: 'Users' }
+  { label: 'Terms & Conditions', href: '/admin/website/terms', icon: 'FileText' }
+  ```
+- [ ] Reorder remaining items: Pages first, then layout widgets, then themes, then SEO
 
-### Task D.8 — Dead Code Cleanup
+### Task D.8 — Remove Old API Routes & Data Layer
 
-> Use the deletion checklist from Phase A Task A.14 as the guide
+- [ ] Delete `src/app/api/admin/cms/about/route.ts`
+- [ ] Delete `src/app/api/admin/cms/terms/route.ts`
+- [ ] Delete `src/lib/data/team.ts` (replaced by `src/lib/data/team-members.ts`)
+- [ ] Verify no external consumers (n8n workflows, webhooks) reference these routes — audit confirmed none known
+- [ ] Update any remaining imports that reference deleted files
 
-- [ ] Delete all admin page files identified as orphaned
-- [ ] Delete all API route files identified as orphaned
-- [ ] Delete all data access files identified as orphaned (`src/lib/data/team.ts`, `src/lib/data/cities.ts`, etc.)
-- [ ] Delete all components only used by removed pages
-- [ ] Remove dead CSS/styles only used by removed components
-- [ ] Clean up any orphaned imports across the codebase (search for imports referencing deleted files)
-- [ ] Remove old data from `business_settings` JSON (about_text, team_members, credentials) after confirming migration is complete and stable
-- [ ] Run a full build to catch any broken imports or references
-- [ ] Grep the codebase for any remaining references to deleted file paths
+### Task D.9 — Dead Code Cleanup
 
-### Task D.9 — Final Validation & Regression Testing
+> Use audit §14 deletion checklist as guide
+
+- [ ] Delete `src/components/admin/content/markdown-editor.tsx` (if not already removed in C.7)
+- [ ] Remove any markdown parsing dependencies (`marked`, `markdown-it`, etc.) if no longer used anywhere
+- [ ] Clean up orphaned imports across codebase (grep for imports referencing deleted files)
+- [ ] Run full build (`next build`) to catch any broken imports or references
+- [ ] Fix the Terms permission bug: current route uses `cms.seo.manage` — new Terms page in Pages system uses `cms.pages.manage` (audit §3)
+
+### Task D.10 — Clean Up business_settings Keys
+
+> Only after confirming all migrations are stable and public frontend renders correctly
+
+- [ ] Remove `business_settings` key: `team_members`
+- [ ] Remove `business_settings` key: `credentials`
+- [ ] Remove `business_settings` key: `about_text`
+- [ ] Remove `business_settings` key: `terms_and_conditions`
+- [ ] Remove `business_settings` key: `terms_effective_date`
+- [ ] Write SQL migration for cleanup
+
+### Task D.11 — Final Validation & Regression Testing
 
 - [ ] Test creating a new page with each block type
-- [ ] Test editing existing migrated pages (About, Terms, Cities)
-- [ ] Test all public rendering paths
-- [ ] Test team member detail pages
+- [ ] Test editing the migrated About page (team_grid + credentials blocks)
+- [ ] Test editing the migrated Terms page (terms_sections block)
+- [ ] Test homepage: team section renders correctly from new `team_members` table
+- [ ] Test `/terms`: renders correctly from new data source
+- [ ] Test `/team/[memberSlug]`: detail pages work
 - [ ] Test AI generation on all block types
 - [ ] Test validation on all forms (Layer 1, 2, 3)
 - [ ] Test unsaved changes warning
 - [ ] Test image upload on all ImageUploadField instances
 - [ ] Test drag-and-drop reorder on all sortable lists
 - [ ] Verify no broken links or missing images on public site
+- [ ] Verify admin sidebar: About & Terms entries removed, remaining items ordered correctly
 
 ### Post-Phase D Checkpoint
 
 - [ ] All content migrated successfully
-- [ ] Old admin tabs removed or redirected
+- [ ] Old admin tabs deleted
+- [ ] Old API routes deleted
 - [ ] Public frontend renders correctly from new data sources
 - [ ] No regressions in existing functionality
+- [ ] All `business_settings` migration keys cleaned up
 - [ ] Update CHANGELOG.md, CLAUDE.md, FILE_TREE.md, DB_SCHEMA.md
 - [ ] `git add -A && git commit && git push && rm -rf .next`
 
@@ -675,7 +775,7 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 
 > **Type:** Future Claude Code sessions (independent of each other)
 > **Prerequisite:** Phase D complete and stable
-> **Note:** These are designed into the architecture but deferred from the initial build. Each can be done as a standalone session.
+> **Note:** Each can be done as a standalone session.
 
 ### E.1 — Preview Mode
 
@@ -702,13 +802,33 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 - [ ] "Restore" button to roll back to a previous version
 - [ ] Optionally store who made the change (employee ID)
 
-### E.4 — Theme System Overhaul
+### E.4 — ImageUploadField on Remaining URL Fields
+
+- [ ] Replace `hero_bg_image_url` URL input in seasonal theme editor (`themes/[id]/page.tsx`) → ImageUploadField
+- [ ] Replace hero slide image URL fields if still using text inputs
+- [ ] Audit for any other remaining URL text input image fields not caught in Phase B
+
+### E.5 — Homepage Hardcoded Items
+
+- [ ] Move `differentiators` array (3 items: Mobile Service, Ceramic Pro Certified, Eco-Friendly Products) to `business_settings.homepage_differentiators`
+- [ ] Move hardcoded Google place ID to `business_settings.google_place_id`
+- [ ] Move CTA before/after image URLs to `business_settings`
+- [ ] Add admin UI for editing these in a "Homepage" section or within existing settings
+
+### E.6 — City Pages SEO Enhancement
+
+- [ ] Wire up unused `service_highlights` (JSONB) and `local_landmarks` (TEXT) fields in city admin UI
+- [ ] Make AI content generator keyword-aware: pull `focus_keywords` from city record, use in prompts
+- [ ] Add content structure guidance per city (different cities can emphasize different services/neighborhoods)
+- [ ] Consider adding local review integration per city
+- [ ] **This is the SEO value play — separate planning session recommended**
+
+### E.7 — Theme System Overhaul
 
 - [ ] Audit current Theme Settings schema and `site-theme` API
 - [ ] Audit Seasonal Themes system — activation/deactivation cron, override behavior
+- [ ] Review CSS variable indirection pattern (critical for Tailwind v4)
 - [ ] Design swappable theme system: create/delete themes, preview before activating
-- [ ] Ensure every public component reads from centralized theme variables
-- [ ] Review CSS variable structure and Tailwind integration
 - [ ] Review relationship between base Theme Settings and Seasonal Themes — simplify if redundant
 - [ ] Dark/light mode consistency across all public pages
 - [ ] Theme import/export capability
@@ -724,84 +844,102 @@ Create `docs/planning/CMS_OVERHAUL_AUDIT.md` containing:
 
 ```
 src/app/admin/website/page.tsx               — Website section landing
-src/app/admin/website/about/page.tsx         — About & Team editor (TO BE MIGRATED)
+src/app/admin/website/about/page.tsx         — About & Team editor (TO BE DELETED — Phase D.7)
 src/app/admin/website/pages/page.tsx         — Pages list
 src/app/admin/website/pages/new/page.tsx     — New page
 src/app/admin/website/pages/[id]/page.tsx    — Edit page (THE FOUNDATION)
-src/app/admin/website/terms/page.tsx         — Terms editor (TO BE MIGRATED)
-src/app/admin/website/seo/cities/page.tsx    — Cities editor (TO BE MIGRATED)
-src/app/admin/website/footer/page.tsx        — Footer editor (HAS DRAG-DROP TO EXTRACT)
-src/app/admin/website/hero/page.tsx          — Hero carousel
+src/app/admin/website/terms/page.tsx         — Terms editor (TO BE DELETED — Phase D.7)
+src/app/admin/website/seo/cities/page.tsx    — Cities editor (STAYS — enhanced with keyword-aware AI in Phase E.6)
+src/app/admin/website/footer/page.tsx        — Footer editor (~1800 lines, HAS DRAG-DROP TO EXTRACT)
+src/app/admin/website/hero/page.tsx          — Hero carousel list
 src/app/admin/website/hero/[id]/page.tsx     — Hero slide editor
 src/app/admin/website/navigation/page.tsx    — Navigation editor
 src/app/admin/website/tickers/page.tsx       — Ticker list
 src/app/admin/website/tickers/[id]/page.tsx  — Ticker editor
 src/app/admin/website/ads/page.tsx           — Ads manager
 src/app/admin/website/catalog/page.tsx       — Catalog display settings
-src/app/admin/website/theme-settings/page.tsx — Theme settings (base theme)
-src/app/admin/website/themes/page.tsx        — Seasonal themes manager
-src/app/admin/website/themes/[id]/page.tsx   — Seasonal theme editor
+src/app/admin/website/theme-settings/page.tsx — Theme settings (base theme — 50+ color/typography/button columns)
+src/app/admin/website/themes/page.tsx        — Seasonal themes manager (8 holiday presets)
+src/app/admin/website/themes/[id]/page.tsx   — Seasonal theme editor (colors, particles, schedule)
 ```
 
 ### Key Components
 
 ```
-src/components/admin/content/page-html-editor.tsx    — Rich HTML editor + AI
-src/components/admin/content/content-block-editor.tsx — Content block system
-src/components/admin/content/faq-editor.tsx           — FAQ block (reference pattern)
-src/components/admin/html-editor-toolbar.tsx          — HTML editor toolbar
-src/components/admin/html-image-manager.tsx           — Image management in editor
-src/components/public/content-block-renderer.tsx      — Public block rendering
-src/components/ui/form-field.tsx                      — Form field (check for error support)
+src/components/admin/content/page-html-editor.tsx    — Rich HTML editor + AI (BECOMES THE universal editor)
+src/components/admin/content/content-block-editor.tsx — Content block system (native HTML5 DnD)
+src/components/admin/content/faq-editor.tsx           — FAQ block editor
+src/components/admin/content/markdown-editor.tsx      — Markdown editor (TO BE REMOVED — Phase C.7)
+src/components/admin/html-editor-toolbar.tsx          — HTML editor toolbar (12 dialog components)
+src/components/admin/html-image-manager.tsx           — Image insertion: upload + library browse (cms-assets bucket)
+src/components/public/content-block-renderer.tsx      — Public block rendering (5 block types → expanding to 9)
+src/components/ui/form-field.tsx                      — Form field (HAS error prop ✅, needs border pass-through)
+src/app/admin/catalog/components/multi-image-upload.tsx — Product image upload (reference for ImageUploadField)
 ```
 
 ### API Routes (CMS)
 
 ```
-src/app/api/admin/cms/about/route.ts         — About CRUD (TO BE DEPRECATED)
-src/app/api/admin/cms/terms/route.ts         — Terms CRUD (TO BE DEPRECATED)
-src/app/api/admin/cms/pages/route.ts         — Pages CRUD (THE FOUNDATION)
-src/app/api/admin/cms/pages/[id]/route.ts    — Single page CRUD
-src/app/api/admin/cms/content/route.ts       — Content blocks CRUD
+src/app/api/admin/cms/about/route.ts         — About CRUD (TO BE DELETED — Phase D.8)
+src/app/api/admin/cms/terms/route.ts         — Terms CRUD (TO BE DELETED — Phase D.8)
+src/app/api/admin/cms/pages/route.ts         — Pages CRUD (THE FOUNDATION) — permission: cms.pages.manage
+src/app/api/admin/cms/pages/[id]/route.ts    — Single page CRUD — handles show_in_nav toggle
+src/app/api/admin/cms/content/route.ts       — Content blocks CRUD — auto-calculates sort_order
 src/app/api/admin/cms/content/[id]/route.ts  — Single block CRUD
-src/app/api/admin/cms/seo/cities/route.ts    — Cities CRUD (TO BE DEPRECATED)
+src/app/api/admin/cms/content/reorder/route.ts — Block reorder — payload: { pagePath, orderedIds }
+src/app/api/admin/cms/content/ai-generate/route.ts — AI content — modes: full_page, single_block, improve, batch_cities
+src/app/api/admin/cms/seo/cities/route.ts    — Cities CRUD (STAYS)
+src/app/api/admin/cms/seo/cities/[id]/route.ts — Single city CRUD (STAYS)
 src/app/api/admin/cms/themes/route.ts        — Seasonal themes list/create
 src/app/api/admin/cms/themes/[id]/route.ts   — Seasonal theme CRUD
-src/app/api/admin/cms/themes/[id]/activate/route.ts  — Activate theme
-src/app/api/admin/cms/themes/[id]/deactivate/route.ts — Deactivate theme
+src/app/api/admin/cms/themes/[id]/activate/route.ts  — Manual activate (mutually exclusive)
+src/app/api/admin/cms/themes/[id]/deactivate/route.ts — Manual deactivate
 src/app/api/admin/cms/site-theme/route.ts    — Base theme settings
-src/app/api/admin/upload/content-image/route.ts — Image upload endpoint
-src/app/api/cron/theme-activation/route.ts   — Cron: scheduled theme activation
+src/app/api/admin/upload/content-image/route.ts — Image upload — bucket: cms-assets, max 5MB
+src/app/api/cron/theme-activation/route.ts   — Cron: every 15 min, auto activate/deactivate seasonal themes
 ```
 
 ### Data Access
 
 ```
-src/lib/data/website-pages.ts    — Page data functions
+src/lib/data/website-pages.ts    — Page data: getPageBySlug, getPublishedPages, getAllPages, getFooterData
 src/lib/data/page-content.ts     — Content block data functions
-src/lib/data/team.ts             — Team data functions (TO BE REPLACED)
-src/lib/data/cities.ts           — Cities data functions (TO BE REPLACED)
-src/lib/data/cms.ts              — CMS data functions (check for homepage/theme data)
-src/lib/services/ai-content-writer.ts — AI content generation
+src/lib/data/team.ts             — Team data from business_settings (TO BE REPLACED by team-members.ts — Phase D.8)
+src/lib/data/cities.ts           — Cities data: getActiveCities, getCityBySlug (STAYS)
+src/lib/services/ai-content-writer.ts — AI: Claude Sonnet, 4000 tokens, business context injected
+src/lib/supabase/types.ts        — ContentBlockType union (EXPAND in Phase C.0)
 ```
 
 ### Public Pages
 
 ```
-src/app/(public)/page.tsx                          — Homepage (AUDIT: hardcoded vs CMS?)
-src/app/(public)/terms/page.tsx                    — Terms public page (TO BE REDIRECTED)
-src/app/(public)/areas/page.tsx                    — Service areas listing
-src/app/(public)/areas/[citySlug]/page.tsx         — City landing page (TO BE REDIRECTED)
+src/app/(public)/page.tsx                          — Homepage (widget assembly — STAYS SEPARATE)
+src/app/(public)/terms/page.tsx                    — Terms public page (STAYS at /terms, data source changes — Phase D.5)
+src/app/(public)/areas/page.tsx                    — Service areas listing (STAYS)
+src/app/(public)/areas/[citySlug]/page.tsx         — City landing page (STAYS)
 src/app/(public)/services/page.tsx                 — Service category listing
 src/app/(public)/products/page.tsx                 — Product category listing
-src/app/(public)/gallery/page.tsx                  — Photo gallery
-src/app/p/[...slug]/page.tsx                       — CMS dynamic pages (THE FOUNDATION)
+src/app/(public)/gallery/page.tsx                  — Photo gallery (feature-flag gated)
+src/app/p/[...slug]/page.tsx                       — CMS dynamic pages (THE FOUNDATION — /p/ prefix KEPT)
+src/app/(public)/team/[memberSlug]/page.tsx        — Team detail page (NEW — Phase D.6)
 ```
 
-### DB Schema
+### DB Tables (from audit)
 
 ```
-docs/dev/DB_SCHEMA.md            — Full database schema reference
+website_pages              — CMS pages (NOT cms_pages)
+page_content_blocks        — Content blocks (NOT cms_page_content_blocks)
+city_landing_pages         — City landing pages (STAYS)
+team_members               — Team members (NEW — Phase D.1)
+seasonal_themes            — Seasonal theme overlays
+site_theme_settings        — Base theme (50+ columns)
+business_settings          — Key-value JSONB store (5 keys to be cleaned up — Phase D.10)
+```
+
+### Sidebar Config
+
+```
+src/lib/auth/roles.ts      — SIDEBAR_NAV definition (lines 137-206) — remove About & Terms entries
 ```
 
 ---
@@ -823,35 +961,43 @@ These bugs prompted this overhaul. All will be resolved by the architecture chan
 
 | Decision | Rationale | Date |
 |---|---|---|
-| Extend Pages system, don't rebuild | Pages already has HTML editor + AI + content blocks + SEO + publishing. Building on existing working system minimizes risk | 2026-02-26 |
-| Content blocks over page templates | Templates are rigid. Blocks give full flexibility — add any combination of content types to any page | 2026-02-26 |
-| Team members in own DB table (not JSON in content block) | Enables detail page routing by slug, querying, future features (scheduling, assignments). Proper relational data | 2026-02-26 |
-| Team detail pages at `/team/[slug]` (dedicated route) | Cleaner URL, independent of /p/ catch-all, avoids slug collision with page system | 2026-02-26 |
-| Extract drag-and-drop from Footer (not build new) | Footer already has working implementation. Reuse > rebuild | 2026-02-26 |
-| Three-layer validation (inline + section badge + toast) | Toast-only validation fails on complex forms. Users need to see exactly which field is wrong and where | 2026-02-26 |
-| AI button per block (not just main content) | Each content area has different context and needs different prompts. Granular AI = better generation quality | 2026-02-26 |
-| Defer theme overhaul to Phase E | Theme is a design system change, not a content management change. Different scope, different risk profile | 2026-02-26 |
-| Defer preview mode, shared blocks, revision history to Phase E | High value but not blocking. Architecture supports adding them later without rework | 2026-02-26 |
-| Desktop-only admin editing | Mobile/tablet admin is out of scope. No responsive optimization needed for admin editors | 2026-02-26 |
-| Seasonal Themes is a separate system from Theme Settings | Theme Settings = base colors/fonts/dark-light. Seasonal Themes = time-based theme overrides with cron activation. Both stay as separate admin tabs; audit will confirm they're self-contained | 2026-02-26 |
-| Homepage management — DEFERRED TO POST-AUDIT | Need audit to determine if homepage is hardcoded assembly or CMS-driven before deciding whether it joins Pages | 2026-02-26 |
-| Website admin menu structure — DEFERRED TO POST-AUDIT | Need full picture of remaining tabs after migration before deciding flat vs. grouped layout | 2026-02-26 |
+| Extend Pages system, don't rebuild | Pages already has HTML editor + AI + content blocks + SEO + publishing. Minimizes risk | 2026-02-26 |
+| Content blocks over page templates | Blocks give full flexibility — any combination of content types on any page | 2026-02-26 |
+| Team members in own DB table (not JSON in content block) | Enables detail page routing by slug, querying, future features. Proper relational data | 2026-02-26 |
+| Team detail pages at `/team/[slug]` (dedicated route) | Cleaner URL, independent of /p/ catch-all, avoids slug collision | 2026-02-26 |
+| Extract drag-and-drop from Footer (not build new) | Footer has working native HTML5 DnD. Reuse > rebuild | 2026-02-26 |
+| Three-layer validation (inline + section badge + toast) | Toast-only fails on complex forms. Users need to see exactly which field is wrong | 2026-02-26 |
+| AI button per block (not just main content) | Granular context = better generation quality | 2026-02-26 |
+| Defer theme overhaul to Phase E | Different scope, different risk profile | 2026-02-26 |
+| Defer preview mode, shared blocks, revision history to Phase E | High value but not blocking. Architecture supports adding later | 2026-02-26 |
+| Desktop-only admin editing | Mobile/tablet admin out of scope | 2026-02-26 |
+| **HTML editor everywhere (remove MarkdownEditor)** | One editor = one rendering path, one set of bugs. Business users shouldn't learn Markdown for SEO content. Existing md content migrated to HTML | 2026-02-27 |
+| **Keep /p/ prefix for CMS pages** | Safety from route collisions. Important pages get dedicated route files (e.g., `/terms` stays at `/terms`) | 2026-02-27 |
+| **Keep /terms route alive, change data source** | High risk of breaking existing links (booking confirmations, email footers, footer link). Route reads from Pages system | 2026-02-27 |
+| **Cities STAY separate (don't migrate to Pages)** | Own DB table with geo fields (distance, state, sort_order, focus_keywords). Already uses ContentBlockEditor. Enhanced with keyword-aware AI in Phase E | 2026-02-27 |
+| **Homepage stays separate** | Widget assembly (15 sections, 12 CMS-driven). Not a content page. Only 3 hardcoded items — optional Phase E fix | 2026-02-27 |
+| **Seasonal Themes: no changes needed** | Fully self-contained per audit. Only benefit: ImageUploadField for hero_bg_image_url (Phase E.4) | 2026-02-27 |
+| **Website admin menu: flat reorder, remove About & Terms** | 11 items after cleanup. Flat list reordered logically (Pages first). Owner can revisit grouping later | 2026-02-27 |
 
 ---
 
 ## 14. Out of Scope
 
-These items are explicitly excluded from all phases:
+These items are explicitly excluded from Phases B–D:
 
 - Mobile/tablet admin editing optimization
 - Bulk content block actions (bulk delete, bulk reorder)
 - Any changes to non-Website admin sections (POS, Marketing, Jobs, etc.)
 - Any functional changes to existing APIs beyond what's needed for migration
-- Theme system overhaul (handled separately in Phase E.4)
+- City page migration to Pages system (cities stay in `city_landing_pages` table)
+- Homepage conversion to a Page (stays as widget assembly)
+- City SEO content enhancement (deferred to Phase E.6)
+- Theme system overhaul (Phase E.7)
 - Drag-and-drop page reordering in the pages list (only within-page block reordering)
 - Multi-language / i18n support
 - Scheduled publishing (publish at future date)
 - Content workflow / approval system
+- Website admin menu grouping (flat reorder only — grouping deferred)
 
 ---
 
@@ -861,11 +1007,13 @@ When picking up this project:
 
 1. **Always read `CLAUDE.md` and `docs/dev/FILE_TREE.md` first** — never guess file paths
 2. **Check `docs/dev/DB_SCHEMA.md`** before creating new DB fields/tables — reuse existing fields first
-3. **This plan is PRE-AUDIT** — Phase A must complete before Phases B–E are finalized. The audit may reveal complications that change the task breakdown
-4. **After the audit**, update this document with refined tasks, specific file paths, and any new findings
-5. **Each phase has a checkpoint** — do not start the next phase until the checkpoint is verified
-6. **Session prompts must end with:** update CHANGELOG.md, CLAUDE.md, and FILE_TREE.md (if new routes/pages/lib/components/migrations created), then `git add -A && git commit && git push && rm -rf .next`
-7. **All cron/scheduling is internal** — never suggest n8n, Vercel Cron, or external schedulers
-8. **Timezone is PST** — `America/Los_Angeles`, not UTC
-9. **Deployed on Hostinger** — not Vercel. Never reference Vercel
-10. **Never provide patch code or quick fixes** — always provide fully thought-out solutions considering all scenarios and edge cases
+3. **Phase A audit is complete** — see `docs/planning/CMS_OVERHAUL_AUDIT.md` for detailed findings
+4. **All architecture decisions are finalized** — see Post-Audit Decisions table and Design Decisions Log
+5. **Correct table names:** `website_pages` (not cms_pages), `page_content_blocks` (not cms_page_content_blocks), `city_landing_pages` (not seo_cities)
+6. **HTML editor everywhere** — all content blocks use PageHtmlEditor, not MarkdownEditor. Existing markdown content must be migrated to HTML
+7. **Each phase has a checkpoint** — do not start the next phase until the checkpoint is verified
+8. **Session prompts must end with:** update CHANGELOG.md, CLAUDE.md, and FILE_TREE.md (if new routes/pages/lib/components/migrations created), then `git add -A && git commit && git push && rm -rf .next`
+9. **All cron/scheduling is internal** — never suggest n8n, Vercel Cron, or external schedulers
+10. **Timezone is PST** — `America/Los_Angeles`, not UTC
+11. **Deployed on Hostinger** — not Vercel. Never reference Vercel
+12. **Never provide patch code or quick fixes** — always provide fully thought-out solutions considering all scenarios and edge cases
