@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   Plus,
@@ -89,6 +90,7 @@ export default function CitiesAdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CityFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [contentCitySlug, setContentCitySlug] = useState<string | null>(null);
   const [contentCityName, setContentCityName] = useState<string>('');
   const [batchGenerating, setBatchGenerating] = useState(false);
@@ -222,18 +224,25 @@ export default function CitiesAdminPage() {
   // Delete
   // -----------------------------------------------------------------------
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    try {
-      const res = await adminFetch(`/api/admin/cms/seo/cities/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Failed');
-      setCities((prev) => prev.filter((c) => c.id !== id));
-      toast.success('City deleted');
-    } catch {
-      toast.error('Failed to delete city');
-    }
+  const handleDelete = (id: string, name: string) => {
+    confirm({
+      title: 'Delete City',
+      description: `Delete "${name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const res = await adminFetch(`/api/admin/cms/seo/cities/${id}`, {
+            method: 'DELETE',
+          });
+          if (!res.ok) throw new Error('Failed');
+          setCities((prev) => prev.filter((c) => c.id !== id));
+          toast.success('City deleted');
+        } catch {
+          toast.error('Failed to delete city');
+        }
+      },
+    });
   };
 
   // -----------------------------------------------------------------------
@@ -249,33 +258,37 @@ export default function CitiesAdminPage() {
   // Batch generate content for all cities
   // -----------------------------------------------------------------------
 
-  const handleBatchGenerate = async () => {
-    if (!confirm('Generate AI content for all cities that don\'t have content blocks yet? This may take a few minutes.')) {
-      return;
-    }
+  const handleBatchGenerate = () => {
+    confirm({
+      title: 'Generate AI Content',
+      description: 'Generate AI content for all cities that don\'t have content blocks yet? This may take a few minutes.',
+      confirmLabel: 'Generate',
+      variant: 'default',
+      onConfirm: async () => {
+        setBatchGenerating(true);
+        try {
+          const res = await adminFetch('/api/admin/cms/content/ai-generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'batch_cities' }),
+          });
 
-    setBatchGenerating(true);
-    try {
-      const res = await adminFetch('/api/admin/cms/content/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'batch_cities' }),
-      });
+          if (!res.ok) throw new Error('Failed');
+          const json = await res.json();
+          const { totalCities, successCount, message } = json.data;
 
-      if (!res.ok) throw new Error('Failed');
-      const json = await res.json();
-      const { totalCities, successCount, message } = json.data;
-
-      if (message) {
-        toast.info(message);
-      } else {
-        toast.success(`Generated content for ${successCount} of ${totalCities} cities`);
-      }
-    } catch {
-      toast.error('Batch content generation failed');
-    } finally {
-      setBatchGenerating(false);
-    }
+          if (message) {
+            toast.info(message);
+          } else {
+            toast.success(`Generated content for ${successCount} of ${totalCities} cities`);
+          }
+        } catch {
+          toast.error('Batch content generation failed');
+        } finally {
+          setBatchGenerating(false);
+        }
+      },
+    });
   };
 
   // -----------------------------------------------------------------------
@@ -292,6 +305,7 @@ export default function CitiesAdminPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="City Landing Pages"
         description="Manage SEO landing pages for service areas"

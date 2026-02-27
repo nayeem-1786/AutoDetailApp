@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { PageHtmlEditor } from './page-html-editor';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 
@@ -87,6 +88,7 @@ export function TermsSectionsEditor({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   const updateData = useCallback(
     (updater: (prev: TermsSectionsContent) => TermsSectionsContent) => {
@@ -125,14 +127,22 @@ export function TermsSectionsEditor({
   };
 
   const handleDeleteSection = (id: string) => {
-    if (!confirm('Delete this section?')) return;
-    updateData((prev) => ({
-      ...prev,
-      sections: prev.sections
-        .filter((s) => s.id !== id)
-        .map((s, i) => ({ ...s, sort_order: i })),
-    }));
-    if (expandedId === id) setExpandedId(null);
+    const section = data.sections.find((s) => s.id === id);
+    confirm({
+      title: 'Delete Section',
+      description: `Delete "${section?.title || 'this section'}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: () => {
+        updateData((prev) => ({
+          ...prev,
+          sections: prev.sections
+            .filter((s) => s.id !== id)
+            .map((s, i) => ({ ...s, sort_order: i })),
+        }));
+        if (expandedId === id) setExpandedId(null);
+      },
+    });
   };
 
   const handleUpdateSection = (id: string, updates: Partial<TermsSection>) => {
@@ -158,13 +168,20 @@ export function TermsSectionsEditor({
   // -------------------------------------------------------------------------
 
   const handleGenerateDefaults = () => {
-    if (!confirm('This will add 9 default T&C sections. Continue?')) return;
-    const sections = DEFAULT_SECTIONS.map((s, i) => ({
-      ...s,
-      id: crypto.randomUUID(),
-      sort_order: i,
-    }));
-    updateData((prev) => ({ ...prev, sections }));
+    confirm({
+      title: 'Generate Default Sections',
+      description: 'This will add 9 default T&C sections. Continue?',
+      confirmLabel: 'Generate',
+      variant: 'default',
+      onConfirm: () => {
+        const sections = DEFAULT_SECTIONS.map((s, i) => ({
+          ...s,
+          id: crypto.randomUUID(),
+          sort_order: i,
+        }));
+        updateData((prev) => ({ ...prev, sections }));
+      },
+    });
   };
 
   // -------------------------------------------------------------------------
@@ -429,6 +446,9 @@ export function TermsSectionsEditor({
           </Button>
         </>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

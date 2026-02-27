@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useAsyncAction } from '@/lib/hooks/use-async-action';
 import {
@@ -32,6 +33,7 @@ const CONTENT_TYPE_LABELS: Record<string, { label: string; icon: typeof ImageIco
 export default function HeroManagerPage() {
   const router = useRouter();
   const { isSubmitting, execute } = useAsyncAction();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [config, setConfig] = useState<HeroCarouselConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,19 +99,26 @@ export default function HeroManagerPage() {
     });
   };
 
-  const deleteSlide = async (id: string) => {
-    if (!confirm('Delete this slide?')) return;
-    await execute(async () => {
-      try {
-        const res = await adminFetch(`/api/admin/cms/hero/${id}`, {
-          method: 'DELETE',
+  const deleteSlide = (id: string) => {
+    confirm({
+      title: 'Delete Slide',
+      description: 'Delete this slide?',
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        await execute(async () => {
+          try {
+            const res = await adminFetch(`/api/admin/cms/hero/${id}`, {
+              method: 'DELETE',
+            });
+            if (!res.ok) throw new Error('Failed');
+            setSlides((prev) => prev.filter((s) => s.id !== id));
+            toast.success('Slide deleted');
+          } catch {
+            toast.error('Failed to delete slide');
+          }
         });
-        if (!res.ok) throw new Error('Failed');
-        setSlides((prev) => prev.filter((s) => s.id !== id));
-        toast.success('Slide deleted');
-      } catch {
-        toast.error('Failed to delete slide');
-      }
+      },
     });
   };
 
@@ -170,6 +179,7 @@ export default function HeroManagerPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="Hero Slides"
         description="Manage the hero section on the homepage"

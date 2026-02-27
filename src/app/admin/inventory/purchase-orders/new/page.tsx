@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { Vendor, Product } from '@/lib/supabase/types';
 import { formatCurrency } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
@@ -28,6 +29,7 @@ interface POLineItem {
 export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -80,9 +82,18 @@ export default function NewPurchaseOrderPage() {
 
   function handleVendorChange(newVendorId: string) {
     if (items.length > 0 && newVendorId !== vendorId) {
-      if (!window.confirm('Changing vendor will clear current line items. Continue?')) return;
-      setItems([]);
-      setProductSearch('');
+      confirm({
+        title: 'Change Vendor',
+        description: 'Changing vendor will clear current line items. Continue?',
+        confirmLabel: 'Continue',
+        variant: 'default',
+        onConfirm: () => {
+          setItems([]);
+          setProductSearch('');
+          setVendorId(newVendorId);
+        },
+      });
+      return;
     }
     setVendorId(newVendorId);
   }
@@ -163,6 +174,7 @@ export default function NewPurchaseOrderPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="New Purchase Order"
         description="Create a purchase order for a vendor"

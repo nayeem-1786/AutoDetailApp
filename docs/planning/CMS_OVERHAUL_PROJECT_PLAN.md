@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-27 (Post-Audit)
-> **Status:** Phase A Audit Complete — Ready for Phase B
+> **Updated:** 2026-02-27 (Phase D Bug Fixes Complete)
+> **Status:** Phase D Complete — All bug fixes applied
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -1040,7 +1040,7 @@ These bugs prompted this overhaul. All will be resolved by the architecture chan
 | No team member detail page exists | Never built — no route for individual staff profiles | Phase C: `/team/[memberSlug]` route with full bio, photo, badges |
 | Content editors are inconsistent — some have HTML editor + AI, others have plain textarea | Each page was built independently without shared components | Phase B: shared components. Phase C: all blocks use same editor patterns |
 | AI generates "Unknown City" markdown for non-city pages | `single_block` and `improve` modes assume city page context. Output format is markdown not HTML | Phase D.11: AI context fix — auto-inject page title/meta, output HTML |
-| "Add Feature" / "Add FAQ" buttons trigger page save instead of adding items | Buttons lack `type="button"`, defaulting to `type="submit"` which fires parent form handler | Phase D.14: sweep all block editors for missing `type="button"` |
+| "Add Feature" / "Add FAQ" buttons trigger page save instead of adding items | Buttons lack `type="button"`, defaulting to `type="submit"` which fires parent form handler | **RESOLVED** Phase D.14 + Post-D sweep: all buttons verified with `type="button"` |
 | New page requires save before Content Blocks card appears | Content blocks live in separate table, need page record to exist first. Architecture limitation. | Phase D.13: auto-draft page creation on `/pages/new` load |
 | Parent Page dropdown has no effect | Saves `parent_id` to DB but nothing reads it — no URL effect, no nav effect | Phase E.8: remove dropdown, navigation owns hierarchy |
 
@@ -1074,6 +1074,8 @@ These bugs prompted this overhaul. All will be resolved by the architecture chan
 | **Keep Show in Nav as sync shortcut** | Toggle ON auto-creates header nav item, OFF removes it. Convenience shortcut that syncs with Navigation page | 2026-02-27 |
 | **Flat URLs — nesting is nav-only** | Nesting in Navigation creates dropdown menus, NOT nested URL paths. `/p/{slug}` always resolves by slug alone. No redirect maintenance burden | 2026-02-27 |
 | **Navigation enhancement deferred to Phase E** | Nav page already 80% built (parent nesting, placements, 3 link types, drag reorder). Drag-to-indent and sync improvements are UX polish, not blocking | 2026-02-27 |
+| **team_grid editor uses team_members API directly** | Block content stores `{ source: "team_members_table" }` marker. Editor manages its own state via API calls, not value/onChange. Auto-save on each operation | 2026-02-27 |
+| **useConfirmDialog hook replaces all confirm() calls** | Browser `confirm()` looks jarring. Reusable hook wraps existing ConfirmDialog component. 18 admin files updated | 2026-02-27 |
 
 ---
 
@@ -1119,3 +1121,5 @@ When picking up this project:
 12. **Deployed on Hostinger** — not Vercel. Never reference Vercel
 13. **Never provide patch code or quick fixes** — always provide fully thought-out solutions considering all scenarios and edge cases
 14. **Button type="button"** — all non-submit buttons in forms must have `type="button"` to prevent accidental form submission
+15. **team_grid editor uses team_members API directly** — NOT block content JSON. The block's `content` field stores `{ "source": "team_members_table" }` as a marker. Editor is self-managing with auto-save.
+16. **useConfirmDialog** — import from `@/components/ui/confirm-dialog`. All admin pages now use this hook instead of browser `confirm()`. Pattern: `const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog()` + render `<ConfirmDialog {...dialogProps} />`

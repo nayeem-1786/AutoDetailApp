@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   ArrowLeft,
@@ -63,6 +64,7 @@ interface CreativePerformance {
 export default function AdCreativeEditorPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const isNew = id === 'new';
 
   const [creative, setCreative] = useState<AdCreative | null>(null);
@@ -212,23 +214,29 @@ export default function AdCreativeEditorPage() {
   // Delete
   // -----------------------------------------------------------------------
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (isNew) return;
-    if (!confirm('Delete this ad creative? This cannot be undone.')) return;
-
-    setDeleting(true);
-    try {
-      const res = await adminFetch(`/api/admin/cms/ads/creatives/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Failed');
-      toast.success('Creative deleted');
-      router.push('/admin/website/ads');
-    } catch {
-      toast.error('Failed to delete creative');
-    } finally {
-      setDeleting(false);
-    }
+    confirm({
+      title: 'Delete Ad Creative',
+      description: 'Delete this ad creative? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        setDeleting(true);
+        try {
+          const res = await adminFetch(`/api/admin/cms/ads/creatives/${id}`, {
+            method: 'DELETE',
+          });
+          if (!res.ok) throw new Error('Failed');
+          toast.success('Creative deleted');
+          router.push('/admin/website/ads');
+        } catch {
+          toast.error('Failed to delete creative');
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
   };
 
   // -----------------------------------------------------------------------
@@ -332,6 +340,7 @@ export default function AdCreativeEditorPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title={isNew ? 'Create Ad' : 'Edit Ad'}
         description={isNew ? 'Create a new ad creative' : form.name || 'Untitled'}

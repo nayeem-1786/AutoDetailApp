@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useAsyncAction } from '@/lib/hooks/use-async-action';
 import { createClient } from '@/lib/supabase/client';
@@ -61,6 +62,7 @@ const TEXT_ENTRY_OPTIONS = [
 export default function TickerManagerPage() {
   const router = useRouter();
   const { isSubmitting, execute } = useAsyncAction();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [tickers, setTickers] = useState<AnnouncementTicker[]>([]);
   const [masterEnabled, setMasterEnabled] = useState(false);
   const [featureFlagEnabled, setFeatureFlagEnabled] = useState(true);
@@ -188,17 +190,24 @@ export default function TickerManagerPage() {
     });
   };
 
-  const deleteTicker = async (id: string) => {
-    if (!confirm('Delete this ticker?')) return;
-    await execute(async () => {
-      try {
-        const res = await adminFetch(`/api/admin/cms/tickers/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed');
-        setTickers((prev) => prev.filter((t) => t.id !== id));
-        toast.success('Ticker deleted');
-      } catch {
-        toast.error('Failed to delete ticker');
-      }
+  const deleteTicker = (id: string) => {
+    confirm({
+      title: 'Delete Ticker',
+      description: 'Delete this ticker?',
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        await execute(async () => {
+          try {
+            const res = await adminFetch(`/api/admin/cms/tickers/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed');
+            setTickers((prev) => prev.filter((t) => t.id !== id));
+            toast.success('Ticker deleted');
+          } catch {
+            toast.error('Failed to delete ticker');
+          }
+        });
+      },
     });
   };
 
@@ -274,6 +283,7 @@ export default function TickerManagerPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="Announcement Tickers"
         description="Scrolling announcements on the public website"

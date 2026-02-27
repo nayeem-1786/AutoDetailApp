@@ -14,6 +14,7 @@ import {
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useAsyncAction } from '@/lib/hooks/use-async-action';
 import type { WebsiteNavItem, WebsitePage, NavPlacement } from '@/lib/supabase/types';
@@ -35,6 +36,7 @@ const BUILT_IN_ROUTES = [
 
 export default function NavigationPage() {
   const { isSubmitting, execute } = useAsyncAction();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [activePlacement, setActivePlacement] = useState<NavPlacement>('header');
   const [items, setItems] = useState<WebsiteNavItem[]>([]);
   const [pages, setPages] = useState<WebsitePage[]>([]);
@@ -99,20 +101,26 @@ export default function NavigationPage() {
     });
   };
 
-  const deleteItem = async (item: WebsiteNavItem) => {
-    if (!confirm(`Remove "${item.label}" from navigation?`)) return;
+  const deleteItem = (item: WebsiteNavItem) => {
+    confirm({
+      title: 'Remove Navigation Link',
+      description: `Remove "${item.label}" from navigation?`,
+      confirmLabel: 'Remove',
+      variant: 'destructive',
+      onConfirm: async () => {
+        await execute(async () => {
+          const res = await adminFetch(`/api/admin/cms/navigation/${item.id}`, {
+            method: 'DELETE',
+          });
 
-    await execute(async () => {
-      const res = await adminFetch(`/api/admin/cms/navigation/${item.id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        setItems((prev) => prev.filter((i) => i.id !== item.id));
-        toast.success('Link removed');
-      } else {
-        toast.error('Failed to delete');
-      }
+          if (res.ok) {
+            setItems((prev) => prev.filter((i) => i.id !== item.id));
+            toast.success('Link removed');
+          } else {
+            toast.error('Failed to delete');
+          }
+        });
+      },
     });
   };
 
@@ -259,6 +267,7 @@ export default function NavigationPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="Navigation"
         description="Manage header and footer navigation links."

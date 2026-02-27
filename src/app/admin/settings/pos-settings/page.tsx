@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { X, Plus, Search } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
@@ -57,6 +58,7 @@ function titleCaseMake(name: string): string {
 // --- Page ---
 
 export default function PosSettingsPage() {
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   // Auto-Logout state
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -217,37 +219,43 @@ export default function PosSettingsPage() {
     }
   }
 
-  async function handleDelete(make: VehicleMake) {
-    if (!confirm(`Delete "${make.name}"? This cannot be undone.`)) return;
+  function handleDelete(make: VehicleMake) {
+    confirm({
+      title: 'Delete Vehicle Make',
+      description: `Delete "${make.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        setDeletingIds((prev) => new Set(prev).add(make.id));
+        try {
+          const res = await adminFetch('/api/admin/vehicle-makes', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: make.id }),
+          });
 
-    setDeletingIds((prev) => new Set(prev).add(make.id));
-    try {
-      const res = await adminFetch('/api/admin/vehicle-makes', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: make.id }),
-      });
+          if (res.status === 409) {
+            const json = await res.json();
+            toast.error(json.error || 'Cannot delete — vehicles exist with this make');
+            return;
+          }
 
-      if (res.status === 409) {
-        const json = await res.json();
-        toast.error(json.error || 'Cannot delete — vehicles exist with this make');
-        return;
-      }
+          if (!res.ok) {
+            toast.error('Failed to delete make');
+            return;
+          }
 
-      if (!res.ok) {
-        toast.error('Failed to delete make');
-        return;
-      }
-
-      toast.success(`Deleted "${make.name}"`);
-      setMakes((prev) => prev.filter((m) => m.id !== make.id));
-    } finally {
-      setDeletingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(make.id);
-        return next;
-      });
-    }
+          toast.success(`Deleted "${make.name}"`);
+          setMakes((prev) => prev.filter((m) => m.id !== make.id));
+        } finally {
+          setDeletingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(make.id);
+            return next;
+          });
+        }
+      },
+    });
   }
 
   function handleCategoryTab(cat: VehicleCategory) {
@@ -282,6 +290,7 @@ export default function PosSettingsPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="POS Settings"
         description="Configure POS behavior, auto-logout, and vehicle options."

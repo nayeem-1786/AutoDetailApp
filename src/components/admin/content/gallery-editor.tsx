@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,7 @@ function serializeGalleryContent(data: GalleryContent): string {
 export function GalleryEditor({ content, onChange }: GalleryEditorProps) {
   const data = parseGalleryContent(content);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   const updateData = (updater: (prev: GalleryContent) => GalleryContent) => {
     const current = parseGalleryContent(content);
@@ -75,12 +77,19 @@ export function GalleryEditor({ content, onChange }: GalleryEditorProps) {
   };
 
   const handleDeleteImage = (id: string) => {
-    if (!confirm('Remove this image?')) return;
-    updateData((prev) => ({
-      images: prev.images
-        .filter((img) => img.id !== id)
-        .map((img, i) => ({ ...img, sort_order: i })),
-    }));
+    confirm({
+      title: 'Remove Image',
+      description: 'Remove this image from the gallery?',
+      confirmLabel: 'Remove',
+      variant: 'destructive',
+      onConfirm: () => {
+        updateData((prev) => ({
+          images: prev.images
+            .filter((img) => img.id !== id)
+            .map((img, i) => ({ ...img, sort_order: i })),
+        }));
+      },
+    });
   };
 
   const handleUpdateImage = (id: string, updates: Partial<GalleryImage>) => {
@@ -213,6 +222,9 @@ export function GalleryEditor({ content, onChange }: GalleryEditorProps) {
           </Button>
         </>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

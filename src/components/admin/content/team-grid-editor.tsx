@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Plus,
   Trash2,
@@ -16,11 +16,12 @@ import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { PageHtmlEditor } from '@/components/admin/content/page-html-editor';
 import { DragDropItem } from '@/components/admin/drag-drop-reorder';
 import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
-// TeamGridEditor — manages team_grid block content
+// TeamGridEditor — manages team_members table via API
 // ---------------------------------------------------------------------------
 
 export interface TeamGridMember {
@@ -33,31 +34,42 @@ export interface TeamGridMember {
   years_of_service: number | null;
   certifications: string[];
   sort_order: number;
+  is_active?: boolean;
 }
 
-interface TeamGridEditorProps {
-  value: TeamGridMember[];
-  onChange: (members: TeamGridMember[]) => void;
-}
-
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
+export function TeamGridEditor() {
+  const [members, setMembers] = useState<TeamGridMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, Record<string, string>>>({});
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
+
+  // -------------------------------------------------------------------------
+  // Load members from API
+  // -------------------------------------------------------------------------
+
+  const loadMembers = useCallback(async () => {
+    try {
+      const res = await adminFetch('/api/admin/team-members');
+      if (!res.ok) throw new Error('Failed to load');
+      const json = await res.json();
+      setMembers(json.data ?? []);
+    } catch {
+      toast.error('Failed to load team members');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
+
+  // -------------------------------------------------------------------------
+  // AI Generate Bio
+  // -------------------------------------------------------------------------
 
   const handleAiGenerateBio = async (member: TeamGridMember) => {
     if (!member.name.trim() || !member.role.trim()) {
@@ -78,7 +90,7 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
       if (!res.ok) throw new Error('Failed');
       const json = await res.json();
       if (json.data?.content) {
-        updateMember(member.id, { bio: json.data.content });
+        await saveMember(member.id, { bio: json.data.content });
         toast.success('Bio generated');
       }
     } catch {
@@ -88,56 +100,91 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
     }
   };
 
-  const handleReorder = useCallback(
-    (reordered: TeamGridMember[]) => {
-      onChange(reordered.map((m, i) => ({ ...m, sort_order: i })));
-    },
-    [onChange]
-  );
+  // -------------------------------------------------------------------------
+  // CRUD via API — auto-save pattern
+  // -------------------------------------------------------------------------
 
-  const { getDragProps, isDragging, isDragOver } = useDragDropReorder({
-    items: value,
-    onReorder: handleReorder,
-  });
-
-  const addMember = () => {
-    const newMember: TeamGridMember = {
-      id: generateId(),
-      name: '',
-      role: '',
-      bio: '',
-      photo_url: '',
-      slug: '',
-      years_of_service: null,
-      certifications: [],
-      sort_order: value.length,
-    };
-    onChange([...value, newMember]);
-    setExpandedId(newMember.id);
+  const addMember = async () => {
+    setSavingId('new');
+    try {
+      const res = await adminFetch('/api/admin/team-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'New Member',
+          role: 'Team Member',
+          bio: '',
+          photo_url: '',
+          years_of_service: null,
+          certifications: [],
+        }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const json = await res.json();
+      setMembers((prev) => [...prev, json.data]);
+      setExpandedId(json.data.id);
+      toast.success('Team member added');
+    } catch {
+      toast.error('Failed to add team member');
+    } finally {
+      setSavingId(null);
+    }
   };
 
-  const removeMember = (id: string) => {
-    if (!confirm('Remove this team member?')) return;
-    onChange(value.filter((m) => m.id !== id).map((m, i) => ({ ...m, sort_order: i })));
-    if (expandedId === id) setExpandedId(null);
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
+  const saveMember = async (id: string, updates: Partial<TeamGridMember>) => {
+    setSavingId(id);
+    try {
+      const res = await adminFetch(`/api/admin/team-members/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed');
+      }
+      const json = await res.json();
+      setMembers((prev) =>
+        prev.map((m) => (m.id === id ? json.data : m))
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const removeMember = (member: TeamGridMember) => {
+    confirm({
+      title: 'Delete Team Member',
+      description: `Remove ${member.name || 'this member'}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const res = await adminFetch(`/api/admin/team-members/${member.id}`, {
+            method: 'DELETE',
+          });
+          if (!res.ok) throw new Error('Failed');
+          setMembers((prev) => prev.filter((m) => m.id !== member.id));
+          if (expandedId === member.id) setExpandedId(null);
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next[member.id];
+            return next;
+          });
+          toast.success('Team member deleted');
+        } catch {
+          toast.error('Failed to delete team member');
+        }
+      },
     });
   };
 
-  const updateMember = (id: string, updates: Partial<TeamGridMember>) => {
-    onChange(
-      value.map((m) => {
-        if (m.id !== id) return m;
-        const updated = { ...m, ...updates };
-        // Auto-generate slug from name
-        if ('name' in updates) {
-          updated.slug = generateSlug(updates.name || '');
-        }
-        return updated;
-      })
+  // Local update — saves on blur
+  const updateMemberLocal = (id: string, updates: Partial<TeamGridMember>) => {
+    setMembers((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
     );
 
     // Clear errors for updated fields
@@ -150,11 +197,43 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
     }
   };
 
+  // -------------------------------------------------------------------------
+  // Drag-drop reorder
+  // -------------------------------------------------------------------------
+
+  const handleReorder = useCallback(
+    async (reordered: TeamGridMember[]) => {
+      setMembers(reordered);
+      // Save to API
+      try {
+        await adminFetch('/api/admin/team-members/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderedIds: reordered.map((m) => m.id),
+          }),
+        });
+      } catch {
+        toast.error('Failed to save order');
+        loadMembers();
+      }
+    },
+    [loadMembers]
+  );
+
+  const { getDragProps, isDragging, isDragOver } = useDragDropReorder({
+    items: members,
+    onReorder: handleReorder,
+  });
+
+  // -------------------------------------------------------------------------
+  // Validation
+  // -------------------------------------------------------------------------
+
   const getMemberError = (memberId: string, field: string): string | undefined => {
     return errors[memberId]?.[field];
   };
 
-  // Validate on blur
   const validateField = (memberId: string, field: string, val: string) => {
     if ((field === 'name' || field === 'role') && !val.trim()) {
       setErrors((prev) => ({
@@ -178,21 +257,57 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
     }
   };
 
+  // Save field on blur
+  const handleFieldBlur = (memberId: string, field: string, value: string) => {
+    validateField(memberId, field, value);
+    const member = members.find((m) => m.id === memberId);
+    if (!member) return;
+
+    // Only save if value actually changed from what we have
+    const currentVal = member[field as keyof TeamGridMember];
+    if (value !== currentVal && value.trim()) {
+      saveMember(memberId, { [field]: value });
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Spinner size="sm" />
+        <span className="ml-2 text-sm text-gray-500">Loading team members...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          {value.length} Member{value.length !== 1 ? 's' : ''}
+          {members.length} Member{members.length !== 1 ? 's' : ''}
         </span>
-        <Button type="button" variant="outline" size="sm" onClick={addMember}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addMember}
+          disabled={savingId === 'new'}
+        >
+          {savingId === 'new' ? (
+            <Spinner size="sm" className="mr-1.5" />
+          ) : (
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+          )}
           Add Member
         </Button>
       </div>
 
       {/* Empty state */}
-      {value.length === 0 && (
+      {members.length === 0 && (
         <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-8 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No team members yet. Click &ldquo;Add Member&rdquo; to get started.
@@ -201,7 +316,7 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
       )}
 
       {/* Members list */}
-      {value.map((member, idx) => (
+      {members.map((member) => (
         <DragDropItem
           key={member.id}
           dragProps={getDragProps(member.id)}
@@ -232,10 +347,13 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
                     &mdash; {member.role}
                   </span>
                 )}
+                {savingId === member.id && (
+                  <Spinner size="sm" className="flex-shrink-0" />
+                )}
               </button>
               <button
                 type="button"
-                onClick={() => removeMember(member.id)}
+                onClick={() => removeMember(member)}
                 className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                 title="Delete member"
               >
@@ -249,7 +367,10 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
                 {/* Photo */}
                 <ImageUploadField
                   value={member.photo_url}
-                  onChange={(url) => updateMember(member.id, { photo_url: url })}
+                  onChange={(url) => {
+                    updateMemberLocal(member.id, { photo_url: url });
+                    saveMember(member.id, { photo_url: url });
+                  }}
                   label="Photo"
                   placeholder="Upload team member photo"
                   folder="team-photos"
@@ -266,9 +387,9 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
                       type="text"
                       value={member.name}
                       onChange={(e) =>
-                        updateMember(member.id, { name: e.target.value })
+                        updateMemberLocal(member.id, { name: e.target.value })
                       }
-                      onBlur={(e) => validateField(member.id, 'name', e.target.value)}
+                      onBlur={(e) => handleFieldBlur(member.id, 'name', e.target.value)}
                       placeholder="Full name"
                       className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                     />
@@ -282,9 +403,9 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
                       type="text"
                       value={member.role}
                       onChange={(e) =>
-                        updateMember(member.id, { role: e.target.value })
+                        updateMemberLocal(member.id, { role: e.target.value })
                       }
-                      onBlur={(e) => validateField(member.id, 'role', e.target.value)}
+                      onBlur={(e) => handleFieldBlur(member.id, 'role', e.target.value)}
                       placeholder="e.g. Lead Detailer"
                       className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                     />
@@ -315,11 +436,28 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
                   </div>
                   <PageHtmlEditor
                     value={member.bio}
-                    onChange={(val) => updateMember(member.id, { bio: val })}
+                    onChange={(val) => updateMemberLocal(member.id, { bio: val })}
                     pageTitle={`${member.name || 'Team Member'} Bio`}
                     placeholder="Write a bio for this team member..."
                     rows={8}
                   />
+                  <div className="flex justify-end mt-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => saveMember(member.id, { bio: member.bio })}
+                      disabled={savingId === member.id}
+                    >
+                      {savingId === member.id ? (
+                        <>
+                          <Spinner size="sm" className="mr-1" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Bio'
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Years of Service */}
@@ -328,12 +466,16 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
                     type="number"
                     value={member.years_of_service ?? ''}
                     onChange={(e) =>
-                      updateMember(member.id, {
+                      updateMemberLocal(member.id, {
                         years_of_service: e.target.value
                           ? parseInt(e.target.value, 10)
                           : null,
                       })
                     }
+                    onBlur={(e) => {
+                      const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                      saveMember(member.id, { years_of_service: val });
+                    }}
                     min={0}
                     placeholder="e.g. 5"
                     className="block w-32 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -343,9 +485,10 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
                 {/* Certifications */}
                 <CertificationsInput
                   value={member.certifications}
-                  onChange={(certs) =>
-                    updateMember(member.id, { certifications: certs })
-                  }
+                  onChange={(certs) => {
+                    updateMemberLocal(member.id, { certifications: certs });
+                    saveMember(member.id, { certifications: certs });
+                  }}
                 />
 
                 {/* Slug (read-only) */}
@@ -361,12 +504,26 @@ export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
       ))}
 
       {/* Add button at bottom */}
-      {value.length > 0 && (
-        <Button type="button" variant="outline" size="sm" onClick={addMember} className="w-full">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
+      {members.length > 0 && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addMember}
+          disabled={savingId === 'new'}
+          className="w-full"
+        >
+          {savingId === 'new' ? (
+            <Spinner size="sm" className="mr-1.5" />
+          ) : (
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+          )}
           Add Member
         </Button>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
@@ -452,42 +609,4 @@ function CertificationsInput({
       </div>
     </FormField>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Parse / Serialize helpers
-// ---------------------------------------------------------------------------
-
-export function parseTeamGridContent(content: string): TeamGridMember[] {
-  try {
-    const parsed = JSON.parse(content);
-    if (Array.isArray(parsed)) {
-      return parsed.map((item: Partial<TeamGridMember>, i: number) => ({
-        id: item.id || generateId(),
-        name: item.name || '',
-        role: item.role || '',
-        bio: item.bio || '',
-        photo_url: item.photo_url || '',
-        slug: item.slug || generateSlug(item.name || ''),
-        years_of_service: item.years_of_service ?? null,
-        certifications: Array.isArray(item.certifications) ? item.certifications : [],
-        sort_order: item.sort_order ?? i,
-      }));
-    }
-  } catch {
-    // fallback
-  }
-  return [];
-}
-
-export function serializeTeamGridContent(members: TeamGridMember[]): string {
-  return JSON.stringify(
-    members
-      .filter((m) => m.name.trim())
-      .map((m, i) => ({ ...m, sort_order: i }))
-  );
-}
-
-export function validateTeamGridContent(members: TeamGridMember[]): boolean {
-  return members.every((m) => !m.name.trim() || (m.name.trim() && m.role.trim()));
 }

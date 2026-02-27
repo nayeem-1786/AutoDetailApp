@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Phase D Bug Fixes: Team Grid API, Button Types, Confirm Dialogs — 2026-02-27
+
+### fix: team_grid editor uses DB, button type sweep, confirm dialogs replaced
+
+**Bug 1 — Team Grid Editor Rewrite (CRITICAL):**
+- `team-grid-editor.tsx` fully rewritten to CRUD against `team_members` API
+- No longer reads/writes inline JSON — uses DB table directly
+- Auto-save pattern: add/edit/delete/reorder all save immediately via API
+- Individual "Save Bio" button for HTML bio field
+- Expand/collapse cards, drag-drop reorder, AI bio generation preserved
+- Block content marker: `{ "source": "team_members_table" }`
+
+**Bug 2 — Button Type Sweep:**
+- Verified all `<button>` and `<Button>` elements in block editors have `type="button"` when not the form submit
+- Added `type="button"` to Save Block button in `content-block-editor.tsx`
+- Added `type="button"` to Cancel/Confirm buttons in `confirm-dialog.tsx`
+
+**Bug 3 — Replace Browser confirm() Dialogs (18 files):**
+- Created `useConfirmDialog` hook in `confirm-dialog.tsx` for convenient confirm() replacement
+- Replaced ALL `confirm()` / `window.confirm()` calls across admin with styled ConfirmDialog:
+  - Content editors: content-block-editor, credentials-editor, gallery-editor, terms-sections-editor, page-html-editor, team-grid-editor
+  - Admin pages: themes, pages list, SEO cities, hero, tickers, navigation, footer, ad creatives, services, card reader, POS settings, purchase orders
+- Left `window.confirm` in `use-unsaved-changes.ts` (browser beforeunload — correct behavior)
+
+---
+
 ## CMS Overhaul Phase D.2: Dead Code Cleanup + UX Fixes — 2026-02-27
 
 ### feat: dead code cleanup, AI context fix, 10MB upload, auto-draft pages, button type fixes

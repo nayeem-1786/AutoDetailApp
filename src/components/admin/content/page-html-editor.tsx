@@ -5,6 +5,7 @@ import { Wand2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { HtmlEditorToolbar } from '@/components/admin/html-editor-toolbar';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 
@@ -32,7 +33,9 @@ export function PageHtmlEditor({
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTone, setAiTone] = useState<'professional' | 'casual' | 'friendly'>('professional');
   const [aiLoading, setAiLoading] = useState(false);
+  const [pendingHtml, setPendingHtml] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   const handleAiDraft = async () => {
     if (!aiPrompt.trim()) {
@@ -60,11 +63,21 @@ export function PageHtmlEditor({
       const { html } = await res.json();
 
       if (value.trim()) {
-        const confirmed = confirm('Replace existing content with AI-generated draft?');
-        if (!confirmed) {
-          setAiLoading(false);
-          return;
-        }
+        setPendingHtml(html);
+        confirm({
+          title: 'Replace Content',
+          description: 'Replace existing content with AI-generated draft?',
+          confirmLabel: 'Replace',
+          variant: 'default',
+          onConfirm: () => {
+            onChange(html);
+            setPendingHtml(null);
+            setShowAiDialog(false);
+            setAiPrompt('');
+            toast.success('AI draft generated');
+          },
+        });
+        return;
       }
 
       onChange(html);
@@ -199,6 +212,9 @@ export function PageHtmlEditor({
       <div className="flex items-center justify-end border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1">
         <span className="text-xs text-gray-400">HTML</span>
       </div>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

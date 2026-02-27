@@ -15,6 +15,7 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Plus, Check, X as XIcon, Wrench, ImageOff } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -25,6 +26,7 @@ type ServiceWithCategory = Service & {
 export default function ServicesPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   const [services, setServices] = useState<ServiceWithCategory[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
@@ -78,28 +80,34 @@ export default function ServicesPage() {
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleReactivate(service: ServiceWithCategory) {
-    if (!window.confirm(`Reactivate "${service.name}"?`)) return;
+  function handleReactivate(service: ServiceWithCategory) {
+    confirm({
+      title: 'Reactivate Service',
+      description: `Reactivate "${service.name}"?`,
+      confirmLabel: 'Reactivate',
+      variant: 'default',
+      onConfirm: async () => {
+        setReactivatingId(service.id);
+        try {
+          const { error } = await supabase
+            .from('services')
+            .update({ is_active: true })
+            .eq('id', service.id);
 
-    setReactivatingId(service.id);
-    try {
-      const { error } = await supabase
-        .from('services')
-        .update({ is_active: true })
-        .eq('id', service.id);
+          if (error) throw error;
 
-      if (error) throw error;
-
-      setServices((prev) =>
-        prev.map((s) => (s.id === service.id ? { ...s, is_active: true } : s))
-      );
-      toast.success(`${service.name} reactivated`);
-    } catch (err) {
-      console.error('Reactivate service error:', err);
-      toast.error('Failed to reactivate service');
-    } finally {
-      setReactivatingId(null);
-    }
+          setServices((prev) =>
+            prev.map((s) => (s.id === service.id ? { ...s, is_active: true } : s))
+          );
+          toast.success(`${service.name} reactivated`);
+        } catch (err) {
+          console.error('Reactivate service error:', err);
+          toast.error('Failed to reactivate service');
+        } finally {
+          setReactivatingId(null);
+        }
+      },
+    });
   }
 
   const filtered = useMemo(() => {
@@ -252,6 +260,7 @@ export default function ServicesPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="Services"
         description={`${services.length} services in catalog`}

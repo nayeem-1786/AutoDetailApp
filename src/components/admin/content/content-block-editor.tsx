@@ -29,17 +29,14 @@ import { FaqEditor, parseFaqContent, serializeFaqContent } from './faq-editor';
 import { TermsSectionsEditor } from './terms-sections-editor';
 import { GalleryEditor } from './gallery-editor';
 import { PageHtmlEditor } from './page-html-editor';
-import {
-  TeamGridEditor,
-  parseTeamGridContent,
-  serializeTeamGridContent,
-} from './team-grid-editor';
+import { TeamGridEditor } from './team-grid-editor';
 import {
   CredentialsEditor,
   parseCredentialsContent,
   serializeCredentialsContent,
 } from './credentials-editor';
 import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -84,6 +81,7 @@ export function ContentBlockEditor({
   const [addingType, setAddingType] = useState<ContentBlockType | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiBlockId, setAiBlockId] = useState<string | null>(null);
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   // -----------------------------------------------------------------------
   // Load blocks
@@ -124,7 +122,7 @@ export function ContentBlockEditor({
         : blockType === 'testimonial_highlight'
         ? JSON.stringify({ quote: '', author: '', rating: 5, source: '' })
         : blockType === 'team_grid'
-        ? '[]'
+        ? JSON.stringify({ source: 'team_members_table' })
         : blockType === 'credentials'
         ? '[]'
         : blockType === 'terms_sections'
@@ -189,19 +187,28 @@ export function ContentBlockEditor({
   // Delete block
   // -----------------------------------------------------------------------
 
-  const handleDeleteBlock = async (id: string) => {
-    if (!confirm('Delete this content block?')) return;
-    try {
-      const res = await adminFetch(`/api/admin/cms/content/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Failed to delete');
-      setBlocks((prev) => prev.filter((b) => b.id !== id));
-      if (expandedId === id) setExpandedId(null);
-      toast.success('Block deleted');
-    } catch {
-      toast.error('Failed to delete block');
-    }
+  const handleDeleteBlock = (id: string) => {
+    const block = blocks.find((b) => b.id === id);
+    const label = block?.title || getBlockTypeLabel(block?.block_type as ContentBlockType) || 'block';
+    confirm({
+      title: 'Delete Content Block',
+      description: `Delete the "${label}" block? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const res = await adminFetch(`/api/admin/cms/content/${id}`, {
+            method: 'DELETE',
+          });
+          if (!res.ok) throw new Error('Failed to delete');
+          setBlocks((prev) => prev.filter((b) => b.id !== id));
+          if (expandedId === id) setExpandedId(null);
+          toast.success('Block deleted');
+        } catch {
+          toast.error('Failed to delete block');
+        }
+      },
+    });
   };
 
   // -----------------------------------------------------------------------
@@ -252,13 +259,7 @@ export function ContentBlockEditor({
   // AI Generate full page content
   // -----------------------------------------------------------------------
 
-  const handleAiGenerateAll = async () => {
-    if (blocks.length > 0) {
-      if (!confirm('This will replace all existing AI-generated content blocks. Continue?')) {
-        return;
-      }
-    }
-
+  const doAiGenerateAll = async () => {
     setAiGenerating(true);
     try {
       const res = await adminFetch('/api/admin/cms/content/ai-generate', {
@@ -285,6 +286,20 @@ export function ContentBlockEditor({
       toast.error(err instanceof Error ? err.message : 'AI generation failed');
     } finally {
       setAiGenerating(false);
+    }
+  };
+
+  const handleAiGenerateAll = () => {
+    if (blocks.length > 0) {
+      confirm({
+        title: 'Regenerate All Content',
+        description: 'This will replace all existing content blocks with AI-generated content. Continue?',
+        confirmLabel: 'Regenerate',
+        variant: 'default',
+        onConfirm: doAiGenerateAll,
+      });
+    } else {
+      doAiGenerateAll();
     }
   };
 
@@ -490,6 +505,9 @@ export function ContentBlockEditor({
           ))}
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
@@ -670,6 +688,7 @@ function BlockRow({
               </span>
             )}
             <Button
+              type="button"
               size="sm"
               onClick={handleSave}
               disabled={!dirty || isSaving}
@@ -784,10 +803,10 @@ function BlockContentEditor({
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             Team Members
           </label>
-          <TeamGridEditor
-            value={parseTeamGridContent(content)}
-            onChange={(members) => onChange(serializeTeamGridContent(members))}
-          />
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+            Team members are managed directly in the database. Changes save automatically.
+          </p>
+          <TeamGridEditor />
         </div>
       );
 
@@ -1244,12 +1263,7 @@ function getContentPreview(block: PageContentBlock): string {
     }
   }
   if (block.block_type === 'team_grid') {
-    try {
-      const items = JSON.parse(block.content);
-      return Array.isArray(items) ? `${items.length} member${items.length !== 1 ? 's' : ''}` : '';
-    } catch {
-      return '';
-    }
+    return 'Team members (from database)';
   }
   if (block.block_type === 'credentials') {
     try {

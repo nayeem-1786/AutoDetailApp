@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { HtmlEditorToolbar } from '@/components/admin/html-editor-toolbar';
 import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
@@ -362,6 +363,7 @@ function MainFooterPanel({
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [newColumnType, setNewColumnType] = useState<'links' | 'html' | 'business_info'>('links');
   const { isSubmitting, execute } = useAsyncAction();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   const addColumn = async () => {
     if (!newColumnTitle.trim()) {
@@ -404,37 +406,39 @@ function MainFooterPanel({
     });
   };
 
-  const deleteColumn = async (col: ColumnWithLinks) => {
-    if (col.content_type === 'brand') {
-      if (
-        !confirm(
-          'The brand column contains your logo and business info. Are you sure you want to remove it?'
-        )
-      )
-        return;
-    } else {
-      const linkCount = col.links?.length ?? 0;
-      const msg =
-        linkCount > 0
-          ? `This will remove the "${col.title}" column and unassign ${linkCount} link${linkCount > 1 ? 's' : ''}. The links won't be deleted but will no longer appear in the footer.`
-          : `Delete the "${col.title}" column?`;
-      if (!confirm(msg)) return;
-    }
+  const deleteColumn = (col: ColumnWithLinks) => {
+    const description =
+      col.content_type === 'brand'
+        ? 'The brand column contains your logo and business info. Are you sure you want to remove it?'
+        : (() => {
+            const linkCount = col.links?.length ?? 0;
+            return linkCount > 0
+              ? `This will remove the "${col.title}" column and unassign ${linkCount} link${linkCount > 1 ? 's' : ''}. The links won't be deleted but will no longer appear in the footer.`
+              : `Delete the "${col.title}" column?`;
+          })();
 
-    execute(async () => {
-      const res = await adminFetch('/api/admin/footer/columns', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: col.id }),
-      });
+    confirm({
+      title: 'Delete Column',
+      description,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        execute(async () => {
+          const res = await adminFetch('/api/admin/footer/columns', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: col.id }),
+          });
 
-      if (res.ok) {
-        // Remove column — do NOT redistribute spans (freed space stays available)
-        setColumns((prev) => prev.filter((c) => c.id !== col.id));
-        toast.success('Column deleted');
-      } else {
-        toast.error('Failed to delete column');
-      }
+          if (res.ok) {
+            // Remove column — do NOT redistribute spans (freed space stays available)
+            setColumns((prev) => prev.filter((c) => c.id !== col.id));
+            toast.success('Column deleted');
+          } else {
+            toast.error('Failed to delete column');
+          }
+        });
+      },
     });
   };
 
@@ -541,6 +545,7 @@ function MainFooterPanel({
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog {...dialogProps} />
       {/* Width preview */}
       <ColumnWidthPreview columns={columns} />
 

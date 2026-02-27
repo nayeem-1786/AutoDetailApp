@@ -15,6 +15,7 @@ import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { PageHtmlEditor } from '@/components/admin/content/page-html-editor';
 import { DragDropItem } from '@/components/admin/drag-drop-reorder';
 import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
 
@@ -43,6 +44,7 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, Record<string, string>>>({});
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   const handleAiGenerateDescription = async (cred: CredentialItem) => {
     if (!cred.title.trim()) {
@@ -97,13 +99,21 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
   };
 
   const removeCredential = (id: string) => {
-    if (!confirm('Remove this credential?')) return;
-    onChange(value.filter((c) => c.id !== id).map((c, i) => ({ ...c, sort_order: i })));
-    if (expandedId === id) setExpandedId(null);
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
+    const cred = value.find((c) => c.id === id);
+    confirm({
+      title: 'Delete Credential',
+      description: `Remove ${cred?.title || 'this credential'}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: () => {
+        onChange(value.filter((c) => c.id !== id).map((c, i) => ({ ...c, sort_order: i })));
+        if (expandedId === id) setExpandedId(null);
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      },
     });
   };
 
@@ -282,6 +292,9 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
           Add Credential
         </Button>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

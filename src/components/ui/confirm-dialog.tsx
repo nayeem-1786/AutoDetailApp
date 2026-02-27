@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
@@ -61,10 +61,11 @@ function ConfirmDialog({
         )}
       </DialogContent>
       <DialogFooter>
-        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
           {cancelLabel}
         </Button>
         <Button
+          type="button"
           variant={variant === 'destructive' ? 'destructive' : 'default'}
           onClick={onConfirm}
           disabled={isConfirmDisabled}
@@ -76,4 +77,42 @@ function ConfirmDialog({
   );
 }
 
-export { ConfirmDialog };
+// ---------------------------------------------------------------------------
+// useConfirmDialog — convenience hook for replacing confirm() calls
+// ---------------------------------------------------------------------------
+
+interface ConfirmState {
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  variant?: 'default' | 'destructive';
+  onConfirm: () => void;
+}
+
+function useConfirmDialog() {
+  const [state, setState] = useState<ConfirmState | null>(null);
+
+  const confirm = useCallback(
+    (opts: ConfirmState) => {
+      setState(opts);
+    },
+    []
+  );
+
+  const dialogProps = {
+    open: state !== null,
+    onOpenChange: (open: boolean) => { if (!open) setState(null); },
+    title: state?.title ?? '',
+    description: state?.description ?? '',
+    confirmLabel: state?.confirmLabel ?? 'Delete',
+    variant: (state?.variant ?? 'destructive') as 'default' | 'destructive',
+    onConfirm: () => {
+      state?.onConfirm();
+      setState(null);
+    },
+  };
+
+  return { confirm, dialogProps, ConfirmDialog };
+}
+
+export { ConfirmDialog, useConfirmDialog };

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   CreditCard,
   Loader2,
@@ -36,6 +37,7 @@ interface StripeReader {
 }
 
 export default function CardReaderSettingsPage() {
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   // Location state
   const [locations, setLocations] = useState<StripeLocation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
@@ -104,25 +106,29 @@ export default function CardReaderSettingsPage() {
     }
   }
 
-  async function handleDeleteReader(readerId: string, label: string) {
-    if (!confirm(`Delete reader "${label}"? This cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/admin/stripe/readers/${readerId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        toast.success('Reader deleted');
-        setRegisteredReaders((prev) => prev.filter((r) => r.id !== readerId));
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to delete reader');
-      }
-    } catch {
-      toast.error('Failed to delete reader');
-    }
+  function handleDeleteReader(readerId: string, label: string) {
+    confirm({
+      title: 'Delete Reader',
+      description: `Delete reader "${label}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/admin/stripe/readers/${readerId}`, {
+            method: 'DELETE',
+          });
+          if (res.ok) {
+            toast.success('Reader deleted');
+            setRegisteredReaders((prev) => prev.filter((r) => r.id !== readerId));
+          } else {
+            const data = await res.json();
+            toast.error(data.error || 'Failed to delete reader');
+          }
+        } catch {
+          toast.error('Failed to delete reader');
+        }
+      },
+    });
   }
 
   async function handleCreateLocation() {
@@ -193,6 +199,7 @@ export default function CardReaderSettingsPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="Card Reader"
         description="Register and manage your Stripe Terminal card reader."

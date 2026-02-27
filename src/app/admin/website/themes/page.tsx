@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { Plus, Trash2, Palette, Sparkles, Play, Square } from 'lucide-react';
 import { THEME_PRESETS } from '@/lib/utils/cms-theme-presets';
@@ -14,6 +15,7 @@ import type { SeasonalTheme } from '@/lib/supabase/types';
 
 export default function ThemeManagerPage() {
   const router = useRouter();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [themes, setThemes] = useState<SeasonalTheme[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPresets, setShowPresets] = useState(false);
@@ -83,16 +85,23 @@ export default function ThemeManagerPage() {
     }
   };
 
-  const deleteTheme = async (id: string) => {
-    if (!confirm('Delete this theme?')) return;
-    try {
-      const res = await adminFetch(`/api/admin/cms/themes/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed');
-      setThemes((prev) => prev.filter((t) => t.id !== id));
-      toast.success('Theme deleted');
-    } catch {
-      toast.error('Failed to delete theme');
-    }
+  const deleteTheme = (id: string) => {
+    confirm({
+      title: 'Delete Theme',
+      description: 'Delete this theme?',
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const res = await adminFetch(`/api/admin/cms/themes/${id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Failed');
+          setThemes((prev) => prev.filter((t) => t.id !== id));
+          toast.success('Theme deleted');
+        } catch {
+          toast.error('Failed to delete theme');
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -105,6 +114,7 @@ export default function ThemeManagerPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="Seasonal Themes"
         description="Create and manage seasonal themes for the public website"

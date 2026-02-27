@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { WebsitePage, PageTemplate } from '@/lib/supabase/types';
 
@@ -26,6 +27,7 @@ const TEMPLATE_COLORS: Record<PageTemplate, string> = {
 
 export default function PagesListPage() {
   const router = useRouter();
+  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [pages, setPages] = useState<WebsitePage[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -124,21 +126,27 @@ export default function PagesListPage() {
     }
   };
 
-  const deletePage = async (page: WebsitePage) => {
-    if (!confirm(`Delete "${page.title}"? This cannot be undone.`)) return;
+  const deletePage = (page: WebsitePage) => {
+    confirm({
+      title: 'Delete Page',
+      description: `Delete "${page.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+      onConfirm: async () => {
+        setDeletingId(page.id);
+        const res = await adminFetch(`/api/admin/cms/pages/${page.id}`, {
+          method: 'DELETE',
+        });
 
-    setDeletingId(page.id);
-    const res = await adminFetch(`/api/admin/cms/pages/${page.id}`, {
-      method: 'DELETE',
+        if (res.ok) {
+          setPages((prev) => prev.filter((p) => p.id !== page.id));
+          toast.success('Page deleted');
+        } else {
+          toast.error('Failed to delete page');
+        }
+        setDeletingId(null);
+      },
     });
-
-    if (res.ok) {
-      setPages((prev) => prev.filter((p) => p.id !== page.id));
-      toast.success('Page deleted');
-    } else {
-      toast.error('Failed to delete page');
-    }
-    setDeletingId(null);
   };
 
   // Build indentation for child pages
@@ -150,6 +158,7 @@ export default function PagesListPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog {...dialogProps} />
       <PageHeader
         title="Pages"
         description="Create and manage custom pages for your website."
