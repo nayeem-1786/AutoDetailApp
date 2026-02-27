@@ -49,6 +49,8 @@ import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
 interface ContentBlockEditorProps {
   pagePath: string;
   pageType: string;
+  pageTitle?: string;
+  pageMetaDescription?: string;
   onClose?: () => void;
 }
 
@@ -71,6 +73,8 @@ function getBlockTypeLabel(type: ContentBlockType): string {
 export function ContentBlockEditor({
   pagePath,
   pageType,
+  pageTitle,
+  pageMetaDescription,
   onClose,
 }: ContentBlockEditorProps) {
   const [blocks, setBlocks] = useState<PageContentBlock[]>([]);
@@ -230,6 +234,21 @@ export function ContentBlockEditor({
   }, [blocks, pagePath, loadBlocks]);
 
   // -----------------------------------------------------------------------
+  // Build page context summary for AI
+  // -----------------------------------------------------------------------
+
+  const buildPageExistingContent = (): string => {
+    return blocks
+      .map((b) => {
+        const stripped = b.content.replace(/<[^>]*>/g, '').trim();
+        return stripped.slice(0, 200);
+      })
+      .filter(Boolean)
+      .join(' | ')
+      .slice(0, 800);
+  };
+
+  // -----------------------------------------------------------------------
   // AI Generate full page content
   // -----------------------------------------------------------------------
 
@@ -249,6 +268,8 @@ export function ContentBlockEditor({
           mode: 'full_page',
           pagePath,
           pageType,
+          pageTitle,
+          pageMetaDescription,
           autoSave: true,
         }),
       });
@@ -283,6 +304,9 @@ export function ContentBlockEditor({
           pageType,
           blockType: block.block_type,
           existingContent: block.content,
+          pageTitle,
+          pageMetaDescription,
+          pageExistingContent: buildPageExistingContent(),
         }),
       });
 
@@ -292,6 +316,13 @@ export function ContentBlockEditor({
       }
 
       const json = await res.json();
+
+      // Handle needsContext response
+      if (json.data?.needsContext) {
+        toast.error(json.data.message || 'Add a page title for better AI content');
+        return;
+      }
+
       const improved = json.data?.blocks?.[0];
       if (improved) {
         // Update the block with improved content
@@ -322,11 +353,21 @@ export function ContentBlockEditor({
           pagePath,
           pageType,
           blockType: 'faq',
+          pageTitle,
+          pageMetaDescription,
+          pageExistingContent: buildPageExistingContent(),
         }),
       });
 
       if (!res.ok) throw new Error('Failed');
       const json = await res.json();
+
+      // Handle needsContext response
+      if (json.data?.needsContext) {
+        toast.error(json.data.message || 'Add a page title for better AI content');
+        return;
+      }
+
       const generated = json.data?.blocks?.[0];
       if (generated) {
         await handleUpdateBlock(block.id, {
@@ -367,6 +408,7 @@ export function ContentBlockEditor({
         </div>
         <div className="flex items-center gap-2">
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={handleAiGenerateAll}
@@ -392,6 +434,7 @@ export function ContentBlockEditor({
             {BLOCK_TYPE_OPTIONS.map((opt) => (
               <Button
                 key={opt.value}
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => handleAddBlock(opt.value)}
@@ -838,6 +881,7 @@ function FeaturesListEditor({
         </label>
         <div className="flex items-center gap-2">
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={onAiImprove}
@@ -851,6 +895,7 @@ function FeaturesListEditor({
             AI Improve
           </Button>
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={() => updateItems([...items, { title: '', description: '' }])}
@@ -975,6 +1020,7 @@ function CtaEditor({
           Call to Action
         </label>
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={handleAiGenerate}
@@ -1101,6 +1147,7 @@ function TestimonialEditor({
           Testimonial
         </label>
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={handleAiGenerate}

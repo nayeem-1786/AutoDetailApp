@@ -100,8 +100,8 @@ export function HtmlImageManager({
         toast.error('Only JPEG, PNG, WebP, SVG, and GIF files are supported');
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('File must be under 5MB');
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File must be under 10MB');
         return;
       }
 
@@ -292,7 +292,7 @@ export function HtmlImageManager({
                   : 'Drop image here or click to browse'}
               </p>
               <p className="text-xs text-gray-400">
-                JPEG, PNG, WebP, SVG, GIF &middot; Max 5MB
+                JPEG, PNG, WebP, SVG, GIF &middot; Max 10MB
               </p>
             </button>
           </div>

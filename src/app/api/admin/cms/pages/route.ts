@@ -19,6 +19,38 @@ export async function GET() {
   if (denied) return denied;
 
   const admin = createAdminClient();
+
+  // Clean up abandoned draft pages (unpublished, untitled, no blocks, older than 24h)
+  try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: drafts } = await admin
+      .from('website_pages')
+      .select('id, slug')
+      .eq('is_published', false)
+      .eq('title', 'Untitled Page')
+      .lt('created_at', cutoff);
+
+    if (drafts && drafts.length > 0) {
+      // Check which drafts have no content blocks
+      const draftPaths = drafts.map((d) => `/p/${d.slug}`);
+      const { data: blocksExist } = await admin
+        .from('page_content_blocks')
+        .select('page_path')
+        .in('page_path', draftPaths);
+
+      const pathsWithBlocks = new Set((blocksExist ?? []).map((b) => b.page_path));
+      const orphanIds = drafts
+        .filter((d) => !pathsWithBlocks.has(`/p/${d.slug}`))
+        .map((d) => d.id);
+
+      if (orphanIds.length > 0) {
+        await admin.from('website_pages').delete().in('id', orphanIds);
+      }
+    }
+  } catch {
+    // Draft cleanup is best-effort — don't block the list load
+  }
+
   const { data, error } = await admin
     .from('website_pages')
     .select('*')

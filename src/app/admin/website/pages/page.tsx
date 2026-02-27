@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Trash2, Eye, EyeOff, FileText, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, FileText, ExternalLink } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { WebsitePage, PageTemplate } from '@/lib/supabase/types';
@@ -27,6 +28,7 @@ export default function PagesListPage() {
   const router = useRouter();
   const [pages, setPages] = useState<WebsitePage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadPages = useCallback(async () => {
@@ -46,6 +48,37 @@ export default function PagesListPage() {
   useEffect(() => {
     loadPages();
   }, [loadPages]);
+
+  // -------------------------------------------------------------------------
+  // Auto-create draft page
+  // -------------------------------------------------------------------------
+
+  const createDraft = async () => {
+    setCreating(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Untitled Page',
+          slug: `untitled-${Date.now()}`,
+          page_template: 'content',
+          is_published: false,
+        }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.data?.id) {
+        router.push(`/admin/website/pages/${json.data.id}`);
+      } else {
+        toast.error(json.error || 'Failed to create page');
+        setCreating(false);
+      }
+    } catch {
+      toast.error('Failed to create page');
+      setCreating(false);
+    }
+  };
 
   const togglePublished = async (page: WebsitePage) => {
     const newValue = !page.is_published;
@@ -121,9 +154,13 @@ export default function PagesListPage() {
         title="Pages"
         description="Create and manage custom pages for your website."
         action={
-          <Button onClick={() => router.push('/admin/website/pages/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Page
+          <Button onClick={createDraft} disabled={creating}>
+            {creating ? (
+              <Spinner size="sm" className="mr-2" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
+            {creating ? 'Creating...' : 'Create Page'}
           </Button>
         }
       />
@@ -218,6 +255,7 @@ export default function PagesListPage() {
                           </a>
                         )}
                         <button
+                          type="button"
                           onClick={() => deletePage(page)}
                           disabled={deletingId === page.id}
                           className="text-gray-400 hover:text-red-600 transition-colors"

@@ -26,6 +26,13 @@ export interface ContentWriterContext {
   productName?: string;
   productDescription?: string;
 
+  // Generic page context (for non-city, non-service pages)
+  pageContext?: {
+    title?: string;
+    metaDescription?: string;
+    existingContent?: string;
+  };
+
   // What to generate
   contentType: 'full_page' | 'section' | 'faq' | 'intro_paragraph' | 'service_description' | 'improve';
   blockType?: ContentBlockType;
@@ -60,14 +67,14 @@ WRITING GUIDELINES:
 - Include trust signals (Google rating, years of experience, certifications like Ceramic Pro)
 - End sections with subtle CTAs driving toward booking
 - Use short paragraphs (2-3 sentences) for mobile readability
-- Use H2/H3 headings (## and ###) for SEO structure
+- Use proper HTML heading tags (<h2>, <h3>) for SEO structure
 - For FAQ blocks: write 5-8 questions real customers would ask, with detailed answers
 - For feature lists: focus on benefits, not just features
 - All content must be unique per page — no duplicate content across city pages
-- Return content as markdown
+- Return content as well-formatted HTML using <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags. Do NOT use markdown syntax (no ##, no **, no - lists).
 
 BLOCK TYPE RULES:
-- "rich_text": Write markdown paragraphs with headings. Use ## for section titles, ### for subsections.
+- "rich_text": Write HTML paragraphs with headings. Use <h2> for section titles, <h3> for subsections, <p> for paragraphs, <ul>/<li> for lists, <strong> and <em> for emphasis.
 - "faq": Return a JSON array of objects with "question" and "answer" keys. Answers should be 2-4 sentences.
 - "features_list": Return a JSON array of objects with "title" and "description" keys.
 - "cta": Return a JSON object with "heading", "description", "button_text", and "button_url" keys.
@@ -98,7 +105,7 @@ Return ONLY valid JSON matching this structure, with no additional text:
   "seoNotes": ["Actionable SEO suggestion 1", "Suggestion 2"]
 }
 
-For rich_text blocks, "content" is markdown text.
+For rich_text blocks, "content" is HTML text (using <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags — NOT markdown).
 For faq, features_list, cta, testimonial_highlight blocks, "content" is a JSON string (stringified JSON).`;
 
 // ---------------------------------------------------------------------------
@@ -286,6 +293,20 @@ function buildSingleBlockPrompt(ctx: ContentWriterContext): string {
     ctx.targetWordCount ? `TARGET WORD COUNT: ${ctx.targetWordCount}` : '',
   ];
 
+  // Inject page context for non-city, non-service pages
+  if (!ctx.cityName && !ctx.serviceName && ctx.pageContext) {
+    if (ctx.pageContext.title) {
+      parts.push(`PAGE TITLE: ${ctx.pageContext.title}`);
+    }
+    if (ctx.pageContext.metaDescription) {
+      parts.push(`PAGE DESCRIPTION: ${ctx.pageContext.metaDescription}`);
+    }
+    if (ctx.pageContext.existingContent) {
+      parts.push(`EXISTING CONTENT ON THIS PAGE: ${ctx.pageContext.existingContent}`);
+    }
+    parts.push('', `Generate content relevant to the page topic "${ctx.pageContext.title || 'this page'}". Write complementary content that adds value to the existing page.`);
+  }
+
   if (typeLabel === 'faq') {
     parts.push('', 'Generate 5-8 Q&A pairs as a JSON array of {question, answer}.');
   } else if (typeLabel === 'features_list') {
@@ -293,7 +314,7 @@ function buildSingleBlockPrompt(ctx: ContentWriterContext): string {
   } else if (typeLabel === 'cta') {
     parts.push('', 'Generate a CTA as a JSON object with {heading, description, button_text, button_url}.');
   } else {
-    parts.push('', `Generate a rich text section with ${ctx.targetWordCount || '200-300'} words.`);
+    parts.push('', `Generate a rich text section with ${ctx.targetWordCount || '200-300'} words using HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>). Do NOT use markdown syntax.`);
   }
 
   if (ctx.additionalInstructions) {
@@ -312,21 +333,35 @@ function buildSingleBlockPrompt(ctx: ContentWriterContext): string {
 function buildImprovePrompt(ctx: ContentWriterContext): string {
   const parts = [
     `Improve and rewrite the following content. Make it more compelling, SEO-friendly, and conversion-focused.`,
+    `Return the improved content as well-formatted HTML using <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags. Do NOT use markdown syntax.`,
     '',
     `PAGE: ${ctx.pagePath}`,
     `BUSINESS: ${ctx.businessName}`,
     `LOCATION: ${ctx.businessLocation}`,
     ctx.focusKeywords?.length ? `FOCUS KEYWORDS: ${ctx.focusKeywords.join(', ')}` : '',
+  ];
+
+  // Inject page context for non-city pages
+  if (!ctx.cityName && !ctx.serviceName && ctx.pageContext) {
+    if (ctx.pageContext.title) {
+      parts.push(`PAGE TITLE: ${ctx.pageContext.title}`);
+    }
+    if (ctx.pageContext.metaDescription) {
+      parts.push(`PAGE DESCRIPTION: ${ctx.pageContext.metaDescription}`);
+    }
+  }
+
+  parts.push(
     '',
     `EXISTING CONTENT TO IMPROVE:`,
     ctx.existingContent || '',
-  ];
+  );
 
   if (ctx.additionalInstructions) {
     parts.push('', `ADDITIONAL INSTRUCTIONS: ${ctx.additionalInstructions}`);
   }
 
-  parts.push('', 'Return the improved content as a single rich_text block.');
+  parts.push('', 'Return the improved content as a single rich_text block with HTML content.');
 
   return parts.filter(Boolean).join('\n');
 }

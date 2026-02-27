@@ -156,7 +156,7 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {value.length} Credential{value.length !== 1 ? 's' : ''}
         </span>
-        <Button variant="outline" size="sm" onClick={addCredential}>
+        <Button type="button" variant="outline" size="sm" onClick={addCredential}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Add Credential
         </Button>
@@ -246,6 +246,7 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
                       Description
                     </label>
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => handleAiGenerateDescription(cred)}
@@ -276,7 +277,7 @@ export function CredentialsEditor({ value, onChange }: CredentialsEditorProps) {
 
       {/* Add button at bottom */}
       {value.length > 0 && (
-        <Button variant="outline" size="sm" onClick={addCredential} className="w-full">
+        <Button type="button" variant="outline" size="sm" onClick={addCredential} className="w-full">
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Add Credential
         </Button>

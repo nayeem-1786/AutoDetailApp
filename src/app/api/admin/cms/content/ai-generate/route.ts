@@ -35,6 +35,10 @@ interface GenerateRequest {
   focusKeywords?: string[];
   targetWordCount?: number;
   autoSave?: boolean;
+  // Page context for non-city/service pages
+  pageTitle?: string;
+  pageMetaDescription?: string;
+  pageExistingContent?: string;
   // Specialized mode context
   memberName?: string;
   memberRole?: string;
@@ -258,9 +262,36 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // For non-city, non-service pages: check if we have enough context
+  const isCityOrService = resolvedPageType === 'city_landing' || resolvedPageType === 'service_detail';
+  if (!isCityOrService && (mode === 'single_block' || mode === 'improve')) {
+    const hasTitle = body.pageTitle && body.pageTitle.trim() && body.pageTitle.trim() !== 'Untitled Page';
+    const hasMeta = body.pageMetaDescription && body.pageMetaDescription.trim();
+    const hasExisting = body.pageExistingContent && body.pageExistingContent.trim();
+    const hasContent = existingContent && existingContent.trim();
+
+    if (!hasTitle && !hasMeta && !hasExisting && !hasContent) {
+      return NextResponse.json({
+        data: {
+          needsContext: true,
+          message: 'Please add a page title or describe the topic for better AI content.',
+        },
+      });
+    }
+  }
+
   const contentType = mode === 'improve' ? 'improve' as const :
     mode === 'single_block' ? 'section' as const :
     'full_page' as const;
+
+  // Build page context for non-city/service pages
+  const pageContext = !isCityOrService
+    ? {
+        title: body.pageTitle || undefined,
+        metaDescription: body.pageMetaDescription || undefined,
+        existingContent: body.pageExistingContent || undefined,
+      }
+    : undefined;
 
   const ctx: ContentWriterContext = {
     ...biz,
@@ -273,6 +304,7 @@ export async function POST(request: NextRequest) {
     additionalInstructions,
     focusKeywords: focusKeywords || pageCtx.focusKeywords,
     targetWordCount,
+    pageContext,
   };
 
   try {

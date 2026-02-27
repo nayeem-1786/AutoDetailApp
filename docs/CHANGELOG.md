@@ -4,6 +4,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Overhaul Phase D.2: Dead Code Cleanup + UX Fixes — 2026-02-27
+
+### feat: dead code cleanup, AI context fix, 10MB upload, auto-draft pages, button type fixes
+
+**Dead Code Removal (D.8–D.9):**
+- Deleted `src/app/api/admin/cms/about/route.ts` — migrated to content blocks
+- Deleted `src/app/api/admin/cms/terms/route.ts` — migrated to content blocks
+- Deleted `src/lib/data/team.ts` — replaced by `src/lib/data/team-members.ts`
+- Verified no orphaned imports of MarkdownEditor, markdownToHtml, or deleted modules
+
+**Database Cleanup (D.10):**
+- Migration `20260227000002_cleanup_migrated_settings.sql` — removes migrated `business_settings` keys: `team_members`, `credentials`, `about_text`, `terms_and_conditions`, `terms_effective_date`
+
+**AI Content Generation Context (D.11):**
+- AI content writer now receives page context (title, meta description, existing block summaries) for non-city/service pages
+- Changed AI output format from markdown to HTML for `rich_text` blocks
+- Added `needsContext` response when page has no context — prompts user to add title/description first
+- Updated `ContentBlockEditorProps` to accept `pageTitle` and `pageMetaDescription`
+
+**Image Upload Limit (D.12):**
+- Increased content image upload limit from 5MB → 10MB in:
+  - `src/app/api/admin/upload/content-image/route.ts`
+  - `src/components/admin/image-upload-field.tsx`
+  - `src/components/admin/html-image-manager.tsx`
+
+**Auto-Draft Page Creation (D.13):**
+- "Create Page" button now auto-creates a draft page and redirects to editor immediately
+- Replaced `/admin/website/pages/new` form with auto-redirect component
+- Added orphaned draft cleanup to pages GET: deletes unpublished "Untitled Page" entries >24h with no content blocks
+
+**Button Type Fixes (D.14):**
+- Added `type="button"` to all `<Button>` action elements across 6 block editors to prevent accidental form submission:
+  - `content-block-editor.tsx`, `faq-editor.tsx`, `team-grid-editor.tsx`, `credentials-editor.tsx`, `terms-sections-editor.tsx`, `gallery-editor.tsx`
+
+**Minor Cleanup:**
+- Removed unused `Eye`, `EyeOff` imports from pages list
+
+---
+
 ## CMS Overhaul Phase D.1: Data Migration, Public Route Updates, Admin Cleanup — 2026-02-27
 
 ### feat: team_members table, About + Terms data migration, public routes updated, admin tabs removed

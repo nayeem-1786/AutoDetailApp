@@ -70,6 +70,7 @@ export function FaqEditor({
         <div className="flex items-center gap-2">
           {onAiGenerate && (
             <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={onAiGenerate}
@@ -83,7 +84,7 @@ export function FaqEditor({
               Generate FAQs
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={addItem}>
+          <Button type="button" variant="outline" size="sm" onClick={addItem}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Question
           </Button>

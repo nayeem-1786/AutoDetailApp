@@ -135,7 +135,7 @@ export function GalleryEditor({ content, onChange }: GalleryEditorProps) {
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
             No images yet. Add images to create a photo gallery.
           </p>
-          <Button variant="outline" size="sm" onClick={handleAddImage}>
+          <Button type="button" variant="outline" size="sm" onClick={handleAddImage}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Image
           </Button>
@@ -207,7 +207,7 @@ export function GalleryEditor({ content, onChange }: GalleryEditorProps) {
             ))}
           </div>
 
-          <Button variant="outline" size="sm" onClick={handleAddImage}>
+          <Button type="button" variant="outline" size="sm" onClick={handleAddImage}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Image
           </Button>

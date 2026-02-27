@@ -274,11 +274,11 @@ export function TermsSectionsEditor({
             No sections yet. Start with the 9 default T&C sections or add sections manually.
           </p>
           <div className="flex items-center justify-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleGenerateDefaults}>
+            <Button type="button" variant="outline" size="sm" onClick={handleGenerateDefaults}>
               <ListChecks className="mr-1.5 h-3.5 w-3.5" />
               Generate Default Sections
             </Button>
-            <Button variant="outline" size="sm" onClick={handleAddSection}>
+            <Button type="button" variant="outline" size="sm" onClick={handleAddSection}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Add Section
             </Button>
@@ -386,6 +386,7 @@ export function TermsSectionsEditor({
                             Content
                           </label>
                           <Button
+                            type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => handleAiGenerateSection(section)}
@@ -422,7 +423,7 @@ export function TermsSectionsEditor({
           </div>
 
           {/* Add Section button */}
-          <Button variant="outline" size="sm" onClick={handleAddSection}>
+          <Button type="button" variant="outline" size="sm" onClick={handleAddSection}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Section
           </Button>

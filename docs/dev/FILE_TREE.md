@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-27 (CMS Overhaul Phase D.1 — team_members table, data migration, admin cleanup)
+> **Last updated:** 2026-02-27 (CMS Overhaul Phase D.2 — dead code cleanup, UX fixes)
 
 ---
 
@@ -647,7 +647,6 @@ src/lib/data/products.ts
 src/lib/data/receipt-config.ts
 src/lib/data/reviews.ts
 src/lib/data/services.ts
-src/lib/data/team.ts
 src/lib/data/team-members.ts
 src/lib/data/vehicle-count.ts
 src/lib/data/website-pages.ts
@@ -1125,6 +1124,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260225000002_seed_addon_suggestions.sql
 20260226000001_expand_block_type_constraint.sql
 20260227000001_create_team_members.sql
+20260227000002_cleanup_migrated_settings.sql
 ```
 
 ---

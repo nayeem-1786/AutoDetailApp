@@ -28,7 +28,7 @@ const ALLOWED_TYPES = [
   'image/avif',
 ];
 
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 function getFilename(url: string): string {
   try {
@@ -66,7 +66,7 @@ export function ImageUploadField({
         return;
       }
       if (file.size > MAX_SIZE) {
-        setUploadError('File must be under 5MB');
+        setUploadError('File must be under 10MB');
         return;
       }
 
@@ -188,7 +188,7 @@ export function ImageUploadField({
                 : placeholder || 'Drop image here or click to browse'}
             </p>
             <p className="text-[10px] text-gray-400">
-              JPEG, PNG, WebP, SVG, GIF, AVIF &middot; Max 5MB
+              JPEG, PNG, WebP, SVG, GIF, AVIF &middot; Max 10MB
             </p>
           </button>
         </div>

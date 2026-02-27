@@ -307,7 +307,7 @@ export default function EditPagePage() {
         {/* Content Blocks */}
         <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Content Blocks</h2>
-          <ContentBlockEditor pagePath={`/p/${slug}`} pageType="custom" />
+          <ContentBlockEditor pagePath={`/p/${slug}`} pageType="custom" pageTitle={title} pageMetaDescription={metaDescription} />
         </div>
 
         {/* SEO */}
