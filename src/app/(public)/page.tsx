@@ -221,9 +221,9 @@ export default async function HomePage() {
                     <p className="text-sm font-medium text-lime">
                       {member.role}
                     </p>
-                    {member.bio && (
+                    {(member.excerpt || member.bio) && (
                       <p className="mt-2 text-sm text-site-text-muted line-clamp-2">
-                        {member.bio}
+                        {member.excerpt || member.bio?.replace(/<[^>]*>/g, '')}
                       </p>
                     )}
                   </div>

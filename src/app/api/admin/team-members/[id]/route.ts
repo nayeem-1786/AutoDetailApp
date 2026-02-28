@@ -48,13 +48,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const { id } = await params;
   const body = await request.json();
-  const { name, slug, role, bio, photo_url, years_of_service, certifications, sort_order, is_active } = body;
+  const { name, slug, role, bio, excerpt, photo_url, years_of_service, certifications, sort_order, is_active } = body;
 
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
   if (slug !== undefined) updates.slug = slug;
   if (role !== undefined) updates.role = role;
   if (bio !== undefined) updates.bio = bio || null;
+  if (excerpt !== undefined) updates.excerpt = excerpt || null;
   if (photo_url !== undefined) updates.photo_url = photo_url || null;
   if (years_of_service !== undefined) updates.years_of_service = years_of_service;
   if (certifications !== undefined) updates.certifications = certifications;

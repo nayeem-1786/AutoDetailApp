@@ -12,6 +12,7 @@ export interface TeamMember {
   slug: string;
   role: string;
   bio: string | null;
+  excerpt: string | null;
   photo_url: string | null;
   years_of_service: number | null;
   certifications: string[];
@@ -137,6 +138,7 @@ function normalizeMember(row: Record<string, unknown>): TeamMember {
     slug: row.slug as string,
     role: row.role as string,
     bio: (row.bio as string) || null,
+    excerpt: (row.excerpt as string) || null,
     photo_url: (row.photo_url as string) || null,
     years_of_service: (row.years_of_service as number) ?? null,
     certifications: Array.isArray(row.certifications) ? row.certifications as string[] : [],

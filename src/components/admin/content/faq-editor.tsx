@@ -188,7 +188,8 @@ export function parseFaqContent(content: string): FaqItem[] {
 
 /**
  * Serialize FaqItem array to JSON string.
+ * Preserves empty items during editing — cleanup happens at save time.
  */
 export function serializeFaqContent(items: FaqItem[]): string {
-  return JSON.stringify(items.filter((i) => i.question.trim() || i.answer.trim()));
+  return JSON.stringify(items);
 }

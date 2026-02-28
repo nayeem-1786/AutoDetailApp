@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## FAQ/Features Add Buttons, Rich Text Fix, Button Type Default, Team Excerpt — 2026-02-27
+
+### fix: FAQ/features-list add buttons, rich text markdown cleanup, global button type default, team member excerpt field
+
+**Bug 1 & 2 — FAQ "Add Question" / Features List "Add Feature" Buttons:**
+- Root cause: `serializeFaqContent()` and `FeaturesListEditor.updateItems()` filtered out empty items on every keystroke, so newly added `{ question: '', answer: '' }` items were immediately removed from state
+- Fix: removed the filter from serialize functions — empty items now persist during editing
+- Added save-time cleanup in `BlockRow.handleSave()` — strips empty items before persisting to DB
+- Added safety filters in public renderers (`FaqBlock`, `FeaturesListBlock`) to skip items with empty question/title
+
+**Bug 3 — Rich Text Blocks Showing Markdown:**
+- Public renderer already has `legacyMarkdownToHtml()` fallback for unmigrated content
+- Admin editor already uses `PageHtmlEditor` with HTML toolbar (not plain textarea)
+- Migration endpoint exists at `/api/admin/cms/migrate-markdown` — run with `{ dryRun: false }` to convert remaining markdown blocks
+- No `MarkdownEditor` references remain in codebase
+
+**Button Type Global Fix:**
+- Changed `Button` component default `type` from HTML default (`"submit"`) to `"button"`
+- All form submit buttons already have explicit `type="submit"` — verified across 30+ occurrences
+- This prevents ALL non-submit buttons from accidentally triggering form submission
+
+**Team Member Excerpt Field:**
+- Added `excerpt` TEXT column to `team_members` table (migration `20260227000003`)
+- Updated `TeamMember` interface, `normalizeMember()`, POST/PATCH API handlers
+- Added "Homepage Summary" textarea in team-grid-editor between Role and Bio fields
+- Character counter: `{length}/150 recommended`, hard limit 200
+- Homepage (`page.tsx`): displays `excerpt` if set, falls back to HTML-stripped `bio` with `line-clamp-2`
+- Content block renderer (`TeamGridBlock`): same excerpt-first logic with `line-clamp-3`
+- Team detail page (`/team/{slug}`) still shows full bio (unaffected)
+
+---
+
 ## Image Upload Sweep + Website Dashboard Cleanup — 2026-02-27
 
 ### fix: standardize ImageUploadField everywhere, clean up website dashboard, add to sidebar

@@ -567,7 +567,28 @@ function BlockRow({
   }, [block.title, block.content]);
 
   const handleSave = () => {
-    onUpdate({ title: localTitle.trim() || null, content: localContent } as Partial<Pick<PageContentBlock, 'title' | 'content' | 'is_active'>>);
+    // Clean up empty items before saving to DB
+    let cleanContent = localContent;
+    if (block.block_type === 'faq') {
+      try {
+        const items = JSON.parse(localContent);
+        if (Array.isArray(items)) {
+          cleanContent = JSON.stringify(
+            items.filter((i: { question?: string; answer?: string }) => i.question?.trim() || i.answer?.trim())
+          );
+        }
+      } catch { /* keep as-is */ }
+    } else if (block.block_type === 'features_list') {
+      try {
+        const items = JSON.parse(localContent);
+        if (Array.isArray(items)) {
+          cleanContent = JSON.stringify(
+            items.filter((i: { title?: string; description?: string }) => i.title?.trim() || i.description?.trim())
+          );
+        }
+      } catch { /* keep as-is */ }
+    }
+    onUpdate({ title: localTitle.trim() || null, content: cleanContent } as Partial<Pick<PageContentBlock, 'title' | 'content' | 'is_active'>>);
     setDirty(false);
   };
 
@@ -896,7 +917,7 @@ function FeaturesListEditor({
   }
 
   const updateItems = (newItems: FeatureItem[]) => {
-    onChange(JSON.stringify(newItems.filter((i) => i.title.trim() || i.description.trim())));
+    onChange(JSON.stringify(newItems));
   };
 
   return (

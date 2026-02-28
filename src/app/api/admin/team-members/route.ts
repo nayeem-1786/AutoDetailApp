@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   if (denied) return denied;
 
   const body = await request.json();
-  const { name, role, bio, photo_url, years_of_service, certifications, is_active } = body;
+  const { name, role, bio, excerpt, photo_url, years_of_service, certifications, is_active } = body;
 
   if (!name || !role) {
     return NextResponse.json({ error: 'name and role are required' }, { status: 400 });
@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
       slug,
       role,
       bio: bio || null,
+      excerpt: excerpt || null,
       photo_url: photo_url || null,
       years_of_service: years_of_service ?? null,
       certifications: certifications || [],

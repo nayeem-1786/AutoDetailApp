@@ -74,8 +74,9 @@ function RichTextBlock({ block }: { block: PageContentBlock }) {
 // ---------------------------------------------------------------------------
 
 function FaqBlock({ block }: { block: PageContentBlock }) {
-  const items = parseJsonContent<FaqItem[]>(block.content);
-  if (!items || items.length === 0) return null;
+  const rawItems = parseJsonContent<FaqItem[]>(block.content);
+  const items = rawItems?.filter((i) => i.question?.trim()) ?? [];
+  if (items.length === 0) return null;
 
   // FAQ structured data
   const faqSchema = {
@@ -126,8 +127,9 @@ function FaqBlock({ block }: { block: PageContentBlock }) {
 // ---------------------------------------------------------------------------
 
 function FeaturesListBlock({ block }: { block: PageContentBlock }) {
-  const items = parseJsonContent<FeatureItem[]>(block.content);
-  if (!items || items.length === 0) return null;
+  const rawItems = parseJsonContent<FeatureItem[]>(block.content);
+  const items = rawItems?.filter((i) => i.title?.trim()) ?? [];
+  if (items.length === 0) return null;
 
   return (
     <div className="content-block">
@@ -245,6 +247,7 @@ interface TeamGridMember {
   name: string;
   role: string;
   bio: string;
+  excerpt: string | null;
   photo_url: string;
   slug: string;
   years_of_service: number | null;
@@ -272,6 +275,7 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
         name: m.name,
         role: m.role,
         bio: m.bio || '',
+        excerpt: m.excerpt || null,
         photo_url: m.photo_url || '',
         slug: m.slug,
         years_of_service: m.years_of_service,
@@ -336,12 +340,18 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
               {member.role}
             </p>
 
-            {/* Bio (truncated) */}
-            {member.bio && (
-              <div
-                className="mt-3 text-sm leading-relaxed text-site-text-muted line-clamp-3"
-                dangerouslySetInnerHTML={{ __html: member.bio }}
-              />
+            {/* Bio — excerpt (plain text) preferred, fallback to truncated HTML bio */}
+            {(member.excerpt || member.bio) && (
+              member.excerpt ? (
+                <p className="mt-3 text-sm leading-relaxed text-site-text-muted line-clamp-3">
+                  {member.excerpt}
+                </p>
+              ) : (
+                <div
+                  className="mt-3 text-sm leading-relaxed text-site-text-muted line-clamp-3"
+                  dangerouslySetInnerHTML={{ __html: member.bio }}
+                />
+              )
             )}
 
             {/* Certifications */}

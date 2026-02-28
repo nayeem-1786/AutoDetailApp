@@ -1125,6 +1125,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260226000001_expand_block_type_constraint.sql
 20260227000001_create_team_members.sql
 20260227000002_cleanup_migrated_settings.sql
+20260227000003_team_member_excerpt.sql
 ```
 
 ---

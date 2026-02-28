@@ -91,7 +91,7 @@ export default function WebsiteDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Website Dashboard"
+        title="Website Overview"
         description="Manage your public-facing website content, SEO, and appearance."
       />
 

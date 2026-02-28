@@ -941,6 +941,7 @@
 | slug | TEXT | UNIQUE, NOT NULL | Auto-generated from name (kebab-case) |
 | role | TEXT | NOT NULL | |
 | bio | TEXT | | HTML content |
+| excerpt | TEXT | | Short 1-2 line summary for homepage display |
 | photo_url | TEXT | | |
 | years_of_service | INTEGER | | |
 | certifications | JSONB | DEFAULT '[]' | Array of strings |

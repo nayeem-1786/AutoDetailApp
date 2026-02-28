@@ -29,6 +29,7 @@ export interface TeamGridMember {
   name: string;
   role: string;
   bio: string;
+  excerpt: string;
   photo_url: string;
   slug: string;
   years_of_service: number | null;
@@ -291,6 +292,7 @@ export function TeamGridEditor() {
       slug: toSlug(member.name),
       role: member.role,
       bio: member.bio,
+      excerpt: member.excerpt,
       photo_url: member.photo_url,
       years_of_service: member.years_of_service,
       certifications: member.certifications,
@@ -438,6 +440,24 @@ export function TeamGridEditor() {
                     />
                   </FormField>
                 </div>
+
+                {/* Homepage Summary */}
+                <FormField
+                  label="Homepage Summary"
+                  description="Short 1-2 line description shown on the homepage team card. Keep under 150 characters."
+                >
+                  <textarea
+                    value={member.excerpt || ''}
+                    onChange={(e) => updateMemberLocal(member.id, { excerpt: e.target.value })}
+                    placeholder="Brief summary for homepage team card..."
+                    rows={2}
+                    maxLength={200}
+                    className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  />
+                  <span className="text-xs text-gray-400 mt-1">
+                    {(member.excerpt || '').length}/150 recommended
+                  </span>
+                </FormField>
 
                 {/* Bio */}
                 <div>
