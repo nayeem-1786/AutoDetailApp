@@ -1287,6 +1287,17 @@ export interface PageContentBlock {
   updated_at: string;
 }
 
+export interface Credential {
+  id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // CMS Pages & Navigation types
 
 export type PageTemplate = 'content' | 'landing' | 'blank';

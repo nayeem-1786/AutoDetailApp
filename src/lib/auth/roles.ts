@@ -149,6 +149,16 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'FileText',
       },
       {
+        label: 'Team Members',
+        href: '/admin/website/team',
+        icon: 'Users',
+      },
+      {
+        label: 'Credentials',
+        href: '/admin/website/credentials',
+        icon: 'Award',
+      },
+      {
         label: 'City Pages',
         href: '/admin/website/seo/cities',
         icon: 'MapPin',

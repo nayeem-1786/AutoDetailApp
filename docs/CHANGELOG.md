@@ -4,6 +4,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Team/Credentials Admin Pages + Display-Only Blocks — 2026-02-27
+
+### restructure: team/credentials data management separated from page display
+
+**Dedicated Admin Pages:**
+- `/admin/website/team` — full CRUD for team members (list, inline edit, drag-drop reorder, photo upload, AI bio generation, active toggle)
+- `/admin/website/credentials` — full CRUD for credentials (list, inline edit, drag-drop reorder, image upload, AI description generation, active toggle)
+- Both pages added to Website sidebar (after Pages, before City Pages)
+- Both pages added as cards on Website Overview dashboard
+
+**Credentials Database Table:**
+- New `credentials` table (id, title, description, image_url, sort_order, is_active, timestamps)
+- RLS policies: public read active, authenticated full access
+- Migration auto-migrates existing credentials from `page_content_blocks` JSON into the new table
+- New CRUD API: `/api/admin/credentials/` (GET, POST), `/api/admin/credentials/[id]` (GET, PATCH, DELETE), `/api/admin/credentials/reorder` (PATCH)
+- New data layer: `src/lib/data/credentials.ts` with `getActiveCredentials()` and `getAllCredentials()`
+- New `Credential` type in `src/lib/supabase/types.ts`
+
+**Display-Only Block Widgets:**
+- `team-grid-editor.tsx` rewritten as config-only widget: shows active member count, link to admin page, display settings (columns, certifications, excerpt, max members)
+- `credentials-editor.tsx` rewritten as config-only widget: shows active credential count, link to admin page, display settings (layout grid/list, descriptions, max items)
+- Both blocks now save normally via Save Block button (no more special team_grid handling)
+
+**Updated Public Renderers:**
+- `TeamGridBlock` reads from `team_members` table with config (columns, show_certifications, show_excerpt, max_members)
+- `CredentialsBlock` reads from `credentials` table with config (layout grid/list, show_descriptions, max_items)
+- Homepage team/credentials sections pull from DB tables
+- Homepage section headings from `business_settings` keys (`homepage_team_heading`, `homepage_credentials_heading`)
+
+**Cleanup:**
+- Removed `getCredentials()` from team-members.ts (was reading from block JSON)
+- Removed `CredentialItem` interface from team-members.ts (replaced by Credential in types.ts)
+- Updated `getTeamSectionTitle()` and `getCredentialsSectionTitle()` to read from business_settings
+- Removed old inline CRUD code from both block editors
+
+---
+
 ## Save Block Cleanup + Dynamic Section Headings — 2026-02-27
 
 ### fix: team_grid save block button, dynamic homepage section headings

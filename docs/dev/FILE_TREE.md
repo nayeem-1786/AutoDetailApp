@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-27 (CMS Overhaul Phase D.2 — dead code cleanup, UX fixes)
+> **Last updated:** 2026-02-27 (Team/Credentials admin pages, display-only blocks)
 
 ---
 
@@ -140,6 +140,13 @@ src/app/api/admin/settings/shipping/carriers/route.ts
 src/app/api/admin/settings/shipping/route.ts
 src/app/api/admin/settings/shipping/test-connection/route.ts
 src/app/api/admin/settings/shipping/validate-address/route.ts
+```
+
+### Admin — Credentials
+```
+src/app/api/admin/credentials/route.ts
+src/app/api/admin/credentials/[id]/route.ts
+src/app/api/admin/credentials/reorder/route.ts
 ```
 
 ### Admin — Team Members
@@ -537,6 +544,7 @@ src/app/admin/website/page.tsx
 src/app/admin/website/ads/creatives/[id]/page.tsx
 src/app/admin/website/ads/page.tsx
 src/app/admin/website/catalog/page.tsx
+src/app/admin/website/credentials/page.tsx
 src/app/admin/website/footer/page.tsx
 src/app/admin/website/hero/[id]/page.tsx
 src/app/admin/website/hero/page.tsx
@@ -546,6 +554,7 @@ src/app/admin/website/pages/new/page.tsx
 src/app/admin/website/pages/page.tsx
 src/app/admin/website/seo/cities/page.tsx
 src/app/admin/website/seo/page.tsx
+src/app/admin/website/team/page.tsx
 src/app/admin/website/theme-settings/page.tsx
 src/app/admin/website/themes/[id]/page.tsx
 src/app/admin/website/themes/page.tsx
@@ -641,6 +650,7 @@ src/lib/data/business-hours.ts
 src/lib/data/business.ts
 src/lib/data/cities.ts
 src/lib/data/cms.ts
+src/lib/data/credentials.ts
 src/lib/data/featured-photos.ts
 src/lib/data/page-content.ts
 src/lib/data/products.ts
@@ -1126,6 +1136,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260227000001_create_team_members.sql
 20260227000002_cleanup_migrated_settings.sql
 20260227000003_team_member_excerpt.sql
+20260227000004_create_credentials.sql
 ```
 
 ---

@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-27 (Post-Phase D cleanup)
-> **Status:** Phase D Complete — All bug fixes applied, dashboard cleanup done
+> **Updated:** 2026-02-27 (Post-Phase D cleanup + Team/Credentials restructure)
+> **Status:** Phase D Complete — Team/Credentials separated into dedicated admin pages, display-only blocks
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -118,8 +118,8 @@ Every page uses the same editor. The editor has:
 
 | Block Type | What it renders | Replaces | Has AI? |
 |---|---|---|---|
-| `team_grid` | Team member cards (photo upload, name, role, bio, badges) | About page team section | ✅ per bio |
-| `credentials` | Awards/certifications grid (image, title, description) | About page credentials section | ✅ per description |
+| `team_grid` | **Display widget** — links to /admin/website/team. Config: columns, show_certifications, show_excerpt, max_members. Data from `team_members` table | About page team section | N/A (widget) |
+| `credentials` | **Display widget** — links to /admin/website/credentials. Config: layout (grid/list), show_descriptions, max_items. Data from `credentials` table | About page credentials section | N/A (widget) |
 | `terms_sections` | Numbered T&C sections with active toggles + effective date | Entire Terms editor | ✅ per section |
 | `gallery` | Photo gallery grid | Future use | ❌ |
 
@@ -940,6 +940,8 @@ src/app/admin/website/navigation/page.tsx    — Navigation editor
 src/app/admin/website/tickers/page.tsx       — Ticker list
 src/app/admin/website/tickers/[id]/page.tsx  — Ticker editor
 src/app/admin/website/ads/page.tsx           — Ads manager
+src/app/admin/website/team/page.tsx           — Team Members admin page (CRUD, drag-drop reorder, AI bio generation)
+src/app/admin/website/credentials/page.tsx   — Credentials admin page (CRUD, drag-drop reorder, AI description)
 src/app/admin/website/catalog/page.tsx       — Catalog display settings
 src/app/admin/website/theme-settings/page.tsx — Theme settings (base theme — 50+ color/typography/button columns)
 src/app/admin/website/themes/page.tsx        — Seasonal themes manager (8 holiday presets)
@@ -951,6 +953,8 @@ src/app/admin/website/themes/[id]/page.tsx   — Seasonal theme editor (colors, 
 ```
 src/components/admin/content/page-html-editor.tsx    — Rich HTML editor + AI (BECOMES THE universal editor)
 src/components/admin/content/content-block-editor.tsx — Content block system (native HTML5 DnD)
+src/components/admin/content/team-grid-editor.tsx     — Display-only config widget (links to /admin/website/team)
+src/components/admin/content/credentials-editor.tsx   — Display-only config widget (links to /admin/website/credentials)
 src/components/admin/content/faq-editor.tsx           — FAQ block editor
 src/components/admin/content/markdown-editor.tsx      — Markdown editor (TO BE REMOVED — Phase C.7)
 src/components/admin/html-editor-toolbar.tsx          — HTML editor toolbar (12 dialog components)
@@ -971,6 +975,9 @@ src/app/api/admin/cms/content/route.ts       — Content blocks CRUD — auto-ca
 src/app/api/admin/cms/content/[id]/route.ts  — Single block CRUD
 src/app/api/admin/cms/content/reorder/route.ts — Block reorder — payload: { pagePath, orderedIds }
 src/app/api/admin/cms/content/ai-generate/route.ts — AI content — modes: full_page, single_block, improve, batch_cities
+src/app/api/admin/credentials/route.ts       — Credentials list + create
+src/app/api/admin/credentials/[id]/route.ts  — Credentials single CRUD
+src/app/api/admin/credentials/reorder/route.ts — Credentials reorder
 src/app/api/admin/cms/seo/cities/route.ts    — Cities CRUD (STAYS)
 src/app/api/admin/cms/seo/cities/[id]/route.ts — Single city CRUD (STAYS)
 src/app/api/admin/cms/themes/route.ts        — Seasonal themes list/create
@@ -987,7 +994,8 @@ src/app/api/cron/theme-activation/route.ts   — Cron: every 15 min, auto activa
 ```
 src/lib/data/website-pages.ts    — Page data: getPageBySlug, getPublishedPages, getAllPages, getFooterData
 src/lib/data/page-content.ts     — Content block data functions
-src/lib/data/team.ts             — Team data from business_settings (TO BE REPLACED by team-members.ts — Phase D.8)
+src/lib/data/team-members.ts     — Team member data: getActiveTeamMembers, getAllTeamMembers, getTeamMemberBySlug, getTeamSectionTitle, getCredentialsSectionTitle
+src/lib/data/credentials.ts      — Credentials data: getActiveCredentials, getAllCredentials
 src/lib/data/cities.ts           — Cities data: getActiveCities, getCityBySlug (STAYS)
 src/lib/services/ai-content-writer.ts — AI: Claude Sonnet, 4000 tokens, business context injected
 src/lib/supabase/types.ts        — ContentBlockType union (EXPAND in Phase C.0)
@@ -1013,7 +1021,8 @@ src/app/(public)/team/[memberSlug]/page.tsx        — Team detail page (NEW —
 website_pages              — CMS pages (NOT cms_pages)
 page_content_blocks        — Content blocks (NOT cms_page_content_blocks)
 city_landing_pages         — City landing pages (STAYS)
-team_members               — Team members (NEW — Phase D.1)
+team_members               — Team members (Phase D.1 — managed via /admin/website/team)
+credentials                — Credentials & awards (NEW — managed via /admin/website/credentials, migrated from block JSON)
 seasonal_themes            — Seasonal theme overlays
 site_theme_settings        — Base theme (50+ columns)
 business_settings          — Key-value JSONB store (5 keys to be cleaned up — Phase D.10)
@@ -1072,8 +1081,10 @@ These bugs prompted this overhaul. All will be resolved by the architecture chan
 | **Keep Show in Nav as sync shortcut** | Toggle ON auto-creates header nav item, OFF removes it. Convenience shortcut that syncs with Navigation page | 2026-02-27 |
 | **Flat URLs — nesting is nav-only** | Nesting in Navigation creates dropdown menus, NOT nested URL paths. `/p/{slug}` always resolves by slug alone. No redirect maintenance burden | 2026-02-27 |
 | **Navigation enhancement deferred to Phase E** | Nav page already 80% built (parent nesting, placements, 3 link types, drag reorder). Drag-to-indent and sync improvements are UX polish, not blocking | 2026-02-27 |
-| **team_grid editor uses team_members API directly** | Block content stores `{ source: "team_members_table" }` marker. Editor manages its own state via API calls, not value/onChange. Auto-save on each operation | 2026-02-27 |
+| **~~team_grid editor uses team_members API directly~~** | ~~Block content stores `{ source: "team_members_table" }` marker.~~ **SUPERSEDED:** team_grid and credentials blocks are now display-only config widgets. Data managed via dedicated admin pages at `/admin/website/team` and `/admin/website/credentials` | 2026-02-27 |
 | **useConfirmDialog hook replaces all confirm() calls** | Browser `confirm()` looks jarring. Reusable hook wraps existing ConfirmDialog component. 18 admin files updated | 2026-02-27 |
+| **Team/Credentials: dedicated admin pages, blocks are display-only widgets (WordPress pattern)** | Data management (CRUD, reorder, AI generation) belongs in dedicated admin pages with proper UX. Content blocks become config widgets that link to admin pages and control display settings (columns, layout, max items). Follows WordPress pattern: manage data in one place, display it in many | 2026-02-27 |
+| **Credentials in own DB table (not JSON in content block)** | Same rationale as team_members — proper relational data enables querying, homepage rendering, future features. Existing block JSON migrated to `credentials` table via SQL migration | 2026-02-27 |
 
 ---
 

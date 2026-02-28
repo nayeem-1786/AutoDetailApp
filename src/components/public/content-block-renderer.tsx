@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ArrowRight, CheckCircle, Star, Quote } from 'lucide-react';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getActiveTeamMembers } from '@/lib/data/team-members';
+import { getActiveCredentials } from '@/lib/data/credentials';
 import { GalleryLightbox } from './gallery-lightbox';
 import type { PageContentBlock } from '@/lib/supabase/types';
 
@@ -239,20 +240,15 @@ function TestimonialBlock({ block }: { block: PageContentBlock }) {
 }
 
 // ---------------------------------------------------------------------------
-// Team Grid Block
+// Team Grid Block — reads from team_members table with config
 // ---------------------------------------------------------------------------
 
-interface TeamGridMember {
-  id: string;
-  name: string;
-  role: string;
-  bio: string;
-  excerpt: string | null;
-  photo_url: string;
-  slug: string;
-  years_of_service: number | null;
-  certifications: string[];
-  sort_order: number;
+interface TeamGridConfig {
+  source?: string;
+  columns?: 2 | 3 | 4;
+  show_certifications?: boolean;
+  show_excerpt?: boolean;
+  max_members?: number;
 }
 
 function getInitials(name: string): string {
@@ -263,41 +259,26 @@ function getInitials(name: string): string {
 }
 
 async function TeamGridBlock({ block }: { block: PageContentBlock }) {
-  // Check if this block sources from the team_members table
-  let visibleMembers: TeamGridMember[];
+  let config: TeamGridConfig = {};
   try {
-    const parsed = JSON.parse(block.content);
-    if (parsed && typeof parsed === 'object' && parsed.source === 'team_members_table') {
-      // Read from team_members table
-      const dbMembers = await getActiveTeamMembers();
-      visibleMembers = dbMembers.map((m) => ({
-        id: m.id,
-        name: m.name,
-        role: m.role,
-        bio: m.bio || '',
-        excerpt: m.excerpt || null,
-        photo_url: m.photo_url || '',
-        slug: m.slug,
-        years_of_service: m.years_of_service,
-        certifications: m.certifications,
-        sort_order: m.sort_order,
-      }));
-    } else if (Array.isArray(parsed)) {
-      visibleMembers = parsed
-        .filter((m: TeamGridMember) => m.name?.trim())
-        .sort((a: TeamGridMember, b: TeamGridMember) => a.sort_order - b.sort_order);
-    } else {
-      return null;
-    }
-  } catch {
-    const members = parseJsonContent<TeamGridMember[]>(block.content);
-    if (!members || members.length === 0) return null;
-    visibleMembers = members
-      .filter((m) => m.name.trim())
-      .sort((a, b) => a.sort_order - b.sort_order);
-  }
+    config = JSON.parse(block.content);
+  } catch { /* use defaults */ }
+
+  const columns = config.columns ?? 3;
+  const showCertifications = config.show_certifications ?? true;
+  const showExcerpt = config.show_excerpt ?? true;
+  const maxMembers = config.max_members ?? 0;
+
+  const allMembers = await getActiveTeamMembers();
+  const visibleMembers = maxMembers > 0 ? allMembers.slice(0, maxMembers) : allMembers;
 
   if (visibleMembers.length === 0) return null;
+
+  const gridCols = columns === 2
+    ? 'sm:grid-cols-2'
+    : columns === 4
+    ? 'sm:grid-cols-2 lg:grid-cols-4'
+    : 'sm:grid-cols-2 lg:grid-cols-3';
 
   return (
     <div className="content-block">
@@ -306,7 +287,7 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
           {block.title}
         </h2>
       )}
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={`grid gap-8 ${gridCols}`}>
         {visibleMembers.map((member) => (
           <Link
             key={member.id}
@@ -341,7 +322,7 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
             </p>
 
             {/* Bio — excerpt (plain text) preferred, fallback to truncated HTML bio */}
-            {(member.excerpt || member.bio) && (
+            {showExcerpt && (member.excerpt || member.bio) && (
               member.excerpt ? (
                 <p className="mt-3 text-sm leading-relaxed text-site-text-muted line-clamp-3">
                   {member.excerpt}
@@ -349,13 +330,13 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
               ) : (
                 <div
                   className="mt-3 text-sm leading-relaxed text-site-text-muted line-clamp-3"
-                  dangerouslySetInnerHTML={{ __html: member.bio }}
+                  dangerouslySetInnerHTML={{ __html: member.bio || '' }}
                 />
               )
             )}
 
             {/* Certifications */}
-            {member.certifications.length > 0 && (
+            {showCertifications && member.certifications.length > 0 && (
               <div className="mt-3 flex flex-wrap justify-center gap-1.5">
                 {member.certifications.map((cert) => (
                   <span
@@ -375,24 +356,32 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
 }
 
 // ---------------------------------------------------------------------------
-// Credentials Block
+// Credentials Block — reads from credentials table with config
 // ---------------------------------------------------------------------------
 
-interface CredentialItem {
-  id: string;
-  title: string;
-  description: string;
-  image_url: string;
-  sort_order: number;
+interface CredentialsBlockConfig {
+  source?: string;
+  layout?: 'grid' | 'list';
+  show_descriptions?: boolean;
+  max_items?: number;
 }
 
-function CredentialsBlock({ block }: { block: PageContentBlock }) {
-  const credentials = parseJsonContent<CredentialItem[]>(block.content);
-  if (!credentials || credentials.length === 0) return null;
+async function CredentialsBlock({ block }: { block: PageContentBlock }) {
+  let config: CredentialsBlockConfig = {};
+  try {
+    const parsed = JSON.parse(block.content);
+    // New config format has source field; legacy format is an array
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      config = parsed;
+    }
+  } catch { /* use defaults */ }
 
-  const visibleCredentials = credentials
-    .filter((c) => c.title.trim())
-    .sort((a, b) => a.sort_order - b.sort_order);
+  const showDescriptions = config.show_descriptions ?? true;
+  const maxItems = config.max_items ?? 0;
+  const layout = config.layout ?? 'grid';
+
+  const allCredentials = await getActiveCredentials();
+  const visibleCredentials = maxItems > 0 ? allCredentials.slice(0, maxItems) : allCredentials;
 
   if (visibleCredentials.length === 0) return null;
 
@@ -403,40 +392,69 @@ function CredentialsBlock({ block }: { block: PageContentBlock }) {
           {block.title}
         </h2>
       )}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleCredentials.map((cred) => (
-          <div
-            key={cred.id}
-            className="flex flex-col items-center text-center rounded-2xl border border-site-border bg-brand-surface p-6"
-          >
-            {/* Badge image */}
-            {cred.image_url && (
-              <div className="relative h-20 w-20 mb-4 flex-shrink-0">
-                <Image
-                  src={cred.image_url}
-                  alt={cred.title}
-                  fill
-                  className="object-contain"
-                  sizes="80px"
-                />
+      {layout === 'list' ? (
+        <div className="space-y-4">
+          {visibleCredentials.map((cred) => (
+            <div
+              key={cred.id}
+              className="flex items-center gap-4 rounded-xl border border-site-border bg-brand-surface p-4"
+            >
+              {cred.image_url && (
+                <div className="relative h-16 w-16 flex-shrink-0">
+                  <Image
+                    src={cred.image_url}
+                    alt={cred.title}
+                    fill
+                    className="object-contain"
+                    sizes="64px"
+                  />
+                </div>
+              )}
+              <div>
+                <h3 className="text-base font-semibold text-site-text">
+                  {cred.title}
+                </h3>
+                {showDescriptions && cred.description && (
+                  <div
+                    className="mt-1 text-sm leading-relaxed text-site-text-muted"
+                    dangerouslySetInnerHTML={{ __html: cred.description }}
+                  />
+                )}
               </div>
-            )}
-
-            {/* Title */}
-            <h3 className="text-base font-semibold text-site-text">
-              {cred.title}
-            </h3>
-
-            {/* Description */}
-            {cred.description && (
-              <div
-                className="mt-2 text-sm leading-relaxed text-site-text-muted"
-                dangerouslySetInnerHTML={{ __html: cred.description }}
-              />
-            )}
-          </div>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleCredentials.map((cred) => (
+            <div
+              key={cred.id}
+              className="flex flex-col items-center text-center rounded-2xl border border-site-border bg-brand-surface p-6"
+            >
+              {cred.image_url && (
+                <div className="relative h-20 w-20 mb-4 flex-shrink-0">
+                  <Image
+                    src={cred.image_url}
+                    alt={cred.title}
+                    fill
+                    className="object-contain"
+                    sizes="80px"
+                  />
+                </div>
+              )}
+              <h3 className="text-base font-semibold text-site-text">
+                {cred.title}
+              </h3>
+              {showDescriptions && cred.description && (
+                <div
+                  className="mt-2 text-sm leading-relaxed text-site-text-muted"
+                  dangerouslySetInnerHTML={{ __html: cred.description }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,8 @@ import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
-import { getActiveTeamMembers, getCredentials, getTeamSectionTitle, getCredentialsSectionTitle } from '@/lib/data/team-members';
+import { getActiveTeamMembers, getTeamSectionTitle, getCredentialsSectionTitle } from '@/lib/data/team-members';
+import { getActiveCredentials } from '@/lib/data/credentials';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles } from '@/lib/data/cms';
@@ -74,7 +75,7 @@ export default async function HomePage() {
     getBusinessInfo(),
     getReviewData(),
     getActiveTeamMembers(),
-    getCredentials(),
+    getActiveCredentials(),
     getActiveHeroSlides(),
     getHeroCarouselConfig(),
     getCmsToggles(),

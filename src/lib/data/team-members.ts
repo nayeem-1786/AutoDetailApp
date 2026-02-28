@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 // ---------------------------------------------------------------------------
 // Team Members — Data Access Layer
-// Replaces src/lib/data/team.ts (which read from business_settings JSON)
 // ---------------------------------------------------------------------------
 
 export interface TeamMember {
@@ -20,14 +19,6 @@ export interface TeamMember {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
-
-export interface CredentialItem {
-  id: string;
-  title: string;
-  description: string;
-  image_url: string;
-  sort_order: number;
 }
 
 /**
@@ -90,77 +81,49 @@ export const getAllTeamMembers = cache(async (): Promise<TeamMember[]> => {
 });
 
 /**
- * Get credentials from the About page's credentials content block.
- */
-export const getCredentials = cache(async (): Promise<CredentialItem[]> => {
-  const supabase = createAdminClient();
-
-  // Find the About page
-  const { data: page } = await supabase
-    .from('website_pages')
-    .select('id')
-    .eq('slug', 'about')
-    .eq('is_published', true)
-    .maybeSingle();
-
-  if (!page) return [];
-
-  // Find the credentials content block on the About page
-  const { data: block } = await supabase
-    .from('page_content_blocks')
-    .select('content')
-    .eq('page_path', '/p/about')
-    .eq('block_type', 'credentials')
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (!block) return [];
-
-  try {
-    const parsed = JSON.parse(block.content);
-    const credentials = Array.isArray(parsed) ? parsed : (parsed.credentials ?? []);
-    return credentials
-      .filter((c: CredentialItem) => c.title?.trim())
-      .sort((a: CredentialItem, b: CredentialItem) => a.sort_order - b.sort_order);
-  } catch {
-    return [];
-  }
-});
-
-/**
- * Get the team_grid block's title for use as the homepage section heading.
- * Falls back to "Meet the Team" if no title is set.
+ * Get homepage team section heading from business_settings.
+ * Falls back to "Meet the Team" if not set.
  */
 export const getTeamSectionTitle = cache(async (): Promise<string> => {
   const supabase = createAdminClient();
 
-  const { data: block } = await supabase
-    .from('page_content_blocks')
-    .select('title')
-    .eq('page_path', '/p/about')
-    .eq('block_type', 'team_grid')
-    .eq('is_active', true)
+  const { data } = await supabase
+    .from('business_settings')
+    .select('value')
+    .eq('key', 'homepage_team_heading')
     .maybeSingle();
 
-  return block?.title?.trim() || 'Meet the Team';
+  if (data?.value) {
+    try {
+      const parsed = JSON.parse(data.value);
+      if (typeof parsed === 'string' && parsed.trim()) return parsed.trim();
+    } catch { /* fallback */ }
+  }
+
+  return 'Meet the Team';
 });
 
 /**
- * Get the credentials block's title for use as the homepage section heading.
- * Falls back to null (no separate heading rendered) if no title is set.
+ * Get homepage credentials section heading from business_settings.
+ * Falls back to "Credentials & Awards" if not set.
  */
-export const getCredentialsSectionTitle = cache(async (): Promise<string | null> => {
+export const getCredentialsSectionTitle = cache(async (): Promise<string> => {
   const supabase = createAdminClient();
 
-  const { data: block } = await supabase
-    .from('page_content_blocks')
-    .select('title')
-    .eq('page_path', '/p/about')
-    .eq('block_type', 'credentials')
-    .eq('is_active', true)
+  const { data } = await supabase
+    .from('business_settings')
+    .select('value')
+    .eq('key', 'homepage_credentials_heading')
     .maybeSingle();
 
-  return block?.title?.trim() || null;
+  if (data?.value) {
+    try {
+      const parsed = JSON.parse(data.value);
+      if (typeof parsed === 'string' && parsed.trim()) return parsed.trim();
+    } catch { /* fallback */ }
+  }
+
+  return 'Credentials & Awards';
 });
 
 // ---------------------------------------------------------------------------

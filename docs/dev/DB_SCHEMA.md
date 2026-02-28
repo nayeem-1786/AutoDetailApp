@@ -953,6 +953,21 @@
 **RLS:** Public read (active only), authenticated full access.
 **Migrated from:** `business_settings.team_members` JSON array.
 
+### credentials
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| title | TEXT | NOT NULL | |
+| description | TEXT | | HTML content |
+| image_url | TEXT | | Badge/logo image |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Auto-updated via trigger |
+
+**RLS:** Public read (active only), authenticated full access.
+**Migrated from:** `page_content_blocks` where `block_type = 'credentials'` (JSON array).
+
 ---
 
 ## Website Footer

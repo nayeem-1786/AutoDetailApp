@@ -16,6 +16,8 @@ import {
   Rows3,
   Paintbrush,
   ArrowRight,
+  Users,
+  Award,
 } from 'lucide-react';
 
 const sections = [
@@ -24,6 +26,18 @@ const sections = [
     description: 'Create and manage custom pages for your website.',
     icon: FileText,
     href: '/admin/website/pages',
+  },
+  {
+    title: 'Team Members',
+    description: 'Manage team member profiles displayed on your website.',
+    icon: Users,
+    href: '/admin/website/team',
+  },
+  {
+    title: 'Credentials',
+    description: 'Manage awards, certifications, and credentials.',
+    icon: Award,
+    href: '/admin/website/credentials',
   },
   {
     title: 'City Pages',

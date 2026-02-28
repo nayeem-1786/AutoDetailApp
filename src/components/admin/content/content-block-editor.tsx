@@ -124,7 +124,7 @@ export function ContentBlockEditor({
         : blockType === 'team_grid'
         ? JSON.stringify({ source: 'team_members_table' })
         : blockType === 'credentials'
-        ? '[]'
+        ? JSON.stringify({ source: 'credentials_table', layout: 'grid', show_descriptions: true, max_items: 0 })
         : blockType === 'terms_sections'
         ? JSON.stringify({ effective_date: null, sections: [] })
         : blockType === 'gallery'
@@ -587,15 +587,6 @@ function BlockRow({
           );
         }
       } catch { /* keep as-is */ }
-    } else if (block.block_type === 'credentials') {
-      try {
-        const items = JSON.parse(localContent);
-        if (Array.isArray(items)) {
-          cleanContent = JSON.stringify(
-            items.filter((i: { title?: string; description?: string; image_url?: string }) => i.title?.trim() || i.description?.trim() || i.image_url?.trim())
-          );
-        }
-      } catch { /* keep as-is */ }
     }
     onUpdate({ title: localTitle.trim() || null, content: cleanContent } as Partial<Pick<PageContentBlock, 'title' | 'content' | 'is_active'>>);
     setDirty(false);
@@ -688,13 +679,7 @@ function BlockRow({
               value={localTitle}
               onChange={(e) => {
                 setLocalTitle(e.target.value);
-                if (block.block_type !== 'team_grid') setDirty(true);
-              }}
-              onBlur={() => {
-                // Auto-save title on blur for team_grid (no Save Block button)
-                if (block.block_type === 'team_grid' && localTitle !== (block.title ?? '')) {
-                  onUpdate({ title: localTitle.trim() || null });
-                }
+                setDirty(true);
               }}
               placeholder="e.g. Frequently Asked Questions"
               className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -716,37 +701,29 @@ function BlockRow({
             pageType={pageType}
           />
 
-          {/* Save — team_grid saves members individually (title auto-saves on blur) */}
-          {block.block_type === 'team_grid' ? (
-            <div className="pt-2">
-              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
-                Team members save individually. Section title auto-saves on blur.
+          {/* Save Block */}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            {dirty && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">
+                Unsaved changes
               </span>
-            </div>
-          ) : (
-            <div className="flex items-center justify-end gap-2 pt-2">
-              {dirty && (
-                <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">
-                  Unsaved changes
-                </span>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSave}
+              disabled={!dirty || isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Spinner size="sm" className="mr-1" />
+                  Saving...
+                </>
+              ) : (
+                'Save Block'
               )}
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSave}
-                disabled={!dirty || isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <Spinner size="sm" className="mr-1" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Block'
-                )}
-              </Button>
-            </div>
-          )}
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -843,28 +820,18 @@ function BlockContentEditor({
 
     case 'team_grid':
       return (
-        <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-            Team Members
-          </label>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-            Team members are managed directly in the database. Changes save automatically.
-          </p>
-          <TeamGridEditor />
-        </div>
+        <TeamGridEditor
+          value={content}
+          onChange={onChange}
+        />
       );
 
     case 'credentials':
       return (
-        <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-            Credentials &amp; Certifications
-          </label>
-          <CredentialsEditor
-            value={parseCredentialsContent(content)}
-            onChange={(creds) => onChange(serializeCredentialsContent(creds))}
-          />
-        </div>
+        <CredentialsEditor
+          value={parseCredentialsContent(content)}
+          onChange={(config) => onChange(serializeCredentialsContent(config))}
+        />
       );
 
     case 'terms_sections':
@@ -1307,15 +1274,10 @@ function getContentPreview(block: PageContentBlock): string {
     }
   }
   if (block.block_type === 'team_grid') {
-    return 'Team members (from database)';
+    return 'Team members grid (display widget)';
   }
   if (block.block_type === 'credentials') {
-    try {
-      const items = JSON.parse(block.content);
-      return Array.isArray(items) ? `${items.length} credential${items.length !== 1 ? 's' : ''}` : '';
-    } catch {
-      return '';
-    }
+    return 'Credentials & awards (display widget)';
   }
   if (block.block_type === 'terms_sections') {
     try {

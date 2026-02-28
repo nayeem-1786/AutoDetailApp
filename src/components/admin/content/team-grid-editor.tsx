@@ -1,656 +1,171 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import {
-  Plus,
-  Trash2,
-  ChevronDown,
-  ChevronRight,
-  X,
-  Sparkles,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+import { Users, ExternalLink } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-import { FormField } from '@/components/ui/form-field';
-import { ImageUploadField } from '@/components/admin/image-upload-field';
-import { PageHtmlEditor } from '@/components/admin/content/page-html-editor';
-import { DragDropItem } from '@/components/admin/drag-drop-reorder';
-import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
-import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { toast } from 'sonner';
+import Link from 'next/link';
 
 // ---------------------------------------------------------------------------
-// TeamGridEditor — manages team_members table via API
+// TeamGridEditor — display-only config widget
+// Data is managed on /admin/website/team, this just shows config options
 // ---------------------------------------------------------------------------
 
-export interface TeamGridMember {
-  id: string;
-  name: string;
-  role: string;
-  bio: string;
-  excerpt: string;
-  photo_url: string;
-  slug: string;
-  years_of_service: number | null;
-  certifications: string[];
-  sort_order: number;
-  is_active?: boolean;
+export interface TeamGridConfig {
+  source: 'team_members_table';
+  columns: 2 | 3 | 4;
+  show_certifications: boolean;
+  show_excerpt: boolean;
+  max_members: number; // 0 = show all
 }
 
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
+const DEFAULT_CONFIG: TeamGridConfig = {
+  source: 'team_members_table',
+  columns: 3,
+  show_certifications: true,
+  show_excerpt: true,
+  max_members: 0,
+};
 
-export function TeamGridEditor() {
-  const [members, setMembers] = useState<TeamGridMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, Record<string, string>>>({});
-  const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
-
-  // -------------------------------------------------------------------------
-  // Load members from API
-  // -------------------------------------------------------------------------
-
-  const loadMembers = useCallback(async () => {
-    try {
-      const res = await adminFetch('/api/admin/team-members');
-      if (!res.ok) throw new Error('Failed to load');
-      const json = await res.json();
-      setMembers(json.data ?? []);
-    } catch {
-      toast.error('Failed to load team members');
-    } finally {
-      setLoading(false);
+export function parseTeamGridConfig(content: string): TeamGridConfig {
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return {
+        source: 'team_members_table',
+        columns: [2, 3, 4].includes(parsed.columns) ? parsed.columns : 3,
+        show_certifications: parsed.show_certifications ?? true,
+        show_excerpt: parsed.show_excerpt ?? true,
+        max_members: typeof parsed.max_members === 'number' ? parsed.max_members : 0,
+      };
     }
+  } catch { /* fallback */ }
+  return DEFAULT_CONFIG;
+}
+
+export function serializeTeamGridConfig(config: TeamGridConfig): string {
+  return JSON.stringify(config);
+}
+
+interface TeamGridEditorProps {
+  value: string;
+  onChange: (content: string) => void;
+}
+
+export function TeamGridEditor({ value, onChange }: TeamGridEditorProps) {
+  const [config, setConfig] = useState<TeamGridConfig>(() => parseTeamGridConfig(value));
+  const [activeCount, setActiveCount] = useState<number | null>(null);
+
+  // Fetch active member count on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await adminFetch('/api/admin/team-members');
+        if (res.ok) {
+          const json = await res.json();
+          const members = json.data ?? [];
+          setActiveCount(members.filter((m: { is_active: boolean }) => m.is_active).length);
+        }
+      } catch { /* ignore */ }
+    })();
   }, []);
 
-  useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
-
-  // -------------------------------------------------------------------------
-  // AI Generate Bio
-  // -------------------------------------------------------------------------
-
-  const handleAiGenerateBio = async (member: TeamGridMember) => {
-    if (!member.name.trim() || !member.role.trim()) {
-      toast.error('Enter a name and role first');
-      return;
-    }
-    setAiLoadingId(member.id);
-    try {
-      const res = await adminFetch('/api/admin/cms/content/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'team_bio',
-          memberName: member.name,
-          memberRole: member.role,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const json = await res.json();
-      if (json.data?.content) {
-        updateMemberLocal(member.id, { bio: json.data.content });
-        toast.success('Bio generated — click Save Member to keep');
-      }
-    } catch {
-      toast.error('Failed to generate bio');
-    } finally {
-      setAiLoadingId(null);
-    }
+  const updateConfig = (updates: Partial<TeamGridConfig>) => {
+    const next = { ...config, ...updates };
+    setConfig(next);
+    onChange(serializeTeamGridConfig(next));
   };
-
-  // -------------------------------------------------------------------------
-  // CRUD via API — auto-save pattern
-  // -------------------------------------------------------------------------
-
-  const addMember = async () => {
-    setSavingId('new');
-    try {
-      const res = await adminFetch('/api/admin/team-members', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'New Member',
-          role: 'Team Member',
-          bio: '',
-          photo_url: '',
-          years_of_service: null,
-          certifications: [],
-        }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const json = await res.json();
-      setMembers((prev) => [...prev, json.data]);
-      setExpandedId(json.data.id);
-      toast.success('Team member added');
-    } catch {
-      toast.error('Failed to add team member');
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const saveMember = async (id: string, updates: Partial<TeamGridMember>): Promise<boolean> => {
-    setSavingId(id);
-    try {
-      const res = await adminFetch(`/api/admin/team-members/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed');
-      }
-      const json = await res.json();
-      setMembers((prev) =>
-        prev.map((m) => (m.id === id ? json.data : m))
-      );
-      return true;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save');
-      return false;
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const removeMember = (member: TeamGridMember) => {
-    confirm({
-      title: 'Delete Team Member',
-      description: `Remove ${member.name || 'this member'}? This cannot be undone.`,
-      confirmLabel: 'Delete',
-      variant: 'destructive',
-      onConfirm: async () => {
-        try {
-          const res = await adminFetch(`/api/admin/team-members/${member.id}`, {
-            method: 'DELETE',
-          });
-          if (!res.ok) throw new Error('Failed');
-          setMembers((prev) => prev.filter((m) => m.id !== member.id));
-          if (expandedId === member.id) setExpandedId(null);
-          setErrors((prev) => {
-            const next = { ...prev };
-            delete next[member.id];
-            return next;
-          });
-          toast.success('Team member deleted');
-        } catch {
-          toast.error('Failed to delete team member');
-        }
-      },
-    });
-  };
-
-  // Local update — saves on blur
-  const updateMemberLocal = (id: string, updates: Partial<TeamGridMember>) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
-    );
-
-    // Clear errors for updated fields
-    if (errors[id]) {
-      const fieldErrors = { ...errors[id] };
-      for (const key of Object.keys(updates)) {
-        delete fieldErrors[key];
-      }
-      setErrors((prev) => ({ ...prev, [id]: fieldErrors }));
-    }
-  };
-
-  // -------------------------------------------------------------------------
-  // Drag-drop reorder
-  // -------------------------------------------------------------------------
-
-  const handleReorder = useCallback(
-    async (reordered: TeamGridMember[]) => {
-      setMembers(reordered);
-      // Save to API
-      try {
-        await adminFetch('/api/admin/team-members/reorder', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderedIds: reordered.map((m) => m.id),
-          }),
-        });
-      } catch {
-        toast.error('Failed to save order');
-        loadMembers();
-      }
-    },
-    [loadMembers]
-  );
-
-  const { getDragProps, isDragging, isDragOver } = useDragDropReorder({
-    items: members,
-    onReorder: handleReorder,
-  });
-
-  // -------------------------------------------------------------------------
-  // Validation
-  // -------------------------------------------------------------------------
-
-  const getMemberError = (memberId: string, field: string): string | undefined => {
-    return errors[memberId]?.[field];
-  };
-
-  const validateField = (memberId: string, field: string, val: string) => {
-    if ((field === 'name' || field === 'role') && !val.trim()) {
-      setErrors((prev) => ({
-        ...prev,
-        [memberId]: {
-          ...(prev[memberId] || {}),
-          [field]: `${field === 'name' ? 'Name' : 'Role'} is required`,
-        },
-      }));
-    } else {
-      setErrors((prev) => {
-        const memberErrors = { ...(prev[memberId] || {}) };
-        delete memberErrors[field];
-        if (Object.keys(memberErrors).length === 0) {
-          const next = { ...prev };
-          delete next[memberId];
-          return next;
-        }
-        return { ...prev, [memberId]: memberErrors };
-      });
-    }
-  };
-
-  // Validate on blur (no auto-save — user clicks "Save Member")
-  const handleFieldBlur = (memberId: string, field: string, value: string) => {
-    validateField(memberId, field, value);
-  };
-
-  // Save all member fields at once
-  const handleSaveMember = async (member: TeamGridMember) => {
-    // Validate required fields
-    if (!member.name.trim() || !member.role.trim()) {
-      const newErrors: Record<string, string> = {};
-      if (!member.name.trim()) newErrors.name = 'Name is required';
-      if (!member.role.trim()) newErrors.role = 'Role is required';
-      setErrors((prev) => ({ ...prev, [member.id]: { ...(prev[member.id] || {}), ...newErrors } }));
-      toast.error('Please fill in required fields');
-      return;
-    }
-
-    const ok = await saveMember(member.id, {
-      name: member.name,
-      slug: toSlug(member.name),
-      role: member.role,
-      bio: member.bio,
-      excerpt: member.excerpt,
-      photo_url: member.photo_url,
-      years_of_service: member.years_of_service,
-      certifications: member.certifications,
-    });
-    if (ok) toast.success('Member saved');
-  };
-
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Spinner size="sm" />
-        <span className="ml-2 text-sm text-gray-500">Loading team members...</span>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-3">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          {members.length} Member{members.length !== 1 ? 's' : ''}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addMember}
-          disabled={savingId === 'new'}
-        >
-          {savingId === 'new' ? (
-            <Spinner size="sm" className="mr-1.5" />
-          ) : (
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-          )}
-          Add Member
-        </Button>
+      <div className="flex items-center gap-2">
+        <Users className="h-5 w-5 text-gray-500" />
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          Team Members Grid
+        </h3>
       </div>
 
-      {/* Empty state */}
-      {members.length === 0 && (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-8 text-center">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            No team members yet. Click &ldquo;Add Member&rdquo; to get started.
-          </p>
-        </div>
-      )}
+      {/* Count */}
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        {activeCount !== null ? (
+          <>Displaying <span className="font-medium text-gray-700 dark:text-gray-300">{activeCount}</span> active team member{activeCount !== 1 ? 's' : ''}</>
+        ) : (
+          <span className="inline-flex items-center gap-1"><Spinner size="sm" /> Loading...</span>
+        )}
+      </p>
 
-      {/* Members list */}
-      {members.map((member) => (
-        <DragDropItem
-          key={member.id}
-          dragProps={getDragProps(member.id)}
-          isDragging={isDragging(member.id)}
-          isDragOver={isDragOver(member.id)}
-          className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-        >
-          <div className="w-full">
-            {/* Card header */}
-            <div className="flex items-center gap-2 px-3 py-2.5">
+      {/* Link to admin page */}
+      <Link
+        href="/admin/website/team"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 transition-colors"
+      >
+        Manage Team Members
+        <ExternalLink className="h-3.5 w-3.5" />
+      </Link>
+
+      {/* Display Settings */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-3">
+        <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          Display Settings
+        </h4>
+
+        {/* Columns */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-gray-600 dark:text-gray-400 w-28">Columns:</label>
+          <div className="flex gap-1">
+            {([2, 3, 4] as const).map((n) => (
               <button
+                key={n}
                 type="button"
-                onClick={() =>
-                  setExpandedId(expandedId === member.id ? null : member.id)
-                }
-                className="flex-1 flex items-center gap-2 text-left min-w-0"
+                onClick={() => updateConfig({ columns: n })}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  config.columns === n
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
               >
-                {expandedId === member.id ? (
-                  <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                )}
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                  {member.name || 'New Member'}
-                </span>
-                {member.role && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                    &mdash; {member.role}
-                  </span>
-                )}
-                {savingId === member.id && (
-                  <Spinner size="sm" className="flex-shrink-0" />
-                )}
+                {n}
               </button>
-              <button
-                type="button"
-                onClick={() => removeMember(member)}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                title="Delete member"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Expanded editor */}
-            {expandedId === member.id && (
-              <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 space-y-4">
-                {/* Photo */}
-                <ImageUploadField
-                  value={member.photo_url}
-                  onChange={(url) => {
-                    updateMemberLocal(member.id, { photo_url: url });
-                  }}
-                  label="Photo"
-                  placeholder="Upload team member photo"
-                  folder="team-photos"
-                />
-
-                {/* Name + Role */}
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    label="Name"
-                    required
-                    error={getMemberError(member.id, 'name')}
-                  >
-                    <input
-                      type="text"
-                      value={member.name}
-                      onChange={(e) =>
-                        updateMemberLocal(member.id, { name: e.target.value })
-                      }
-                      onBlur={(e) => handleFieldBlur(member.id, 'name', e.target.value)}
-                      placeholder="Full name"
-                      className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                    />
-                  </FormField>
-                  <FormField
-                    label="Role"
-                    required
-                    error={getMemberError(member.id, 'role')}
-                  >
-                    <input
-                      type="text"
-                      value={member.role}
-                      onChange={(e) =>
-                        updateMemberLocal(member.id, { role: e.target.value })
-                      }
-                      onBlur={(e) => handleFieldBlur(member.id, 'role', e.target.value)}
-                      placeholder="e.g. Lead Detailer"
-                      className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                    />
-                  </FormField>
-                </div>
-
-                {/* Homepage Summary */}
-                <FormField
-                  label="Homepage Summary"
-                  description="Short 1-2 line description shown on the homepage team card. Keep under 150 characters."
-                >
-                  <textarea
-                    value={member.excerpt || ''}
-                    onChange={(e) => updateMemberLocal(member.id, { excerpt: e.target.value })}
-                    placeholder="Brief summary for homepage team card..."
-                    rows={2}
-                    maxLength={200}
-                    className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  />
-                  <span className="text-xs text-gray-400 mt-1">
-                    {(member.excerpt || '').length}/150 recommended
-                  </span>
-                </FormField>
-
-                {/* Bio */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Bio
-                    </label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleAiGenerateBio(member)}
-                      disabled={aiLoadingId === member.id || !member.name.trim() || !member.role.trim()}
-                      className="h-7 text-xs"
-                    >
-                      {aiLoadingId === member.id ? (
-                        <Spinner size="sm" className="mr-1" />
-                      ) : (
-                        <Sparkles className="mr-1 h-3 w-3" />
-                      )}
-                      AI Generate Bio
-                    </Button>
-                  </div>
-                  <PageHtmlEditor
-                    value={member.bio}
-                    onChange={(val) => updateMemberLocal(member.id, { bio: val })}
-                    pageTitle={`${member.name || 'Team Member'} Bio`}
-                    placeholder="Write a bio for this team member..."
-                    rows={8}
-                  />
-                </div>
-
-                {/* Years of Service */}
-                <FormField label="Years of Service" description="Optional">
-                  <input
-                    type="number"
-                    value={member.years_of_service ?? ''}
-                    onChange={(e) =>
-                      updateMemberLocal(member.id, {
-                        years_of_service: e.target.value
-                          ? parseInt(e.target.value, 10)
-                          : null,
-                      })
-                    }
-                    min={0}
-                    placeholder="e.g. 5"
-                    className="block w-32 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  />
-                </FormField>
-
-                {/* Certifications */}
-                <CertificationsInput
-                  value={member.certifications}
-                  onChange={(certs) => {
-                    updateMemberLocal(member.id, { certifications: certs });
-                  }}
-                />
-
-                {/* Slug (read-only) */}
-                {member.slug && (
-                  <div className="text-xs text-gray-400 dark:text-gray-500">
-                    URL slug: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/team/{member.slug}</code>
-                  </div>
-                )}
-
-                {/* Save Member */}
-                <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleSaveMember(member)}
-                    disabled={savingId === member.id}
-                  >
-                    {savingId === member.id ? (
-                      <>
-                        <Spinner size="sm" className="mr-1" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Member'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DragDropItem>
-      ))}
-
-      {/* Add button at bottom */}
-      {members.length > 0 && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addMember}
-          disabled={savingId === 'new'}
-          className="w-full"
-        >
-          {savingId === 'new' ? (
-            <Spinner size="sm" className="mr-1.5" />
-          ) : (
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-          )}
-          Add Member
-        </Button>
-      )}
-
-      {/* Confirm Dialog */}
-      <ConfirmDialog {...dialogProps} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// CertificationsInput — tag-style input for certifications
-// ---------------------------------------------------------------------------
-
-function CertificationsInput({
-  value,
-  onChange,
-}: {
-  value: string[];
-  onChange: (certs: string[]) => void;
-}) {
-  const [inputValue, setInputValue] = useState('');
-
-  const addCert = () => {
-    const trimmed = inputValue.trim();
-    if (!trimmed) return;
-    if (value.includes(trimmed)) {
-      setInputValue('');
-      return;
-    }
-    onChange([...value, trimmed]);
-    setInputValue('');
-  };
-
-  const removeCert = (cert: string) => {
-    onChange(value.filter((c) => c !== cert));
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addCert();
-    }
-  };
-
-  return (
-    <FormField label="Certifications" description="Optional — e.g. Ceramic Pro Certified, IDA Member">
-      <div className="space-y-2">
-        {/* Tags */}
-        {value.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {value.map((cert) => (
-              <span
-                key={cert}
-                className="inline-flex items-center gap-1 rounded-full bg-lime/10 border border-lime/20 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300"
-              >
-                {cert}
-                <button
-                  type="button"
-                  onClick={() => removeCert(cert)}
-                  className="text-gray-400 hover:text-red-500"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
             ))}
           </div>
-        )}
-        {/* Input + Add */}
-        <div className="flex items-center gap-2">
+        </div>
+
+        {/* Show certifications toggle */}
+        <label className="flex items-center gap-3 cursor-pointer">
           <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Add certification..."
-            className="block flex-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            type="checkbox"
+            checked={config.show_certifications}
+            onChange={(e) => updateConfig({ show_certifications: e.target.checked })}
+            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addCert}
-            disabled={!inputValue.trim()}
-          >
-            Add
-          </Button>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Show certifications</span>
+        </label>
+
+        {/* Show excerpt toggle */}
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={config.show_excerpt}
+            onChange={(e) => updateConfig({ show_excerpt: e.target.checked })}
+            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+          />
+          <span className="text-sm text-gray-600 dark:text-gray-400">Show excerpt / bio preview</span>
+        </label>
+
+        {/* Max members */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-gray-600 dark:text-gray-400 w-28">Max members:</label>
+          <input
+            type="number"
+            min={0}
+            value={config.max_members}
+            onChange={(e) => updateConfig({ max_members: parseInt(e.target.value) || 0 })}
+            className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          />
+          <span className="text-xs text-gray-400">0 = show all</span>
         </div>
       </div>
-    </FormField>
+    </div>
   );
 }
