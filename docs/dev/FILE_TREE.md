@@ -608,6 +608,12 @@ src/app/(customer-auth)/signin/reset-password/page.tsx
 src/app/(customer-auth)/signup/page.tsx
 ```
 
+### Auth (`src/app/auth/`)
+```
+src/app/auth/callback/route.ts              — OAuth/magic-link code exchange
+src/app/auth/reset-password/page.tsx        — Staff password reset landing page
+```
+
 ### Customer Portal (`src/app/(account)/`)
 ```
 src/app/(account)/layout.tsx

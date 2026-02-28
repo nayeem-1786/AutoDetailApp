@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
@@ -82,11 +81,11 @@ export async function POST(
         );
       }
 
-      const serverClient = await createClient();
-      const { error: resetError } = await serverClient.auth.resetPasswordForEmail(
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         employee.email,
         {
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/login/reset-password`,
+          redirectTo: `${baseUrl}/auth/callback?next=/auth/reset-password`,
         }
       );
 
