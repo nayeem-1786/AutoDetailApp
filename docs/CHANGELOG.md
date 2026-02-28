@@ -4,6 +4,65 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Phase E.6: City Pages SEO Enhancement — 2026-02-28
+
+### Admin UI
+- **Service Highlights editor** in city form: add/edit/delete/reorder service highlights with featured toggle
+- **Import from Catalog** button: pulls service names from catalog to populate highlights
+- **Local Landmarks** text input: comma-separated landmarks used by AI for location-specific content
+- **SEO Data badges** in cities table: KW (keywords), SH (service highlights), LM (landmarks) indicators
+- **Keyword density indicator** in content editor dialog showing focus keywords for AI targeting
+- Form field ordering: City info → Service Highlights → Local Landmarks → Heading/Intro → SEO → Status
+
+### AI Content Generation
+- `buildCityPagePrompt()` now injects service_highlights (featured + descriptions), local_landmarks, and focus_keywords with explicit usage instructions
+- `buildSingleBlockPrompt()` and `buildImprovePrompt()` inject city context (landmarks, highlights) when generating for city pages
+- `buildCityContext()` now fetches and parses service_highlights from DB
+- Batch cities mode (`batch_cities`) now passes service_highlights per city
+- Focus keywords get explicit "incorporate 2-3 times" instruction in prompts
+
+### Public Rendering
+- Service highlights section: featured services rendered as large cards with lime border and "Featured" badge; non-featured as compact cards with checkmark icon
+- When service_highlights is populated, it replaces the generic service categories grid
+- Local landmarks shown in hero: "Serving the {city} area near {landmark1}, {landmark2}..."
+- Enhanced JSON-LD: `areaServed` includes City/State schema, `hasOfferCatalog` lists service highlights as Offers
+
+**Files changed:**
+- `src/app/admin/website/seo/cities/page.tsx` — service highlights editor, landmarks input, SEO data badges
+- `src/lib/services/ai-content-writer.ts` — enriched prompts with city context, ServiceHighlight type
+- `src/app/api/admin/cms/content/ai-generate/route.ts` — service_highlights in batch mode
+- `src/app/(public)/areas/[citySlug]/page.tsx` — service highlights rendering, landmarks display, enhanced JSON-LD
+
+---
+
+## CMS Phase E.2: Global Reusable Blocks — 2026-02-28
+
+- **Global blocks system**: Content blocks can be marked as "global" and shared across multiple pages via junction table (`page_block_placements`)
+- **Admin management page**: `/admin/website/global-blocks` — create, view, toggle visibility, and permanently delete global blocks with usage counts
+- **Insert Global Block dialog**: Available in every page's content block editor — search and insert existing global blocks
+- **Visual indicators**: Blue left border + "Shared" badge on global blocks in page editors, warning banner when editing showing usage count
+- **Smart delete**: Removing a global block from a page only removes the placement, not the block itself. Permanent delete only from management view
+- **Reorder support**: Mixed page-scoped and global blocks can be reordered together — sort order stored in respective tables
+- **Public renderer**: Automatically merges global blocks into page content at their sort position
+
+**Files created:**
+- `supabase/migrations/20260228000004_global_blocks.sql` — is_global, global_name columns + page_block_placements table
+- `src/app/api/admin/cms/global-blocks/route.ts` — list + create global blocks
+- `src/app/api/admin/cms/global-blocks/[id]/route.ts` — delete global block
+- `src/app/api/admin/cms/global-blocks/[id]/place/route.ts` — place/remove global block on page
+- `src/app/admin/website/global-blocks/page.tsx` — Global Blocks management page
+
+**Files changed:**
+- `src/lib/supabase/types.ts` — added is_global, global_name, _placement_id, _usage_count to PageContentBlock; added PageBlockPlacement interface
+- `src/lib/data/page-content.ts` — updated getPageContentBlocks and getPageContentBlocksAdmin to merge global blocks; added global block data access functions
+- `src/app/api/admin/cms/content/route.ts` — GET merges global placements; POST supports is_global
+- `src/app/api/admin/cms/content/[id]/route.ts` — added global_name to allowed fields
+- `src/app/api/admin/cms/content/reorder/route.ts` — handles placementMap for global blocks
+- `src/components/admin/content/content-block-editor.tsx` — Insert Global Block dialog, shared badge, warning banner, smart delete
+- `src/app/admin/website/page.tsx` — added Global Blocks card to Website overview
+
+---
+
 ## CMS Phase E.8: Pages Editor Cleanup + Navigation Sync — 2026-02-28
 
 ### Pages Editor Cleanup

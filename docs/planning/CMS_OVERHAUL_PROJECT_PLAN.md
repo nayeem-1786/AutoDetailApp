@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-28 (Phase E.8 Pages Editor Cleanup + Navigation Sync)
-> **Status:** Phase E.8 Complete — Pages editor cleanup, nav sync toggle, drag-to-indent, tree lines
+> **Updated:** 2026-02-28 (Phase E.6 City Pages SEO Enhancement)
+> **Status:** Phase E.6 Complete — Service highlights, landmarks, keyword-aware AI for city pages
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -847,13 +847,17 @@ Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger
 - [x] Preview renders draft/unpublished pages with a "Preview Mode" banner
 - [x] Preview token expires after 1 hour or on publish
 
-### E.2 — Shared / Global Reusable Blocks
+### E.2 — Shared / Global Reusable Blocks ✅ COMPLETE (2026-02-28)
 
-- [ ] Add `is_global` flag to content blocks
-- [ ] Global blocks can be referenced by multiple pages (many-to-many relationship)
-- [ ] Editing a global block updates it everywhere it's used
-- [ ] "Insert Global Block" option in the content block dropdown
-- [ ] List of global blocks with usage count in a management view
+- [x] Add `is_global` flag + `global_name` to content blocks
+- [x] `page_block_placements` junction table for page-block many-to-many relationships
+- [x] Editing a global block on any page updates it everywhere
+- [x] "Insert Global Block" button + dialog in content block editor
+- [x] Global Blocks management page at `/admin/website/global-blocks` with usage counts
+- [x] Visual indicator (blue left border + "Shared" badge) on global blocks in page editor
+- [x] Warning banner when editing shared blocks with usage count
+- [x] Remove-from-page vs delete-permanently distinction
+- [x] Reorder support for mixed page-scoped + global blocks (placement sort_order)
 
 ### E.3 — Revision History ✅ COMPLETE (2026-02-28)
 
@@ -881,13 +885,17 @@ Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger
 - [x] Admin UI at `/admin/website/homepage` — differentiators editor (icon picker, reorder, add/remove), Google Place ID, CTA images via ImageUploadField, section headings
 - [x] API route at `/api/admin/cms/homepage-settings` — batch GET/PUT for all homepage settings
 
-### E.6 — City Pages SEO Enhancement
+### E.6 — City Pages SEO Enhancement ✅ COMPLETE (2026-02-28)
 
-- [ ] Wire up unused `service_highlights` (JSONB) and `local_landmarks` (TEXT) fields in city admin UI
-- [ ] Make AI content generator keyword-aware: pull `focus_keywords` from city record, use in prompts
-- [ ] Add content structure guidance per city (different cities can emphasize different services/neighborhoods)
-- [ ] Consider adding local review integration per city
-- [ ] **This is the SEO value play — separate planning session recommended**
+- [x] Wire up `service_highlights` (JSONB) and `local_landmarks` (TEXT) fields in city admin UI
+- [x] Service Highlights editor: add/edit/delete/reorder/featured toggle, drag-to-reorder, "Import from Catalog" button
+- [x] Local Landmarks input: comma-separated text field for local points of interest
+- [x] AI content generator now keyword-aware: injects focus_keywords, local_landmarks, and service_highlights into all city prompts (full_page, batch_cities, single_block, improve modes)
+- [x] Service highlights displayed on public city pages: featured services get prominent cards, non-featured in secondary grid
+- [x] Local landmarks shown in hero section ("Serving the {city} area near {landmarks}")
+- [x] Enhanced JSON-LD: City-specific areaServed with State containment, hasOfferCatalog with service highlights as Offers
+- [x] Keyword density indicator in content editor dialog showing focus keywords for reference
+- [x] SEO Data column in cities table showing KW/SH/LM badges for quick data completeness check
 
 ### E.7 — Theme System Overhaul
 

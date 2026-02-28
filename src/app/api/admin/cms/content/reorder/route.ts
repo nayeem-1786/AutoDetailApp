@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
 // ---------------------------------------------------------------------------
-// PATCH /api/admin/cms/content/reorder — Reorder blocks
+// PATCH /api/admin/cms/content/reorder — Reorder blocks (page-scoped + global)
 // ---------------------------------------------------------------------------
 
 export async function PATCH(request: NextRequest) {
@@ -18,7 +18,8 @@ export async function PATCH(request: NextRequest) {
   if (denied) return denied;
 
   const body = await request.json();
-  const { pagePath, orderedIds } = body;
+  const { pagePath, orderedIds, placementMap } = body;
+  // placementMap: Record<blockId, placementId> — for global blocks
 
   if (!pagePath || !orderedIds || !Array.isArray(orderedIds)) {
     return NextResponse.json(
@@ -31,14 +32,30 @@ export async function PATCH(request: NextRequest) {
   const now = new Date().toISOString();
 
   for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await admin
-      .from('page_content_blocks')
-      .update({ sort_order: i, updated_at: now })
-      .eq('id', orderedIds[i])
-      .eq('page_path', pagePath);
+    const blockId = orderedIds[i];
+    const placementId = placementMap?.[blockId];
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (placementId) {
+      // Global block — update placement sort_order
+      const { error } = await admin
+        .from('page_block_placements')
+        .update({ sort_order: i })
+        .eq('id', placementId);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    } else {
+      // Page-scoped block — update block sort_order
+      const { error } = await admin
+        .from('page_content_blocks')
+        .update({ sort_order: i, updated_at: now })
+        .eq('id', blockId)
+        .eq('page_path', pagePath);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
     }
   }
 

@@ -10,7 +10,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 // DELETE /api/admin/cms/content/[id]  — Delete block
 // ---------------------------------------------------------------------------
 
-const ALLOWED_FIELDS = ['title', 'content', 'block_type', 'is_active', 'sort_order'];
+const ALLOWED_FIELDS = ['title', 'content', 'block_type', 'is_active', 'sort_order', 'global_name'];
 
 export async function GET(
   _request: NextRequest,

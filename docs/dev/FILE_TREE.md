@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-28 (Phase E.4+E.5 — Homepage Settings admin page, API, data layer)
+> **Last updated:** 2026-02-28 (Phase E.2 — Global reusable blocks)
 
 ---
 
@@ -75,6 +75,9 @@ src/app/api/admin/cms/content/ai-generate/route.ts
 src/app/api/admin/cms/migrate-markdown/route.ts
 src/app/api/admin/cms/content/reorder/route.ts
 src/app/api/admin/cms/content/route.ts
+src/app/api/admin/cms/global-blocks/route.ts
+src/app/api/admin/cms/global-blocks/[id]/route.ts
+src/app/api/admin/cms/global-blocks/[id]/place/route.ts
 src/app/api/admin/cms/homepage-settings/route.ts
 src/app/api/admin/cms/hero/[id]/route.ts
 src/app/api/admin/cms/hero/config/route.ts
@@ -551,6 +554,7 @@ src/app/admin/website/ads/page.tsx
 src/app/admin/website/catalog/page.tsx
 src/app/admin/website/credentials/page.tsx
 src/app/admin/website/footer/page.tsx
+src/app/admin/website/global-blocks/page.tsx
 src/app/admin/website/hero/[id]/page.tsx
 src/app/admin/website/hero/page.tsx
 src/app/admin/website/homepage/page.tsx
@@ -1148,6 +1152,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260228000001_page_preview_tokens.sql
 20260228000002_create_page_revisions.sql
 20260228000003_homepage_settings.sql
+20260228000004_global_blocks.sql
 ```
 
 ---

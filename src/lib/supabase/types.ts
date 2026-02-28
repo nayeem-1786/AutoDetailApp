@@ -1281,10 +1281,25 @@ export interface PageContentBlock {
   content: string;
   sort_order: number;
   is_active: boolean;
+  is_global: boolean;
+  global_name: string | null;
   ai_generated: boolean;
   ai_last_generated_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Client-side only: set when this block was loaded via a placement */
+  _placement_id?: string;
+  /** Client-side only: usage count across pages (global blocks) */
+  _usage_count?: number;
+}
+
+export interface PageBlockPlacement {
+  id: string;
+  page_path: string;
+  page_type: string;
+  block_id: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface Credential {

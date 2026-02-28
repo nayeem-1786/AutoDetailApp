@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowRight, Star, MapPin, Phone } from 'lucide-react';
+import { ArrowRight, Star, MapPin, Phone, Sparkles, CheckCircle2 } from 'lucide-react';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getActiveCities, getCityBySlug } from '@/lib/data/cities';
 import { getBusinessInfo } from '@/lib/data/business';
@@ -20,6 +20,35 @@ import { CtaSection } from '@/components/public/cta-section';
 import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import { formatPhone, phoneToE164 } from '@/lib/utils/format';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
+
+// ---------------------------------------------------------------------------
+// Service Highlight type (matches admin editor)
+// ---------------------------------------------------------------------------
+
+interface ServiceHighlight {
+  id: string;
+  service_name: string;
+  description: string;
+  is_featured: boolean;
+}
+
+function parseServiceHighlights(raw: unknown): ServiceHighlight[] {
+  if (!raw) return [];
+  try {
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((h: Record<string, unknown>) => h.service_name)
+      .map((h: Record<string, unknown>) => ({
+        id: (h.id as string) || '',
+        service_name: (h.service_name as string) || '',
+        description: (h.description as string) || '',
+        is_featured: Boolean(h.is_featured),
+      }));
+  } catch {
+    return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Static params — pre-render all active cities at build time
@@ -114,11 +143,53 @@ export default async function CityLandingPage({
   // Limit service categories to 6 for the highlights section
   const topCategories = categories.slice(0, 6);
 
+  // Parse service highlights
+  const serviceHighlights = parseServiceHighlights(city.service_highlights);
+  const featuredHighlights = serviceHighlights.filter((h) => h.is_featured);
+  const otherHighlights = serviceHighlights.filter((h) => !h.is_featured);
+
+  // Parse landmarks
+  const landmarks = city.local_landmarks
+    ? city.local_landmarks.split(',').map((l) => l.trim()).filter(Boolean)
+    : [];
+
   // JSON-LD structured data
   const localBusinessSchema = generateLocalBusinessSchema(businessInfo, {
     google: { rating: reviews.google.rating, count: reviews.google.count },
     yelp: { rating: reviews.yelp.rating, count: reviews.yelp.count },
   });
+
+  // Enhance LocalBusiness schema with city-specific areaServed
+  const cityBusinessSchema = {
+    ...localBusinessSchema,
+    areaServed: [
+      ...(Array.isArray(localBusinessSchema.areaServed) ? localBusinessSchema.areaServed : []),
+      {
+        '@type': 'City',
+        name: city.city_name,
+        containedInPlace: {
+          '@type': 'State',
+          name: city.state === 'CA' ? 'California' : city.state,
+        },
+      },
+    ],
+    ...(serviceHighlights.length > 0
+      ? {
+          hasOfferCatalog: {
+            '@type': 'OfferCatalog',
+            name: `Auto Detailing Services in ${city.city_name}`,
+            itemListElement: serviceHighlights.map((h) => ({
+              '@type': 'Offer',
+              itemOffered: {
+                '@type': 'Service',
+                name: h.service_name,
+                ...(h.description ? { description: h.description } : {}),
+              },
+            })),
+          },
+        }
+      : {}),
+  };
 
   const breadcrumbSchema = generateBreadcrumbSchema([
     { name: 'Home', url: SITE_URL },
@@ -132,7 +203,7 @@ export default async function CityLandingPage({
 
   return (
     <>
-      <JsonLd data={localBusinessSchema} />
+      <JsonLd data={cityBusinessSchema} />
       <JsonLd data={breadcrumbSchema} />
 
       {/* Hero Section */}
@@ -169,6 +240,12 @@ export default async function CityLandingPage({
                 {businessInfo.state}
               </p>
             )}
+            {landmarks.length > 0 && (
+              <p className="mt-1.5 text-sm text-site-text-dim">
+                Serving the {city.city_name} area near {landmarks.slice(0, 3).join(', ')}
+                {landmarks.length > 3 ? `, and more` : ''}
+              </p>
+            )}
             <div className="mt-8">
               <Link
                 href="/book"
@@ -182,8 +259,97 @@ export default async function CityLandingPage({
         </div>
       </section>
 
-      {/* Service Highlights */}
-      {topCategories.length > 0 && (
+      {/* Custom Service Highlights (from service_highlights field) */}
+      {serviceHighlights.length > 0 && (
+        <section className="bg-brand-dark section-spacing">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <AnimatedSection>
+              <div className="text-center">
+                <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
+                  Our Services in{' '}
+                  <span className="text-gradient-lime">{city.city_name}</span>
+                </h2>
+                <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
+                  Premium mobile auto detailing services tailored for {city.city_name} vehicles and conditions.
+                </p>
+              </div>
+            </AnimatedSection>
+
+            {/* Featured services — larger cards */}
+            {featuredHighlights.length > 0 && (
+              <AnimatedSection stagger className="mt-12 grid gap-6 sm:grid-cols-2">
+                {featuredHighlights.map((h) => (
+                  <AnimatedItem key={h.id}>
+                    <div className="relative rounded-2xl bg-brand-surface border border-lime/20 p-8 hover:border-lime/40 transition-colors overflow-hidden">
+                      <div className="absolute top-4 right-4">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-lime/10 px-2.5 py-1 text-xs font-semibold text-lime">
+                          <Sparkles className="h-3 w-3" />
+                          Featured
+                        </span>
+                      </div>
+                      <h3 className="font-display text-xl font-bold text-site-text pr-20">
+                        {h.service_name}
+                      </h3>
+                      {h.description && (
+                        <p className="mt-3 text-sm leading-relaxed text-site-text-muted">
+                          {h.description}
+                        </p>
+                      )}
+                      <Link
+                        href="/book"
+                        className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
+                      >
+                        Book now
+                        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    </div>
+                  </AnimatedItem>
+                ))}
+              </AnimatedSection>
+            )}
+
+            {/* Non-featured services — smaller grid */}
+            {otherHighlights.length > 0 && (
+              <AnimatedSection stagger className={`${featuredHighlights.length > 0 ? 'mt-6' : 'mt-12'} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
+                {otherHighlights.map((h) => (
+                  <AnimatedItem key={h.id}>
+                    <div className="rounded-xl bg-brand-surface border border-site-border p-6 hover:border-lime/20 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-lime" />
+                        <div>
+                          <h3 className="font-semibold text-site-text">
+                            {h.service_name}
+                          </h3>
+                          {h.description && (
+                            <p className="mt-1.5 text-sm text-site-text-muted leading-relaxed">
+                              {h.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </AnimatedItem>
+                ))}
+              </AnimatedSection>
+            )}
+
+            <AnimatedSection delay={0.3}>
+              <div className="mt-10 text-center">
+                <Link
+                  href="/services"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
+                >
+                  View all services
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
+            </AnimatedSection>
+          </div>
+        </section>
+      )}
+
+      {/* Service Categories (fallback when no custom highlights) */}
+      {serviceHighlights.length === 0 && topCategories.length > 0 && (
         <section className="bg-brand-dark section-spacing">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <AnimatedSection>

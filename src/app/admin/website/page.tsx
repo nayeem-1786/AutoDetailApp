@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Users,
   Award,
+  Layers,
 } from 'lucide-react';
 
 const sections = [
@@ -45,6 +46,12 @@ const sections = [
     description: 'Manage awards, certifications, and credentials.',
     icon: Award,
     href: '/admin/website/credentials',
+  },
+  {
+    title: 'Global Blocks',
+    description: 'Shared content blocks that can be reused across multiple pages.',
+    icon: Layers,
+    href: '/admin/website/global-blocks',
   },
   {
     title: 'City Pages',

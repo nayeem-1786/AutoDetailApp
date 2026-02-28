@@ -6,6 +6,13 @@ import type { ContentBlockType } from '@/lib/supabase/types';
 // Reuses ANTHROPIC_API_KEY from messaging/SEO integration
 // ---------------------------------------------------------------------------
 
+export interface ServiceHighlight {
+  id: string;
+  service_name: string;
+  description: string;
+  is_featured: boolean;
+}
+
 export interface ContentWriterContext {
   pagePath: string;
   pageType: string;
@@ -19,6 +26,7 @@ export interface ContentWriterContext {
   cityName?: string;
   cityDistance?: string;
   localLandmarks?: string;
+  serviceHighlights?: ServiceHighlight[];
   serviceName?: string;
   serviceCategory?: string;
   serviceDescription?: string;
@@ -210,6 +218,9 @@ export async function getBusinessContext(): Promise<{
 // ---------------------------------------------------------------------------
 
 function buildCityPagePrompt(ctx: ContentWriterContext): string {
+  const featured = ctx.serviceHighlights?.filter((s) => s.is_featured) ?? [];
+  const allHighlights = ctx.serviceHighlights ?? [];
+
   const parts = [
     `Generate FULL PAGE CONTENT for a city landing page.`,
     '',
@@ -220,19 +231,51 @@ function buildCityPagePrompt(ctx: ContentWriterContext): string {
     `BUSINESS PHONE: ${ctx.businessPhone}`,
     `GOOGLE RATING: ${ctx.googleRating} stars (${ctx.googleReviewCount} reviews)`,
     ctx.cityDistance ? `DISTANCE FROM SHOP: ${ctx.cityDistance}` : '',
-    ctx.localLandmarks ? `LOCAL LANDMARKS: ${ctx.localLandmarks}` : '',
-    ctx.focusKeywords?.length ? `FOCUS KEYWORDS: ${ctx.focusKeywords.join(', ')}` : '',
+  ];
+
+  // Inject city-specific SEO context
+  if (ctx.focusKeywords?.length) {
+    parts.push(`FOCUS KEYWORDS (must be naturally incorporated throughout): ${ctx.focusKeywords.join(', ')}`);
+  }
+  if (ctx.localLandmarks) {
+    parts.push(`LOCAL LANDMARKS & POINTS OF INTEREST: ${ctx.localLandmarks}`);
+  }
+  if (featured.length > 0) {
+    parts.push(`FEATURED SERVICES FOR THIS CITY: ${featured.map((s) => s.service_name).join(', ')}`);
+  }
+  if (allHighlights.length > 0) {
+    const descriptions = allHighlights
+      .filter((s) => s.description)
+      .map((s) => `  - ${s.service_name}: ${s.description}`);
+    if (descriptions.length > 0) {
+      parts.push(`SERVICE CONTEXT FOR THIS CITY:`);
+      parts.push(...descriptions);
+    }
+  }
+
+  parts.push(
     '',
     `Generate these blocks IN ORDER:`,
-    `1. "rich_text" — City-specific intro paragraph mentioning ${ctx.cityName}, distance, and local context (150-200 words)`,
-    `2. "rich_text" — "Why Choose ${ctx.businessName} in ${ctx.cityName}" — mobile service convenience, certifications, local knowledge (200-300 words)`,
-    `3. "features_list" — "Popular Services in ${ctx.cityName}" — Top 4-5 services with benefit-focused descriptions (JSON array of {title, description})`,
-    `4. "rich_text" — "The Smart Details Difference" — Differentiators, quality commitment, premium products (150-250 words)`,
-    `5. "faq" — 6-8 city-specific FAQ questions real customers would ask, with detailed answers (JSON array of {question, answer})`,
+    `1. "rich_text" — City-specific intro paragraph mentioning ${ctx.cityName}, distance, and local context. ${ctx.localLandmarks ? `Reference landmarks like ${ctx.localLandmarks.split(',').slice(0, 2).join(' and ')}.` : ''} (150-200 words)`,
+    `2. "rich_text" — "Why Choose ${ctx.businessName} in ${ctx.cityName}" — mobile service convenience, certifications, local knowledge${featured.length > 0 ? `, emphasize ${featured.map((s) => s.service_name).join(', ')}` : ''} (200-300 words)`,
+    `3. "features_list" — "Popular Services in ${ctx.cityName}" — ${allHighlights.length > 0 ? `Use these services: ${allHighlights.map((s) => s.service_name).join(', ')}. Include city-specific descriptions.` : 'Top 4-5 services with benefit-focused descriptions.'} (JSON array of {title, description})`,
+    `4. "rich_text" — "The Smart Details Difference" — Differentiators, quality commitment, premium products${ctx.localLandmarks ? `, reference serving near ${ctx.localLandmarks.split(',')[0]?.trim()}` : ''} (150-250 words)`,
+    `5. "faq" — 6-8 city-specific FAQ questions real customers in ${ctx.cityName} would ask, with detailed answers (JSON array of {question, answer})`,
     `6. "cta" — Booking CTA: "Ready for Premium Detailing in ${ctx.cityName}?" (JSON object with heading, description, button_text, button_url="/book")`,
     '',
-    `CRITICAL: Each section must have UNIQUE content specific to ${ctx.cityName}. DO NOT use generic content that could apply to any city.`,
-  ];
+    `CRITICAL REQUIREMENTS:`,
+    `- Each section must have UNIQUE content specific to ${ctx.cityName}. DO NOT use generic content that could apply to any city.`,
+  );
+
+  if (ctx.focusKeywords?.length) {
+    parts.push(`- Naturally incorporate EACH focus keyword at least 2-3 times across all blocks: ${ctx.focusKeywords.join(', ')}`);
+  }
+  if (ctx.localLandmarks) {
+    parts.push(`- Reference local landmarks to build geographic relevance`);
+  }
+  if (featured.length > 0) {
+    parts.push(`- Give prominent attention to featured services: ${featured.map((s) => s.service_name).join(', ')}`);
+  }
 
   if (ctx.additionalInstructions) {
     parts.push('', `ADDITIONAL INSTRUCTIONS: ${ctx.additionalInstructions}`);
@@ -293,6 +336,24 @@ function buildSingleBlockPrompt(ctx: ContentWriterContext): string {
     ctx.targetWordCount ? `TARGET WORD COUNT: ${ctx.targetWordCount}` : '',
   ];
 
+  // Inject city-specific context
+  if (ctx.cityName) {
+    if (ctx.cityDistance) parts.push(`DISTANCE FROM SHOP: ${ctx.cityDistance}`);
+    if (ctx.localLandmarks) parts.push(`LOCAL LANDMARKS: ${ctx.localLandmarks}`);
+    const featured = ctx.serviceHighlights?.filter((s) => s.is_featured) ?? [];
+    if (featured.length > 0) {
+      parts.push(`FEATURED SERVICES: ${featured.map((s) => s.service_name).join(', ')}`);
+    }
+    if (ctx.serviceHighlights && ctx.serviceHighlights.length > 0) {
+      const descriptions = ctx.serviceHighlights
+        .filter((s) => s.description)
+        .map((s) => `  - ${s.service_name}: ${s.description}`);
+      if (descriptions.length > 0) {
+        parts.push(`SERVICE CONTEXT:`, ...descriptions);
+      }
+    }
+  }
+
   // Inject page context for non-city, non-service pages
   if (!ctx.cityName && !ctx.serviceName && ctx.pageContext) {
     if (ctx.pageContext.title) {
@@ -317,6 +378,10 @@ function buildSingleBlockPrompt(ctx: ContentWriterContext): string {
     parts.push('', `Generate a rich text section with ${ctx.targetWordCount || '200-300'} words using HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>). Do NOT use markdown syntax.`);
   }
 
+  if (ctx.focusKeywords?.length) {
+    parts.push(`Naturally incorporate these keywords: ${ctx.focusKeywords.join(', ')}`);
+  }
+
   if (ctx.additionalInstructions) {
     parts.push('', `ADDITIONAL INSTRUCTIONS: ${ctx.additionalInstructions}`);
   }
@@ -338,8 +403,19 @@ function buildImprovePrompt(ctx: ContentWriterContext): string {
     `PAGE: ${ctx.pagePath}`,
     `BUSINESS: ${ctx.businessName}`,
     `LOCATION: ${ctx.businessLocation}`,
-    ctx.focusKeywords?.length ? `FOCUS KEYWORDS: ${ctx.focusKeywords.join(', ')}` : '',
+    ctx.focusKeywords?.length ? `FOCUS KEYWORDS (incorporate naturally): ${ctx.focusKeywords.join(', ')}` : '',
   ];
+
+  // Inject city-specific context
+  if (ctx.cityName) {
+    parts.push(`CITY: ${ctx.cityName}`);
+    if (ctx.cityDistance) parts.push(`DISTANCE FROM SHOP: ${ctx.cityDistance}`);
+    if (ctx.localLandmarks) parts.push(`LOCAL LANDMARKS: ${ctx.localLandmarks}`);
+    const featured = ctx.serviceHighlights?.filter((s) => s.is_featured) ?? [];
+    if (featured.length > 0) {
+      parts.push(`FEATURED SERVICES: ${featured.map((s) => s.service_name).join(', ')}`);
+    }
+  }
 
   // Inject page context for non-city pages
   if (!ctx.cityName && !ctx.serviceName && ctx.pageContext) {
@@ -499,7 +575,7 @@ export async function buildCityContext(
 
   const { data: city } = await admin
     .from('city_landing_pages')
-    .select('city_name, slug, state, distance_miles, intro_text, local_landmarks, focus_keywords')
+    .select('city_name, slug, state, distance_miles, intro_text, local_landmarks, focus_keywords, service_highlights')
     .eq('slug', citySlug)
     .single();
 
@@ -520,11 +596,32 @@ export async function buildCityContext(
     );
   }
 
+  // Parse service highlights
+  let serviceHighlights: ServiceHighlight[] | undefined;
+  if (city.service_highlights) {
+    try {
+      const raw = typeof city.service_highlights === 'string'
+        ? JSON.parse(city.service_highlights as string)
+        : city.service_highlights;
+      if (Array.isArray(raw) && raw.length > 0) {
+        serviceHighlights = raw.map((h: Record<string, unknown>) => ({
+          id: (h.id as string) || '',
+          service_name: (h.service_name as string) || '',
+          description: (h.description as string) || '',
+          is_featured: Boolean(h.is_featured),
+        }));
+      }
+    } catch {
+      // Invalid JSON — skip
+    }
+  }
+
   return {
     cityName: city.city_name,
     cityDistance: city.distance_miles ? `${city.distance_miles} miles from Lomita` : undefined,
     localLandmarks: typeof city.local_landmarks === 'string' ? city.local_landmarks : undefined,
     focusKeywords: focusKeywords.length > 0 ? focusKeywords : undefined,
+    serviceHighlights,
   };
 }
 

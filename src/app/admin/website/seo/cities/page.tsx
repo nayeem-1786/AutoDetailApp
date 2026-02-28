@@ -17,6 +17,11 @@ import {
   X,
   FileText,
   Wand2,
+  GripVertical,
+  Star,
+  Download,
+  MapPin,
+  Search,
 } from 'lucide-react';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import type { CityLandingPage } from '@/lib/supabase/types';
@@ -35,6 +40,26 @@ function toSlug(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Service Highlight type
+// ---------------------------------------------------------------------------
+
+interface ServiceHighlight {
+  id: string;
+  service_name: string;
+  description: string;
+  is_featured: boolean;
+}
+
+function newHighlight(name = '', description = ''): ServiceHighlight {
+  return {
+    id: crypto.randomUUID(),
+    service_name: name,
+    description,
+    is_featured: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Form type
 // ---------------------------------------------------------------------------
 
@@ -49,6 +74,8 @@ interface CityFormData {
   meta_title: string;
   meta_description: string;
   is_active: boolean;
+  service_highlights: ServiceHighlight[];
+  local_landmarks: string;
 }
 
 const emptyForm: CityFormData = {
@@ -62,9 +89,30 @@ const emptyForm: CityFormData = {
   meta_title: '',
   meta_description: '',
   is_active: true,
+  service_highlights: [],
+  local_landmarks: '',
 };
 
 function cityToForm(city: CityLandingPage): CityFormData {
+  let highlights: ServiceHighlight[] = [];
+  if (city.service_highlights) {
+    try {
+      const raw = typeof city.service_highlights === 'string'
+        ? JSON.parse(city.service_highlights)
+        : city.service_highlights;
+      if (Array.isArray(raw)) {
+        highlights = raw.map((h: Record<string, unknown>) => ({
+          id: (h.id as string) || crypto.randomUUID(),
+          service_name: (h.service_name as string) || '',
+          description: (h.description as string) || '',
+          is_featured: Boolean(h.is_featured),
+        }));
+      }
+    } catch {
+      // Invalid JSON — start fresh
+    }
+  }
+
   return {
     city_name: city.city_name,
     slug: city.slug,
@@ -76,7 +124,27 @@ function cityToForm(city: CityLandingPage): CityFormData {
     meta_title: city.meta_title ?? '',
     meta_description: city.meta_description ?? '',
     is_active: city.is_active,
+    service_highlights: highlights,
+    local_landmarks: city.local_landmarks ?? '',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Keyword density checker
+// ---------------------------------------------------------------------------
+
+function countKeywordOccurrences(text: string, keyword: string): number {
+  if (!text || !keyword) return 0;
+  const plain = text.replace(/<[^>]*>/g, ' ').toLowerCase();
+  const kw = keyword.toLowerCase().trim();
+  if (!kw) return 0;
+  let count = 0;
+  let pos = 0;
+  while ((pos = plain.indexOf(kw, pos)) !== -1) {
+    count++;
+    pos += kw.length;
+  }
+  return count;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +161,10 @@ export default function CitiesAdminPage() {
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [contentCitySlug, setContentCitySlug] = useState<string | null>(null);
   const [contentCityName, setContentCityName] = useState<string>('');
+  const [contentCityId, setContentCityId] = useState<string | null>(null);
   const [batchGenerating, setBatchGenerating] = useState(false);
+  const [importingServices, setImportingServices] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   // -----------------------------------------------------------------------
   // Data loading
@@ -167,6 +238,8 @@ export default function CitiesAdminPage() {
         meta_title: form.meta_title.trim() || null,
         meta_description: form.meta_description.trim() || null,
         is_active: form.is_active,
+        service_highlights: form.service_highlights.length > 0 ? form.service_highlights : null,
+        local_landmarks: form.local_landmarks.trim() || null,
       };
 
       const url = editingId
@@ -200,7 +273,6 @@ export default function CitiesAdminPage() {
   // -----------------------------------------------------------------------
 
   const toggleActive = async (id: string, isActive: boolean) => {
-    // Optimistic update
     setCities((prev) =>
       prev.map((c) => (c.id === id ? { ...c, is_active: isActive } : c))
     );
@@ -212,7 +284,6 @@ export default function CitiesAdminPage() {
       });
       if (!res.ok) throw new Error('Failed');
     } catch {
-      // Revert
       setCities((prev) =>
         prev.map((c) => (c.id === id ? { ...c, is_active: !isActive } : c))
       );
@@ -252,6 +323,7 @@ export default function CitiesAdminPage() {
   const openContentEditor = (city: CityLandingPage) => {
     setContentCitySlug(city.slug);
     setContentCityName(city.city_name);
+    setContentCityId(city.id);
   };
 
   // -----------------------------------------------------------------------
@@ -289,6 +361,110 @@ export default function CitiesAdminPage() {
         }
       },
     });
+  };
+
+  // -----------------------------------------------------------------------
+  // Service Highlights helpers
+  // -----------------------------------------------------------------------
+
+  const addHighlight = () => {
+    setForm((prev) => ({
+      ...prev,
+      service_highlights: [...prev.service_highlights, newHighlight()],
+    }));
+  };
+
+  const updateHighlight = (idx: number, updates: Partial<ServiceHighlight>) => {
+    setForm((prev) => ({
+      ...prev,
+      service_highlights: prev.service_highlights.map((h, i) =>
+        i === idx ? { ...h, ...updates } : h
+      ),
+    }));
+  };
+
+  const removeHighlight = (idx: number) => {
+    setForm((prev) => ({
+      ...prev,
+      service_highlights: prev.service_highlights.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleDragStart = (idx: number) => {
+    setDragIdx(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) return;
+    setForm((prev) => {
+      const items = [...prev.service_highlights];
+      const [dragged] = items.splice(dragIdx, 1);
+      items.splice(idx, 0, dragged);
+      return { ...prev, service_highlights: items };
+    });
+    setDragIdx(idx);
+  };
+
+  const handleDragEnd = () => {
+    setDragIdx(null);
+  };
+
+  // Import services from catalog
+  const importFromCatalog = async () => {
+    setImportingServices(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/catalog/services');
+      if (!res.ok) throw new Error('Failed to load services');
+      const json = await res.json();
+      const services = json.data ?? [];
+
+      if (services.length === 0) {
+        toast.info('No services found in catalog');
+        return;
+      }
+
+      // Get existing service names to avoid duplicates
+      const existingNames = new Set(
+        form.service_highlights.map((h) => h.service_name.toLowerCase())
+      );
+
+      const newHighlights: ServiceHighlight[] = [];
+      for (const svc of services) {
+        const name = svc.name as string;
+        if (!existingNames.has(name.toLowerCase())) {
+          newHighlights.push(newHighlight(name, ''));
+        }
+      }
+
+      if (newHighlights.length === 0) {
+        toast.info('All catalog services already added');
+        return;
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        service_highlights: [...prev.service_highlights, ...newHighlights],
+      }));
+      toast.success(`Imported ${newHighlights.length} services`);
+    } catch {
+      toast.error('Failed to import services');
+    } finally {
+      setImportingServices(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Keyword density for content editor
+  // -----------------------------------------------------------------------
+
+  const getKeywordDensity = (cityId: string) => {
+    const city = cities.find((c) => c.id === cityId);
+    if (!city?.focus_keywords) return null;
+    return city.focus_keywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
   };
 
   // -----------------------------------------------------------------------
@@ -355,6 +531,9 @@ export default function CitiesAdminPage() {
                   Distance
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  SEO Data
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Content
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -366,79 +545,106 @@ export default function CitiesAdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
-              {cities.map((city) => (
-                <tr key={city.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => openEditDialog(city)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {city.city_name}, {city.state}
-                    </button>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <code className="text-xs text-gray-500 dark:text-gray-400">
-                      /areas/{city.slug}
-                    </code>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                    {city.distance_miles != null
-                      ? `${city.distance_miles} mi`
-                      : '--'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => openContentEditor(city)}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
-                    >
-                      <FileText className="h-3 w-3" />
-                      Edit Content
-                    </button>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={city.is_active}
-                        onCheckedChange={(val) => toggleActive(city.id, val)}
-                      />
-                      <Badge variant={city.is_active ? 'success' : 'default'}>
-                        {city.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <a
-                        href={`/areas/${city.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 text-gray-400 hover:text-brand-600 transition-colors"
-                        title="Preview page"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
+              {cities.map((city) => {
+                const hasHighlights = Array.isArray(city.service_highlights) && (city.service_highlights as unknown[]).length > 0;
+                const hasLandmarks = Boolean(city.local_landmarks);
+                const hasKeywords = Boolean(city.focus_keywords);
+                return (
+                  <tr key={city.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="whitespace-nowrap px-4 py-3">
                       <button
                         type="button"
                         onClick={() => openEditDialog(city)}
-                        className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-                        title="Edit"
+                        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
                       >
-                        <Pencil className="h-4 w-4" />
+                        {city.city_name}, {city.state}
                       </button>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <code className="text-xs text-gray-500 dark:text-gray-400">
+                        /areas/{city.slug}
+                      </code>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                      {city.distance_miles != null
+                        ? `${city.distance_miles} mi`
+                        : '--'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        {hasKeywords && (
+                          <span title="Has focus keywords" className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
+                            <Search className="mr-0.5 h-2.5 w-2.5" />KW
+                          </span>
+                        )}
+                        {hasHighlights && (
+                          <span title="Has service highlights" className="inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-300">
+                            <Star className="mr-0.5 h-2.5 w-2.5" />SH
+                          </span>
+                        )}
+                        {hasLandmarks && (
+                          <span title="Has local landmarks" className="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                            <MapPin className="mr-0.5 h-2.5 w-2.5" />LM
+                          </span>
+                        )}
+                        {!hasKeywords && !hasHighlights && !hasLandmarks && (
+                          <span className="text-xs text-gray-400">--</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
                       <button
                         type="button"
-                        onClick={() => handleDelete(city.id, city.city_name)}
-                        className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                        title="Delete"
+                        onClick={() => openContentEditor(city)}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <FileText className="h-3 w-3" />
+                        Edit Content
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={city.is_active}
+                          onCheckedChange={(val) => toggleActive(city.id, val)}
+                        />
+                        <Badge variant={city.is_active ? 'success' : 'default'}>
+                          {city.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <a
+                          href={`/areas/${city.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 text-gray-400 hover:text-brand-600 transition-colors"
+                          title="Preview page"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => openEditDialog(city)}
+                          className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(city.id, city.city_name)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -454,17 +660,48 @@ export default function CitiesAdminPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => setContentCitySlug(null)}
+                onClick={() => {
+                  setContentCitySlug(null);
+                  setContentCityId(null);
+                }}
                 className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="px-6 py-5">
+              {/* Keyword Density Indicator */}
+              {contentCityId && (() => {
+                const keywords = getKeywordDensity(contentCityId);
+                if (!keywords || keywords.length === 0) return null;
+                return (
+                  <div className="mb-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3">
+                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1.5">
+                      Focus Keywords
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {keywords.map((kw) => (
+                        <span
+                          key={kw}
+                          className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-800/50 px-2 py-0.5 text-xs text-blue-700 dark:text-blue-200"
+                        >
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-blue-500 dark:text-blue-400">
+                      AI generation will target these keywords in content
+                    </p>
+                  </div>
+                );
+              })()}
               <ContentBlockEditor
                 pagePath={`/areas/${contentCitySlug}`}
                 pageType="city_landing"
-                onClose={() => setContentCitySlug(null)}
+                onClose={() => {
+                  setContentCitySlug(null);
+                  setContentCityId(null);
+                }}
               />
             </div>
           </div>
@@ -560,8 +797,149 @@ export default function CitiesAdminPage() {
                 </div>
               </div>
 
+              {/* Service Highlights Section */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Service Highlights
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Customize which services to emphasize for this city
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={importFromCatalog}
+                      disabled={importingServices}
+                    >
+                      {importingServices ? (
+                        <Spinner size="sm" className="mr-1.5" />
+                      ) : (
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Import from Catalog
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addHighlight}
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                {form.service_highlights.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-gray-300 dark:border-gray-600 p-4 text-center">
+                    <p className="text-xs text-gray-400">
+                      No service highlights yet. Add services to emphasize for this city.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {form.service_highlights.map((h, idx) => (
+                      <div
+                        key={h.id}
+                        draggable
+                        onDragStart={() => handleDragStart(idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDragEnd={handleDragEnd}
+                        className={`rounded-lg border p-3 transition-colors ${
+                          dragIdx === idx
+                            ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <button
+                            type="button"
+                            className="mt-1 cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing"
+                            aria-label="Drag to reorder"
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </button>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={h.service_name}
+                                onChange={(e) =>
+                                  updateHighlight(idx, { service_name: e.target.value })
+                                }
+                                placeholder="Service name (e.g. Ceramic Coating)"
+                                className="flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm dark:border-gray-500 dark:bg-gray-600 dark:text-gray-200"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateHighlight(idx, { is_featured: !h.is_featured })
+                                }
+                                className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                                  h.is_featured
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-400'
+                                }`}
+                                title={h.is_featured ? 'Featured' : 'Not featured'}
+                              >
+                                <Star className={`h-3 w-3 ${h.is_featured ? 'fill-current' : ''}`} />
+                                {h.is_featured ? 'Featured' : 'Feature'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeHighlight(idx)}
+                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Remove"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={h.description}
+                              onChange={(e) =>
+                                updateHighlight(idx, { description: e.target.value })
+                              }
+                              placeholder={`City-specific angle (e.g. "Protecting ${form.city_name || 'city'} vehicles from coastal salt air")`}
+                              className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm dark:border-gray-500 dark:bg-gray-600 dark:text-gray-200"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Local Landmarks Section */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Local Landmarks & Points of Interest
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5 mb-2">
+                  Used by AI to generate location-specific content
+                </p>
+                <input
+                  type="text"
+                  value={form.local_landmarks}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, local_landmarks: e.target.value }))
+                  }
+                  placeholder="e.g. Del Amo Fashion Center, Torrance Beach, Madrona Marsh, Wilson Park"
+                  className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Comma-separated landmarks
+                </p>
+              </div>
+
               {/* Heading */}
-              <div>
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Page Heading
                 </label>
@@ -601,6 +979,27 @@ export default function CitiesAdminPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Focus Keywords
+                    </label>
+                    <input
+                      type="text"
+                      value={form.focus_keywords}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          focus_keywords: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. auto detailing torrance, car wash torrance"
+                      className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">
+                      Comma-separated keywords — AI will target these in generated content
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Meta Title
                     </label>
                     <input
@@ -638,27 +1037,6 @@ export default function CitiesAdminPage() {
                     />
                     <p className="mt-1 text-xs text-gray-400">
                       {form.meta_description.length}/160 characters
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Focus Keywords
-                    </label>
-                    <input
-                      type="text"
-                      value={form.focus_keywords}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          focus_keywords: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. auto detailing torrance, car wash torrance"
-                      className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                    />
-                    <p className="mt-1 text-xs text-gray-400">
-                      Comma-separated keywords
                     </p>
                   </div>
                 </div>

@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     // Get all active cities
     const { data: cities } = await admin
       .from('city_landing_pages')
-      .select('slug, city_name, distance_miles, local_landmarks, focus_keywords')
+      .select('slug, city_name, distance_miles, local_landmarks, focus_keywords, service_highlights')
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
 
@@ -182,6 +182,26 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Parse service highlights
+        let serviceHighlights: ContentWriterContext['serviceHighlights'];
+        if (city.service_highlights) {
+          try {
+            const raw = typeof city.service_highlights === 'string'
+              ? JSON.parse(city.service_highlights as string)
+              : city.service_highlights;
+            if (Array.isArray(raw) && raw.length > 0) {
+              serviceHighlights = raw.map((h: Record<string, unknown>) => ({
+                id: (h.id as string) || '',
+                service_name: (h.service_name as string) || '',
+                description: (h.description as string) || '',
+                is_featured: Boolean(h.is_featured),
+              }));
+            }
+          } catch {
+            // Invalid JSON — skip
+          }
+        }
+
         const ctx: ContentWriterContext = {
           ...biz,
           pagePath: cityPath,
@@ -191,6 +211,7 @@ export async function POST(request: NextRequest) {
           cityDistance: city.distance_miles ? `${city.distance_miles} miles from Lomita` : undefined,
           localLandmarks: typeof city.local_landmarks === 'string' ? city.local_landmarks : undefined,
           focusKeywords: cityFocusKeywords.length > 0 ? cityFocusKeywords : undefined,
+          serviceHighlights,
           additionalInstructions,
         };
 

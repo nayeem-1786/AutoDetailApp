@@ -24,6 +24,10 @@ import {
   Award,
   Images,
   Sparkles,
+  Link2,
+  AlertTriangle,
+  X,
+  Search,
 } from 'lucide-react';
 import { FaqEditor, parseFaqContent, serializeFaqContent } from './faq-editor';
 import { TermsSectionsEditor } from './terms-sections-editor';
@@ -81,6 +85,7 @@ export function ContentBlockEditor({
   const [addingType, setAddingType] = useState<ContentBlockType | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiBlockId, setAiBlockId] = useState<string | null>(null);
+  const [showGlobalDialog, setShowGlobalDialog] = useState(false);
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 
   // -----------------------------------------------------------------------
@@ -184,12 +189,39 @@ export function ContentBlockEditor({
   };
 
   // -----------------------------------------------------------------------
-  // Delete block
+  // Delete block (page-scoped) or remove placement (global)
   // -----------------------------------------------------------------------
 
   const handleDeleteBlock = (id: string) => {
     const block = blocks.find((b) => b.id === id);
-    const label = block?.title || getBlockTypeLabel(block?.block_type as ContentBlockType) || 'block';
+    const label = block?.title || block?.global_name || getBlockTypeLabel(block?.block_type as ContentBlockType) || 'block';
+
+    // Global block — remove from page only (not delete the block)
+    if (block?.is_global && block?._placement_id) {
+      confirm({
+        title: 'Remove Shared Block',
+        description: `Remove "${label}" from this page? The shared block will still be available for other pages.`,
+        confirmLabel: 'Remove from Page',
+        variant: 'destructive',
+        onConfirm: async () => {
+          try {
+            const res = await adminFetch(
+              `/api/admin/cms/global-blocks/${id}/place?placementId=${block._placement_id}`,
+              { method: 'DELETE' }
+            );
+            if (!res.ok) throw new Error('Failed to remove');
+            setBlocks((prev) => prev.filter((b) => b.id !== id || b._placement_id !== block._placement_id));
+            if (expandedId === id) setExpandedId(null);
+            toast.success('Shared block removed from this page');
+          } catch {
+            toast.error('Failed to remove block');
+          }
+        },
+      });
+      return;
+    }
+
+    // Page-scoped block — delete permanently
     confirm({
       title: 'Delete Content Block',
       description: `Delete the "${label}" block? This cannot be undone.`,
@@ -212,6 +244,33 @@ export function ContentBlockEditor({
   };
 
   // -----------------------------------------------------------------------
+  // Insert global block into this page
+  // -----------------------------------------------------------------------
+
+  const handleInsertGlobalBlock = async (globalBlock: PageContentBlock) => {
+    try {
+      const res = await adminFetch(`/api/admin/cms/global-blocks/${globalBlock.id}/place`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          page_path: pagePath,
+          page_type: pageType,
+        }),
+      });
+      if (res.status === 409) {
+        toast.error('This block is already on this page');
+        return;
+      }
+      if (!res.ok) throw new Error('Failed to place');
+      toast.success(`"${globalBlock.global_name}" added to this page`);
+      setShowGlobalDialog(false);
+      await loadBlocks();
+    } catch {
+      toast.error('Failed to insert global block');
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Reorder (drag & drop) — using shared hook
   // -----------------------------------------------------------------------
 
@@ -226,12 +285,21 @@ export function ContentBlockEditor({
 
   const saveBlockOrder = useCallback(async () => {
     try {
+      // Build placementMap for global blocks
+      const placementMap: Record<string, string> = {};
+      blocks.forEach((b) => {
+        if (b.is_global && b._placement_id) {
+          placementMap[b.id] = b._placement_id;
+        }
+      });
+
       await adminFetch('/api/admin/cms/content/reorder', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pagePath,
           orderedIds: blocks.map((b) => b.id),
+          placementMap: Object.keys(placementMap).length > 0 ? placementMap : undefined,
         }),
       });
     } catch {
@@ -443,7 +511,7 @@ export function ContentBlockEditor({
       {blocks.length === 0 ? (
         <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-8 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            No content blocks yet. Add blocks manually or use AI to generate content.
+            No content blocks yet. Add blocks manually, use AI, or insert a global block.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {BLOCK_TYPE_OPTIONS.map((opt) => (
@@ -459,6 +527,16 @@ export function ContentBlockEditor({
                 {opt.label}
               </Button>
             ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGlobalDialog(true)}
+              className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30"
+            >
+              <Link2 className="mr-1.5 h-3.5 w-3.5" />
+              Insert Global Block
+            </Button>
           </div>
         </div>
       ) : (
@@ -503,7 +581,24 @@ export function ContentBlockEditor({
               {opt.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setShowGlobalDialog(true)}
+            className="inline-flex items-center gap-1 rounded-md border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+          >
+            <Link2 className="h-3 w-3" />
+            Insert Global Block
+          </button>
         </div>
+      )}
+
+      {/* Insert Global Block Dialog */}
+      {showGlobalDialog && (
+        <InsertGlobalBlockDialog
+          onInsert={handleInsertGlobalBlock}
+          onClose={() => setShowGlobalDialog(false)}
+          currentBlockIds={blocks.map((b) => b.id)}
+        />
       )}
 
       {/* Confirm Dialog */}
@@ -603,7 +698,7 @@ function BlockRow({
       }}
       className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-opacity ${
         isDragging ? 'opacity-50' : ''
-      }`}
+      } ${block.is_global ? 'border-l-2 border-l-blue-400 dark:border-l-blue-500' : ''}`}
     >
       {/* Collapsed header */}
       <div className="flex items-center gap-2 px-3 py-2.5">
@@ -627,8 +722,14 @@ function BlockRow({
           <Badge variant="secondary" className="flex-shrink-0 text-[10px]">
             {getBlockTypeLabel(block.block_type as ContentBlockType)}
           </Badge>
+          {block.is_global && (
+            <Badge className="flex-shrink-0 text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 border-0">
+              <Link2 className="mr-0.5 h-2.5 w-2.5" />
+              Shared
+            </Badge>
+          )}
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-            {block.title || contentPreview || 'Untitled'}
+            {block.global_name || block.title || contentPreview || 'Untitled'}
           </span>
         </button>
 
@@ -669,6 +770,15 @@ function BlockRow({
       {/* Expanded editor */}
       {isExpanded && (
         <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 space-y-4">
+          {/* Global block warning */}
+          {block.is_global && (
+            <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                This is a shared block{block._usage_count ? ` used on ${block._usage_count} page${block._usage_count !== 1 ? 's' : ''}` : ''}. Changes will apply everywhere.
+              </p>
+            </div>
+          )}
           {/* Title */}
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
@@ -1235,6 +1345,168 @@ function TestimonialEditor({
             placeholder="Google Review"
             className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Insert Global Block Dialog
+// ---------------------------------------------------------------------------
+
+function InsertGlobalBlockDialog({
+  onInsert,
+  onClose,
+  currentBlockIds,
+}: {
+  onInsert: (block: PageContentBlock) => void;
+  onClose: () => void;
+  currentBlockIds: string[];
+}) {
+  const [globalBlocks, setGlobalBlocks] = useState<PageContentBlock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [inserting, setInserting] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await adminFetch('/api/admin/cms/global-blocks');
+        if (!res.ok) throw new Error('Failed to load');
+        const json = await res.json();
+        setGlobalBlocks(json.data ?? []);
+      } catch {
+        toast.error('Failed to load global blocks');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const filtered = globalBlocks.filter((b) => {
+    const term = search.toLowerCase();
+    if (!term) return true;
+    return (
+      (b.global_name?.toLowerCase().includes(term)) ||
+      (b.title?.toLowerCase().includes(term)) ||
+      b.block_type.toLowerCase().includes(term)
+    );
+  });
+
+  const handleInsert = async (block: PageContentBlock) => {
+    setInserting(block.id);
+    await onInsert(block);
+    setInserting(null);
+  };
+
+  const alreadyOnPage = new Set(currentBlockIds);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Insert Global Block
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search global blocks..."
+              className="block w-full rounded-md border border-gray-300 bg-white pl-8 pr-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            />
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto px-4 py-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner size="lg" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {globalBlocks.length === 0
+                  ? 'No global blocks yet. Create one from the Global Blocks management page.'
+                  : 'No matching blocks found.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((block) => {
+                const isOnPage = alreadyOnPage.has(block.id);
+                return (
+                  <div
+                    key={block.id}
+                    className="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Link2 className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {block.global_name || 'Untitled'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {getBlockTypeLabel(block.block_type as ContentBlockType)}
+                          </Badge>
+                          <span className="text-[11px] text-gray-400">
+                            Used on {(block as { _usage_count?: number })._usage_count ?? 0} page{((block as { _usage_count?: number })._usage_count ?? 0) !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isOnPage ? 'outline' : 'default'}
+                        disabled={isOnPage || inserting !== null}
+                        onClick={() => handleInsert(block)}
+                        className="flex-shrink-0 h-7 text-xs"
+                      >
+                        {inserting === block.id ? (
+                          <Spinner size="sm" />
+                        ) : isOnPage ? (
+                          'Already Added'
+                        ) : (
+                          'Insert'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
         </div>
       </div>
     </div>
