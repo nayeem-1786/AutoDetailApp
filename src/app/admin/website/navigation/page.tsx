@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   Plus,
@@ -10,6 +10,7 @@ import {
   X,
   Check,
   ExternalLink,
+  FileStack,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,11 @@ const BUILT_IN_ROUTES = [
   { label: 'Terms & Conditions', url: '/terms' },
 ];
 
+interface DropTarget {
+  id: string;
+  isIndent: boolean;
+}
+
 export default function NavigationPage() {
   const { isSubmitting, execute } = useAsyncAction();
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
@@ -41,11 +47,13 @@ export default function NavigationPage() {
   const [items, setItems] = useState<WebsiteNavItem[]>([]);
   const [pages, setPages] = useState<WebsitePage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addingPages, setAddingPages] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [editUrl, setEditUrl] = useState('');
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 
   // Add dialog state
   const [addLinkType, setAddLinkType] = useState<'custom' | 'page' | 'builtin'>('custom');
@@ -208,6 +216,46 @@ export default function NavigationPage() {
     });
   };
 
+  const handleAddPublishedPages = async () => {
+    setAddingPages(true);
+    try {
+      // Find pages without a corresponding nav item
+      const existingPageIds = new Set(
+        items.filter((i) => i.page_id).map((i) => i.page_id)
+      );
+      const missingPages = pages.filter((p) => !existingPageIds.has(p.id));
+
+      if (missingPages.length === 0) {
+        toast.success('All published pages are already in navigation');
+        return;
+      }
+
+      let added = 0;
+      for (const page of missingPages) {
+        const res = await adminFetch('/api/admin/cms/navigation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            placement: activePlacement,
+            label: page.title,
+            url: `/p/${page.slug}`,
+            page_id: page.id,
+          }),
+        });
+        if (res.ok) added++;
+      }
+
+      if (added > 0) {
+        await loadItems();
+        toast.success(`Added ${added} page${added > 1 ? 's' : ''} to navigation`);
+      }
+    } catch {
+      toast.error('Failed to add pages');
+    } finally {
+      setAddingPages(false);
+    }
+  };
+
   const resetAddForm = () => {
     setAddLinkType('custom');
     setAddLabel('');
@@ -218,52 +266,173 @@ export default function NavigationPage() {
     setAddBuiltinIdx('');
   };
 
-  // Drag and drop reorder
+  // ---------------------------------------------------------------------------
+  // Drag and drop — reorder + indent-to-nest
+  // ---------------------------------------------------------------------------
+  const dragIdRef = useRef<string | null>(null);
+
   const handleDragStart = (e: React.DragEvent, itemId: string) => {
     setDragId(itemId);
+    dragIdRef.current = itemId;
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, targetItem: WebsiteNavItem) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    const currentDragId = dragIdRef.current;
+    if (!currentDragId || currentDragId === targetItem.id) {
+      setDropTarget(null);
+      return;
+    }
+
+    // Don't allow nesting under a child (limit to 2 levels)
+    const isTargetChild = !!targetItem.parent_id;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const isIndentZone = !isTargetChild && x > rect.width * 0.6;
+
+    setDropTarget({ id: targetItem.id, isIndent: isIndentZone });
   };
 
-  const handleDrop = async (e: React.DragEvent, targetId: string) => {
+  const handleDragLeave = () => {
+    setDropTarget(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetItem: WebsiteNavItem) => {
     e.preventDefault();
-    if (!dragId || dragId === targetId) return;
+    const currentDragId = dragId;
+    const currentDropTarget = dropTarget;
+    setDragId(null);
+    dragIdRef.current = null;
+    setDropTarget(null);
 
-    await execute(async () => {
-      const oldItems = [...items];
-      const dragIdx = items.findIndex((i) => i.id === dragId);
-      const targetIdx = items.findIndex((i) => i.id === targetId);
+    if (!currentDragId || currentDragId === targetItem.id) return;
 
-      if (dragIdx === -1 || targetIdx === -1) return;
+    const draggedItem = items.find((i) => i.id === currentDragId);
+    if (!draggedItem) return;
 
-      const newItems = [...items];
-      const [moved] = newItems.splice(dragIdx, 1);
-      newItems.splice(targetIdx, 0, moved);
-      setItems(newItems);
-      setDragId(null);
+    if (currentDropTarget?.isIndent && currentDropTarget.id === targetItem.id) {
+      // Nest: make dragged item a child of target
+      await execute(async () => {
+        const oldItems = [...items];
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === currentDragId ? { ...i, parent_id: targetItem.id } : i
+          )
+        );
 
-      const res = await adminFetch('/api/admin/cms/navigation/reorder', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          placement: activePlacement,
-          orderedIds: newItems.map((i) => i.id),
-        }),
+        const res = await adminFetch(`/api/admin/cms/navigation/${currentDragId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parent_id: targetItem.id }),
+        });
+
+        if (!res.ok) {
+          setItems(oldItems);
+          toast.error('Failed to nest item');
+        }
       });
+    } else {
+      // Normal reorder
+      await execute(async () => {
+        const oldItems = [...items];
+        const dragIdx = items.findIndex((i) => i.id === currentDragId);
+        const targetIdx = items.findIndex((i) => i.id === targetItem.id);
 
-      if (!res.ok) {
-        setItems(oldItems);
-        toast.error('Failed to reorder');
-      }
-    });
+        if (dragIdx === -1 || targetIdx === -1) return;
+
+        const newItems = [...items];
+        const [moved] = newItems.splice(dragIdx, 1);
+
+        // If dragging to top-level area and item is a child, un-nest it
+        if (moved.parent_id && !targetItem.parent_id) {
+          moved.parent_id = null;
+          // Update parent_id on server
+          await adminFetch(`/api/admin/cms/navigation/${currentDragId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parent_id: null }),
+          });
+        }
+
+        newItems.splice(targetIdx, 0, moved);
+        setItems(newItems);
+
+        const res = await adminFetch('/api/admin/cms/navigation/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            placement: activePlacement,
+            orderedIds: newItems.map((i) => i.id),
+          }),
+        });
+
+        if (!res.ok) {
+          setItems(oldItems);
+          toast.error('Failed to reorder');
+        }
+      });
+    }
   };
 
+  const handleDragEnd = () => {
+    setDragId(null);
+    dragIdRef.current = null;
+    setDropTarget(null);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Tree rendering helpers
+  // ---------------------------------------------------------------------------
   const topLevelItems = items.filter((i) => !i.parent_id);
   const getChildren = (parentId: string) => items.filter((i) => i.parent_id === parentId);
+
+  const renderNavTree = (parentId: string | null, depth: number) => {
+    const children = parentId
+      ? items.filter((i) => i.parent_id === parentId)
+      : items.filter((i) => !i.parent_id);
+
+    return children.map((item, index) => {
+      const itemChildren = getChildren(item.id);
+      const isLastChild = index === children.length - 1;
+
+      return (
+        <div key={item.id}>
+          <NavItemRow
+            item={item}
+            editing={editingId === item.id}
+            editLabel={editLabel}
+            editUrl={editUrl}
+            onEditLabel={setEditLabel}
+            onEditUrl={setEditUrl}
+            onStartEdit={() => startEdit(item)}
+            onSaveEdit={saveEdit}
+            onCancelEdit={() => setEditingId(null)}
+            onToggleActive={() => toggleActive(item)}
+            onDelete={() => deleteItem(item)}
+            onDragStart={(e) => handleDragStart(e, item.id)}
+            onDragOver={(e) => handleDragOver(e, item)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, item)}
+            onDragEnd={handleDragEnd}
+            indent={depth}
+            isLastChild={isLastChild}
+            isDragging={dragId === item.id}
+            isDropTarget={dropTarget?.id === item.id && !dropTarget.isIndent}
+            isIndentTarget={dropTarget?.id === item.id && dropTarget.isIndent}
+            disabled={isSubmitting}
+          />
+          {/* Render children (max 2 levels) */}
+          {depth < 1 && itemChildren.length > 0 && (
+            <div>
+              {renderNavTree(item.id, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -272,10 +441,21 @@ export default function NavigationPage() {
         title="Navigation"
         description="Manage header and footer navigation links."
         action={
-          <Button onClick={() => setShowAddDialog(true)} disabled={isSubmitting}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Link
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddPublishedPages}
+              disabled={isSubmitting || addingPages || loading}
+            >
+              <FileStack className="mr-2 h-4 w-4" />
+              {addingPages ? 'Adding...' : 'Add Published Pages'}
+            </Button>
+            <Button onClick={() => setShowAddDialog(true)} disabled={isSubmitting}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Link
+            </Button>
+          </div>
         }
       />
 
@@ -296,6 +476,13 @@ export default function NavigationPage() {
         ))}
       </div>
 
+      {/* Drag hint */}
+      {!loading && items.length > 0 && (
+        <p className="text-xs text-gray-400">
+          Drag items to reorder. Drag to the right side of a row to nest it as a child (max 2 levels).
+        </p>
+      )}
+
       {/* Navigation items list */}
       {loading ? (
         <div className="text-center py-12 text-sm text-gray-500">Loading...</div>
@@ -305,50 +492,7 @@ export default function NavigationPage() {
         </div>
       ) : (
         <div className="bg-white rounded-lg border shadow-sm divide-y">
-          {topLevelItems.map((item) => (
-            <div key={item.id}>
-              <NavItemRow
-                item={item}
-                editing={editingId === item.id}
-                editLabel={editLabel}
-                editUrl={editUrl}
-                onEditLabel={setEditLabel}
-                onEditUrl={setEditUrl}
-                onStartEdit={() => startEdit(item)}
-                onSaveEdit={saveEdit}
-                onCancelEdit={() => setEditingId(null)}
-                onToggleActive={() => toggleActive(item)}
-                onDelete={() => deleteItem(item)}
-                onDragStart={(e) => handleDragStart(e, item.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, item.id)}
-                indent={0}
-                disabled={isSubmitting}
-              />
-              {/* Children */}
-              {getChildren(item.id).map((child) => (
-                <NavItemRow
-                  key={child.id}
-                  item={child}
-                  editing={editingId === child.id}
-                  editLabel={editLabel}
-                  editUrl={editUrl}
-                  onEditLabel={setEditLabel}
-                  onEditUrl={setEditUrl}
-                  onStartEdit={() => startEdit(child)}
-                  onSaveEdit={saveEdit}
-                  onCancelEdit={() => setEditingId(null)}
-                  onToggleActive={() => toggleActive(child)}
-                  onDelete={() => deleteItem(child)}
-                  onDragStart={(e) => handleDragStart(e, child.id)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, child.id)}
-                  indent={1}
-                  disabled={isSubmitting}
-                />
-              ))}
-            </div>
-          ))}
+          {renderNavTree(null, 0)}
         </div>
       )}
 
@@ -517,7 +661,7 @@ export default function NavigationPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Nav Item Row
+// Nav Item Row — supports indent, tree lines, and drop target indicators
 // ---------------------------------------------------------------------------
 
 interface NavItemRowProps {
@@ -534,8 +678,14 @@ interface NavItemRowProps {
   onDelete: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
   onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
   indent: number;
+  isLastChild: boolean;
+  isDragging: boolean;
+  isDropTarget: boolean;
+  isIndentTarget: boolean;
   disabled?: boolean;
 }
 
@@ -553,21 +703,33 @@ function NavItemRow({
   onDelete,
   onDragStart,
   onDragOver,
+  onDragLeave,
   onDrop,
+  onDragEnd,
   indent,
+  isLastChild,
+  isDragging,
+  isDropTarget,
+  isIndentTarget,
   disabled,
 }: NavItemRowProps) {
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50"
+      className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+        isDragging ? 'opacity-40 bg-gray-100' : 'hover:bg-gray-50'
+      } ${isDropTarget ? 'bg-brand-50 border-l-2 border-l-brand-500' : ''} ${
+        isIndentTarget ? 'bg-blue-50 border-r-4 border-r-blue-400' : ''
+      }`}
       draggable
       onDragStart={onDragStart}
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
+      onDragEnd={onDragEnd}
     >
       <GripVertical className="h-4 w-4 text-gray-300 cursor-grab flex-shrink-0" />
 
-      <div className="flex-1 min-w-0" style={{ paddingLeft: indent * 24 }}>
+      <div className="flex-1 min-w-0" style={{ paddingLeft: indent * 32 }}>
         {editing ? (
           <div className="flex items-center gap-2">
             <input
@@ -583,16 +745,39 @@ function NavItemRow({
               onChange={(e) => onEditUrl(e.target.value)}
               className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
             />
-            <button onClick={onSaveEdit} className="text-green-600 hover:text-green-700">
+            <button type="button" onClick={onSaveEdit} className="text-green-600 hover:text-green-700">
               <Check className="h-4 w-4" />
             </button>
-            <button onClick={onCancelEdit} className="text-gray-400 hover:text-gray-600">
+            <button type="button" onClick={onCancelEdit} className="text-gray-400 hover:text-gray-600">
               <X className="h-4 w-4" />
             </button>
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            {indent > 0 && <span className="text-gray-400 text-xs">└</span>}
+            {indent > 0 && (
+              <span className="relative inline-flex items-center" style={{ width: 16, height: 20 }}>
+                {/* Vertical line */}
+                <span
+                  className="absolute bg-gray-300"
+                  style={{
+                    left: 0,
+                    top: 0,
+                    bottom: isLastChild ? '50%' : 0,
+                    width: 1,
+                  }}
+                />
+                {/* Horizontal connector */}
+                <span
+                  className="absolute bg-gray-300"
+                  style={{
+                    left: 0,
+                    top: '50%',
+                    width: 12,
+                    height: 1,
+                  }}
+                />
+              </span>
+            )}
             <span className="text-sm font-medium text-gray-900">{item.label}</span>
             <span className="text-xs text-gray-400">{item.url}</span>
             {item.target === '_blank' && (
@@ -610,6 +795,7 @@ function NavItemRow({
             disabled={disabled}
           />
           <button
+            type="button"
             onClick={onStartEdit}
             disabled={disabled}
             className={`text-gray-400 hover:text-gray-600 transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
@@ -618,6 +804,7 @@ function NavItemRow({
             <Pencil className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={onDelete}
             disabled={disabled}
             className={`text-gray-400 hover:text-red-600 transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}

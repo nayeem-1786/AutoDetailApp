@@ -4,6 +4,37 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Phase E.8: Pages Editor Cleanup + Navigation Sync — 2026-02-28
+
+### Pages Editor Cleanup
+
+- Removed "Parent Page" dropdown from page editor (field had no URL effect — nesting is nav-only)
+- Published and Show in Navigation toggles rearranged side by side in bordered cards
+- "Show in Navigation" is now an immediate sync toggle (no save required):
+  - Toggle ON: creates header nav item with page title and `/p/{slug}` URL
+  - Toggle OFF: deletes associated nav item
+  - On page load: toggle reflects reality by checking `website_navigation` for existing nav item
+- Slug changes now auto-update the associated nav item URL in the page PATCH handler
+- Navigation API (`GET /api/admin/cms/navigation`) now supports `page_id` query parameter filter
+
+### Navigation Page Enhancements
+
+- **Drag-to-indent**: drag an item to the right side (40%) of another row to nest it as a child — visual blue border indicator
+- **Un-nest on drag**: dragging a child to a top-level position automatically removes its parent_id
+- **Visual tree connector lines**: CSS-positioned vertical + horizontal connectors replace the plain `└` character
+- **Recursive tree rendering**: `renderNavTree()` supports 2-level hierarchy with proper connectors
+- **"Add Published Pages" button**: bulk-creates nav items for all published pages not yet in navigation
+- Drop target highlight: brand-colored left border for reorder targets, blue right border for indent targets
+- Drag hint text below placement tabs
+
+**Files changed:**
+- `src/app/admin/website/pages/[id]/page.tsx` — removed Parent Page dropdown, side-by-side toggles, immediate nav sync
+- `src/app/admin/website/navigation/page.tsx` — drag-to-indent, tree lines, Add Published Pages, recursive render
+- `src/app/api/admin/cms/navigation/route.ts` — added page_id filter to GET
+- `src/app/api/admin/cms/pages/[id]/route.ts` — slug change → nav item URL update
+
+---
+
 ## CMS Phase E.4+E.5: ImageUploadField Sweep + Homepage Settings — 2026-02-28
 
 ### E.4: ImageUploadField on Remaining URL Fields

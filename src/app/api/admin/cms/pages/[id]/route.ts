@@ -50,6 +50,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const body = await request.json();
   const admin = createAdminClient();
 
+  // Fetch current page to detect slug changes
+  const { data: currentPage } = await admin
+    .from('website_pages')
+    .select('slug')
+    .eq('id', id)
+    .single();
+
   // Build update object with only provided fields
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
@@ -115,6 +122,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         .delete()
         .eq('page_id', id);
     }
+  }
+
+  // If slug changed, update associated nav item URL
+  if ('slug' in body && currentPage && body.slug !== currentPage.slug) {
+    await admin
+      .from('website_navigation')
+      .update({ url: `/p/${data.slug}` })
+      .eq('page_id', id);
   }
 
   // --- Auto-save revision snapshot ---

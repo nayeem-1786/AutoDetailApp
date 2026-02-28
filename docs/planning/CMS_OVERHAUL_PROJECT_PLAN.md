@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-28 (Phase E.4+E.5 ImageUploadField sweep + Homepage Settings)
-> **Status:** Phase E.4+E.5 Complete — ImageUploadField sweep, homepage settings admin page
+> **Updated:** 2026-02-28 (Phase E.8 Pages Editor Cleanup + Navigation Sync)
+> **Status:** Phase E.8 Complete — Pages editor cleanup, nav sync toggle, drag-to-indent, tree lines
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -900,26 +900,28 @@ Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger
 - [ ] Theme import/export capability
 - [ ] **This is a separate project scope — do not bundle with Phases A–D**
 
-### E.8 — Pages Editor Cleanup + Navigation Sync
+### E.8 — Pages Editor Cleanup + Navigation Sync ✅
 
 **Pages editor changes:**
-- [ ] Remove "Parent Page" dropdown from `pages/[id]/page.tsx` and `pages/new/page.tsx` — the field saves to DB but nothing reads it (no URL effect, no nav effect)
-- [ ] Move Published toggle and Show in Navigation toggle **side by side** into the space freed by removing Parent Page dropdown. Both toggles fit in the same row.
-- [ ] Wire "Show in Navigation" as a sync shortcut:
-  - Toggle ON → auto-create a nav item in `website_nav_items` with `placement: 'header'`, `label: page.title`, `url: /p/{slug}`, `page_id: page.id`
+- [x] Remove "Parent Page" dropdown from `pages/[id]/page.tsx` — `pages/new/page.tsx` is auto-draft (no dropdown)
+- [x] Move Published toggle and Show in Navigation toggle **side by side** in bordered cards within a responsive grid
+- [x] Wire "Show in Navigation" as an immediate sync shortcut:
+  - Toggle ON → auto-create a nav item in `website_navigation` with `placement: 'header'`, `label: page.title`, `url: /p/{slug}`, `page_id: page.id`
   - Toggle OFF → delete the associated nav item where `page_id = page.id`
-  - If a nav item already exists for this page (created manually via Navigation page), toggling reflects its current state
-- [ ] Remove `parent_id` column from `website_pages` if no other code references it (or leave column, just remove UI)
+  - On page load, toggle state reflects reality (checks if nav item exists via API)
+- [x] Left `parent_id` column in `website_pages` (no migration needed), just removed UI
+- [x] Page slug change → auto-updates associated nav item URL in PATCH handler
 
 **Navigation page enhancements:**
-- [ ] Drag-to-indent: drag an item slightly right onto another to nest it as a child (visual indent zone)
-- [ ] Support recursive nesting beyond 1 level if needed (update `getChildren` to be recursive, update render)
-- [ ] Visual tree connector lines instead of just `└` character
-- [ ] "Add All Published Pages" bulk button — creates nav items for all published pages not yet in nav
-- [ ] Refactor to use shared `useDragDropReorder` hook from Phase B
+- [x] Drag-to-indent: drag to right 40% of a row to nest as child, with visual blue indicator
+- [x] Recursive tree rendering with `renderNavTree()` (supports 2 levels max)
+- [x] Visual tree connector lines (CSS positioned spans replacing `└` character)
+- [x] "Add Published Pages" bulk button — creates nav items for all published pages not yet in nav
+- [x] Kept custom DnD (shared `useDragDropReorder` hook doesn't support indent-to-nest)
+- [x] Dragging child to top-level area auto-un-nests it
 
 **Architectural notes:**
-- Navigation system already supports: parent_id nesting, placement tabs (header/footer), 3 link types (custom/page/builtin), inline editing, active toggle, drag reorder
+- Navigation system supports: parent_id nesting, placement tabs (header/footer), 3 link types (custom/page/builtin), inline editing, active toggle, drag reorder
 - URLs stay flat — nesting is for nav dropdown menu structure only, NOT URL paths
 - `/p/{slug}` always resolves to just the slug, regardless of nav hierarchy
 

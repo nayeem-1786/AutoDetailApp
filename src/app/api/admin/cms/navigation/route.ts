@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
   if (denied) return denied;
 
   const placement = request.nextUrl.searchParams.get('placement');
+  const pageId = request.nextUrl.searchParams.get('page_id');
 
   const admin = createAdminClient();
   let query = admin
@@ -28,6 +29,10 @@ export async function GET(request: NextRequest) {
 
   if (placement) {
     query = query.eq('placement', placement);
+  }
+
+  if (pageId) {
+    query = query.eq('page_id', pageId);
   }
 
   const { data, error } = await query;

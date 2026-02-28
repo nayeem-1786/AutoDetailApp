@@ -41,13 +41,12 @@ export default function EditPagePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [allPages, setAllPages] = useState<WebsitePage[]>([]);
+  const [navToggling, setNavToggling] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [pageTemplate, setPageTemplate] = useState<PageTemplate>('content');
-  const [parentId, setParentId] = useState<string>('');
   const [content, setContent] = useState('');
   const [isPublished, setIsPublished] = useState(false);
   const [showInNav, setShowInNav] = useState(false);
@@ -69,7 +68,7 @@ export default function EditPagePage() {
   // Track saved values for dirty detection
   const savedValuesRef = useRef({
     title: '', slug: '', pageTemplate: 'content' as PageTemplate,
-    parentId: '', content: '', isPublished: false, showInNav: false,
+    content: '', isPublished: false,
     metaTitle: '', metaDescription: '', ogImageUrl: '',
   });
 
@@ -77,10 +76,8 @@ export default function EditPagePage() {
     title !== savedValuesRef.current.title ||
     slug !== savedValuesRef.current.slug ||
     pageTemplate !== savedValuesRef.current.pageTemplate ||
-    parentId !== savedValuesRef.current.parentId ||
     content !== savedValuesRef.current.content ||
     isPublished !== savedValuesRef.current.isPublished ||
-    showInNav !== savedValuesRef.current.showInNav ||
     metaTitle !== savedValuesRef.current.metaTitle ||
     metaDescription !== savedValuesRef.current.metaDescription ||
     ogImageUrl !== savedValuesRef.current.ogImageUrl
@@ -92,41 +89,39 @@ export default function EditPagePage() {
 
   const loadPage = useCallback(async () => {
     try {
-      const [pageRes, pagesRes] = await Promise.all([
+      const [pageRes, navRes] = await Promise.all([
         adminFetch(`/api/admin/cms/pages/${id}`),
-        adminFetch('/api/admin/cms/pages'),
+        adminFetch(`/api/admin/cms/navigation?page_id=${id}`),
       ]);
 
       const pageJson = await pageRes.json();
-      const pagesJson = await pagesRes.json();
+      const navJson = await navRes.json();
 
       if (pageRes.ok && pageJson.data) {
         const p = pageJson.data as WebsitePage;
         setTitle(p.title);
         setSlug(p.slug);
         setPageTemplate(p.page_template);
-        setParentId(p.parent_id || '');
         setContent(p.content || '');
         setIsPublished(p.is_published);
-        setShowInNav(p.show_in_nav);
         setMetaTitle(p.meta_title || '');
         setMetaDescription(p.meta_description || '');
         setOgImageUrl(p.og_image_url || '');
 
+        // Determine nav toggle state from reality (does a nav item exist for this page?)
+        const hasNavItem = navRes.ok && Array.isArray(navJson.data) && navJson.data.length > 0;
+        setShowInNav(hasNavItem);
+
         savedValuesRef.current = {
           title: p.title, slug: p.slug, pageTemplate: p.page_template,
-          parentId: p.parent_id || '', content: p.content || '',
-          isPublished: p.is_published, showInNav: p.show_in_nav,
+          content: p.content || '',
+          isPublished: p.is_published,
           metaTitle: p.meta_title || '', metaDescription: p.meta_description || '',
           ogImageUrl: p.og_image_url || '',
         };
       } else {
         toast.error('Page not found');
         router.push('/admin/website/pages');
-      }
-
-      if (pagesRes.ok) {
-        setAllPages((pagesJson.data || []).filter((p: WebsitePage) => p.id !== id));
       }
     } catch {
       toast.error('Failed to load page');
@@ -183,6 +178,63 @@ export default function EditPagePage() {
     }
   };
 
+  // Immediate nav toggle — creates/deletes nav item without waiting for page save
+  const handleNavToggle = async (checked: boolean) => {
+    setShowInNav(checked);
+    setNavToggling(true);
+    try {
+      if (checked) {
+        // Check if nav item already exists
+        const checkRes = await adminFetch(`/api/admin/cms/navigation?page_id=${id}`);
+        const checkJson = await checkRes.json();
+        const existing = checkRes.ok && Array.isArray(checkJson.data) && checkJson.data.length > 0;
+
+        if (!existing) {
+          const res = await adminFetch('/api/admin/cms/navigation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              placement: 'header',
+              label: title,
+              url: `/p/${slug}`,
+              page_id: id,
+              is_active: true,
+            }),
+          });
+          if (!res.ok) throw new Error();
+        }
+        // Sync the page column
+        await adminFetch(`/api/admin/cms/pages/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ show_in_nav: true }),
+        });
+        toast.success('Added to navigation');
+      } else {
+        // Find and delete nav item(s) for this page
+        const checkRes = await adminFetch(`/api/admin/cms/navigation?page_id=${id}`);
+        const checkJson = await checkRes.json();
+        if (checkRes.ok && Array.isArray(checkJson.data)) {
+          for (const navItem of checkJson.data) {
+            await adminFetch(`/api/admin/cms/navigation/${navItem.id}`, { method: 'DELETE' });
+          }
+        }
+        // Sync the page column
+        await adminFetch(`/api/admin/cms/pages/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ show_in_nav: false }),
+        });
+        toast.success('Removed from navigation');
+      }
+    } catch {
+      setShowInNav(!checked);
+      toast.error('Failed to update navigation');
+    } finally {
+      setNavToggling(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -214,10 +266,8 @@ export default function EditPagePage() {
           title: title.trim(),
           slug: slug.trim(),
           page_template: pageTemplate,
-          parent_id: parentId || null,
           content,
           is_published: isPublished,
-          show_in_nav: showInNav,
           meta_title: metaTitle || null,
           meta_description: metaDescription || null,
           og_image_url: ogImageUrl || null,
@@ -230,7 +280,7 @@ export default function EditPagePage() {
         clearAll();
         savedValuesRef.current = {
           title: title.trim(), slug: slug.trim(), pageTemplate,
-          parentId, content, isPublished, showInNav,
+          content, isPublished,
           metaTitle, metaDescription, ogImageUrl,
         };
       } else {
@@ -393,23 +443,6 @@ export default function EditPagePage() {
                 <option value="blank">Blank (content blocks only)</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Parent Page</label>
-              <select
-                value={parentId}
-                onChange={(e) => setParentId(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              >
-                <option value="">None (top-level)</option>
-                {allPages
-                  .filter((p) => !p.parent_id)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-              </select>
-            </div>
           </div>
         </div>
 
@@ -501,21 +534,25 @@ export default function EditPagePage() {
         {/* Publishing */}
         <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Publishing</h2>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-700">Published</p>
-              <p className="text-xs text-gray-500">Make this page visible to the public</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Published</p>
+                <p className="text-xs text-gray-500">Visible to the public</p>
+              </div>
+              <Switch checked={isPublished} onCheckedChange={setIsPublished} />
             </div>
-            <Switch checked={isPublished} onCheckedChange={setIsPublished} />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-700">Show in Navigation</p>
-              <p className="text-xs text-gray-500">
-                Auto-add to header navigation when enabled
-              </p>
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Show in Navigation</p>
+                <p className="text-xs text-gray-500">Add to header nav</p>
+              </div>
+              <Switch
+                checked={showInNav}
+                onCheckedChange={handleNavToggle}
+                disabled={navToggling}
+              />
             </div>
-            <Switch checked={showInNav} onCheckedChange={setShowInNav} />
           </div>
         </div>
 
