@@ -468,6 +468,26 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     };
   }, [employee, twoWaySmsEnabled]);
 
+  // Collapsible group state for sidebar sections (e.g. Website sub-groups)
+  // Keyed by group name, persisted to localStorage
+  const SIDEBAR_GROUP_DEFAULTS: Record<string, boolean> = {
+    Content: true,
+    Data: true,
+    Layout: false,
+    Appearance: false,
+  };
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    const stored: Record<string, boolean> = {};
+    for (const group of Object.keys(SIDEBAR_GROUP_DEFAULTS)) {
+      const key = `sidebar_collapsed_${group}`;
+      const val = localStorage.getItem(key);
+      stored[group] = val !== null ? val === 'true' : !SIDEBAR_GROUP_DEFAULTS[group];
+    }
+    return stored;
+  });
+
   // Auto-expand parent nav item when child is active
   useEffect(() => {
     if (!employee) return;
@@ -479,6 +499,25 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       }
     });
   }, [pathname, employee]);
+
+  // Auto-expand group when a child within it is active
+  useEffect(() => {
+    SIDEBAR_NAV.forEach((item) => {
+      if (!item.children) return;
+      item.children.forEach((child) => {
+        if (child.group && pathname.startsWith(child.href)) {
+          setCollapsedGroups((prev) => {
+            if (prev[child.group!]) {
+              const next = { ...prev, [child.group!]: false };
+              localStorage.setItem(`sidebar_collapsed_${child.group}`, 'false');
+              return next;
+            }
+            return prev;
+          });
+        }
+      });
+    });
+  }, [pathname]);
 
   if (loading) {
     return (
@@ -505,26 +544,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     );
   };
 
-  // Collapsible group state for sidebar sections (e.g. Website sub-groups)
-  // Keyed by group name, persisted to localStorage
-  const SIDEBAR_GROUP_DEFAULTS: Record<string, boolean> = {
-    Content: true,
-    Data: true,
-    Layout: false,
-    Appearance: false,
-  };
-
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
-    if (typeof window === 'undefined') return {};
-    const stored: Record<string, boolean> = {};
-    for (const group of Object.keys(SIDEBAR_GROUP_DEFAULTS)) {
-      const key = `sidebar_collapsed_${group}`;
-      const val = localStorage.getItem(key);
-      stored[group] = val !== null ? val === 'true' : !SIDEBAR_GROUP_DEFAULTS[group];
-    }
-    return stored;
-  });
-
   const toggleGroupCollapse = (group: string) => {
     setCollapsedGroups((prev) => {
       const next = { ...prev, [group]: !prev[group] };
@@ -532,25 +551,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       return next;
     });
   };
-
-  // Auto-expand group when a child within it is active
-  useEffect(() => {
-    SIDEBAR_NAV.forEach((item) => {
-      if (!item.children) return;
-      item.children.forEach((child) => {
-        if (child.group && pathname.startsWith(child.href)) {
-          setCollapsedGroups((prev) => {
-            if (prev[child.group!]) {
-              const next = { ...prev, [child.group!]: false };
-              localStorage.setItem(`sidebar_collapsed_${child.group}`, 'false');
-              return next;
-            }
-            return prev;
-          });
-        }
-      });
-    });
-  }, [pathname]);
 
   // Build grouped children structure from a flat child array with group properties
   const buildGroupedChildren = (children: NavItem[]) => {
