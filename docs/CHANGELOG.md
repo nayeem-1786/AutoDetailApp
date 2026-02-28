@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Credentials Add Button Serializer Fix — 2026-02-27
+
+### fix: credentials add button serializer
+
+**Credentials "+ Add Credential" Button:**
+- Same root cause as the FAQ/Features List bug: `serializeCredentialsContent()` filtered out items without a title on every state change, so newly added empty credential cards were immediately removed
+- Fix: removed the filter from `serializeCredentialsContent()` — empty items now persist during editing
+- Added save-time cleanup in `BlockRow.handleSave()` for `credentials` block type — strips items with no title, description, or image before persisting to DB
+- Public data layer (`getCredentials()` in `team-members.ts`) already filters out empty-title items — no change needed
+
+**Homepage Excerpt Verification:**
+- Confirmed all layers already support excerpt: data layer (`getActiveTeamMembers`), API (GET/PATCH/POST), team-grid-editor (`handleSaveMember`), and homepage renderer
+- Homepage `page.tsx:224-228` correctly renders `member.excerpt` first, falls back to HTML-stripped `member.bio`
+- No code changes needed — excerpt pipeline was complete from the previous commit
+
+---
+
 ## FAQ/Features Add Buttons, Rich Text Fix, Button Type Default, Team Excerpt — 2026-02-27
 
 ### fix: FAQ/features-list add buttons, rich text markdown cleanup, global button type default, team member excerpt field

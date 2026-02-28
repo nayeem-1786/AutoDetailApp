@@ -321,10 +321,12 @@ export function parseCredentialsContent(content: string): CredentialItem[] {
   return [];
 }
 
+/**
+ * Serialize CredentialItem array to JSON string.
+ * Preserves empty items during editing — cleanup happens at save time.
+ */
 export function serializeCredentialsContent(credentials: CredentialItem[]): string {
   return JSON.stringify(
-    credentials
-      .filter((c) => c.title.trim())
-      .map((c, i) => ({ ...c, sort_order: i }))
+    credentials.map((c, i) => ({ ...c, sort_order: i }))
   );
 }

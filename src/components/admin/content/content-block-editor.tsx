@@ -587,6 +587,15 @@ function BlockRow({
           );
         }
       } catch { /* keep as-is */ }
+    } else if (block.block_type === 'credentials') {
+      try {
+        const items = JSON.parse(localContent);
+        if (Array.isArray(items)) {
+          cleanContent = JSON.stringify(
+            items.filter((i: { title?: string; description?: string; image_url?: string }) => i.title?.trim() || i.description?.trim() || i.image_url?.trim())
+          );
+        }
+      } catch { /* keep as-is */ }
     }
     onUpdate({ title: localTitle.trim() || null, content: cleanContent } as Partial<Pick<PageContentBlock, 'title' | 'content' | 'is_active'>>);
     setDirty(false);
