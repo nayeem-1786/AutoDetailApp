@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Team Grid Centered Layout — 2026-02-27
+
+### fix: team grid uses flexbox with row distribution by count
+
+- New `TeamGridLayout` component (`src/components/public/team-grid-layout.tsx`) — reusable flexbox layout with smart row splitting
+- Row distribution: 1→[1], 2→[2], 3→[3], 4→[2+2], 5→[2+3], 6→[3+3], 7+→rows of 3 with remainder
+- Every row centered via `flex justify-center`
+- Cards have fixed width (`w-full sm:w-72`) — full-width on mobile, fixed on desktop
+- Applied to both homepage team section and public `TeamGridBlock` renderer
+- Replaces CSS grid which couldn't center partial rows
+
+---
+
 ## Team/Credentials Admin Pages + Display-Only Blocks — 2026-02-27
 
 ### restructure: team/credentials data management separated from page display

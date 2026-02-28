@@ -21,6 +21,7 @@ import { ServiceCategoryCard } from '@/components/public/service-category-card';
 import { CtaSection } from '@/components/public/cta-section';
 import { JsonLd } from '@/components/public/json-ld';
 import { HomeAnimations } from '@/components/public/home-animations';
+import { TeamGridLayout } from '@/components/public/team-grid-layout';
 
 export const revalidate = 60;
 
@@ -192,46 +193,50 @@ export default async function HomePage() {
               </div>
             </HomeAnimations>
 
-            <HomeAnimations type="stagger-grid" className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {teamMembers.map((member) => {
-                const initials = member.name
-                  .split(' ')
-                  .map(n => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2);
+            <HomeAnimations type="stagger-grid" className="mt-12">
+              <TeamGridLayout
+                items={teamMembers}
+                cardWidth="w-full sm:w-72"
+                renderCard={(member) => {
+                  const initials = member.name
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2);
 
-                return (
-                  <div key={member.id} className="text-center">
-                    <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-brand-surface border border-site-border flex items-center justify-center">
-                      {member.photo_url ? (
-                        <Image
-                          src={member.photo_url}
-                          alt={member.name}
-                          width={128}
-                          height={128}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-3xl font-bold text-lime">
-                          {initials}
-                        </span>
+                  return (
+                    <div className="text-center">
+                      <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-brand-surface border border-site-border flex items-center justify-center">
+                        {member.photo_url ? (
+                          <Image
+                            src={member.photo_url}
+                            alt={member.name}
+                            width={128}
+                            height={128}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-3xl font-bold text-lime">
+                            {initials}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="mt-4 font-display text-lg font-semibold text-site-text">
+                        {member.name}
+                      </h3>
+                      <p className="text-sm font-medium text-lime">
+                        {member.role}
+                      </p>
+                      {(member.excerpt || member.bio) && (
+                        <p className="mt-2 text-sm text-site-text-muted line-clamp-2">
+                          {member.excerpt || member.bio?.replace(/<[^>]*>/g, '')}
+                        </p>
                       )}
                     </div>
-                    <h3 className="mt-4 font-display text-lg font-semibold text-site-text">
-                      {member.name}
-                    </h3>
-                    <p className="text-sm font-medium text-lime">
-                      {member.role}
-                    </p>
-                    {(member.excerpt || member.bio) && (
-                      <p className="mt-2 text-sm text-site-text-muted line-clamp-2">
-                        {member.excerpt || member.bio?.replace(/<[^>]*>/g, '')}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                }}
+              />
             </HomeAnimations>
 
             {credentials.length > 0 && (

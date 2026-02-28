@@ -892,6 +892,7 @@ src/components/public/site-footer.tsx
 src/components/public/site-header.tsx
 src/components/public/theme-toggle-initializer.tsx
 src/components/public/theme-toggle.tsx
+src/components/public/team-grid-layout.tsx
 src/components/public/trust-bar-client.tsx
 src/components/public/trust-bar.tsx
 ```

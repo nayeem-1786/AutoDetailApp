@@ -5,6 +5,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getActiveTeamMembers } from '@/lib/data/team-members';
 import { getActiveCredentials } from '@/lib/data/credentials';
 import { GalleryLightbox } from './gallery-lightbox';
+import { TeamGridLayout } from './team-grid-layout';
 import type { PageContentBlock } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -264,7 +265,6 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
     config = JSON.parse(block.content);
   } catch { /* use defaults */ }
 
-  const columns = config.columns ?? 3;
   const showCertifications = config.show_certifications ?? true;
   const showExcerpt = config.show_excerpt ?? true;
   const maxMembers = config.max_members ?? 0;
@@ -274,12 +274,6 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
 
   if (visibleMembers.length === 0) return null;
 
-  const gridCols = columns === 2
-    ? 'sm:grid-cols-2'
-    : columns === 4
-    ? 'sm:grid-cols-2 lg:grid-cols-4'
-    : 'sm:grid-cols-2 lg:grid-cols-3';
-
   return (
     <div className="content-block">
       {block.title && (
@@ -287,10 +281,11 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
           {block.title}
         </h2>
       )}
-      <div className={`grid gap-8 ${gridCols}`}>
-        {visibleMembers.map((member) => (
+      <TeamGridLayout
+        items={visibleMembers}
+        cardWidth="w-full sm:w-72"
+        renderCard={(member) => (
           <Link
-            key={member.id}
             href={`/team/${member.slug}`}
             className="group flex flex-col items-center text-center rounded-2xl border border-site-border bg-brand-surface p-6 hover:border-lime/30 transition-colors"
           >
@@ -349,8 +344,8 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
               </div>
             )}
           </Link>
-        ))}
-      </div>
+        )}
+      />
     </div>
   );
 }
