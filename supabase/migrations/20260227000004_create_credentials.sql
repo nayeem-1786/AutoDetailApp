@@ -32,7 +32,7 @@ CREATE INDEX idx_credentials_sort_order ON credentials(sort_order);
 CREATE TRIGGER set_credentials_updated_at
   BEFORE UPDATE ON credentials
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at();
 
 -- Migrate existing credentials from page_content_blocks JSON into the new table
 DO $$
