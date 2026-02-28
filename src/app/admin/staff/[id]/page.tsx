@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Calendar, Trash2, CalendarOff, Plus, ExternalLink, Loader2, Shield, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Trash2, CalendarOff, Plus, ExternalLink, Loader2, Shield, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { cn } from '@/lib/utils/cn';
 
@@ -90,6 +90,11 @@ export default function StaffDetailPage() {
   const [tab, setTab] = useState(initialTab);
   const [showDeactivate, setShowDeactivate] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+
+  // Password reset state
+  const [newPassword, setNewPassword] = useState('');
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
 
   // Permissions state
   const [permissionDefinitions, setPermissionDefinitions] = useState<PermissionDefinition[]>([]);
@@ -345,6 +350,56 @@ export default function StaffDetailPage() {
     }
   }
 
+  async function handleSetPassword() {
+    if (!newPassword || newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+
+    setIsSettingPassword(true);
+    try {
+      const res = await adminFetch(`/api/admin/staff/${id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_password', password: newPassword }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('Password updated successfully');
+        setNewPassword('');
+      } else {
+        toast.error(data.error || 'Failed to set password');
+      }
+    } catch {
+      toast.error('Failed to set password');
+    } finally {
+      setIsSettingPassword(false);
+    }
+  }
+
+  async function handleSendResetEmail() {
+    setIsSendingReset(true);
+    try {
+      const res = await adminFetch(`/api/admin/staff/${id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_reset_email' }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(data.message);
+      } else {
+        toast.error(data.error || 'Failed to send reset email');
+      }
+    } catch {
+      toast.error('Failed to send reset email');
+    } finally {
+      setIsSendingReset(false);
+    }
+  }
+
   // Build grouped permissions from definitions
   const permissionsByCategory = permissionDefinitions.reduce<
     Record<string, PermissionDefinition[]>
@@ -533,6 +588,7 @@ export default function StaffDetailPage() {
 
         {/* Profile Tab */}
         <TabsContent value="profile">
+          <div className="space-y-6">
           <form onSubmit={handleSubmit(onSaveProfile)} className="space-y-6">
             <Card>
               <CardHeader>
@@ -649,6 +705,66 @@ export default function StaffDetailPage() {
               </div>
             </div>
           </form>
+
+          {/* Password & Security — outside the profile form, has its own handlers */}
+          {employee.auth_user_id && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Password &amp; Security
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Option 1: Admin sets password directly */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-900">Set New Password</h4>
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      className="max-w-xs"
+                      minLength={8}
+                      autoComplete="new-password"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleSetPassword}
+                      disabled={!newPassword || newPassword.length < 8 || isSettingPassword}
+                    >
+                      {isSettingPassword ? 'Setting...' : 'Set Password'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Minimum 8 characters. The staff member can use this password immediately.
+                  </p>
+                </div>
+
+                <div className="border-t border-gray-200 pt-4">
+                  {/* Option 2: Send reset email */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Send Password Reset Email</h4>
+                      <p className="text-xs text-gray-500">
+                        Sends a reset link to {employee.email}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSendResetEmail}
+                      disabled={isSendingReset}
+                    >
+                      {isSendingReset ? 'Sending...' : 'Send Reset Email'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          </div>
         </TabsContent>
 
         {/* Schedule Tab */}

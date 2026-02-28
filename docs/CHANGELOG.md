@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Staff Password Reset — 2026-02-28
+
+### Admin Staff Password Management
+- **Set password directly**: Admin can type a new password for any staff member and apply it immediately via Supabase Auth admin API
+- **Send reset email**: Sends a Supabase Auth password reset email to the staff member's email, linking to existing `/login/reset-password` page
+- **UI**: "Password & Security" card on staff edit Profile tab (only shown when employee has an auth account)
+- **API route**: `POST /api/admin/staff/[id]/reset-password` — supports `set_password` and `send_reset_email` actions
+- **Auth**: Requires `settings.manage_users` permission, audit-logged for both actions
+- **Validation**: 8-char minimum for direct password set, button disabled until met
+
+### Hooks Order Fix
+- **Bug**: `useState` for `collapsedGroups` and its `useEffect` were declared after early returns in `AdminContent`, causing "Rendered more hooks than during the previous render" error
+- **Fix**: Moved both hooks before the `if (loading)` / `if (!employee)` early returns in `admin-shell.tsx`
+
+---
+
 ## Add-On URL Fix — 2026-02-28
 
 ### Recommended Add-On URLs — Wrong Category Slug

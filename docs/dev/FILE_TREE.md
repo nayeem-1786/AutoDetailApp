@@ -179,6 +179,7 @@ src/app/api/admin/vehicle-makes/route.ts
 ### Admin — Staff & Roles
 ```
 src/app/api/admin/staff/[id]/permissions/route.ts
+src/app/api/admin/staff/[id]/reset-password/route.ts
 src/app/api/admin/staff/[id]/route.ts
 src/app/api/admin/staff/roles/[id]/reset/route.ts
 src/app/api/admin/staff/roles/[id]/route.ts
