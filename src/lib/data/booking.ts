@@ -62,6 +62,7 @@ export interface BookingConfig {
   advance_days_max: number;
   slot_interval_minutes: number;
   require_payment: boolean;
+  default_deposit_amount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,8 +236,8 @@ export async function getBusinessHours(): Promise<BusinessHours> {
 export async function getBookingConfig(): Promise<BookingConfig> {
   const supabase = await getClient();
 
-  // Fetch booking config and payment feature flag in parallel
-  const [configResult, flagResult] = await Promise.all([
+  // Fetch booking config, payment feature flag, and deposit amount in parallel
+  const [configResult, flagResult, depositResult] = await Promise.all([
     supabase
       .from('business_settings')
       .select('value')
@@ -247,13 +248,28 @@ export async function getBookingConfig(): Promise<BookingConfig> {
       .select('enabled')
       .eq('key', 'online_booking_payment')
       .single(),
+    supabase
+      .from('business_settings')
+      .select('value')
+      .eq('key', 'default_deposit_amount')
+      .maybeSingle(),
   ]);
+
+  // Parse deposit amount from business_settings (stored as JSON number)
+  let depositAmount = 50; // fallback
+  if (depositResult.data?.value) {
+    try {
+      const parsed = JSON.parse(depositResult.data.value);
+      if (typeof parsed === 'number' && parsed > 0) depositAmount = parsed;
+    } catch { /* use fallback */ }
+  }
 
   const defaults: BookingConfig = {
     advance_days_min: 1,
     advance_days_max: 30,
     slot_interval_minutes: 30,
     require_payment: true, // Default to requiring payment
+    default_deposit_amount: depositAmount,
   };
 
   if (!configResult.data?.value) {
@@ -271,6 +287,7 @@ export async function getBookingConfig(): Promise<BookingConfig> {
   return {
     ...val,
     require_payment: flagResult.data?.enabled ?? true,
+    default_deposit_amount: depositAmount,
   } as BookingConfig;
 }
 

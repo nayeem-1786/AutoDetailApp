@@ -4,7 +4,11 @@ import { getReviewData } from '@/lib/data/reviews';
 import { getHeroBeforeAfter } from '@/lib/data/featured-photos';
 import { HeroClient } from './hero-client';
 
-export async function HeroSection() {
+interface HeroSectionProps {
+  tagline?: string;
+}
+
+export async function HeroSection({ tagline }: HeroSectionProps) {
   const [reviews, heroPhoto] = await Promise.all([
     getReviewData(),
     getHeroBeforeAfter(),
@@ -38,8 +42,7 @@ export async function HeroSection() {
             </div>
 
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-site-text-muted">
-              Expert ceramic coatings, paint correction, and premium detailing.
-              We bring showroom results directly to your doorstep.
+              {tagline || 'Expert ceramic coatings, paint correction, and premium detailing. We bring showroom results directly to your doorstep.'}
             </p>
 
             <div className="mt-8">

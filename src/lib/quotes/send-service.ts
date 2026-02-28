@@ -32,6 +32,21 @@ type SendQuoteResult =
   | { success: true; link: string; sent_via: string[]; errors?: string[]; quote: unknown }
   | { success: false; error: string; status: number };
 
+async function getQuoteValidityDays(supabase: SupabaseClient): Promise<number> {
+  const { data } = await supabase
+    .from('business_settings')
+    .select('value')
+    .eq('key', 'quote_validity_days')
+    .maybeSingle();
+  if (data?.value) {
+    try {
+      const parsed = JSON.parse(data.value);
+      if (typeof parsed === 'number' && parsed > 0) return parsed;
+    } catch { /* fallback */ }
+  }
+  return 10;
+}
+
 export async function sendQuote(
   supabase: SupabaseClient,
   quoteId: string,
@@ -67,6 +82,7 @@ export async function sendQuote(
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const quoteLink = `${appUrl}/quote/${quote.access_token}`;
+  const validityDays = await getQuoteValidityDays(supabase);
 
   // Generate short link for SMS (falls back to full URL on failure)
   const shortLink = await createShortLink(`${appUrl}/quote/${quote.access_token}`);
@@ -116,8 +132,8 @@ export async function sendQuote(
             ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
             : 'N/A';
 
-          const textBody = buildEmailText(business, quote, customerName, vehicleStr, items, quoteLink);
-          const htmlBody = buildEmailHtml(business, quote, customerName, vehicleStr, items, quoteLink);
+          const textBody = buildEmailText(business, quote, customerName, vehicleStr, items, quoteLink, validityDays);
+          const htmlBody = buildEmailHtml(business, quote, customerName, vehicleStr, items, quoteLink, validityDays);
 
           const formData = new URLSearchParams();
           formData.append('from', `${business.name} <quotes@${mailgunDomain}>`);
@@ -237,7 +253,8 @@ function buildEmailText(
   customerName: string,
   vehicleStr: string,
   items: QuoteItem[],
-  quoteLink: string
+  quoteLink: string,
+  validityDays: number
 ): string {
   const itemLines = items
     .map(
@@ -264,7 +281,7 @@ Total: ${formatCurrency(quote.total_amount)}
 View your estimate online:
 ${quoteLink}
 
-This estimate is valid for 10 days. If you have any questions, please call us at ${business.phone}.
+This estimate is valid for ${validityDays} days. If you have any questions, please call us at ${business.phone}.
 
 Thank you for choosing ${business.name}!`;
 }
@@ -275,7 +292,8 @@ function buildEmailHtml(
   customerName: string,
   vehicleStr: string,
   items: QuoteItem[],
-  quoteLink: string
+  quoteLink: string,
+  validityDays: number
 ): string {
   const itemRowsHtml = items
     .map(
@@ -378,7 +396,7 @@ function buildEmailHtml(
         </div>
 
         <p class="email-text-muted" style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
-          This estimate is valid for 10 days.<br>
+          This estimate is valid for ${validityDays} days.<br>
           Questions? Call us at <a class="email-link" href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
         </p>
       </div>

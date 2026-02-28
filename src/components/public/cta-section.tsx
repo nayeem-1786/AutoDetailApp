@@ -7,6 +7,7 @@ import { BeforeAfterSlider } from '@/components/public/before-after-slider';
 interface CtaSectionProps {
   title?: string;
   description?: string;
+  buttonText?: string;
   beforeImage?: string;
   afterImage?: string;
 }
@@ -14,6 +15,7 @@ interface CtaSectionProps {
 export async function CtaSection({
   title = 'Ready to Transform Your Vehicle?',
   description = 'Book your appointment today and experience the difference professional detailing makes.',
+  buttonText = 'Book Your Detail',
   beforeImage,
   afterImage,
 }: CtaSectionProps) {
@@ -43,7 +45,7 @@ export async function CtaSection({
                   href="/book"
                   className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-lg h-14 px-10 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
                 >
-                  Book Your Detail
+                  {buttonText}
                   <ArrowRight className="h-5 w-5" />
                 </Link>
               </div>

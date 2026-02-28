@@ -6,6 +6,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ## Hardcoded Audit Fixes — 2026-02-28
 
+### Homepage Settings + Booking Settings (Session 2)
+- **Migration**: New `business_settings` keys: `homepage_hero_tagline`, `homepage_cta_title`, `homepage_cta_description`, `homepage_cta_button_text`, `homepage_services_description`, `services_page_description`, `default_deposit_amount`, `quote_validity_days`
+- **Homepage Settings admin**: Expanded with Hero Settings (tagline, CTA images), CTA Defaults (title, description, button text), and Section Content (services descriptions, team/credentials headings) — reorganized from previous layout
+- **`getHomepageSettings()`**: Added `heroTagline`, `ctaTitle`, `ctaDescription`, `ctaButtonText`, `servicesDescription`, `servicesPageDescription` fields with fallback defaults
+- **Hero section**: Accepts `tagline` prop, homepage passes `homepageSettings.heroTagline`
+- **CTA section**: Accepts `buttonText` prop; homepage passes all CTA settings as props
+- **Services descriptions**: Homepage and `/services` page now use `homepageSettings.servicesDescription` / `.servicesPageDescription` instead of hardcoded copy
+- **Deposit amount**: Configurable via `default_deposit_amount` in `business_settings`. `BookingConfig` interface extended, `getBookingConfig()` fetches from DB (fallback: $50). `step-confirm-book.tsx` and `booking-wizard.tsx` use config value instead of hardcoded `50`
+- **Quote validity**: Configurable via `quote_validity_days` in `business_settings`. `send-service.ts` reads from DB (fallback: 10 days). Quote emails show "valid for N days" with configured value
+- **Business Profile admin**: New "Booking & Quotes" card with deposit amount and quote validity fields
+
 ### Bug Fixes (Part 1)
 - **Fix 1.1**: City pages (`areas/[citySlug]`) now use dynamic Google Place ID from `getHomepageSettings()` instead of hardcoded value
 - **Fix 1.2**: Booking wizard loyalty calculations now import `LOYALTY.REDEEM_RATE` and `LOYALTY.REDEEM_MINIMUM` from `constants.ts` instead of duplicating hardcoded `0.05` / `100`

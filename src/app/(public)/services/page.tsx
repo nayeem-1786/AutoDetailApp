@@ -5,6 +5,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getServiceCategories } from '@/lib/data/services';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getCmsToggles } from '@/lib/data/cms';
+import { getHomepageSettings } from '@/lib/data/homepage-settings';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
@@ -44,9 +45,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ServicesPage() {
-  const [categories, cmsToggles] = await Promise.all([
+  const [categories, cmsToggles, homepageSettings] = await Promise.all([
     getServiceCategories(),
     getCmsToggles(),
+    getHomepageSettings(),
   ]);
 
   return (
@@ -60,8 +62,7 @@ export default async function ServicesPage() {
               Our Detailing <span className="text-gradient-lime">Services</span>
             </h1>
             <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
-              From express washes to multi-year ceramic coating packages, our trained technicians
-              deliver results you can see and feel.
+              {homepageSettings.servicesPageDescription}
             </p>
           </AnimatedSection>
         </div>

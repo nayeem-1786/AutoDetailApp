@@ -31,6 +31,12 @@ export default function BusinessProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
+  const [savingBooking, setSavingBooking] = useState(false);
+  const [booking, setBooking] = useState({
+    default_deposit_amount: '50',
+    quote_validity_days: '10',
+  });
+  const [bookingDirty, setBookingDirty] = useState(false);
   const [savingSeo, setSavingSeo] = useState(false);
   const [seo, setSeo] = useState({
     business_description: '',
@@ -84,6 +90,7 @@ export default function BusinessProfilePage() {
         .in('key', [
           'business_name', 'business_phone', 'business_address', 'business_email', 'business_website', 'business_hours',
           'business_description', 'business_latitude', 'business_longitude', 'service_area_name', 'service_area_radius', 'price_range',
+          'default_deposit_amount', 'quote_validity_days',
         ]);
 
       if (error) {
@@ -123,6 +130,12 @@ export default function BusinessProfilePage() {
           setHours(parsed.data);
         }
       }
+
+      // Load booking & quote settings
+      setBooking({
+        default_deposit_amount: String(settings.default_deposit_amount ?? '50'),
+        quote_validity_days: String(settings.quote_validity_days ?? '10'),
+      });
 
       // Load SEO settings
       setSeo({
@@ -236,6 +249,56 @@ export default function BusinessProfilePage() {
       setHoursDirty(false);
     }
     setSavingHours(false);
+  }
+
+  function updateBookingField(field: keyof typeof booking, value: string) {
+    setBooking((prev) => ({ ...prev, [field]: value }));
+    setBookingDirty(true);
+  }
+
+  async function saveBooking() {
+    const depositNum = parseInt(booking.default_deposit_amount) || 50;
+    const validityNum = parseInt(booking.quote_validity_days) || 10;
+
+    if (depositNum < 0) {
+      toast.error('Deposit amount cannot be negative');
+      return;
+    }
+    if (validityNum < 1 || validityNum > 365) {
+      toast.error('Quote validity must be between 1 and 365 days');
+      return;
+    }
+
+    setSavingBooking(true);
+    const supabase = createClient();
+
+    const entries = [
+      { key: 'default_deposit_amount', value: depositNum },
+      { key: 'quote_validity_days', value: validityNum },
+    ];
+
+    for (const entry of entries) {
+      const { error } = await supabase
+        .from('business_settings')
+        .upsert(
+          {
+            key: entry.key,
+            value: entry.value as unknown,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'key' }
+        );
+
+      if (error) {
+        toast.error(`Failed to save ${entry.key}`, { description: error.message });
+        setSavingBooking(false);
+        return;
+      }
+    }
+
+    toast.success('Booking & Quote settings updated');
+    setBookingDirty(false);
+    setSavingBooking(false);
   }
 
   function updateSeoField(field: keyof typeof seo, value: string) {
@@ -478,6 +541,58 @@ export default function BusinessProfilePage() {
               disabled={savingHours || !hoursDirty}
             >
               {savingHours ? 'Saving...' : 'Save Hours'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Booking & Quotes */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Booking &amp; Quotes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              label="Default Deposit Amount ($)"
+              description="Amount charged as a deposit when booking online."
+              htmlFor="deposit_amount"
+            >
+              <Input
+                id="deposit_amount"
+                type="number"
+                min="0"
+                step="1"
+                value={booking.default_deposit_amount}
+                onChange={(e) => updateBookingField('default_deposit_amount', e.target.value)}
+                placeholder="50"
+              />
+            </FormField>
+
+            <FormField
+              label="Quote Validity (days)"
+              description="How many days a quote remains valid. Shown in quote emails."
+              htmlFor="quote_validity"
+            >
+              <Input
+                id="quote_validity"
+                type="number"
+                min="1"
+                max="365"
+                value={booking.quote_validity_days}
+                onChange={(e) => updateBookingField('quote_validity_days', e.target.value)}
+                placeholder="10"
+              />
+            </FormField>
+          </div>
+
+          <div className="flex justify-end border-t border-gray-200 pt-4">
+            <Button
+              type="button"
+              onClick={saveBooking}
+              disabled={savingBooking || !bookingDirty}
+            >
+              {savingBooking ? 'Saving...' : 'Save Booking Settings'}
             </Button>
           </div>
         </CardContent>

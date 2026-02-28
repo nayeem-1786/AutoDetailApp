@@ -762,7 +762,7 @@ export function BookingWizard({
       if (effectivePaymentOption === 'full') {
         depositAmount = grandTotal;
       } else if (effectivePaymentOption === 'deposit') {
-        depositAmount = 50;
+        depositAmount = bookingConfig.default_deposit_amount;
       }
     }
 
@@ -821,7 +821,7 @@ export function BookingWizard({
             : null;
 
     const amountCharged = paymentIntentId
-      ? (effectivePaymentOption === 'full' || discountsCoverAmount ? grandTotal : 50)
+      ? (effectivePaymentOption === 'full' || discountsCoverAmount ? grandTotal : bookingConfig.default_deposit_amount)
       : 0;
 
     setConfirmation({
@@ -957,6 +957,7 @@ export function BookingWizard({
             onCouponAutoApplyAttempted={() => setUrlCouponAttempted(true)}
             vehicleCategory={state.selectedCategory}
             selectedSizeClass={state.config.size_class ?? null}
+            depositAmount={bookingConfig.default_deposit_amount}
           />
         )}
     </div>

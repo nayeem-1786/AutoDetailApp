@@ -95,7 +95,7 @@ export default async function HomePage() {
       {useCarousel ? (
         <HeroCarousel slides={heroSlides} config={heroConfig} />
       ) : (
-        <HeroSection />
+        <HeroSection tagline={homepageSettings.heroTagline} />
       )}
 
       {cmsToggles.adPlacements && <Suspense fallback={null}><AdZone zoneId="below_hero" pagePath="/" /></Suspense>}
@@ -113,8 +113,7 @@ export default async function HomePage() {
                 Our Services
               </h2>
               <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
-                From express washes to multi-year ceramic coating packages, we offer
-                comprehensive auto detailing tailored to your vehicle&apos;s needs.
+                {homepageSettings.servicesDescription}
               </p>
             </div>
           </HomeAnimations>
@@ -343,6 +342,9 @@ export default async function HomePage() {
       <SectionTickerSlot position="before_cta" pageType="home" />
 
       <CtaSection
+        title={homepageSettings.ctaTitle}
+        description={homepageSettings.ctaDescription}
+        buttonText={homepageSettings.ctaButtonText}
         beforeImage={homepageSettings.ctaBeforeImage}
         afterImage={homepageSettings.ctaAfterImage}
       />

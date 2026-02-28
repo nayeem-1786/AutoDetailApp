@@ -15,6 +15,12 @@ const HOMEPAGE_KEYS = [
   'homepage_cta_after_image',
   'homepage_team_heading',
   'homepage_credentials_heading',
+  'homepage_hero_tagline',
+  'homepage_cta_title',
+  'homepage_cta_description',
+  'homepage_cta_button_text',
+  'homepage_services_description',
+  'services_page_description',
 ] as const;
 
 export async function GET() {

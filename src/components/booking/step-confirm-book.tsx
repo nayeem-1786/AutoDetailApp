@@ -91,6 +91,8 @@ export interface StepConfirmBookProps {
   // Vehicle category from Step 1
   vehicleCategory: string;
   selectedSizeClass: VehicleSizeClass | null;
+  // Configurable deposit amount
+  depositAmount?: number;
 }
 
 // --- Component ---
@@ -129,6 +131,7 @@ export function StepConfirmBook({
   onCouponAutoApplyAttempted,
   vehicleCategory,
   selectedSizeClass,
+  depositAmount: depositAmountProp = 50,
 }: StepConfirmBookProps) {
   // --- State ---
   const [businessName, setBusinessName] = useState('our business');
@@ -177,7 +180,7 @@ export function StepConfirmBook({
   const grandTotal = Math.max(0, subtotal - couponDiscount - loyaltyDiscount);
 
   const isFullPaymentRequired = grandTotal < 100;
-  const depositAmount = 50;
+  const depositAmount = depositAmountProp;
   // Payment amount based on selected option
   const paymentAmount = paymentOption === 'full' ? grandTotal
     : paymentOption === 'deposit' ? depositAmount

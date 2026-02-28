@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { adminFetch } from '@/lib/utils/admin-fetch';
@@ -60,6 +61,12 @@ interface HomepageSettingsState {
   ctaAfterImage: string;
   teamHeading: string;
   credentialsHeading: string;
+  heroTagline: string;
+  ctaTitle: string;
+  ctaDescription: string;
+  ctaButtonText: string;
+  servicesDescription: string;
+  servicesPageDescription: string;
 }
 
 const DEFAULTS: HomepageSettingsState = {
@@ -73,6 +80,12 @@ const DEFAULTS: HomepageSettingsState = {
   ctaAfterImage: '',
   teamHeading: 'Meet the Team',
   credentialsHeading: 'Credentials & Awards',
+  heroTagline: '',
+  ctaTitle: '',
+  ctaDescription: '',
+  ctaButtonText: '',
+  servicesDescription: '',
+  servicesPageDescription: '',
 };
 
 // ---------------------------------------------------------------------------
@@ -99,6 +112,12 @@ export default function HomepageSettingsPage() {
         ctaAfterImage: data.homepage_cta_after_image || '',
         teamHeading: data.homepage_team_heading || 'Meet the Team',
         credentialsHeading: data.homepage_credentials_heading || 'Credentials & Awards',
+        heroTagline: data.homepage_hero_tagline || '',
+        ctaTitle: data.homepage_cta_title || '',
+        ctaDescription: data.homepage_cta_description || '',
+        ctaButtonText: data.homepage_cta_button_text || '',
+        servicesDescription: data.homepage_services_description || '',
+        servicesPageDescription: data.services_page_description || '',
       });
     } catch {
       toast.error('Failed to load homepage settings');
@@ -130,6 +149,12 @@ export default function HomepageSettingsPage() {
           homepage_cta_after_image: settings.ctaAfterImage || null,
           homepage_team_heading: settings.teamHeading || 'Meet the Team',
           homepage_credentials_heading: settings.credentialsHeading || 'Credentials & Awards',
+          homepage_hero_tagline: settings.heroTagline || null,
+          homepage_cta_title: settings.ctaTitle || null,
+          homepage_cta_description: settings.ctaDescription || null,
+          homepage_cta_button_text: settings.ctaButtonText || null,
+          homepage_services_description: settings.servicesDescription || null,
+          services_page_description: settings.servicesPageDescription || null,
         }),
       });
       if (!res.ok) throw new Error('Failed');
@@ -186,13 +211,157 @@ export default function HomepageSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Homepage Settings"
-        description="Manage differentiators, CTA images, review links, and section headings."
+        description="Manage hero content, CTA defaults, section copy, differentiators, and review links."
         action={
           <Button onClick={save} disabled={saving}>
             {saving ? <><Spinner size="sm" /> Saving...</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
           </Button>
         }
       />
+
+      {/* Hero Settings */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Hero Settings</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            Main tagline displayed on the homepage hero section.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Hero Tagline
+          </label>
+          <Textarea
+            value={settings.heroTagline}
+            onChange={(e) => setSettings((prev) => ({ ...prev, heroTagline: e.target.value }))}
+            className="mt-1 text-sm"
+            rows={2}
+            placeholder="Expert ceramic coatings, paint correction, and premium detailing. We bring showroom results directly to your doorstep."
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <ImageUploadField
+            value={settings.ctaBeforeImage}
+            onChange={(url) => setSettings((prev) => ({ ...prev, ctaBeforeImage: url }))}
+            folder="homepage"
+            label="CTA Before Image"
+          />
+          <ImageUploadField
+            value={settings.ctaAfterImage}
+            onChange={(url) => setSettings((prev) => ({ ...prev, ctaAfterImage: url }))}
+            folder="homepage"
+            label="CTA After Image"
+          />
+        </div>
+      </div>
+
+      {/* CTA Defaults */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">CTA Defaults</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            Default call-to-action shown across the site. Individual pages can override via content blocks.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            CTA Title
+          </label>
+          <Input
+            value={settings.ctaTitle}
+            onChange={(e) => setSettings((prev) => ({ ...prev, ctaTitle: e.target.value }))}
+            className="mt-1 text-sm"
+            placeholder="Ready to Transform Your Vehicle?"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            CTA Description
+          </label>
+          <Textarea
+            value={settings.ctaDescription}
+            onChange={(e) => setSettings((prev) => ({ ...prev, ctaDescription: e.target.value }))}
+            className="mt-1 text-sm"
+            rows={2}
+            placeholder="Book your appointment today and experience the difference professional detailing makes."
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            CTA Button Text
+          </label>
+          <Input
+            value={settings.ctaButtonText}
+            onChange={(e) => setSettings((prev) => ({ ...prev, ctaButtonText: e.target.value }))}
+            className="mt-1 text-sm"
+            placeholder="Book Your Detail"
+          />
+        </div>
+      </div>
+
+      {/* Section Content */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Section Content</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            Marketing copy for the services sections and section headings.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Services Description (Homepage)
+          </label>
+          <Textarea
+            value={settings.servicesDescription}
+            onChange={(e) => setSettings((prev) => ({ ...prev, servicesDescription: e.target.value }))}
+            className="mt-1 text-sm"
+            rows={2}
+            placeholder="From express washes to multi-year ceramic coating packages..."
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Shown under &ldquo;Our Services&rdquo; on the homepage.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Services Description (Listing Page)
+          </label>
+          <Textarea
+            value={settings.servicesPageDescription}
+            onChange={(e) => setSettings((prev) => ({ ...prev, servicesPageDescription: e.target.value }))}
+            className="mt-1 text-sm"
+            rows={2}
+            placeholder="From express washes to multi-year ceramic coating packages..."
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Shown in the header of the /services page.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Team Section Heading
+            </label>
+            <Input
+              value={settings.teamHeading}
+              onChange={(e) => setSettings((prev) => ({ ...prev, teamHeading: e.target.value }))}
+              className="mt-1"
+              placeholder="Meet the Team"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Credentials Section Heading
+            </label>
+            <Input
+              value={settings.credentialsHeading}
+              onChange={(e) => setSettings((prev) => ({ ...prev, credentialsHeading: e.target.value }))}
+              className="mt-1"
+              placeholder="Credentials & Awards"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Differentiators — "Why Choose Us" */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
@@ -326,60 +495,6 @@ export default function HomepageSettingsPage() {
         </div>
       </div>
 
-      {/* CTA Before/After Images */}
-      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            CTA Before/After Images
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Shown in the bottom CTA section&apos;s before/after slider.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <ImageUploadField
-            value={settings.ctaBeforeImage}
-            onChange={(url) => setSettings((prev) => ({ ...prev, ctaBeforeImage: url }))}
-            folder="homepage"
-            label="Before Image"
-          />
-          <ImageUploadField
-            value={settings.ctaAfterImage}
-            onChange={(url) => setSettings((prev) => ({ ...prev, ctaAfterImage: url }))}
-            folder="homepage"
-            label="After Image"
-          />
-        </div>
-      </div>
-
-      {/* Section Headings */}
-      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Section Headings</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Team Section Heading
-            </label>
-            <Input
-              value={settings.teamHeading}
-              onChange={(e) => setSettings((prev) => ({ ...prev, teamHeading: e.target.value }))}
-              className="mt-1"
-              placeholder="Meet the Team"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Credentials Section Heading
-            </label>
-            <Input
-              value={settings.credentialsHeading}
-              onChange={(e) => setSettings((prev) => ({ ...prev, credentialsHeading: e.target.value }))}
-              className="mt-1"
-              placeholder="Credentials & Awards"
-            />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
