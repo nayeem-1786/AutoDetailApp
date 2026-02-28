@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { usePermission } from '@/lib/hooks/use-permission';
 import type { Employee } from '@/lib/supabase/types';
-import { ROLE_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
@@ -16,12 +15,21 @@ import { Spinner } from '@/components/ui/spinner';
 import { Plus } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
+interface RoleOption {
+  id: string;
+  name: string;
+  display_name: string;
+  is_system: boolean;
+}
+
 export default function StaffPage() {
   const router = useRouter();
   const supabase = createClient();
   const { granted: canManageUsers } = usePermission('settings.manage_users');
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [roleMap, setRoleMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -30,15 +38,28 @@ export default function StaffPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .order('first_name');
+      const [empResult, rolesResult] = await Promise.all([
+        supabase.from('employees').select('*').order('first_name'),
+        supabase
+          .from('roles')
+          .select('id, name, display_name, is_system')
+          .order('is_system', { ascending: false })
+          .order('display_name'),
+      ]);
 
-      if (error) {
-        console.error('Error loading employees:', error);
+      if (empResult.error) {
+        console.error('Error loading employees:', empResult.error);
       }
-      if (data) setEmployees(data);
+      if (empResult.data) setEmployees(empResult.data);
+      if (rolesResult.data) {
+        setRoles(rolesResult.data);
+        // Build role_id → display_name map for fast lookups
+        const map: Record<string, string> = {};
+        for (const r of rolesResult.data) {
+          map[r.id] = r.display_name;
+        }
+        setRoleMap(map);
+      }
       setLoading(false);
     }
     load();
@@ -52,7 +73,7 @@ export default function StaffPage() {
         const matchesEmail = e.email.toLowerCase().includes(q);
         if (!matchesName && !matchesEmail) return false;
       }
-      if (roleFilter && e.role !== roleFilter) return false;
+      if (roleFilter && e.role_id !== roleFilter) return false;
       if (statusFilter && e.status !== statusFilter) return false;
       return true;
     });
@@ -84,7 +105,7 @@ export default function StaffPage() {
       header: 'Role',
       cell: ({ row }) => (
         <Badge variant="info">
-          {ROLE_LABELS[row.original.role] || row.original.role}
+          {roleMap[row.original.role_id] || row.original.role}
         </Badge>
       ),
     },
@@ -145,10 +166,9 @@ export default function StaffPage() {
           className="w-full sm:w-44"
         >
           <option value="">All Roles</option>
-          <option value="super_admin">Super Admin</option>
-          <option value="admin">Admin</option>
-          <option value="cashier">Cashier</option>
-          <option value="detailer">Detailer</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>{r.display_name}</option>
+          ))}
         </Select>
         <Select
           value={statusFilter}

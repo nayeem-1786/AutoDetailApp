@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Staff Role Dropdown Fix — 2026-02-28
+
+- **Fix**: Staff edit, new, and list pages now fetch roles dynamically from the `roles` table instead of using hardcoded `ROLE_LABELS` constant (4 system roles only)
+- **Custom roles**: Role dropdown shows all roles from Role Management (system + custom)
+- **Enum safety**: `employees.role` column stays as valid `user_role` enum; custom role names fall back to `'detailer'` for the enum column while `role_id` stores the actual role UUID
+- **Validation**: Zod schema widened from `z.enum([...])` to `z.string().min(1)` to accept custom role names
+- **Staff list**: Role badge and filter dropdown now use `role_id` → `display_name` from roles table
+- **Staff edit**: Page header description and role dropdown both resolve from roles table
+- **APIs updated**: Both `PATCH /api/admin/staff/[id]` and `POST /api/staff/create` handle custom role names gracefully
+
+---
+
 ## Staff Editor Security Tab — 2026-02-28
 
 - **Moved**: "Password & Security" from a card inside the Profile tab to its own dedicated "Security" tab in the staff editor

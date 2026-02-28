@@ -7,7 +7,6 @@ import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { employeeUpdateSchema, type EmployeeUpdateInput } from '@/lib/utils/validation';
-import { ROLE_LABELS } from '@/lib/utils/constants';
 import { formatPhoneInput } from '@/lib/utils/format';
 import type { Employee, UserRole, EmployeeSchedule } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
@@ -24,6 +23,14 @@ import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Calendar, Trash2, CalendarOff, Plus, ExternalLink, Loader2, Shield, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { cn } from '@/lib/utils/cn';
+
+// Role option from roles table
+interface RoleOption {
+  id: string;
+  name: string;
+  display_name: string;
+  is_system: boolean;
+}
 
 // Permission definition from API
 interface PermissionDefinition {
@@ -90,6 +97,7 @@ export default function StaffDetailPage() {
   const [tab, setTab] = useState(initialTab);
   const [showDeactivate, setShowDeactivate] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
 
   // Password reset state
   const [newPassword, setNewPassword] = useState('');
@@ -137,17 +145,31 @@ export default function StaffDetailPage() {
 
   const loadEmployee = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('id', id)
-      .single();
 
-    if (error || !data) {
+    // Fetch employee and roles in parallel
+    const [empResult, rolesResult] = await Promise.all([
+      supabase.from('employees').select('*').eq('id', id).single(),
+      supabase
+        .from('roles')
+        .select('id, name, display_name, is_system')
+        .order('is_system', { ascending: false })
+        .order('display_name'),
+    ]);
+
+    if (empResult.error || !empResult.data) {
       toast.error('Staff member not found');
       router.push('/admin/staff');
       return;
     }
+
+    const data = empResult.data;
+    if (rolesResult.data) {
+      setRoles(rolesResult.data);
+    }
+
+    // Resolve the actual role name from role_id (not the enum fallback)
+    const actualRole = rolesResult.data?.find((r: RoleOption) => r.id === data.role_id);
+    const roleName = actualRole?.name || data.role;
 
     setEmployee(data);
     reset({
@@ -155,7 +177,7 @@ export default function StaffDetailPage() {
       last_name: data.last_name,
       email: data.email,
       phone: data.phone || '',
-      role: data.role,
+      role: roleName,
       pin_code: data.pin_code || '',
       hourly_rate: data.hourly_rate,
       bookable_for_appointments: data.bookable_for_appointments,
@@ -565,7 +587,7 @@ export default function StaffDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={`${employee.first_name} ${employee.last_name}`}
-        description={ROLE_LABELS[employee.role]}
+        description={roles.find((r) => r.id === employee.role_id)?.display_name || employee.role}
         action={
           <Button variant="outline" onClick={() => router.push('/admin/staff')}>
             <ArrowLeft className="h-4 w-4" />
@@ -634,8 +656,8 @@ export default function StaffDetailPage() {
 
                   <FormField label="Role" error={errors.role?.message} required htmlFor="role">
                     <Select id="role" {...register('role')}>
-                      {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
+                      {roles.map((r) => (
+                        <option key={r.name} value={r.name}>{r.display_name}</option>
                       ))}
                     </Select>
                   </FormField>

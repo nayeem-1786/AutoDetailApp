@@ -30,7 +30,7 @@ export const employeeCreateSchema = z.object({
   last_name: requiredString,
   email: z.string().email('Invalid email'),
   phone: phoneSchema,
-  role: z.enum(['super_admin', 'admin', 'cashier', 'detailer']),
+  role: z.string().min(1, 'Role is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   pin_code: pinCodeSchema,
   hourly_rate: positiveNumber.optional().nullable(),

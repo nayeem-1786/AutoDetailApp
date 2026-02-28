@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
 import { employeeCreateSchema, type EmployeeCreateInput } from '@/lib/utils/validation';
-import { ROLE_LABELS } from '@/lib/utils/constants';
 import { formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -17,9 +17,18 @@ import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
 
+interface RoleOption {
+  id: string;
+  name: string;
+  display_name: string;
+  is_system: boolean;
+}
+
 export default function NewStaffPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [saving, setSaving] = useState(false);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
 
   const {
     register,
@@ -43,6 +52,18 @@ export default function NewStaffPage() {
   });
 
   const bookable = watch('bookable_for_appointments');
+
+  useEffect(() => {
+    async function loadRoles() {
+      const { data } = await supabase
+        .from('roles')
+        .select('id, name, display_name, is_system')
+        .order('is_system', { ascending: false })
+        .order('display_name');
+      if (data) setRoles(data);
+    }
+    loadRoles();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onSubmit(data: EmployeeCreateInput) {
     setSaving(true);
@@ -112,8 +133,8 @@ export default function NewStaffPage() {
 
               <FormField label="Role" error={errors.role?.message} required htmlFor="role">
                 <Select id="role" {...register('role')}>
-                  {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                  {roles.map((r) => (
+                    <option key={r.name} value={r.name}>{r.display_name}</option>
                   ))}
                 </Select>
               </FormField>

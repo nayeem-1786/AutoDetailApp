@@ -51,7 +51,9 @@ export async function PATCH(
     }
 
     // Look up role_id from roles table when role is provided
+    const VALID_ROLE_ENUMS = ['super_admin', 'admin', 'cashier', 'detailer'];
     let role_id: string | undefined;
+    let roleEnum: string | undefined;
     if (role) {
       const { data: roleRow } = await supabase
         .from('roles')
@@ -61,6 +63,8 @@ export async function PATCH(
       if (roleRow) {
         role_id = roleRow.id;
       }
+      // Map role name to valid enum value; custom roles fall back to 'detailer'
+      roleEnum = VALID_ROLE_ENUMS.includes(role) ? role : 'detailer';
     }
 
     // Update employee record
@@ -69,7 +73,7 @@ export async function PATCH(
       last_name,
       email,
       phone: phone || null,
-      role,
+      role: roleEnum ?? role,
       pin_code: pin_code || null,
       hourly_rate: hourly_rate ?? null,
       bookable_for_appointments,

@@ -43,6 +43,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Map role name to valid enum value; custom roles fall back to 'detailer'
+    const VALID_ROLE_ENUMS = ['super_admin', 'admin', 'cashier', 'detailer'];
+    const roleEnum = VALID_ROLE_ENUMS.includes(employeeData.role)
+      ? employeeData.role
+      : 'detailer';
+
     // Check for duplicate PIN
     if (pin_code) {
       const { data: existing } = await adminClient
@@ -89,7 +95,7 @@ export async function POST(request: NextRequest) {
         last_name: employeeData.last_name,
         email: employeeData.email,
         phone: employeeData.phone || null,
-        role: employeeData.role,
+        role: roleEnum,
         role_id: roleRow.id,
         pin_code: pin_code || null,
         hourly_rate: employeeData.hourly_rate ?? null,
