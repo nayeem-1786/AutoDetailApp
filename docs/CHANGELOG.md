@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Phase E.4+E.5: ImageUploadField Sweep + Homepage Settings — 2026-02-28
+
+### E.4: ImageUploadField on Remaining URL Fields
+
+- Replaced `hero_bg_image_url` plain text input in seasonal theme editor with `ImageUploadField` (drag-drop upload with preview)
+- Audited all admin pages: hero slide editor already uses `HeroImageUpload`, ad creatives use file upload — no remaining plain text inputs for image URLs
+
+### E.5: Homepage Hardcoded Items → business_settings
+
+**Database:**
+- New `business_settings` keys: `homepage_differentiators` (JSON array of {icon, title, description}), `google_place_id`, `homepage_cta_before_image`, `homepage_cta_after_image`
+- Existing keys now also edited from homepage admin: `homepage_team_heading`, `homepage_credentials_heading`
+
+**Data Layer:**
+- New `src/lib/data/homepage-settings.ts` — `getHomepageSettings()` reads all homepage settings with typed return and hardcoded fallback defaults
+
+**Homepage Updates:**
+- Differentiators ("Why Choose Us") now read from DB with icon name → Lucide component resolution via `ICON_MAP`
+- Google Place ID for reviews link now from DB
+- CTA before/after images now from DB
+- All values fall back to original hardcoded defaults if settings are missing
+
+**Admin UI:**
+- New page at `/admin/website/homepage` with:
+  - Differentiators editor: icon dropdown (17 Lucide icons), title, description, add/remove, up/down reorder
+  - Google Place ID input with help link to Google Place ID Finder
+  - CTA before/after images via `ImageUploadField`
+  - Team and Credentials section heading inputs
+- Added "Homepage" card (first position) to Website Dashboard
+- New API route: `GET/PUT /api/admin/cms/homepage-settings` — batch read/write all homepage keys
+
+**Files changed:**
+- `src/app/admin/website/themes/[id]/page.tsx` — ImageUploadField for hero_bg_image_url
+- `src/app/(public)/page.tsx` — reads from getHomepageSettings(), dynamic icon map
+- `src/app/admin/website/page.tsx` — added Homepage card
+- `src/app/admin/website/homepage/page.tsx` — NEW
+- `src/app/api/admin/cms/homepage-settings/route.ts` — NEW
+- `src/lib/data/homepage-settings.ts` — NEW
+- `supabase/migrations/20260228000003_homepage_settings.sql` — NEW
+
+---
+
 ## CMS Phase E.3: Revision History — 2026-02-28
 
 ### feat: page revision history with auto-save, view, and restore

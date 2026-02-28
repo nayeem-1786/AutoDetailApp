@@ -848,7 +848,7 @@
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
-**Known keys:** business_name, business_address, business_phone, business_hours, tax_rate, tax_products_only, tip_presets, cc_fee_rate, loyalty_earn_rate, loyalty_redeem_rate, loyalty_redeem_minimum, appointment_buffer_minutes, mobile_travel_buffer_minutes, cancellation_window_hours, receipt_email_enabled, receipt_sms_enabled, water_sku, ticker_enabled, ads_enabled, hero_carousel, announcement_tickers, ad_placements, seasonal_themes
+**Known keys:** business_name, business_address, business_phone, business_hours, tax_rate, tax_products_only, tip_presets, cc_fee_rate, loyalty_earn_rate, loyalty_redeem_rate, loyalty_redeem_minimum, appointment_buffer_minutes, mobile_travel_buffer_minutes, cancellation_window_hours, receipt_email_enabled, receipt_sms_enabled, water_sku, ticker_enabled, ads_enabled, hero_carousel, announcement_tickers, ad_placements, seasonal_themes, homepage_team_heading, homepage_credentials_heading, homepage_differentiators, google_place_id, homepage_cta_before_image, homepage_cta_after_image
 
 ### feature_flags
 | Column | Type | Constraints | Notes |
