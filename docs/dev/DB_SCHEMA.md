@@ -924,6 +924,39 @@
 **Index:** `idx_page_revisions_page_id` on `(page_id, revision_number DESC)`.
 **RLS:** Authenticated read/insert/delete. Auto-pruned to last 20 per page.
 
+### page_content_blocks
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| page_path | TEXT | NOT NULL | Page path (e.g. `/p/about`). `__global__` for global blocks |
+| page_type | TEXT | NOT NULL | 'page', 'city', 'global' |
+| block_type | TEXT | CHECK constraint | 'rich_text', 'faq', 'features_list', 'cta', 'testimonial_highlight', 'team_grid', 'credentials', 'terms_sections', 'gallery' |
+| title | TEXT | | Optional section title |
+| content | TEXT | NOT NULL | Block content (HTML or JSON depending on type) |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| is_global | BOOLEAN | NOT NULL, DEFAULT false | If true, block can be shared across pages via placements |
+| global_name | TEXT | | Human-readable name for global blocks (e.g. "Company FAQ") |
+| ai_generated | BOOLEAN | DEFAULT false | |
+| ai_last_generated_at | TIMESTAMPTZ | | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**RLS:** Public read (active only), authenticated full access.
+
+### page_block_placements
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| page_path | TEXT | NOT NULL | Page using this global block |
+| page_type | TEXT | NOT NULL, DEFAULT 'page' | |
+| block_id | UUID | NOT NULL, FK → page_content_blocks(id) ON DELETE CASCADE | |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | Position on the page |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:** `idx_page_block_unique` UNIQUE(page_path, block_id), `idx_page_block_path` (page_path, sort_order).
+**RLS:** Public read, authenticated full access.
+
 ### homepage_config
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
