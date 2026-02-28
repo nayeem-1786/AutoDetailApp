@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Save Block Cleanup + Dynamic Section Headings — 2026-02-27
+
+### fix: team_grid save block button, dynamic homepage section headings
+
+**Bug 3 — team_grid "Save Block" Button:**
+- Removed Save Block button entirely for `team_grid` block type
+- Title auto-saves on blur instead (calls `onUpdate` directly)
+- Static helper text always visible: "Team members save individually. Section title auto-saves on blur."
+- Credentials block still uses Save Block button (saves via block content JSON, not separate API)
+
+**Bug 4 — Dynamic Team/Credentials Section Headings:**
+- Added `getTeamSectionTitle()` and `getCredentialsSectionTitle()` to `team-members.ts`
+- Queries `page_content_blocks` table for the team_grid/credentials block's `title` field
+- Team section falls back to "Meet the Team" if no title set
+- Credentials section only shows heading if title is explicitly set (no default)
+- Homepage `page.tsx` now renders dynamic headings from block titles
+
+---
+
 ## Credentials Add Button Serializer Fix — 2026-02-27
 
 ### fix: credentials add button serializer

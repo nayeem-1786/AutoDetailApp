@@ -688,7 +688,13 @@ function BlockRow({
               value={localTitle}
               onChange={(e) => {
                 setLocalTitle(e.target.value);
-                setDirty(true);
+                if (block.block_type !== 'team_grid') setDirty(true);
+              }}
+              onBlur={() => {
+                // Auto-save title on blur for team_grid (no Save Block button)
+                if (block.block_type === 'team_grid' && localTitle !== (block.title ?? '')) {
+                  onUpdate({ title: localTitle.trim() || null });
+                }
               }}
               placeholder="e.g. Frequently Asked Questions"
               className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -710,19 +716,20 @@ function BlockRow({
             pageType={pageType}
           />
 
-          {/* Save — for team_grid, only show when title changed; members save individually */}
-          <div className="flex items-center justify-end gap-2 pt-2">
-            {block.block_type === 'team_grid' && !dirty && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 mr-auto">
-                Team members save individually
+          {/* Save — team_grid saves members individually (title auto-saves on blur) */}
+          {block.block_type === 'team_grid' ? (
+            <div className="pt-2">
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                Team members save individually. Section title auto-saves on blur.
               </span>
-            )}
-            {dirty && (
-              <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">
-                Unsaved changes
-              </span>
-            )}
-            {(block.block_type !== 'team_grid' || dirty) && (
+            </div>
+          ) : (
+            <div className="flex items-center justify-end gap-2 pt-2">
+              {dirty && (
+                <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">
+                  Unsaved changes
+                </span>
+              )}
               <Button
                 type="button"
                 size="sm"
@@ -738,8 +745,8 @@ function BlockRow({
                   'Save Block'
                 )}
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

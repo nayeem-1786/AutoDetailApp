@@ -7,7 +7,7 @@ import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
-import { getActiveTeamMembers, getCredentials } from '@/lib/data/team-members';
+import { getActiveTeamMembers, getCredentials, getTeamSectionTitle, getCredentialsSectionTitle } from '@/lib/data/team-members';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles } from '@/lib/data/cms';
@@ -69,7 +69,7 @@ const differentiators = [
 ] as const;
 
 export default async function HomePage() {
-  const [categories, businessInfo, reviews, teamMembers, credentials, heroSlides, heroConfig, cmsToggles] = await Promise.all([
+  const [categories, businessInfo, reviews, teamMembers, credentials, heroSlides, heroConfig, cmsToggles, teamSectionTitle, credentialsSectionTitle] = await Promise.all([
     getServiceCategories(),
     getBusinessInfo(),
     getReviewData(),
@@ -78,6 +78,8 @@ export default async function HomePage() {
     getActiveHeroSlides(),
     getHeroCarouselConfig(),
     getCmsToggles(),
+    getTeamSectionTitle(),
+    getCredentialsSectionTitle(),
   ]);
 
   const useCarousel = cmsToggles.heroCarousel && heroSlides.length > 0;
@@ -184,7 +186,7 @@ export default async function HomePage() {
             <HomeAnimations type="section-header">
               <div className="text-center">
                 <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
-                  Meet the Team
+                  {teamSectionTitle}
                 </h2>
               </div>
             </HomeAnimations>
@@ -234,6 +236,11 @@ export default async function HomePage() {
             {credentials.length > 0 && (
               <HomeAnimations type="section-header">
                 <div className="mt-12 border-t border-site-border pt-8">
+                  {credentialsSectionTitle && (
+                    <h3 className="font-display text-xl font-semibold text-site-text text-center mb-6">
+                      {credentialsSectionTitle}
+                    </h3>
+                  )}
                   <div className="flex flex-wrap justify-center gap-8 items-center">
                     {credentials.map((cred) => (
                       <div key={cred.id} className="flex items-center gap-3 text-center">

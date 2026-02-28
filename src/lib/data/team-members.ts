@@ -127,6 +127,42 @@ export const getCredentials = cache(async (): Promise<CredentialItem[]> => {
   }
 });
 
+/**
+ * Get the team_grid block's title for use as the homepage section heading.
+ * Falls back to "Meet the Team" if no title is set.
+ */
+export const getTeamSectionTitle = cache(async (): Promise<string> => {
+  const supabase = createAdminClient();
+
+  const { data: block } = await supabase
+    .from('page_content_blocks')
+    .select('title')
+    .eq('page_path', '/p/about')
+    .eq('block_type', 'team_grid')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  return block?.title?.trim() || 'Meet the Team';
+});
+
+/**
+ * Get the credentials block's title for use as the homepage section heading.
+ * Falls back to null (no separate heading rendered) if no title is set.
+ */
+export const getCredentialsSectionTitle = cache(async (): Promise<string | null> => {
+  const supabase = createAdminClient();
+
+  const { data: block } = await supabase
+    .from('page_content_blocks')
+    .select('title')
+    .eq('page_path', '/p/about')
+    .eq('block_type', 'credentials')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  return block?.title?.trim() || null;
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
