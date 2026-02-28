@@ -238,7 +238,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   const addon = suggestion.addon_service;
                   if (!addon) return null;
 
-                  const addonHref = `/services/${categorySlug}/${addon.slug}`;
+                  const addonCategorySlug = addon.service_categories?.slug;
+                  if (!addonCategorySlug) return null;
+
+                  const addonHref = `/services/${addonCategorySlug}/${addon.slug}`;
 
                   let priceLabel: string | null = null;
                   if (suggestion.combo_price != null) {

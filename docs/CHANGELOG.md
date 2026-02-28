@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Add-On URL Fix — 2026-02-28
+
+### Recommended Add-On URLs — Wrong Category Slug
+- **Bug**: On service detail pages, "Recommended Add-Ons" links used the current page's category slug instead of each add-on's own category slug
+- **Example**: Headlight Restoration on an Express Detail page linked to `/services/express-detail-services/headlight-restoration` (wrong) instead of `/services/exterior-enhancements/headlight-restoration` (correct)
+- **Fix**: Updated `getServiceBySlug` query in `src/lib/data/services.ts` to join `service_categories(slug)` on each addon service
+- **Fix**: Updated `ServiceWithFullDetails` type to include addon's `service_categories`
+- **Fix**: Updated `src/app/(public)/services/[categorySlug]/[serviceSlug]/page.tsx` to use `addon.service_categories.slug` for the href
+- **Edge case**: Addons missing a category are now gracefully skipped (not rendered)
+- **Audit**: All 28 add-on URLs across all service pages verified valid
+
+---
+
 ## Sidebar, City AI, Footer Fixes — 2026-02-28
 
 ### Website Sidebar — Collapsible Groups
