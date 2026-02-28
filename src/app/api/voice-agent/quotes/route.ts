@@ -201,9 +201,23 @@ export async function POST(request: NextRequest) {
     const status = send_sms ? 'sent' : 'draft';
     const sentAt = send_sms ? now : null;
 
-    // Set valid_until to 10 days from now
+    // Read quote validity from admin settings
+    const { data: validitySetting } = await supabase
+      .from('business_settings')
+      .select('value')
+      .eq('key', 'quote_validity_days')
+      .maybeSingle();
+
+    let quoteValidityDays = 10; // fallback
+    if (validitySetting?.value) {
+      try {
+        const parsed = JSON.parse(validitySetting.value);
+        if (typeof parsed === 'number' && parsed > 0) quoteValidityDays = parsed;
+      } catch { /* use fallback */ }
+    }
+
     const validUntil = new Date(
-      Date.now() + 10 * 24 * 60 * 60 * 1000
+      Date.now() + quoteValidityDays * 24 * 60 * 60 * 1000
     ).toISOString();
 
     // Create quote

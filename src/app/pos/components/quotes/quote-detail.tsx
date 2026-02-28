@@ -90,7 +90,7 @@ interface Communication {
 
 export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailProps) {
   const router = useRouter();
-  const { dispatch: quoteDispatch } = useQuote();
+  const { dispatch: quoteDispatch, quoteValidityDays } = useQuote();
   const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [communications, setCommunications] = useState<Communication[]>([]);
@@ -129,13 +129,13 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
 
   function handleEdit() {
     // Clear quote state before editing to force fresh load
-    quoteDispatch({ type: 'CLEAR_QUOTE' });
+    quoteDispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
     onEdit(quoteId);
   }
 
   function handleReQuote() {
     // Clear quote state — builder will create new from this quote's data
-    quoteDispatch({ type: 'CLEAR_QUOTE' });
+    quoteDispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
     onReQuote(quoteId);
   }
 

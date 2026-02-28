@@ -150,4 +150,4 @@ export type QuoteAction =
   | { type: 'REMOVE_MANUAL_DISCOUNT' }
   | { type: 'LOAD_QUOTE'; state: QuoteState }
   | { type: 'SET_VALID_UNTIL'; date: string | null }
-  | { type: 'CLEAR_QUOTE' };
+  | { type: 'CLEAR_QUOTE'; validityDays?: number };

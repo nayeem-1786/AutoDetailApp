@@ -26,7 +26,7 @@ interface QuoteBuilderProps {
 }
 
 export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuilderProps) {
-  const { quote, dispatch } = useQuote();
+  const { quote, dispatch, quoteValidityDays } = useQuote();
   const { products, services, loading: catalogLoading } = useCatalog();
   const [tab, setTab] = useState<CatalogTab>('services');
   const [search, setSearch] = useState('');
@@ -37,7 +37,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
   useEffect(() => {
     if (!quoteId) {
       // New quote — always start fresh (clears stale items from unsaved quotes)
-      dispatch({ type: 'CLEAR_QUOTE' });
+      dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
       return;
     }
 
@@ -116,6 +116,15 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
 
     loadQuote();
   }, [quoteId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update validUntil when admin setting loads (async) for new quotes only
+  useEffect(() => {
+    if (!quoteId && !quote.quoteId && quote.items.length === 0) {
+      const d = new Date();
+      d.setDate(d.getDate() + quoteValidityDays);
+      dispatch({ type: 'SET_VALID_UNTIL', date: d.toISOString().split('T')[0] });
+    }
+  }, [quoteValidityDays]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicleSizeClass = quote.vehicle?.size_class ?? null;
   const vehicleSpecialtyTier = quote.vehicle?.specialty_tier ?? null;

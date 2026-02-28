@@ -37,7 +37,7 @@ interface QuoteTicketPanelProps {
 export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps) {
   const router = useRouter();
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
-  const { quote, dispatch } = useQuote();
+  const { quote, dispatch, quoteValidityDays } = useQuote();
   const { services } = useCatalog();
 
   const [customerLookupOpen, setCustomerLookupOpen] = useState(false);
@@ -180,7 +180,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
         const data = await res.json();
         toast.success(`Quote ${data.quote.quote_number} created`);
-        dispatch({ type: 'CLEAR_QUOTE' });
+        dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
         onSaved(data.quote.id);
       }
     } catch (err) {
@@ -295,7 +295,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   function handleSendComplete() {
     setSendDialogOpen(false);
     if (quote.quoteId) {
-      dispatch({ type: 'CLEAR_QUOTE' });
+      dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
       onSaved(quote.quoteId);
     }
   }
@@ -421,7 +421,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       }
 
       toast.success(`Walk-in job created for ${quote.customer.first_name} ${quote.customer.last_name}`);
-      dispatch({ type: 'CLEAR_QUOTE' });
+      dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
 
       // Step 6: Navigate to jobs tab
       router.push('/pos/jobs');

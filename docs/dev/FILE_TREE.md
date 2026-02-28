@@ -150,6 +150,11 @@ src/app/api/admin/settings/shipping/test-connection/route.ts
 src/app/api/admin/settings/shipping/validate-address/route.ts
 ```
 
+### POS — Settings
+```
+src/app/api/pos/settings/quote-defaults/route.ts
+```
+
 ### Admin — Credentials
 ```
 src/app/api/admin/credentials/route.ts

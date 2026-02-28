@@ -321,8 +321,9 @@ export function quoteReducer(
     }
 
     case 'CLEAR_QUOTE': {
+      const days = action.validityDays ?? 10;
       const defaultValidUntil = new Date();
-      defaultValidUntil.setDate(defaultValidUntil.getDate() + 10);
+      defaultValidUntil.setDate(defaultValidUntil.getDate() + days);
       const validUntil = defaultValidUntil.toISOString().split('T')[0];
       return { ...initialQuoteState, validUntil };
     }

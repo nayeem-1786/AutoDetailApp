@@ -720,7 +720,22 @@ export async function POST(request: NextRequest) {
           }
 
           if (quoteItems.length > 0) {
-            const validUntil = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+            // Read quote validity from admin settings
+            const { data: validitySetting } = await admin
+              .from('business_settings')
+              .select('value')
+              .eq('key', 'quote_validity_days')
+              .maybeSingle();
+
+            let quoteValidityDays = 10; // fallback
+            if (validitySetting?.value) {
+              try {
+                const parsed = JSON.parse(validitySetting.value);
+                if (typeof parsed === 'number' && parsed > 0) quoteValidityDays = parsed;
+              } catch { /* use fallback */ }
+            }
+
+            const validUntil = new Date(Date.now() + quoteValidityDays * 24 * 60 * 60 * 1000).toISOString();
 
             const { quote } = await createQuote(admin, {
               customer_id: quoteCustomerId,

@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Quote Validity Reads from Admin Setting Everywhere — 2026-02-28
+
+- **Bug**: Admin `quote_validity_days` was set to 3 days, but POS quote builder defaulted to 10 (hardcoded in reducer), voice agent used 10 (hardcoded in route), and Twilio auto-quote used 10 (hardcoded in webhook). Only the email template correctly read from DB.
+- **Fix**:
+  - `voice-agent/quotes/route.ts` — reads `quote_validity_days` from `business_settings` instead of hardcoded 10
+  - `webhooks/twilio/inbound/route.ts` — same fix for auto-quote SMS flow
+  - `pos/context/quote-reducer.ts` — `CLEAR_QUOTE` now accepts optional `validityDays` parameter
+  - `pos/types.ts` — updated `CLEAR_QUOTE` action type with `validityDays?: number`
+  - `pos/context/quote-context.tsx` — fetches `quote_validity_days` on mount via new API, exposes through context
+  - All 6 `CLEAR_QUOTE` dispatch sites updated to pass `quoteValidityDays` from context
+  - `quote-builder.tsx` — secondary effect updates `validUntil` when async setting loads for new quotes
+- **New API**: `GET /api/pos/settings/quote-defaults` — returns `{ quote_validity_days }` from admin settings
+
+---
+
 ## Fix: Infinite Spinner on OTP/Email Verification — 2026-02-28
 
 - **Bug**: After entering OTP code and submitting, the Verify button spinner would spin forever. Refreshing showed login worked (session existed).
