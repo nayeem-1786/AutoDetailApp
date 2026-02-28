@@ -4,6 +4,55 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Phase E.7: Theme System Overhaul — 2026-02-28
+
+### Audit
+- **Full theme system audit** documented in `docs/planning/THEME_AUDIT.md`
+- Mapped 49 columns in `site_theme_settings` (26 wired to ThemeProvider, 21 reserved for future use, 2 metadata)
+- Mapped `seasonal_themes` table fields, activation mechanisms (manual + cron), and CSS variable injection
+- Documented 3-layer cascade: CSS defaults → site theme → seasonal overrides → user light/dark toggle
+
+### Simplification
+- **Override indicators** on seasonal theme editor: each color shows "base" badge when using default, override count in header
+- **Clear buttons** (reset icon) on each seasonal theme color field to revert individual overrides to base theme default
+- **Cron feature flag fix**: `theme-activation` cron now syncs the `seasonal_themes` feature flag when auto-activating/deactivating (was missing — themes auto-activated via cron could be invisible)
+- Added `revalidateTag()` calls to cron route for proper cache invalidation
+
+### Preview Before Activate
+- **Preview mode**: `?theme_preview={themeId}` or `?theme_preview=base` query parameter on any public page
+- **Preview banner**: Fixed indigo bar at top with theme name, "Apply" and "Close Preview" buttons
+- **Preview API**: `/api/public/cms/theme-preview?id=xxx` — returns CSS variable overrides for client-side application
+- Preview is per-browser only — doesn't affect other visitors
+- "Apply" from preview activates the seasonal theme directly
+- "Close Preview" removes overrides and cleans up URL
+
+### Import/Export
+- **Export** button on both base theme settings and seasonal theme editors — downloads JSON file
+- **Import** button on both editors — file picker, validates schema, applies values (save required)
+- Separate JSON formats for `base_theme` and `seasonal_theme` exports with version and metadata
+
+### Dark/Light Mode Consistency
+- **Extracted `LIGHT_MODE_VARS`** to shared constant at `src/lib/utils/light-mode-vars.ts`
+- `ThemeToggle` and `ThemeToggleInitializer` now import from single source of truth (was duplicated in 2 files)
+- `ThemeToggleInitializer` uses `getLightModeVarsJson()` for pre-hydration script generation
+- Admin panel confirmed isolated from public theme changes (separate layout, no ThemeProvider wrapper)
+
+**Files created:**
+- `docs/planning/THEME_AUDIT.md` — complete theme system audit
+- `src/lib/utils/light-mode-vars.ts` — shared light mode CSS variable constants
+- `src/components/public/cms/theme-preview-banner.tsx` — preview mode banner client component
+- `src/app/api/public/cms/theme-preview/route.ts` — preview theme API endpoint
+
+**Files modified:**
+- `src/app/(public)/layout.tsx` — added ThemePreviewBanner with Suspense
+- `src/app/admin/website/theme-settings/page.tsx` — added Preview, Export, Import buttons
+- `src/app/admin/website/themes/[id]/page.tsx` — override indicators, clear buttons, Preview/Export/Import
+- `src/app/api/cron/theme-activation/route.ts` — feature flag sync + cache revalidation
+- `src/components/public/theme-toggle.tsx` — uses shared LIGHT_MODE_VARS
+- `src/components/public/theme-toggle-initializer.tsx` — uses shared getLightModeVarsJson()
+
+---
+
 ## CMS Phase E.6: City Pages SEO Enhancement — 2026-02-28
 
 ### Admin UI

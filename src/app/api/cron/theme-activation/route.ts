@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { setFeatureFlag } from '@/lib/utils/feature-flags';
+import { revalidateTag } from '@/lib/utils/revalidate';
 
 // ---------------------------------------------------------------------------
 // GET /api/cron/theme-activation — Auto-activate/deactivate seasonal themes
@@ -67,6 +69,18 @@ export async function GET(request: NextRequest) {
       deactivated++;
       console.log(`[CRON] Theme auto-deactivated: ${theme.name}`);
     }
+  }
+
+  // Sync feature flag with actual active theme state
+  if (activated > 0 || deactivated > 0) {
+    const { count } = await supabase
+      .from('seasonal_themes')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true);
+
+    await setFeatureFlag('seasonal_themes', (count ?? 0) > 0);
+    revalidateTag('cms-theme');
+    revalidateTag('cms-toggles');
   }
 
   return NextResponse.json({

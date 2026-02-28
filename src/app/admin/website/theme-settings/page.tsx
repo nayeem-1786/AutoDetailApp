@@ -13,7 +13,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   RotateCcw, Save, Palette, Type, RectangleHorizontal,
-  Sparkles, ChevronDown, AlertTriangle,
+  Sparkles, ChevronDown, AlertTriangle, Eye, Download, Upload,
 } from 'lucide-react';
 import type { SiteThemeSettings } from '@/lib/supabase/types';
 import { ColorField } from './_components/color-field';
@@ -70,6 +70,68 @@ export default function ThemeSettingsPage() {
 
   const getVal = (key: keyof typeof THEME_DEFAULTS): string | null => {
     return (formData as Record<string, string | null>)[key] ?? null;
+  };
+
+  const handlePreview = () => {
+    window.open('/?theme_preview=base', '_blank');
+  };
+
+  const handleExport = () => {
+    const exportData = {
+      type: 'base_theme' as const,
+      name: (formData as Record<string, unknown>).name ?? 'Custom Theme',
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      settings: Object.fromEntries(
+        Object.entries(formData).filter(([k]) =>
+          k.startsWith('color_') || k.startsWith('font_') ||
+          k.startsWith('btn_') || k.startsWith('border_') ||
+          k.startsWith('spacing_') || k === 'mode' || k === 'name'
+        )
+      ),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `base-theme-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Base theme exported');
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data.settings || typeof data.settings !== 'object') {
+          toast.error('Invalid theme file: missing settings');
+          return;
+        }
+        if (data.type && data.type !== 'base_theme') {
+          toast.error('This file is not a base theme export');
+          return;
+        }
+        const s = data.settings;
+        const newData: FormData = { ...formData };
+        for (const [key, value] of Object.entries(s)) {
+          if (key in THEME_DEFAULTS || key === 'mode' || key === 'name') {
+            (newData as Record<string, unknown>)[key] = value;
+          }
+        }
+        setFormData(newData);
+        toast.success(`Imported "${data.name ?? 'theme'}" — click Save to apply`);
+      } catch {
+        toast.error('Failed to parse theme file');
+      }
+    };
+    input.click();
   };
 
   const handleSave = async () => {
@@ -152,14 +214,26 @@ export default function ThemeSettingsPage() {
         title="Theme & Style Settings"
         description="These settings control your site's base theme. Active seasonal themes may override some colors."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <Button variant="outline" onClick={handlePreview}>
+              <Eye className="mr-2 h-4 w-4" />
+              Preview
+            </Button>
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+            <Button variant="outline" onClick={handleImport}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import
+            </Button>
             <Button variant="outline" onClick={() => setResetOpen(true)}>
               <RotateCcw className="mr-2 h-4 w-4" />
-              Reset to Default
+              Reset
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Spinner size="sm" /> : <Save className="mr-2 h-4 w-4" />}
-              Save Changes
+              Save
             </Button>
           </div>
         }

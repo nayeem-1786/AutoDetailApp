@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-28 (Phase E.6 City Pages SEO Enhancement)
-> **Status:** Phase E.6 Complete — Service highlights, landmarks, keyword-aware AI for city pages
+> **Updated:** 2026-02-28 (Phase E.7 Theme System Overhaul)
+> **Status:** Phase E.7 Complete — Theme audit, preview, import/export, dark/light mode consistency
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -897,16 +897,16 @@ Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger
 - [x] Keyword density indicator in content editor dialog showing focus keywords for reference
 - [x] SEO Data column in cities table showing KW/SH/LM badges for quick data completeness check
 
-### E.7 — Theme System Overhaul
+### E.7 — Theme System Overhaul ✅ COMPLETE (2026-02-28)
 
-- [ ] Audit current Theme Settings schema and `site-theme` API
-- [ ] Audit Seasonal Themes system — activation/deactivation cron, override behavior
-- [ ] Review CSS variable indirection pattern (critical for Tailwind v4)
-- [ ] Design swappable theme system: create/delete themes, preview before activating
-- [ ] Review relationship between base Theme Settings and Seasonal Themes — simplify if redundant
-- [ ] Dark/light mode consistency across all public pages
-- [ ] Theme import/export capability
-- [ ] **This is a separate project scope — do not bundle with Phases A–D**
+- [x] Full audit documented in `docs/planning/THEME_AUDIT.md` — 49 columns mapped, 26 wired, 21 reserved
+- [x] Seasonal theme override indicators with base/override badges and clear buttons
+- [x] Cron feature flag sync fix — auto-activate/deactivate now toggles `seasonal_themes` flag
+- [x] Preview before activate: `?theme_preview={id}` with banner (Apply/Close)
+- [x] Theme import/export for both base and seasonal themes (JSON format)
+- [x] Dark/light mode: extracted `LIGHT_MODE_VARS` to shared constant, eliminated duplication
+- [x] Admin panel confirmed isolated from public theme changes
+- [x] Deprecated fields documented (21 unwired DB columns — reserved for future use, not dropped)
 
 ### E.8 — Pages Editor Cleanup + Navigation Sync ✅
 

@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-28 (Phase E.2 — Global reusable blocks)
+> **Last updated:** 2026-02-28 (Phase E.7 — Theme system overhaul)
 
 ---
 
@@ -359,6 +359,7 @@ src/app/api/public/cms/ads/route.ts
 src/app/api/public/cms/hero/route.ts
 src/app/api/public/cms/site-theme/route.ts
 src/app/api/public/cms/theme/route.ts
+src/app/api/public/cms/theme-preview/route.ts
 src/app/api/public/cms/tickers/route.ts
 ```
 
@@ -779,6 +780,7 @@ src/lib/utils/format.ts
 src/lib/utils/idempotency.ts
 src/lib/utils/issue-types.ts
 src/lib/utils/job-zones.ts
+src/lib/utils/light-mode-vars.ts
 src/lib/utils/link-tracking.ts
 src/lib/utils/mailgun-signature.ts
 src/lib/utils/order-emails.ts
@@ -879,6 +881,7 @@ src/components/public/cms/announcement-ticker.tsx
 src/components/public/cms/hero-carousel.tsx
 src/components/public/cms/particle-canvas.tsx
 src/components/public/cms/section-ticker-slot.tsx
+src/components/public/cms/theme-preview-banner.tsx
 src/components/public/cms/theme-provider.tsx
 src/components/public/content-block-renderer.tsx
 src/components/public/gallery-lightbox.tsx

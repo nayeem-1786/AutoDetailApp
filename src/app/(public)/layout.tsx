@@ -1,7 +1,9 @@
+import { Suspense } from 'react';
 import { SiteHeader } from '@/components/public/site-header';
 import { SiteFooter } from '@/components/public/site-footer';
 import { ConditionalFooter } from '@/components/public/conditional-footer';
 import { ThemeProvider } from '@/components/public/cms/theme-provider';
+import { ThemePreviewBanner } from '@/components/public/cms/theme-preview-banner';
 import { TopBarTickerFiltered, LayoutSectionTickers } from '@/components/public/cms/announcement-ticker';
 import { CartProviderWrapper } from '@/components/public/cart/cart-provider-wrapper';
 import { CartDrawer } from '@/components/public/cart/cart-drawer';
@@ -37,6 +39,9 @@ export default async function PublicLayout({
       siteTheme={hasSiteTheme ? siteTheme : null}
     >
       <ThemeToggleInitializer />
+      <Suspense>
+        <ThemePreviewBanner />
+      </Suspense>
       <CartProviderWrapper>
         <div className="public-theme bg-brand-black text-site-text min-h-screen antialiased">
           {/* Ticker at very top of page, header directly below */}
