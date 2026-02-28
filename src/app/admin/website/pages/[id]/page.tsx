@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, ExternalLink, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, ExternalLink, Eye, Sparkles, History, ChevronDown, RotateCcw, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -13,16 +13,34 @@ import { SectionErrorBadge } from '@/components/ui/section-error-badge';
 import { PageHtmlEditor } from '@/components/admin/content/page-html-editor';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { ConfirmDialog, useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useFormValidation } from '@/lib/hooks/use-form-validation';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { formatDistanceToNow } from 'date-fns';
 import type { WebsitePage, PageTemplate } from '@/lib/supabase/types';
+
+interface Revision {
+  id: string;
+  revision_number: number;
+  change_summary: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+interface RevisionSnapshot {
+  page: Record<string, unknown>;
+  blocks: Array<{ block_type: string; title: string | null; content: string; sort_order: number }>;
+  savedAt: string;
+}
 
 export default function EditPagePage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [allPages, setAllPages] = useState<WebsitePage[]>([]);
 
   // Form state
@@ -38,6 +56,15 @@ export default function EditPagePage() {
   const [ogImageUrl, setOgImageUrl] = useState('');
   const [seoGenerating, setSeoGenerating] = useState(false);
   const [seoGenerated, setSeoGenerated] = useState(false);
+
+  // Revision history state
+  const [revisions, setRevisions] = useState<Revision[]>([]);
+  const [revisionsExpanded, setRevisionsExpanded] = useState(false);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [viewingSnapshot, setViewingSnapshot] = useState<RevisionSnapshot | null>(null);
+  const [viewingRevisionNumber, setViewingRevisionNumber] = useState(0);
+  const [restoring, setRestoring] = useState(false);
+  const { confirm, dialogProps, ConfirmDialog: ConfirmDialogComponent } = useConfirmDialog();
 
   // Track saved values for dirty detection
   const savedValuesRef = useRef({
@@ -111,6 +138,22 @@ export default function EditPagePage() {
   useEffect(() => {
     loadPage();
   }, [loadPage]);
+
+  const handlePreview = async () => {
+    setPreviewing(true);
+    try {
+      const res = await adminFetch(`/api/admin/cms/pages/${id}/preview`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('Failed to generate preview');
+      const { url } = await res.json();
+      window.open(url, '_blank');
+    } catch {
+      toast.error('Failed to generate preview link');
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   const handleSeoGenerate = async () => {
     const pagePath = `/p/${slug}`;
@@ -200,6 +243,77 @@ export default function EditPagePage() {
     }
   };
 
+  // --- Revision history handlers ---
+  const loadRevisions = useCallback(async () => {
+    setRevisionsLoading(true);
+    try {
+      const res = await adminFetch(`/api/admin/cms/pages/${id}/revisions`);
+      if (res.ok) {
+        const json = await res.json();
+        setRevisions(json.data || []);
+      }
+    } catch {
+      // silent — non-critical
+    } finally {
+      setRevisionsLoading(false);
+    }
+  }, [id]);
+
+  const handleToggleRevisions = () => {
+    const next = !revisionsExpanded;
+    setRevisionsExpanded(next);
+    if (next && revisions.length === 0) {
+      loadRevisions();
+    }
+  };
+
+  const handleViewRevision = async (revisionId: string, revisionNumber: number) => {
+    try {
+      const res = await adminFetch(`/api/admin/cms/pages/${id}/revisions/${revisionId}`);
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      setViewingSnapshot(json.data.snapshot as RevisionSnapshot);
+      setViewingRevisionNumber(revisionNumber);
+    } catch {
+      toast.error('Failed to load revision');
+    }
+  };
+
+  const handleRestoreRevision = (revisionId: string, revisionNumber: number) => {
+    confirm({
+      title: `Restore to Revision #${revisionNumber}?`,
+      description: 'This will replace the current page content with the saved version. A new revision will be created recording this restore.',
+      confirmLabel: 'Restore',
+      variant: 'default',
+      onConfirm: async () => {
+        setRestoring(true);
+        try {
+          const res = await adminFetch(`/api/admin/cms/pages/${id}/revisions/${revisionId}/restore`, {
+            method: 'POST',
+          });
+          if (!res.ok) throw new Error();
+          toast.success(`Restored to revision #${revisionNumber}`);
+          // Reload the page data and revisions
+          await loadPage();
+          await loadRevisions();
+        } catch {
+          toast.error('Failed to restore revision');
+        } finally {
+          setRestoring(false);
+        }
+      },
+    });
+  };
+
+  // Refresh revisions after save
+  const prevSavingRef = useRef(saving);
+  useEffect(() => {
+    if (prevSavingRef.current && !saving && revisionsExpanded) {
+      loadRevisions();
+    }
+    prevSavingRef.current = saving;
+  }, [saving, revisionsExpanded, loadRevisions]);
+
   if (loading) {
     return (
       <div className="text-center py-12 text-sm text-gray-500">Loading page...</div>
@@ -212,6 +326,15 @@ export default function EditPagePage() {
         title={`Edit: ${title}`}
         action={
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePreview}
+              disabled={previewing}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              {previewing ? 'Opening...' : 'Preview'}
+            </Button>
             {isPublished && (
               <a
                 href={`/p/${slug}`}
@@ -396,6 +519,67 @@ export default function EditPagePage() {
           </div>
         </div>
 
+        {/* Revision History */}
+        <div className="bg-white rounded-lg border shadow-sm">
+          <button
+            type="button"
+            className="w-full p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
+            onClick={handleToggleRevisions}
+          >
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <History className="h-4 w-4" /> Revision History
+            </h2>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${revisionsExpanded ? 'rotate-180' : ''}`} />
+          </button>
+
+          {revisionsExpanded && (
+            <div className="px-6 pb-6">
+              {revisionsLoading ? (
+                <div className="flex justify-center py-4">
+                  <Spinner size="sm" />
+                </div>
+              ) : revisions.length === 0 ? (
+                <p className="text-sm text-gray-500">No revisions yet. Save the page to create the first revision.</p>
+              ) : (
+                <div className="divide-y">
+                  {revisions.map((rev) => (
+                    <div key={rev.id} className="flex items-center justify-between py-3">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-sm font-medium text-gray-900">Revision #{rev.revision_number}</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          {formatDistanceToNow(new Date(rev.created_at), { addSuffix: true })}
+                        </span>
+                        {rev.change_summary && (
+                          <p className="text-xs text-gray-400 truncate">{rev.change_summary}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 ml-4 shrink-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewRevision(rev.id, rev.revision_number)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" /> View
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestoreRevision(rev.id, rev.revision_number)}
+                          disabled={restoring}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" /> Restore
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Submit */}
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => router.push('/admin/website/pages')}>
@@ -407,7 +591,116 @@ export default function EditPagePage() {
           </Button>
         </div>
       </form>
+
+      {/* Confirm Dialog for Restore */}
+      <ConfirmDialogComponent {...dialogProps} loading={restoring} />
+
+      {/* View Revision Modal */}
+      <RevisionViewDialog
+        snapshot={viewingSnapshot}
+        revisionNumber={viewingRevisionNumber}
+        onClose={() => setViewingSnapshot(null)}
+      />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RevisionViewDialog — read-only preview of a revision snapshot
+// ---------------------------------------------------------------------------
+function RevisionViewDialog({
+  snapshot,
+  revisionNumber,
+  onClose,
+}: {
+  snapshot: RevisionSnapshot | null;
+  revisionNumber: number;
+  onClose: () => void;
+}) {
+  if (!snapshot) return null;
+
+  const page = snapshot.page;
+
+  return (
+    <Dialog open={!!snapshot} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogHeader>
+        <DialogTitle>Revision #{revisionNumber}</DialogTitle>
+        <DialogClose onClose={onClose} />
+      </DialogHeader>
+      <DialogContent className="max-h-[60vh] overflow-y-auto">
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase">Title</p>
+            <p className="text-sm text-gray-900">{page.title as string || '(empty)'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase">Slug</p>
+            <p className="text-sm text-gray-900">/p/{page.slug as string}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase">Template</p>
+            <p className="text-sm text-gray-900">{page.page_template as string}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase">Status</p>
+            <p className="text-sm text-gray-900">{page.is_published ? 'Published' : 'Draft'}</p>
+          </div>
+          {String(page.meta_title || '') && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase">Meta Title</p>
+              <p className="text-sm text-gray-900">{String(page.meta_title)}</p>
+            </div>
+          )}
+          {String(page.meta_description || '') && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase">Meta Description</p>
+              <p className="text-sm text-gray-900">{String(page.meta_description)}</p>
+            </div>
+          )}
+          {String(page.content || '') && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase">Content Preview</p>
+              <div className="mt-1 max-h-32 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 whitespace-pre-wrap">
+                {String(page.content).replace(/<[^>]+>/g, ' ').slice(0, 500)}
+                {String(page.content).length > 500 ? '...' : ''}
+              </div>
+            </div>
+          )}
+          {snapshot.blocks.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase mb-2">
+                Content Blocks ({snapshot.blocks.length})
+              </p>
+              <div className="space-y-2">
+                {snapshot.blocks.map((block, i) => (
+                  <div key={i} className="rounded border border-gray-200 bg-gray-50 p-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded">
+                        {block.block_type}
+                      </span>
+                      {block.title && (
+                        <span className="text-xs text-gray-700">{block.title}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase">Saved At</p>
+            <p className="text-sm text-gray-900">
+              {new Date(snapshot.savedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 

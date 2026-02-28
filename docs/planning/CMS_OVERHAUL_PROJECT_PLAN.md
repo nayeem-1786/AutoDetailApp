@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-27 (Post-Phase D cleanup + Team/Credentials restructure)
-> **Status:** Phase D Complete — Team/Credentials separated into dedicated admin pages, display-only blocks
+> **Updated:** 2026-02-28 (Phase E.1 Preview Mode complete)
+> **Status:** Phase E.1 Complete — Token-based preview mode for unpublished pages
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -839,13 +839,13 @@ Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger
 > **Prerequisite:** Phase D complete and stable
 > **Note:** Each can be done as a standalone session.
 
-### E.1 — Preview Mode
+### E.1 — Preview Mode ✅ COMPLETE (2026-02-28)
 
-- [ ] Add `?preview=true&token={previewToken}` query parameter support to public page renderer
-- [ ] Generate preview tokens per page (short-lived, admin-only)
-- [ ] Add "Preview" button to page editor (opens new tab with preview URL)
-- [ ] Preview renders draft/unpublished pages with a "Preview Mode" banner
-- [ ] Preview token expires after 1 hour or on publish
+- [x] Add `?preview=true&token={previewToken}` query parameter support to public page renderer
+- [x] Generate preview tokens per page (short-lived, admin-only)
+- [x] Add "Preview" button to page editor (opens new tab with preview URL)
+- [x] Preview renders draft/unpublished pages with a "Preview Mode" banner
+- [x] Preview token expires after 1 hour or on publish
 
 ### E.2 — Shared / Global Reusable Blocks
 

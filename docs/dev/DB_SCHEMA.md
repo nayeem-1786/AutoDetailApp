@@ -890,13 +890,23 @@
 
 ## Website CMS
 
-### cms_pages
+### cms_pages (table: `website_pages`)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK | |
 | slug | TEXT | UNIQUE, NOT NULL | |
 | title | TEXT | NOT NULL | |
-| placement | TEXT | CHECK ('header','footer_quick_links','footer_services') | |
+| page_template | TEXT | CHECK ('content','landing','blank') | |
+| parent_id | UUID | FK → website_pages(id) | |
+| content | TEXT | | HTML content |
+| is_published | BOOLEAN | DEFAULT false | |
+| show_in_nav | BOOLEAN | DEFAULT false | Auto-creates header nav entry |
+| sort_order | INTEGER | DEFAULT 0 | |
+| meta_title | TEXT | | SEO title |
+| meta_description | TEXT | | SEO description |
+| og_image_url | TEXT | | OpenGraph image |
+| preview_token | TEXT | | Short-lived preview token (UUID) |
+| preview_token_expires_at | TIMESTAMPTZ | | Token expiry (1 hour from generation) |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 

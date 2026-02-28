@@ -87,6 +87,27 @@ export const getPageBySlug = unstable_cache(
 );
 
 /**
+ * Fetch a page by slug without the published filter (for preview mode).
+ * Not cached — preview should always reflect latest state.
+ */
+export async function getPageBySlugForPreview(slug: string): Promise<WebsitePage | null> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from('website_pages')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to load page by slug (preview):', error);
+    return null;
+  }
+
+  return data as WebsitePage | null;
+}
+
+/**
  * Fetch all published pages (for sitemap).
  */
 export const getPublishedPages = unstable_cache(

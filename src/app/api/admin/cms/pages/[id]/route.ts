@@ -65,6 +65,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
+  // Clear preview token when publishing (page is now live, token unnecessary)
+  if (body.is_published === true) {
+    updates.preview_token = null;
+    updates.preview_token_expires_at = null;
+  }
+
   const { data, error } = await admin
     .from('website_pages')
     .update(updates)
@@ -111,10 +117,93 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
+  // --- Auto-save revision snapshot ---
+  try {
+    // Fetch content blocks for this page
+    const { data: blocks } = await admin
+      .from('page_content_blocks')
+      .select('*')
+      .eq('page_path', `/p/${data.slug}`)
+      .order('sort_order');
+
+    // Get the previous revision for change summary comparison
+    const { data: lastRevision } = await admin
+      .from('page_revisions')
+      .select('revision_number, snapshot')
+      .eq('page_id', id)
+      .order('revision_number', { ascending: false })
+      .limit(1)
+      .single();
+
+    const nextNumber = (lastRevision?.revision_number || 0) + 1;
+
+    const snapshot = {
+      page: data,
+      blocks: blocks || [],
+      savedAt: new Date().toISOString(),
+    };
+
+    const changeSummary = generateChangeSummary(
+      lastRevision?.snapshot as Record<string, unknown> | null,
+      snapshot
+    );
+
+    await admin.from('page_revisions').insert({
+      page_id: id,
+      revision_number: nextNumber,
+      snapshot,
+      change_summary: changeSummary,
+      created_by: employee.id,
+    });
+
+    // Prune old revisions — keep only last 20 per page
+    if (nextNumber > 20) {
+      await admin
+        .from('page_revisions')
+        .delete()
+        .eq('page_id', id)
+        .lt('revision_number', nextNumber - 19);
+    }
+  } catch {
+    // Non-critical — don't fail the page save if revision tracking errors
+    console.error('Failed to save page revision');
+  }
+
   revalidateTag('cms-pages');
   revalidateTag('cms-navigation');
 
   return NextResponse.json({ data });
+}
+
+// ---------------------------------------------------------------------------
+// generateChangeSummary — compare old and new snapshots to describe changes
+// ---------------------------------------------------------------------------
+function generateChangeSummary(
+  oldSnapshot: Record<string, unknown> | null,
+  newSnapshot: { page: Record<string, unknown>; blocks: unknown[] }
+): string {
+  if (!oldSnapshot) return 'Initial revision';
+
+  const changes: string[] = [];
+  const oldPage = (oldSnapshot.page || {}) as Record<string, unknown>;
+  const newPage = newSnapshot.page;
+
+  if (oldPage.title !== newPage.title) changes.push('Updated title');
+  if (oldPage.content !== newPage.content) changes.push('Updated content');
+  if (oldPage.meta_title !== newPage.meta_title) changes.push('Updated meta title');
+  if (oldPage.meta_description !== newPage.meta_description) changes.push('Updated meta description');
+  if (oldPage.is_published !== newPage.is_published) {
+    changes.push(newPage.is_published ? 'Published' : 'Unpublished');
+  }
+  if (oldPage.page_template !== newPage.page_template) changes.push('Changed template');
+  if (oldPage.slug !== newPage.slug) changes.push('Changed slug');
+
+  const oldBlockCount = Array.isArray(oldSnapshot.blocks) ? oldSnapshot.blocks.length : 0;
+  const newBlockCount = newSnapshot.blocks.length;
+  if (newBlockCount > oldBlockCount) changes.push(`Added ${newBlockCount - oldBlockCount} block(s)`);
+  if (newBlockCount < oldBlockCount) changes.push(`Removed ${oldBlockCount - newBlockCount} block(s)`);
+
+  return changes.length > 0 ? changes.join(', ') : 'Minor changes';
 }
 
 export async function DELETE(_request: NextRequest, context: RouteContext) {

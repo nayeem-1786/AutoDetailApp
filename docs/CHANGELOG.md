@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Phase E.1: Preview Mode — 2026-02-28
+
+### feat: preview mode with token-based access for unpublished pages
+
+- **Preview button** in page editor header (Eye icon) — generates short-lived token and opens page in new tab
+- **Token-based access**: `?preview=true&token={uuid}` query params bypass published filter
+- **Preview banner**: fixed amber bar at top with "Preview Mode" label and link back to editor
+- **Token security**: 1-hour expiry, new token per click (invalidates old links), cleared on publish
+- **No auth required** to view preview — the token IS the authentication (allows sharing with clients)
+- **API**: `POST /api/admin/cms/pages/[id]/preview` — generates token, returns preview URL
+- **Data layer**: `getPageBySlugForPreview()` — uncached fetch without published filter
+- **Migration**: `preview_token` and `preview_token_expires_at` columns on `website_pages`
+- Works for both published and unpublished pages; all templates (content, landing, blank)
+
+---
+
 ## Team Grid Centered Layout — 2026-02-27
 
 ### fix: team grid uses flexbox with row distribution by count

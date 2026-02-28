@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-27 (Team/Credentials admin pages, display-only blocks)
+> **Last updated:** 2026-02-28 (Phase E.1 Preview Mode — preview token API)
 
 ---
 
@@ -83,6 +83,7 @@ src/app/api/admin/cms/navigation/[id]/route.ts
 src/app/api/admin/cms/navigation/reorder/route.ts
 src/app/api/admin/cms/navigation/route.ts
 src/app/api/admin/cms/pages/[id]/route.ts
+src/app/api/admin/cms/pages/[id]/preview/route.ts
 src/app/api/admin/cms/pages/ai-draft/route.ts
 src/app/api/admin/cms/pages/route.ts
 src/app/api/admin/cms/seo/ai-apply/route.ts
@@ -1138,6 +1139,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260227000002_cleanup_migrated_settings.sql
 20260227000003_team_member_excerpt.sql
 20260227000004_create_credentials.sql
+20260228000001_page_preview_tokens.sql
 ```
 
 ---

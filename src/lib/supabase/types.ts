@@ -1316,6 +1316,8 @@ export interface WebsitePage {
   meta_title: string | null;
   meta_description: string | null;
   og_image_url: string | null;
+  preview_token: string | null;
+  preview_token_expires_at: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations
