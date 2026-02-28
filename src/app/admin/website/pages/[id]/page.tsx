@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, ExternalLink, Eye, Sparkles, History, ChevronDown, RotateCcw, X } from 'lucide-react';
+import { ArrowLeft, Save, ExternalLink, Eye, Sparkles, History, ChevronDown, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';

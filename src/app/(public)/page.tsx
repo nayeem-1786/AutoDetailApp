@@ -2,13 +2,19 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Truck, Shield, Leaf, ArrowRight, Star } from 'lucide-react';
+import {
+  Truck, Shield, Leaf, ArrowRight, Star,
+  Phone, Mail, MapPin, Clock, Globe, MessageCircle,
+  Heart, Award, ThumbsUp, Calendar, CreditCard,
+  Wrench, Zap, type LucideIcon,
+} from 'lucide-react';
 import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
 import { getActiveTeamMembers, getTeamSectionTitle, getCredentialsSectionTitle } from '@/lib/data/team-members';
 import { getActiveCredentials } from '@/lib/data/credentials';
+import { getHomepageSettings } from '@/lib/data/homepage-settings';
 import { generateLocalBusinessSchema } from '@/lib/seo/json-ld';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getActiveHeroSlides, getHeroCarouselConfig, getCmsToggles } from '@/lib/data/cms';
@@ -22,6 +28,13 @@ import { CtaSection } from '@/components/public/cta-section';
 import { JsonLd } from '@/components/public/json-ld';
 import { HomeAnimations } from '@/components/public/home-animations';
 import { TeamGridLayout } from '@/components/public/team-grid-layout';
+
+/** Map icon names (from business_settings) → Lucide components */
+const ICON_MAP: Record<string, LucideIcon> = {
+  Truck, Shield, Leaf, Star, Phone, Mail, MapPin, Clock, Globe,
+  MessageCircle, Heart, Award, ThumbsUp, Calendar, CreditCard,
+  Wrench, Zap,
+};
 
 export const revalidate = 60;
 
@@ -52,26 +65,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return mergeMetadata(auto, seoOverrides);
 }
 
-const differentiators = [
-  {
-    icon: Truck,
-    title: 'Mobile Service',
-    description: 'We come to your home or office throughout the South Bay area.',
-  },
-  {
-    icon: Shield,
-    title: 'Ceramic Pro Certified',
-    description: 'Professional-grade coatings for lasting protection.',
-  },
-  {
-    icon: Leaf,
-    title: 'Eco-Friendly Products',
-    description: 'Premium products that are safe for your vehicle and the environment.',
-  },
-] as const;
-
 export default async function HomePage() {
-  const [categories, businessInfo, reviews, teamMembers, credentials, heroSlides, heroConfig, cmsToggles, teamSectionTitle, credentialsSectionTitle] = await Promise.all([
+  const [categories, businessInfo, reviews, teamMembers, credentials, heroSlides, heroConfig, cmsToggles, teamSectionTitle, credentialsSectionTitle, homepageSettings] = await Promise.all([
     getServiceCategories(),
     getBusinessInfo(),
     getReviewData(),
@@ -82,6 +77,7 @@ export default async function HomePage() {
     getCmsToggles(),
     getTeamSectionTitle(),
     getCredentialsSectionTitle(),
+    getHomepageSettings(),
   ]);
 
   const useCarousel = cmsToggles.heroCarousel && heroSlides.length > 0;
@@ -163,8 +159,8 @@ export default async function HomePage() {
             type="stagger-grid"
             className="mt-14 grid gap-0 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0 divide-site-border"
           >
-            {differentiators.map((item) => {
-              const Icon = item.icon;
+            {homepageSettings.differentiators.map((item) => {
+              const Icon = ICON_MAP[item.icon] || Star;
               return (
                 <div key={item.title} className="px-6 py-8 text-center sm:py-0 sm:first:pl-0 sm:last:pr-0">
                   <Icon className="mx-auto h-8 w-8 text-lime" />
@@ -325,7 +321,7 @@ export default async function HomePage() {
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm">
               <a
-                href={`https://search.google.com/local/reviews?placeid=ChIJf7qNDhW1woAROX-FX8CScGE`}
+                href={`https://search.google.com/local/reviews?placeid=${homepageSettings.googlePlaceId}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-lime hover:text-lime-400 font-medium transition-colors"
@@ -344,8 +340,8 @@ export default async function HomePage() {
       <SectionTickerSlot position="before_cta" pageType="home" />
 
       <CtaSection
-        beforeImage="/images/before-after-old.webp"
-        afterImage="/images/before-after-new.webp"
+        beforeImage={homepageSettings.ctaBeforeImage}
+        afterImage={homepageSettings.ctaAfterImage}
       />
     </>
   );

@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-28 (Phase E.1 Preview Mode — preview token API)
+> **Last updated:** 2026-02-28 (Phase E.4+E.5 — Homepage Settings admin page, API, data layer)
 
 ---
 
@@ -75,6 +75,7 @@ src/app/api/admin/cms/content/ai-generate/route.ts
 src/app/api/admin/cms/migrate-markdown/route.ts
 src/app/api/admin/cms/content/reorder/route.ts
 src/app/api/admin/cms/content/route.ts
+src/app/api/admin/cms/homepage-settings/route.ts
 src/app/api/admin/cms/hero/[id]/route.ts
 src/app/api/admin/cms/hero/config/route.ts
 src/app/api/admin/cms/hero/reorder/route.ts
@@ -84,6 +85,9 @@ src/app/api/admin/cms/navigation/reorder/route.ts
 src/app/api/admin/cms/navigation/route.ts
 src/app/api/admin/cms/pages/[id]/route.ts
 src/app/api/admin/cms/pages/[id]/preview/route.ts
+src/app/api/admin/cms/pages/[id]/revisions/route.ts
+src/app/api/admin/cms/pages/[id]/revisions/[revisionId]/route.ts
+src/app/api/admin/cms/pages/[id]/revisions/[revisionId]/restore/route.ts
 src/app/api/admin/cms/pages/ai-draft/route.ts
 src/app/api/admin/cms/pages/route.ts
 src/app/api/admin/cms/seo/ai-apply/route.ts
@@ -549,6 +553,7 @@ src/app/admin/website/credentials/page.tsx
 src/app/admin/website/footer/page.tsx
 src/app/admin/website/hero/[id]/page.tsx
 src/app/admin/website/hero/page.tsx
+src/app/admin/website/homepage/page.tsx
 src/app/admin/website/navigation/page.tsx
 src/app/admin/website/pages/[id]/page.tsx
 src/app/admin/website/pages/new/page.tsx
@@ -653,6 +658,7 @@ src/lib/data/cities.ts
 src/lib/data/cms.ts
 src/lib/data/credentials.ts
 src/lib/data/featured-photos.ts
+src/lib/data/homepage-settings.ts
 src/lib/data/page-content.ts
 src/lib/data/products.ts
 src/lib/data/receipt-config.ts
@@ -1140,6 +1146,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260227000003_team_member_excerpt.sql
 20260227000004_create_credentials.sql
 20260228000001_page_preview_tokens.sql
+20260228000002_create_page_revisions.sql
+20260228000003_homepage_settings.sql
 ```
 
 ---

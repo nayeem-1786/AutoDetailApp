@@ -4,6 +4,37 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## CMS Phase E.3: Revision History — 2026-02-28
+
+### feat: page revision history with auto-save, view, and restore
+
+**Database:**
+- New `page_revisions` table — stores JSONB snapshots of page data + content blocks per save
+- Indexed by `(page_id, revision_number DESC)` for fast lookups
+- RLS: authenticated read/insert/delete
+- `ON DELETE CASCADE` from `website_pages` — deleting a page removes all its revisions
+
+**Auto-Save on Page Save:**
+- Every PATCH to `/api/admin/cms/pages/[id]` auto-creates a revision snapshot
+- Captures full page data + all content blocks at time of save
+- Auto-generates change summary by comparing with previous revision (e.g., "Updated title, Added 2 block(s)")
+- Records `created_by` (employee ID) for audit trail
+- Auto-prunes to keep only last 20 revisions per page
+
+**API Routes:**
+- `GET /api/admin/cms/pages/[id]/revisions` — list revisions (without snapshot data)
+- `GET /api/admin/cms/pages/[id]/revisions/[revisionId]` — get full snapshot
+- `POST /api/admin/cms/pages/[id]/revisions/[revisionId]/restore` — restore page to revision state
+
+**Revision History Panel (Page Editor):**
+- Collapsible card between Publishing and Submit sections
+- Shows revision number, relative time (via date-fns), and change summary
+- "View" button opens modal with read-only snapshot preview (title, slug, template, status, content preview, blocks list)
+- "Restore" button with confirmation dialog — replaces page content and creates a new "Restored to revision #X" entry
+- Auto-refreshes revision list after each save
+
+---
+
 ## CMS Phase E.1: Preview Mode — 2026-02-28
 
 ### feat: preview mode with token-based access for unpublished pages

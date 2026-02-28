@@ -1,7 +1,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
 > Auto-generated from `supabase/migrations/*.sql`
-> Last updated: Feb 27, 2026
+> Last updated: Feb 28, 2026
 
 ---
 
@@ -909,6 +909,20 @@
 | preview_token_expires_at | TIMESTAMPTZ | | Token expiry (1 hour from generation) |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
+
+### page_revisions
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| page_id | UUID | NOT NULL, FK → website_pages(id) ON DELETE CASCADE | |
+| revision_number | INTEGER | NOT NULL | Sequential per page |
+| snapshot | JSONB | NOT NULL | Full page data + content blocks at time of save |
+| change_summary | TEXT | | Auto-generated: "Updated title, added 2 blocks" |
+| created_by | UUID | FK → employees(id) | Who saved |
+| created_at | TIMESTAMPTZ | DEFAULT now() | |
+
+**Index:** `idx_page_revisions_page_id` on `(page_id, revision_number DESC)`.
+**RLS:** Authenticated read/insert/delete. Auto-pruned to last 20 per page.
 
 ### homepage_config
 | Column | Type | Constraints | Notes |

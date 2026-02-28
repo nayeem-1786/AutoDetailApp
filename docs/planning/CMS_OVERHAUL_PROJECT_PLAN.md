@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-28 (Phase E.1 Preview Mode complete)
-> **Status:** Phase E.1 Complete — Token-based preview mode for unpublished pages
+> **Updated:** 2026-02-28 (Phase E.4+E.5 ImageUploadField sweep + Homepage Settings)
+> **Status:** Phase E.4+E.5 Complete — ImageUploadField sweep, homepage settings admin page
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -855,27 +855,31 @@ Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger
 - [ ] "Insert Global Block" option in the content block dropdown
 - [ ] List of global blocks with usage count in a management view
 
-### E.3 — Revision History
+### E.3 — Revision History ✅ COMPLETE (2026-02-28)
 
-- [ ] Create `cms_page_revisions` table storing snapshots of page data (JSON)
-- [ ] Auto-save revision on every publish or save (configurable)
-- [ ] Store last N revisions per page (default: 20)
-- [ ] "Revision History" panel in page editor showing timestamps and diff summary
-- [ ] "Restore" button to roll back to a previous version
-- [ ] Optionally store who made the change (employee ID)
+- [x] Create `page_revisions` table storing snapshots of page data (JSONB)
+- [x] Auto-save revision on every page save
+- [x] Store last 20 revisions per page (auto-prune)
+- [x] "Revision History" collapsible panel in page editor with timestamps and change summary
+- [x] "View" modal with read-only snapshot preview
+- [x] "Restore" button with confirmation dialog to roll back to a previous version
+- [x] Store who made the change (employee ID via `created_by`)
 
-### E.4 — ImageUploadField on Remaining URL Fields
+### E.4 — ImageUploadField on Remaining URL Fields ✅ COMPLETE (2026-02-28)
 
-- [ ] Replace `hero_bg_image_url` URL input in seasonal theme editor (`themes/[id]/page.tsx`) → ImageUploadField
-- [ ] Replace hero slide image URL fields if still using text inputs
-- [ ] Audit for any other remaining URL text input image fields not caught in Phase B
+- [x] Replace `hero_bg_image_url` URL input in seasonal theme editor (`themes/[id]/page.tsx`) → ImageUploadField
+- [x] Audited hero slide editor — already uses `HeroImageUpload` for all image fields
+- [x] Audited all admin pages — no remaining plain text inputs for image URLs
 
-### E.5 — Homepage Hardcoded Items
+### E.5 — Homepage Hardcoded Items ✅ COMPLETE (2026-02-28)
 
-- [ ] Move `differentiators` array (3 items: Mobile Service, Ceramic Pro Certified, Eco-Friendly Products) to `business_settings.homepage_differentiators`
-- [ ] Move hardcoded Google place ID to `business_settings.google_place_id`
-- [ ] Move CTA before/after image URLs to `business_settings`
-- [ ] Add admin UI for editing these in a "Homepage" section or within existing settings
+- [x] Move `differentiators` array (3 items: Mobile Service, Ceramic Pro Certified, Eco-Friendly Products) to `business_settings.homepage_differentiators`
+- [x] Move hardcoded Google place ID to `business_settings.google_place_id`
+- [x] Move CTA before/after image URLs to `business_settings.homepage_cta_before_image` / `homepage_cta_after_image`
+- [x] Created `src/lib/data/homepage-settings.ts` — `getHomepageSettings()` with typed return and fallback defaults
+- [x] Homepage now reads all values from DB with hardcoded fallbacks
+- [x] Admin UI at `/admin/website/homepage` — differentiators editor (icon picker, reorder, add/remove), Google Place ID, CTA images via ImageUploadField, section headings
+- [x] API route at `/api/admin/cms/homepage-settings` — batch GET/PUT for all homepage settings
 
 ### E.6 — City Pages SEO Enhancement
 
@@ -940,6 +944,7 @@ src/app/admin/website/navigation/page.tsx    — Navigation editor
 src/app/admin/website/tickers/page.tsx       — Ticker list
 src/app/admin/website/tickers/[id]/page.tsx  — Ticker editor
 src/app/admin/website/ads/page.tsx           — Ads manager
+src/app/admin/website/homepage/page.tsx       — Homepage Settings (differentiators, Google Place ID, CTA images, headings)
 src/app/admin/website/team/page.tsx           — Team Members admin page (CRUD, drag-drop reorder, AI bio generation)
 src/app/admin/website/credentials/page.tsx   — Credentials admin page (CRUD, drag-drop reorder, AI description)
 src/app/admin/website/catalog/page.tsx       — Catalog display settings

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import {
+  Home,
   Image,
   Megaphone,
   RectangleHorizontal,
@@ -21,6 +22,12 @@ import {
 } from 'lucide-react';
 
 const sections = [
+  {
+    title: 'Homepage',
+    description: 'Manage differentiators, CTA images, reviews, and section headings.',
+    icon: Home,
+    href: '/admin/website/homepage',
+  },
   {
     title: 'Pages',
     description: 'Create and manage custom pages for your website.',

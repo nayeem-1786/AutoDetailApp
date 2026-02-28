@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { ArrowLeft, Save } from 'lucide-react';
+import { ImageUploadField } from '@/components/admin/image-upload-field';
 import type { SeasonalTheme, ParticleEffect } from '@/lib/supabase/types';
 
 const PARTICLE_EFFECTS: { value: ParticleEffect | ''; label: string }[] = [
@@ -407,17 +408,12 @@ export default function ThemeEditorPage() {
       {/* Background */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Background</h3>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Hero Background Image URL (optional)
-          </label>
-          <Input
-            value={theme.hero_bg_image_url || ''}
-            onChange={(e) => update('hero_bg_image_url', e.target.value || null)}
-            className="mt-1"
-            placeholder="https://..."
-          />
-        </div>
+        <ImageUploadField
+          value={theme.hero_bg_image_url || ''}
+          onChange={(url) => update('hero_bg_image_url', url || null)}
+          folder="seasonal-themes"
+          label="Hero Background Image (optional)"
+        />
       </div>
     </div>
   );
