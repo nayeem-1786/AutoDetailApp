@@ -22,6 +22,7 @@ import {
   Download,
   MapPin,
   Search,
+  Sparkles,
 } from 'lucide-react';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import type { CityLandingPage } from '@/lib/supabase/types';
@@ -165,6 +166,7 @@ export default function CitiesAdminPage() {
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [importingServices, setImportingServices] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [cityAiGenerating, setCityAiGenerating] = useState(false);
 
   // -----------------------------------------------------------------------
   // Data loading
@@ -361,6 +363,54 @@ export default function CitiesAdminPage() {
         }
       },
     });
+  };
+
+  // -----------------------------------------------------------------------
+  // Generate AI content for a single city
+  // -----------------------------------------------------------------------
+
+  const handleGenerateCityContent = async () => {
+    if (!contentCitySlug || !contentCityId) return;
+
+    const city = cities.find((c) => c.id === contentCityId);
+    if (!city) return;
+
+    const hasKeywords = Boolean(city.focus_keywords);
+    if (!hasKeywords) {
+      toast.info('Add focus keywords first for better results', { duration: 3000 });
+    }
+
+    setCityAiGenerating(true);
+    try {
+      const res = await adminFetch('/api/admin/cms/content/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'full_page',
+          pagePath: `/areas/${contentCitySlug}`,
+          pageType: 'city_landing',
+          autoSave: true,
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error || 'Failed to generate');
+      }
+
+      toast.success('Content generated! Review and save when ready.');
+      // Force ContentBlockEditor to reload by toggling the slug
+      setContentCitySlug(null);
+      setTimeout(() => {
+        setContentCitySlug(city.slug);
+        setContentCityName(city.city_name);
+        setContentCityId(city.id);
+      }, 100);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'AI generation failed');
+    } finally {
+      setCityAiGenerating(false);
+    }
   };
 
   // -----------------------------------------------------------------------
@@ -658,17 +708,36 @@ export default function CitiesAdminPage() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Page Content — {contentCityName}
               </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setContentCitySlug(null);
-                  setContentCityId(null);
-                }}
-                className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateCityContent}
+                  disabled={cityAiGenerating}
+                >
+                  {cityAiGenerating ? (
+                    <Spinner size="sm" className="mr-1.5" />
+                  ) : (
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {cityAiGenerating ? 'Generating...' : 'Generate AI Content'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContentCitySlug(null);
+                    setContentCityId(null);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
+            <p className="px-6 pt-2 text-xs text-gray-500 dark:text-gray-400">
+              Uses focus keywords, service highlights, and landmarks to generate optimized content
+            </p>
             <div className="px-6 py-5">
               {/* Keyword Density Indicator */}
               {contentCityId && (() => {

@@ -4,6 +4,7 @@ export interface NavItem {
   href: string;
   icon: string; // lucide-react icon name
   children?: NavItem[];
+  group?: string; // collapsible group label (used in Website sidebar)
 }
 
 export const SIDEBAR_NAV: NavItem[] = [
@@ -143,70 +144,93 @@ export const SIDEBAR_NAV: NavItem[] = [
         href: '/admin/website',
         icon: 'LayoutDashboard',
       },
+      // --- Content group ---
+      {
+        label: 'Homepage',
+        href: '/admin/website/homepage',
+        icon: 'Home',
+        group: 'Content',
+      },
       {
         label: 'Pages',
         href: '/admin/website/pages',
         icon: 'FileText',
+        group: 'Content',
       },
+      {
+        label: 'Global Blocks',
+        href: '/admin/website/global-blocks',
+        icon: 'Layers',
+        group: 'Content',
+      },
+      // --- Data group ---
       {
         label: 'Team Members',
         href: '/admin/website/team',
         icon: 'Users',
+        group: 'Data',
       },
       {
         label: 'Credentials',
         href: '/admin/website/credentials',
         icon: 'Award',
+        group: 'Data',
       },
       {
         label: 'City Pages',
         href: '/admin/website/seo/cities',
         icon: 'MapPin',
+        group: 'Data',
       },
+      // --- Layout group ---
       {
         label: 'Hero',
         href: '/admin/website/hero',
         icon: 'Image',
+        group: 'Layout',
       },
       {
         label: 'Navigation',
         href: '/admin/website/navigation',
         icon: 'PanelTop',
+        group: 'Layout',
       },
       {
         label: 'Footer',
         href: '/admin/website/footer',
         icon: 'Rows3',
+        group: 'Layout',
       },
       {
         label: 'Tickers',
         href: '/admin/website/tickers',
         icon: 'Megaphone',
+        group: 'Layout',
       },
       {
         label: 'Ads',
         href: '/admin/website/ads',
         icon: 'RectangleHorizontal',
+        group: 'Layout',
       },
       {
         label: 'Catalog Display',
         href: '/admin/website/catalog',
         icon: 'LayoutGrid',
+        group: 'Layout',
       },
+      // --- Appearance group ---
       {
         label: 'Theme & Styles',
         href: '/admin/website/theme-settings',
         icon: 'Paintbrush',
+        group: 'Appearance',
       },
       {
         label: 'Seasonal Themes',
         href: '/admin/website/themes',
         icon: 'Palette',
-      },
-      {
-        label: 'SEO',
-        href: '/admin/website/seo',
-        icon: 'Search',
+        group: 'Appearance',
       },
     ],
   },

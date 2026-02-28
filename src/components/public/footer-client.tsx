@@ -79,6 +79,7 @@ export function FooterClient({ footerData, phone, reviews, year }: FooterClientP
           links={bottomLinks}
           businessName={businessInfo.name}
           year={year}
+          customCopyright={(bottomBarSection?.config?.custom_copyright as string) || ''}
         />
       )}
     </footer>
@@ -389,22 +390,37 @@ function ServiceAreasSection({
 // Bottom Bar Section
 // ---------------------------------------------------------------------------
 
+// Sanitize footer HTML — allow only safe inline tags
+function sanitizeFooterHtml(html: string): string {
+  return html.replace(/<(?!\/?(?:a|strong|em|span|br)\b)[^>]*>/gi, '');
+}
+
 function BottomBarSection({
   links,
   businessName,
   year,
+  customCopyright,
 }: {
   links: FooterBottomLink[];
   businessName: string;
   year: number;
+  customCopyright: string;
 }) {
 
   return (
     <div className="border-t border-site-border-light">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-xs text-site-text-dim">
-          &copy; {year} {businessName}. All rights reserved.
-        </p>
+        {customCopyright ? (
+          <p
+            className="text-xs text-site-text-dim [&_a]:text-site-link [&_a]:hover:text-site-link-hover [&_a]:underline"
+            suppressHydrationWarning
+            dangerouslySetInnerHTML={{ __html: sanitizeFooterHtml(customCopyright) }}
+          />
+        ) : (
+          <p className="text-xs text-site-text-dim">
+            &copy; {year} {businessName}. All rights reserved.
+          </p>
+        )}
         {links.length > 0 && (
           <div className="flex items-center gap-4">
             {links.map((link) => (

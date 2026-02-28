@@ -4,6 +4,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Sidebar, City AI, Footer Fixes — 2026-02-28
+
+### Website Sidebar — Collapsible Groups
+- **Collapsible section groups**: Website sidebar children organized into 4 groups — Content, Data, Layout, Appearance
+- **Group headers**: Clickable labels with chevron indicators to collapse/expand
+- **Content** and **Data** groups default expanded; **Layout** and **Appearance** default collapsed
+- Collapse state persisted to `localStorage` (`sidebar_collapsed_{group}`)
+- **Auto-expand**: Navigating to a page inside a collapsed group automatically expands it
+- **Overview** item sits above all groups, not inside any group
+
+### Missing Sidebar Entries
+- **Global Blocks** added to sidebar (`/admin/website/global-blocks`, Layers icon) — already existed as a page but had no nav entry
+- **Homepage** added to sidebar (`/admin/website/homepage`, Home icon) — already existed as a page but had no nav entry
+- **SEO** standalone sidebar entry removed (City Pages already links to `/admin/website/seo/cities`)
+- Both pages already had cards on the Website Dashboard page (no changes needed there)
+
+### City Pages — AI Content Generate Button
+- **"Generate AI Content" button** added to the content editor dialog header for individual cities
+- Uses `/api/admin/cms/content/ai-generate` with `mode: full_page` and `autoSave: true`
+- Shows loading state while generating; reloads content blocks on completion
+- Helper text explains it uses focus keywords, service highlights, and landmarks
+- Toasts user if no focus keywords are set (still generates, but warns)
+
+### Footer Copyright — HTML Rendering Fix
+- **`custom_copyright`** from the `bottom_bar` section config now flows through to `BottomBarSection`
+- Renders custom copyright with `dangerouslySetInnerHTML` + `sanitizeFooterHtml()` sanitizer
+- Sanitizer allows only safe tags: `<a>`, `<strong>`, `<em>`, `<span>`, `<br>` — strips everything else (XSS safe)
+- Anchor styling: `text-site-link hover:text-site-link-hover underline`
+- Falls back to default `© {year} {businessName}. All rights reserved.` when no custom copyright is set
+
+**Files modified:**
+- `src/lib/auth/roles.ts` — NavItem.group property, Website children restructured into groups, added Homepage + Global Blocks entries
+- `src/app/admin/admin-shell.tsx` — collapsible group rendering, localStorage persistence, auto-expand, added Home/Layers/Award icons
+- `src/app/admin/website/seo/cities/page.tsx` — per-city AI generate button + handler, Sparkles icon import
+- `src/components/public/footer-client.tsx` — sanitizeFooterHtml(), custom_copyright prop, dangerouslySetInnerHTML rendering
+
+---
+
 ## CMS Phase E.7: Theme System Overhaul — 2026-02-28
 
 ### Audit

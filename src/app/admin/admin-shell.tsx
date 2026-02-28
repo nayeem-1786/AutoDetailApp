@@ -54,6 +54,9 @@ import {
   Paintbrush,
   ShoppingCart,
   Rows3,
+  Home,
+  Layers,
+  Award,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -99,6 +102,9 @@ const iconMap: Record<string, LucideIcon> = {
   Paintbrush,
   ShoppingCart,
   Rows3,
+  Home,
+  Layers,
+  Award,
 };
 
 // Breadcrumb formatting: special case acronyms, capitalize words, hide UUID segments
@@ -499,6 +505,111 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     );
   };
 
+  // Collapsible group state for sidebar sections (e.g. Website sub-groups)
+  // Keyed by group name, persisted to localStorage
+  const SIDEBAR_GROUP_DEFAULTS: Record<string, boolean> = {
+    Content: true,
+    Data: true,
+    Layout: false,
+    Appearance: false,
+  };
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    const stored: Record<string, boolean> = {};
+    for (const group of Object.keys(SIDEBAR_GROUP_DEFAULTS)) {
+      const key = `sidebar_collapsed_${group}`;
+      const val = localStorage.getItem(key);
+      stored[group] = val !== null ? val === 'true' : !SIDEBAR_GROUP_DEFAULTS[group];
+    }
+    return stored;
+  });
+
+  const toggleGroupCollapse = (group: string) => {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [group]: !prev[group] };
+      localStorage.setItem(`sidebar_collapsed_${group}`, String(next[group]));
+      return next;
+    });
+  };
+
+  // Auto-expand group when a child within it is active
+  useEffect(() => {
+    SIDEBAR_NAV.forEach((item) => {
+      if (!item.children) return;
+      item.children.forEach((child) => {
+        if (child.group && pathname.startsWith(child.href)) {
+          setCollapsedGroups((prev) => {
+            if (prev[child.group!]) {
+              const next = { ...prev, [child.group!]: false };
+              localStorage.setItem(`sidebar_collapsed_${child.group}`, 'false');
+              return next;
+            }
+            return prev;
+          });
+        }
+      });
+    });
+  }, [pathname]);
+
+  // Build grouped children structure from a flat child array with group properties
+  const buildGroupedChildren = (children: NavItem[]) => {
+    const ungrouped: NavItem[] = [];
+    const groups: { label: string; items: NavItem[] }[] = [];
+    const groupMap = new Map<string, NavItem[]>();
+
+    for (const child of children) {
+      if (child.group) {
+        let items = groupMap.get(child.group);
+        if (!items) {
+          items = [];
+          groupMap.set(child.group, items);
+          groups.push({ label: child.group, items });
+        }
+        items.push(child);
+      } else {
+        ungrouped.push(child);
+      }
+    }
+
+    return { ungrouped, groups };
+  };
+
+  const renderChildLink = (child: NavItem) => {
+    const ChildIcon = iconMap[child.icon] || LayoutDashboard;
+    const childActive = pathname === child.href;
+    const badgeNumber: Record<string, number> = {
+      '/admin/marketing/coupons': 1,
+      '/admin/marketing/automations': 2,
+      '/admin/marketing/campaigns': 3,
+    };
+    const badge = badgeNumber[child.href];
+    return (
+      <li key={child.href}>
+        <button
+          onClick={() => {
+            router.push(child.href);
+            setSidebarOpen(false);
+          }}
+          className={cn(
+            'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+            childActive
+              ? 'font-medium text-gray-900'
+              : 'text-gray-500 hover:text-gray-900'
+          )}
+        >
+          <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+          {badge && (
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-900 text-white text-[10px] font-medium dark:bg-white dark:text-gray-900">
+              {badge}
+            </span>
+          )}
+          {child.label}
+        </button>
+      </li>
+    );
+  };
+
   const renderNavItem = (item: NavItem) => {
     const Icon = iconMap[item.icon] || LayoutDashboard;
     const isActive = pathname === item.href;
@@ -507,6 +618,9 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     const isChildActive = item.children?.some((child) =>
       pathname.startsWith(child.href)
     );
+
+    // Check if children use groups
+    const hasGroups = item.children?.some((c) => c.group);
 
     return (
       <li key={item.href}>
@@ -540,42 +654,48 @@ function AdminContent({ children }: { children: React.ReactNode }) {
               <ChevronRight className="h-4 w-4" />
             ))}
         </button>
-        {hasChildren && isExpanded && (
+        {hasChildren && isExpanded && hasGroups && (() => {
+          const { ungrouped, groups } = buildGroupedChildren(item.children!);
+          return (
+            <div className="ml-4 mt-1 border-l border-gray-200 pl-3">
+              {/* Ungrouped items (e.g. Overview) */}
+              {ungrouped.length > 0 && (
+                <ul className="space-y-1">
+                  {ungrouped.map(renderChildLink)}
+                </ul>
+              )}
+              {/* Grouped items */}
+              {groups.map((group) => {
+                const isGroupCollapsed = collapsedGroups[group.label] ?? false;
+                return (
+                  <div key={group.label} className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupCollapse(group.label)}
+                      className="flex w-full items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {group.label}
+                      <ChevronDown
+                        className={cn(
+                          'h-3 w-3 transition-transform',
+                          isGroupCollapsed && '-rotate-90'
+                        )}
+                      />
+                    </button>
+                    {!isGroupCollapsed && (
+                      <ul className="mt-0.5 space-y-0.5">
+                        {group.items.map(renderChildLink)}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+        {hasChildren && isExpanded && !hasGroups && (
           <ul className="ml-4 mt-1 space-y-1 border-l border-gray-200 pl-3">
-            {item.children!.map((child) => {
-              const ChildIcon = iconMap[child.icon] || LayoutDashboard;
-              const childActive = pathname === child.href;
-              const badgeNumber: Record<string, number> = {
-                '/admin/marketing/coupons': 1,
-                '/admin/marketing/automations': 2,
-                '/admin/marketing/campaigns': 3,
-              };
-              const badge = badgeNumber[child.href];
-              return (
-                <li key={child.href}>
-                  <button
-                    onClick={() => {
-                      router.push(child.href);
-                      setSidebarOpen(false);
-                    }}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
-                      childActive
-                        ? 'font-medium text-gray-900'
-                        : 'text-gray-500 hover:text-gray-900'
-                    )}
-                  >
-                    <ChildIcon className="h-3.5 w-3.5 shrink-0" />
-                    {badge && (
-                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-900 text-white text-[10px] font-medium dark:bg-white dark:text-gray-900">
-                        {badge}
-                      </span>
-                    )}
-                    {child.label}
-                  </button>
-                </li>
-              );
-            })}
+            {item.children!.map(renderChildLink)}
           </ul>
         )}
       </li>
