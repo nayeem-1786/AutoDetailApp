@@ -534,7 +534,7 @@ export default function TeamMembersAdminPage() {
                       </Button>
                     </div>
                     <PageHtmlEditor
-                      value={member.bio}
+                      value={member.bio ?? ''}
                       onChange={(val) => updateMemberLocal(member.id, { bio: val })}
                       pageTitle={`${member.name || 'Team Member'} Bio`}
                       placeholder="Write a bio for this team member..."
