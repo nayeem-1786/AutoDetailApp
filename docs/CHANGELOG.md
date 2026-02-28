@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Infinite Spinner on OTP/Email Verification — 2026-02-28
+
+- **Bug**: After entering OTP code and submitting, the Verify button spinner would spin forever. Refreshing showed login worked (session existed).
+- **Root cause**: `onSuccess()` (async `handleAuthSuccess`) was not awaited in `inline-auth.tsx`, and `setLoading(false)` was never called on success paths.
+- **Fix**: Added `await` before `onSuccess()` and `setLoading(false)` safety net on all 3 success paths — `verifyOtp` (end of function), `verifyOtp` (link-by-phone branch), and `onEmailSubmit`.
+- **File**: `src/components/booking/inline-auth.tsx`
+
+---
+
 ## Hardcoded Audit Fixes — 2026-02-28
 
 ### Homepage Settings + Booking Settings (Session 2)

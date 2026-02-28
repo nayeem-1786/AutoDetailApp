@@ -268,7 +268,8 @@ function SignInFlow({
           const linkData = await linkRes.json();
 
           if (linkData.success) {
-            onSuccess();
+            await onSuccess();
+            setLoading(false);
             return;
           }
 
@@ -296,7 +297,8 @@ function SignInFlow({
       }
     }
 
-    onSuccess();
+    await onSuccess();
+    setLoading(false);
   }, [onSuccess, onSwitchToSignUp]);
 
   const resendOtp = async () => {
@@ -399,7 +401,8 @@ function SignInFlow({
       }
     }
 
-    onSuccess();
+    await onSuccess();
+    setLoading(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
