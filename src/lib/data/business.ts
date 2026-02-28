@@ -2,6 +2,19 @@ import { unstable_cache } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // ---------------------------------------------------------------------------
+// SeoSettings — SEO / location data for JSON-LD structured data
+// ---------------------------------------------------------------------------
+
+export interface SeoSettings {
+  description: string;
+  latitude: number;
+  longitude: number;
+  serviceAreaName: string;
+  serviceAreaRadius: string;
+  priceRange: string;
+}
+
+// ---------------------------------------------------------------------------
 // BusinessInfo — shape returned to public components
 // ---------------------------------------------------------------------------
 
@@ -64,5 +77,69 @@ export const getBusinessInfo = unstable_cache(
     };
   },
   ['business-info'],
+  { revalidate: 60, tags: ['business-info'] }
+);
+
+// ---------------------------------------------------------------------------
+// getSeoSettings
+// Reads SEO / geo settings from business_settings. Falls back to current
+// hardcoded defaults so existing installs work without migration.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_SEO: SeoSettings = {
+  description: 'Professional auto detailing, ceramic coatings, and car care supplies in Lomita, CA. Mobile detailing available in the South Bay area.',
+  latitude: 33.7922,
+  longitude: -118.3151,
+  serviceAreaName: 'South Bay, Los Angeles',
+  serviceAreaRadius: '5 mi',
+  priceRange: '$$',
+};
+
+export const getSeoSettings = unstable_cache(
+  async (): Promise<SeoSettings> => {
+    const supabase = createAdminClient();
+
+    const { data } = await supabase
+      .from('business_settings')
+      .select('key, value')
+      .in('key', [
+        'business_description',
+        'business_latitude',
+        'business_longitude',
+        'service_area_name',
+        'service_area_radius',
+        'price_range',
+      ]);
+
+    const settings: Record<string, unknown> = {};
+    for (const row of data ?? []) {
+      settings[row.key] = row.value;
+    }
+
+    // Parse JSON-wrapped strings (business_settings stores values as JSONB)
+    const parseStr = (val: unknown, fallback: string): string => {
+      if (typeof val === 'string') return val;
+      return fallback;
+    };
+
+    const parseNum = (val: unknown, fallback: number): number => {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') {
+        const n = parseFloat(val);
+        return isNaN(n) ? fallback : n;
+      }
+      return fallback;
+    };
+
+    return {
+      description: parseStr(settings.business_description, DEFAULT_SEO.description),
+      latitude: parseNum(settings.business_latitude, DEFAULT_SEO.latitude),
+      longitude: parseNum(settings.business_longitude, DEFAULT_SEO.longitude),
+      serviceAreaName: parseStr(settings.service_area_name, DEFAULT_SEO.serviceAreaName),
+      serviceAreaRadius: parseStr(settings.service_area_radius, DEFAULT_SEO.serviceAreaRadius),
+      priceRange: parseStr(settings.price_range, DEFAULT_SEO.priceRange),
+    };
+  },
+  ['seo-settings'],
   { revalidate: 60, tags: ['business-info'] }
 );

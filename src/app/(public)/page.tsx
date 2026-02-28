@@ -8,9 +8,9 @@ import {
   Heart, Award, ThumbsUp, Calendar, CreditCard,
   Wrench, Zap, type LucideIcon,
 } from 'lucide-react';
-import { SITE_URL, SITE_DESCRIPTION } from '@/lib/utils/constants';
+import { SITE_URL } from '@/lib/utils/constants';
 import { getServiceCategories } from '@/lib/data/services';
-import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessInfo, getSeoSettings } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
 import { getActiveTeamMembers, getTeamSectionTitle, getCredentialsSectionTitle } from '@/lib/data/team-members';
 import { getActiveCredentials } from '@/lib/data/credentials';
@@ -39,19 +39,21 @@ const ICON_MAP: Record<string, LucideIcon> = {
 export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [businessInfo, seoOverrides] = await Promise.all([
+  const [businessInfo, seoOverrides, seo] = await Promise.all([
     getBusinessInfo(),
     getPageSeo('/'),
+    getSeoSettings(),
   ]);
+  const description = seo.description;
   const auto: Metadata = {
     title: businessInfo.name,
-    description: SITE_DESCRIPTION,
+    description,
     alternates: {
       canonical: SITE_URL,
     },
     openGraph: {
       title: businessInfo.name,
-      description: SITE_DESCRIPTION,
+      description,
       url: SITE_URL,
       siteName: businessInfo.name,
       type: 'website',
@@ -59,14 +61,14 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: 'summary',
       title: businessInfo.name,
-      description: SITE_DESCRIPTION,
+      description,
     },
   };
   return mergeMetadata(auto, seoOverrides);
 }
 
 export default async function HomePage() {
-  const [categories, businessInfo, reviews, teamMembers, credentials, heroSlides, heroConfig, cmsToggles, teamSectionTitle, credentialsSectionTitle, homepageSettings] = await Promise.all([
+  const [categories, businessInfo, reviews, teamMembers, credentials, heroSlides, heroConfig, cmsToggles, teamSectionTitle, credentialsSectionTitle, homepageSettings, seoSettings] = await Promise.all([
     getServiceCategories(),
     getBusinessInfo(),
     getReviewData(),
@@ -78,6 +80,7 @@ export default async function HomePage() {
     getTeamSectionTitle(),
     getCredentialsSectionTitle(),
     getHomepageSettings(),
+    getSeoSettings(),
   ]);
 
   const useCarousel = cmsToggles.heroCarousel && heroSlides.length > 0;
@@ -87,7 +90,7 @@ export default async function HomePage() {
       <JsonLd data={generateLocalBusinessSchema(businessInfo, {
         google: { rating: reviews.google.rating, count: reviews.google.count },
         yelp: { rating: reviews.yelp.rating, count: reviews.yelp.count },
-      })} />
+      }, seoSettings)} />
 
       {useCarousel ? (
         <HeroCarousel slides={heroSlides} config={heroConfig} />

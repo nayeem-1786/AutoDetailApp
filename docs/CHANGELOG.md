@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Hardcoded Audit Fixes — 2026-02-28
+
+### Bug Fixes (Part 1)
+- **Fix 1.1**: City pages (`areas/[citySlug]`) now use dynamic Google Place ID from `getHomepageSettings()` instead of hardcoded value
+- **Fix 1.2**: Booking wizard loyalty calculations now import `LOYALTY.REDEEM_RATE` and `LOYALTY.REDEEM_MINIMUM` from `constants.ts` instead of duplicating hardcoded `0.05` / `100`
+- **Fix 1.3**: AI content writer (`buildCityContext()`) and AI generate route now derive business city from `getBusinessContext()` instead of hardcoding "Lomita"
+- **Fix 1.4**: OG image alt text changed from hardcoded business name to generic descriptor (static `export const alt` limitation)
+- **Fix 1.5**: POS layout converted from static `export const metadata` to `generateMetadata()` using `getBusinessInfo()`. POS shell fetches business name from `/api/public/business-info` instead of hardcoded "Smart Details Auto Spa"
+
+### JSON-LD & Business Profile (Part 2)
+- **Migration**: New `business_settings` keys: `business_description`, `business_latitude`, `business_longitude`, `service_area_name`, `service_area_radius`, `price_range`
+- **`getSeoSettings()`**: New cached data function in `@/lib/data/business.ts` — reads SEO/geo settings from DB with hardcoded fallbacks
+- **JSON-LD**: `generateLocalBusinessSchema()` and `generateServiceSchema()` now accept optional `SeoSettings` parameter — lat/lng, area served, price range all DB-driven
+- **SITE_DESCRIPTION**: Removed as import; homepage and OG image now use `getSeoSettings().description` from DB
+- **SITE_URL**: Changed from hardcoded constant to `process.env.NEXT_PUBLIC_APP_URL` with fallback
+- **SEO admin page**: Domain display and canonical placeholder now use `SITE_URL` constant instead of hardcoded domain
+- **Business Profile admin**: New "SEO & Location" card with fields for description, lat/lng, service area name/radius, and price range
+
+---
+
 ## Staff Role Dropdown Fix — 2026-02-28
 
 - **Fix**: Staff edit, new, and list pages now fetch roles dynamically from the `roles` table instead of using hardcoded `ROLE_LABELS` constant (4 system roles only)

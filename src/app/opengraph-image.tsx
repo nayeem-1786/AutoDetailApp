@@ -1,16 +1,18 @@
 import { ImageResponse } from 'next/og';
-import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessInfo, getSeoSettings } from '@/lib/data/business';
 import { getReviewData } from '@/lib/data/reviews';
-import { SITE_DESCRIPTION } from '@/lib/utils/constants';
 
-export const alt = 'Smart Details Auto Spa — Professional Auto Detailing';
+// Note: `alt` is a static export — cannot be made dynamic in opengraph-image.tsx.
+// The actual image content uses biz.name dynamically (line 57).
+export const alt = 'Professional Auto Detailing — Mobile Service & Ceramic Coatings';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default async function OGImage() {
-  const [biz, reviews] = await Promise.all([
+  const [biz, reviews, seo] = await Promise.all([
     getBusinessInfo(),
     getReviewData(),
+    getSeoSettings(),
   ]);
 
   const starCount = Math.round(parseFloat(reviews.google.rating || '0'));
@@ -68,7 +70,7 @@ export default async function OGImage() {
             lineHeight: 1.4,
           }}
         >
-          {SITE_DESCRIPTION}
+          {seo.description}
         </div>
 
         {/* Review Stars */}

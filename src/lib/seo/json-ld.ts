@@ -1,6 +1,6 @@
 import { SITE_URL } from '@/lib/utils/constants';
 import { formatCurrency, phoneToE164 } from '@/lib/utils/format';
-import type { BusinessInfo } from '@/lib/data/business';
+import type { BusinessInfo, SeoSettings } from '@/lib/data/business';
 import type { Service, ServiceCategory, Product, ProductCategory, ServicePricing } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,8 @@ interface ReviewData {
 
 export function generateLocalBusinessSchema(
   business: BusinessInfo,
-  reviewData?: { google?: ReviewData; yelp?: ReviewData }
+  reviewData?: { google?: ReviewData; yelp?: ReviewData },
+  seo?: SeoSettings
 ) {
   const schema: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -43,20 +44,20 @@ export function generateLocalBusinessSchema(
       postalCode: business.zip,
       addressCountry: 'US',
     },
-    priceRange: '$$',
+    priceRange: seo?.priceRange ?? '$$',
     areaServed: [
       {
         '@type': 'GeoCircle',
         geoMidpoint: {
           '@type': 'GeoCoordinates',
-          latitude: 33.7922,
-          longitude: -118.3151,
+          latitude: seo?.latitude ?? 33.7922,
+          longitude: seo?.longitude ?? -118.3151,
         },
-        geoRadius: '5 mi',
+        geoRadius: seo?.serviceAreaRadius ?? '5 mi',
       },
       {
         '@type': 'Place',
-        name: 'South Bay, Los Angeles',
+        name: seo?.serviceAreaName ?? 'South Bay, Los Angeles',
       },
     ],
     sameAs: [],
@@ -85,7 +86,8 @@ export function generateLocalBusinessSchema(
 export function generateServiceSchema(
   service: Service & { service_pricing?: ServicePricing[] },
   category: ServiceCategory,
-  business: BusinessInfo
+  business: BusinessInfo,
+  seo?: SeoSettings
 ) {
   const url = `${SITE_URL}/services/${category.slug}/${service.slug}`;
 
@@ -99,7 +101,7 @@ export function generateServiceSchema(
     category: category.name,
     areaServed: {
       '@type': 'Place',
-      name: 'South Bay, Los Angeles',
+      name: seo?.serviceAreaName ?? 'South Bay, Los Angeles',
     },
   };
 

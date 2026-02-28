@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
           pageType: 'city_landing',
           contentType: 'full_page',
           cityName: city.city_name,
-          cityDistance: city.distance_miles ? `${city.distance_miles} miles from Lomita` : undefined,
+          cityDistance: city.distance_miles ? `${city.distance_miles} miles from ${biz.businessLocation.split(',')[0]?.trim() || 'Lomita'}` : undefined,
           localLandmarks: typeof city.local_landmarks === 'string' ? city.local_landmarks : undefined,
           focusKeywords: cityFocusKeywords.length > 0 ? cityFocusKeywords : undefined,
           serviceHighlights,

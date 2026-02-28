@@ -187,6 +187,15 @@ function PosShellContent({
   const { connectedReader, isConnecting, discoverAndConnect } = useReader();
   const [heldPanelOpen, setHeldPanelOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [businessName, setBusinessName] = useState('POS');
+
+  // Fetch business name for header branding
+  useEffect(() => {
+    fetch('/api/public/business-info')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.name) setBusinessName(data.name); })
+      .catch(() => { /* keep fallback */ });
+  }, []);
 
   // Listen for custom event from ticket panel to open held tickets panel
   useEffect(() => {
@@ -310,7 +319,7 @@ function PosShellContent({
         {/* Center: Brand name (absolute centered) */}
         <div className="absolute inset-x-0 flex justify-center pointer-events-none">
           <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            <span className="hidden sm:inline">Smart Details Auto Spa - POS</span>
+            <span className="hidden sm:inline">{businessName} - POS</span>
             <span className="sm:hidden">POS</span>
           </span>
         </div>

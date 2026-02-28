@@ -1,5 +1,5 @@
 // Site-wide constants
-export const SITE_URL = 'https://smartdetailsautospa.com';
+export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://smartdetailsautospa.com';
 export const SITE_DESCRIPTION = 'Professional auto detailing, ceramic coatings, and car care supplies in Lomita, CA. Mobile detailing available in the South Bay area.';
 
 export const TAX_RATE = 0.1025; // 10.25% CA sales tax

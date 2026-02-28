@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation';
 import { ArrowRight, Star, MapPin, Phone, Sparkles, CheckCircle2 } from 'lucide-react';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getActiveCities, getCityBySlug } from '@/lib/data/cities';
-import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessInfo, getSeoSettings } from '@/lib/data/business';
+import { getHomepageSettings } from '@/lib/data/homepage-settings';
 import { getServiceCategories } from '@/lib/data/services';
 import { getReviewData } from '@/lib/data/reviews';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
@@ -122,12 +123,14 @@ export default async function CityLandingPage({
   params: Promise<{ citySlug: string }>;
 }) {
   const { citySlug } = await params;
-  const [city, businessInfo, categories, reviews, contentBlocks] = await Promise.all([
+  const [city, businessInfo, categories, reviews, contentBlocks, homepageSettings, seoSettings] = await Promise.all([
     getCityBySlug(citySlug),
     getBusinessInfo(),
     getServiceCategories(),
     getReviewData(),
     getPageContentBlocks(`/areas/${citySlug}`),
+    getHomepageSettings(),
+    getSeoSettings(),
   ]);
 
   if (!city) {
@@ -157,7 +160,7 @@ export default async function CityLandingPage({
   const localBusinessSchema = generateLocalBusinessSchema(businessInfo, {
     google: { rating: reviews.google.rating, count: reviews.google.count },
     yelp: { rating: reviews.yelp.rating, count: reviews.yelp.count },
-  });
+  }, seoSettings);
 
   // Enhance LocalBusiness schema with city-specific areaServed
   const cityBusinessSchema = {
@@ -437,7 +440,7 @@ export default async function CityLandingPage({
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm">
               <a
-                href="https://search.google.com/local/reviews?placeid=ChIJf7qNDhW1woAROX-FX8CScGE"
+                href={`https://search.google.com/local/reviews?placeid=${homepageSettings.googlePlaceId}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-lime hover:text-lime-400 font-medium transition-colors"

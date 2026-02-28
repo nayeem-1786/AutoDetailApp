@@ -616,9 +616,13 @@ export async function buildCityContext(
     }
   }
 
+  // Get the business city dynamically instead of hardcoding "Lomita"
+  const biz = await getBusinessContext();
+  const businessCity = biz.businessLocation.split(',')[0]?.trim() || 'Lomita';
+
   return {
     cityName: city.city_name,
-    cityDistance: city.distance_miles ? `${city.distance_miles} miles from Lomita` : undefined,
+    cityDistance: city.distance_miles ? `${city.distance_miles} miles from ${businessCity}` : undefined,
     localLandmarks: typeof city.local_landmarks === 'string' ? city.local_landmarks : undefined,
     focusKeywords: focusKeywords.length > 0 ? focusKeywords : undefined,
     serviceHighlights,

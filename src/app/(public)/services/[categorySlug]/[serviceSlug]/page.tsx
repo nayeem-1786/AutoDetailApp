@@ -8,7 +8,7 @@ import {
   getServicesByCategory,
   getAllServicesForSitemap,
 } from '@/lib/data/services';
-import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessInfo, getSeoSettings } from '@/lib/data/business';
 import { generateServiceMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { generateServiceSchema, generateServiceFaqSchema, generateBreadcrumbSchema } from '@/lib/seo/json-ld';
@@ -64,10 +64,11 @@ export default async function ServiceDetailPage({ params }: PageProps) {
   }
 
   const { service, category } = result;
-  const [businessInfo, categoryResult, cmsToggles] = await Promise.all([
+  const [businessInfo, categoryResult, cmsToggles, seoSettings] = await Promise.all([
     getBusinessInfo(),
     getServicesByCategory(categorySlug),
     getCmsToggles(),
+    getSeoSettings(),
   ]);
   const addonSuggestions = service.service_addon_suggestions ?? [];
 
@@ -93,7 +94,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
   return (
     <>
-      <JsonLd data={generateServiceSchema(service, category, businessInfo)} />
+      <JsonLd data={generateServiceSchema(service, category, businessInfo, seoSettings)} />
       <JsonLd data={generateServiceFaqSchema(service, category.name, businessInfo.name)} />
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 

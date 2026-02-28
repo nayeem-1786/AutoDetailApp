@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { SITE_URL } from '@/lib/utils/constants';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import type { PageSeo } from '@/lib/supabase/types';
 import {
@@ -207,7 +208,8 @@ function SerpPreview({
   url: string;
   description: string;
 }) {
-  const displayUrl = `smartdetailsautospa.com${url}`;
+  const domain = SITE_URL.replace(/^https?:\/\//, '');
+  const displayUrl = `${domain}${url}`;
   return (
     <div className="rounded-md border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
@@ -577,7 +579,7 @@ function PageEditor({
             onChange={(e) =>
               setForm((prev) => ({ ...prev, canonical_url: e.target.value }))
             }
-            placeholder="https://smartdetailsautospa.com/..."
+            placeholder={`${SITE_URL}/...`}
             className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           />
         </div>

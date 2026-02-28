@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
+import { LOYALTY } from '@/lib/utils/constants';
 import { StepIndicator } from './step-indicator';
 import { StepServiceSelect, type ConfigureResult } from './step-service-select';
 import { StepSchedule } from './step-schedule';
@@ -699,11 +700,9 @@ export function BookingWizard({
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
-      const REDEEM_RATE = 0.05;
-      const REDEEM_MINIMUM = 100;
-      const maxPointsForBalance = Math.floor(remainingAfterCoupon / REDEEM_RATE);
+      const maxPointsForBalance = Math.floor(remainingAfterCoupon / LOYALTY.REDEEM_RATE);
       const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
-      const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
+      const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / LOYALTY.REDEEM_MINIMUM) * LOYALTY.REDEEM_MINIMUM;
       const adjustedLoyaltyPoints = Math.min(prev.loyaltyPointsToUse, maxLoyaltyPointsUsable);
 
       return {
@@ -722,11 +721,9 @@ export function BookingWizard({
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
-      const REDEEM_RATE = 0.05;
-      const REDEEM_MINIMUM = 100;
-      const maxPointsForBalance = Math.floor(remainingAfterCoupon / REDEEM_RATE);
+      const maxPointsForBalance = Math.floor(remainingAfterCoupon / LOYALTY.REDEEM_RATE);
       const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
-      const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
+      const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / LOYALTY.REDEEM_MINIMUM) * LOYALTY.REDEEM_MINIMUM;
       const cappedPoints = Math.min(points, maxLoyaltyPointsUsable);
 
       return { ...prev, loyaltyPointsToUse: cappedPoints };
@@ -744,7 +741,7 @@ export function BookingWizard({
       throw new Error('Missing booking data');
     }
 
-    const loyaltyDiscount = loyaltyPointsToUse * 0.05;
+    const loyaltyDiscount = loyaltyPointsToUse * LOYALTY.REDEEM_RATE;
 
     const grandTotal = config.price +
       config.addons.reduce((sum, a) => sum + a.price, 0) +

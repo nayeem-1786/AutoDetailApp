@@ -31,6 +31,16 @@ export default function BusinessProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
+  const [savingSeo, setSavingSeo] = useState(false);
+  const [seo, setSeo] = useState({
+    business_description: '',
+    business_latitude: '',
+    business_longitude: '',
+    service_area_name: '',
+    service_area_radius: '',
+    price_range: '$$',
+  });
+  const [seoDirty, setSeoDirty] = useState(false);
   const [hours, setHours] = useState<BusinessHoursInput>({
     monday: { open: '08:00', close: '18:00' },
     tuesday: { open: '08:00', close: '18:00' },
@@ -71,7 +81,10 @@ export default function BusinessProfilePage() {
       const { data, error } = await supabase
         .from('business_settings')
         .select('key, value')
-        .in('key', ['business_name', 'business_phone', 'business_address', 'business_email', 'business_website', 'business_hours']);
+        .in('key', [
+          'business_name', 'business_phone', 'business_address', 'business_email', 'business_website', 'business_hours',
+          'business_description', 'business_latitude', 'business_longitude', 'service_area_name', 'service_area_radius', 'price_range',
+        ]);
 
       if (error) {
         toast.error('Failed to load business settings', {
@@ -110,6 +123,16 @@ export default function BusinessProfilePage() {
           setHours(parsed.data);
         }
       }
+
+      // Load SEO settings
+      setSeo({
+        business_description: String(settings.business_description ?? ''),
+        business_latitude: String(settings.business_latitude ?? ''),
+        business_longitude: String(settings.business_longitude ?? ''),
+        service_area_name: String(settings.service_area_name ?? ''),
+        service_area_radius: String(settings.service_area_radius ?? ''),
+        price_range: String(settings.price_range ?? '$$'),
+      });
 
       setLoading(false);
     }
@@ -213,6 +236,51 @@ export default function BusinessProfilePage() {
       setHoursDirty(false);
     }
     setSavingHours(false);
+  }
+
+  function updateSeoField(field: keyof typeof seo, value: string) {
+    setSeo((prev) => ({ ...prev, [field]: value }));
+    setSeoDirty(true);
+  }
+
+  async function saveSeo() {
+    setSavingSeo(true);
+    const supabase = createClient();
+
+    const entries = [
+      { key: 'business_description', value: seo.business_description || null },
+      { key: 'business_latitude', value: seo.business_latitude ? parseFloat(seo.business_latitude) : null },
+      { key: 'business_longitude', value: seo.business_longitude ? parseFloat(seo.business_longitude) : null },
+      { key: 'service_area_name', value: seo.service_area_name || null },
+      { key: 'service_area_radius', value: seo.service_area_radius || null },
+      { key: 'price_range', value: seo.price_range || null },
+    ];
+
+    for (const entry of entries) {
+      if (entry.value === null) continue;
+      const { error } = await supabase
+        .from('business_settings')
+        .upsert(
+          {
+            key: entry.key,
+            value: entry.value as unknown,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'key' }
+        );
+
+      if (error) {
+        toast.error(`Failed to save ${entry.key}`, {
+          description: error.message,
+        });
+        setSavingSeo(false);
+        return;
+      }
+    }
+
+    toast.success('SEO & Location settings updated');
+    setSeoDirty(false);
+    setSavingSeo(false);
   }
 
   return (
@@ -410,6 +478,97 @@ export default function BusinessProfilePage() {
               disabled={savingHours || !hoursDirty}
             >
               {savingHours ? 'Saving...' : 'Save Hours'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SEO & Location */}
+      <Card>
+        <CardHeader>
+          <CardTitle>SEO &amp; Location</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500">
+            These values power JSON-LD structured data, the OG image, and homepage meta description.
+          </p>
+
+          <FormField label="Business Description" htmlFor="seo_description">
+            <textarea
+              id="seo_description"
+              rows={3}
+              value={seo.business_description}
+              onChange={(e) => updateSeoField('business_description', e.target.value)}
+              placeholder="Professional auto detailing, ceramic coatings, and car care supplies..."
+              className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+          </FormField>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Latitude" htmlFor="seo_latitude">
+              <Input
+                id="seo_latitude"
+                type="number"
+                step="any"
+                value={seo.business_latitude}
+                onChange={(e) => updateSeoField('business_latitude', e.target.value)}
+                placeholder="33.7922"
+              />
+            </FormField>
+
+            <FormField label="Longitude" htmlFor="seo_longitude">
+              <Input
+                id="seo_longitude"
+                type="number"
+                step="any"
+                value={seo.business_longitude}
+                onChange={(e) => updateSeoField('business_longitude', e.target.value)}
+                placeholder="-118.3151"
+              />
+            </FormField>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Service Area Name" htmlFor="seo_area_name">
+              <Input
+                id="seo_area_name"
+                value={seo.service_area_name}
+                onChange={(e) => updateSeoField('service_area_name', e.target.value)}
+                placeholder="South Bay, Los Angeles"
+              />
+            </FormField>
+
+            <FormField label="Service Area Radius" htmlFor="seo_area_radius">
+              <Input
+                id="seo_area_radius"
+                value={seo.service_area_radius}
+                onChange={(e) => updateSeoField('service_area_radius', e.target.value)}
+                placeholder="5 mi"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Price Range" htmlFor="seo_price_range">
+            <select
+              id="seo_price_range"
+              value={seo.price_range}
+              onChange={(e) => updateSeoField('price_range', e.target.value)}
+              className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="$">$ — Budget</option>
+              <option value="$$">$$ — Moderate</option>
+              <option value="$$$">$$$ — Premium</option>
+              <option value="$$$$">$$$$ — Luxury</option>
+            </select>
+          </FormField>
+
+          <div className="flex justify-end border-t border-gray-200 pt-4">
+            <Button
+              type="button"
+              onClick={saveSeo}
+              disabled={savingSeo || !seoDirty}
+            >
+              {savingSeo ? 'Saving...' : 'Save SEO Settings'}
             </Button>
           </div>
         </CardContent>
