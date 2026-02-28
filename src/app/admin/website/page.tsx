@@ -8,13 +8,13 @@ import {
   Megaphone,
   RectangleHorizontal,
   Palette,
-  Users,
   LayoutGrid,
   Search,
   MapPin,
   FileText,
   PanelTop,
   Rows3,
+  Paintbrush,
   ArrowRight,
 } from 'lucide-react';
 
@@ -24,6 +24,18 @@ const sections = [
     description: 'Create and manage custom pages for your website.',
     icon: FileText,
     href: '/admin/website/pages',
+  },
+  {
+    title: 'City Pages',
+    description: 'Manage local city landing pages for regional SEO.',
+    icon: MapPin,
+    href: '/admin/website/seo/cities',
+  },
+  {
+    title: 'Hero',
+    description: 'Manage hero slides and carousel images for your homepage.',
+    icon: Image,
+    href: '/admin/website/hero',
   },
   {
     title: 'Navigation',
@@ -38,12 +50,6 @@ const sections = [
     href: '/admin/website/footer',
   },
   {
-    title: 'Hero',
-    description: 'Manage hero slides and carousel images for your homepage.',
-    icon: Image,
-    href: '/admin/website/hero',
-  },
-  {
     title: 'Tickers',
     description: 'Configure announcement tickers and scrolling messages.',
     icon: Megaphone,
@@ -56,22 +62,22 @@ const sections = [
     href: '/admin/website/ads',
   },
   {
-    title: 'Themes',
-    description: 'Create seasonal themes with particle effects and styling.',
-    icon: Palette,
-    href: '/admin/website/themes',
-  },
-  {
-    title: 'About & Team',
-    description: 'Manage team members, credentials, and about page content.',
-    icon: Users,
-    href: '/admin/website/about',
-  },
-  {
     title: 'Catalog Display',
     description: 'Control website visibility for services and products.',
     icon: LayoutGrid,
     href: '/admin/website/catalog',
+  },
+  {
+    title: 'Theme & Styles',
+    description: 'Customize site colors, fonts, and branding.',
+    icon: Paintbrush,
+    href: '/admin/website/theme-settings',
+  },
+  {
+    title: 'Seasonal Themes',
+    description: 'Create seasonal themes with particle effects and styling.',
+    icon: Palette,
+    href: '/admin/website/themes',
   },
   {
     title: 'SEO',
@@ -79,25 +85,13 @@ const sections = [
     icon: Search,
     href: '/admin/website/seo',
   },
-  {
-    title: 'City Pages',
-    description: 'Manage local city landing pages for regional SEO.',
-    icon: MapPin,
-    href: '/admin/website/seo/cities',
-  },
-  {
-    title: 'Terms & Conditions',
-    description: 'Edit terms and conditions page content.',
-    icon: FileText,
-    href: '/admin/website/terms',
-  },
 ];
 
-export default function WebsitePage() {
+export default function WebsiteDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Website"
+        title="Website Dashboard"
         description="Manage your public-facing website content, SEO, and appearance."
       />
 

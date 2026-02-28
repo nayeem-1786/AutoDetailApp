@@ -139,6 +139,11 @@ export const SIDEBAR_NAV: NavItem[] = [
     icon: 'Globe',
     children: [
       {
+        label: 'Dashboard',
+        href: '/admin/website',
+        icon: 'LayoutDashboard',
+      },
+      {
         label: 'Pages',
         href: '/admin/website/pages',
         icon: 'FileText',

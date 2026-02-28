@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Image Upload Sweep + Website Dashboard Cleanup — 2026-02-27
+
+### fix: standardize ImageUploadField everywhere, clean up website dashboard, add to sidebar
+
+**Image Upload Standardization:**
+- Verified all image upload patterns across admin — all already use `ImageUploadField` or appropriate specialized components (MultiImageUpload, HeroImageUpload, catalog ImageUpload)
+- No plain URL text inputs or raw `<input type="file">` elements found — no changes needed
+
+**Website Dashboard Cleanup:**
+- Removed dead "About & Team" card (page deleted in Phase D.7)
+- Removed dead "Terms & Conditions" card (page deleted in Phase D.7)
+- Updated dashboard cards to match current sidebar structure: Pages, City Pages, Hero, Navigation, Footer, Tickers, Ads, Catalog Display, Theme & Styles, Seasonal Themes, SEO
+- Renamed page title from "Website" to "Website Dashboard"
+
+**Sidebar Update:**
+- Added "Dashboard" as first item in Website sidebar section (LayoutDashboard icon, `/admin/website`)
+- Website sidebar now: Dashboard → Pages → City Pages → Hero → Navigation → Footer → Tickers → Ads → Catalog Display → Theme & Styles → Seasonal Themes → SEO
+
+---
+
 ## CMS Phase D Bug Fixes: Team Grid Save Flow, Button Types, Confirm Dialogs — 2026-02-27
 
 ### fix: team-grid per-member save, remove save bio, fix parent save button

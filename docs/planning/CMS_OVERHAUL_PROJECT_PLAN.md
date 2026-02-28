@@ -2,8 +2,8 @@
 
 > **Project:** Smart Details Auto Spa — Admin Website Section Restructure
 > **Created:** 2026-02-26
-> **Updated:** 2026-02-27 (Phase D Bug Fixes Complete)
-> **Status:** Phase D Complete — All bug fixes applied
+> **Updated:** 2026-02-27 (Post-Phase D cleanup)
+> **Status:** Phase D Complete — All bug fixes applied, dashboard cleanup done
 > **Audit:** `docs/planning/CMS_OVERHAUL_AUDIT.md`
 > **Owner:** Nayeem (121 Media)
 
@@ -928,12 +928,10 @@ Action buttons inside block editors (like "Add Feature", "Add FAQ Item") trigger
 ### Admin Pages (Website Section)
 
 ```
-src/app/admin/website/page.tsx               — Website section landing
-src/app/admin/website/about/page.tsx         — About & Team editor (TO BE DELETED — Phase D.7)
+src/app/admin/website/page.tsx               — Website Dashboard (cleaned up — dead links removed, sidebar entry added)
 src/app/admin/website/pages/page.tsx         — Pages list
-src/app/admin/website/pages/new/page.tsx     — New page
+src/app/admin/website/pages/new/page.tsx     — New page (auto-creates draft, redirects to edit)
 src/app/admin/website/pages/[id]/page.tsx    — Edit page (THE FOUNDATION)
-src/app/admin/website/terms/page.tsx         — Terms editor (TO BE DELETED — Phase D.7)
 src/app/admin/website/seo/cities/page.tsx    — Cities editor (STAYS — enhanced with keyword-aware AI in Phase E.6)
 src/app/admin/website/footer/page.tsx        — Footer editor (~1800 lines, HAS DRAG-DROP TO EXTRACT)
 src/app/admin/website/hero/page.tsx          — Hero carousel list
