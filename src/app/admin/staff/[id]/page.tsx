@@ -577,6 +577,10 @@ export default function StaffDetailPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="security">
+            <Lock className="mr-1.5 h-4 w-4" />
+            Security
+          </TabsTrigger>
           {employee.bookable_for_appointments && (
             <TabsTrigger value="schedule">
               <Calendar className="mr-1.5 h-4 w-4" />
@@ -706,8 +710,12 @@ export default function StaffDetailPage() {
             </div>
           </form>
 
-          {/* Password & Security — outside the profile form, has its own handlers */}
-          {employee.auth_user_id && (
+          </div>
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security">
+          {employee.auth_user_id ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -763,8 +771,13 @@ export default function StaffDetailPage() {
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-gray-500">
+                This staff member does not have a login account. Password management is not available.
+              </CardContent>
+            </Card>
           )}
-          </div>
         </TabsContent>
 
         {/* Schedule Tab */}

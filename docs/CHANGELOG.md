@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Staff Editor Security Tab — 2026-02-28
+
+- **Moved**: "Password & Security" from a card inside the Profile tab to its own dedicated "Security" tab in the staff editor
+- **Tab order**: Profile → Security → Schedule → Permissions
+- **No-auth fallback**: Security tab shows "no login account" message for staff without auth accounts (previously the card was hidden entirely)
+
+---
+
 ## Staff Password Reset — 2026-02-28
 
 ### Admin Staff Password Management
