@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Light Mode Lime Contrast — 2026-03-01
+
+- **Bug**: ~200+ raw `text-lime`, `bg-lime`, `border-lime`, `ring-lime` Tailwind classes across 30+ public-facing files resolve to `--lime: #CCFF00` (neon green), which is near-invisible on white backgrounds (~1.2:1 contrast ratio)
+- **Fix**: Override `--lime` scale to charcoal neutrals (`#545454` base) in light mode CSS layer. Also override `--site-icon-accent`, `--site-link`, `--site-btn-*`, `--theme-accent-glow-rgb`, `--ui-ring`, and `--site-text-on-primary` to match. Added `.text-gradient-lime` light mode override.
+- **Design**: Charcoal #545454 is neutral, 7.5:1 contrast on white (WCAG AAA), maintains premium brand feel. Neon lime stays on dark mode where it belongs.
+- **Files**: `globals.css` (CSS overrides), `light-mode-vars.ts` (JS inline style overrides — single source of truth for both `ThemeToggle` and `ThemeToggleInitializer`)
+- **Zero component changes**: All 200+ usages fixed via CSS variable cascade — no `.tsx` files modified
+
+---
+
 ## Fix: Ticker Date Round-Trip Corruption — 2026-03-01
 
 - **Bug**: `isoToLocal()` in ticker editor sliced the UTC ISO string directly (e.g., `2026-03-01T08:00:00Z` → `2026-03-01T08:00`) instead of converting to local timezone, causing dates to display 8 hours ahead (PST) and drift on every save

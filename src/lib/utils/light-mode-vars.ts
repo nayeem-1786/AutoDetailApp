@@ -30,23 +30,32 @@ export const LIGHT_MODE_VARS: Record<string, string> = {
   '--site-header-bg': '#ffffff',
   '--site-footer-bg': '#f8fafc',
   // Text on primary
-  '--site-text-on-primary': '#000000',
+  '--site-text-on-primary': '#ffffff',
   // Divider
   '--site-divider': '#e5e7eb',
-  // Icon accent — stays lime in light mode (cascades through var(--lime))
-  '--site-icon-accent': 'var(--lime)',
-  // Links — darker green for contrast on white
-  '--site-link': '#4d7c0f',
-  '--site-link-hover': '#65a30d',
-  // Buttons — #4d7c0f with white text = 4.6:1 (passes WCAG AA normal text)
-  '--site-btn-primary-bg': '#4d7c0f',
+  // Lime palette — charcoal neutrals for white background contrast
+  '--lime': '#545454',
+  '--lime-50': '#f5f5f5',
+  '--lime-100': '#e8e8e8',
+  '--lime-200': '#d4d4d4',
+  '--lime-300': '#737373',
+  '--lime-400': '#616161',
+  '--lime-500': '#545454',
+  '--lime-600': '#3d3d3d',
+  // Icon accent
+  '--site-icon-accent': '#545454',
+  // Links — charcoal for contrast on white
+  '--site-link': '#545454',
+  '--site-link-hover': '#3d3d3d',
+  // Buttons — #545454 with white text = 7.5:1 (passes WCAG AAA)
+  '--site-btn-primary-bg': '#545454',
   '--site-btn-primary-text': '#ffffff',
-  '--site-btn-primary-hover-bg': '#65a30d',
-  '--site-btn-cta-bg': '#4d7c0f',
+  '--site-btn-primary-hover-bg': '#3d3d3d',
+  '--site-btn-cta-bg': '#545454',
   '--site-btn-cta-text': '#ffffff',
-  '--site-btn-cta-hover-bg': '#65a30d',
+  '--site-btn-cta-hover-bg': '#3d3d3d',
   // Accent glow
-  '--theme-accent-glow-rgb': '101, 163, 13',
+  '--theme-accent-glow-rgb': '84, 84, 84',
   // UI tokens (shared components)
   '--ui-bg': '#ffffff',
   '--ui-bg-hover': '#f9fafb',
@@ -59,7 +68,7 @@ export const LIGHT_MODE_VARS: Record<string, string> = {
   '--ui-text-faint': '#d1d5db',
   '--ui-border': '#e5e7eb',
   '--ui-border-light': '#f3f4f6',
-  '--ui-ring': '#65a30d',
+  '--ui-ring': '#545454',
   '--ui-placeholder': '#9ca3af',
   '--ui-shadow': 'rgba(0,0,0,0.1)',
   '--ui-input-bg': '#ffffff',
