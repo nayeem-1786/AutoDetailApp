@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Remove Dead Hero Settings Card from Homepage Admin — 2026-02-28
+
+- **Problem**: Admin → Website → Homepage had a "Hero Settings" card with a Hero Tagline field. The real hero is managed at Admin → Website → Layout → Hero (hero_slides table), making this card dead UI.
+- **Fix**: Removed the entire Hero Settings card and `heroTagline` from the admin page state, interface, defaults, load, and save payload.
+- **Data layer preserved**: `heroTagline` remains in `HomepageSettings` interface, `getHomepageSettings()`, and the API route's `HOMEPAGE_KEYS` — the public `HeroSection` still reads it as a DB-only default. The existing DB value persists since the PUT endpoint only upserts keys present in the request body.
+- **Card order after removal**: CTA Defaults → Section Content → Differentiators → Google Reviews
+- **File**: `src/app/admin/website/homepage/page.tsx`
+
+---
+
 ## Fix: Move CTA Before/After Images to CTA Defaults Card — 2026-02-28
 
 - **Bug**: CTA Before/After image uploads were inside the Hero Settings card on Admin → Website → Homepage. They belong in the CTA Defaults card.

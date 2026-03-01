@@ -61,7 +61,6 @@ interface HomepageSettingsState {
   ctaAfterImage: string;
   teamHeading: string;
   credentialsHeading: string;
-  heroTagline: string;
   ctaTitle: string;
   ctaDescription: string;
   ctaButtonText: string;
@@ -80,7 +79,6 @@ const DEFAULTS: HomepageSettingsState = {
   ctaAfterImage: '',
   teamHeading: 'Meet the Team',
   credentialsHeading: 'Credentials & Awards',
-  heroTagline: '',
   ctaTitle: '',
   ctaDescription: '',
   ctaButtonText: '',
@@ -112,7 +110,6 @@ export default function HomepageSettingsPage() {
         ctaAfterImage: data.homepage_cta_after_image || '',
         teamHeading: data.homepage_team_heading || 'Meet the Team',
         credentialsHeading: data.homepage_credentials_heading || 'Credentials & Awards',
-        heroTagline: data.homepage_hero_tagline || '',
         ctaTitle: data.homepage_cta_title || '',
         ctaDescription: data.homepage_cta_description || '',
         ctaButtonText: data.homepage_cta_button_text || '',
@@ -149,7 +146,6 @@ export default function HomepageSettingsPage() {
           homepage_cta_after_image: settings.ctaAfterImage || null,
           homepage_team_heading: settings.teamHeading || 'Meet the Team',
           homepage_credentials_heading: settings.credentialsHeading || 'Credentials & Awards',
-          homepage_hero_tagline: settings.heroTagline || null,
           homepage_cta_title: settings.ctaTitle || null,
           homepage_cta_description: settings.ctaDescription || null,
           homepage_cta_button_text: settings.ctaButtonText || null,
@@ -211,35 +207,13 @@ export default function HomepageSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Homepage Settings"
-        description="Manage hero content, CTA defaults, section copy, differentiators, and review links."
+        description="Manage CTA defaults, section copy, differentiators, and review links."
         action={
           <Button onClick={save} disabled={saving}>
             {saving ? <><Spinner size="sm" /> Saving...</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
           </Button>
         }
       />
-
-      {/* Hero Settings */}
-      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Hero Settings</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Main tagline displayed on the homepage hero section.
-          </p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Hero Tagline
-          </label>
-          <Textarea
-            value={settings.heroTagline}
-            onChange={(e) => setSettings((prev) => ({ ...prev, heroTagline: e.target.value }))}
-            className="mt-1 text-sm"
-            rows={2}
-            placeholder="Expert ceramic coatings, paint correction, and premium detailing. We bring showroom results directly to your doorstep."
-          />
-        </div>
-      </div>
 
       {/* CTA Defaults */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 space-y-4">
