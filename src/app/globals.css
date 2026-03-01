@@ -315,12 +315,22 @@
   --theme-accent-glow-rgb: 84, 84, 84;
 }
 
-/* Light mode: override gradient text to charcoal (neon lime invisible on white) */
+/* Light mode: headline accent words stay brand lime — large text pops on white */
 .public-theme[data-user-theme="light"] .text-gradient-lime {
-  background: linear-gradient(135deg, #545454, #3d3d3d);
+  background: linear-gradient(135deg, #CCFF00, #A3CC00);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Headline accent words stay brand lime in light mode */
+.public-theme[data-user-theme="light"] h1 .text-lime,
+.public-theme[data-user-theme="light"] h2 .text-lime,
+.public-theme[data-user-theme="light"] h3 .text-lime,
+.public-theme[data-user-theme="light"] .text-4xl .text-lime,
+.public-theme[data-user-theme="light"] .text-5xl .text-lime,
+.public-theme[data-user-theme="light"] .text-6xl .text-lime {
+  color: #CCFF00 !important;
 }
 
 @theme inline {

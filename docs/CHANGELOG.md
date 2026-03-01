@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Restore Lime Accent on Headlines in Light Mode — 2026-03-01
+
+- **Issue**: Charcoal contrast fix made headline accent words (#545454) blend in — large text should stay brand lime #CCFF00
+- **Fix**: `.text-gradient-lime` override now uses lime gradient (#CCFF00 → #A3CC00). Added targeted rule for `text-lime` inside h1-h3 and text-4xl/5xl/6xl containers.
+- **Result**: Headlines pop with lime, icons/body text/links stay charcoal
+- **File**: `globals.css`
+
+---
+
 ## Fix: Restore Brand Lime Buttons in Light Mode — 2026-03-01
 
 - **Issue**: Previous contrast fix changed buttons to charcoal — buttons should keep the brand lime #CCFF00 with black text in both modes
