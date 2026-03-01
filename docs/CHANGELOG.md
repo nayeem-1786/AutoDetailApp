@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: SEO Page Restored to Sidebar — 2026-02-28
+
+- **Bug**: SEO page (`/admin/website/seo`) had a dashboard card but no sidebar entry — was incorrectly removed earlier
+- **Fix**: Added back to Website sidebar under Data group (Team Members, Credentials, City Pages, SEO)
+- **Context**: SEO page is a full per-page SEO management tool (SERP previews, AI bulk generation, score tracking) — not redundant with City Pages
+
+---
+
 ## Fix: Homepage Settings Cleanup — 2026-02-28
 
 - **Removed**: Hero Settings card from Admin → Website → Homepage (dead UI — real hero managed at Website → Layout → Hero via `hero_slides` table)

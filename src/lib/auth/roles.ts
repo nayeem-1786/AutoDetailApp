@@ -182,6 +182,12 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'MapPin',
         group: 'Data',
       },
+      {
+        label: 'SEO',
+        href: '/admin/website/seo',
+        icon: 'Search',
+        group: 'Data',
+      },
       // --- Layout group ---
       {
         label: 'Hero',

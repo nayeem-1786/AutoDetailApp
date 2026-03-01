@@ -158,6 +158,7 @@ All core build phases complete. App is in active daily use with ongoing refineme
 - Website → Pages: "In Nav" toggle disabled when unpublished, auto-clears on unpublish
 - Global OG Image upload in Business Profile (custom social share image with auto-generated fallback)
 - Homepage Settings: removed dead Hero Settings card, moved CTA images to CTA Defaults card
+- SEO page restored to Website sidebar (Data group) — full per-page SEO manager with AI generation
 
 ## Integrations
 
