@@ -239,20 +239,6 @@ export default function HomepageSettingsPage() {
             placeholder="Expert ceramic coatings, paint correction, and premium detailing. We bring showroom results directly to your doorstep."
           />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <ImageUploadField
-            value={settings.ctaBeforeImage}
-            onChange={(url) => setSettings((prev) => ({ ...prev, ctaBeforeImage: url }))}
-            folder="homepage"
-            label="CTA Before Image"
-          />
-          <ImageUploadField
-            value={settings.ctaAfterImage}
-            onChange={(url) => setSettings((prev) => ({ ...prev, ctaAfterImage: url }))}
-            folder="homepage"
-            label="CTA After Image"
-          />
-        </div>
       </div>
 
       {/* CTA Defaults */}
@@ -295,6 +281,20 @@ export default function HomepageSettingsPage() {
             onChange={(e) => setSettings((prev) => ({ ...prev, ctaButtonText: e.target.value }))}
             className="mt-1 text-sm"
             placeholder="Book Your Detail"
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <ImageUploadField
+            value={settings.ctaBeforeImage}
+            onChange={(url) => setSettings((prev) => ({ ...prev, ctaBeforeImage: url }))}
+            folder="homepage"
+            label="CTA Before Image"
+          />
+          <ImageUploadField
+            value={settings.ctaAfterImage}
+            onChange={(url) => setSettings((prev) => ({ ...prev, ctaAfterImage: url }))}
+            folder="homepage"
+            label="CTA After Image"
           />
         </div>
       </div>

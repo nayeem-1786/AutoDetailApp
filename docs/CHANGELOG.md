@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Move CTA Before/After Images to CTA Defaults Card — 2026-02-28
+
+- **Bug**: CTA Before/After image uploads were inside the Hero Settings card on Admin → Website → Homepage. They belong in the CTA Defaults card.
+- **Fix**: Moved the two `ImageUploadField` components from Hero Settings into CTA Defaults, positioned after the Button Text field.
+- **CTA Defaults field order**: Title → Description → Button Text → Before Image → After Image
+- **File**: `src/app/admin/website/homepage/page.tsx`
+
+---
+
 ## Fix: In Nav Requires Published + Global OG Image Upload — 2026-02-28
 
 ### In Nav / Published Toggle Dependency
