@@ -234,12 +234,14 @@ export interface TickerPlacementOptions {
   hold_duration: number;   // seconds, default 5
   bg_transition: 'slide_down' | 'crossfade' | 'none'; // default 'crossfade'
   text_entry: 'scroll' | 'ltr' | 'rtl' | 'ttb' | 'btt' | 'fade_in'; // default 'rtl'
+  message_gap: number;     // rem units, default 5
 }
 
 const DEFAULT_TICKER_OPTIONS: TickerPlacementOptions = {
   hold_duration: 5,
   bg_transition: 'crossfade',
   text_entry: 'rtl',
+  message_gap: 5,
 };
 
 export const getTickerOptions = unstable_cache(

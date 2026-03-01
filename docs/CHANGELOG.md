@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Feat: Configurable Message Gap for Ticker Scroll Mode — 2026-03-01
+
+- **Feature**: Per-placement "Message Gap" slider controlling space between repeated messages in scroll/marquee mode
+- **Admin UI**: Slider (1–20 rem, step 0.5) in Top Bar and Section rotation options panels
+- **Default**: 5 rem (matches previous hardcoded value)
+- **Storage**: Stored in existing `ticker_top_bar_options` / `ticker_section_options` JSONB keys — no DB migration needed
+- **Scope**: Only affects scroll/marquee mode. Static text entry modes (ltr, rtl, ttb, btt, fade_in) unchanged.
+- **Files**: `src/lib/data/cms.ts`, `src/components/public/cms/announcement-ticker.tsx`, `src/app/admin/website/tickers/page.tsx`
+
+---
+
 ## Fix: Restore Lime Accent on Headlines in Light Mode — 2026-03-01
 
 - **Issue**: Charcoal contrast fix made headline accent words (#545454) blend in — large text should stay brand lime #CCFF00

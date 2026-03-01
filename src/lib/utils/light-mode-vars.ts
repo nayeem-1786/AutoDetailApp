@@ -43,7 +43,7 @@ export const LIGHT_MODE_VARS: Record<string, string> = {
   '--lime-500': '#545454',
   '--lime-600': '#3d3d3d',
   // Icon accent
-  '--site-icon-accent': '#545454',
+  '--site-icon-accent': '#CCFF00',
   // Links — charcoal for contrast on white
   '--site-link': '#545454',
   '--site-link-hover': '#3d3d3d',

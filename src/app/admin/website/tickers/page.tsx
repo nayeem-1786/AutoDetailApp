@@ -33,12 +33,14 @@ interface TickerPlacementOptions {
   hold_duration: number;
   bg_transition: 'slide_down' | 'crossfade' | 'none';
   text_entry: 'scroll' | 'ltr' | 'rtl' | 'ttb' | 'btt' | 'fade_in';
+  message_gap: number;
 }
 
 const DEFAULT_OPTIONS: TickerPlacementOptions = {
   hold_duration: 5,
   bg_transition: 'crossfade',
   text_entry: 'rtl',
+  message_gap: 5,
 };
 
 const BG_TRANSITION_OPTIONS = [
@@ -488,6 +490,33 @@ function OptionsCard({
             <span className="text-xs text-gray-500">seconds</span>
           </div>
         </div>
+      </div>
+
+      {/* Message Gap */}
+      <div className="mt-4">
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Message Gap
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={1}
+            max={20}
+            step={0.5}
+            value={options.message_gap}
+            onChange={(e) =>
+              onChange({ ...options, message_gap: Number(e.target.value) })
+            }
+            disabled={disabled}
+            className="flex-1"
+          />
+          <span className="text-xs text-gray-500 w-14 text-right">
+            {options.message_gap} rem
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-gray-400">
+          Space between repeated messages in scroll mode (1–20 rem).
+        </p>
       </div>
     </div>
   );
