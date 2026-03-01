@@ -84,9 +84,13 @@ export default function PagesListPage() {
 
   const togglePublished = async (page: WebsitePage) => {
     const newValue = !page.is_published;
-    // Optimistic update
+    // Optimistic update — if unpublishing, also turn off show_in_nav
     setPages((prev) =>
-      prev.map((p) => (p.id === page.id ? { ...p, is_published: newValue } : p))
+      prev.map((p) =>
+        p.id === page.id
+          ? { ...p, is_published: newValue, ...(!newValue && { show_in_nav: false }) }
+          : p
+      )
     );
 
     const res = await adminFetch(`/api/admin/cms/pages/${page.id}`, {
@@ -98,7 +102,7 @@ export default function PagesListPage() {
     if (!res.ok) {
       // Revert
       setPages((prev) =>
-        prev.map((p) => (p.id === page.id ? { ...p, is_published: !newValue } : p))
+        prev.map((p) => (p.id === page.id ? { ...p, is_published: !newValue, show_in_nav: page.show_in_nav } : p))
       );
       toast.error('Failed to update page');
     }
@@ -242,10 +246,16 @@ export default function PagesListPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <Switch
-                        checked={page.show_in_nav}
-                        onCheckedChange={() => toggleShowInNav(page)}
-                      />
+                      <div className="flex flex-col items-center gap-0.5">
+                        <Switch
+                          checked={page.show_in_nav}
+                          onCheckedChange={() => toggleShowInNav(page)}
+                          disabled={!page.is_published}
+                        />
+                        {!page.is_published && (
+                          <span className="text-[10px] text-gray-400">Publish first</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(page.updated_at).toLocaleDateString()}

@@ -12,6 +12,7 @@ export interface SeoSettings {
   serviceAreaName: string;
   serviceAreaRadius: string;
   priceRange: string;
+  ogImageUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,7 @@ const DEFAULT_SEO: SeoSettings = {
   serviceAreaName: 'South Bay, Los Angeles',
   serviceAreaRadius: '5 mi',
   priceRange: '$$',
+  ogImageUrl: null,
 };
 
 export const getSeoSettings = unstable_cache(
@@ -109,6 +111,7 @@ export const getSeoSettings = unstable_cache(
         'service_area_name',
         'service_area_radius',
         'price_range',
+        'og_image_url',
       ]);
 
     const settings: Record<string, unknown> = {};
@@ -131,6 +134,10 @@ export const getSeoSettings = unstable_cache(
       return fallback;
     };
 
+    // OG image: empty string means "not set"
+    const rawOg = settings.og_image_url;
+    const ogUrl = typeof rawOg === 'string' && rawOg.length > 0 ? rawOg : null;
+
     return {
       description: parseStr(settings.business_description, DEFAULT_SEO.description),
       latitude: parseNum(settings.business_latitude, DEFAULT_SEO.latitude),
@@ -138,6 +145,7 @@ export const getSeoSettings = unstable_cache(
       serviceAreaName: parseStr(settings.service_area_name, DEFAULT_SEO.serviceAreaName),
       serviceAreaRadius: parseStr(settings.service_area_radius, DEFAULT_SEO.serviceAreaRadius),
       priceRange: parseStr(settings.price_range, DEFAULT_SEO.priceRange),
+      ogImageUrl: ogUrl,
     };
   },
   ['seo-settings'],

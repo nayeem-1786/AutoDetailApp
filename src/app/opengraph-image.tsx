@@ -9,10 +9,31 @@ export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default async function OGImage() {
-  const [biz, reviews, seo] = await Promise.all([
+  const seo = await getSeoSettings();
+
+  // If a custom OG image is uploaded, fetch and return it directly
+  if (seo.ogImageUrl) {
+    try {
+      const imageRes = await fetch(seo.ogImageUrl);
+      if (imageRes.ok) {
+        const imageBuffer = await imageRes.arrayBuffer();
+        const ct = imageRes.headers.get('content-type') || 'image/png';
+        return new Response(imageBuffer, {
+          headers: {
+            'Content-Type': ct,
+            'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+          },
+        });
+      }
+    } catch {
+      // Fall through to auto-generated image
+    }
+  }
+
+  // Auto-generated fallback image
+  const [biz, reviews] = await Promise.all([
     getBusinessInfo(),
     getReviewData(),
-    getSeoSettings(),
   ]);
 
   const starCount = Math.round(parseFloat(reviews.google.rating || '0'));

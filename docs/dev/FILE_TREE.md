@@ -1170,6 +1170,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260228000004_global_blocks.sql
 20260228000005_seo_business_settings.sql
 20260228000006_homepage_settings_expansion.sql
+20260228000007_og_image_setting.sql
 ```
 
 ---

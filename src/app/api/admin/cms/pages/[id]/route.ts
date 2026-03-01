@@ -78,6 +78,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     updates.preview_token_expires_at = null;
   }
 
+  // Unpublishing → force show_in_nav off (unpublished pages can't be in nav)
+  if (body.is_published === false) {
+    updates.show_in_nav = false;
+  }
+
   const { data, error } = await admin
     .from('website_pages')
     .update(updates)
@@ -97,8 +102,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   // Handle show_in_nav toggle — auto-create or delete nav entry
-  if ('show_in_nav' in body) {
-    if (body.show_in_nav) {
+  // Also triggers when unpublishing forces show_in_nav off
+  const navChanged = 'show_in_nav' in body || (body.is_published === false);
+  if (navChanged) {
+    if (data.show_in_nav) {
       // Check if nav entry already exists for this page
       const { data: existingNav } = await admin
         .from('website_navigation')

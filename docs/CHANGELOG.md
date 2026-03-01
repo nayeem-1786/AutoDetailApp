@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: In Nav Requires Published + Global OG Image Upload — 2026-02-28
+
+### In Nav / Published Toggle Dependency
+- **Bug**: Pages admin allowed "In Nav" toggle to be turned on for unpublished pages, creating broken nav links.
+- **Fix (frontend)**: "In Nav" toggle is now disabled (greyed out) with "Publish first" helper text when page is unpublished. Unpublishing a page auto-turns off "In Nav" in the optimistic update.
+- **Fix (API)**: `PATCH /api/admin/cms/pages/[id]` — when `is_published` is set to `false`, also sets `show_in_nav` to `false` and cleans up associated nav entries.
+- **Files**: `src/app/admin/website/pages/page.tsx`, `src/app/api/admin/cms/pages/[id]/route.ts`
+
+### Global OG Image Upload
+- **Feature**: Admin → Settings → Business Profile now has a "Social Share Image (OG Image)" card with upload/remove functionality using `ImageUploadField`.
+- **Storage**: `og_image_url` key in `business_settings` table, uploaded via `content-image` API to `og` folder.
+- **Data layer**: `SeoSettings.ogImageUrl` added to `getSeoSettings()` in `src/lib/data/business.ts`.
+- **OG image route**: `src/app/opengraph-image.tsx` checks for custom image URL first — if set, fetches and returns it directly. Falls back to auto-generated JSX image when no custom image is uploaded.
+- **Migration**: `20260228000007_og_image_setting.sql` — seeds empty `og_image_url` key.
+- **Files**: `src/app/admin/settings/business-profile/page.tsx`, `src/lib/data/business.ts`, `src/app/opengraph-image.tsx`
+
+---
+
 ## Fix: Quote Validity Reads from Admin Setting Everywhere — 2026-02-28
 
 - **Bug**: Admin `quote_validity_days` was set to 3 days, but POS quote builder defaulted to 10 (hardcoded in reducer), voice agent used 10 (hardcoded in route), and Twilio auto-quote used 10 (hardcoded in webhook). Only the email template correctly read from DB.

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
+import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { toast } from 'sonner';
 
@@ -47,6 +48,9 @@ export default function BusinessProfilePage() {
     price_range: '$$',
   });
   const [seoDirty, setSeoDirty] = useState(false);
+  const [ogImageUrl, setOgImageUrl] = useState('');
+  const [ogImageDirty, setOgImageDirty] = useState(false);
+  const [savingOgImage, setSavingOgImage] = useState(false);
   const [hours, setHours] = useState<BusinessHoursInput>({
     monday: { open: '08:00', close: '18:00' },
     tuesday: { open: '08:00', close: '18:00' },
@@ -90,7 +94,7 @@ export default function BusinessProfilePage() {
         .in('key', [
           'business_name', 'business_phone', 'business_address', 'business_email', 'business_website', 'business_hours',
           'business_description', 'business_latitude', 'business_longitude', 'service_area_name', 'service_area_radius', 'price_range',
-          'default_deposit_amount', 'quote_validity_days',
+          'default_deposit_amount', 'quote_validity_days', 'og_image_url',
         ]);
 
       if (error) {
@@ -146,6 +150,10 @@ export default function BusinessProfilePage() {
         service_area_radius: String(settings.service_area_radius ?? ''),
         price_range: String(settings.price_range ?? '$$'),
       });
+
+      // Load OG image
+      const rawOgUrl = settings.og_image_url;
+      setOgImageUrl(typeof rawOgUrl === 'string' ? rawOgUrl : '');
 
       setLoading(false);
     }
@@ -344,6 +352,30 @@ export default function BusinessProfilePage() {
     toast.success('SEO & Location settings updated');
     setSeoDirty(false);
     setSavingSeo(false);
+  }
+
+  async function saveOgImage() {
+    setSavingOgImage(true);
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from('business_settings')
+      .upsert(
+        {
+          key: 'og_image_url',
+          value: ogImageUrl || '',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      );
+
+    if (error) {
+      toast.error('Failed to save OG image', { description: error.message });
+    } else {
+      toast.success('Social share image updated');
+      setOgImageDirty(false);
+    }
+    setSavingOgImage(false);
   }
 
   return (
@@ -684,6 +716,45 @@ export default function BusinessProfilePage() {
               disabled={savingSeo || !seoDirty}
             >
               {savingSeo ? 'Saving...' : 'Save SEO Settings'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Social Share Image (OG Image) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Social Share Image (OG Image)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500">
+            This image appears when someone shares a link to your website on social media
+            (Facebook, LinkedIn, X), messaging apps (iMessage, Slack, WhatsApp), or in search
+            results. Recommended size: 1200&times;630px.
+          </p>
+
+          <ImageUploadField
+            value={ogImageUrl}
+            onChange={(url) => {
+              setOgImageUrl(url);
+              setOgImageDirty(true);
+            }}
+            folder="og"
+            placeholder="Drop image here or click to upload (1200x630px recommended)"
+          />
+
+          <p className="text-xs text-gray-400">
+            If no image is uploaded, an auto-generated branded image is used. Per-page SEO images
+            (set in the page editor) will override this global image on those pages.
+          </p>
+
+          <div className="flex justify-end border-t border-gray-200 pt-4">
+            <Button
+              type="button"
+              onClick={saveOgImage}
+              disabled={savingOgImage || !ogImageDirty}
+            >
+              {savingOgImage ? 'Saving...' : 'Save OG Image'}
             </Button>
           </div>
         </CardContent>
