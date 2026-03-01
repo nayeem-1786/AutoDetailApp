@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Ticker Date Round-Trip Corruption — 2026-03-01
+
+- **Bug**: `isoToLocal()` in ticker editor sliced the UTC ISO string directly (e.g., `2026-03-01T08:00:00Z` → `2026-03-01T08:00`) instead of converting to local timezone, causing dates to display 8 hours ahead (PST) and drift on every save
+- **Fix**: Replaced with `new Date()` conversion using `getFullYear/getMonth/getDate/getHours/getMinutes` which correctly converts UTC to the browser's local timezone
+- **Impact**: Any tickers with date ranges that were saved multiple times may have corrupted `starts_at`/`ends_at` values — re-enter dates and re-save
+- **File**: `src/app/admin/website/tickers/[id]/page.tsx`
+
+---
+
 ## Fix: SEO Page Restored to Sidebar — 2026-02-28
 
 - **Bug**: SEO page (`/admin/website/seo`) had a dashboard card but no sidebar entry — was incorrectly removed earlier
