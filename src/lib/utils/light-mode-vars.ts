@@ -30,7 +30,7 @@ export const LIGHT_MODE_VARS: Record<string, string> = {
   '--site-header-bg': '#ffffff',
   '--site-footer-bg': '#f8fafc',
   // Text on primary
-  '--site-text-on-primary': '#ffffff',
+  '--site-text-on-primary': '#000000',
   // Divider
   '--site-divider': '#e5e7eb',
   // Lime palette — charcoal neutrals for white background contrast
@@ -47,13 +47,13 @@ export const LIGHT_MODE_VARS: Record<string, string> = {
   // Links — charcoal for contrast on white
   '--site-link': '#545454',
   '--site-link-hover': '#3d3d3d',
-  // Buttons — #545454 with white text = 7.5:1 (passes WCAG AAA)
-  '--site-btn-primary-bg': '#545454',
-  '--site-btn-primary-text': '#ffffff',
-  '--site-btn-primary-hover-bg': '#3d3d3d',
-  '--site-btn-cta-bg': '#545454',
-  '--site-btn-cta-text': '#ffffff',
-  '--site-btn-cta-hover-bg': '#3d3d3d',
+  // Buttons — brand lime with black text, same as dark mode
+  '--site-btn-primary-bg': '#CCFF00',
+  '--site-btn-primary-text': '#000000',
+  '--site-btn-primary-hover-bg': '#B8E600',
+  '--site-btn-cta-bg': '#CCFF00',
+  '--site-btn-cta-text': '#000000',
+  '--site-btn-cta-hover-bg': '#B8E600',
   // Accent glow
   '--theme-accent-glow-rgb': '84, 84, 84',
   // UI tokens (shared components)

@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Restore Brand Lime Buttons in Light Mode — 2026-03-01
+
+- **Issue**: Previous contrast fix changed buttons to charcoal — buttons should keep the brand lime #CCFF00 with black text in both modes
+- **Fix**: Restored `--site-btn-primary-bg`/`--site-btn-cta-bg` to `#CCFF00`, text to `#000000`, hover to `#B8E600`, added radius `9999px`. Updated `--site-text-on-primary` back to `#000000`.
+- **Files**: `globals.css`, `light-mode-vars.ts`
+- **Unchanged**: All other charcoal overrides (icons, text, links, borders, lime scale, gradients) remain
+
+---
+
 ## Fix: Light Mode Lime Contrast — 2026-03-01
 
 - **Bug**: ~200+ raw `text-lime`, `bg-lime`, `border-lime`, `ring-lime` Tailwind classes across 30+ public-facing files resolve to `--lime: #CCFF00` (neon green), which is near-invisible on white backgrounds (~1.2:1 contrast ratio)
