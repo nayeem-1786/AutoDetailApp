@@ -98,9 +98,7 @@ The full database schema is documented in `docs/dev/DB_SCHEMA.md`. This file con
 
 ## Current Phase
 
-Phase 12: iPad POS Optimization & POS Polish — header/nav reorganization, Stripe Terminal PWA fix, dark mode, auth resilience — **in progress**.
-
-Previous: Phase 9 (E-commerce/Online Store) and Phase 11 (Intelligence & Growth) complete. CMS/website complete.
+All core build phases complete. App is in active daily use with ongoing refinement and bug fixes.
 
 ## Build Phase Status
 
@@ -110,7 +108,12 @@ Previous: Phase 9 (E-commerce/Online Store) and Phase 11 (Intelligence & Growth)
 | 9 | Native Online Store (cart, checkout, orders, shipping, CMS) | Done |
 | 10 | Recurring Services | Postponed indefinitely |
 | 11 | Intelligence & Growth (campaigns, lifecycle, loyalty, coupons, AI responder) | Done |
-| 12 | iPad POS Optimization & POS Polish | In progress |
+| 12 | iPad POS Optimization & POS Polish (dark mode, Stripe Terminal, auth) | Done |
+| — | Bug fix marathon (45+ booking/POS/admin bugs across Sessions 0–8) | Done |
+| — | Customer Portal Redesign (6 sub-phases: profile, transactions, loyalty, vehicles, appointments, dashboard) | Done |
+| — | CMS Overhaul (Phases A–E: page builder, navigation, footer, hero, tickers, city SEO, theme system, preview, revisions, global blocks) | Done |
+| — | QuickBooks Integration (OAuth, sync engines, auto-sync cron) | Done |
+| — | Hardcoded Audit & Admin Settings Expansion (147-item audit, JSON-LD, business profile, homepage settings, deposit/validity config) | Done |
 | 13 | Full QA — section-by-section testing checklist across every module/tab | Not started |
 | 14 | User Manual — complete how-to document (see `docs/manual/README.md`) | Not started |
 | 15 | Store Setup & Hardware — scanners, receipt printer, copier, water system, email/SMS final checks | Not started |
@@ -118,43 +121,38 @@ Previous: Phase 9 (E-commerce/Online Store) and Phase 11 (Intelligence & Growth)
 
 **Phase 16 details:** Delete ALL test data from Square, test jobs, test accounts — everything from Jan 1, 2026 to launch date. Then reimport real Square transactions from 01/01/2026 to launch date. Confirm that deleting test product purchases restores inventory levels back to correct counts before reimporting.
 
-## Phase 12: iPad POS Optimization — Details
+## Recent Completions (Late February 2026)
 
-### Completed (Sessions D–D9)
+**Hardcoded Audit & Fixes:**
+- 147-item audit across 12 categories (report: `docs/planning/HARDCODED_AUDIT.md`)
+- Bug fixes: Place ID, loyalty constants, AI city reference, OG image, POS header — all dynamic
+- JSON-LD geo data (lat/lng, area, radius, price range) → `business_settings` with admin UI
+- `SITE_URL` → env var; `SITE_DESCRIPTION` → `business_settings`
+- Business Profile admin: "SEO & Location" card (6 fields), "Booking & Quotes" card (deposit + validity)
 
-**Layout & Navigation (D, D1, D2, D4, D7)**
-- Header reduced from 16 → 8 elements: [Scanner] [CC Reader●] ... company name ... [⚡offline] [Role] | Staff | [→🚪]
-- Bottom nav reduced from 6 → 5 tabs (Sale renamed to Register)
-- More menu: 7 items with theme segmented control (Light/Dark/System) above Cash Drawer
-- All pill backgrounds removed from header; status icons at h-4 w-4
-- Role pill removed from header — only in ticket panel + More menu
-- Staff name moved to ticket panel header opposite "TICKET"
-- Held tickets (PauseCircle) button moved to ticket panel header
-- Logout moved from More menu to header (icon button)
-- Company text: "Smart Details Auto Spa - POS"
+**Homepage Settings Expansion:**
+- Hero tagline, CTA defaults, services descriptions → all admin-editable
+- Homepage admin: 5 sections (Hero, CTA Defaults, Section Content, Differentiators, Google Reviews)
 
-**Stripe Terminal PWA Fix (D2 — CRITICAL)**
-- Root cause: pfSense DNS Rebind Protection blocks Stripe Terminal local reader DNS
-- Stripe SDK resolves `192-168-X-X.[random].device.stripe-terminal-local-reader.net` → local IP
-- Desktop browsers use DNS-over-HTTPS (bypasses pfSense); iPad Safari PWA uses system DNS → blocked
-- Fix: pfSense > Services > DNS Resolver > Custom options: `server: private-domain: "stripe-terminal-local-reader.net"`
-- NOT a code bug — 4 sessions of code attempts before discovering network-level root cause
+**Quote Validity Sync:**
+- Single source of truth: `business_settings.quote_validity_days`
+- Synced across POS date picker, voice agent route, Twilio webhook, email template
+- New API: `GET /api/pos/settings/quote-defaults`
 
-**Auth & Security (D5, D6)**
-- Auth expiry: 3 defensive layers (posFetch 401 catch, global error listeners, login toast)
-- CRON resilience: BASE_URL changed to `http://localhost:${PORT || 3000}`, 30s timeout, single retry with 5s delay
+**Staff Management:**
+- Password reset: admin-set + send reset email + dedicated Security tab
+- Role dropdown: dynamic from `roles` table (supports custom roles from Role Management)
 
-**UX Polish (D2, D5, D7, D8, D9)**
-- Cash Drawer: green/red Vault icon + status text
-- Toast duration: 1.5s success, 3s error, max 3 visible
-- POS tabs light mode: bg-gray-200 container + white active pill
-- PIN entry lag: 200ms delay before auto-submit, touch-action: manipulation, transition-colors
-- CustomerLookup: inputMode="numeric" + pattern="[0-9]*" for native iOS number pad
-- Customer lookup results: dark mode fix — bg-white dark:bg-gray-900 on results container, professional badge dark variants
+**Booking:**
+- OTP verification infinite spinner fix (await onSuccess + clear loading state)
+- Configurable deposit amount from admin settings (was hardcoded $50)
 
-### Remaining
-- Additional dark mode audit as issues surface during real-world use
-- Any further POS polish from daily use feedback
+**Admin UI:**
+- Website sidebar: 4 collapsible groups (Content, Data, Layout, Appearance)
+- Global Blocks + Homepage sidebar entries added
+- City AI generate button in content editor
+- Footer copyright HTML rendering (sanitized dangerouslySetInnerHTML)
+- Add-on service URLs use addon's own category slug
 
 ## Integrations
 
