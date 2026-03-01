@@ -154,6 +154,11 @@ All core build phases complete. App is in active daily use with ongoing refineme
 - Footer copyright HTML rendering (sanitized dangerouslySetInnerHTML)
 - Add-on service URLs use addon's own category slug
 
+**Admin UI Polish:**
+- Website → Pages: "In Nav" toggle disabled when unpublished, auto-clears on unpublish
+- Global OG Image upload in Business Profile (custom social share image with auto-generated fallback)
+- Homepage Settings: removed dead Hero Settings card, moved CTA images to CTA Defaults card
+
 ## Integrations
 
 | Service | Purpose | Auth |

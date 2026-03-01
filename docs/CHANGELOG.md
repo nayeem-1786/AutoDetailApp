@@ -4,40 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Fix: Remove Dead Hero Settings Card from Homepage Admin — 2026-02-28
+## Fix: Homepage Settings Cleanup — 2026-02-28
 
-- **Problem**: Admin → Website → Homepage had a "Hero Settings" card with a Hero Tagline field. The real hero is managed at Admin → Website → Layout → Hero (hero_slides table), making this card dead UI.
-- **Fix**: Removed the entire Hero Settings card and `heroTagline` from the admin page state, interface, defaults, load, and save payload.
-- **Data layer preserved**: `heroTagline` remains in `HomepageSettings` interface, `getHomepageSettings()`, and the API route's `HOMEPAGE_KEYS` — the public `HeroSection` still reads it as a DB-only default. The existing DB value persists since the PUT endpoint only upserts keys present in the request body.
-- **Card order after removal**: CTA Defaults → Section Content → Differentiators → Google Reviews
-- **File**: `src/app/admin/website/homepage/page.tsx`
-
----
-
-## Fix: Move CTA Before/After Images to CTA Defaults Card — 2026-02-28
-
-- **Bug**: CTA Before/After image uploads were inside the Hero Settings card on Admin → Website → Homepage. They belong in the CTA Defaults card.
-- **Fix**: Moved the two `ImageUploadField` components from Hero Settings into CTA Defaults, positioned after the Button Text field.
-- **CTA Defaults field order**: Title → Description → Button Text → Before Image → After Image
-- **File**: `src/app/admin/website/homepage/page.tsx`
+- **Removed**: Hero Settings card from Admin → Website → Homepage (dead UI — real hero managed at Website → Layout → Hero via `hero_slides` table)
+- **Moved**: CTA Before/After image uploads from Hero card into CTA Defaults card, below Button Text
+- **Preserved**: `heroTagline` in data layer — `HeroSection` still uses the prop from DB, just no admin UI for editing it
+- **Final card order**: CTA Defaults → Section Content → Differentiators → Google Reviews
 
 ---
 
-## Fix: In Nav Requires Published + Global OG Image Upload — 2026-02-28
+## Fix: In Nav Requires Published + Global OG Image — 2026-02-28
 
-### In Nav / Published Toggle Dependency
-- **Bug**: Pages admin allowed "In Nav" toggle to be turned on for unpublished pages, creating broken nav links.
-- **Fix (frontend)**: "In Nav" toggle is now disabled (greyed out) with "Publish first" helper text when page is unpublished. Unpublishing a page auto-turns off "In Nav" in the optimistic update.
-- **Fix (API)**: `PATCH /api/admin/cms/pages/[id]` — when `is_published` is set to `false`, also sets `show_in_nav` to `false` and cleans up associated nav entries.
-- **Files**: `src/app/admin/website/pages/page.tsx`, `src/app/api/admin/cms/pages/[id]/route.ts`
-
-### Global OG Image Upload
-- **Feature**: Admin → Settings → Business Profile now has a "Social Share Image (OG Image)" card with upload/remove functionality using `ImageUploadField`.
-- **Storage**: `og_image_url` key in `business_settings` table, uploaded via `content-image` API to `og` folder.
-- **Data layer**: `SeoSettings.ogImageUrl` added to `getSeoSettings()` in `src/lib/data/business.ts`.
-- **OG image route**: `src/app/opengraph-image.tsx` checks for custom image URL first — if set, fetches and returns it directly. Falls back to auto-generated JSX image when no custom image is uploaded.
-- **Migration**: `20260228000007_og_image_setting.sql` — seeds empty `og_image_url` key.
-- **Files**: `src/app/admin/settings/business-profile/page.tsx`, `src/lib/data/business.ts`, `src/app/opengraph-image.tsx`
+- **Toggle dependency**: "In Nav" toggle on Website → Pages is now disabled when page is unpublished, with "Publish first" helper text. Unpublishing auto-turns off "In Nav" and removes linked `website_navigation` rows
+- **API enforcement**: `PATCH /api/admin/cms/pages/[id]` forces `show_in_nav = false` when `is_published` is set to `false`
+- **Global OG Image**: New "Social Share Image (OG Image)" upload card in Admin → Settings → Business Profile with description of what OG images are and how they work
+- **OG Image route**: `src/app/opengraph-image.tsx` checks for custom uploaded image first, falls back to auto-generated branded image
+- **Migration**: `og_image_url` key added to `business_settings`
+- **Data layer**: `SeoSettings.ogImageUrl` added to `getSeoSettings()`
 
 ---
 
