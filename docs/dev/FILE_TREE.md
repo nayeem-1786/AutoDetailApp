@@ -1196,6 +1196,8 @@ docs/dev/SERVICE_CATALOG.md
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md
+docs/manual/03-job-management.md
+docs/manual/05-customers.md
 docs/manual/website/README.md
 docs/planning/CMS_OVERHAUL_PROJECT_PLAN.md
 docs/planning/COUPONS.md

@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: User Manual — Job Management, Customers (Phase 14 session 2) — 2026-03-02
+
+Two new chapters for the user manual:
+
+- **03-job-management.md**: Full job lifecycle (scheduled → intake → in_progress → completed → closed), terminal statuses, admin jobs list (columns, filters, sorting, pagination), job detail page (overview + photos tabs), POS job management (today's view, walk-in creation, workflow actions), photo documentation (15 zones across exterior/interior, 3 phases, before/after pairing, featured photos), add-on authorization flow (proposal → SMS/email → customer approve/decline → expiration), customer photo gallery (token-based), vehicle categories & pricing tiers, jobs ↔ appointments relationship, permissions reference
+- **05-customers.md**: Customer overview & fields, customer list (8 stats cards, 8 table columns, search/sort/4 filters, bulk tag actions), create customer form (3 cards, real-time duplicate checking, auto-consent toggles), customer detail page (6 tabs: Info, Vehicles, Loyalty, History, Quotes, Service History), vehicle management (5 categories, specialty tiers, CRUD), duplicate detection & merging (scoring algorithm, side-by-side comparison, merge all), customer portal (dashboard, 8 sub-pages, OTP/email auth), customer types (enthusiast/professional), tags (free-form, AND filtering, bulk operations), marketing consent (auto-toggle, compliance logging), permissions reference
+
+---
+
 ## docs: User Manual — README, Getting Started, Dashboard (Phase 14 session 1) — 2026-03-01
 
 Phase 14 kickoff — user manual for three audiences (owner, staff, developers):
