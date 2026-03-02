@@ -4,6 +4,53 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: User Manual — README, Getting Started, Dashboard (Phase 14 session 1) — 2026-03-01
+
+Phase 14 kickoff — user manual for three audiences (owner, staff, developers):
+
+- **README.md**: Complete table of contents linking to all 12 planned chapters
+- **01-getting-started.md**: System access points (admin/POS/portal/public), auth flows (email+password, PIN, phone OTP), full role & permission reference (4 roles, 70+ permission keys across 10 categories), default permission matrix, permission resolution order, first-time setup checklist (10 steps: business profile, staff, catalog, features, payments, SMS, email, tax, POS)
+- **02-dashboard.md**: All dashboard sections documented — alert banners (pending appointments, stock alerts), appointment stats row, quotes & customers row, online orders widget, week-at-a-glance grid, today's schedule, quick actions, data freshness behavior
+
+---
+
+## feat: Photo Gallery Audit & Unification — 2026-03-01
+
+Complete overhaul of the POS → Admin → Public gallery pipeline:
+
+### Database
+- Dropped orphaned `photos` table and `photo_type` enum (replaced by `job_photos`)
+- Added `tags TEXT[]` column with GIN index to `job_photos` for manual tag categorization
+
+### Public Gallery (`/gallery`)
+- **Zone-level pairing**: Gallery now shows one before/after pair per `(job_id, zone)` instead of one per job — dramatically increases content from existing photos
+- **Tag-based filtering**: Dropdown + pills hybrid UX — zone group pills (Interior/Exterior), service dropdown (~30 services), active filter shown as removable chip
+- **Infinite scroll**: IntersectionObserver-based loading, page 1 server-rendered for SEO, subsequent pages loaded via `/api/gallery`
+- **URL state**: Filter changes update URL with `replaceState` for shareable filtered views (`/gallery?tag=Ceramic+Coating`)
+- **Loading skeletons** during page fetches
+- **SEO**: `<link rel="canonical" href="/gallery">`, updated `generateMetadata()` for active filter, accurate `numberOfItems` in JSON-LD
+
+### Admin Photos (`/admin/photos`)
+- **Tag management**: Tag pills with autocomplete input in detail modal sidebar, add/remove individual tags
+- **Featured star pair-gating**: Feature button disabled on photos without a matching before/after pair for same `(job_id, zone)`. Tooltip explains why. Progress photos cannot be featured.
+- **Paired featuring**: Starring a photo features BOTH sides of the pair (intake + completion). Unstarring removes both.
+- **Bulk tag operations**: "Add Tag" / "Remove Tag" buttons in floating bulk action bar with autocomplete popover
+- **Tag filter**: New dropdown in filter bar populated from `/api/admin/photos/tags`
+- **Gallery Preview**: "Preview Gallery" button shows featured photos as zone-level before/after pairs using `BeforeAfterSlider`, with pair count
+- **Pair status indicator**: "Before/After Pair" field in detail modal shows green "Complete" or gray "Missing"
+- **Skipped count on bulk feature**: Bulk feature shows count of skipped photos missing pairs
+- **Numbered pagination**: Clickable page numbers with ellipsis, direct page input ("Go to" field), prev/next arrows (replaces simple prev/next buttons)
+
+### API Changes
+- `GET /api/gallery` — Zone-level pairing, `tag` filter param, `filter_options` in response
+- `GET /api/admin/photos` — Added `tags`, `has_pair`, `tag` filter param
+- `PATCH /api/admin/photos/[id]` — Accepts `tags: string[]`, pair-complete validation on featuring
+- `PATCH /api/admin/photos/bulk` — Accepts `add_tags`/`remove_tags`, pair-complete validation on featuring with skip count
+- `GET /api/admin/photos/tags` — New endpoint returning all unique tags for autocomplete
+- `GET /api/admin/photos/gallery-preview` — Admin gallery preview (bypasses `PHOTO_GALLERY` feature flag)
+
+---
+
 ## Refactor: Semantic Token Refactor (`accent-brand` + `accent-ui`) — 2026-03-01
 
 - **Problem**: Every `lime` reference in 50+ public-facing files was a raw color name with no semantic intent. Light mode required `--lime` to be globally overridden to gray (#545454), which broke headlines/buttons and needed `!important` bandaids. No way to distinguish "should stay brand green in light mode" from "should become gray."

@@ -1,63 +1,28 @@
 # Smart Details Auto Spa — User Manual
 
-> **Status: Skeleton only.** This manual will be fully written after Phase 9 (E-commerce)
-> is complete and a comprehensive system audit is performed. Sections will include
-> step-by-step instructions, field explanations, screenshots, and common scenarios.
+Complete operational guide for the Smart Details Auto Spa management platform.
+
+## Audiences
+
+- **Owners & Admins** — Full system control, settings, integrations
+- **Staff & Managers** — Day-to-day operations, POS, jobs, customers
+- **Developers** — Architecture, deployment, environment setup
 
 ## Table of Contents
 
-### Getting Started
-- [ ] Logging in and user roles
-- [ ] First-time business setup
-- [ ] Dashboard overview (what each metric means, where data comes from)
-
-### Job Management
-- [ ] Creating and scheduling jobs
-- [ ] Job lifecycle (booked > in-progress > completed)
-- [ ] Intake photos and documentation
-- [ ] Customer portal view
-
-### Point of Sale (POS)
-- [ ] Daily workflow
-- [ ] iPad POS usage
-- [ ] Processing payments (Square)
-
-### Website Management (CMS)
-- [ ] Pages and content editing
-- [ ] HTML editor toolbar (images, videos, tables, buttons, etc.)
-- [ ] Hero section and carousel
-- [ ] Footer configuration (columns, brand, service areas)
-- [ ] Announcement tickers
-- [ ] Navigation menus
-- [ ] Themes, styling, and seasonal presets
-- [ ] SEO settings
-- [ ] See also: [Website System Guide](website/README.md)
-
-### Online Store (E-commerce)
-- [ ] Product management
-- [ ] Order processing and fulfillment
-- [ ] Shipping configuration (Shippo)
-- [ ] Coupons and discounts
-
-### Marketing
-- [ ] Creating a marketing campaign
-- [ ] Lifecycle engine (automated follow-ups)
-- [ ] SMS and email templates
-- [ ] TCPA compliance
-
-### Accounting & Integrations
-- [ ] QuickBooks sync setup and usage
-- [ ] Square integration
-- [ ] Invoicing
-
-### Settings & Configuration
-- [ ] Business information
-- [ ] Service catalog management
-- [ ] Feature toggles (enabling/disabling site sections)
-- [ ] User management and permissions
+1. [Getting Started](./01-getting-started.md) — Login, roles, first-time setup
+2. [Dashboard](./02-dashboard.md) — Metrics, charts, data sources
+3. [Job Management](./03-job-management.md) — Create, schedule, track jobs
+4. [Point of Sale (POS)](./04-pos.md) — iPad workflow, payments, receipts
+5. [Customers](./05-customers.md) — Profiles, vehicles, duplicates, portal
+6. [Services & Pricing](./06-services-pricing.md) — Catalog, tiers, combos, add-ons
+7. [Website & CMS](./07-cms-website.md) — Pages, hero, footer, tickers, themes, SEO
+8. [Online Store](./08-online-store.md) — Products, orders, shipping, coupons
+9. [Marketing](./09-marketing.md) — Campaigns, lifecycle, SMS/email, compliance
+10. [Accounting & Integrations](./10-accounting.md) — QuickBooks, invoicing, reports
+11. [Settings & Configuration](./11-settings.md) — Business info, toggles, staff, permissions
+12. [Developer Guide](./12-developer-guide.md) — Architecture, env vars, cron, deployment
 
 ---
 
-*Documentation plan: After Phase 9 completion > full system audit >
-document each section with current UI/UX > add screenshots >
-write scenario walkthroughs (e.g., "How to create a coupon from start to finish").*
+*Last updated: 2026-03-01*

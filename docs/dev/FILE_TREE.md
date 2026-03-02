@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-02-28 (Phase E.7 — Theme system overhaul)
+> **Last updated:** 2026-03-01 (Photo Gallery Audit & Unification)
 
 ---
 
@@ -48,6 +48,8 @@ src/app/api/admin/orders/route.ts
 src/app/api/admin/photos/[id]/route.ts
 src/app/api/admin/photos/bulk/route.ts
 src/app/api/admin/photos/route.ts
+src/app/api/admin/photos/tags/route.ts
+src/app/api/admin/photos/gallery-preview/route.ts
 src/app/api/admin/purchase-orders/[id]/receive/route.ts
 src/app/api/admin/purchase-orders/[id]/route.ts
 src/app/api/admin/purchase-orders/route.ts
@@ -1192,6 +1194,8 @@ docs/dev/TROUBLESHOOTING.md
 docs/dev/QBO_INTEGRATION.md
 docs/dev/SERVICE_CATALOG.md
 docs/manual/README.md
+docs/manual/01-getting-started.md
+docs/manual/02-dashboard.md
 docs/manual/website/README.md
 docs/planning/CMS_OVERHAUL_PROJECT_PLAN.md
 docs/planning/COUPONS.md
