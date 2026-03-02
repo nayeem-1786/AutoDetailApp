@@ -74,14 +74,15 @@ function SingleTickerMarquee({ ticker, gap }: { ticker: AnnouncementTicker; gap:
   const speedValue = getSpeedValue(ticker);
   const ref = useRef<HTMLSpanElement>(null);
   const [duration, setDuration] = useState(20);
+  const [measured, setMeasured] = useState(false);
 
   const measure = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     const pxPerSec = speedToPxPerSec(speedValue);
-    // Total travel: 100vw (start off-screen right) + 100% element width (exit off-screen left)
     const totalDistance = window.innerWidth + el.scrollWidth;
     setDuration(Math.max(3, totalDistance / pxPerSec));
+    setMeasured(true);
   }, [speedValue]);
 
   useEffect(() => {
@@ -97,7 +98,11 @@ function SingleTickerMarquee({ ticker, gap }: { ticker: AnnouncementTicker; gap:
       <span
         ref={ref}
         className="inline-block animate-marquee"
-        style={{ animationDuration: `${duration.toFixed(1)}s`, willChange: 'transform' }}
+        style={{
+          animationDuration: `${duration.toFixed(1)}s`,
+          willChange: 'transform',
+          visibility: measured ? 'visible' : 'hidden',
+        }}
       >
         {Array.from({ length: REPEAT_COUNT }, (_, i) => (
           <MessageUnit key={`a-${i}`} ticker={ticker} gap={gap} />

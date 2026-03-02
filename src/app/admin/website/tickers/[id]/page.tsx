@@ -87,10 +87,9 @@ export default function TickerEditorPage() {
     function measure() {
       const el = previewRef.current;
       if (!el) return;
-      const totalWidth = el.scrollWidth;
-      const halfWidth = totalWidth / 2;
       const pxPerSec = speedToPxPerSec(speedValue);
-      const dur = Math.max(3, halfWidth / pxPerSec);
+      const totalDistance = window.innerWidth + el.scrollWidth;
+      const dur = Math.max(3, totalDistance / pxPerSec);
       setPreviewDuration(dur);
     }
     measure();

@@ -553,7 +553,7 @@ function GapSlider({
           <input
             type="range"
             min={1}
-            max={20}
+            max={100}
             step={0.5}
             value={gap}
             onChange={(e) => onChange(Number(e.target.value))}
@@ -565,7 +565,7 @@ function GapSlider({
           </span>
         </div>
         <p className="mt-1 text-xs text-gray-400">
-          Space between repeated messages in scroll mode (1–20 rem).
+          Space between repeated messages in scroll mode (1–100 rem).
         </p>
       </div>
     </div>

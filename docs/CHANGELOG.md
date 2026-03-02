@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Ticker Preview Speed Mismatch + Flash on Load — 2026-03-01
+
+- **Bug 1**: Edit page preview used `halfWidth / pxPerSec` while public site uses `(viewport + scrollWidth) / pxPerSec` — preview ran much faster than actual site
+- **Fix 1**: Aligned edit page `measure()` to use `window.innerWidth + el.scrollWidth` matching the public component formula
+- **Bug 2**: Public marquee started with arbitrary 20s default duration, then recalculated on next frame — visible flash of wrong-speed scrolling
+- **Fix 2**: Added `measured` state flag; marquee uses `visibility: hidden` until first measurement completes (one frame), then appears at correct speed
+- **Files**: `src/app/admin/website/tickers/[id]/page.tsx`, `src/components/public/cms/announcement-ticker.tsx`
+
+---
+
 ## Fix: Show Ticker Gap Slider for Single Ticker — 2026-03-01
 
 - **Bug**: Message gap slider was inside `OptionsCard` (gated to 2+ active tickers), but the gap controls spacing between repeated copies of a single message in marquee mode — relevant with just 1 ticker
