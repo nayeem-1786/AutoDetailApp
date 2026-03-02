@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: OTP Verification Infinite Spinner (All Auth Flows) — 2026-03-01
+
+- **Bug**: Multiple auth functions in `inline-auth.tsx` had missing `setLoading(false)` on certain code paths and no top-level try/catch — any uncaught error or edge case left the spinner running forever
+- **Affected flows**: Sign-in OTP verify, sign-in email, sign-up OTP verify, sign-up profile completion, sign-up full registration
+- **Root cause 1**: `verifyOtp` (sign-in) — no try/catch wrapping the entire function; if any await threw, `setLoading(false)` was never reached
+- **Root cause 2**: `verifyOtp` (sign-in) — `onSwitchToSignUp()` path returned without `setLoading(false)`
+- **Root cause 3**: `onSuccess()` calls were not awaited in sign-up flow, and `setLoading(false)` was never called after them
+- **Fix**: Wrapped all 5 auth handler functions in try/catch/finally, with `setLoading(false)` always in the `finally` block. Removed scattered `setLoading(false)` calls from individual early-return paths.
+- **File**: `src/components/booking/inline-auth.tsx`
+
+---
+
 ## Refactor: Move Message Gap to Per-Ticker Column — 2026-03-01
 
 - **Change**: Moved `message_gap` from global `TickerPlacementOptions` (per-placement JSONB in `business_settings`) to a per-ticker column on `announcement_tickers` table

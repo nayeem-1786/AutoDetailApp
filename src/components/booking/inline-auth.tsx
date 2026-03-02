@@ -209,56 +209,54 @@ function SignInFlow({
       return;
     }
 
-    const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      phone: e164,
-      token: data.code,
-      type: 'sms',
-    });
+    try {
+      const supabase = createClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        phone: e164,
+        token: data.code,
+        type: 'sms',
+      });
 
-    if (verifyError) {
-      if (verifyError.message.includes('expired')) {
-        setError('Your verification code has expired. Please request a new one.');
-      } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
-        setError('That code didn\u2019t work. Please check and try again, or request a new code.');
-      } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong verifying your code. Please try again.');
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Staff guard
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const { data: emp } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (emp) {
-        await supabase.auth.signOut();
-        setError('This phone number is linked to a staff account. Please use a different number.');
-        setLoading(false);
+      if (verifyError) {
+        if (verifyError.message.includes('expired')) {
+          setError('Your verification code has expired. Please request a new one.');
+        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
+          setError('That code didn\u2019t work. Please check and try again, or request a new code.');
+        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setError('Something went wrong verifying your code. Please try again.');
+        }
         return;
       }
 
-      // Check for customer record
-      const { data: cust } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
+      // Staff guard
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (!cust) {
-        // Try to link via API
-        try {
+      if (user) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (emp) {
+          await supabase.auth.signOut();
+          setError('This phone number is linked to a staff account. Please use a different number.');
+          return;
+        }
+
+        // Check for customer record
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (!cust) {
+          // Try to link via API
           const linkRes = await fetch('/api/customer/link-by-phone', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -269,14 +267,12 @@ function SignInFlow({
 
           if (linkData.success) {
             await onSuccess();
-            setLoading(false);
             return;
           }
 
           if (linkData.error === 'This phone number is already linked to another account') {
             await supabase.auth.signOut();
             setError('This phone number is already linked to another account.');
-            setLoading(false);
             return;
           }
 
@@ -287,18 +283,17 @@ function SignInFlow({
           }
 
           setError('Something went wrong linking your account. Please try again.');
-          setLoading(false);
-          return;
-        } catch {
-          setError('Something went wrong linking your account. Please try again.');
-          setLoading(false);
           return;
         }
       }
-    }
 
-    await onSuccess();
-    setLoading(false);
+      await onSuccess();
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      setError('Something went wrong verifying your code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }, [onSuccess, onSwitchToSignUp]);
 
   const resendOtp = async () => {
@@ -327,82 +322,85 @@ function SignInFlow({
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
-    if (authError) {
-      if (authError.message.includes('Invalid login') || authError.message.includes('invalid')) {
-        setError(
-          <>
-            Incorrect email or password. Please try again, or{' '}
-            <button
-              type="button"
-              onClick={onSwitchToSignUp}
-              className="font-medium text-lime hover:text-lime-400 underline"
-            >
-              create a new account
-            </button>
-            .
-          </>
-        );
-      } else if (authError.message.includes('rate') || authError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong signing you in. Please try again.');
+      if (authError) {
+        if (authError.message.includes('Invalid login') || authError.message.includes('invalid')) {
+          setError(
+            <>
+              Incorrect email or password. Please try again, or{' '}
+              <button
+                type="button"
+                onClick={onSwitchToSignUp}
+                className="font-medium text-lime hover:text-lime-400 underline"
+              >
+                create a new account
+              </button>
+              .
+            </>
+          );
+        } else if (authError.message.includes('rate') || authError.message.includes('too many')) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setError('Something went wrong signing you in. Please try again.');
+        }
+        return;
       }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (emp) {
+          await supabase.auth.signOut();
+          setError('This email is linked to a staff account. Please use a different email.');
+          return;
+        }
+
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (!cust) {
+          await supabase.auth.signOut();
+          setError(
+            <>
+              We couldn&apos;t find a customer account with that email.{' '}
+              <button
+                type="button"
+                onClick={onSwitchToSignUp}
+                className="font-medium text-lime hover:text-lime-400 underline"
+              >
+                Create a new account
+              </button>{' '}
+              to get started.
+            </>
+          );
+          return;
+        }
+      }
+
+      await onSuccess();
+    } catch (err) {
+      console.error('Email sign-in error:', err);
+      setError('Something went wrong signing you in. Please try again.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const { data: emp } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (emp) {
-        await supabase.auth.signOut();
-        setError('This email is linked to a staff account. Please use a different email.');
-        setLoading(false);
-        return;
-      }
-
-      const { data: cust } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (!cust) {
-        await supabase.auth.signOut();
-        setError(
-          <>
-            We couldn&apos;t find a customer account with that email.{' '}
-            <button
-              type="button"
-              onClick={onSwitchToSignUp}
-              className="font-medium text-lime hover:text-lime-400 underline"
-            >
-              Create a new account
-            </button>{' '}
-            to get started.
-          </>
-        );
-        setLoading(false);
-        return;
-      }
-    }
-
-    await onSuccess();
-    setLoading(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -845,50 +843,48 @@ function SignUpFlow({
       return;
     }
 
-    const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      phone: e164,
-      token: data.code,
-      type: 'sms',
-    });
+    try {
+      const supabase = createClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        phone: e164,
+        token: data.code,
+        type: 'sms',
+      });
 
-    if (verifyError) {
-      if (verifyError.message.includes('expired')) {
-        setError('Your verification code has expired. Please request a new one.');
-      } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
-        setError('That code didn\u2019t work. Please check and try again, or request a new code.');
-      } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong verifying your code. Please try again.');
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Sign-in-instead path: do sign-in-style verification then call success
-    if (phoneExists) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: emp } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single();
-        if (emp) {
-          await supabase.auth.signOut();
-          setError('This phone number is linked to a staff account. Please use a different number.');
-          setLoading(false);
-          return;
+      if (verifyError) {
+        if (verifyError.message.includes('expired')) {
+          setError('Your verification code has expired. Please request a new one.');
+        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
+          setError('That code didn\u2019t work. Please check and try again, or request a new code.');
+        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setError('Something went wrong verifying your code. Please try again.');
         }
+        return;
+      }
 
-        const { data: cust } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single();
-        if (!cust) {
-          try {
+      // Sign-in-instead path: do sign-in-style verification then call success
+      if (phoneExists) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: emp } = await supabase
+            .from('employees')
+            .select('id')
+            .eq('auth_user_id', user.id)
+            .single();
+          if (emp) {
+            await supabase.auth.signOut();
+            setError('This phone number is linked to a staff account. Please use a different number.');
+            return;
+          }
+
+          const { data: cust } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('auth_user_id', user.id)
+            .single();
+          if (!cust) {
             const linkRes = await fetch('/api/customer/link-by-phone', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -896,13 +892,12 @@ function SignUpFlow({
             });
             const linkData = await linkRes.json();
             if (linkData.success) {
-              onSuccess();
+              await onSuccess();
               return;
             }
             if (linkData.error === 'This phone number is already linked to another account') {
               await supabase.auth.signOut();
               setError('This phone number is already linked to another account.');
-              setLoading(false);
               return;
             }
             if (!linkData.found) {
@@ -910,21 +905,20 @@ function SignUpFlow({
               return;
             }
             setError('Something went wrong linking your account. Please try again.');
-            setLoading(false);
-            return;
-          } catch {
-            setError('Something went wrong linking your account. Please try again.');
-            setLoading(false);
             return;
           }
         }
+        await onSuccess();
+        return;
       }
-      onSuccess();
-      return;
-    }
 
-    setMode('otp-profile');
-    setLoading(false);
+      setMode('otp-profile');
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      setError('Something went wrong verifying your code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resendOtp = async () => {
@@ -956,32 +950,38 @@ function SignUpFlow({
     setError(null);
     setHint(null);
 
-    const linkRes = await fetch('/api/customer/link-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        first_name: data.first_name,
-        last_name: data.last_name,
-        email: data.email,
-        phone: otpPhone,
-      }),
-    });
+    try {
+      const linkRes = await fetch('/api/customer/link-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: data.first_name,
+          last_name: data.last_name,
+          email: data.email,
+          phone: otpPhone,
+        }),
+      });
 
-    const linkData = await linkRes.json();
+      const linkData = await linkRes.json();
 
-    if (!linkRes.ok) {
-      if (linkRes.status === 401) {
-        setError('Your session has expired. Please try again.');
-      } else if (linkData.error?.includes('staff account')) {
-        setError('This email is used for a staff account. Please use a different email.');
-      } else {
-        setError('Something went wrong creating your account. Please try again.');
+      if (!linkRes.ok) {
+        if (linkRes.status === 401) {
+          setError('Your session has expired. Please try again.');
+        } else if (linkData.error?.includes('staff account')) {
+          setError('This email is used for a staff account. Please use a different email.');
+        } else {
+          setError('Something went wrong creating your account. Please try again.');
+        }
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    onSuccess();
+      await onSuccess();
+    } catch (err) {
+      console.error('Profile completion error:', err);
+      setError('Something went wrong creating your account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Full registration (email/password)
@@ -990,49 +990,14 @@ function SignUpFlow({
     setError(null);
     setHint(null);
 
-    // Pre-check email
-    const emailCheck = await checkExists({ email: data.email });
-    if (emailCheck.exists) {
-      if (emailCheck.hasAuthAccount) {
-        setError(
-          <>
-            This email is already linked to an account.{' '}
-            <button
-              type="button"
-              onClick={() => onSwitchToSignIn(data.phone)}
-              className="font-medium text-lime hover:text-lime-400 underline"
-            >
-              Sign in instead &rarr;
-            </button>
-          </>
-        );
-      } else {
-        setHint(
-          <>
-            Welcome back! We already have your info on file.{' '}
-            <button
-              type="button"
-              onClick={() => onSwitchToSignIn(data.phone)}
-              className="font-medium text-lime hover:text-lime-400 underline"
-            >
-              Sign in here
-            </button>{' '}
-            to access your account.
-          </>
-        );
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Pre-check phone
-    if (data.phone) {
-      const phoneCheck = await checkExists({ phone: data.phone });
-      if (phoneCheck.exists) {
-        if (phoneCheck.hasAuthAccount) {
+    try {
+      // Pre-check email
+      const emailCheck = await checkExists({ email: data.email });
+      if (emailCheck.exists) {
+        if (emailCheck.hasAuthAccount) {
           setError(
             <>
-              This phone number is already linked to an account.{' '}
+              This email is already linked to an account.{' '}
               <button
                 type="button"
                 onClick={() => onSwitchToSignIn(data.phone)}
@@ -1057,66 +1022,104 @@ function SignUpFlow({
             </>
           );
         }
-        setLoading(false);
         return;
       }
-    }
 
-    const supabase = createClient();
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-    });
-
-    if (signUpError) {
-      if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
-        setError(
-          <>
-            This email is already linked to an account.{' '}
-            <button
-              type="button"
-              onClick={() => onSwitchToSignIn(data.phone)}
-              className="font-medium text-lime hover:text-lime-400 underline"
-            >
-              Sign in instead &rarr;
-            </button>
-          </>
-        );
-      } else if (signUpError.message.includes('rate') || signUpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong creating your account. Please try again.');
+      // Pre-check phone
+      if (data.phone) {
+        const phoneCheck = await checkExists({ phone: data.phone });
+        if (phoneCheck.exists) {
+          if (phoneCheck.hasAuthAccount) {
+            setError(
+              <>
+                This phone number is already linked to an account.{' '}
+                <button
+                  type="button"
+                  onClick={() => onSwitchToSignIn(data.phone)}
+                  className="font-medium text-lime hover:text-lime-400 underline"
+                >
+                  Sign in instead &rarr;
+                </button>
+              </>
+            );
+          } else {
+            setHint(
+              <>
+                Welcome back! We already have your info on file.{' '}
+                <button
+                  type="button"
+                  onClick={() => onSwitchToSignIn(data.phone)}
+                  className="font-medium text-lime hover:text-lime-400 underline"
+                >
+                  Sign in here
+                </button>{' '}
+                to access your account.
+              </>
+            );
+          }
+          return;
+        }
       }
-      setLoading(false);
-      return;
-    }
 
-    const linkRes = await fetch('/api/customer/link-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        first_name: data.first_name,
-        last_name: data.last_name,
+      const supabase = createClient();
+      const { error: signUpError } = await supabase.auth.signUp({
         email: data.email,
-        phone: data.phone,
-      }),
-    });
+        password: data.password,
+      });
 
-    const linkData = await linkRes.json();
-
-    if (!linkRes.ok) {
-      if (linkRes.status === 401) {
-        setError('Your session has expired. Please try again.');
-      } else if (linkData.error?.includes('staff account')) {
-        setError('This email is used for a staff account. Please use a different email.');
-      } else {
-        setError('Something went wrong creating your account. Please try again.');
+      if (signUpError) {
+        if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
+          setError(
+            <>
+              This email is already linked to an account.{' '}
+              <button
+                type="button"
+                onClick={() => onSwitchToSignIn(data.phone)}
+                className="font-medium text-lime hover:text-lime-400 underline"
+              >
+                Sign in instead &rarr;
+              </button>
+            </>
+          );
+        } else if (signUpError.message.includes('rate') || signUpError.message.includes('too many')) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setError('Something went wrong creating your account. Please try again.');
+        }
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    onSuccess();
+      const linkRes = await fetch('/api/customer/link-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: data.first_name,
+          last_name: data.last_name,
+          email: data.email,
+          phone: data.phone,
+        }),
+      });
+
+      const linkData = await linkRes.json();
+
+      if (!linkRes.ok) {
+        if (linkRes.status === 401) {
+          setError('Your session has expired. Please try again.');
+        } else if (linkData.error?.includes('staff account')) {
+          setError('This email is used for a staff account. Please use a different email.');
+        } else {
+          setError('Something went wrong creating your account. Please try again.');
+        }
+        return;
+      }
+
+      await onSuccess();
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('Something went wrong creating your account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const { ref: signupOtpCodeRef, ...signupOtpCodeField } = otpVerifyForm.register('code');
