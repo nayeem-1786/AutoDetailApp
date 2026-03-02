@@ -105,6 +105,45 @@ export function ticketReducer(
 
     case 'ADD_SERVICE': {
       const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId } = action;
+
+      // Duplicate guard: check if this service (same serviceId, same parent context) already exists
+      const existing = state.items.find(
+        (i) =>
+          i.itemType === 'service' &&
+          i.serviceId === service.id &&
+          i.parentItemId === (parentItemId ?? null)
+      );
+
+      if (existing) {
+        const isExistingPerUnit = existing.perUnitQty != null && existing.perUnitPrice != null;
+
+        if (isExistingPerUnit) {
+          const max = existing.perUnitMax ?? service.per_unit_max ?? 10;
+          if (existing.perUnitQty! >= max) {
+            // At max — no-op
+            return state;
+          }
+          // Increment per-unit quantity inline
+          const newQty = existing.perUnitQty! + 1;
+          const unitPrice = existing.perUnitPrice! * newQty;
+          const items = state.items.map((item) =>
+            item.id === existing.id
+              ? {
+                  ...item,
+                  perUnitQty: newQty,
+                  unitPrice,
+                  totalPrice: unitPrice * item.quantity,
+                  taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
+                }
+              : item
+          );
+          return recalculateTotals({ ...state, items });
+        }
+
+        // Non-per-unit service already on ticket — no-op
+        return state;
+      }
+
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
       const unitPrice = isPerUnit
         ? service.per_unit_price! * perUnitQty

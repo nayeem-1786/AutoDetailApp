@@ -109,6 +109,29 @@ export function PosWorkspace() {
   }
 
   function handleTapService(service: CatalogService) {
+    // Duplicate check — non-per-unit services are one-per-ticket
+    const existingItem = ticket.items.find(
+      (i) => i.itemType === 'service' && i.serviceId === service.id && !i.parentItemId
+    );
+    if (existingItem) {
+      const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
+      if (isPerUnit) {
+        const max = existingItem.perUnitMax ?? service.per_unit_max ?? 10;
+        if (existingItem.perUnitQty! >= max) {
+          const label = service.per_unit_label || 'unit';
+          toast.warning(`${service.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+        } else {
+          dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: existingItem.perUnitQty! + 1 });
+          const label = service.per_unit_label || 'unit';
+          const newQty = existingItem.perUnitQty! + 1;
+          toast.success(`${service.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
+        }
+      } else {
+        toast.warning('Already on ticket');
+      }
+      return;
+    }
+
     // Per-unit services always need the quantity picker
     if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
       setPickerService(service);
@@ -174,6 +197,12 @@ export function PosWorkspace() {
   const vehicleSpecialtyTier = ticket.vehicle?.specialty_tier ?? null;
   const isGlobalSearch = search && tab === 'register';
 
+  // Track which services are already on the ticket for visual indicators
+  const addedServiceIds = useMemo(
+    () => new Set(ticket.items.filter((i) => i.itemType === 'service' && i.serviceId && !i.parentItemId).map((i) => i.serviceId!)),
+    [ticket.items]
+  );
+
   return (
     <div className="grid h-full min-h-0 grid-cols-[1fr_380px] grid-rows-[1fr]">
       {/* Left panel */}
@@ -231,6 +260,7 @@ export function PosWorkspace() {
                     services={filteredServices}
                     vehicleSizeClass={vehicleSizeClass}
                     onTapService={handleTapService}
+                    addedServiceIds={addedServiceIds}
                   />
                 </div>
               )}

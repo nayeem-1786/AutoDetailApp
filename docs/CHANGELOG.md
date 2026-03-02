@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Prevent duplicate services on POS tickets — 2026-03-02
+
+Staff could tap the same detail service multiple times in POS and it would add as separate line items, causing double/triple charges. The quote builder already had this guard but the POS ticket flow did not.
+
+**Two-layer fix:**
+
+- **Reducer safety net** (`ticket-reducer.ts`): `ADD_SERVICE` now checks for existing item with same `serviceId` and `parentItemId` before adding. Non-per-unit duplicates are silently rejected. Per-unit duplicates auto-increment quantity up to `per_unit_max`.
+- **Caller-side toasts**: Pre-dispatch duplicate checks with user feedback in `pos-workspace.tsx` (Register tab global search), `catalog-browser.tsx` (Services tab quick-add + pricing picker), and `service-detail-dialog.tsx` (detail dialog add button). Shows "Already on ticket" for non-per-unit, updated quantity toast for per-unit, "already at maximum" for per-unit at cap.
+- **Visual indicators**: Services already on ticket now show green highlight + checkmark badge in catalog grids. `addedServiceIds` computed from `ticket.items` and passed to `ServiceGrid` in global search results and auto-computed in `CatalogBrowser` when no external prop provided.
+
+Child addon services (with different `parentItemId`) can still be added even if the parent service exists. Products still increment quantity on repeat tap (unchanged). Quote builder unaffected (has its own guard).
+
+---
+
 ## fix: POS barcode scan false error + scanner icon indicator — 2026-03-02
 
 Two POS barcode scanning improvements:

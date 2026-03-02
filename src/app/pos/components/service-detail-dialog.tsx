@@ -97,6 +97,38 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   }
 
   function handleAdd() {
+    // Duplicate check for POS ticket path (not callback mode)
+    if (!onAdd && dispatch) {
+      const existingItem = ticket.items.find(
+        (i) => i.itemType === 'service' && i.serviceId === service.id && i.parentItemId === (parentItemId ?? null)
+      );
+      if (existingItem) {
+        const isExistingPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
+        if (isExistingPerUnit) {
+          const max = existingItem.perUnitMax ?? service.per_unit_max ?? 10;
+          if (isPerUnit && perUnitQty) {
+            // User chose a quantity in the dialog — set to that if within max
+            const targetQty = Math.min(perUnitQty, max);
+            if (existingItem.perUnitQty! >= max) {
+              const label = service.per_unit_label || 'unit';
+              toast.warning(`${service.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+            } else {
+              dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: targetQty });
+              const label = service.per_unit_label || 'unit';
+              toast.success(`${service.name} — ${targetQty} ${label}${targetQty > 1 ? 's' : ''}`);
+            }
+          } else {
+            const label = service.per_unit_label || 'unit';
+            toast.warning(`${service.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+          }
+        } else {
+          toast.warning('Already on ticket');
+        }
+        onClose();
+        return;
+      }
+    }
+
     if (isPerUnit) {
       const perUnitPrice = service.per_unit_price!;
       const total = perUnitQty * perUnitPrice;

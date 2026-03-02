@@ -49,6 +49,17 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   const [detailService, setDetailService] = useState<CatalogService | null>(null);
   const [compatWarning, setCompatWarning] = useState<{ service: CatalogService; mode: 'direct' | 'detail' } | null>(null);
 
+  // Auto-compute addedServiceIds from ticket when no external prop provided
+  const resolvedAddedServiceIds = useMemo(() => {
+    if (addedServiceIds) return addedServiceIds;
+    if (!dispatch) return undefined; // callback mode — caller controls it
+    return new Set(
+      ticket.items
+        .filter((i) => i.itemType === 'service' && i.serviceId && !i.parentItemId)
+        .map((i) => i.serviceId!)
+    );
+  }, [addedServiceIds, dispatch, ticket.items]);
+
   const items = type === 'products' ? products : services;
   const vehicleSizeClass = vehicleSizeOverride !== undefined
     ? vehicleSizeOverride
@@ -185,6 +196,28 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       if (onAddService) {
         onAddService(svc, p, vsc);
       } else if (dispatch) {
+        // Duplicate check for POS ticket path
+        const existingItem = ticket.items.find(
+          (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId
+        );
+        if (existingItem) {
+          const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
+          if (isPerUnit) {
+            const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
+            if (existingItem.perUnitQty! >= max) {
+              const label = svc.per_unit_label || 'unit';
+              toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+            } else {
+              dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: existingItem.perUnitQty! + 1 });
+              const label = svc.per_unit_label || 'unit';
+              const newQty = existingItem.perUnitQty! + 1;
+              toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
+            }
+          } else {
+            toast.warning('Already on ticket');
+          }
+          return;
+        }
         dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc });
       }
     }
@@ -255,6 +288,29 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     if (onAddService) {
       onAddService(pickerService, pricing, vsc, perUnitQty);
     } else if (dispatch) {
+      // Duplicate check for POS ticket path
+      const existingItem = ticket.items.find(
+        (i) => i.itemType === 'service' && i.serviceId === pickerService.id && !i.parentItemId
+      );
+      if (existingItem) {
+        const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
+        if (isPerUnit) {
+          const max = existingItem.perUnitMax ?? pickerService.per_unit_max ?? 10;
+          if (existingItem.perUnitQty! >= max) {
+            const label = pickerService.per_unit_label || 'unit';
+            toast.warning(`${pickerService.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+          } else {
+            const newQty = perUnitQty ?? (existingItem.perUnitQty! + 1);
+            dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: newQty });
+            const label = pickerService.per_unit_label || 'unit';
+            toast.success(`${pickerService.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
+          }
+        } else {
+          toast.warning('Already on ticket');
+        }
+        setPickerService(null);
+        return;
+      }
       dispatch({
         type: 'ADD_SERVICE',
         service: pickerService,
@@ -288,7 +344,31 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     const pricing = service.pricing ?? [];
     function quickAdd(svc: CatalogService, p: ServicePricing, vsc: VehicleSizeClass | null) {
       if (onAddService) { onAddService(svc, p, vsc); }
-      else if (dispatch) { dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc }); }
+      else if (dispatch) {
+        // Duplicate check for POS ticket path
+        const existingItem = ticket.items.find(
+          (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId
+        );
+        if (existingItem) {
+          const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
+          if (isPerUnit) {
+            const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
+            if (existingItem.perUnitQty! >= max) {
+              const label = svc.per_unit_label || 'unit';
+              toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+            } else {
+              dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: existingItem.perUnitQty! + 1 });
+              const label = svc.per_unit_label || 'unit';
+              const newQty = existingItem.perUnitQty! + 1;
+              toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
+            }
+          } else {
+            toast.warning('Already on ticket');
+          }
+          return;
+        }
+        dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc });
+      }
     }
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
       quickAdd(service, pricing[0], vehicleSizeClass);
@@ -400,7 +480,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
             services={searchResults as CatalogService[]}
             vehicleSizeClass={vehicleSizeClass}
             onTapService={handleTapServiceDirect}
-            addedServiceIds={addedServiceIds}
+            addedServiceIds={resolvedAddedServiceIds}
           />
         )}
         {dialogs}
@@ -433,7 +513,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
               services={categoryItems as CatalogService[]}
               vehicleSizeClass={vehicleSizeClass}
               onTapService={handleTapService}
-              addedServiceIds={addedServiceIds}
+              addedServiceIds={resolvedAddedServiceIds}
             />
           )}
         </div>
