@@ -4,6 +4,36 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: User Manual — Point of Sale (Phase 14 session 3) — 2026-03-02
+
+POS chapter — the most operationally critical chapter covering daily in-shop workflows:
+
+- **04-pos.md**: Complete POS manual (18 sections) covering:
+  - POS overview, PWA setup on iPad, PIN login
+  - Layout breakdown (header, catalog panel, ticket panel, bottom nav, More menu)
+  - Daily opening workflow (PIN login, card reader check, cash drawer open)
+  - Register tab (favorites grid, catalog browsing, search, barcode scanning)
+  - Adding services (pricing picker, vehicle-size auto-resolution, per-unit services, duplicate prevention, vehicle compatibility)
+  - Adding products, custom amounts via keypad, line item editing, swipe-to-delete
+  - Add-on suggestions (service-driven upsell chips, combo pricing)
+  - Coupon application and promotions tab (exclusive, available, upsell categories)
+  - Customer management (lookup, create with duplicate checking, type badges, guest checkout)
+  - Vehicle management (selection, creation for 5 categories, size class and specialty tier)
+  - Full checkout flow (cash, card via Stripe Terminal, check, split payment, tip screen)
+  - Receipt options (print, email, SMS, Star thermal printer)
+  - Held tickets (hold, view, resume with confirmation)
+  - Loyalty program (earn/redeem flow, point calculations)
+  - Jobs tab (queue, status progression, filtering, walk-in creation, photo capture by zone, annotation tools, flag issue 7-step wizard, job checkout)
+  - Quotes tab (list, builder, send via SMS/email, walk-in mode, convert to job)
+  - Transactions tab (search, date filtering, detail view, refund flow, void)
+  - End of day (register open/close, denomination counting, reconciliation, variance)
+  - Offline mode (IndexedDB queueing, auto-sync, limitations)
+  - Security (idle timeout, 12-hour JWT expiry, HMAC auth, IP whitelist)
+  - Stripe Terminal setup and troubleshooting
+  - Keyboard shortcuts reference
+
+---
+
 ## docs: User Manual — Job Management, Customers (Phase 14 session 2) — 2026-03-02
 
 Two new chapters for the user manual:
