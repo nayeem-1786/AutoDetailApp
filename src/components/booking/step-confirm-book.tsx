@@ -424,13 +424,13 @@ export function StepConfirmBook({
         </div>
       )}
       {appliedCoupon && appliedCoupon.discount > 0 && (
-        <div className="flex justify-between text-green-400">
+        <div className="flex justify-between text-success">
           <span>Coupon ({appliedCoupon.code})</span>
           <span className="font-medium">-{formatCurrency(appliedCoupon.discount)}</span>
         </div>
       )}
       {loyaltyPointsToUse > 0 && (
-        <div className="flex justify-between text-amber-400">
+        <div className="flex justify-between text-warning">
           <span>Loyalty Points ({loyaltyPointsToUse.toLocaleString()} pts)</span>
           <span className="font-medium">-{formatCurrency(loyaltyDiscount)}</span>
         </div>
@@ -485,7 +485,7 @@ export function StepConfirmBook({
           {isAuthenticated && (
             <>
               {/* Mobile Order Summary (collapsible) */}
-              <div className="lg:hidden rounded-lg border border-site-border overflow-hidden">
+              <div className="booking-summary-dark lg:hidden rounded-lg border border-site-border overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setSummaryExpanded(!summaryExpanded)}
@@ -524,7 +524,7 @@ export function StepConfirmBook({
                   <div className="flex items-center gap-2">
                     <Gift className="h-4 w-4 text-purple-500" />
                     {appliedCoupon ? (
-                      <span className="text-sm font-semibold text-green-400">
+                      <span className="text-sm font-semibold text-success">
                         Saving {formatCurrency(appliedCoupon.discount)} with {appliedCoupon.code}
                       </span>
                     ) : (
@@ -539,7 +539,7 @@ export function StepConfirmBook({
                       variant="ghost"
                       size="sm"
                       onClick={(e) => { e.stopPropagation(); handleRemoveCoupon(); }}
-                      className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                      className="text-success hover:text-success/80 hover:bg-success-surface"
                     >
                       Remove
                     </Button>
@@ -654,12 +654,12 @@ export function StepConfirmBook({
               {isPortal && loyaltyPointsBalance >= REDEEM_MINIMUM && (
                 <div className="rounded-lg border border-site-border p-4">
                   <div className="flex items-center gap-2">
-                    <Coins className="h-4 w-4 text-amber-500" />
+                    <Coins className="h-4 w-4 text-warning" />
                     <h3 className="text-sm font-semibold text-site-text-secondary">Use Your Loyalty Points</h3>
                   </div>
                   <p className="mt-1 text-xs text-site-text-muted">
-                    You have <span className="font-semibold text-amber-400">{loyaltyPointsBalance.toLocaleString()} points</span> worth{' '}
-                    <span className="font-semibold text-green-400">{formatCurrency(loyaltyPointsValue)}</span>.
+                    You have <span className="font-semibold text-warning">{loyaltyPointsBalance.toLocaleString()} points</span> worth{' '}
+                    <span className="font-semibold text-success">{formatCurrency(loyaltyPointsValue)}</span>.
                     {maxLoyaltyPointsUsable > 0 ? ' Apply them to reduce your total.' : ''}
                   </p>
 
@@ -676,7 +676,7 @@ export function StepConfirmBook({
                           step={REDEEM_MINIMUM}
                           value={loyaltyPointsToUse}
                           onChange={(e) => onLoyaltyPointsChange(Number(e.target.value))}
-                          className="flex-1 min-w-0 h-2 bg-brand-surface rounded-lg appearance-none cursor-pointer accent-amber-500"
+                          className="flex-1 min-w-0 h-2 bg-ui-border rounded-lg appearance-none cursor-pointer accent-warning"
                         />
                         <span className="text-xs font-semibold text-site-text whitespace-nowrap shrink-0">
                           {loyaltyPointsToUse.toLocaleString()} pts
@@ -684,14 +684,14 @@ export function StepConfirmBook({
                       </div>
 
                       {loyaltyPointsToUse > 0 && (
-                        <div className="mt-2 flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 p-2">
-                          <span className="text-sm text-amber-300">Points discount:</span>
-                          <span className="text-sm font-semibold text-amber-300">-{formatCurrency(loyaltyDiscount)}</span>
+                        <div className="mt-2 flex items-center justify-between rounded-lg bg-warning-surface border border-warning-border p-2">
+                          <span className="text-sm text-warning-muted">Points discount:</span>
+                          <span className="text-sm font-semibold text-warning-muted">-{formatCurrency(loyaltyDiscount)}</span>
                         </div>
                       )}
 
                       {maxLoyaltyPointsUsable < loyaltyPointsBalance && (
-                        <p className="mt-2 text-xs text-amber-400">
+                        <p className="mt-2 text-xs text-warning">
                           Only {maxLoyaltyPointsUsable.toLocaleString()} points needed to cover remaining balance.
                         </p>
                       )}
@@ -701,8 +701,8 @@ export function StepConfirmBook({
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-3 rounded-lg bg-green-500/10 border border-green-500/30 p-2">
-                      <p className="text-xs text-green-400">
+                    <div className="mt-3 rounded-lg bg-success-surface border border-success-border p-2">
+                      <p className="text-xs text-success">
                         Your coupon already covers the remaining balance — no points needed! Your points will be saved for a future visit.
                       </p>
                     </div>
@@ -712,10 +712,10 @@ export function StepConfirmBook({
 
               {/* Loyalty Points - message for users without enough points */}
               {isPortal && loyaltyPointsBalance > 0 && loyaltyPointsBalance < REDEEM_MINIMUM && (
-                <div className="rounded-lg border border-dashed border-amber-500/30 bg-amber-500/10 p-4">
+                <div className="rounded-lg border border-dashed border-warning-border bg-warning-surface p-4">
                   <div className="flex items-center gap-2">
-                    <Coins className="h-4 w-4 text-amber-500" />
-                    <p className="text-sm text-amber-400">
+                    <Coins className="h-4 w-4 text-warning" />
+                    <p className="text-sm text-warning">
                       You have <span className="font-semibold">{loyaltyPointsBalance} points</span>. Earn {REDEEM_MINIMUM - loyaltyPointsBalance} more to redeem for{' '}
                       {formatCurrency(REDEEM_MINIMUM * REDEEM_RATE)} off!
                     </p>
@@ -729,8 +729,8 @@ export function StepConfirmBook({
                   <h3 className="text-sm font-semibold text-site-text-secondary">Payment</h3>
 
                   {discountsCoverAmount ? (
-                    <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
-                      <p className="text-sm font-medium text-green-400">
+                    <div className="rounded-lg border border-success-border bg-success-surface p-3">
+                      <p className="text-sm font-medium text-success">
                         Remaining balance of {formatCurrency(grandTotal)} is below minimum — no payment required!
                       </p>
                     </div>
@@ -834,12 +834,12 @@ export function StepConfirmBook({
 
                   {/* Cancellation Disclaimer — only for Pay on Site */}
                   {paymentOption === 'pay_on_site' && (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                    <div className="rounded-lg border border-warning-border bg-warning-surface p-3">
                       <div className="flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-400 mt-0.5" />
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-warning mt-0.5" />
                         <div>
-                          <p className="text-xs font-medium text-amber-300">Cancellation & No-Show Policy</p>
-                          <p className="text-xs text-amber-400 mt-0.5">
+                          <p className="text-xs font-medium text-warning-muted">Cancellation & No-Show Policy</p>
+                          <p className="text-xs text-warning mt-0.5">
                             {cancellationFeeEnabled
                               ? <>Cancellations must be made at least 24 hours before your appointment. Late cancellations or no-shows will be charged a <span className="font-semibold">$50 fee</span>.</>
                               : 'Cancellations must be made at least 24 hours before your appointment.'}
@@ -866,8 +866,8 @@ export function StepConfirmBook({
 
               {/* Points cover full order — no payment needed */}
               {requirePayment && pointsCoverOrder && (
-                <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
-                  <p className="text-sm font-medium text-green-400">
+                <div className="rounded-lg border border-success-border bg-success-surface p-3">
+                  <p className="text-sm font-medium text-success">
                     Your loyalty points cover the full amount — no payment required!
                   </p>
                 </div>
@@ -891,7 +891,7 @@ export function StepConfirmBook({
                           href="/terms"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-accent-brand hover:text-accent-brand-hover underline"
+                          className="text-accent-ui hover:text-accent-ui/80 underline"
                           onClick={(e) => e.stopPropagation()}
                         >
                           Terms &amp; Conditions
@@ -946,7 +946,7 @@ export function StepConfirmBook({
 
         {/* Desktop right column: Order Summary (always expanded) */}
         <div className="hidden lg:block">
-          <div className="sticky top-8 rounded-lg border border-site-border bg-brand-surface p-5">
+          <div className="booking-summary-dark sticky top-8 rounded-lg border border-site-border bg-brand-surface p-5">
             <h3 className="text-sm font-semibold text-site-text-secondary mb-3">
               Order Summary
             </h3>
@@ -957,7 +957,7 @@ export function StepConfirmBook({
 
       {/* Mobile sticky footer */}
       {isAuthenticated && !showPaymentForm && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-site-border bg-brand-surface px-4 py-3">
+        <div className="booking-summary-dark lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-site-border bg-brand-surface px-4 py-3">
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
             <div>
               <p className="text-xs text-site-text-muted">Total</p>

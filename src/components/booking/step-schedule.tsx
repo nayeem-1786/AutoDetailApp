@@ -284,7 +284,7 @@ export function StepSchedule({
       {/* Desktop right column: Order Summary */}
       {orderSummary && (
         <div className="hidden lg:block">
-          <div className="sticky top-8 rounded-lg border border-site-border bg-brand-surface p-5">
+          <div className="booking-summary-dark sticky top-8 rounded-lg border border-site-border bg-brand-surface p-5">
             <h3 className="text-sm font-semibold text-site-text-secondary">
               Your Selection
             </h3>
@@ -327,7 +327,7 @@ export function StepSchedule({
 
       {/* Mobile sticky footer */}
       {orderSummary && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-site-border bg-brand-surface px-4 py-3">
+        <div className="booking-summary-dark lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-site-border bg-brand-surface px-4 py-3">
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
             <div>
               <p className="text-xs text-site-text-muted">Total</p>

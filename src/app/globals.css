@@ -239,6 +239,15 @@
   --ui-page-card-bg: var(--brand-surface);
   --ui-page-header-bg: var(--site-header-bg);
   --ui-page-footer-bg: var(--site-footer-bg);
+
+  /* Warning / success semantic tokens (amber/green) */
+  --warning: #fbbf24;
+  --warning-muted: #fcd34d;
+  --warning-surface: rgba(245, 158, 11, 0.1);
+  --warning-border: rgba(245, 158, 11, 0.3);
+  --success: #4ade80;
+  --success-surface: rgba(34, 197, 94, 0.1);
+  --success-border: rgba(34, 197, 94, 0.3);
 }
 
 /* Layer 3: User toggles to light mode on public pages */
@@ -310,6 +319,29 @@
   --theme-accent-glow-rgb: 84, 84, 84;
   /* Semantic accent: only accent-ui shifts to gray; accent-brand stays lime */
   --accent-ui: #545454;
+  /* Warning / success — high-contrast on white */
+  --warning: #b45309;
+  --warning-muted: #d97706;
+  --warning-surface: #fffbeb;
+  --warning-border: #fde68a;
+  --success: #15803d;
+  --success-surface: #f0fdf4;
+  --success-border: #bbf7d0;
+}
+
+/* Booking auth card: stronger tint in light mode for visibility */
+.public-theme[data-user-theme="light"] .booking-auth-card {
+  background-color: color-mix(in srgb, var(--accent-brand) 25%, transparent);
+}
+
+/* Booking summary cards: force dark background in light mode so lime accents stay visible */
+.public-theme[data-user-theme="light"] .booking-summary-dark {
+  --brand-surface: #1A1A1A;
+  --site-text: #ffffff;
+  --site-text-secondary: #D1D5DB;
+  --site-text-muted: #9CA3AF;
+  --site-text-dim: #6b7280;
+  --site-border: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
@@ -374,6 +406,15 @@
   --color-accent-brand: var(--accent-brand);
   --color-accent-brand-hover: var(--accent-brand-hover);
   --color-accent-ui: var(--accent-ui);
+
+  /* Warning / success semantic colors */
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-success-border: var(--success-border);
 
   /* Accent glow shadows — use the RGB var so seasonal themes auto-update */
   --shadow-accent-sm: 0 0 10px rgba(var(--theme-accent-glow-rgb), 0.1);

@@ -90,7 +90,7 @@ function PaymentForm({ amount, totalAmount, remainingAmount, isDeposit, onPaymen
         </div>
 
         {isDeposit && totalAmount && remainingAmount !== undefined && (
-          <div className="mb-4 rounded-lg bg-brand-surface p-4 text-sm">
+          <div className="booking-summary-dark mb-4 rounded-lg bg-brand-surface p-4 text-sm">
             <div className="flex justify-between text-site-text-secondary">
               <span>Service Total</span>
               <span className="font-medium text-site-text">{formatCurrency(totalAmount)}</span>

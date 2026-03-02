@@ -1573,7 +1573,7 @@ export function InlineAuth({
   if ((isAuthenticated || !!localAuthData || !!localAuthRef.current) && effectiveData) {
     const { first_name, last_name, phone, email } = effectiveData.customer;
     return (
-      <div className="rounded-lg border border-accent-brand/30 bg-accent-brand/5 p-4">
+      <div className="rounded-lg border border-accent-brand/30 bg-accent-brand/5 p-4 booking-auth-card">
         <div className="flex items-start justify-between gap-4">
           {/* Left: Customer info */}
           <div className="min-w-0 flex-1">
