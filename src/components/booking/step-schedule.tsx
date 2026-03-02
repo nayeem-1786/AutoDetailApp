@@ -199,7 +199,7 @@ export function StepSchedule({
                       !inMonth && 'text-site-text-dim',
                       inMonth && !disabled && !selected && 'text-site-text hover:bg-brand-surface',
                       disabled && inMonth && 'text-site-text-dim cursor-not-allowed',
-                      selected && 'bg-lime text-site-text-on-primary font-semibold'
+                      selected && 'bg-accent-brand text-site-text-on-primary font-semibold'
                     )}
                   >
                     {format(day, 'd')}
@@ -241,8 +241,8 @@ export function StepSchedule({
                       className={cn(
                         'rounded-md border px-3 py-2 text-sm font-medium transition-colors',
                         selectedTime === slot
-                          ? 'border-lime bg-lime text-site-text-on-primary'
-                          : 'border-site-border text-site-text-secondary hover:border-lime/50 hover:bg-brand-surface'
+                          ? 'border-accent-brand bg-accent-brand text-site-text-on-primary'
+                          : 'border-site-border text-site-text-secondary hover:border-accent-ui/50 hover:bg-brand-surface'
                       )}
                     >
                       {formatTime(slot)}
@@ -271,7 +271,7 @@ export function StepSchedule({
           <Button
             onClick={handleContinue}
             disabled={!selectedDate || !selectedTime}
-            className="hidden lg:inline-flex bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+            className="hidden lg:inline-flex bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
           >
             Continue
           </Button>
@@ -336,7 +336,7 @@ export function StepSchedule({
             <Button
               onClick={handleContinue}
               disabled={!selectedDate || !selectedTime}
-              className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+              className="bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
             >
               Continue
             </Button>

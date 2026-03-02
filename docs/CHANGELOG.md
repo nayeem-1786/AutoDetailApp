@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Refactor: Semantic Token Refactor (`accent-brand` + `accent-ui`) — 2026-03-01
+
+- **Problem**: Every `lime` reference in 50+ public-facing files was a raw color name with no semantic intent. Light mode required `--lime` to be globally overridden to gray (#545454), which broke headlines/buttons and needed `!important` bandaids. No way to distinguish "should stay brand green in light mode" from "should become gray."
+- **Solution**: Two semantic CSS tokens:
+  - `accent-brand` — Always `#CCFF00`. Buttons, prices, headlines, selected states, step indicators.
+  - `accent-ui` — `#CCFF00` dark / `#545454` light. Hover text, focus rings, decorative borders, icon tints, card hover shadows.
+- **Token cascade**: Both alias through `var(--lime)` so seasonal themes cascade naturally. Only `--accent-ui` is overridden in light mode.
+- **Migration scope**: 50+ files across `src/components/public/`, `src/components/booking/`, `src/components/account/`, `src/app/(public)/`, `src/app/(account)/`, `src/app/(customer-auth)/`
+- **Cleanup removed**:
+  - `--color-lime*` entries from `@theme inline` (8 entries)
+  - Light mode `--lime*` palette overrides (8 entries shifting lime to charcoal)
+  - Headline `!important` bandaids (`.text-gradient-lime` override + h1-h3 `.text-lime` overrides)
+  - Legacy CSS class aliases (`.text-gradient-lime`, `.btn-lime-glow`, `.animate-lime-pulse`, `--shadow-lime-*`)
+  - Lime palette entries from `light-mode-vars.ts`
+- **Intentional exceptions**: `bg-lime-600` (decorative category icon in booking), `colorPrimary: '#CCFF00'` (Stripe SDK, 2 files)
+- **Files modified**: `globals.css`, `light-mode-vars.ts`, `theme-provider.tsx`, + 50 component/page files
+
+---
+
 ## Fix: OTP Verification Infinite Spinner (All Auth Flows) — 2026-03-01
 
 - **Bug**: Multiple auth functions in `inline-auth.tsx` had missing `setLoading(false)` on certain code paths and no top-level try/catch — any uncaught error or edge case left the spinner running forever

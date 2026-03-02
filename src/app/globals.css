@@ -57,6 +57,14 @@
   --lime-500: #A3CC00;
   --lime-600: #7A9900;
 
+  /* Semantic accent tokens
+     accent-brand: Always brand green. Buttons, prices, headlines, selected states.
+     accent-ui:    Brand green in dark / gray in light. Hover text, focus rings, decorative tints.
+     Aliased through --lime so seasonal themes cascade naturally. */
+  --accent-brand: var(--lime);
+  --accent-brand-hover: var(--lime-200);
+  --accent-ui: var(--lime);
+
   /* Dark brand surfaces */
   --brand-black: #000000;
   --brand-dark: #0A0A0A;
@@ -83,9 +91,9 @@
   --site-header-bg: #000000;
   --site-footer-bg: #0A0A0A;
 
-  /* Site link colors */
-  --site-link: var(--lime);
-  --site-link-hover: var(--lime-200);
+  /* Site link colors — flow through accent-ui so light mode gets gray */
+  --site-link: var(--accent-ui);
+  --site-link-hover: var(--accent-ui);
 
   /* Text on primary (for button text on primary-colored backgrounds) */
   --site-text-on-primary: #000000;
@@ -93,8 +101,8 @@
   /* Site divider color (defaults to border color) */
   --site-divider: rgba(255, 255, 255, 0.1);
 
-  /* Icon accent color — defaults to lime, overridable via admin theme settings */
-  --site-icon-accent: var(--lime);
+  /* Icon accent color — flows through accent-ui so light mode gets gray */
+  --site-icon-accent: var(--accent-ui);
 
   /* Site button tokens — ThemeProvider overrides these from admin settings.
      Fallbacks match the default lime/dark design. */
@@ -206,7 +214,7 @@
   --ui-text-faint: var(--site-text-faint);
   --ui-border: var(--site-border);
   --ui-border-light: var(--site-border-light);
-  --ui-ring: var(--lime);
+  --ui-ring: var(--accent-ui);
   --ui-placeholder: var(--site-text-dim);
   --ui-shadow: rgba(0, 0, 0, 0.3);
   --ui-input-bg: var(--brand-dark);
@@ -290,19 +298,6 @@
   --site-footer-bg: #f8fafc;
   --site-text-on-primary: #000000;
   --site-divider: #e5e7eb;
-  /* Lime palette — shift to charcoal neutrals for white background contrast.
-     Brand lime (#CCFF00) is invisible on white; charcoal keeps premium feel. */
-  --lime: #545454;
-  --lime-50: #f5f5f5;
-  --lime-100: #e8e8e8;
-  --lime-200: #d4d4d4;
-  --lime-300: #737373;
-  --lime-400: #616161;
-  --lime-500: #545454;
-  --lime-600: #3d3d3d;
-  --site-icon-accent: #545454;
-  --site-link: #545454;
-  --site-link-hover: #3d3d3d;
   /* Buttons — brand lime with black text, same as dark mode */
   --site-btn-primary-bg: #CCFF00;
   --site-btn-primary-text: #000000;
@@ -313,24 +308,8 @@
   --site-btn-cta-hover-bg: #B8E600;
   --site-btn-cta-radius: 9999px;
   --theme-accent-glow-rgb: 84, 84, 84;
-}
-
-/* Light mode: headline accent words stay brand lime — large text pops on white */
-.public-theme[data-user-theme="light"] .text-gradient-lime {
-  background: linear-gradient(135deg, #CCFF00, #A3CC00);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Headline accent words stay brand lime in light mode */
-.public-theme[data-user-theme="light"] h1 .text-lime,
-.public-theme[data-user-theme="light"] h2 .text-lime,
-.public-theme[data-user-theme="light"] h3 .text-lime,
-.public-theme[data-user-theme="light"] .text-4xl .text-lime,
-.public-theme[data-user-theme="light"] .text-5xl .text-lime,
-.public-theme[data-user-theme="light"] .text-6xl .text-lime {
-  color: #CCFF00 !important;
+  /* Semantic accent: only accent-ui shifts to gray; accent-brand stays lime */
+  --accent-ui: #545454;
 }
 
 @theme inline {
@@ -353,16 +332,6 @@
   --color-navy-light: var(--navy-light);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
-
-  /* Lime accent palette — ThemeProvider overrides --lime, --lime-200, etc. */
-  --color-lime: var(--lime);
-  --color-lime-50: var(--lime-50);
-  --color-lime-100: var(--lime-100);
-  --color-lime-200: var(--lime-200);
-  --color-lime-300: var(--lime-300);
-  --color-lime-400: var(--lime-400);
-  --color-lime-500: var(--lime-500);
-  --color-lime-600: var(--lime-600);
 
   /* Dark brand surfaces — ThemeProvider overrides --brand-black, etc. */
   --color-brand-black: var(--brand-black);
@@ -401,11 +370,16 @@
   /* Icon accent color */
   --color-site-icon-accent: var(--site-icon-accent);
 
+  /* Semantic accent colors */
+  --color-accent-brand: var(--accent-brand);
+  --color-accent-brand-hover: var(--accent-brand-hover);
+  --color-accent-ui: var(--accent-ui);
+
   /* Accent glow shadows — use the RGB var so seasonal themes auto-update */
-  --shadow-lime-sm: 0 0 10px rgba(var(--theme-accent-glow-rgb), 0.1);
-  --shadow-lime: 0 0 20px rgba(var(--theme-accent-glow-rgb), 0.15);
-  --shadow-lime-lg: 0 0 40px rgba(var(--theme-accent-glow-rgb), 0.25);
-  --shadow-lime-glow: 0 0 60px rgba(var(--theme-accent-glow-rgb), 0.3);
+  --shadow-accent-sm: 0 0 10px rgba(var(--theme-accent-glow-rgb), 0.1);
+  --shadow-accent: 0 0 20px rgba(var(--theme-accent-glow-rgb), 0.15);
+  --shadow-accent-lg: 0 0 40px rgba(var(--theme-accent-glow-rgb), 0.25);
+  --shadow-accent-glow: 0 0 60px rgba(var(--theme-accent-glow-rgb), 0.3);
 
   /* Contextual UI tokens */
   --color-ui-bg: var(--ui-bg);
@@ -636,9 +610,9 @@ h1, h2, h3 {
    Smart Details Brand — Public Pages Only
    ============================================ */
 
-/* Gradient text — references --color-lime so seasonal themes auto-update */
-.text-gradient-lime {
-  background: linear-gradient(135deg, var(--color-lime), var(--color-lime-500));
+/* Gradient text — semantic accent version */
+.text-gradient-accent {
+  background: linear-gradient(135deg, var(--color-accent-brand), var(--lime-500));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -652,11 +626,11 @@ h1, h2, h3 {
 }
 
 /* Button glow — uses accent RGB var for seasonal theme support */
-.btn-lime-glow {
+.btn-accent-glow {
   position: relative;
   overflow: hidden;
 }
-.btn-lime-glow::after {
+.btn-accent-glow::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -665,26 +639,26 @@ h1, h2, h3 {
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
-.btn-lime-glow:hover::after {
+.btn-accent-glow:hover::after {
   opacity: 1;
 }
 
-/* Scrollbar — references --color-lime for accent thumb hover */
+/* Scrollbar — accent-ui for thumb hover (gray in light mode, lime in dark) */
 .public-theme::-webkit-scrollbar { width: 8px; }
 .public-theme::-webkit-scrollbar-track { background: var(--color-brand-dark); }
 .public-theme::-webkit-scrollbar-thumb { background: var(--color-brand-grey-light); border-radius: 4px; }
-.public-theme::-webkit-scrollbar-thumb:hover { background: var(--color-lime); }
+.public-theme::-webkit-scrollbar-thumb:hover { background: var(--color-accent-ui); }
 
 /* Hidden scrollbar utility — for horizontal swipeable strips */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* Pulse animation — uses accent RGB var */
-@keyframes lime-pulse {
+@keyframes accent-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(var(--theme-accent-glow-rgb), 0.3); }
   50% { box-shadow: 0 0 0 8px rgba(var(--theme-accent-glow-rgb), 0); }
 }
-.animate-lime-pulse { animation: lime-pulse 2s ease-in-out infinite; }
+.animate-accent-pulse { animation: accent-pulse 2s ease-in-out infinite; }
 
 /* ── Site Button Classes ──────────────────────────────────────────────────
    Theme-aware button styles. Uses CSS vars from ThemeProvider so admin

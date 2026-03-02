@@ -142,8 +142,8 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                 <dl className="mt-4 space-y-4">
                   {service.base_duration_minutes > 0 && (
                     <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime/5">
-                        <Clock className="h-4 w-4 text-lime" />
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-accent-ui/5">
+                        <Clock className="h-4 w-4 text-accent-brand" />
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-site-text-muted">
@@ -159,8 +159,8 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   )}
 
                   <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime/5">
-                      <Truck className="h-4 w-4 text-lime" />
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-accent-ui/5">
+                      <Truck className="h-4 w-4 text-accent-brand" />
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-site-text-muted">
@@ -175,8 +175,8 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime/5">
-                      <Tag className="h-4 w-4 text-lime" />
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-accent-ui/5">
+                      <Tag className="h-4 w-4 text-accent-brand" />
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-site-text-muted">
@@ -204,7 +204,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <div className="border-t border-site-border pt-4">
                       <Link
                         href={`/book?service=${service.slug}`}
-                        className="flex w-full items-center justify-center gap-2 site-btn-cta px-4 py-3 text-sm font-bold shadow-sm hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
+                        className="flex w-full items-center justify-center gap-2 site-btn-cta px-4 py-3 text-sm font-bold shadow-sm hover:shadow-accent-lg hover:scale-[1.03] transition-all btn-accent-glow"
                       >
                         <CalendarDays className="h-4 w-4" />
                         Book This Service
@@ -257,10 +257,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                     <Link
                       key={suggestion.id}
                       href={addonHref}
-                      className="group flex items-center justify-between rounded-2xl bg-brand-surface p-4 border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-0.5"
+                      className="group flex items-center justify-between rounded-2xl bg-brand-surface p-4 border border-site-border transition-all duration-300 hover:border-accent-ui/30 hover:-translate-y-0.5"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold text-site-text group-hover:text-lime transition-colors">
+                        <h3 className="text-sm font-semibold text-site-text group-hover:text-accent-ui transition-colors">
                           {addon.name}
                         </h3>
                         {addon.description && (
@@ -269,12 +269,12 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                           </p>
                         )}
                         {priceLabel && (
-                          <p className="mt-1 text-sm font-bold text-lime">
+                          <p className="mt-1 text-sm font-bold text-accent-brand">
                             {priceLabel}
                           </p>
                         )}
                       </div>
-                      <div className="ml-3 flex-shrink-0 text-site-text-dim group-hover:text-lime transition-colors">
+                      <div className="ml-3 flex-shrink-0 text-site-text-dim group-hover:text-accent-ui transition-colors">
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </Link>

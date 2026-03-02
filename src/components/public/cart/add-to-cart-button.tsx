@@ -88,7 +88,7 @@ export function AddToCartButton({
           type="button"
           disabled
           className={cn(
-            'flex items-center justify-center rounded-xl bg-lime/20 border border-lime/30 text-lime cursor-not-allowed h-10 w-10',
+            'flex items-center justify-center rounded-xl bg-accent-brand/20 border border-accent-brand/30 text-accent-brand cursor-not-allowed h-10 w-10',
             className
           )}
           aria-label="Maximum reached"
@@ -102,7 +102,7 @@ export function AddToCartButton({
         type="button"
         disabled
         className={cn(
-          'flex items-center justify-center gap-2 rounded-xl bg-lime/20 border border-lime/30 text-lime cursor-not-allowed font-medium',
+          'flex items-center justify-center gap-2 rounded-xl bg-accent-brand/20 border border-accent-brand/30 text-accent-brand cursor-not-allowed font-medium',
           variant === 'compact' ? 'text-xs px-3 py-2' : 'text-sm px-5 py-2.5',
           className
         )}
@@ -122,8 +122,8 @@ export function AddToCartButton({
         className={cn(
           'flex items-center justify-center rounded-xl border transition-all duration-200 h-10 w-10',
           inCart
-            ? 'bg-lime/20 border-lime/30 text-lime hover:bg-lime/30'
-            : 'bg-brand-surface border-site-border text-site-text-muted hover:bg-lime hover:text-site-text-on-primary hover:border-lime',
+            ? 'bg-accent-brand/20 border-accent-brand/30 text-accent-brand hover:bg-accent-brand/30'
+            : 'bg-brand-surface border-site-border text-site-text-muted hover:bg-accent-brand hover:text-site-text-on-primary hover:border-accent-brand',
           className
         )}
         aria-label={inCart ? `In cart (${cartQty}), add another` : 'Add to cart'}
@@ -146,8 +146,8 @@ export function AddToCartButton({
         'flex items-center justify-center gap-2 rounded-xl font-medium transition-all duration-200',
         variant === 'compact' ? 'text-xs px-3 py-2' : 'text-sm px-5 py-2.5',
         inCart
-          ? 'bg-lime/20 border border-lime/30 text-lime hover:bg-lime/30'
-          : 'bg-lime text-site-text-on-primary hover:bg-lime-200 shadow-lg shadow-lime/20 hover:shadow-lime/30',
+          ? 'bg-accent-brand/20 border border-accent-brand/30 text-accent-brand hover:bg-accent-brand/30'
+          : 'bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover shadow-lg shadow-accent-brand/20 hover:shadow-accent-brand/30',
         className
       )}
     >

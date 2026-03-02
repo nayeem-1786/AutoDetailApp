@@ -139,7 +139,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                         <span className="text-lg text-site-text-muted line-through">
                           {formatCurrency(saleInfo.originalPrice)}
                         </span>
-                        <span className="font-display text-3xl font-bold text-lime">
+                        <span className="font-display text-3xl font-bold text-accent-brand">
                           {formatCurrency(saleInfo.currentPrice)}
                         </span>
                       </div>
@@ -154,7 +154,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 }
 
                 return (
-                  <p className="mt-4 font-display text-3xl font-bold text-lime">
+                  <p className="mt-4 font-display text-3xl font-bold text-accent-brand">
                     {formatCurrency(product.retail_price)}
                   </p>
                 );

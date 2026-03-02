@@ -69,7 +69,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
                   <Link
                     href={item.url}
                     target={item.target}
-                    className="font-display text-3xl font-semibold text-site-text hover:text-lime transition-colors"
+                    className="font-display text-3xl font-semibold text-site-text hover:text-accent-ui transition-colors"
                     onClick={() => setOpen(false)}
                   >
                     {item.label}

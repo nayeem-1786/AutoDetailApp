@@ -111,7 +111,7 @@ function ConfirmationContent() {
       <section className="bg-brand-dark py-16 sm:py-24">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 text-center">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-lime" />
+            <Loader2 className="h-8 w-8 animate-spin text-accent-ui" />
             <p className="text-sm text-site-text-muted">
               Confirming your payment...
             </p>
@@ -135,7 +135,7 @@ function ConfirmationContent() {
             </p>
             <Link
               href="/products"
-              className="inline-flex items-center gap-2 rounded-xl bg-lime px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-accent-brand px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors"
             >
               Browse Products
             </Link>
@@ -159,7 +159,7 @@ function ConfirmationContent() {
             Order Confirmed!
           </h1>
           {order.order_number ? (
-            <p className="mt-2 text-lg font-bold text-lime">
+            <p className="mt-2 text-lg font-bold text-accent-brand">
               {order.order_number}
             </p>
           ) : (
@@ -224,11 +224,11 @@ function ConfirmationContent() {
             </div>
             {order.discount_amount > 0 && (
               <div className="flex justify-between">
-                <span className="text-lime">
+                <span className="text-accent-brand">
                   Discount
                   {order.coupon_code && ` (${order.coupon_code})`}
                 </span>
-                <span className="text-lime tabular-nums">
+                <span className="text-accent-brand tabular-nums">
                   -{formatCurrency(order.discount_amount / 100)}
                 </span>
               </div>
@@ -241,7 +241,7 @@ function ConfirmationContent() {
             </div>
             <div className="flex justify-between">
               <span className="text-site-text-muted">Shipping</span>
-              <span className={`tabular-nums ${order.shipping_amount > 0 ? 'text-site-text' : 'text-lime font-medium'}`}>
+              <span className={`tabular-nums ${order.shipping_amount > 0 ? 'text-site-text' : 'text-accent-brand font-medium'}`}>
                 {order.shipping_amount > 0
                   ? formatCurrency(order.shipping_amount / 100)
                   : 'FREE'}
@@ -249,7 +249,7 @@ function ConfirmationContent() {
             </div>
             <div className="border-t border-site-border pt-3 flex justify-between">
               <span className="text-base font-bold text-site-text">Total</span>
-              <span className="text-base font-bold text-lime tabular-nums">
+              <span className="text-base font-bold text-accent-brand tabular-nums">
                 {formatCurrency(order.total / 100)}
               </span>
             </div>
@@ -258,7 +258,7 @@ function ConfirmationContent() {
           {/* Fulfillment */}
           <div className="border-t border-site-border pt-4">
             <div className="flex items-center gap-2 text-sm mb-2">
-              <Package className="h-4 w-4 text-lime" />
+              <Package className="h-4 w-4 text-accent-brand" />
               <span className="font-medium text-site-text">
                 {order.fulfillment_method === 'pickup'
                   ? 'Local Pickup'
@@ -302,7 +302,7 @@ function ConfirmationContent() {
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 rounded-xl bg-lime px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20"
+            className="inline-flex items-center gap-2 rounded-xl bg-accent-brand px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors shadow-lg shadow-accent-brand/20"
           >
             Continue Shopping
             <ArrowRight className="h-4 w-4" />
@@ -320,7 +320,7 @@ export default function ConfirmationPage() {
         <section className="bg-brand-dark py-16 sm:py-24">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 text-center">
             <div className="flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-lime" />
+              <Loader2 className="h-8 w-8 animate-spin text-accent-ui" />
             </div>
           </div>
         </section>

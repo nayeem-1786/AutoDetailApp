@@ -90,7 +90,7 @@ export default function CartPage() {
             </p>
             <Link
               href="/products"
-              className="inline-flex items-center gap-2 rounded-xl bg-lime px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20"
+              className="inline-flex items-center gap-2 rounded-xl bg-accent-brand px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors shadow-lg shadow-accent-brand/20"
             >
               Browse Products
               <ArrowRight className="h-4 w-4" />
@@ -146,7 +146,7 @@ export default function CartPage() {
                   <div className="flex items-start justify-between gap-2">
                     <Link
                       href={`/products/${item.categorySlug}/${item.slug}`}
-                      className="font-medium text-site-text hover:text-lime transition-colors truncate"
+                      className="font-medium text-site-text hover:text-accent-ui transition-colors truncate"
                     >
                       {item.name}
                     </Link>
@@ -182,7 +182,7 @@ export default function CartPage() {
             <div className="flex items-center justify-between pt-2">
               <Link
                 href="/products"
-                className="text-sm font-medium text-lime hover:text-lime-200 transition-colors"
+                className="text-sm font-medium text-accent-brand hover:text-accent-brand-hover transition-colors"
               >
                 Continue Shopping
               </Link>
@@ -206,10 +206,10 @@ export default function CartPage() {
               {/* Coupon */}
               <div>
                 {appliedCoupon ? (
-                  <div className="flex items-center justify-between rounded-xl bg-lime/10 border border-lime/20 px-3 py-2">
+                  <div className="flex items-center justify-between rounded-xl bg-accent-brand/10 border border-accent-brand/20 px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-lime" />
-                      <span className="text-sm font-medium text-lime">
+                      <Tag className="h-4 w-4 text-accent-brand" />
+                      <span className="text-sm font-medium text-accent-brand">
                         {appliedCoupon.code}
                       </span>
                     </div>
@@ -230,7 +230,7 @@ export default function CartPage() {
                       onChange={(e) => setCouponCode(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
                       placeholder="Coupon code"
-                      className="flex-1 rounded-xl border border-site-border bg-brand-dark px-3 py-2 text-sm text-site-text placeholder:text-site-text-faint focus:border-lime focus:outline-none focus:ring-1 focus:ring-lime"
+                      className="flex-1 rounded-xl border border-site-border bg-brand-dark px-3 py-2 text-sm text-site-text placeholder:text-site-text-faint focus:border-accent-ui focus:outline-none focus:ring-1 focus:ring-accent-ui"
                     />
                     <button
                       type="button"
@@ -257,8 +257,8 @@ export default function CartPage() {
                 </div>
                 {appliedCoupon && (
                   <div className="flex justify-between">
-                    <span className="text-lime">Discount</span>
-                    <span className="text-lime tabular-nums">
+                    <span className="text-accent-brand">Discount</span>
+                    <span className="text-accent-brand tabular-nums">
                       -{formatCurrency(discountAmount)}
                     </span>
                   </div>
@@ -290,7 +290,7 @@ export default function CartPage() {
               {/* Checkout CTA */}
               <Link
                 href={`/checkout${appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''}`}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-lime px-6 py-3.5 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20 hover:shadow-lime/30"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-brand px-6 py-3.5 text-sm font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors shadow-lg shadow-accent-brand/20 hover:shadow-accent-brand/30"
               >
                 Proceed to Checkout
                 <ArrowRight className="h-4 w-4" />

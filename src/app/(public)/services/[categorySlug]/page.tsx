@@ -130,10 +130,10 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
                 <Link
                   key={cat.id}
                   href={`/services/${cat.slug}`}
-                  className="group flex items-center justify-between rounded-2xl bg-brand-dark p-5 border border-site-border transition-all duration-300 hover:border-lime/30 hover:bg-site-border-light"
+                  className="group flex items-center justify-between rounded-2xl bg-brand-dark p-5 border border-site-border transition-all duration-300 hover:border-accent-ui/30 hover:bg-site-border-light"
                 >
                   <div>
-                    <h3 className="font-display text-base font-semibold text-site-text group-hover:text-lime transition-colors">
+                    <h3 className="font-display text-base font-semibold text-site-text group-hover:text-accent-ui transition-colors">
                       {cat.name}
                     </h3>
                     {cat.description && (
@@ -142,7 +142,7 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
                       </p>
                     )}
                   </div>
-                  <ArrowRight className="ml-3 h-4 w-4 flex-shrink-0 text-site-text-dim group-hover:text-lime transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight className="ml-3 h-4 w-4 flex-shrink-0 text-site-text-dim group-hover:text-accent-ui transition-transform group-hover:translate-x-0.5" />
                 </Link>
               ))}
             </div>

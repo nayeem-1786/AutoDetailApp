@@ -77,7 +77,7 @@ export function GalleryLightbox({ images }: GalleryLightboxProps) {
             key={image.id}
             type="button"
             onClick={() => setSelectedIdx(idx)}
-            className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-site-border bg-brand-surface cursor-pointer focus:outline-none focus:ring-2 focus:ring-lime focus:ring-offset-2 focus:ring-offset-brand-dark"
+            className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-site-border bg-brand-surface cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent-ui focus:ring-offset-2 focus:ring-offset-brand-dark"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

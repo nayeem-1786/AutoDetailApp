@@ -200,7 +200,7 @@ export default async function CityLandingPage({
     { name: city.city_name, url: `${SITE_URL}/areas/${city.slug}` },
   ]);
 
-  // Extract city name from heading for lime gradient effect
+  // Extract city name from heading for accent gradient effect
   const headingParts = heading.split(city.city_name);
   const hasCity = headingParts.length > 1;
 
@@ -212,7 +212,7 @@ export default async function CityLandingPage({
       {/* Hero Section */}
       <section className="bg-brand-black py-16 sm:py-20 lg:py-24 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-lime/3 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent-brand/3 rounded-full blur-3xl" />
         </div>
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
@@ -226,7 +226,7 @@ export default async function CityLandingPage({
               {hasCity ? (
                 <>
                   {headingParts[0]}
-                  <span className="text-gradient-lime">{city.city_name}</span>
+                  <span className="text-gradient-accent">{city.city_name}</span>
                   {headingParts[1]}
                 </>
               ) : (
@@ -252,7 +252,7 @@ export default async function CityLandingPage({
             <div className="mt-8">
               <Link
                 href="/book"
-                className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
+                className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-base h-13 px-8 shadow-lg shadow-accent-brand/25 hover:shadow-xl hover:shadow-accent-brand/40 hover:-translate-y-0.5 transition-all duration-300 btn-accent-glow"
               >
                 Book Your Detail
                 <ArrowRight className="h-4 w-4" />
@@ -270,7 +270,7 @@ export default async function CityLandingPage({
               <div className="text-center">
                 <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                   Our Services in{' '}
-                  <span className="text-gradient-lime">{city.city_name}</span>
+                  <span className="text-gradient-accent">{city.city_name}</span>
                 </h2>
                 <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
                   Premium mobile auto detailing services tailored for {city.city_name} vehicles and conditions.
@@ -283,9 +283,9 @@ export default async function CityLandingPage({
               <AnimatedSection stagger className="mt-12 grid gap-6 sm:grid-cols-2">
                 {featuredHighlights.map((h) => (
                   <AnimatedItem key={h.id}>
-                    <div className="relative rounded-2xl bg-brand-surface border border-lime/20 p-8 hover:border-lime/40 transition-colors overflow-hidden">
+                    <div className="relative rounded-2xl bg-brand-surface border border-accent-brand/20 p-8 hover:border-accent-ui/40 transition-colors overflow-hidden">
                       <div className="absolute top-4 right-4">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-lime/10 px-2.5 py-1 text-xs font-semibold text-lime">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-accent-brand/10 px-2.5 py-1 text-xs font-semibold text-accent-brand">
                           <Sparkles className="h-3 w-3" />
                           Featured
                         </span>
@@ -300,7 +300,7 @@ export default async function CityLandingPage({
                       )}
                       <Link
                         href="/book"
-                        className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
+                        className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-brand hover:text-accent-ui transition-colors group"
                       >
                         Book now
                         <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -316,9 +316,9 @@ export default async function CityLandingPage({
               <AnimatedSection stagger className={`${featuredHighlights.length > 0 ? 'mt-6' : 'mt-12'} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
                 {otherHighlights.map((h) => (
                   <AnimatedItem key={h.id}>
-                    <div className="rounded-xl bg-brand-surface border border-site-border p-6 hover:border-lime/20 transition-colors">
+                    <div className="rounded-xl bg-brand-surface border border-site-border p-6 hover:border-accent-ui/20 transition-colors">
                       <div className="flex items-start gap-3">
-                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-lime" />
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-accent-brand" />
                         <div>
                           <h3 className="font-semibold text-site-text">
                             {h.service_name}
@@ -340,7 +340,7 @@ export default async function CityLandingPage({
               <div className="mt-10 text-center">
                 <Link
                   href="/services"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-accent-brand hover:text-accent-ui transition-colors group"
                 >
                   View all services
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -359,7 +359,7 @@ export default async function CityLandingPage({
               <div className="text-center">
                 <h2 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
                   Services Available in{' '}
-                  <span className="text-gradient-lime">{city.city_name}</span>
+                  <span className="text-gradient-accent">{city.city_name}</span>
                 </h2>
                 <p className="mx-auto mt-4 max-w-2xl text-site-text-muted">
                   From express washes to multi-year ceramic coating packages, we bring
@@ -380,7 +380,7 @@ export default async function CityLandingPage({
               <div className="mt-10 text-center">
                 <Link
                   href="/services"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-accent-brand hover:text-accent-ui transition-colors group"
                 >
                   View all services
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -413,7 +413,7 @@ export default async function CityLandingPage({
             <AnimatedSection stagger className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
                 <AnimatedItem key={i}>
-                  <div className="rounded-2xl bg-brand-surface p-7 border border-site-border hover:border-lime/20 transition-colors">
+                  <div className="rounded-2xl bg-brand-surface p-7 border border-site-border hover:border-accent-ui/20 transition-colors">
                     <div className="flex items-center gap-1">
                       {Array.from({ length: review.rating }).map((_, j) => (
                         <Star
@@ -443,7 +443,7 @@ export default async function CityLandingPage({
                 href={`https://search.google.com/local/reviews?placeid=${homepageSettings.googlePlaceId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-lime hover:text-lime-400 font-medium transition-colors"
+                className="text-accent-brand hover:text-accent-ui font-medium transition-colors"
               >
                 See all {reviews.google.count} reviews on Google &rarr;
               </a>
@@ -470,7 +470,7 @@ export default async function CityLandingPage({
             </div>
             <a
               href={`tel:${phoneToE164(businessInfo.phone)}`}
-              className="flex items-center gap-2 text-sm text-site-text-muted hover:text-lime transition-colors"
+              className="flex items-center gap-2 text-sm text-site-text-muted hover:text-accent-ui transition-colors"
             >
               <Phone className="h-4 w-4 text-site-text-dim" />
               {formatPhone(businessInfo.phone)}

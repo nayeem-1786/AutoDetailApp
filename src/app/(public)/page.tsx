@@ -134,7 +134,7 @@ export default async function HomePage() {
             <div className="mt-10 text-center">
               <Link
                 href="/services"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-lime hover:text-lime-400 transition-colors group"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-accent-brand hover:text-accent-ui transition-colors group"
               >
                 View all services
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -165,7 +165,7 @@ export default async function HomePage() {
               const Icon = ICON_MAP[item.icon] || Star;
               return (
                 <div key={item.title} className="px-6 py-8 text-center sm:py-0 sm:first:pl-0 sm:last:pr-0">
-                  <Icon className="mx-auto h-8 w-8 text-lime" />
+                  <Icon className="mx-auto h-8 w-8 text-accent-brand" />
                   <h3 className="mt-4 font-display text-lg font-semibold text-site-text">
                     {item.title}
                   </h3>
@@ -215,7 +215,7 @@ export default async function HomePage() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <span className="text-3xl font-bold text-lime">
+                          <span className="text-3xl font-bold text-accent-brand">
                             {initials}
                           </span>
                         )}
@@ -223,7 +223,7 @@ export default async function HomePage() {
                       <h3 className="mt-4 font-display text-lg font-semibold text-site-text">
                         {member.name}
                       </h3>
-                      <p className="text-sm font-medium text-lime">
+                      <p className="text-sm font-medium text-accent-brand">
                         {member.role}
                       </p>
                       {(member.excerpt || member.bio) && (
@@ -295,15 +295,15 @@ export default async function HomePage() {
               {reviews.google.reviews.slice(0, 3).map((review, i) => (
                 <div
                   key={i}
-                  className="relative rounded-2xl bg-brand-surface p-7 sm:p-8 border border-site-border hover:border-lime/30 transition-all duration-300"
+                  className="relative rounded-2xl bg-brand-surface p-7 sm:p-8 border border-site-border hover:border-accent-ui/30 transition-all duration-300"
                 >
                   {/* Decorative quote mark */}
-                  <span className="absolute -top-2 -left-1 text-6xl font-serif text-lime/20 leading-none select-none" aria-hidden="true">
+                  <span className="absolute -top-2 -left-1 text-6xl font-serif text-accent-brand/20 leading-none select-none" aria-hidden="true">
                     &ldquo;
                   </span>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: review.rating }).map((_, j) => (
-                      <Star key={j} className="h-4 w-4 fill-lime text-lime" />
+                      <Star key={j} className="h-4 w-4 fill-accent-brand text-accent-brand" />
                     ))}
                   </div>
                   <p className="mt-4 text-base sm:text-lg leading-relaxed text-site-text-secondary italic line-clamp-4">
@@ -326,7 +326,7 @@ export default async function HomePage() {
                 href={`https://search.google.com/local/reviews?placeid=${homepageSettings.googlePlaceId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-lime hover:text-lime-400 font-medium transition-colors"
+                className="text-accent-brand hover:text-accent-ui font-medium transition-colors"
               >
                 See all {reviews.google.count} reviews on Google &rarr;
               </a>

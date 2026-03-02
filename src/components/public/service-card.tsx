@@ -93,7 +93,7 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
 
   return (
     <Link href={`/services/${categorySlug}/${service.slug}`} className="group block">
-      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
+      <div className="h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-accent-ui/30 hover:-translate-y-1 hover:shadow-accent-sm">
         {/* Service image */}
         {service.image_url && (
           <div className="relative w-full h-48 sm:h-56 overflow-hidden">
@@ -114,10 +114,10 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
 
         <div className="p-6">
           <div className="flex items-start justify-between">
-            <h3 className="font-display text-lg font-bold text-site-text group-hover:text-lime transition-colors">
+            <h3 className="font-display text-lg font-bold text-site-text group-hover:text-accent-ui transition-colors">
               {service.name}
             </h3>
-            <div className="ml-3 flex-shrink-0 text-site-text-dim group-hover:text-lime transition-colors">
+            <div className="ml-3 flex-shrink-0 text-site-text-dim group-hover:text-accent-ui transition-colors">
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </div>
           </div>
@@ -135,7 +135,7 @@ export function ServiceCard({ service, categorySlug }: ServiceCardProps) {
                   {priceDisplay.wasText}
                 </span>
               )}
-              <span className="text-lg font-bold text-lime">
+              <span className="text-lg font-bold text-accent-brand">
                 {priceDisplay.text}
               </span>
             </div>

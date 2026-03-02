@@ -59,7 +59,7 @@ export function NavDropdown({ item }: NavDropdownProps) {
             open ? 'rotate-180' : ''
           }`}
         />
-        <span className="absolute inset-x-4 -bottom-px h-0.5 bg-lime scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+        <span className="absolute inset-x-4 -bottom-px h-0.5 bg-accent-ui scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
       </button>
 
       {open && item.children && item.children.length > 0 && (

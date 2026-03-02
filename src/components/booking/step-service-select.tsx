@@ -255,7 +255,7 @@ export function StepServiceSelect({
         {/* Add-ons */}
         {addonSuggestions.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-lime">
+            <h3 className="text-sm font-semibold text-accent-brand">
               Choose Add-ons <span className="font-normal text-site-text-muted">(optional)</span>
             </h3>
             <div className="mt-2 space-y-2">
@@ -287,7 +287,7 @@ export function StepServiceSelect({
                     className={cn(
                       'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-all',
                       isSelected
-                        ? 'border-lime bg-lime/5'
+                        ? 'border-accent-brand bg-accent-brand/5'
                         : 'border-site-border hover:border-site-border-medium'
                     )}
                   >
@@ -306,11 +306,11 @@ export function StepServiceSelect({
                             <span className="text-xs text-site-text-muted line-through">
                               {formatCurrency(standalonePrice)}
                             </span>
-                            <span className="text-sm font-semibold text-lime whitespace-nowrap">
+                            <span className="text-sm font-semibold text-accent-brand whitespace-nowrap">
                               +{formatCurrency(addonPrice)}
                             </span>
                           </div>
-                          <span className="text-[10px] font-medium text-lime/80">
+                          <span className="text-[10px] font-medium text-accent-brand/80">
                             Save {formatCurrency(savings)}
                           </span>
                         </div>
@@ -323,7 +323,7 @@ export function StepServiceSelect({
                         className={cn(
                           'h-5 w-5 rounded border flex items-center justify-center transition-colors flex-shrink-0',
                           isSelected
-                            ? 'border-lime bg-lime text-site-text-on-primary'
+                            ? 'border-accent-brand bg-accent-brand text-site-text-on-primary'
                             : 'border-site-border'
                         )}
                       >
@@ -340,7 +340,7 @@ export function StepServiceSelect({
               <button
                 type="button"
                 onClick={() => setShowAllAddons(!showAllAddons)}
-                className="mt-2 text-sm text-lime hover:text-lime-200 font-medium"
+                className="mt-2 text-sm text-accent-brand hover:text-accent-brand-hover font-medium"
               >
                 {showAllAddons
                   ? 'Show fewer add-ons'
@@ -359,7 +359,7 @@ export function StepServiceSelect({
                 <button
                   type="button"
                   onClick={() => setShowMobileFields(true)}
-                  className="text-lime hover:text-lime-200 font-medium"
+                  className="text-accent-brand hover:text-accent-brand-hover font-medium"
                 >
                   Add mobile service &rarr;
                 </button>
@@ -367,7 +367,7 @@ export function StepServiceSelect({
             ) : (
               <div className="rounded-lg border border-site-border p-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-lime" />
+                  <Truck className="h-4 w-4 text-accent-brand" />
                   <p className="text-sm font-medium text-site-text">Mobile Service</p>
                 </div>
 
@@ -377,7 +377,7 @@ export function StepServiceSelect({
                     placeholder="123 Main St, City, CA 90000"
                     value={mobileAddress}
                     onChange={(e) => setMobileAddress(e.target.value)}
-                    className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim"
+                    className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-accent-ui dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim"
                   />
                 </FormField>
 
@@ -386,7 +386,7 @@ export function StepServiceSelect({
                     id="mobile-zone-field"
                     value={mobileZoneId ?? ''}
                     onChange={(e) => setMobileZoneId(e.target.value || null)}
-                    className="border-site-border bg-brand-surface text-site-text focus-visible:ring-lime dark:border-site-border dark:bg-brand-surface dark:text-site-text"
+                    className="border-site-border bg-brand-surface text-site-text focus-visible:ring-accent-ui dark:border-site-border dark:bg-brand-surface dark:text-site-text"
                   >
                     <option value="">Select zone...</option>
                     {mobileZones.map((z) => (
@@ -437,7 +437,7 @@ export function StepServiceSelect({
           <Button
             onClick={handleContinue}
             disabled={!canContinue}
-            className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+            className="bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
           >
             Continue
           </Button>
@@ -465,7 +465,7 @@ export function StepServiceSelect({
               <span className="text-site-text-secondary">
                 {addon.name}
                 {showSavings && (
-                  <span className="ml-1 text-xs text-lime/80">
+                  <span className="ml-1 text-xs text-accent-brand/80">
                     (save {formatCurrency(originalPrice - addon.price)})
                   </span>
                 )}
@@ -511,7 +511,7 @@ export function StepServiceSelect({
               <button
                 type="button"
                 onClick={() => setShowVehicleSheet(true)}
-                className="text-lime hover:text-lime-200 font-medium"
+                className="text-accent-brand hover:text-accent-brand-hover font-medium"
               >
                 Change
               </button>
@@ -522,7 +522,7 @@ export function StepServiceSelect({
               <button
                 type="button"
                 onClick={() => setShowVehicleSheet(true)}
-                className="text-lime hover:text-lime-200 font-medium"
+                className="text-accent-brand hover:text-accent-brand-hover font-medium"
               >
                 Change vehicle type
               </button>
@@ -573,7 +573,7 @@ export function StepServiceSelect({
                         />
                         {/* Mobile accordion: configure panel inline below selected card */}
                         {pendingServiceId === service.id && (
-                          <div className="lg:hidden mt-2 rounded-lg border border-lime/20 bg-brand-surface p-4">
+                          <div className="lg:hidden mt-2 rounded-lg border border-accent-brand/20 bg-brand-surface p-4">
                             {renderConfigurePanel()}
                           </div>
                         )}
@@ -610,7 +610,7 @@ export function StepServiceSelect({
                 <Button
                   onClick={handleContinue}
                   disabled={!canContinue}
-                  className="w-full bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+                  className="w-full bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
                 >
                   Continue
                 </Button>
@@ -710,8 +710,8 @@ function VehicleCategorySheet({
                 className={cn(
                   'flex flex-col items-center gap-2 rounded-lg border p-4 transition-all',
                   isActive
-                    ? 'border-lime bg-lime/10 ring-1 ring-lime'
-                    : 'border-site-border hover:border-lime/50'
+                    ? 'border-accent-brand bg-accent-brand/10 ring-1 ring-accent-brand'
+                    : 'border-site-border hover:border-accent-ui/50'
                 )}
               >
                 {vc.image_url ? (
@@ -721,13 +721,13 @@ function VehicleCategorySheet({
                     className="h-12 w-12 rounded-lg object-cover"
                   />
                 ) : (
-                  <FallbackIcon className={cn('h-8 w-8', isActive ? 'text-lime' : 'text-site-text-muted')} />
+                  <FallbackIcon className={cn('h-8 w-8', isActive ? 'text-accent-brand' : 'text-site-text-muted')} />
                 )}
-                <span className={cn('text-sm font-medium', isActive ? 'text-lime' : 'text-site-text')}>
+                <span className={cn('text-sm font-medium', isActive ? 'text-accent-brand' : 'text-site-text')}>
                   {vc.display_name}
                 </span>
                 {isActive && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-brand text-site-text-on-primary">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </div>
                 )}
@@ -764,8 +764,8 @@ function ServiceCard({
       className={cn(
         'flex w-full items-center gap-4 rounded-lg border p-3 sm:p-4 text-left transition-all',
         isSelected
-          ? 'border-lime bg-lime/5 ring-1 ring-lime'
-          : 'border-site-border hover:border-lime/50 hover:shadow-sm',
+          ? 'border-accent-brand bg-accent-brand/5 ring-1 ring-accent-brand'
+          : 'border-site-border hover:border-accent-ui/50 hover:shadow-sm',
       )}
     >
       {/* Thumbnail */}
@@ -788,7 +788,7 @@ function ServiceCard({
             {service.name}
           </h3>
           {isSelected && (
-            <div className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary">
+            <div className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-accent-brand text-site-text-on-primary">
               <Check className="h-3.5 w-3.5" strokeWidth={3} />
             </div>
           )}
@@ -809,7 +809,7 @@ function ServiceCard({
                   <span className="line-through text-site-text-muted font-normal mr-1">
                     {originalPrice}
                   </span>
-                  <span className="inline-flex items-center rounded bg-lime/20 px-1 py-0.5 text-[10px] font-semibold text-lime uppercase mr-1">
+                  <span className="inline-flex items-center rounded bg-accent-brand/20 px-1 py-0.5 text-[10px] font-semibold text-accent-brand uppercase mr-1">
                     Sale
                   </span>
                 </>
@@ -913,7 +913,7 @@ function PricingSelector({
     case 'vehicle_size':
       return (
         <div>
-          <h3 className="text-sm font-semibold text-lime">
+          <h3 className="text-sm font-semibold text-accent-brand">
             Choose Vehicle Size
           </h3>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -930,11 +930,11 @@ function PricingSelector({
                   className={cn(
                     'flex flex-col items-center rounded-lg border p-4 transition-all',
                     isSelected
-                      ? 'border-lime bg-lime/5 ring-1 ring-lime'
-                      : 'border-site-border hover:border-lime/50'
+                      ? 'border-accent-brand bg-accent-brand/5 ring-1 ring-accent-brand'
+                      : 'border-site-border hover:border-accent-ui/50'
                   )}
                 >
-                  <SizeIcon className={cn('h-8 w-8 mb-2', isSelected ? 'text-lime' : 'text-site-text-muted')} />
+                  <SizeIcon className={cn('h-8 w-8 mb-2', isSelected ? 'text-accent-brand' : 'text-site-text-muted')} />
                   <p className="text-sm font-medium text-site-text">
                     {tier.tier_label ?? VEHICLE_SIZE_LABELS[tier.tier_name] ?? tier.tier_name}
                   </p>
@@ -943,10 +943,10 @@ function PricingSelector({
                       <p className="text-sm text-site-text-muted line-through">
                         {formatCurrency(saleInfo.originalPrice)}
                       </p>
-                      <p className="text-lg font-bold text-lime">
+                      <p className="text-lg font-bold text-accent-brand">
                         {formatCurrency(saleInfo.currentPrice)}
                       </p>
-                      <p className="text-xs text-lime">
+                      <p className="text-xs text-accent-brand">
                         Save {formatCurrency(saleInfo.savings)}
                       </p>
                     </div>
@@ -956,7 +956,7 @@ function PricingSelector({
                     </p>
                   )}
                   {isSelected && (
-                    <div className="mt-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary">
+                    <div className="mt-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent-brand text-site-text-on-primary">
                       <Check className="h-3.5 w-3.5" strokeWidth={3} />
                     </div>
                   )}
@@ -996,7 +996,7 @@ function PricingSelector({
             if (!current?.is_vehicle_size_aware) return null;
             return (
               <div>
-                <h3 className="text-sm font-semibold text-lime">
+                <h3 className="text-sm font-semibold text-accent-brand">
                   Choose Vehicle Size
                 </h3>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -1013,11 +1013,11 @@ function PricingSelector({
                         className={cn(
                           'flex flex-col items-center rounded-lg border p-4 transition-all',
                           isSelected
-                            ? 'border-lime bg-lime/5 ring-1 ring-lime'
-                            : 'border-site-border hover:border-lime/50'
+                            ? 'border-accent-brand bg-accent-brand/5 ring-1 ring-accent-brand'
+                            : 'border-site-border hover:border-accent-ui/50'
                         )}
                       >
-                        <SizeIcon className={cn('h-8 w-8 mb-2', isSelected ? 'text-lime' : 'text-site-text-muted')} />
+                        <SizeIcon className={cn('h-8 w-8 mb-2', isSelected ? 'text-accent-brand' : 'text-site-text-muted')} />
                         <p className="text-sm font-medium text-site-text">
                           {VEHICLE_SIZE_LABELS[sc]}
                         </p>
@@ -1025,7 +1025,7 @@ function PricingSelector({
                           {formatCurrency(p)}
                         </p>
                         {isSelected && (
-                          <div className="mt-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary">
+                          <div className="mt-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent-brand text-site-text-on-primary">
                             <Check className="h-3.5 w-3.5" strokeWidth={3} />
                           </div>
                         )}
@@ -1128,13 +1128,13 @@ function ScopeTierCard({
       className={cn(
         'flex items-center justify-between rounded-lg border p-3 text-left transition-all',
         isSelected
-          ? 'border-lime bg-lime/5 ring-1 ring-lime'
-          : 'border-site-border hover:border-lime/50'
+          ? 'border-accent-brand bg-accent-brand/5 ring-1 ring-accent-brand'
+          : 'border-site-border hover:border-accent-ui/50'
       )}
     >
       <div className="flex items-center gap-2">
         {isSelected && (
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-lime text-site-text-on-primary flex-shrink-0">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-brand text-site-text-on-primary flex-shrink-0">
             <Check className="h-3.5 w-3.5" strokeWidth={3} />
           </div>
         )}
@@ -1148,7 +1148,7 @@ function ScopeTierCard({
             <span className="text-sm text-site-text-muted line-through">
               {formatCurrency(saleInfo.originalPrice)}
             </span>
-            <span className="text-base font-bold text-lime">
+            <span className="text-base font-bold text-accent-brand">
               {formatCurrency(saleInfo.currentPrice)}
             </span>
           </div>

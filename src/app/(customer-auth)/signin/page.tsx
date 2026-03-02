@@ -119,7 +119,7 @@ export default function CustomerSignInPage() {
       setError(
         <>
           We couldn&apos;t find an account with that phone number.{' '}
-          <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+          <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
             Create a new account
           </Link>{' '}
           to get started.
@@ -198,7 +198,7 @@ export default function CustomerSignInPage() {
         setError(
           <>
             This phone number is linked to a staff account.{' '}
-            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
               Sign in as staff
             </Link>{' '}
             instead, or use a different number.
@@ -308,7 +308,7 @@ export default function CustomerSignInPage() {
         setError(
           <>
             Incorrect email or password. Please try again, or{' '}
-            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
               create a new account
             </Link>
             .
@@ -339,7 +339,7 @@ export default function CustomerSignInPage() {
         setError(
           <>
             This email is linked to a staff account.{' '}
-            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
               Sign in as staff
             </Link>{' '}
             instead, or use a different email.
@@ -360,7 +360,7 @@ export default function CustomerSignInPage() {
         setError(
           <>
             We couldn&apos;t find a customer account with that email.{' '}
-            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
               Create a new account
             </Link>{' '}
             to get started.
@@ -413,7 +413,7 @@ export default function CustomerSignInPage() {
       <div className="w-full max-w-md space-y-6 px-4">
         {/* Business Logo/Icon + Heading */}
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent-brand/10 border border-accent-brand/30 text-xl font-bold text-accent-brand">
             SD
           </div>
           <h1 className="mt-4 text-2xl font-bold text-site-text">
@@ -600,7 +600,7 @@ export default function CustomerSignInPage() {
                   setForgotMode(true);
                   setError(null);
                 }}
-                className="block w-full text-center text-sm text-site-text-muted hover:text-lime transition-colors"
+                className="block w-full text-center text-sm text-site-text-muted hover:text-accent-ui transition-colors"
               >
                 Forgot password?
               </button>
@@ -693,7 +693,7 @@ export default function CustomerSignInPage() {
           Don&apos;t have an account?{' '}
           <Link
             href="/signup"
-            className="font-medium text-lime hover:text-lime-400 transition-colors"
+            className="font-medium text-accent-brand hover:text-accent-ui transition-colors"
           >
             Sign up
           </Link>

@@ -82,7 +82,7 @@ async function checkExists(params: { phone?: string; email?: string }): Promise<
 }
 
 // --- Shared input class ---
-const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime text-base sm:text-sm';
+const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-accent-ui text-base sm:text-sm';
 
 // --- Sign In Flow ---
 
@@ -167,7 +167,7 @@ function SignInFlow({
           <button
             type="button"
             onClick={onSwitchToSignUp}
-            className="font-medium text-lime hover:text-lime-400 underline"
+            className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
           >
             Create a new account
           </button>{' '}
@@ -337,7 +337,7 @@ function SignInFlow({
               <button
                 type="button"
                 onClick={onSwitchToSignUp}
-                className="font-medium text-lime hover:text-lime-400 underline"
+                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
               >
                 create a new account
               </button>
@@ -383,7 +383,7 @@ function SignInFlow({
               <button
                 type="button"
                 onClick={onSwitchToSignUp}
-                className="font-medium text-lime hover:text-lime-400 underline"
+                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
               >
                 Create a new account
               </button>{' '}
@@ -611,7 +611,7 @@ function SignInFlow({
           <button
             type="button"
             onClick={() => { setForgotMode(true); setError(null); }}
-            className="block w-full text-center text-sm text-site-text-muted hover:text-lime transition-colors"
+            className="block w-full text-center text-sm text-site-text-muted hover:text-accent-ui transition-colors"
           >
             Forgot password?
           </button>
@@ -1001,7 +1001,7 @@ function SignUpFlow({
               <button
                 type="button"
                 onClick={() => onSwitchToSignIn(data.phone)}
-                className="font-medium text-lime hover:text-lime-400 underline"
+                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
               >
                 Sign in instead &rarr;
               </button>
@@ -1014,7 +1014,7 @@ function SignUpFlow({
               <button
                 type="button"
                 onClick={() => onSwitchToSignIn(data.phone)}
-                className="font-medium text-lime hover:text-lime-400 underline"
+                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
               >
                 Sign in here
               </button>{' '}
@@ -1036,7 +1036,7 @@ function SignUpFlow({
                 <button
                   type="button"
                   onClick={() => onSwitchToSignIn(data.phone)}
-                  className="font-medium text-lime hover:text-lime-400 underline"
+                  className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
                 >
                   Sign in instead &rarr;
                 </button>
@@ -1049,7 +1049,7 @@ function SignUpFlow({
                 <button
                   type="button"
                   onClick={() => onSwitchToSignIn(data.phone)}
-                  className="font-medium text-lime hover:text-lime-400 underline"
+                  className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
                 >
                   Sign in here
                 </button>{' '}
@@ -1075,7 +1075,7 @@ function SignUpFlow({
               <button
                 type="button"
                 onClick={() => onSwitchToSignIn(data.phone)}
-                className="font-medium text-lime hover:text-lime-400 underline"
+                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
               >
                 Sign in instead &rarr;
               </button>
@@ -1573,7 +1573,7 @@ export function InlineAuth({
   if ((isAuthenticated || !!localAuthData || !!localAuthRef.current) && effectiveData) {
     const { first_name, last_name, phone, email } = effectiveData.customer;
     return (
-      <div className="rounded-lg border border-lime/30 bg-lime/5 p-4">
+      <div className="rounded-lg border border-accent-brand/30 bg-accent-brand/5 p-4">
         <div className="flex items-start justify-between gap-4">
           {/* Left: Customer info */}
           <div className="min-w-0 flex-1">
@@ -1626,10 +1626,10 @@ export function InlineAuth({
           <button
             type="button"
             onClick={() => setView('sign-in')}
-            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
+            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-accent-ui/50 hover:bg-accent-ui/5"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-brand/10 text-accent-brand">
                 <LogIn className="h-5 w-5" />
               </div>
               <div>
@@ -1642,10 +1642,10 @@ export function InlineAuth({
           <button
             type="button"
             onClick={() => setView('sign-up')}
-            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-lime/50 hover:bg-lime/5"
+            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-accent-ui/50 hover:bg-accent-ui/5"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime/10 text-lime">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-brand/10 text-accent-brand">
                 <UserPlus className="h-5 w-5" />
               </div>
               <div>

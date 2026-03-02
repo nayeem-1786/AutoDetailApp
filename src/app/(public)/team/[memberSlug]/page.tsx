@@ -105,7 +105,7 @@ export default async function TeamMemberPage({ params }: PageProps) {
       {/* Back link */}
       <Link
         href="/p/about"
-        className="inline-flex items-center gap-1.5 text-sm text-site-text-muted hover:text-lime transition-colors mb-8"
+        className="inline-flex items-center gap-1.5 text-sm text-site-text-muted hover:text-accent-ui transition-colors mb-8"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to About
@@ -126,7 +126,7 @@ export default async function TeamMemberPage({ params }: PageProps) {
             />
           </div>
         ) : (
-          <div className="flex h-[300px] w-[300px] flex-shrink-0 items-center justify-center rounded-full sm:rounded-2xl bg-lime/10 text-lime text-6xl font-bold">
+          <div className="flex h-[300px] w-[300px] flex-shrink-0 items-center justify-center rounded-full sm:rounded-2xl bg-accent-brand/10 text-accent-brand text-6xl font-bold">
             {getInitials(member.name)}
           </div>
         )}
@@ -136,7 +136,7 @@ export default async function TeamMemberPage({ params }: PageProps) {
           <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl">
             {member.name}
           </h1>
-          <p className="mt-2 text-lg font-medium text-lime">
+          <p className="mt-2 text-lg font-medium text-accent-brand">
             {member.role}
           </p>
 
@@ -153,7 +153,7 @@ export default async function TeamMemberPage({ params }: PageProps) {
               {member.certifications.map((cert) => (
                 <span
                   key={cert}
-                  className="inline-block rounded-full bg-lime/10 border border-lime/20 px-3 py-1 text-xs font-medium text-lime"
+                  className="inline-block rounded-full bg-accent-brand/10 border border-accent-brand/20 px-3 py-1 text-xs font-medium text-accent-brand"
                 >
                   {cert}
                 </span>
@@ -167,7 +167,7 @@ export default async function TeamMemberPage({ params }: PageProps) {
       {member.bio && (
         <div className="mt-12">
           <div
-            className="prose prose-invert max-w-none prose-headings:font-display prose-p:text-site-text-muted prose-p:leading-relaxed prose-a:text-lime hover:prose-a:text-lime-400 prose-li:text-site-text-muted"
+            className="prose prose-invert max-w-none prose-headings:font-display prose-p:text-site-text-muted prose-p:leading-relaxed prose-a:text-accent-ui hover:prose-a:text-accent-ui prose-li:text-site-text-muted"
             dangerouslySetInnerHTML={{ __html: member.bio }}
           />
         </div>

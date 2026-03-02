@@ -300,7 +300,7 @@ function getBgTransitionStyles(
   phase: 'in' | 'visible' | 'out',
   ticker: AnnouncementTicker,
 ): React.CSSProperties {
-  const bg = ticker.bg_color || '#CCFF00';
+  const bg = ticker.bg_color || 'var(--accent-brand)';
 
   switch (transition) {
     case 'slide_down':
@@ -365,7 +365,7 @@ export function TopBarTicker({
       <div
         className="ticker-track relative overflow-hidden py-2.5"
         style={{
-          backgroundColor: ticker.bg_color || '#CCFF00',
+          backgroundColor: ticker.bg_color || 'var(--accent-brand)',
           color: ticker.text_color || '#000000',
         }}
       >
@@ -403,7 +403,7 @@ export function SectionTicker({
       <div
         className="ticker-track overflow-hidden py-2.5"
         style={{
-          backgroundColor: ticker.bg_color || '#CCFF00',
+          backgroundColor: ticker.bg_color || 'var(--accent-brand)',
           color: ticker.text_color || '#000000',
         }}
       >

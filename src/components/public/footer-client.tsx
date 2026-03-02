@@ -166,7 +166,7 @@ function FooterColumnRenderer({
               <Link
                 href={link.url}
                 target={link.target || '_self'}
-                className="text-sm text-site-text-muted hover:text-lime transition-colors"
+                className="text-sm text-site-text-muted hover:text-accent-ui transition-colors"
               >
                 {link.label}
               </Link>
@@ -181,7 +181,7 @@ function FooterColumnRenderer({
 
       {column.content_type === 'html' && column.html_content && (
         <div
-          className="text-sm text-site-text-muted space-y-2 [&_a]:text-lime [&_a]:hover:underline"
+          className="text-sm text-site-text-muted space-y-2 [&_a]:text-accent-brand [&_a]:hover:underline"
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: column.html_content }}
         />
@@ -228,7 +228,7 @@ function BrandColumn({
         />
       ) : (
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-accent-brand flex items-center justify-center">
             <span className="text-site-text-on-primary font-black text-lg">S</span>
           </div>
           <span className="text-site-text font-bold text-lg">
@@ -311,14 +311,14 @@ function BusinessInfoColumn({
     <div className="space-y-2.5">
       <Link
         href="/book"
-        className="text-sm text-site-text-muted hover:text-lime transition-colors"
+        className="text-sm text-site-text-muted hover:text-accent-ui transition-colors"
       >
         Book Appointment
       </Link>
       <br />
       <Link
         href="/book"
-        className="text-sm text-site-text-muted hover:text-lime transition-colors"
+        className="text-sm text-site-text-muted hover:text-accent-ui transition-colors"
       >
         Get a Quote
       </Link>

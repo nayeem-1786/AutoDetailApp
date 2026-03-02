@@ -163,7 +163,7 @@ function StepIndicator({
     <nav className="flex items-center gap-1 sm:gap-2 mb-8">
       <Link
         href="/cart"
-        className="text-xs sm:text-sm text-site-text-faint hover:text-lime transition-colors"
+        className="text-xs sm:text-sm text-site-text-faint hover:text-accent-ui transition-colors"
       >
         Cart
       </Link>
@@ -181,21 +181,21 @@ function StepIndicator({
               onClick={() => !isFuture && onStepClick(step.num)}
               className={`flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-colors ${
                 isActive
-                  ? 'text-lime'
+                  ? 'text-accent-brand'
                   : isComplete
-                    ? 'text-site-text hover:text-lime cursor-pointer'
+                    ? 'text-site-text hover:text-accent-ui cursor-pointer'
                     : 'text-site-text-faint cursor-not-allowed'
               }`}
             >
               {isComplete ? (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-lime/20 text-lime">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-brand/20 text-accent-brand">
                   <Check className="h-3 w-3" />
                 </span>
               ) : (
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
                     isActive
-                      ? 'bg-lime text-site-text-on-primary'
+                      ? 'bg-accent-brand text-site-text-on-primary'
                       : 'bg-site-border text-site-text-faint'
                   }`}
                 >
@@ -288,7 +288,7 @@ function PaymentForm({
       <button
         type="submit"
         disabled={!stripe || processing}
-        className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-lime px-6 py-4 text-base font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-accent-brand px-6 py-4 text-base font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors shadow-lg shadow-accent-brand/20 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {processing ? (
           <span className="flex items-center gap-2">
@@ -308,7 +308,7 @@ function PaymentForm({
 // ---------------------------------------------------------------------------
 
 const inputClass =
-  'w-full rounded-xl border border-site-border bg-brand-dark px-4 py-2.5 text-sm text-site-text placeholder:text-site-text-faint focus:border-lime focus:outline-none focus:ring-1 focus:ring-lime disabled:opacity-60';
+  'w-full rounded-xl border border-site-border bg-brand-dark px-4 py-2.5 text-sm text-site-text placeholder:text-site-text-faint focus:border-accent-ui focus:outline-none focus:ring-1 focus:ring-accent-ui disabled:opacity-60';
 
 // ---------------------------------------------------------------------------
 // Main Checkout Page
@@ -836,7 +836,7 @@ function CheckoutContent() {
                     Contact Information
                   </h2>
                   {autoPopulated && (
-                    <p className="text-xs text-lime mb-4">
+                    <p className="text-xs text-accent-brand mb-4">
                       Using your saved information — feel free to edit
                     </p>
                   )}
@@ -906,7 +906,7 @@ function CheckoutContent() {
                     <label
                       className={`flex items-start gap-3 cursor-pointer rounded-xl border p-4 transition-colors ${
                         fulfillmentMethod === 'pickup'
-                          ? 'border-lime/30 bg-lime/5'
+                          ? 'border-accent-brand/30 bg-accent-brand/5'
                           : 'border-site-border hover:border-site-border-light'
                       }`}
                     >
@@ -916,15 +916,15 @@ function CheckoutContent() {
                         value="pickup"
                         checked={fulfillmentMethod === 'pickup'}
                         onChange={() => setFulfillmentMethod('pickup')}
-                        className="mt-0.5 accent-lime"
+                        className="mt-0.5 accent-accent-brand"
                       />
                       <div>
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-lime" />
+                          <MapPin className="h-4 w-4 text-accent-brand" />
                           <span className="font-medium text-site-text">
                             Local Pickup
                           </span>
-                          <span className="text-xs font-bold text-lime">
+                          <span className="text-xs font-bold text-accent-brand">
                             FREE
                           </span>
                         </div>
@@ -938,7 +938,7 @@ function CheckoutContent() {
                     <label
                       className={`flex items-start gap-3 cursor-pointer rounded-xl border p-4 transition-colors ${
                         fulfillmentMethod === 'shipping'
-                          ? 'border-lime/30 bg-lime/5'
+                          ? 'border-accent-brand/30 bg-accent-brand/5'
                           : 'border-site-border hover:border-site-border-light'
                       }`}
                     >
@@ -948,11 +948,11 @@ function CheckoutContent() {
                         value="shipping"
                         checked={fulfillmentMethod === 'shipping'}
                         onChange={() => setFulfillmentMethod('shipping')}
-                        className="mt-0.5 accent-lime"
+                        className="mt-0.5 accent-accent-brand"
                       />
                       <div>
                         <div className="flex items-center gap-2">
-                          <Truck className="h-4 w-4 text-lime" />
+                          <Truck className="h-4 w-4 text-accent-brand" />
                           <span className="font-medium text-site-text">
                             Ship to Address
                           </span>
@@ -970,7 +970,7 @@ function CheckoutContent() {
                 <div className="flex items-center justify-between">
                   <Link
                     href="/cart"
-                    className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-lime transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-accent-ui transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Back to Cart
@@ -985,7 +985,7 @@ function CheckoutContent() {
                       setCurrentStep(2);
                     }}
                     disabled={!contactValid}
-                    className="rounded-xl bg-lime px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="rounded-xl bg-accent-brand px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors shadow-lg shadow-accent-brand/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continue
                   </button>
@@ -1071,7 +1071,7 @@ function CheckoutContent() {
 
                       {ratesLoading && (
                         <div className="flex items-center gap-2 text-sm text-site-text-muted py-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-lime" />
+                          <Loader2 className="h-4 w-4 animate-spin text-accent-ui" />
                           Calculating shipping options...
                         </div>
                       )}
@@ -1110,7 +1110,7 @@ function CheckoutContent() {
                               key={rate.id}
                               className={`flex items-center justify-between cursor-pointer rounded-xl border p-3 transition-colors ${
                                 selectedRateId === rate.id
-                                  ? 'border-lime/30 bg-lime/5'
+                                  ? 'border-accent-brand/30 bg-accent-brand/5'
                                   : 'border-site-border hover:border-site-border-light'
                               }`}
                             >
@@ -1121,7 +1121,7 @@ function CheckoutContent() {
                                   value={rate.id}
                                   checked={selectedRateId === rate.id}
                                   onChange={() => setSelectedRateId(rate.id)}
-                                  className="accent-lime"
+                                  className="accent-accent-brand"
                                 />
                                 {showCarrierLogo && rate.carrierLogo && (
                                   <Image
@@ -1149,7 +1149,7 @@ function CheckoutContent() {
                               <span
                                 className={`text-sm font-semibold tabular-nums ${
                                   rate.totalAmount === 0
-                                    ? 'text-lime'
+                                    ? 'text-accent-brand'
                                     : 'text-site-text'
                                 }`}
                               >
@@ -1210,7 +1210,7 @@ function CheckoutContent() {
                   <button
                     type="button"
                     onClick={() => setCurrentStep(1)}
-                    className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-lime transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-accent-ui transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Back
@@ -1225,7 +1225,7 @@ function CheckoutContent() {
                       handleCreatePaymentIntent();
                     }}
                     disabled={loading || (!contactValid) || (fulfillmentMethod === 'shipping' && !shippingAddressValid) || ratesLoading}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-lime px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-accent-brand px-6 py-3 text-sm font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors shadow-lg shadow-accent-brand/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={buttonState.disabled ? buttonState.label : undefined}
                   >
                     {loading ? (
@@ -1267,7 +1267,7 @@ function CheckoutContent() {
                     <button
                       type="button"
                       onClick={handleBackFromPayment}
-                      className="flex items-center gap-1 text-xs text-site-text-faint hover:text-lime transition-colors"
+                      className="flex items-center gap-1 text-xs text-site-text-faint hover:text-accent-ui transition-colors"
                     >
                       <Pencil className="h-3 w-3" />
                       Edit
@@ -1313,7 +1313,7 @@ function CheckoutContent() {
                     <button
                       type="button"
                       onClick={handleBackFromPayment}
-                      className="flex items-center gap-1 text-xs text-site-text-faint hover:text-lime transition-colors"
+                      className="flex items-center gap-1 text-xs text-site-text-faint hover:text-accent-ui transition-colors"
                     >
                       <Pencil className="h-3 w-3" />
                       Edit
@@ -1362,7 +1362,7 @@ function CheckoutContent() {
                 <button
                   type="button"
                   onClick={handleBackFromPayment}
-                  className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-lime transition-colors"
+                  className="flex items-center gap-1.5 text-sm text-site-text-muted hover:text-accent-ui transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Back to Shipping
@@ -1440,8 +1440,8 @@ function CheckoutContent() {
 
                 {totals && totals.discount > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-lime">Discount</span>
-                    <span className="text-lime tabular-nums">
+                    <span className="text-accent-brand">Discount</span>
+                    <span className="text-accent-brand tabular-nums">
                       -{formatCurrency(totals.discount / 100)}
                     </span>
                   </div>
@@ -1454,7 +1454,7 @@ function CheckoutContent() {
                       className={`tabular-nums ${
                         totals.shipping > 0
                           ? 'text-site-text'
-                          : 'text-lime font-medium'
+                          : 'text-accent-brand font-medium'
                       }`}
                     >
                       {totals.shipping > 0
@@ -1462,7 +1462,7 @@ function CheckoutContent() {
                         : 'FREE'}
                     </span>
                   ) : fulfillmentMethod === 'pickup' ? (
-                    <span className="text-lime font-medium">
+                    <span className="text-accent-brand font-medium">
                       FREE (Local Pickup)
                     </span>
                   ) : selectedRate ? (
@@ -1512,7 +1512,7 @@ function CheckoutContent() {
               </div>
 
               {couponCode && !totals && (
-                <div className="flex items-center gap-2 rounded-xl bg-lime/10 border border-lime/20 px-3 py-2 text-sm text-lime">
+                <div className="flex items-center gap-2 rounded-xl bg-accent-brand/10 border border-accent-brand/20 px-3 py-2 text-sm text-accent-brand">
                   <span>Coupon: {couponCode}</span>
                 </div>
               )}
@@ -1531,7 +1531,7 @@ export default function CheckoutPage() {
         <section className="bg-brand-dark py-16 sm:py-24">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 text-center">
             <div className="flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-lime" />
+              <Loader2 className="h-8 w-8 animate-spin text-accent-ui" />
             </div>
           </div>
         </section>

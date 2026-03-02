@@ -72,7 +72,7 @@ export default function AccountOrderDetailPage() {
     return (
       <div className="py-16 text-center">
         <p className="text-site-text-faint">Order not found</p>
-        <button onClick={() => router.push('/account/orders')} className="mt-4 text-sm text-lime hover:underline">
+        <button onClick={() => router.push('/account/orders')} className="mt-4 text-sm text-accent-brand hover:underline">
           Back to Orders
         </button>
       </div>
@@ -126,7 +126,7 @@ export default function AccountOrderDetailPage() {
                 {item.product_slug && item.category_slug ? (
                   <Link
                     href={`/products/${item.category_slug}/${item.product_slug}`}
-                    className="font-medium text-site-text hover:text-lime"
+                    className="font-medium text-site-text hover:text-accent-ui"
                   >
                     {item.product_name}
                   </Link>
@@ -166,7 +166,7 @@ export default function AccountOrderDetailPage() {
           )}
           <div className="flex justify-between border-t border-site-border pt-2 font-semibold">
             <span className="text-site-text">Total</span>
-            <span className="text-lime">{formatCurrency(order.total / 100)}</span>
+            <span className="text-accent-brand">{formatCurrency(order.total / 100)}</span>
           </div>
         </div>
       </div>
@@ -203,7 +203,7 @@ export default function AccountOrderDetailPage() {
                 href={order.tracking_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block mt-2 rounded-lg bg-lime px-4 py-2 text-sm font-medium text-site-text-on-primary hover:opacity-90"
+                className="inline-block mt-2 rounded-lg bg-accent-brand px-4 py-2 text-sm font-medium text-site-text-on-primary hover:opacity-90"
               >
                 Track Package
               </a>

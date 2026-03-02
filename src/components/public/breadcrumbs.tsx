@@ -56,7 +56,7 @@ export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
               ) : (
                 <Link
                   href={item.href}
-                  className="underline underline-offset-2 decoration-site-text-faint transition-colors hover:text-lime hover:decoration-lime"
+                  className="underline underline-offset-2 decoration-site-text-faint transition-colors hover:text-accent-ui hover:decoration-accent-ui"
                 >
                   {item.label}
                 </Link>

@@ -23,7 +23,7 @@ function renderTitle(title: string) {
   return (
     <>
       {words.join(' ')}{' '}
-      <span className="text-gradient-lime">{lastWord}</span>
+      <span className="text-gradient-accent">{lastWord}</span>
     </>
   );
 }
@@ -249,7 +249,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
                 >
                   <Link
                     href={slide.cta_url}
-                    className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-4 site-btn-cta font-bold text-sm uppercase tracking-wider hover:shadow-lime-lg hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
+                    className="inline-flex items-center gap-2 mt-6 sm:mt-8 px-8 py-4 site-btn-cta font-bold text-sm uppercase tracking-wider hover:shadow-accent-lg hover:scale-[1.03] transition-all duration-300 btn-accent-glow"
                   >
                     {slide.content_type === 'video' && <Play className="w-4 h-4" />}
                     {slide.cta_text}
@@ -268,7 +268,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
           <button
             type="button"
             onClick={prev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:border-lime/30 transition-all"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:border-accent-ui/30 transition-all"
             aria-label="Previous slide"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -276,7 +276,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
           <button
             type="button"
             onClick={next}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:border-lime/30 transition-all"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:border-accent-ui/30 transition-all"
             aria-label="Next slide"
           >
             <ChevronRight className="w-5 h-5" />
@@ -294,7 +294,7 @@ export function HeroCarousel({ slides, config }: HeroCarouselProps) {
               onClick={() => goTo(i, i > current ? 1 : -1)}
               className={`h-1.5 rounded-full transition-all duration-500 ${
                 i === current
-                  ? 'bg-lime w-8'
+                  ? 'bg-accent-brand w-8'
                   : 'bg-white/30 w-1.5 hover:bg-white/50'
               }`}
               aria-label={`Go to slide ${i + 1}`}
@@ -371,13 +371,13 @@ function HeroBeforeAfter({
         className="absolute top-0 bottom-0 z-10 pointer-events-none"
         style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
       >
-        <div className="w-[3px] h-full bg-lime shadow-[0_0_8px_rgba(204,255,0,0.4)]" />
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-black border-2 border-lime shadow-2xl flex items-center justify-center">
+        <div className="w-[3px] h-full bg-accent-brand shadow-[0_0_8px_rgba(204,255,0,0.4)]" />
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-black border-2 border-accent-brand shadow-2xl flex items-center justify-center">
           <div className="flex items-center gap-0.5">
-            <svg className="w-3 h-3 text-lime rotate-180" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-accent-brand rotate-180" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
             </svg>
-            <svg className="w-3 h-3 text-lime" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-accent-brand" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
             </svg>
           </div>
@@ -397,7 +397,7 @@ function HeroBeforeAfter({
         className="pointer-events-none absolute top-4 right-4 z-20 transition-opacity duration-200"
         style={{ opacity: position < 90 ? 1 : 0 }}
       >
-        <span className="bg-lime/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-site-text-on-primary text-xs font-bold uppercase tracking-wider">
+        <span className="bg-accent-brand/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-site-text-on-primary text-xs font-bold uppercase tracking-wider">
           {afterLabel}
         </span>
       </div>

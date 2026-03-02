@@ -55,8 +55,8 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
             className={cn(
               'px-4 py-2 text-sm font-medium rounded-full border transition-all duration-300',
               !serviceFilter
-                ? 'bg-lime text-site-text-on-primary border-lime'
-                : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-lime/30 hover:text-lime'
+                ? 'bg-accent-brand text-site-text-on-primary border-accent-brand'
+                : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-accent-ui/30 hover:text-accent-ui'
             )}
           >
             All
@@ -68,8 +68,8 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
               className={cn(
                 'px-4 py-2 text-sm font-medium rounded-full border transition-all duration-300',
                 serviceFilter === s
-                  ? 'bg-lime text-site-text-on-primary border-lime'
-                  : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-lime/30 hover:text-lime'
+                  ? 'bg-accent-brand text-site-text-on-primary border-accent-brand'
+                  : 'bg-site-border-light border-site-border text-site-text-secondary hover:border-accent-ui/30 hover:text-accent-ui'
               )}
             >
               {s}
@@ -94,7 +94,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
             return (
               <div
                 key={pair.job_id}
-                className="mb-6 break-inside-avoid overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-lime/30 hover:shadow-lime-sm group"
+                className="mb-6 break-inside-avoid overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-accent-ui/30 hover:shadow-accent-sm group"
               >
                 <div aria-label={altText} className="relative">
                   <BeforeAfterSlider
@@ -109,7 +109,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
                   </div>
                 </div>
                 <div className="px-4 py-3">
-                  <p className="font-display text-sm font-semibold text-site-text group-hover:text-lime transition-colors">
+                  <p className="font-display text-sm font-semibold text-site-text group-hover:text-accent-ui transition-colors">
                     {pair.service_names.join(', ')}
                   </p>
                   <p className="mt-0.5 text-xs text-site-text-muted">
@@ -128,7 +128,7 @@ export function GalleryClient({ initialPairs, serviceOptions }: GalleryClientPro
         <div className="mt-12 text-center">
           <button
             onClick={() => setVisibleCount((prev) => prev + ITEMS_PER_PAGE)}
-            className="site-btn-cta px-8 py-3 text-sm font-bold hover:shadow-lime-lg hover:scale-[1.03] transition-all btn-lime-glow"
+            className="site-btn-cta px-8 py-3 text-sm font-bold hover:shadow-accent-lg hover:scale-[1.03] transition-all btn-accent-glow"
           >
             Load More
           </button>

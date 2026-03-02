@@ -86,7 +86,7 @@ export default function AccountOrdersPage() {
         <p className="mt-1 text-sm text-site-text-faint">Browse our products to get started.</p>
         <Link
           href="/products"
-          className="mt-6 rounded-lg bg-lime px-6 py-2 text-sm font-medium text-site-text-on-primary hover:opacity-90"
+          className="mt-6 rounded-lg bg-accent-brand px-6 py-2 text-sm font-medium text-site-text-on-primary hover:opacity-90"
         >
           Shop Products
         </Link>

@@ -106,7 +106,7 @@ export function CartDrawer() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-site-border px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <ShoppingBag className="h-5 w-5 text-lime" />
+            <ShoppingBag className="h-5 w-5 text-accent-brand" />
             <h2 className="font-display text-lg font-bold text-site-text">
               Your Cart
               {itemCount > 0 && (
@@ -136,7 +136,7 @@ export function CartDrawer() {
             <Link
               href="/products"
               onClick={closeCart}
-              className="text-sm font-medium text-lime hover:text-lime-200 transition-colors"
+              className="text-sm font-medium text-accent-brand hover:text-accent-brand-hover transition-colors"
             >
               Continue Shopping
             </Link>
@@ -176,7 +176,7 @@ export function CartDrawer() {
                   <Link
                     href={`/products/${item.categorySlug}/${item.slug}`}
                     onClick={closeCart}
-                    className="text-sm font-medium text-site-text hover:text-lime transition-colors truncate"
+                    className="text-sm font-medium text-site-text hover:text-accent-ui transition-colors truncate"
                   >
                     {item.name}
                   </Link>
@@ -232,7 +232,7 @@ export function CartDrawer() {
               <Link
                 href="/checkout"
                 onClick={closeCart}
-                className="flex items-center justify-center rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-site-text-on-primary hover:bg-lime-200 transition-colors shadow-lg shadow-lime/20"
+                className="flex items-center justify-center rounded-xl bg-accent-brand px-4 py-2.5 text-sm font-bold text-site-text-on-primary hover:bg-accent-brand-hover transition-colors shadow-lg shadow-accent-brand/20"
               >
                 Checkout
               </Link>

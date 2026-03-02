@@ -18,7 +18,7 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
   const effectivePrice = saleInfo?.isDiscounted ? saleInfo.currentPrice : product.retail_price;
 
   return (
-    <div className="group h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
+    <div className="group h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-accent-ui/30 hover:-translate-y-1 hover:shadow-accent-sm">
       {/* Image — links to detail */}
       <Link href={href} className="block">
         <div className="relative aspect-[4/3] w-full bg-brand-surface overflow-hidden">
@@ -48,12 +48,12 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
                 <span className="text-xs text-white/60 line-through mr-1.5">
                   {formatCurrency(saleInfo.originalPrice)}
                 </span>
-                <span className="text-sm font-bold text-lime">
+                <span className="text-sm font-bold text-accent-brand">
                   {formatCurrency(saleInfo.currentPrice)}
                 </span>
               </>
             ) : (
-              <span className="text-sm font-bold text-lime">
+              <span className="text-sm font-bold text-accent-brand">
                 {formatCurrency(product.retail_price)}
               </span>
             )}
@@ -63,7 +63,7 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
 
       <div className="p-5">
         <Link href={href}>
-          <h3 className="font-display text-base font-bold text-site-text group-hover:text-lime transition-colors">
+          <h3 className="font-display text-base font-bold text-site-text group-hover:text-accent-ui transition-colors">
             {product.name}
           </h3>
         </Link>

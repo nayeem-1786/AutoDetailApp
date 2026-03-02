@@ -24,7 +24,7 @@ export function TrustBarClient({
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 lg:gap-x-16">
           {/* Google */}
           <div className="flex items-center gap-2">
-            <Star className="h-5 w-5 fill-lime text-lime" />
+            <Star className="h-5 w-5 fill-accent-brand text-accent-brand" />
             <span className="text-xl sm:text-2xl font-bold text-site-text">{parseFloat(googleRating).toFixed(1)}</span>
             <span className="text-sm text-site-text-muted">
               Google (<CountUp end={parseInt(googleCount) || 0} className="font-semibold text-site-text" /> reviews)
@@ -35,7 +35,7 @@ export function TrustBarClient({
 
           {/* Yelp */}
           <div className="flex items-center gap-2">
-            <Star className="h-5 w-5 fill-lime text-lime" />
+            <Star className="h-5 w-5 fill-accent-brand text-accent-brand" />
             <span className="text-xl sm:text-2xl font-bold text-site-text">{parseFloat(yelpRating).toFixed(1)}</span>
             <span className="text-sm text-site-text-muted">
               Yelp (<CountUp end={parseInt(yelpCount) || 0} className="font-semibold text-site-text" /> reviews)
@@ -46,7 +46,7 @@ export function TrustBarClient({
 
           {/* Vehicles */}
           <div className="flex items-center gap-2">
-            <Car className="h-5 w-5 text-lime" />
+            <Car className="h-5 w-5 text-accent-ui" />
             <span className="text-xl sm:text-2xl font-bold text-site-text">
               <CountUp end={vehicleCount} suffix="+" />
             </span>
@@ -57,7 +57,7 @@ export function TrustBarClient({
 
           {/* Same-Day */}
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-lime" />
+            <Clock className="h-5 w-5 text-accent-ui" />
             <span className="text-sm text-site-text-muted">Same-Day Available</span>
           </div>
         </div>

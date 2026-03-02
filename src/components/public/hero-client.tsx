@@ -22,7 +22,7 @@ export function HeroClient({
         <div className="bg-white/10 backdrop-blur-sm px-4 py-3 flex items-center justify-between text-sm text-white/80">
           {vehicleInfo && <span>{vehicleInfo}</span>}
           {serviceName && (
-            <span className="text-lime font-medium">{serviceName}</span>
+            <span className="text-accent-brand font-medium">{serviceName}</span>
           )}
         </div>
       )}

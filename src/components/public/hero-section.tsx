@@ -29,13 +29,13 @@ export async function HeroSection({ tagline }: HeroSectionProps) {
             {/* Inline review stats */}
             <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-site-text-muted">
               <span className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-lime text-lime" />
+                <Star className="h-4 w-4 fill-accent-brand text-accent-brand" />
                 <span className="font-semibold text-site-text">{parseFloat(reviews.google.rating).toFixed(1)}</span>
                 <span>&middot; {reviews.google.count} Google Reviews</span>
               </span>
               <span className="hidden sm:inline text-white/30">|</span>
               <span className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-lime text-lime" />
+                <Star className="h-4 w-4 fill-accent-brand text-accent-brand" />
                 <span className="font-semibold text-site-text">{parseFloat(reviews.yelp.rating).toFixed(1)}</span>
                 <span>&middot; {reviews.yelp.count} Yelp Reviews</span>
               </span>
@@ -48,7 +48,7 @@ export async function HeroSection({ tagline }: HeroSectionProps) {
             <div className="mt-8">
               <Link
                 href="/book"
-                className="inline-flex items-center justify-center site-btn-cta font-bold text-base h-13 px-8 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:-translate-y-0.5 transition-all duration-300 btn-lime-glow"
+                className="inline-flex items-center justify-center site-btn-cta font-bold text-base h-13 px-8 shadow-lg shadow-accent-brand/25 hover:shadow-xl hover:shadow-accent-brand/40 hover:-translate-y-0.5 transition-all duration-300 btn-accent-glow"
               >
                 Book Appointment
               </Link>

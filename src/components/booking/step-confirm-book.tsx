@@ -441,7 +441,7 @@ export function StepConfirmBook({
       </div>
       {requirePayment && paymentOption !== 'pay_on_site' && paymentOption !== null && !discountsCoverAmount && (
         <>
-          <div className="flex justify-between pt-1 text-lime">
+          <div className="flex justify-between pt-1 text-accent-brand">
             <span>{paymentOption === 'full' ? 'Amount Due' : 'Deposit now'}</span>
             <span className="font-medium">{formatCurrency(paymentAmount)}</span>
           </div>
@@ -627,7 +627,7 @@ export function StepConfirmBook({
                           placeholder="e.g., SAVE20"
                           value={couponInput}
                           onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                          className="flex-1 font-mono border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-lime"
+                          className="flex-1 font-mono border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-accent-ui"
                         />
                         <Button
                           type="button"
@@ -740,7 +740,7 @@ export function StepConfirmBook({
                       <label
                         className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                           paymentOption === 'full'
-                            ? 'border-lime bg-brand-surface'
+                            ? 'border-accent-brand bg-brand-surface'
                             : 'border-site-border hover:border-site-border-medium'
                         }`}
                       >
@@ -750,7 +750,7 @@ export function StepConfirmBook({
                           value="full"
                           checked={paymentOption === 'full'}
                           onChange={() => handlePaymentOptionSwitch('full')}
-                          className="mt-0.5 h-4 w-4 text-lime focus:ring-lime"
+                          className="mt-0.5 h-4 w-4 text-accent-brand focus:ring-accent-ui"
                         />
                         <div className="flex-1">
                           <p className="text-sm font-medium text-site-text">
@@ -771,7 +771,7 @@ export function StepConfirmBook({
                         <label
                           className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                             paymentOption === 'deposit'
-                              ? 'border-lime bg-brand-surface'
+                              ? 'border-accent-brand bg-brand-surface'
                               : 'border-site-border hover:border-site-border-medium'
                           }`}
                         >
@@ -781,7 +781,7 @@ export function StepConfirmBook({
                             value="deposit"
                             checked={paymentOption === 'deposit'}
                             onChange={() => handlePaymentOptionSwitch('deposit')}
-                            className="mt-0.5 h-4 w-4 text-lime focus:ring-lime"
+                            className="mt-0.5 h-4 w-4 text-accent-brand focus:ring-accent-ui"
                           />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-site-text">
@@ -799,7 +799,7 @@ export function StepConfirmBook({
                         <label
                           className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                             paymentOption === 'pay_on_site'
-                              ? 'border-lime bg-brand-surface'
+                              ? 'border-accent-brand bg-brand-surface'
                               : 'border-site-border hover:border-site-border-medium'
                           }`}
                         >
@@ -809,7 +809,7 @@ export function StepConfirmBook({
                             value="pay_on_site"
                             checked={paymentOption === 'pay_on_site'}
                             onChange={() => handlePaymentOptionSwitch('pay_on_site')}
-                            className="mt-0.5 h-4 w-4 text-lime focus:ring-lime"
+                            className="mt-0.5 h-4 w-4 text-accent-brand focus:ring-accent-ui"
                           />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-site-text">
@@ -883,7 +883,7 @@ export function StepConfirmBook({
                         type="checkbox"
                         checked={agreedToAll}
                         onChange={(e) => setAgreedToAll(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-site-border text-lime focus:ring-lime"
+                        className="mt-0.5 h-4 w-4 rounded border-site-border text-accent-brand focus:ring-accent-ui"
                       />
                       <span className="text-xs text-site-text-secondary leading-relaxed">
                         I agree to the{' '}
@@ -891,7 +891,7 @@ export function StepConfirmBook({
                           href="/terms"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-lime hover:text-lime-200 underline"
+                          className="text-accent-brand hover:text-accent-brand-hover underline"
                           onClick={(e) => e.stopPropagation()}
                         >
                           Terms &amp; Conditions
@@ -923,7 +923,7 @@ export function StepConfirmBook({
                       type="button"
                       onClick={handleBookingSubmit}
                       disabled={!canSubmit}
-                      className="hidden lg:inline-flex bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+                      className="hidden lg:inline-flex bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
                     >
                       {submitting ? (
                         <>
@@ -967,7 +967,7 @@ export function StepConfirmBook({
               type="button"
               onClick={handleBookingSubmit}
               disabled={!canSubmit}
-              className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200"
+              className="bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
             >
               {submitting ? (
                 <>

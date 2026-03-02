@@ -102,7 +102,7 @@ export default function ServiceHistoryPage() {
           <select
             value={selectedVehicle}
             onChange={(e) => setSelectedVehicle(e.target.value)}
-            className="rounded-md border border-site-border bg-brand-surface px-3 py-2 text-sm text-site-text-muted focus:border-lime focus:outline-none focus:ring-1 focus:ring-lime"
+            className="rounded-md border border-site-border bg-brand-surface px-3 py-2 text-sm text-site-text-muted focus:border-accent-ui focus:outline-none focus:ring-1 focus:ring-accent-ui"
           >
             <option value="">All Vehicles</option>
             {vehicles.map((v) => (

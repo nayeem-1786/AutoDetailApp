@@ -156,7 +156,7 @@ export default async function GalleryPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <AnimatedSection>
             <h1 className="font-display text-4xl font-bold tracking-tight text-site-text sm:text-5xl">
-              Our <span className="text-gradient-lime">Work</span>
+              Our <span className="text-gradient-accent">Work</span>
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-site-text-muted">
               See the difference professional detailing makes. Browse our before and after gallery

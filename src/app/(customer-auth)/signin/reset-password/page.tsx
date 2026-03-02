@@ -52,7 +52,7 @@ export default function CustomerResetPasswordPage() {
     <section className="flex items-center justify-center py-12 sm:py-16">
       <div className="w-full max-w-md space-y-6 px-4">
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent-brand/10 border border-accent-brand/30 text-xl font-bold text-accent-brand">
             SD
           </div>
           <h1 className="mt-4 text-2xl font-bold text-site-text">

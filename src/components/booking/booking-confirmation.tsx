@@ -178,7 +178,7 @@ export function BookingConfirmation({
       {isPortal && (
         <div className="mt-8 flex justify-center">
           <Link href="/account">
-            <Button className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
+            <Button className="bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover">
               View My Appointments
             </Button>
           </Link>

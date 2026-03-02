@@ -125,7 +125,7 @@ export default function CustomerSignUpPage() {
         setError(
           <>
             This email is already linked to an account.{' '}
-            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
               Sign in here
             </Link>{' '}
             or use a different email.
@@ -135,7 +135,7 @@ export default function CustomerSignUpPage() {
         setHint(
           <>
             Welcome back! We already have your info on file.{' '}
-            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
               Sign in here
             </Link>{' '}
             to access your account.
@@ -154,7 +154,7 @@ export default function CustomerSignUpPage() {
           setError(
             <>
               This phone number is already linked to an account.{' '}
-              <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+              <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
                 Sign in here
               </Link>{' '}
               instead.
@@ -168,7 +168,7 @@ export default function CustomerSignUpPage() {
           setHint(
             <>
               Welcome back! We already have your info on file.{' '}
-              <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-lime hover:text-lime-400 underline">
+              <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-accent-brand hover:text-accent-ui underline">
                 Sign in here
               </Link>{' '}
               to access your account.
@@ -192,7 +192,7 @@ export default function CustomerSignUpPage() {
         setError(
           <>
             This email is already linked to an account.{' '}
-            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
               Sign in here
             </Link>{' '}
             or use a different email.
@@ -225,7 +225,7 @@ export default function CustomerSignUpPage() {
         setError(
           <>
             Your session has expired. Please{' '}
-            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
               start over
             </Link>{' '}
             to try again.
@@ -235,7 +235,7 @@ export default function CustomerSignUpPage() {
         setError(
           <>
             This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
-            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
               sign in as staff
             </Link>
             .
@@ -272,7 +272,7 @@ export default function CustomerSignUpPage() {
         setError(
           <>
             This phone number is already linked to an account.{' '}
-            <Link href="/signin" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
               Sign in here
             </Link>{' '}
             instead.
@@ -286,7 +286,7 @@ export default function CustomerSignUpPage() {
         setHint(
           <>
             Welcome back! We already have your info on file.{' '}
-            <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-accent-brand hover:text-accent-ui underline">
               Sign in here
             </Link>{' '}
             to access your account.
@@ -403,7 +403,7 @@ export default function CustomerSignUpPage() {
         setError(
           <>
             Your session has expired. Please{' '}
-            <Link href="/signup" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
               start over
             </Link>{' '}
             to try again.
@@ -413,7 +413,7 @@ export default function CustomerSignUpPage() {
         setError(
           <>
             This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
-            <Link href="/login" className="font-medium text-lime hover:text-lime-400 underline">
+            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
               sign in as staff
             </Link>
             .
@@ -443,7 +443,7 @@ export default function CustomerSignUpPage() {
       <div className="w-full max-w-md space-y-6 px-4">
         {/* Business Icon + Heading */}
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 border border-lime/30 text-xl font-bold text-lime">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent-brand/10 border border-accent-brand/30 text-xl font-bold text-accent-brand">
             SD
           </div>
           <h1 className="mt-4 text-2xl font-bold text-site-text">
@@ -772,7 +772,7 @@ export default function CustomerSignUpPage() {
           Already have an account?{' '}
           <Link
             href="/signin"
-            className="font-medium text-lime hover:text-lime-400 transition-colors"
+            className="font-medium text-accent-brand hover:text-accent-ui transition-colors"
           >
             Sign In
           </Link>

@@ -95,7 +95,7 @@ function PaymentForm({ amount, totalAmount, remainingAmount, isDeposit, onPaymen
               <span>Service Total</span>
               <span className="font-medium text-site-text">{formatCurrency(totalAmount)}</span>
             </div>
-            <div className="flex justify-between mt-1 text-lime font-medium">
+            <div className="flex justify-between mt-1 text-accent-brand font-medium">
               <span>Deposit Now</span>
               <span>{formatCurrency(amount)}</span>
             </div>
@@ -121,7 +121,7 @@ function PaymentForm({ amount, totalAmount, remainingAmount, isDeposit, onPaymen
         <Button type="button" variant="outline" onClick={onBack} disabled={processing} className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface">
           Back
         </Button>
-        <Button type="submit" disabled={!stripe || processing} className="bg-lime text-site-text-on-primary hover:bg-lime-200 dark:bg-lime dark:text-site-text-on-primary dark:hover:bg-lime-200">
+        <Button type="submit" disabled={!stripe || processing} className="bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover">
           {processing ? (
             <Spinner className="h-4 w-4" />
           ) : isDeposit ? (

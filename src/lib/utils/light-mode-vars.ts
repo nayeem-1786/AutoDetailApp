@@ -33,20 +33,8 @@ export const LIGHT_MODE_VARS: Record<string, string> = {
   '--site-text-on-primary': '#000000',
   // Divider
   '--site-divider': '#e5e7eb',
-  // Lime palette — charcoal neutrals for white background contrast
-  '--lime': '#545454',
-  '--lime-50': '#f5f5f5',
-  '--lime-100': '#e8e8e8',
-  '--lime-200': '#d4d4d4',
-  '--lime-300': '#737373',
-  '--lime-400': '#616161',
-  '--lime-500': '#545454',
-  '--lime-600': '#3d3d3d',
-  // Icon accent
-  '--site-icon-accent': '#CCFF00',
-  // Links — charcoal for contrast on white
-  '--site-link': '#545454',
-  '--site-link-hover': '#3d3d3d',
+  // Note: --lime palette overrides removed — accent-ui handles the light mode shift.
+  // --site-icon-accent and --site-link* flow through --accent-ui in :root.
   // Buttons — brand lime with black text, same as dark mode
   '--site-btn-primary-bg': '#CCFF00',
   '--site-btn-primary-text': '#000000',
@@ -54,6 +42,8 @@ export const LIGHT_MODE_VARS: Record<string, string> = {
   '--site-btn-cta-bg': '#CCFF00',
   '--site-btn-cta-text': '#000000',
   '--site-btn-cta-hover-bg': '#B8E600',
+  // Semantic accent — only accent-ui shifts to gray; accent-brand stays lime
+  '--accent-ui': '#545454',
   // Accent glow
   '--theme-accent-glow-rgb': '84, 84, 84',
   // UI tokens (shared components)

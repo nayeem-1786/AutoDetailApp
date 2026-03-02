@@ -57,7 +57,7 @@ export default async function ProductsPage() {
           <Breadcrumbs items={[{ label: 'Products' }]} />
           <AnimatedSection>
             <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl lg:text-5xl">
-              Our <span className="text-gradient-lime">Products</span>
+              Our <span className="text-gradient-accent">Products</span>
             </h1>
             <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
               Professional-grade products for every need. The same products our

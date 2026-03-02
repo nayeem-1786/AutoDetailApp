@@ -97,7 +97,7 @@ export function BeforeAfterSlider({
         style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
         onPointerDown={handlePointerDown}
       >
-        <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-lime bg-white shadow-lg transition-shadow hover:shadow-xl">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-accent-ui bg-white shadow-lg transition-shadow hover:shadow-xl">
           <ChevronLeft className="h-4 w-4 -mr-1 text-gray-700" />
           <ChevronRight className="h-4 w-4 -ml-1 text-gray-700" />
         </div>

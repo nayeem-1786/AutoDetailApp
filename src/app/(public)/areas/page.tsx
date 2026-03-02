@@ -72,7 +72,7 @@ export default async function AreasIndexPage() {
           <Breadcrumbs items={[{ label: 'Service Areas' }]} />
           <AnimatedSection>
             <h1 className="font-display text-3xl font-bold tracking-tight text-site-text sm:text-4xl lg:text-5xl">
-              Service <span className="text-gradient-lime">Areas</span>
+              Service <span className="text-gradient-accent">Areas</span>
             </h1>
             <p className="mt-4 max-w-3xl text-lg text-site-text-muted">
               {businessInfo.name} provides premium mobile auto detailing across
@@ -93,10 +93,10 @@ export default async function AreasIndexPage() {
                     href={`/areas/${city.slug}`}
                     className="group block h-full"
                   >
-                    <div className="relative h-full overflow-hidden rounded-2xl bg-brand-surface p-7 border border-site-border transition-all duration-300 hover:border-lime/30 hover:-translate-y-1 hover:shadow-lime-sm">
+                    <div className="relative h-full overflow-hidden rounded-2xl bg-brand-surface p-7 border border-site-border transition-all duration-300 hover:border-accent-ui/30 hover:-translate-y-1 hover:shadow-accent-sm">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <h2 className="font-display text-lg font-semibold text-site-text group-hover:text-lime transition-colors">
+                          <h2 className="font-display text-lg font-semibold text-site-text group-hover:text-accent-ui transition-colors">
                             {city.city_name}, {city.state}
                           </h2>
                           {city.distance_miles != null && (
@@ -111,7 +111,7 @@ export default async function AreasIndexPage() {
                             </p>
                           )}
                         </div>
-                        <div className="ml-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-site-text-dim group-hover:text-lime transition-colors">
+                        <div className="ml-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-site-text-dim group-hover:text-accent-ui transition-colors">
                           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                         </div>
                       </div>

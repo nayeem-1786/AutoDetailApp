@@ -64,7 +64,7 @@ function RichTextBlock({ block }: { block: PageContentBlock }) {
         </h2>
       )}
       <div
-        className="prose prose-invert max-w-none prose-headings:font-display prose-h2:text-2xl prose-h3:text-xl prose-p:text-site-text-muted prose-p:leading-relaxed prose-a:text-lime hover:prose-a:text-lime-400 prose-li:text-site-text-muted"
+        className="prose prose-invert max-w-none prose-headings:font-display prose-h2:text-2xl prose-h3:text-xl prose-p:text-site-text-muted prose-p:leading-relaxed prose-a:text-accent-brand hover:prose-a:text-accent-ui prose-li:text-site-text-muted"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>
@@ -147,7 +147,7 @@ function FeaturesListBlock({ block }: { block: PageContentBlock }) {
             className="rounded-xl border border-site-border bg-brand-surface p-6"
           >
             <div className="flex items-start gap-3">
-              <CheckCircle className="h-6 w-6 flex-shrink-0 text-lime mt-0.5" />
+              <CheckCircle className="h-6 w-6 flex-shrink-0 text-accent-brand mt-0.5" />
               <div>
                 <h3 className="text-base font-semibold text-site-text">
                   {item.title}
@@ -176,7 +176,7 @@ function CtaBlock({ block }: { block: PageContentBlock }) {
     <div className="content-block">
       <div className="rounded-2xl bg-gradient-to-br from-brand-grey to-black border border-site-border px-8 py-12 text-center sm:px-12 sm:py-16 relative overflow-hidden">
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-          <div className="w-64 h-64 bg-lime/5 rounded-full blur-3xl" />
+          <div className="w-64 h-64 bg-accent-brand/5 rounded-full blur-3xl" />
         </div>
         <div className="relative">
         <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl">
@@ -188,7 +188,7 @@ function CtaBlock({ block }: { block: PageContentBlock }) {
         <div className="mt-8">
           <Link
             href={data.button_url || '/book'}
-            className="inline-flex items-center justify-center gap-2 site-btn-cta btn-lime-glow font-semibold text-base h-13 px-8 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+            className="inline-flex items-center justify-center gap-2 site-btn-cta btn-accent-glow font-semibold text-base h-13 px-8 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
           >
             {data.button_text || 'Book Now'}
             <ArrowRight className="h-4 w-4" />
@@ -211,7 +211,7 @@ function TestimonialBlock({ block }: { block: PageContentBlock }) {
   return (
     <div className="content-block">
       <div className="rounded-2xl bg-brand-surface p-8 sm:p-10">
-        <Quote className="h-8 w-8 text-lime mb-4" />
+        <Quote className="h-8 w-8 text-accent-ui mb-4" />
         <blockquote className="text-lg leading-relaxed text-site-text-secondary italic">
           &ldquo;{data.quote}&rdquo;
         </blockquote>
@@ -287,7 +287,7 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
         renderCard={(member) => (
           <Link
             href={`/team/${member.slug}`}
-            className="group flex flex-col items-center text-center rounded-2xl border border-site-border bg-brand-surface p-6 hover:border-lime/30 transition-colors"
+            className="group flex flex-col items-center text-center rounded-2xl border border-site-border bg-brand-surface p-6 hover:border-accent-ui/30 transition-colors"
           >
             {/* Photo or initials */}
             {member.photo_url ? (
@@ -301,18 +301,18 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
                 />
               </div>
             ) : (
-              <div className="flex h-32 w-32 items-center justify-center rounded-full bg-lime/10 text-lime text-3xl font-bold mb-4">
+              <div className="flex h-32 w-32 items-center justify-center rounded-full bg-accent-ui/10 text-accent-brand text-3xl font-bold mb-4">
                 {getInitials(member.name)}
               </div>
             )}
 
             {/* Name */}
-            <h3 className="text-base font-bold text-site-text group-hover:text-lime transition-colors">
+            <h3 className="text-base font-bold text-site-text group-hover:text-accent-ui transition-colors">
               {member.name}
             </h3>
 
             {/* Role */}
-            <p className="mt-1 text-sm font-medium text-lime">
+            <p className="mt-1 text-sm font-medium text-accent-brand">
               {member.role}
             </p>
 
@@ -336,7 +336,7 @@ async function TeamGridBlock({ block }: { block: PageContentBlock }) {
                 {member.certifications.map((cert) => (
                   <span
                     key={cert}
-                    className="inline-block rounded-full bg-lime/10 border border-lime/20 px-2 py-0.5 text-[10px] font-medium text-lime"
+                    className="inline-block rounded-full bg-accent-ui/10 border border-accent-ui/20 px-2 py-0.5 text-[10px] font-medium text-accent-brand"
                   >
                     {cert}
                   </span>
@@ -523,7 +523,7 @@ async function TermsSectionsBlock({ block }: { block: PageContentBlock }) {
             </h3>
             {section.content ? (
               <div
-                className="mt-3 text-sm leading-relaxed text-site-text-muted prose prose-invert prose-sm max-w-none prose-p:text-site-text-muted prose-li:text-site-text-muted prose-a:text-lime"
+                className="mt-3 text-sm leading-relaxed text-site-text-muted prose prose-invert prose-sm max-w-none prose-p:text-site-text-muted prose-li:text-site-text-muted prose-a:text-accent-brand"
                 dangerouslySetInnerHTML={{ __html: section.content }}
               />
             ) : (
@@ -539,11 +539,11 @@ async function TermsSectionsBlock({ block }: { block: PageContentBlock }) {
         <p className="text-xs text-site-text-muted">
           If you have questions about these terms, please contact us at{' '}
           {biz.email ? (
-            <a href={`mailto:${biz.email}`} className="text-lime hover:underline">
+            <a href={`mailto:${biz.email}`} className="text-accent-brand hover:underline">
               {biz.email}
             </a>
           ) : (
-            <a href={`tel:${biz.phone}`} className="text-lime hover:underline">
+            <a href={`tel:${biz.phone}`} className="text-accent-brand hover:underline">
               {biz.phone}
             </a>
           )}

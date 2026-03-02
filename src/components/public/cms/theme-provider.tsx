@@ -25,8 +25,8 @@ interface ThemeProviderProps {
 
 /**
  * Maps site_theme_settings fields to CSS custom property names.
- * Sets raw :root vars (e.g. --brand-black, --lime) so Tailwind utilities
- * that reference them via var() in @theme inline cascade correctly.
+ * Sets raw :root vars (e.g. --brand-black, --lime) and semantic accent tokens
+ * so Tailwind utilities cascade correctly via @theme inline.
  * Only non-null fields produce variables.
  */
 function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
@@ -44,12 +44,14 @@ function buildSiteThemeVars(st: SiteThemeSettings): Record<string, string> {
   if (st.color_text_secondary) vars['--site-text-secondary'] = st.color_text_secondary;
   if (st.color_text_muted) vars['--site-text-muted'] = st.color_text_muted;
 
-  // Brand / accent colors — raw lime vars
+  // Brand / accent colors — set --lime (raw) which accent tokens alias via var()
   if (st.color_primary) {
     vars['--lime'] = st.color_primary;
     vars['--lime-300'] = st.color_primary;
   }
-  if (st.color_primary_hover) vars['--lime-200'] = st.color_primary_hover;
+  if (st.color_primary_hover) {
+    vars['--lime-200'] = st.color_primary_hover;
+  }
   if (st.color_accent) vars['--lime-400'] = st.color_accent;
   if (st.color_accent_hover) vars['--lime-500'] = st.color_accent_hover;
 

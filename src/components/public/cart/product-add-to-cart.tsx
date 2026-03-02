@@ -73,8 +73,8 @@ export function ProductAddToCart({ product }: ProductAddToCartProps) {
           disabled={atMax}
           className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-base py-3.5 transition-all duration-200 ${
             atMax
-              ? 'bg-lime/20 border border-lime/30 text-lime cursor-not-allowed'
-              : 'bg-lime text-site-text-on-primary hover:bg-lime-200 shadow-lg shadow-lime/20 hover:shadow-lime/30'
+              ? 'bg-accent-brand/20 border border-accent-brand/30 text-accent-brand cursor-not-allowed'
+              : 'bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover shadow-lg shadow-accent-brand/20 hover:shadow-accent-brand/30'
           }`}
         >
           {atMax ? (
@@ -97,7 +97,7 @@ export function ProductAddToCart({ product }: ProductAddToCartProps) {
       </div>
 
       {cartQty > 0 && (
-        <p className="text-sm text-lime">
+        <p className="text-sm text-accent-brand">
           {cartQty} already in your cart
         </p>
       )}

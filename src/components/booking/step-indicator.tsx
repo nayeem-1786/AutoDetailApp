@@ -36,8 +36,8 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
                   onClick={() => isCompleted && onStepClick?.(stepNum)}
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
-                    isCompleted && 'bg-lime text-site-text-on-primary cursor-pointer hover:bg-lime-200',
-                    isCurrent && 'bg-lime text-site-text-on-primary ring-2 ring-lime ring-offset-2 ring-offset-brand-dark cursor-default',
+                    isCompleted && 'bg-accent-brand text-site-text-on-primary cursor-pointer hover:bg-accent-brand-hover',
+                    isCurrent && 'bg-accent-brand text-site-text-on-primary ring-2 ring-accent-brand ring-offset-2 ring-offset-brand-dark cursor-default',
                     !isCompleted && !isCurrent && 'bg-brand-surface text-site-text-muted cursor-default'
                   )}
                   aria-label={isCompleted ? `Go back to ${step.label}` : step.label}
@@ -62,7 +62,7 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
                 <div
                   className={cn(
                     'mx-2 h-0.5 flex-1',
-                    isCompleted ? 'bg-lime' : 'bg-brand-surface'
+                    isCompleted ? 'bg-accent-brand' : 'bg-brand-surface'
                   )}
                 />
               )}
@@ -74,7 +74,7 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
       {/* Mobile: compact format */}
       <div className="sm:hidden flex flex-col items-center gap-3">
         <p className="text-sm font-medium text-site-text">
-          Step {currentStep} of {totalSteps}: <span className="text-lime">{currentLabel}</span>
+          Step {currentStep} of {totalSteps}: <span className="text-accent-brand">{currentLabel}</span>
         </p>
         <div className="flex items-center gap-2">
           {STEPS.map((step, index) => {
@@ -90,8 +90,8 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
                 onClick={() => isCompleted && onStepClick?.(stepNum)}
                 className={cn(
                   'h-2.5 w-2.5 rounded-full transition-colors',
-                  isCompleted && 'bg-lime cursor-pointer hover:bg-lime-200',
-                  isCurrent && 'bg-lime ring-2 ring-lime/30 cursor-default',
+                  isCompleted && 'bg-accent-brand cursor-pointer hover:bg-accent-brand-hover',
+                  isCurrent && 'bg-accent-brand ring-2 ring-accent-brand/30 cursor-default',
                   !isCompleted && !isCurrent && 'bg-brand-surface cursor-default'
                 )}
                 aria-label={isCompleted ? `Go back to ${step.label}` : step.label}

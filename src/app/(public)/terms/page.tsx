@@ -91,7 +91,7 @@ export default async function TermsPage() {
                 </h2>
                 {section.content ? (
                   <div
-                    className="mt-3 text-sm leading-relaxed text-site-text-muted prose prose-invert prose-sm max-w-none prose-p:text-site-text-muted prose-li:text-site-text-muted prose-a:text-lime"
+                    className="mt-3 text-sm leading-relaxed text-site-text-muted prose prose-invert prose-sm max-w-none prose-p:text-site-text-muted prose-li:text-site-text-muted prose-a:text-accent-brand"
                     dangerouslySetInnerHTML={{ __html: section.content }}
                   />
                 ) : (
@@ -107,11 +107,11 @@ export default async function TermsPage() {
             <p className="text-xs text-site-text-muted">
               If you have questions about these terms, please contact us at{' '}
               {biz.email ? (
-                <a href={`mailto:${biz.email}`} className="text-lime hover:underline">
+                <a href={`mailto:${biz.email}`} className="text-accent-brand hover:underline">
                   {biz.email}
                 </a>
               ) : (
-                <a href={`tel:${biz.phone}`} className="text-lime hover:underline">
+                <a href={`tel:${biz.phone}`} className="text-accent-brand hover:underline">
                   {biz.phone}
                 </a>
               )}

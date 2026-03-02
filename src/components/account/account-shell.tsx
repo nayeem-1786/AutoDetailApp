@@ -85,7 +85,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
             {businessPhone && (
               <a
                 href={`tel:${businessPhone.replace(/\D/g, '')}`}
-                className="flex items-center justify-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-site-text-on-primary hover:bg-lime-200 transition-colors"
+                className="flex items-center justify-center gap-2 rounded-full bg-accent-brand px-6 py-3 text-sm font-medium text-site-text-on-primary hover:bg-accent-brand-hover transition-colors"
               >
                 <Phone className="h-4 w-4" />
                 Call {formatPhone(businessPhone)}
@@ -121,7 +121,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
               className={cn(
                 'flex-shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-all',
                 isActive
-                  ? 'bg-lime/10 text-lime border border-lime/20'
+                  ? 'bg-accent-brand/10 text-accent-brand border border-accent-brand/20'
                   : 'text-site-text-muted hover:text-site-text'
               )}
             >

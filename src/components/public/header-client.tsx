@@ -138,14 +138,14 @@ export function HeaderClient({
               <Image src={logoUrl} alt={businessName} width={160} height={48} className="h-10 lg:h-12 w-auto" priority />
             ) : (
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-lime flex items-center justify-center">
+                <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-accent-brand flex items-center justify-center">
                   <span className="text-site-text-on-primary font-black text-lg lg:text-xl">S</span>
                 </div>
                 <div className="hidden sm:block">
                   <div className="text-site-text font-bold text-sm lg:text-base tracking-tight leading-none">
                     {businessName}
                   </div>
-                  <div className="text-lime text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase">
+                  <div className="text-accent-brand text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase">
                     Premium Detail
                   </div>
                 </div>
@@ -197,7 +197,7 @@ export function HeaderClient({
                         target={child.target || '_self'}
                         className="flex items-start gap-3 p-3 rounded-xl hover:bg-site-border-light transition-colors group"
                       >
-                        <div className="text-sm font-medium text-site-text group-hover:text-lime transition-colors">
+                        <div className="text-sm font-medium text-site-text group-hover:text-accent-ui transition-colors">
                           {child.label}
                         </div>
                       </Link>
@@ -237,7 +237,7 @@ export function HeaderClient({
                 >
                   <Link
                     href="/account"
-                    className="flex items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-lime/10 rounded-lg transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-accent-ui/10 rounded-lg transition-colors"
                   >
                     <LayoutDashboard className="w-4 h-4 text-site-text-muted" />
                     Dashboard
@@ -270,7 +270,7 @@ export function HeaderClient({
             {/* CTA */}
             <Link
               href="/book"
-              className="hidden sm:inline-flex items-center gap-2 px-6 py-2.5 site-btn-cta text-sm font-bold transition-all duration-300 shadow-lg shadow-lime/25 hover:shadow-lime/40 hover:scale-[1.02] btn-lime-glow"
+              className="hidden sm:inline-flex items-center gap-2 px-6 py-2.5 site-btn-cta text-sm font-bold transition-all duration-300 shadow-lg shadow-accent-brand/25 hover:shadow-accent-brand/40 hover:scale-[1.02] btn-accent-glow"
             >
               Book Now
             </Link>

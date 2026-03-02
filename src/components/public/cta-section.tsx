@@ -26,7 +26,7 @@ export async function CtaSection({
     <section className="bg-gradient-to-br from-brand-grey to-brand-black section-spacing relative overflow-hidden">
       {/* Subtle radial glow behind CTA */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-        <div className="w-96 h-96 bg-lime/5 rounded-full blur-3xl" />
+        <div className="w-96 h-96 bg-accent-brand/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -43,7 +43,7 @@ export async function CtaSection({
               <div className="mt-10">
                 <Link
                   href="/book"
-                  className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-lg h-14 px-10 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
+                  className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-lg h-14 px-10 shadow-lg shadow-accent-brand/25 hover:shadow-xl hover:shadow-accent-brand/40 hover:scale-[1.03] transition-all duration-300 btn-accent-glow"
                 >
                   {buttonText}
                   <ArrowRight className="h-5 w-5" />
@@ -51,7 +51,7 @@ export async function CtaSection({
               </div>
               <a
                 href={`tel:${phoneToE164(biz.phone)}`}
-                className="mt-5 inline-block text-sm font-medium text-site-text-dim hover:text-lime transition-colors"
+                className="mt-5 inline-block text-sm font-medium text-site-text-dim hover:text-accent-ui transition-colors"
               >
                 or call {formatPhone(biz.phone)}
               </a>
@@ -77,7 +77,7 @@ export async function CtaSection({
             <div className="mt-10">
               <Link
                 href="/book"
-                className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-lg h-14 px-10 shadow-lg shadow-lime/25 hover:shadow-xl hover:shadow-lime/40 hover:scale-[1.03] transition-all duration-300 btn-lime-glow"
+                className="inline-flex items-center justify-center gap-2 site-btn-cta font-bold text-lg h-14 px-10 shadow-lg shadow-accent-brand/25 hover:shadow-xl hover:shadow-accent-brand/40 hover:scale-[1.03] transition-all duration-300 btn-accent-glow"
               >
                 Book Your Detail
                 <ArrowRight className="h-5 w-5" />
@@ -85,7 +85,7 @@ export async function CtaSection({
             </div>
             <a
               href={`tel:${phoneToE164(biz.phone)}`}
-              className="mt-5 inline-block text-sm font-medium text-site-text-dim hover:text-lime transition-colors"
+              className="mt-5 inline-block text-sm font-medium text-site-text-dim hover:text-accent-ui transition-colors"
             >
               or call {formatPhone(biz.phone)}
             </a>
