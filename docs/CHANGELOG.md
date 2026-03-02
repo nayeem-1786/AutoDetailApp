@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: POS scanner icon persists green state across reloads — 2026-03-02
+
+The POS barcode scanner icon (green = detected, gray = not) would reset to gray on page reload, PWA background/foreground, or idle lock/unlock — making staff think the Bluetooth scanner disconnected when it was still connected. Fixed by persisting the detection flag in `sessionStorage`, which survives reloads within the same browser/PWA session. Icon stays green until the session ends (tab close or fresh PWA launch).
+
+---
+
 ## fix: Prevent duplicate services on POS tickets — 2026-03-02
 
 Staff could tap the same detail service multiple times in POS and it would add as separate line items, causing double/triple charges. The quote builder already had this guard but the POS ticket flow did not.

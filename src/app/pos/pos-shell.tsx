@@ -189,7 +189,12 @@ function PosShellContent({
   const [heldPanelOpen, setHeldPanelOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [businessName, setBusinessName] = useState('POS');
-  const [scannerDetected, setScannerDetected] = useState(false);
+  const [scannerDetected, setScannerDetected] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('pos-scanner-detected') === '1';
+    }
+    return false;
+  });
 
   // Fetch business name for header branding
   useEffect(() => {
@@ -208,7 +213,10 @@ function PosShellContent({
 
   // Listen for barcode scanner detection to light up the scanner icon
   useEffect(() => {
-    const handler = () => setScannerDetected(true);
+    const handler = () => {
+      setScannerDetected(true);
+      try { sessionStorage.setItem('pos-scanner-detected', '1'); } catch {}
+    };
     window.addEventListener('pos-scanner-detected', handler);
     return () => window.removeEventListener('pos-scanner-detected', handler);
   }, []);
