@@ -20,11 +20,6 @@ export function usePosTheme() {
 
 const STORAGE_KEY = 'pos-theme';
 
-function getInitialTheme(): PosTheme {
-  if (typeof window === 'undefined') return 'light';
-  return (localStorage.getItem(STORAGE_KEY) as PosTheme) || 'light';
-}
-
 function resolveTheme(theme: PosTheme): 'light' | 'dark' {
   if (theme === 'system') {
     if (typeof window === 'undefined') return 'light';
@@ -34,8 +29,16 @@ function resolveTheme(theme: PosTheme): 'light' | 'dark' {
 }
 
 export function PosThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<PosTheme>(getInitialTheme);
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolveTheme(getInitialTheme()));
+  // Always start 'light' to match SSR — read localStorage after hydration
+  const [theme, setThemeState] = useState<PosTheme>('light');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+
+  // Read saved theme from localStorage after mount (avoids hydration mismatch)
+  useEffect(() => {
+    const saved = (localStorage.getItem(STORAGE_KEY) as PosTheme) || 'light';
+    setThemeState(saved);
+    setResolvedTheme(resolveTheme(saved));
+  }, []);
 
   // Apply .dark class + color-scheme to <html> whenever resolvedTheme changes
   useEffect(() => {
