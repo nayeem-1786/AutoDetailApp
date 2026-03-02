@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: Combined Complete User Manual (Phase 14 session 8) — 2026-03-02
+
+Assembled all 12 manual chapters into a single comprehensive document:
+
+- **COMPLETE_MANUAL.md** (7,592 lines): Full combined user manual with title, generated date, audience note (Owners/Admins, Staff/Managers, Developers), auto-generated Table of Contents with markdown anchor links to all 12 chapters and 128 sections, all chapter content preserved verbatim with adjusted heading levels (# → ##, ## → ###, ### → ####), horizontal rule separators between chapters, navigation footers and per-chapter "Last updated" lines removed. Individual chapter files unmodified.
+
+---
+
 ## docs: User Manual — Developer Guide + Phase 14 Complete (Phase 14 session 7) — 2026-03-02
 
 Final manual chapter — the developer guide for onboarding new developers:
