@@ -12,6 +12,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
 import { ROLE_LABELS } from '@/lib/utils/constants';
 import { PosAuthProvider, usePosAuth } from './context/pos-auth-context';
 import type { PosSessionEmployee } from './context/pos-auth-context';
@@ -188,6 +189,7 @@ function PosShellContent({
   const [heldPanelOpen, setHeldPanelOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [businessName, setBusinessName] = useState('POS');
+  const [scannerDetected, setScannerDetected] = useState(false);
 
   // Fetch business name for header branding
   useEffect(() => {
@@ -202,6 +204,13 @@ function PosShellContent({
     const handler = () => setHeldPanelOpen(true);
     window.addEventListener('pos-open-held-panel', handler);
     return () => window.removeEventListener('pos-open-held-panel', handler);
+  }, []);
+
+  // Listen for barcode scanner detection to light up the scanner icon
+  useEffect(() => {
+    const handler = () => setScannerDetected(true);
+    window.addEventListener('pos-scanner-detected', handler);
+    return () => window.removeEventListener('pos-scanner-detected', handler);
   }, []);
 
   const handleHeaderLogout = useCallback(() => {
@@ -276,8 +285,8 @@ function PosShellContent({
         {/* Left: Scanner, Card Reader */}
         <div className="flex items-center gap-3">
           {/* Scanner indicator */}
-          <div className="flex items-center gap-1" title="Scanner: disconnected">
-            <ScanLine className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+          <div className="flex items-center gap-1" title={scannerDetected ? 'Scanner: connected' : 'Scanner: disconnected'}>
+            <ScanLine className={cn('h-4 w-4', scannerDetected ? 'text-green-500' : 'text-gray-400 dark:text-gray-500')} />
           </div>
 
           {/* Card Reader Status */}

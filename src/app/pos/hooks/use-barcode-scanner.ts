@@ -58,6 +58,7 @@ export function useBarcodeScanner({
         if (bufferRef.current.length >= minLength) {
           e.preventDefault();
           onScanRef.current(bufferRef.current);
+          window.dispatchEvent(new Event('pos-scanner-detected'));
         }
         bufferRef.current = '';
         return;

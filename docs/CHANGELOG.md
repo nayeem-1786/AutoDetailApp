@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: POS barcode scan false error + scanner icon indicator — 2026-03-02
+
+Two POS barcode scanning improvements:
+
+- **Barcode scan fallback**: When scanning a barcode with no exact match in the `barcode`/`sku` fields (most products have null barcode), the POS no longer shows a false "No product found" error toast. Instead it falls back silently to the text search results already visible in the search bar. Error toast only appears if both exact barcode lookup AND text search return zero results. Applied to both `pos-workspace.tsx` (active) and `catalog-panel.tsx` (dead code, kept consistent).
+- **Scanner icon lights up on scan**: The scanner icon in the POS header was hardcoded gray. Now dispatches a `pos-scanner-detected` custom event from `use-barcode-scanner.ts` on successful scan detection. `pos-shell.tsx` listens for this event and flips the icon from gray to green for the remainder of the session.
+
+---
+
 ## docs: Combined Complete User Manual (Phase 14 session 8) — 2026-03-02
 
 Assembled all 12 manual chapters into a single comprehensive document:
