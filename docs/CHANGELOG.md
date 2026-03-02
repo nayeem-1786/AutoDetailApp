@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: Show Ticker Gap Slider for Single Ticker — 2026-03-01
+
+- **Bug**: Message gap slider was inside `OptionsCard` (gated to 2+ active tickers), but the gap controls spacing between repeated copies of a single message in marquee mode — relevant with just 1 ticker
+- **Fix**: Extracted gap slider into standalone `GapSlider` component, shown when 1+ active ticker exists. `OptionsCard` (rotation settings) stays gated behind 2+ active.
+- **File**: `src/app/admin/website/tickers/page.tsx`
+
+---
+
 ## Feat: Configurable Message Gap for Ticker Scroll Mode — 2026-03-01
 
 - **Feature**: Per-placement "Message Gap" slider controlling space between repeated messages in scroll/marquee mode
