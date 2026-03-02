@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: User Manual — Services & Pricing, CMS Website (Phase 14 session 4) — 2026-03-02
+
+Two manual chapters covering the service catalog and the full CMS/website management system:
+
+- **06-services-pricing.md**: Service catalog overview, category management, service CRUD (all fields, classifications, vehicle compatibility, options), six pricing models (vehicle_size, scope, per_unit, specialty, flat, custom) with storage details, sale pricing (3 discount modes, scheduling, status indicators), add-on suggestions with combo pricing, service prerequisites (3 enforcement types), packages, mobile zones (feature flag, zone CRUD, booking rules)
+- **07-cms-website.md**: 16 sections covering the entire Website admin — overview dashboard (15 section cards in 4 groups), page editor (templates, HTML editor, content blocks, SEO, revisions, preview), HTML toolbar (all 4 button groups with CMS-only flags), hero carousel (3 content types, 6 color overrides, carousel config), navigation (2 placements, 3 link types, 7 built-in routes, nesting), footer (12-unit grid, 4 column types, brand editor), announcement tickers (all fields, 5 section positions, 10 target pages, multi-ticker rotation), themes (18 color tokens, typography, buttons, 8 seasonal presets, particle effects), SEO manager (score formula, AI optimization), city pages (AI generation, keyword density), catalog display, global blocks (9 block types), ads (creatives, page map, analytics), team members, credentials, homepage settings
+
+---
+
 ## docs: User Manual — Point of Sale (Phase 14 session 3) — 2026-03-02
 
 POS chapter — the most operationally critical chapter covering daily in-shop workflows:
