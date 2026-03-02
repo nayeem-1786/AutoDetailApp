@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Refactor: Move Message Gap to Per-Ticker Column — 2026-03-01
+
+- **Change**: Moved `message_gap` from global `TickerPlacementOptions` (per-placement JSONB in `business_settings`) to a per-ticker column on `announcement_tickers` table
+- **Why**: The gap controls spacing between repeated copies of the same message in its own marquee — it's an individual ticker property like scroll speed, not a global rotation setting
+- **Migration**: `20260301000001_ticker_message_gap.sql` — adds `message_gap NUMERIC NOT NULL DEFAULT 5` to `announcement_tickers`
+- **Admin edit page**: Scroll Speed and Message Gap sliders now side-by-side in the Appearance card
+- **Admin list page**: Removed standalone `GapSlider` component; gap is now per-ticker on the edit page
+- **Public component**: `MessageUnit` / `SingleTickerMarquee` read `ticker.message_gap` directly instead of from global options prop
+- **Files**: migration, `types.ts`, `cms.ts`, `tickers/page.tsx`, `tickers/[id]/page.tsx`, `announcement-ticker.tsx`, `tickers/[id]/route.ts`
+
+---
+
 ## Fix: Ticker Preview Speed Mismatch + Flash on Load — 2026-03-01
 
 - **Bug 1**: Edit page preview used `halfWidth / pxPerSec` while public site uses `(viewport + scrollWidth) / pxPerSec` — preview ran much faster than actual site

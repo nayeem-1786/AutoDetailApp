@@ -33,14 +33,12 @@ interface TickerPlacementOptions {
   hold_duration: number;
   bg_transition: 'slide_down' | 'crossfade' | 'none';
   text_entry: 'scroll' | 'ltr' | 'rtl' | 'ttb' | 'btt' | 'fade_in';
-  message_gap: number;
 }
 
 const DEFAULT_OPTIONS: TickerPlacementOptions = {
   hold_duration: 5,
   bg_transition: 'crossfade',
   text_entry: 'rtl',
-  message_gap: 5,
 };
 
 const BG_TRANSITION_OPTIONS = [
@@ -357,20 +355,6 @@ export default function TickerManagerPage() {
             />
           )}
 
-          {/* Top Bar Gap — show when 1+ active top bar ticker */}
-          {activeTopBar.length >= 1 && (
-            <GapSlider
-              label="Top Bar"
-              gap={topBarOptions.message_gap}
-              onChange={(gap) => {
-                const opts = { ...topBarOptions, message_gap: gap };
-                setTopBarOptions(opts);
-                saveOptions('ticker_top_bar_options', opts);
-              }}
-              disabled={isSubmitting}
-            />
-          )}
-
           {/* Top Bar Rotation Options — only when 2+ active */}
           {activeTopBar.length >= 2 && (
             <OptionsCard
@@ -394,20 +378,6 @@ export default function TickerManagerPage() {
               onToggle={toggleActive}
               onDelete={deleteTicker}
               onEdit={(id) => router.push(`/admin/website/tickers/${id}`)}
-              disabled={isSubmitting}
-            />
-          )}
-
-          {/* Section Gap — show when 1+ active section ticker */}
-          {activeSection.length >= 1 && (
-            <GapSlider
-              label="Section"
-              gap={sectionOptions.message_gap}
-              onChange={(gap) => {
-                const opts = { ...sectionOptions, message_gap: gap };
-                setSectionOptions(opts);
-                saveOptions('ticker_section_options', opts);
-              }}
               disabled={isSubmitting}
             />
           )}
@@ -518,55 +488,6 @@ function OptionsCard({
             <span className="text-xs text-gray-500">seconds</span>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// GapSlider — message gap control, visible with 1+ active ticker
-// ---------------------------------------------------------------------------
-function GapSlider({
-  label,
-  gap,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  gap: number;
-  onChange: (gap: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Settings2 className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-          {label} Scroll Settings
-        </h4>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Message Gap
-        </label>
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min={1}
-            max={100}
-            step={0.5}
-            value={gap}
-            onChange={(e) => onChange(Number(e.target.value))}
-            disabled={disabled}
-            className="flex-1"
-          />
-          <span className="text-xs text-gray-500 w-14 text-right">
-            {gap} rem
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-gray-400">
-          Space between repeated messages in scroll mode (1–100 rem).
-        </p>
       </div>
     </div>
   );

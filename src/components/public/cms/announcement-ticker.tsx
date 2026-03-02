@@ -38,7 +38,8 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 // MessageUnit — message text + optional link + spacer
 // ---------------------------------------------------------------------------
-function MessageUnit({ ticker, gap }: { ticker: AnnouncementTicker; gap: number }) {
+function MessageUnit({ ticker }: { ticker: AnnouncementTicker }) {
+  const gap = ticker.message_gap ?? 5;
   return (
     <span className="inline-flex items-center">
       <span dangerouslySetInnerHTML={{ __html: ticker.message }} />
@@ -70,7 +71,7 @@ const REPEAT_COUNT = 6;
 // creates a seamless loop. Hover pause is handled entirely by CSS:
 //   .ticker-track:hover .animate-marquee { animation-play-state: paused }
 // ---------------------------------------------------------------------------
-function SingleTickerMarquee({ ticker, gap }: { ticker: AnnouncementTicker; gap: number }) {
+function SingleTickerMarquee({ ticker }: { ticker: AnnouncementTicker }) {
   const speedValue = getSpeedValue(ticker);
   const ref = useRef<HTMLSpanElement>(null);
   const [duration, setDuration] = useState(20);
@@ -105,10 +106,10 @@ function SingleTickerMarquee({ ticker, gap }: { ticker: AnnouncementTicker; gap:
         }}
       >
         {Array.from({ length: REPEAT_COUNT }, (_, i) => (
-          <MessageUnit key={`a-${i}`} ticker={ticker} gap={gap} />
+          <MessageUnit key={`a-${i}`} ticker={ticker} />
         ))}
         {Array.from({ length: REPEAT_COUNT }, (_, i) => (
-          <MessageUnit key={`b-${i}`} ticker={ticker} gap={gap} />
+          <MessageUnit key={`b-${i}`} ticker={ticker} />
         ))}
       </span>
     </div>
@@ -196,7 +197,6 @@ const DEFAULT_OPTIONS: TickerPlacementOptions = {
   hold_duration: 5,
   bg_transition: 'crossfade',
   text_entry: 'rtl',
-  message_gap: 5,
 };
 
 // ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ function MultiTickerRotation({
       >
         {showContent ? (
           isScrollMode ? (
-            <SingleTickerMarquee key={currentIndex} ticker={current} gap={options.message_gap ?? 5} />
+            <SingleTickerMarquee key={currentIndex} ticker={current} />
           ) : (
             <StaticMessage
               key={currentIndex}
@@ -369,7 +369,7 @@ export function TopBarTicker({
           color: ticker.text_color || '#000000',
         }}
       >
-        <SingleTickerMarquee ticker={ticker} gap={options?.message_gap ?? 5} />
+        <SingleTickerMarquee ticker={ticker} />
       </div>
     );
   }
@@ -407,7 +407,7 @@ export function SectionTicker({
           color: ticker.text_color || '#000000',
         }}
       >
-        <SingleTickerMarquee ticker={ticker} gap={options?.message_gap ?? 5} />
+        <SingleTickerMarquee ticker={ticker} />
       </div>
     );
   }

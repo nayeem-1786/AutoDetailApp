@@ -957,6 +957,32 @@
 **Indexes:** `idx_page_block_unique` UNIQUE(page_path, block_id), `idx_page_block_path` (page_path, sort_order).
 **RLS:** Public read, authenticated full access.
 
+### announcement_tickers
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| message | TEXT | NOT NULL | Ticker text (supports inline HTML) |
+| link_url | TEXT | | Optional CTA link |
+| link_text | TEXT | | Optional link label |
+| placement | TEXT | NOT NULL, DEFAULT 'top_bar', CHECK ('top_bar','section') | |
+| section_position | TEXT | | Position for section tickers (e.g. 'before_footer') |
+| bg_color | TEXT | DEFAULT '#1e3a5f' | |
+| text_color | TEXT | DEFAULT '#ffffff' | |
+| scroll_speed | TEXT | DEFAULT 'normal', CHECK ('slow','normal','fast') | Legacy enum |
+| scroll_speed_value | INTEGER | DEFAULT 50 | Slider 1-100, overrides enum |
+| message_gap | NUMERIC | NOT NULL, DEFAULT 5 | Space in rem between repeated copies in marquee |
+| font_size | TEXT | DEFAULT 'sm', CHECK ('xs','sm','base','lg') | |
+| target_pages | JSONB | DEFAULT '["all"]' | Page types to show on |
+| starts_at | TIMESTAMPTZ | | Schedule start |
+| ends_at | TIMESTAMPTZ | | Schedule end |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Index:** `idx_tickers_active` on `(is_active, placement, sort_order)` WHERE `is_active = true`.
+**RLS:** Public read (active only), authenticated full access.
+
 ### homepage_config
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|

@@ -114,6 +114,7 @@ export default function TickerEditorPage() {
           text_color: ticker.text_color,
           scroll_speed: ticker.scroll_speed,
           scroll_speed_value: ticker.scroll_speed_value,
+          message_gap: ticker.message_gap,
           font_size: ticker.font_size,
           target_pages: ticker.target_pages,
           starts_at: localToIso(startDate),
@@ -182,7 +183,7 @@ export default function TickerEditorPage() {
                   {ticker.link_text && (
                     <span className="underline ml-2">{ticker.link_text}</span>
                   )}
-                  <span className="inline-block" style={{ width: '5rem' }} />
+                  <span className="inline-block" style={{ width: `${ticker.message_gap ?? 5}rem` }} />
                 </span>
               ))
             )}
@@ -298,27 +299,50 @@ export default function TickerEditorPage() {
           </div>
         </div>
 
-        {/* Scroll Speed Slider */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Scroll Speed
-          </label>
-          <div className="mt-2">
+        {/* Scroll Speed + Message Gap — side by side */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Scroll Speed */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Scroll Speed
+            </label>
             <input
               type="range"
               min={1}
               max={100}
-              step={1}
               value={speedValue}
-              onChange={(e) => update('scroll_speed_value', parseInt(e.target.value, 10))}
-              className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-brand-500 bg-gray-200 dark:bg-gray-600"
+              onChange={(e) => update('scroll_speed_value', Number(e.target.value))}
+              className="mt-2 w-full"
             />
-            <div className="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex justify-between text-xs text-gray-400 mt-1">
               <span>Slower</span>
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 {speedValue} &mdash; {Math.round(pxPerSec)} px/s
               </span>
               <span>Faster</span>
+            </div>
+          </div>
+
+          {/* Message Gap */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Message Gap
+            </label>
+            <input
+              type="range"
+              min={1}
+              max={100}
+              step={0.5}
+              value={ticker.message_gap ?? 5}
+              onChange={(e) => update('message_gap', Number(e.target.value))}
+              className="mt-2 w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-400 mt-1">
+              <span>Closer</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                {ticker.message_gap ?? 5} rem
+              </span>
+              <span>Further</span>
             </div>
           </div>
         </div>
