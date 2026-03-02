@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isFeatureEnabled } from '@/lib/utils/feature-flags';
-import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { getZoneGroup } from '@/lib/utils/job-zones';
 
+/**
+ * Admin gallery preview — shows what the public gallery will look like.
+ * Bypasses the PHOTO_GALLERY feature flag so admins can preview before enabling.
+ */
 export async function GET(request: NextRequest) {
   try {
-    // Check feature flag
-    const enabled = await isFeatureEnabled(FEATURE_FLAGS.PHOTO_GALLERY);
-    if (!enabled) {
-      return NextResponse.json({ error: 'Gallery not available' }, { status: 404 });
+    const employee = await getEmployeeFromSession();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const denied = await requirePermission(employee.id, 'admin.photos.manage');
+    if (denied) return denied;
+
     const { searchParams } = new URL(request.url);
-    const tag = searchParams.get('tag');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '12', 10), 48);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '48', 10), 100);
 
     const supabase = createAdminClient();
 
-    // Get featured, non-internal photos with intake or completion phase
     const { data: photos, error } = await supabase
       .from('job_photos')
       .select(
@@ -61,9 +64,7 @@ export async function GET(request: NextRequest) {
           job_id: photo.job_id,
           zone: photo.zone,
           vehicle: (Array.isArray(job.vehicles) ? job.vehicles[0] : job.vehicles) as {
-            make: string;
-            model: string;
-            year: number | null;
+            make: string; model: string; year: number | null;
           } | null,
           service_names: services.map((s) => s.name),
           date: job.created_at as string,
@@ -79,7 +80,6 @@ export async function GET(request: NextRequest) {
       } else if (photo.phase === 'completion' && !entry.completion) {
         entry.completion = photo;
       }
-      // Merge manual tags from both photos
       const photoTags = (photo.tags as string[]) || [];
       for (const t of photoTags) {
         if (!entry.manual_tags.includes(t)) entry.manual_tags.push(t);
@@ -91,47 +91,23 @@ export async function GET(request: NextRequest) {
       .filter((p): p is PairEntry & { intake: NonNullable<PairEntry['intake']>; completion: NonNullable<PairEntry['completion']> } =>
         p.intake !== null && p.completion !== null
       )
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, limit);
 
-    // Build filter options from ALL valid pairs (before applying tag filter)
+    // Build filter options
     const filterOptionSet = new Set<string>();
     for (const pair of allPairs) {
-      // Zone group
       const group = getZoneGroup(pair.zone);
       filterOptionSet.add(group === 'interior' ? 'Interior' : 'Exterior');
-      // Service names
       for (const name of pair.service_names) {
         if (name) filterOptionSet.add(name);
       }
-      // Manual tags
       for (const t of pair.manual_tags) {
         if (t) filterOptionSet.add(t);
       }
     }
-    const filterOptions = [...filterOptionSet].sort();
 
-    // Apply tag filter
-    let filtered = allPairs;
-    if (tag) {
-      const tagLower = tag.toLowerCase();
-      filtered = allPairs.filter((p) => {
-        // Zone group match
-        const group = getZoneGroup(p.zone);
-        if (tagLower === 'interior' && group === 'interior') return true;
-        if (tagLower === 'exterior' && group === 'exterior') return true;
-        // Service name match
-        if (p.service_names.some((s) => s.toLowerCase() === tagLower)) return true;
-        // Manual tag match
-        if (p.manual_tags.some((t) => t.toLowerCase() === tagLower)) return true;
-        return false;
-      });
-    }
-
-    const total = filtered.length;
-    const paginated = filtered.slice(offset, offset + limit);
-
-    // Build response — NO customer info
-    const results = paginated.map((pair) => ({
+    const results = allPairs.map((pair) => ({
       job_id: pair.job_id,
       zone: pair.zone,
       vehicle: pair.vehicle
@@ -147,11 +123,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: results,
-      total,
-      filter_options: filterOptions,
+      total: allPairs.length,
+      filter_options: [...filterOptionSet].sort(),
     });
   } catch (err) {
-    console.error('[gallery] Error:', err);
+    console.error('[admin/photos/gallery-preview] Error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

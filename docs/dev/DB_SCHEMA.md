@@ -1,7 +1,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
 > Auto-generated from `supabase/migrations/*.sql`
-> Last updated: Feb 28, 2026
+> Last updated: Mar 1, 2026
 
 ---
 
@@ -380,6 +380,7 @@
 | is_featured | BOOLEAN | NOT NULL, DEFAULT false | |
 | is_internal | BOOLEAN | NOT NULL, DEFAULT false | |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | |
+| tags | TEXT[] | NOT NULL, DEFAULT '{}' | Manual tags for gallery categorization. GIN indexed. |
 | created_by | UUID | FK → employees(id) | |
 
 ### job_addons
@@ -637,20 +638,6 @@
 | created_at | TIMESTAMPTZ | | |
 
 ---
-
-## Photos
-
-### photos
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| id | UUID | PK | |
-| appointment_id | UUID | FK → appointments(id) | |
-| transaction_id | UUID | FK → transactions(id) | |
-| customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE CASCADE | |
-| vehicle_id | UUID | FK → vehicles(id) | |
-| type | photo_type (enum) | NOT NULL | |
-| marketing_consent | BOOLEAN | NOT NULL, DEFAULT false | |
-| created_at | TIMESTAMPTZ | | |
 
 ---
 
@@ -1209,7 +1196,6 @@ Seeded with 45 common makes. Used in POS, admin, booking, and customer portal ve
 - **lifecycle_action**: sms, email, both
 - **consent_action**: (various)
 - **consent_source**: (various)
-- **photo_type**: (various)
 - **po_status**: draft, ordered, partial, received, cancelled
 - **quote_status**: draft, sent, accepted, declined, expired, converted
 

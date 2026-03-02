@@ -17,6 +17,9 @@ import {
   CheckSquare,
   Square,
   MousePointerClick,
+  Tag,
+  Plus,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { createClient } from '@/lib/supabase/client';
@@ -34,6 +37,7 @@ import {
   getZoneGroup,
 } from '@/lib/utils/job-zones';
 import type { Annotation } from '@/lib/utils/job-zones';
+import { BeforeAfterSlider } from '@/components/before-after-slider';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +51,8 @@ interface PhotoResponse {
   annotation_data: Annotation[] | null;
   is_featured: boolean;
   is_internal: boolean;
+  tags: string[];
+  has_pair: boolean;
   created_at: string;
   job: {
     id: string;
@@ -77,6 +83,16 @@ interface StaffOption {
   id: string;
   first_name: string;
   last_name: string;
+}
+
+interface GalleryPreviewPair {
+  job_id: string;
+  zone: string;
+  vehicle: { make: string; model: string; year: number | null } | null;
+  service_names: string[];
+  before_image: string;
+  after_image: string;
+  tags: string[];
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -131,6 +147,7 @@ export default function AdminPhotosPage() {
   const [staffId, setStaffId] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [search, setSearch] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
 
   // Customer search
   const customerTimerRef = useRef<NodeJS.Timeout>(undefined);
@@ -142,14 +159,26 @@ export default function AdminPhotosPage() {
   // Staff list for dropdown
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
 
+  // Tag suggestions
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+
   // Selection mode
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Bulk tag popover
+  const [showBulkTagPopover, setShowBulkTagPopover] = useState<'add' | 'remove' | null>(null);
+  const [bulkTagInput, setBulkTagInput] = useState('');
+
   // Detail modal
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  // Load staff list for dropdown
+  // Gallery preview mode
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewPairs, setPreviewPairs] = useState<GalleryPreviewPair[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Load staff list + tags
   useEffect(() => {
     async function loadStaff() {
       const supabase = createClient();
@@ -160,7 +189,17 @@ export default function AdminPhotosPage() {
         .order('first_name');
       if (data) setStaffList(data);
     }
+    async function loadTags() {
+      try {
+        const res = await adminFetch('/api/admin/photos/tags');
+        if (res.ok) {
+          const json = await res.json();
+          setAvailableTags(json.tags || []);
+        }
+      } catch { /* ignore */ }
+    }
     loadStaff();
+    loadTags();
   }, []);
 
   // Fetch photos
@@ -178,6 +217,7 @@ export default function AdminPhotosPage() {
       if (staffId) params.set('staff_id', staffId);
       if (featuredOnly) params.set('featured', 'true');
       if (search.length >= 2) params.set('search', search);
+      if (tagFilter) params.set('tag', tagFilter);
 
       const res = await adminFetch(`/api/admin/photos?${params}`);
       if (!res.ok) throw new Error('Failed to load photos');
@@ -190,7 +230,7 @@ export default function AdminPhotosPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, selectedCustomerId, zone, phase, staffId, featuredOnly, search]);
+  }, [dateFrom, dateTo, selectedCustomerId, zone, phase, staffId, featuredOnly, search, tagFilter]);
 
   useEffect(() => {
     if (canView) fetchPhotos(1);
@@ -251,6 +291,7 @@ export default function AdminPhotosPage() {
     if (selectMode) {
       setSelectMode(false);
       setSelectedIds(new Set());
+      setShowBulkTagPopover(null);
     } else {
       setSelectMode(true);
     }
@@ -266,7 +307,11 @@ export default function AdminPhotosPage() {
       });
       if (!res.ok) throw new Error();
       const json = await res.json();
-      toast.success(`Updated ${json.updated} photo${json.updated !== 1 ? 's' : ''}`);
+      let msg = `Updated ${json.updated} photo${json.updated !== 1 ? 's' : ''}`;
+      if (json.skipped > 0) {
+        msg += ` (${json.skipped} skipped — missing before/after pair)`;
+      }
+      toast.success(msg);
       setSelectedIds(new Set());
       fetchPhotos(page);
     } catch {
@@ -274,18 +319,56 @@ export default function AdminPhotosPage() {
     }
   };
 
-  // Single photo update (from modal)
-  const updatePhoto = async (photoId: string, updates: { is_featured?: boolean; is_internal?: boolean }) => {
+  // Bulk tag action
+  const bulkTagAction = async (action: 'add' | 'remove') => {
+    const tagValue = bulkTagInput.trim();
+    if (!tagValue) return;
+
+    try {
+      const body: Record<string, unknown> = { photo_ids: [...selectedIds] };
+      if (action === 'add') body.add_tags = [tagValue];
+      else body.remove_tags = [tagValue];
+
+      const res = await adminFetch('/api/admin/photos/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      toast.success(`${action === 'add' ? 'Added' : 'Removed'} tag "${tagValue}" on ${json.updated} photo${json.updated !== 1 ? 's' : ''}`);
+      setBulkTagInput('');
+      setShowBulkTagPopover(null);
+      fetchPhotos(page);
+      // Refresh tag list
+      const tagsRes = await adminFetch('/api/admin/photos/tags');
+      if (tagsRes.ok) {
+        const tagsJson = await tagsRes.json();
+        setAvailableTags(tagsJson.tags || []);
+      }
+    } catch {
+      toast.error('Tag update failed');
+    }
+  };
+
+  // Single photo update (from modal) — supports tags
+  const updatePhoto = async (photoId: string, updates: { is_featured?: boolean; is_internal?: boolean; tags?: string[] }) => {
     try {
       const res = await adminFetch(`/api/admin/photos/${photoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) throw new Error();
-      setPhotos((prev) =>
-        prev.map((p) => (p.id === photoId ? { ...p, ...updates } : p))
-      );
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        if (errJson?.error) {
+          toast.error(errJson.error);
+          return;
+        }
+        throw new Error();
+      }
+      // Refresh the photo list to get updated has_pair and pair status
+      fetchPhotos(page);
     } catch {
       toast.error('Update failed');
     }
@@ -301,9 +384,30 @@ export default function AdminPhotosPage() {
     setStaffId('');
     setFeaturedOnly(false);
     setSearch('');
+    setTagFilter('');
   };
 
-  const hasActiveFilters = dateFrom || dateTo || selectedCustomerId || zone || phase || staffId || featuredOnly || search;
+  const hasActiveFilters = dateFrom || dateTo || selectedCustomerId || zone || phase || staffId || featuredOnly || search || tagFilter;
+
+  // Gallery preview
+  const togglePreview = async () => {
+    if (previewMode) {
+      setPreviewMode(false);
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const res = await adminFetch('/api/admin/photos/gallery-preview?limit=48');
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      setPreviewPairs(json.data);
+      setPreviewMode(true);
+    } catch {
+      toast.error('Failed to load gallery preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   // ─── Render Guards ──────────────────────────────────────────────────────
 
@@ -337,6 +441,68 @@ export default function AdminPhotosPage() {
 
   const totalPages = Math.ceil(total / LIMIT);
 
+  // ─── Gallery Preview Mode ──────────────────────────────────────────────
+
+  if (previewMode) {
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title="Gallery Preview"
+          description={`${previewPairs.length} pairs will show on your website`}
+          action={
+            <Button variant="outline" size="sm" onClick={() => setPreviewMode(false)}>
+              Back to Photos
+            </Button>
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {previewPairs.map((pair, i) => {
+            const vehicleStr = pair.vehicle
+              ? `${pair.vehicle.year ? pair.vehicle.year + ' ' : ''}${pair.vehicle.make} ${pair.vehicle.model}`
+              : '';
+            return (
+              <Card key={`${pair.job_id}:${pair.zone}:${i}`} className="overflow-hidden">
+                <BeforeAfterSlider
+                  beforeSrc={pair.before_image}
+                  afterSrc={pair.after_image}
+                />
+                <div className="p-3">
+                  <p className="text-sm font-medium text-gray-900">
+                    {pair.service_names.join(', ')}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {vehicleStr && <>{vehicleStr} &middot; </>}
+                    {getZoneLabel(pair.zone)}
+                  </p>
+                  {pair.tags.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {pair.tags.map((t) => (
+                        <span key={t} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {previewPairs.length === 0 && (
+          <Card className="p-12 text-center">
+            <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
+            <h3 className="mt-3 text-sm font-medium text-gray-900">No gallery pairs yet</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Feature photos with complete before/after pairs to populate the gallery.
+            </p>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
   // ─── Main Render ──────────────────────────────────────────────────────
 
   return (
@@ -347,6 +513,17 @@ export default function AdminPhotosPage() {
         description={`${total} photo${total !== 1 ? 's' : ''}`}
         action={
           <div className="flex items-center gap-2">
+            {canManage && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={togglePreview}
+                disabled={previewLoading}
+              >
+                <ImageIcon className="mr-1.5 h-4 w-4" />
+                {previewLoading ? 'Loading...' : 'Preview Gallery'}
+              </Button>
+            )}
             {canManage && (
               <Button
                 variant={selectMode ? 'default' : 'outline'}
@@ -493,6 +670,21 @@ export default function AdminPhotosPage() {
               />
             </div>
 
+            {/* Tag filter */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500">Tag</label>
+              <select
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
+                className="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm"
+              >
+                <option value="">All Tags</option>
+                {availableTags.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Featured toggle */}
             <div className="flex items-end pb-0.5">
               <label className="flex items-center gap-2 text-sm">
@@ -573,27 +765,11 @@ export default function AdminPhotosPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => fetchPhotos(page - 1)}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-gray-500">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => fetchPhotos(page + 1)}
-              >
-                Next
-              </Button>
-            </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={fetchPhotos}
+            />
           )}
         </>
       )}
@@ -601,7 +777,7 @@ export default function AdminPhotosPage() {
       {/* Floating bulk action bar */}
       {selectMode && selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-          <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-xl">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-xl">
             <span className="text-sm font-medium text-gray-700">
               {selectedIds.size} selected
             </span>
@@ -619,6 +795,68 @@ export default function AdminPhotosPage() {
               <Eye className="mr-1 h-3.5 w-3.5" /> Mark Public
             </Button>
             <div className="h-5 w-px bg-gray-200" />
+            {/* Tag buttons */}
+            <div className="relative">
+              <Button size="sm" variant="outline" onClick={() => setShowBulkTagPopover(showBulkTagPopover === 'add' ? null : 'add')}>
+                <Tag className="mr-1 h-3.5 w-3.5" /> Add Tag
+              </Button>
+              {showBulkTagPopover === 'add' && (
+                <div className="absolute bottom-full left-0 mb-2 w-56 rounded-lg border bg-white p-3 shadow-xl">
+                  <input
+                    type="text"
+                    value={bulkTagInput}
+                    onChange={(e) => setBulkTagInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && bulkTagAction('add')}
+                    placeholder="Tag name..."
+                    className="mb-2 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm"
+                    autoFocus
+                  />
+                  {availableTags.filter((t) => t.toLowerCase().includes(bulkTagInput.toLowerCase())).slice(0, 5).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => { setBulkTagInput(t); }}
+                      className="block w-full rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-50"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                  <Button size="sm" className="mt-2 w-full" onClick={() => bulkTagAction('add')} disabled={!bulkTagInput.trim()}>
+                    <Plus className="mr-1 h-3 w-3" /> Add
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <Button size="sm" variant="outline" onClick={() => setShowBulkTagPopover(showBulkTagPopover === 'remove' ? null : 'remove')}>
+                <X className="mr-1 h-3.5 w-3.5" /> Remove Tag
+              </Button>
+              {showBulkTagPopover === 'remove' && (
+                <div className="absolute bottom-full left-0 mb-2 w-56 rounded-lg border bg-white p-3 shadow-xl">
+                  <input
+                    type="text"
+                    value={bulkTagInput}
+                    onChange={(e) => setBulkTagInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && bulkTagAction('remove')}
+                    placeholder="Tag to remove..."
+                    className="mb-2 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm"
+                    autoFocus
+                  />
+                  {availableTags.filter((t) => t.toLowerCase().includes(bulkTagInput.toLowerCase())).slice(0, 5).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => { setBulkTagInput(t); }}
+                      className="block w-full rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-50"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                  <Button size="sm" variant="destructive" className="mt-2 w-full" onClick={() => bulkTagAction('remove')} disabled={!bulkTagInput.trim()}>
+                    Remove
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="h-5 w-px bg-gray-200" />
             <button onClick={deselectAll} className="text-xs text-gray-500 hover:text-gray-700">
               Clear
             </button>
@@ -633,6 +871,7 @@ export default function AdminPhotosPage() {
           index={selectedIndex}
           total={photos.length}
           canManage={canManage}
+          availableTags={availableTags}
           onClose={() => setSelectedIndex(null)}
           onNavigate={setSelectedIndex}
           onUpdate={updatePhoto}
@@ -675,6 +914,10 @@ function PhotoCard({
     day: 'numeric',
     year: 'numeric',
   });
+
+  // Pair-complete gating: can only feature if has_pair is true
+  const canFeature = photo.has_pair;
+  const isProgressPhase = photo.phase === 'progress';
 
   return (
     <div className="group">
@@ -741,9 +984,31 @@ function PhotoCard({
         {/* Featured star — outside image, overlapping bottom-right */}
         {canManage && !selectMode && (
           <button
-            onClick={(e) => { e.stopPropagation(); onToggleFeatured(); }}
-            className="absolute -bottom-1 -right-1 z-10 rounded-full bg-white p-1 shadow-sm transition-transform hover:scale-110"
-            title={photo.is_featured ? 'Remove from featured' : 'Add to featured'}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!canFeature && !photo.is_featured && !isProgressPhase) {
+                toast.error('No matching before/after pair for this zone');
+                return;
+              }
+              if (isProgressPhase) {
+                toast.error('Progress photos cannot be featured');
+                return;
+              }
+              onToggleFeatured();
+            }}
+            className={cn(
+              'absolute -bottom-1 -right-1 z-10 rounded-full bg-white p-1 shadow-sm transition-transform',
+              canFeature && !isProgressPhase ? 'hover:scale-110' : 'opacity-40 cursor-not-allowed'
+            )}
+            title={
+              isProgressPhase
+                ? 'Progress photos cannot be featured'
+                : !canFeature && !photo.is_featured
+                ? 'No matching before/after pair for this zone'
+                : photo.is_featured
+                ? 'Remove from featured'
+                : 'Add to featured'
+            }
           >
             {photo.is_featured ? (
               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -763,6 +1028,19 @@ function PhotoCard({
           <p className="truncate text-[11px] text-gray-500">{vehicleStr}</p>
         )}
         <p className="text-[11px] text-gray-400">{date}</p>
+        {/* Tag pills */}
+        {photo.tags && photo.tags.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-0.5">
+            {photo.tags.slice(0, 2).map((t) => (
+              <span key={t} className="rounded bg-blue-50 px-1.5 py-0.5 text-[9px] text-blue-600">
+                {t}
+              </span>
+            ))}
+            {photo.tags.length > 2 && (
+              <span className="text-[9px] text-gray-400">+{photo.tags.length - 2}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -775,6 +1053,7 @@ function PhotoDetailModal({
   index,
   total,
   canManage,
+  availableTags,
   onClose,
   onNavigate,
   onUpdate,
@@ -783,11 +1062,14 @@ function PhotoDetailModal({
   index: number;
   total: number;
   canManage: boolean;
+  availableTags: string[];
   onClose: () => void;
   onNavigate: (i: number) => void;
-  onUpdate: (id: string, updates: { is_featured?: boolean; is_internal?: boolean }) => void;
+  onUpdate: (id: string, updates: { is_featured?: boolean; is_internal?: boolean; tags?: string[] }) => void;
 }) {
   const annotations = (photo.annotation_data ?? []) as Annotation[];
+  const [tagInput, setTagInput] = useState('');
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
 
   const vehicleStr = photo.vehicle
     ? `${photo.vehicle.year} ${photo.vehicle.make} ${photo.vehicle.model}${photo.vehicle.color ? ` (${photo.vehicle.color})` : ''}`
@@ -798,6 +1080,33 @@ function PhotoDetailModal({
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+
+  const canFeature = photo.has_pair;
+  const isProgressPhase = photo.phase === 'progress';
+
+  const addTag = (tag: string) => {
+    const trimmed = tag.trim();
+    if (!trimmed || photo.tags.includes(trimmed)) return;
+    onUpdate(photo.id, { tags: [...photo.tags, trimmed] });
+    setTagInput('');
+    setShowTagSuggestions(false);
+  };
+
+  const removeTag = (tag: string) => {
+    onUpdate(photo.id, { tags: photo.tags.filter((t) => t !== tag) });
+  };
+
+  const handleFeatureToggle = () => {
+    if (isProgressPhase) {
+      toast.error('Progress photos cannot be featured');
+      return;
+    }
+    if (!canFeature && !photo.is_featured) {
+      toast.error('No matching before/after pair for this zone');
+      return;
+    }
+    onUpdate(photo.id, { is_featured: !photo.is_featured });
+  };
 
   // Keyboard navigation
   useEffect(() => {
@@ -816,6 +1125,10 @@ function PhotoDetailModal({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [index, total, onNavigate, onClose]);
+
+  const filteredSuggestions = availableTags
+    .filter((t) => !photo.tags.includes(t) && t.toLowerCase().includes(tagInput.toLowerCase()))
+    .slice(0, 5);
 
   return (
     <div className="fixed inset-0 z-50 flex bg-black" onClick={onClose}>
@@ -947,6 +1260,58 @@ function PhotoDetailModal({
             </span>
           </div>
 
+          {/* Pair status */}
+          <div>
+            <p className="text-xs text-gray-400">Before/After Pair</p>
+            <p className={cn('text-xs', photo.has_pair ? 'text-green-400' : 'text-gray-500')}>
+              {photo.has_pair ? 'Complete pair exists' : 'Missing matching photo'}
+            </p>
+          </div>
+
+          {/* Tags */}
+          {canManage && (
+            <div>
+              <p className="text-xs text-gray-400 mb-1.5">Tags</p>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {(photo.tags || []).map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-[11px] text-gray-200">
+                    {t}
+                    <button onClick={() => removeTag(t)} className="hover:text-red-400">
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {(!photo.tags || photo.tags.length === 0) && (
+                  <span className="text-[11px] text-gray-500">No tags</span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                  onKeyDown={(e) => e.key === 'Enter' && addTag(tagInput)}
+                  onFocus={() => setShowTagSuggestions(true)}
+                  placeholder="Add tag..."
+                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1 text-xs text-gray-200 placeholder:text-gray-500"
+                />
+                {showTagSuggestions && tagInput && filteredSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-32 overflow-y-auto rounded-md border border-gray-700 bg-gray-800">
+                    {filteredSuggestions.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => addTag(t)}
+                        className="block w-full px-2.5 py-1.5 text-left text-xs text-gray-300 hover:bg-gray-700"
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Taken by */}
           {photo.taken_by && (
             <div>
@@ -975,11 +1340,14 @@ function PhotoDetailModal({
           <div className="border-t border-gray-800 p-4 space-y-2">
             {/* Featured toggle */}
             <button
-              onClick={() => onUpdate(photo.id, { is_featured: !photo.is_featured })}
+              onClick={handleFeatureToggle}
+              disabled={!canFeature && !photo.is_featured && !isProgressPhase ? false : undefined}
               className={cn(
                 'flex w-full items-center justify-between rounded-md px-3 py-2 text-xs font-medium transition-colors',
                 photo.is_featured
                   ? 'bg-yellow-500/20 text-yellow-300'
+                  : !canFeature || isProgressPhase
+                  ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
               )}
             >
@@ -987,12 +1355,18 @@ function PhotoDetailModal({
                 {photo.is_featured ? <Star className="h-3.5 w-3.5 fill-current" /> : <Star className="h-3.5 w-3.5" />}
                 Featured on website
               </span>
-              <span className={cn(
-                'rounded-full px-1.5 py-0.5 text-[10px]',
-                photo.is_featured ? 'bg-yellow-500/30' : 'bg-gray-700'
-              )}>
-                {photo.is_featured ? 'ON' : 'OFF'}
-              </span>
+              {(!canFeature && !photo.is_featured) || isProgressPhase ? (
+                <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-gray-700">
+                  {isProgressPhase ? 'N/A' : 'No pair'}
+                </span>
+              ) : (
+                <span className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[10px]',
+                  photo.is_featured ? 'bg-yellow-500/30' : 'bg-gray-700'
+                )}>
+                  {photo.is_featured ? 'ON' : 'OFF'}
+                </span>
+              )}
             </button>
 
             {/* Internal toggle */}
@@ -1018,6 +1392,137 @@ function PhotoDetailModal({
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Pagination ──────────────────────────────────────────────────────────────
+
+function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) {
+  const [inputValue, setInputValue] = useState(String(page));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync input when page changes externally
+  useEffect(() => {
+    setInputValue(String(page));
+  }, [page]);
+
+  const goToPage = (p: number) => {
+    const clamped = Math.max(1, Math.min(totalPages, p));
+    onPageChange(clamped);
+  };
+
+  const handleInputSubmit = () => {
+    const parsed = parseInt(inputValue, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
+      goToPage(parsed);
+    } else {
+      setInputValue(String(page));
+    }
+  };
+
+  // Build page numbers with ellipsis
+  const getPageNumbers = (): (number | '...')[] => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pages: (number | '...')[] = [1];
+
+    if (page > 3) {
+      pages.push('...');
+    }
+
+    const start = Math.max(2, page - 1);
+    const end = Math.min(totalPages - 1, page + 1);
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (page < totalPages - 2) {
+      pages.push('...');
+    }
+
+    if (!pages.includes(totalPages)) {
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
+
+  const pageNumbers = getPageNumbers();
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3">
+      {/* Previous */}
+      <button
+        onClick={() => goToPage(page - 1)}
+        disabled={page <= 1}
+        className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+
+      {/* Page numbers */}
+      {pageNumbers.map((p, i) =>
+        p === '...' ? (
+          <span key={`ellipsis-${i}`} className="px-1 text-xs text-gray-400">
+            ...
+          </span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => goToPage(p)}
+            className={cn(
+              'min-w-[2rem] rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+              p === page
+                ? 'bg-gray-900 text-white'
+                : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+            )}
+          >
+            {p}
+          </button>
+        )
+      )}
+
+      {/* Next */}
+      <button
+        onClick={() => goToPage(page + 1)}
+        disabled={page >= totalPages}
+        className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+
+      {/* Page input */}
+      <div className="ml-3 flex items-center gap-1.5">
+        <span className="text-xs text-gray-500">Go to</span>
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value.replace(/\D/g, ''))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleInputSubmit();
+              inputRef.current?.blur();
+            }
+          }}
+          onBlur={handleInputSubmit}
+          className="w-12 rounded-md border border-gray-200 px-2 py-1 text-center text-xs"
+        />
+        <span className="text-xs text-gray-400">of {totalPages}</span>
       </div>
     </div>
   );

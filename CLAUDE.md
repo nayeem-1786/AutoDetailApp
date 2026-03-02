@@ -114,6 +114,7 @@ All core build phases complete. App is in active daily use with ongoing refineme
 | — | CMS Overhaul (Phases A–E: page builder, navigation, footer, hero, tickers, city SEO, theme system, preview, revisions, global blocks) | Done |
 | — | QuickBooks Integration (OAuth, sync engines, auto-sync cron) | Done |
 | — | Hardcoded Audit & Admin Settings Expansion (147-item audit, JSON-LD, business profile, homepage settings, deposit/validity config) | Done |
+| — | Photo Gallery Audit & Unification (zone-level pairing, tagging, infinite scroll, admin curation, gallery preview) | Done |
 | 13 | Full QA — section-by-section testing checklist across every module/tab | Not started |
 | 14 | User Manual — complete how-to document (see `docs/manual/README.md`) | Not started |
 | 15 | Store Setup & Hardware — scanners, receipt printer, copier, water system, email/SMS final checks | Not started |
@@ -121,7 +122,16 @@ All core build phases complete. App is in active daily use with ongoing refineme
 
 **Phase 16 details:** Delete ALL test data from Square, test jobs, test accounts — everything from Jan 1, 2026 to launch date. Then reimport real Square transactions from 01/01/2026 to launch date. Confirm that deleting test product purchases restores inventory levels back to correct counts before reimporting.
 
-## Recent Completions (Late February 2026)
+## Recent Completions (March 2026)
+
+**Photo Gallery Audit & Unification:**
+- Public gallery: zone-level before/after pairing (1 pair per job+zone, not 1 per job), infinite scroll, tag-based filtering (Interior/Exterior pills + service dropdown + manual tags), URL state, SEO
+- Admin photos: manual tag management (single + bulk), featured star pair-gating (requires both intake + completion), gallery preview mode, tag filter, numbered pagination with direct page input
+- DB: dropped orphaned `photos` table, added `tags TEXT[]` to `job_photos`
+- New API endpoints: `/api/admin/photos/tags`, `/api/admin/photos/gallery-preview`
+- Feature flag `photo_gallery` must be enabled for public gallery
+
+## Previous Completions (Late February 2026)
 
 **Hardcoded Audit & Fixes:**
 - 147-item audit across 12 categories (report: `docs/planning/HARDCODED_AUDIT.md`)

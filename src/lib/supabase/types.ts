@@ -968,6 +968,7 @@ export interface JobPhoto {
   is_featured: boolean;
   is_internal: boolean;
   sort_order: number;
+  tags: string[];
   created_by: string | null;
   created_at: string;
 }

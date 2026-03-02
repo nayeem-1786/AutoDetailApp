@@ -13,6 +13,7 @@ export interface BeforeAfterPair {
   serviceName: string | null;
   zone: string;
   jobId: string;
+  tags: string[];
 }
 
 interface FeaturedPhotoOptions {
@@ -48,7 +49,7 @@ async function fetchFeaturedBeforeAfter(
   let query = supabase
     .from('job_photos')
     .select(
-      `id, job_id, zone, phase, image_url,
+      `id, job_id, zone, phase, image_url, tags,
        jobs!inner(
          id, services,
          vehicles(make, model, year)
@@ -72,19 +73,24 @@ async function fetchFeaturedBeforeAfter(
   // Group by (job_id, zone) and find pairs with both intake + completion
   const groups = new Map<
     string,
-    { intake: string | null; completion: string | null; photo: (typeof photos)[0] }
+    { intake: string | null; completion: string | null; photo: (typeof photos)[0]; tags: string[] }
   >();
 
   for (const photo of photos) {
     const key = `${photo.job_id}:${photo.zone}`;
     if (!groups.has(key)) {
-      groups.set(key, { intake: null, completion: null, photo });
+      groups.set(key, { intake: null, completion: null, photo, tags: [] });
     }
     const group = groups.get(key)!;
     if (photo.phase === 'intake' && !group.intake) {
       group.intake = photo.image_url;
     } else if (photo.phase === 'completion' && !group.completion) {
       group.completion = photo.image_url;
+    }
+    // Merge tags
+    const photoTags = (photo.tags as string[]) || [];
+    for (const t of photoTags) {
+      if (!group.tags.includes(t)) group.tags.push(t);
     }
   }
 
@@ -138,6 +144,7 @@ async function fetchFeaturedBeforeAfter(
         serviceName,
         zone: key.split(':')[1],
         jobId: job.id,
+        tags: group.tags,
       });
 
       if (pairs.length >= limit) break;

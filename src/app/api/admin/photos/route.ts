@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const staffId = searchParams.get('staff_id');
     const featured = searchParams.get('featured');
     const search = searchParams.get('search');
+    const tagFilter = searchParams.get('tag');
 
     const offset = (page - 1) * limit;
     const supabase = createAdminClient();
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       .select(
         `id, job_id, zone, phase, image_url, thumbnail_url, storage_path,
          notes, annotation_data, is_featured, is_internal, sort_order,
-         created_by, created_at,
+         tags, created_by, created_at,
          jobs!inner(
            id, status, services, customer_id, vehicle_id, created_at,
            customers(id, first_name, last_name),
@@ -109,6 +110,11 @@ export async function GET(request: NextRequest) {
       query = query.eq('is_featured', true);
     }
 
+    // Tag filter
+    if (tagFilter) {
+      query = query.contains('tags', [tagFilter]);
+    }
+
     // Search: filter by matching customer or vehicle IDs
     if (search && search.length >= 2 && searchCustomerIds && searchVehicleIds) {
       const allIds = [...searchCustomerIds, ...searchVehicleIds];
@@ -116,9 +122,6 @@ export async function GET(request: NextRequest) {
         // No matches — return empty
         return NextResponse.json({ photos: [], total: 0, page, limit });
       }
-      // Filter jobs by customer or vehicle match
-      // Since we can't do OR across different related fields, we need to do
-      // post-query filtering
     }
 
     // Apply pagination
@@ -158,12 +161,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Transform response to match spec shape
+    // Compute has_pair for each photo: does a matching intake+completion exist for same (job_id, zone)?
+    // Batch: collect unique (job_id, zone) combinations from results
+    const jobZoneKeys = new Set(
+      filtered.map((p: Record<string, unknown>) => `${p.job_id}:${p.zone}`)
+    );
+    const pairMap = new Map<string, Set<string>>(); // key -> phases present
+
+    if (jobZoneKeys.size > 0) {
+      // Get all photos for these job_id+zone combos (only phase needed)
+      const jobIds = [...new Set(filtered.map((p: Record<string, unknown>) => p.job_id as string))];
+      const { data: pairPhotos } = await supabase
+        .from('job_photos')
+        .select('job_id, zone, phase')
+        .in('job_id', jobIds)
+        .in('phase', ['intake', 'completion']);
+
+      for (const pp of pairPhotos || []) {
+        const key = `${pp.job_id}:${pp.zone}`;
+        if (!pairMap.has(key)) pairMap.set(key, new Set());
+        pairMap.get(key)!.add(pp.phase);
+      }
+    }
+
+    // Transform response
     const photos = filtered.map((photo: Record<string, unknown>) => {
       const job = photo.jobs as Record<string, unknown> | null;
       const customer = job?.customers as Record<string, unknown> | null;
       const vehicle = job?.vehicles as Record<string, unknown> | null;
       const takenBy = photo.created_by ? staffMap[photo.created_by as string] : null;
+
+      const pairKey = `${photo.job_id}:${photo.zone}`;
+      const phases = pairMap.get(pairKey);
+      const hasPair = phases ? phases.has('intake') && phases.has('completion') : false;
 
       return {
         id: photo.id,
@@ -175,6 +205,8 @@ export async function GET(request: NextRequest) {
         annotation_data: photo.annotation_data,
         is_featured: photo.is_featured,
         is_internal: photo.is_internal,
+        tags: photo.tags ?? [],
+        has_pair: hasPair,
         created_at: photo.created_at,
         job: job
           ? {
