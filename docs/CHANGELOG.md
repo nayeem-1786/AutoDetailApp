@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: User Manual — Developer Guide + Phase 14 Complete (Phase 14 session 7) — 2026-03-02
+
+Final manual chapter — the developer guide for onboarding new developers:
+
+- **12-developer-guide.md**: Architecture overview (full tech stack table, 5 route groups, server vs client component pattern), local development setup (prerequisites, clone/install, all 22 env vars with descriptions and groupings, dev server commands, local access URLs), project structure (directory map, naming conventions, import aliases), database (Supabase Postgres with RLS, migration workflow with 7 rules, common column patterns, key JSONB structures), authentication & authorization (3 auth contexts: admin with Supabase Auth flow, POS with PIN→JWT→HMAC flow, customer with phone OTP flow, adminFetch() session expiry handling, permission helpers for server and client, super admin bypass), API route patterns (admin/POS/public/customer patterns with code examples, response shapes, idempotency system), key patterns & gotchas (timezone PST-only, business info never hardcode, SMS centralized utilities, Supabase .or() workaround, iOS Safari quirks, POS dark mode, soft-delete filtering, feature flags server+client, auth validation, component reuse, cache revalidation wrapper), internal cron system (architecture with instrumentation.ts + scheduler.ts, all 9 node-cron jobs + 1 pg_cron job in table, adding new jobs 3-step process), integrations (Stripe payments+webhooks, Supabase DB+Auth+Storage, Twilio SMS send/receive/TCPA, Mailgun email+webhooks, Shippo shipping, QuickBooks OAuth+sync, Anthropic AI features), theme & design system (CSS variable indirection pattern, 5-level priority chain, admin theme editor, seasonal themes), deployment (current setup, build/deploy commands, production env vars, Next.js version pin, next.config.ts settings), troubleshooting (WSOD, auth loops, build failures, POS card reader, stale cache, cron issues), reference docs index (12-entry table linking all docs/dev/ files)
+
+Phase 14 (User Manual) is now complete — all 12 chapters written.
+
+---
+
 ## docs: User Manual — Accounting, Settings & Configuration (Phase 14 session 6) — 2026-03-02
 
 Two manual chapters covering the accounting/integrations and settings/configuration systems:

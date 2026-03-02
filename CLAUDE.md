@@ -116,7 +116,7 @@ All core build phases complete. App is in active daily use with ongoing refineme
 | — | Hardcoded Audit & Admin Settings Expansion (147-item audit, JSON-LD, business profile, homepage settings, deposit/validity config) | Done |
 | — | Photo Gallery Audit & Unification (zone-level pairing, tagging, infinite scroll, admin curation, gallery preview) | Done |
 | 13 | Full QA — section-by-section testing checklist across every module/tab | Not started |
-| 14 | User Manual — complete how-to document (see `docs/manual/README.md`) | Not started |
+| 14 | User Manual — complete how-to document (see `docs/manual/README.md`) | Done |
 | 15 | Store Setup & Hardware — scanners, receipt printer, copier, water system, email/SMS final checks | Not started |
 | 16 | Launch Prep — set go-live date, purge all test data, reimport real data | Not started |
 
