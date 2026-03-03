@@ -7,9 +7,8 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
-import { generateReceiptLines, generateReceiptHtml } from '../lib/receipt-template';
+import { generateReceiptHtml } from '../lib/receipt-template';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
-import { printReceipt } from '../lib/star-printer';
 
 interface ReceiptOptionsProps {
   transactionId: string;
@@ -38,11 +37,16 @@ export function ReceiptOptions({
   async function handleReceiptPrint() {
     setPrinting(true);
     try {
-      const res = await posFetch('/api/pos/receipts/print', {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+
+      const res = await posFetch('/api/pos/receipts/print-server', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transaction_id: transactionId }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       const json = await res.json();
       if (!res.ok) {
@@ -50,13 +54,14 @@ export function ReceiptOptions({
         return;
       }
 
-      const rcfg: MergedReceiptConfig | undefined = json.data.receipt_config ?? undefined;
-      const lines = generateReceiptLines(json.data.transaction, rcfg);
-      await printReceipt(json.data.printer_ip, lines);
       setPrinted(true);
       toast.success('Receipt printed');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Print failed');
+      if (err instanceof Error && err.name === 'AbortError') {
+        toast.error('Printer unavailable');
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Printer unavailable');
+      }
     } finally {
       setPrinting(false);
     }

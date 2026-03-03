@@ -36,6 +36,7 @@ export interface MergedReceiptConfig {
 
 interface ReceiptConfig {
   printer_ip: string | null;
+  print_server_url: string | null;
   override_name: string | null;
   override_phone: string | null;
   override_address: string | null;
@@ -52,6 +53,7 @@ interface ReceiptConfig {
 
 const DEFAULT_RECEIPT_CONFIG: ReceiptConfig = {
   printer_ip: null,
+  print_server_url: null,
   override_name: null,
   override_phone: null,
   override_address: null,
@@ -90,7 +92,7 @@ const DEFAULT_ZONES: CustomTextZone[] = [
 
 export async function fetchReceiptConfig(
   supabase: SupabaseClient
-): Promise<{ merged: MergedReceiptConfig; printer_ip: string | null }> {
+): Promise<{ merged: MergedReceiptConfig; printer_ip: string | null; print_server_url: string | null }> {
   const { data } = await supabase
     .from('business_settings')
     .select('key, value')
@@ -163,5 +165,8 @@ export async function fetchReceiptConfig(
   // Printer IP: receipt_config.printer_ip wins, fall back to legacy star_printer_ip
   const printer_ip = rc.printer_ip || (settings.star_printer_ip as string) || null;
 
-  return { merged, printer_ip };
+  // Print server URL for ESC/POS via local print server
+  const print_server_url = rc.print_server_url || null;
+
+  return { merged, printer_ip, print_server_url };
 }

@@ -13,7 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X } from 'lucide-react';
+import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
 
@@ -26,6 +26,7 @@ const SHORTCODES = [
 
 interface ReceiptConfigState {
   printer_ip: string;
+  print_server_url: string;
   override_name: string;
   override_phone: string;
   override_address: string;
@@ -50,6 +51,7 @@ interface BusinessDefaults {
 
 const INITIAL_CONFIG: ReceiptConfigState = {
   printer_ip: '',
+  print_server_url: '',
   override_name: '',
   override_phone: '',
   override_address: '',
@@ -79,6 +81,63 @@ const DEFAULT_ZONES: CustomTextZone[] = [
     enabled: true,
   },
 ];
+
+function PrintServerTestButton({ url, type }: { url: string; type: 'connection' | 'print' }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  async function handleTest() {
+    setStatus('loading');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+
+    try {
+      if (type === 'connection') {
+        const res = await fetch(`${url}/health`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok) {
+          setStatus('success');
+          toast.success('Print server connected');
+        } else {
+          setStatus('error');
+          toast.error('Print server returned an error');
+        }
+      } else {
+        const res = await fetch(`${url}/test`, {
+          method: 'POST',
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          setStatus('success');
+          toast.success('Test receipt sent to printer');
+        } else {
+          setStatus('error');
+          toast.error('Test print failed');
+        }
+      }
+    } catch {
+      clearTimeout(timeout);
+      setStatus('error');
+      toast.error('Print server unreachable — check URL and that server is running');
+    }
+
+    // Reset icon after 3 seconds
+    setTimeout(() => setStatus('idle'), 3000);
+  }
+
+  return (
+    <Button variant="outline" size="sm" onClick={handleTest} disabled={status === 'loading'}>
+      {status === 'loading' ? (
+        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+      ) : status === 'success' ? (
+        <CheckCircle2 className="mr-1.5 h-4 w-4 text-green-500" />
+      ) : status === 'error' ? (
+        <XCircle className="mr-1.5 h-4 w-4 text-red-500" />
+      ) : null}
+      {type === 'connection' ? 'Test Connection' : 'Test Print'}
+    </Button>
+  );
+}
 
 export default function ReceiptPrinterPage() {
   const [loading, setLoading] = useState(true);
@@ -177,6 +236,7 @@ export default function ReceiptPrinterPage() {
 
       setConfig({
         printer_ip: (rc.printer_ip as string) || legacyIp || '',
+        print_server_url: (rc.print_server_url as string) || '',
         override_name: (rc.override_name as string) || '',
         override_phone: (rc.override_phone as string) || '',
         override_address: (rc.override_address as string) || '',
@@ -259,6 +319,7 @@ export default function ReceiptPrinterPage() {
 
     const configValue = {
       printer_ip: config.printer_ip || null,
+      print_server_url: config.print_server_url || null,
       override_name: config.override_name || null,
       override_phone: config.override_phone || null,
       override_address: config.override_address || null,
@@ -414,8 +475,28 @@ export default function ReceiptPrinterPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <FormField
-            label="Printer IP Address"
-            description="Star TSP-100 printer IP on local network (e.g. 192.168.1.100)"
+            label="Print Server URL"
+            description="URL of the local print server running on the shop PC (e.g. http://192.168.1.174:8080)"
+            htmlFor="print_server_url"
+          >
+            <Input
+              id="print_server_url"
+              placeholder="http://192.168.1.174:8080"
+              value={config.print_server_url}
+              onChange={(e) => updateConfig('print_server_url', e.target.value)}
+            />
+          </FormField>
+
+          {config.print_server_url && (
+            <div className="flex gap-2">
+              <PrintServerTestButton url={config.print_server_url} type="connection" />
+              <PrintServerTestButton url={config.print_server_url} type="print" />
+            </div>
+          )}
+
+          <FormField
+            label="Printer IP Address (Legacy)"
+            description="Star TSP-100 WebPRNT IP — used for direct browser printing. Leave blank if using Print Server above."
             htmlFor="printer_ip"
           >
             <Input

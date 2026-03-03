@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: ESC/POS receipt renderer + local print server integration — 2026-03-03
+
+Wired the POS receipt printing system to a local print server running on the shop Optiplex (192.168.1.174:8080) connected to the Star TSP100III receipt printer via USB.
+
+**New ESC/POS renderer** (`receipt-template.ts`):
+- `receiptToEscPos(lines, width)` — converts `ReceiptLine[]` to Star TSP100 ESC/POS binary commands (Uint8Array). Same pattern as `receiptToPlainText()`. Handles all 7 line types: header (center + bold + double-size), text (centered), bold, divider (dashes), columns (padded), spacer (line feed), image (skipped — TODO).
+- `escPosOpenDrawer()` — returns cash drawer kick command bytes.
+
+**New API routes:**
+- `POST /api/pos/receipts/print-server` — fetches transaction, generates ESC/POS binary, relays to local print server with 3s timeout
+- `POST /api/pos/receipts/cash-drawer` — sends drawer kick command to print server
+
+**Receipt config** (`receipt-config.ts`):
+- Added `print_server_url` field alongside existing `printer_ip` (kept for backward compat)
+
+**Admin Settings > Receipt Printer:**
+- New "Print Server URL" field with placeholder `http://192.168.1.174:8080`
+- "Test Connection" button — hits `GET /health`, shows green check or red X
+- "Test Print" button — hits `POST /test`, prints a test receipt
+- Legacy "Printer IP Address" field preserved for WebPRNT fallback
+
+**POS Receipt Options:**
+- "Receipt" button now calls `/api/pos/receipts/print-server` (server-side ESC/POS generation + relay)
+- Replaced client-side WebPRNT approach with server-side print server relay
+- 3-second timeout, graceful "Printer unavailable" toast on failure
+- "Print" button (copier/HTML print) unchanged
+
+**POS Cash Drawer:**
+- Cash payment completion fires a fire-and-forget drawer kick via `/api/pos/receipts/cash-drawer`
+
+**Admin Receipt Dialog:**
+- "Receipt" button updated to use print-server route (same as POS)
+
+**Local print server** (`docs/hardware/print-server/`):
+- `server.js` — Express server with endpoints: GET /health, POST /print, POST /test, POST /cash-drawer
+- Only dependency: express (no native packages)
+- Writes binary data to printer via Windows `copy /b` to USB port
+- CORS enabled for cross-origin requests
+- `README.md` with setup, troubleshooting, and auto-start instructions
+
+---
+
 ## fix: POS scanner icon persists green state across reloads — 2026-03-02
 
 The POS barcode scanner icon (green = detected, gray = not) would reset to gray on page reload, PWA background/foreground, or idle lock/unlock — making staff think the Bluetooth scanner disconnected when it was still connected. Fixed by persisting the detection flag in `sessionStorage`, which survives reloads within the same browser/PWA session. Icon stays green until the session ends (tab close or fresh PWA launch).

@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-03-01 (Photo Gallery Audit & Unification)
+> **Last updated:** 2026-03-03 (ESC/POS Receipt Printer Integration)
 
 ---
 
@@ -342,8 +342,10 @@ src/app/api/pos/quotes/[id]/convert/route.ts
 src/app/api/pos/quotes/[id]/route.ts
 src/app/api/pos/quotes/[id]/send/route.ts
 src/app/api/pos/quotes/route.ts
+src/app/api/pos/receipts/cash-drawer/route.ts
 src/app/api/pos/receipts/email/route.ts
 src/app/api/pos/receipts/print/route.ts
+src/app/api/pos/receipts/print-server/route.ts
 src/app/api/pos/receipts/sms/route.ts
 src/app/api/pos/refunds/route.ts
 src/app/api/pos/services/durations/route.ts
@@ -1199,6 +1201,9 @@ docs/manual/02-dashboard.md
 docs/manual/03-job-management.md
 docs/manual/05-customers.md
 docs/manual/website/README.md
+docs/hardware/print-server/package.json
+docs/hardware/print-server/README.md
+docs/hardware/print-server/server.js
 docs/planning/CMS_OVERHAUL_PROJECT_PLAN.md
 docs/planning/COUPONS.md
 docs/planning/iPAD.md

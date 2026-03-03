@@ -607,3 +607,118 @@ function row(left: string, right: string, color?: string): string {
     <td style="padding:3px 0;font-size:14px;text-align:right${style}">${right}</td>
   </tr>`;
 }
+
+// ---------------------------------------------------------------------------
+// ESC/POS Binary Renderer — Star TSP100III via local print server
+// ---------------------------------------------------------------------------
+
+// Star TSP100 ESC/POS command bytes
+const ESC = 0x1B;
+const LF = 0x0A;
+
+const CMD_INIT = [ESC, 0x40]; // Initialize printer
+const CMD_ALIGN_LEFT = [ESC, 0x1D, 0x61, 0x00];
+const CMD_ALIGN_CENTER = [ESC, 0x1D, 0x61, 0x01];
+const CMD_BOLD_ON = [ESC, 0x45, 0x01];
+const CMD_BOLD_OFF = [ESC, 0x45, 0x00];
+const CMD_DOUBLE_SIZE = [ESC, 0x69, 0x01, 0x01]; // Double height + width
+const CMD_NORMAL_SIZE = [ESC, 0x69, 0x00, 0x00];
+const CMD_CUT = [ESC, 0x64, 0x02]; // Partial cut
+const CMD_CASH_DRAWER = [ESC, 0x70, 0x00, 0x19, 0xFA]; // Kick pin 2
+
+function textToBytes(text: string): number[] {
+  const bytes: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    // ASCII-safe: replace non-ASCII with '?'
+    bytes.push(code < 128 ? code : 0x3F);
+  }
+  return bytes;
+}
+
+/**
+ * Convert receipt lines to Star TSP100 ESC/POS binary commands.
+ * Same pattern as receiptToPlainText() — processes each ReceiptLine type.
+ * Image lines are skipped (TODO: logo printing added later).
+ */
+export function receiptToEscPos(lines: ReceiptLine[], width = 48): Uint8Array {
+  const parts: number[] = [];
+
+  // Initialize printer
+  parts.push(...CMD_INIT);
+
+  for (const line of lines) {
+    switch (line.type) {
+      case 'header':
+        parts.push(...CMD_ALIGN_CENTER);
+        parts.push(...CMD_BOLD_ON);
+        parts.push(...CMD_DOUBLE_SIZE);
+        parts.push(...textToBytes(line.text ?? ''));
+        parts.push(LF);
+        parts.push(...CMD_NORMAL_SIZE);
+        parts.push(...CMD_BOLD_OFF);
+        break;
+
+      case 'text':
+        parts.push(...CMD_ALIGN_CENTER);
+        parts.push(...textToBytes(line.text ?? ''));
+        parts.push(LF);
+        break;
+
+      case 'bold':
+        parts.push(...CMD_BOLD_ON);
+        parts.push(...textToBytes(line.text ?? ''));
+        parts.push(LF);
+        parts.push(...CMD_BOLD_OFF);
+        break;
+
+      case 'divider':
+        parts.push(...CMD_ALIGN_LEFT);
+        parts.push(...textToBytes('-'.repeat(width)));
+        parts.push(LF);
+        break;
+
+      case 'columns': {
+        parts.push(...CMD_ALIGN_LEFT);
+        const left = line.left ?? '';
+        const center = line.center ?? '';
+        const right = line.right ?? '';
+        let padded: string;
+        if (center) {
+          const usedLen = left.length + center.length + right.length;
+          const totalGap = Math.max(2, width - usedLen);
+          const gapLeft = Math.ceil(totalGap / 2);
+          const gapRight = totalGap - gapLeft;
+          padded = left + ' '.repeat(gapLeft) + center + ' '.repeat(gapRight) + right;
+        } else {
+          const gap = width - left.length - right.length;
+          padded = left + ' '.repeat(Math.max(1, gap)) + right;
+        }
+        parts.push(...textToBytes(padded));
+        parts.push(LF);
+        break;
+      }
+
+      case 'spacer':
+        parts.push(LF);
+        break;
+
+      case 'image':
+        // TODO: logo printing via ESC/POS raster commands — added later
+        break;
+    }
+  }
+
+  // Feed a few lines then cut
+  parts.push(LF, LF, LF);
+  parts.push(...CMD_CUT);
+
+  return new Uint8Array(parts);
+}
+
+/**
+ * Generate ESC/POS cash drawer kick command for Star TSP100.
+ */
+export function escPosOpenDrawer(): Uint8Array {
+  return new Uint8Array([...CMD_INIT, ...CMD_CASH_DRAWER]);
+}
