@@ -619,6 +619,7 @@ const LF = 0x0A;
 const CMD_INIT = [ESC, 0x40]; // Initialize printer
 const CMD_ALIGN_LEFT = [ESC, 0x1D, 0x61, 0x00];
 const CMD_ALIGN_CENTER = [ESC, 0x1D, 0x61, 0x01];
+const CMD_ALIGN_RIGHT = [ESC, 0x1D, 0x61, 0x02];
 const CMD_BOLD_ON = [ESC, 0x45, 0x01];
 const CMD_BOLD_OFF = [ESC, 0x45, 0x00];
 const CMD_DOUBLE_SIZE = [ESC, 0x69, 0x01, 0x01]; // Double height + width
@@ -637,15 +638,86 @@ function textToBytes(text: string): number[] {
 }
 
 /**
- * Convert receipt lines to Star TSP100 ESC/POS binary commands.
- * Same pattern as receiptToPlainText() — processes each ReceiptLine type.
- * Image lines are skipped (TODO: logo printing added later).
+ * Convert an image URL to ESC/POS raster bit-image command bytes (GS v 0).
+ * Uses `sharp` (server-side only) to resize and convert to 1-bit monochrome.
+ * Returns null on failure — logo is silently skipped.
  */
-export function receiptToEscPos(lines: ReceiptLine[], width = 48): Uint8Array {
+async function convertLogoToRaster(
+  url: string,
+  targetWidth: number
+): Promise<number[] | null> {
+  try {
+    const sharp = (await import('sharp')).default;
+
+    // Fetch image
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    // Align width to 8 pixels (required for 1-bit bitmap byte packing)
+    const maxWidth = Math.min(targetWidth, 576); // 576 = max dots for 3-inch paper
+    const alignedWidth = Math.ceil(maxWidth / 8) * 8;
+
+    // Resize, convert to single-channel grayscale, get raw pixels
+    const { data, info } = await sharp(buffer)
+      .resize(alignedWidth, null, { fit: 'inside' })
+      .grayscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    // Ensure bitmap width is multiple of 8 (should be, but be safe)
+    const bitmapWidth = Math.ceil(info.width / 8) * 8;
+    const bytesPerRow = bitmapWidth / 8;
+    const bitmapData = new Uint8Array(bytesPerRow * info.height);
+
+    // Convert grayscale to 1-bit monochrome (dark=ink, light=paper)
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const luminance = data[y * info.width + x];
+        if (luminance < 128) {
+          const byteIndex = y * bytesPerRow + Math.floor(x / 8);
+          const bitIndex = 7 - (x % 8);
+          bitmapData[byteIndex] |= 1 << bitIndex;
+        }
+      }
+    }
+
+    // GS v 0 — Print raster bit image (standard ESC/POS, supported by Star TSP100III)
+    // Format: 1D 76 30 m xL xH yL yH d1...dk
+    const xL = bytesPerRow & 0xFF;
+    const xH = (bytesPerRow >> 8) & 0xFF;
+    const yL = info.height & 0xFF;
+    const yH = (info.height >> 8) & 0xFF;
+
+    return [
+      0x1D, 0x76, 0x30, 0x00, // GS v 0, mode=normal
+      xL, xH, yL, yH,
+      ...Array.from(bitmapData),
+    ];
+  } catch (error) {
+    console.error('Failed to convert logo for ESC/POS:', error);
+    return null;
+  }
+}
+
+/**
+ * Convert receipt lines to Star TSP100 ESC/POS binary commands.
+ * Matches the visual layout of generateReceiptHtml() as closely
+ * as a 48-column thermal printer allows:
+ * - Logo via GS v 0 raster command (sharp server-side conversion)
+ * - TOTAL line in bold + double-size (matches HTML bold/15px)
+ * - "Payment" label before payment rows (matches HTML bold label)
+ * - Empty bold line rendered as spacer (matches HTML solid <hr>)
+ */
+export async function receiptToEscPos(lines: ReceiptLine[], width = 48): Promise<Uint8Array> {
   const parts: number[] = [];
 
   // Initialize printer
   parts.push(...CMD_INIT);
+
+  // State tracking to match HTML semantic sections
+  let seenTotal = false;
+  let paymentLabelAdded = false;
 
   for (const line of lines) {
     switch (line.type) {
@@ -666,16 +738,31 @@ export function receiptToEscPos(lines: ReceiptLine[], width = 48): Uint8Array {
         break;
 
       case 'bold':
-        parts.push(...CMD_BOLD_ON);
-        parts.push(...textToBytes(line.text ?? ''));
-        parts.push(LF);
-        parts.push(...CMD_BOLD_OFF);
+        if (!(line.text ?? '').trim()) {
+          // Empty bold line = visual separator before TOTAL
+          // (matches the solid <hr> in the HTML preview between subtotals and TOTAL)
+          parts.push(LF);
+        } else {
+          parts.push(...CMD_BOLD_ON);
+          parts.push(...textToBytes(line.text ?? ''));
+          parts.push(LF);
+          parts.push(...CMD_BOLD_OFF);
+        }
         break;
 
       case 'divider':
         parts.push(...CMD_ALIGN_LEFT);
         parts.push(...textToBytes('-'.repeat(width)));
         parts.push(LF);
+        // After the divider following TOTAL, add bold "Payment" label
+        // (matches HTML: <div font-weight:bold>Payment</div>)
+        if (seenTotal && !paymentLabelAdded) {
+          paymentLabelAdded = true;
+          parts.push(...CMD_BOLD_ON);
+          parts.push(...textToBytes('Payment'));
+          parts.push(LF);
+          parts.push(...CMD_BOLD_OFF);
+        }
         break;
 
       case 'columns': {
@@ -683,6 +770,15 @@ export function receiptToEscPos(lines: ReceiptLine[], width = 48): Uint8Array {
         const left = line.left ?? '';
         const center = line.center ?? '';
         const right = line.right ?? '';
+
+        // TOTAL line — bold + double-size to match HTML bold/15px styling
+        const isTotalLine = left === 'TOTAL';
+        if (isTotalLine) {
+          seenTotal = true;
+          parts.push(...CMD_BOLD_ON);
+          parts.push(...CMD_DOUBLE_SIZE);
+        }
+
         let padded: string;
         if (center) {
           const usedLen = left.length + center.length + right.length;
@@ -691,11 +787,18 @@ export function receiptToEscPos(lines: ReceiptLine[], width = 48): Uint8Array {
           const gapRight = totalGap - gapLeft;
           padded = left + ' '.repeat(gapLeft) + center + ' '.repeat(gapRight) + right;
         } else {
-          const gap = width - left.length - right.length;
+          // Double-size chars take 2 columns each, so halve effective width
+          const effectiveWidth = isTotalLine ? Math.floor(width / 2) : width;
+          const gap = effectiveWidth - left.length - right.length;
           padded = left + ' '.repeat(Math.max(1, gap)) + right;
         }
         parts.push(...textToBytes(padded));
         parts.push(LF);
+
+        if (isTotalLine) {
+          parts.push(...CMD_NORMAL_SIZE);
+          parts.push(...CMD_BOLD_OFF);
+        }
         break;
       }
 
@@ -704,7 +807,28 @@ export function receiptToEscPos(lines: ReceiptLine[], width = 48): Uint8Array {
         break;
 
       case 'image':
-        // TODO: logo printing via ESC/POS raster commands — added later
+        if (line.url) {
+          try {
+            const rasterData = await convertLogoToRaster(
+              line.url,
+              line.width ?? 200
+            );
+            if (rasterData) {
+              // Set alignment for the image
+              const align = line.alignment || 'center';
+              if (align === 'center') parts.push(...CMD_ALIGN_CENTER);
+              else if (align === 'right') parts.push(...CMD_ALIGN_RIGHT);
+              else parts.push(...CMD_ALIGN_LEFT);
+
+              parts.push(...rasterData);
+
+              // Reset alignment after image
+              parts.push(...CMD_ALIGN_LEFT);
+            }
+          } catch {
+            // Logo failed — skip silently, don't block receipt printing
+          }
+        }
         break;
     }
   }

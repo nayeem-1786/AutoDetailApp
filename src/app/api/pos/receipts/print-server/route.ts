@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       payments: tx.payments ?? [],
     }, merged);
 
-    const escPosData = receiptToEscPos(receiptLines);
+    const escPosData = await receiptToEscPos(receiptLines);
 
     // Send binary data to local print server with 3-second timeout
     const controller = new AbortController();

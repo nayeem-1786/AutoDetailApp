@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: ESC/POS receipt output now matches admin preview layout — 2026-03-03
+
+**Bug:** Physical thermal receipt from Star TSP100III did not match the HTML receipt preview in Admin > Settings > Receipt Printer. Missing logo, no bold/large TOTAL, no "Payment" label, and formatting differences.
+
+**Fixes to `receiptToEscPos()` in `receipt-template.ts`:**
+- **Logo**: Implemented server-side image-to-raster conversion using `sharp`. Fetches logo URL, converts to 1-bit monochrome bitmap, outputs via `GS v 0` raster command. Respects `logo_placement` (above_name/below_name/above_footer) and `logo_alignment` (left/center/right) from receipt config.
+- **TOTAL line**: Now renders in bold + double-size (double height + width) to match HTML's bold 15px styling. Column padding uses halved effective width to account for double-width characters.
+- **"Payment" label**: Added bold "Payment" header text before payment rows, matching the HTML preview's `<div>Payment</div>`.
+- **Empty bold separator**: The empty `bold` line before TOTAL now renders as a blank spacer line (matching the HTML's solid `<hr>` between subtotals and grand total).
+- **Right alignment**: Added `CMD_ALIGN_RIGHT` constant for logo alignment support.
+
+**Architecture change:** `receiptToEscPos()` is now `async` (returns `Promise<Uint8Array>`) because logo conversion requires async image fetch + sharp processing. Print-server API route updated to `await` the call.
+
+**Files changed:**
+- `src/app/pos/lib/receipt-template.ts` — `convertLogoToRaster()` helper + rewritten `receiptToEscPos()`
+- `src/app/api/pos/receipts/print-server/route.ts` — `await receiptToEscPos()`
+
+---
+
 ## fix: POS print server URL not found — stale module cache — 2026-03-03
 
 **Bug:** POS "Receipt" button showed "Print server not configured" toast despite Admin > Settings > Receipt Printer having the correct URL saved. Test Connection and Test Print both worked from admin.
