@@ -15,11 +15,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - **Empty bold separator**: The empty `bold` line before TOTAL now renders as a blank spacer line (matching the HTML's solid `<hr>` between subtotals and grand total).
 - **Right alignment**: Added `CMD_ALIGN_RIGHT` constant for logo alignment support.
 
-**Architecture change:** `receiptToEscPos()` is now `async` (returns `Promise<Uint8Array>`) because logo conversion requires async image fetch + sharp processing. Print-server API route updated to `await` the call.
+**Architecture:** Logo conversion uses `sharp` (server-only native module). To avoid bundling `sharp` into the client (POS components import `receipt-template.ts` for HTML preview), the conversion lives in a separate server-only module (`escpos-logo.ts`). The API route calls `prepareReceiptImages()` to pre-convert logos, then passes the raster data map to `receiptToEscPos()`. The function stays synchronous.
 
 **Files changed:**
-- `src/app/pos/lib/receipt-template.ts` — `convertLogoToRaster()` helper + rewritten `receiptToEscPos()`
-- `src/app/api/pos/receipts/print-server/route.ts` — `await receiptToEscPos()`
+- `src/app/pos/lib/receipt-template.ts` — rewritten `receiptToEscPos()` with formatting fixes + `imageData` param
+- `src/lib/utils/escpos-logo.ts` — NEW: `prepareReceiptImages()` + `convertLogoToRaster()` (sharp, server-only)
+- `src/app/api/pos/receipts/print-server/route.ts` — calls `prepareReceiptImages()` before `receiptToEscPos()`
 
 ---
 

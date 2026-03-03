@@ -638,78 +638,19 @@ function textToBytes(text: string): number[] {
 }
 
 /**
- * Convert an image URL to ESC/POS raster bit-image command bytes (GS v 0).
- * Uses `sharp` (server-side only) to resize and convert to 1-bit monochrome.
- * Returns null on failure — logo is silently skipped.
- */
-async function convertLogoToRaster(
-  url: string,
-  targetWidth: number
-): Promise<number[] | null> {
-  try {
-    const sharp = (await import('sharp')).default;
-
-    // Fetch image
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    // Align width to 8 pixels (required for 1-bit bitmap byte packing)
-    const maxWidth = Math.min(targetWidth, 576); // 576 = max dots for 3-inch paper
-    const alignedWidth = Math.ceil(maxWidth / 8) * 8;
-
-    // Resize, convert to single-channel grayscale, get raw pixels
-    const { data, info } = await sharp(buffer)
-      .resize(alignedWidth, null, { fit: 'inside' })
-      .grayscale()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
-    // Ensure bitmap width is multiple of 8 (should be, but be safe)
-    const bitmapWidth = Math.ceil(info.width / 8) * 8;
-    const bytesPerRow = bitmapWidth / 8;
-    const bitmapData = new Uint8Array(bytesPerRow * info.height);
-
-    // Convert grayscale to 1-bit monochrome (dark=ink, light=paper)
-    for (let y = 0; y < info.height; y++) {
-      for (let x = 0; x < info.width; x++) {
-        const luminance = data[y * info.width + x];
-        if (luminance < 128) {
-          const byteIndex = y * bytesPerRow + Math.floor(x / 8);
-          const bitIndex = 7 - (x % 8);
-          bitmapData[byteIndex] |= 1 << bitIndex;
-        }
-      }
-    }
-
-    // GS v 0 — Print raster bit image (standard ESC/POS, supported by Star TSP100III)
-    // Format: 1D 76 30 m xL xH yL yH d1...dk
-    const xL = bytesPerRow & 0xFF;
-    const xH = (bytesPerRow >> 8) & 0xFF;
-    const yL = info.height & 0xFF;
-    const yH = (info.height >> 8) & 0xFF;
-
-    return [
-      0x1D, 0x76, 0x30, 0x00, // GS v 0, mode=normal
-      xL, xH, yL, yH,
-      ...Array.from(bitmapData),
-    ];
-  } catch (error) {
-    console.error('Failed to convert logo for ESC/POS:', error);
-    return null;
-  }
-}
-
-/**
  * Convert receipt lines to Star TSP100 ESC/POS binary commands.
  * Matches the visual layout of generateReceiptHtml() as closely
  * as a 48-column thermal printer allows:
- * - Logo via GS v 0 raster command (sharp server-side conversion)
+ * - Logo via pre-converted raster data (pass imageData from prepareReceiptImages)
  * - TOTAL line in bold + double-size (matches HTML bold/15px)
  * - "Payment" label before payment rows (matches HTML bold label)
  * - Empty bold line rendered as spacer (matches HTML solid <hr>)
  */
-export async function receiptToEscPos(lines: ReceiptLine[], width = 48): Promise<Uint8Array> {
+export function receiptToEscPos(
+  lines: ReceiptLine[],
+  width = 48,
+  imageData?: Map<string, number[]>
+): Uint8Array {
   const parts: number[] = [];
 
   // Initialize printer
@@ -807,27 +748,18 @@ export async function receiptToEscPos(lines: ReceiptLine[], width = 48): Promise
         break;
 
       case 'image':
-        if (line.url) {
-          try {
-            const rasterData = await convertLogoToRaster(
-              line.url,
-              line.width ?? 200
-            );
-            if (rasterData) {
-              // Set alignment for the image
-              const align = line.alignment || 'center';
-              if (align === 'center') parts.push(...CMD_ALIGN_CENTER);
-              else if (align === 'right') parts.push(...CMD_ALIGN_RIGHT);
-              else parts.push(...CMD_ALIGN_LEFT);
+        if (line.url && imageData?.has(line.url)) {
+          // Pre-converted raster data from prepareReceiptImages()
+          const rasterData = imageData.get(line.url)!;
+          const align = line.alignment || 'center';
+          if (align === 'center') parts.push(...CMD_ALIGN_CENTER);
+          else if (align === 'right') parts.push(...CMD_ALIGN_RIGHT);
+          else parts.push(...CMD_ALIGN_LEFT);
 
-              parts.push(...rasterData);
+          parts.push(...rasterData);
 
-              // Reset alignment after image
-              parts.push(...CMD_ALIGN_LEFT);
-            }
-          } catch {
-            // Logo failed — skip silently, don't block receipt printing
-          }
+          // Reset alignment after image
+          parts.push(...CMD_ALIGN_LEFT);
         }
         break;
     }

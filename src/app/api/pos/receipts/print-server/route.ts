@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { generateReceiptLines, receiptToEscPos } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
+import { prepareReceiptImages } from '@/lib/utils/escpos-logo';
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,7 +81,10 @@ export async function POST(request: NextRequest) {
       payments: tx.payments ?? [],
     }, merged);
 
-    const escPosData = await receiptToEscPos(receiptLines);
+    // Pre-convert logo images server-side (sharp — can't run in client bundle)
+    const imageData = await prepareReceiptImages(receiptLines);
+
+    const escPosData = receiptToEscPos(receiptLines, 48, imageData);
 
     // Send binary data to local print server with 3-second timeout
     const controller = new AbortController();
