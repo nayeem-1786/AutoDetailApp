@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     const { print_server_url } = await fetchReceiptConfig(supabase);
 
     if (!print_server_url) {
+      console.error('print_server_url is null — receipt_config may not have been saved with this field yet');
       return NextResponse.json(
         { error: 'Print server not configured' },
         { status: 400 }

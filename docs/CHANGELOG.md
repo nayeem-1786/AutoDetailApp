@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: POS print server URL not found — stale module cache — 2026-03-03
+
+**Bug:** POS "Receipt" button showed "Print server not configured" toast despite Admin > Settings > Receipt Printer having the correct URL saved. Test Connection and Test Print both worked from admin.
+
+**Root cause:** Stale Turbopack module cache. When `receipt-config.ts` was modified to add `print_server_url` to the return value, the server-side module cache wasn't invalidated. The API route ran the old version of `fetchReceiptConfig()` that didn't return `print_server_url`. Fix: `rm -rf .next` and restart `npm run dev`.
+
+**Code verified correct at every level:**
+- `ReceiptConfig` type, `DEFAULT_RECEIPT_CONFIG`, `fetchReceiptConfig()` return — all include `print_server_url`
+- Admin save includes `print_server_url` in configValue JSONB
+- print-server and cash-drawer routes correctly destructure `print_server_url`
+- DB schema is JSONB, RLS allows admin writes, middleware excludes API routes
+
+**Defensive improvements:**
+- Added `console.error` logging in print-server and cash-drawer routes when `print_server_url` is null
+- Updated DB_SCHEMA.md to document `print_server_url` in `receipt_config` JSONB structure
+
+---
+
 ## feat: ESC/POS receipt renderer + local print server integration — 2026-03-03
 
 Wired the POS receipt printing system to a local print server running on the shop Optiplex (192.168.1.174:8080) connected to the Star TSP100III receipt printer via USB.

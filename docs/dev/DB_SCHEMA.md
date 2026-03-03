@@ -1215,7 +1215,8 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 
 ```jsonc
 {
-  "printer_ip": "192.168.1.100",     // Star TSP-100 IP
+  "printer_ip": "192.168.1.100",     // Star TSP-100 WebPRNT IP (legacy)
+  "print_server_url": "http://192.168.1.174:8080", // Local print server URL for ESC/POS
   "override_name": null,              // Override business name on receipt
   "override_phone": null,             // Override phone on receipt
   "override_address": null,           // Override address on receipt
