@@ -4,10 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { generateReceiptLines, receiptToEscPos } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
-// TODO: Logo printing disabled — Star TSP100III doesn't recognize standard
-// GS v 0 raster command; bytes print as gibberish text. Need to use Star-specific
-// ESC GS S / ESC * bit-image commands instead. See escpos-logo.ts for the
-// conversion logic (sharp-based, works server-side).
+import { logoToEscPosRaster } from '@/app/api/pos/receipts/logo-to-raster';
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,9 +81,19 @@ export async function POST(request: NextRequest) {
       payments: tx.payments ?? [],
     }, merged);
 
-    // Logo images skipped — no imageData passed, so receiptToEscPos silently
-    // skips image lines. See TODO at top of file for Star raster command issue.
-    const escPosData = receiptToEscPos(receiptLines);
+    // Convert logo to ESC/POS raster bytes server-side (sharp can't run in browser)
+    let logoRasterBytes: Uint8Array | undefined;
+    if (merged.logo_url) {
+      logoRasterBytes = await logoToEscPosRaster(
+        merged.logo_url,
+        merged.logo_width,
+        merged.logo_alignment
+      );
+      // Empty array = conversion failed, will be silently skipped
+      if (logoRasterBytes.length === 0) logoRasterBytes = undefined;
+    }
+
+    const escPosData = receiptToEscPos(receiptLines, 48, logoRasterBytes);
 
     // Send binary data to local print server with 3-second timeout
     const controller = new AbortController();

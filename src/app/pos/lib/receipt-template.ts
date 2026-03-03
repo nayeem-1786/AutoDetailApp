@@ -641,7 +641,7 @@ function textToBytes(text: string): number[] {
  * Convert receipt lines to Star TSP100 ESC/POS binary commands.
  * Matches the visual layout of generateReceiptHtml() as closely
  * as a 48-column thermal printer allows:
- * - Logo via pre-converted raster data (pass imageData from prepareReceiptImages)
+ * - Logo via pre-converted raster bytes (pass logoRasterBytes from logoToEscPosRaster)
  * - TOTAL line in bold + double-size (matches HTML bold/15px)
  * - "Payment" label before payment rows (matches HTML bold label)
  * - Empty bold line rendered as spacer (matches HTML solid <hr>)
@@ -649,7 +649,7 @@ function textToBytes(text: string): number[] {
 export function receiptToEscPos(
   lines: ReceiptLine[],
   width = 48,
-  imageData?: Map<string, number[]>
+  logoRasterBytes?: Uint8Array
 ): Uint8Array {
   const parts: number[] = [];
 
@@ -748,18 +748,13 @@ export function receiptToEscPos(
         break;
 
       case 'image':
-        if (line.url && imageData?.has(line.url)) {
-          // Pre-converted raster data from prepareReceiptImages()
-          const rasterData = imageData.get(line.url)!;
-          const align = line.alignment || 'center';
-          if (align === 'center') parts.push(...CMD_ALIGN_CENTER);
-          else if (align === 'right') parts.push(...CMD_ALIGN_RIGHT);
-          else parts.push(...CMD_ALIGN_LEFT);
-
-          parts.push(...rasterData);
-
-          // Reset alignment after image
-          parts.push(...CMD_ALIGN_LEFT);
+        // Insert pre-converted logo raster bytes (self-contained: alignment + GS v 0 + data + reset)
+        // Logo bytes are built by logoToEscPosRaster() in the server-side API route.
+        // If not provided or empty, the image line is silently skipped.
+        if (logoRasterBytes && logoRasterBytes.length > 0) {
+          for (let i = 0; i < logoRasterBytes.length; i++) {
+            parts.push(logoRasterBytes[i]);
+          }
         }
         break;
     }

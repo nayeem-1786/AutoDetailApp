@@ -4,23 +4,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: add logo printing to thermal receipts via server-side raster conversion — 2026-03-03
+
+Logo now prints on physical receipts using `GS v 0` raster command. Sharp-based image conversion runs server-side only to avoid client bundle issues.
+
+**Architecture:**
+- `src/app/api/pos/receipts/logo-to-raster.ts` — NEW server-only utility. `logoToEscPosRaster(imageUrl, targetWidth, alignment)` fetches logo, uses `sharp` to resize + grayscale + threshold to 1-bit monochrome, returns self-contained `Uint8Array` (alignment + `GS v 0` raster command + bitmap data + alignment reset). Returns empty array on failure.
+- `receipt-template.ts` — `receiptToEscPos()` accepts optional `logoRasterBytes?: Uint8Array`. When an `image` line is encountered, the pre-built bytes are inserted byte-by-byte (no spread). Zero server-only imports — safe for client bundle.
+- `print-server/route.ts` — if `merged.logo_url` exists, calls `logoToEscPosRaster()` then passes result as 3rd arg to `receiptToEscPos()`.
+- Deleted `src/lib/utils/escpos-logo.ts` (old location, caused client build errors).
+
+**Logo placement** respects `receipt_config`: above_name, below_name, or above_footer — determined by where `generateReceiptLines()` places the `image` line. Alignment (left/center/right) embedded in the raster bytes.
+
+---
+
 ## fix: ESC/POS receipt output now matches admin preview layout — 2026-03-03
 
-**Bug:** Physical thermal receipt from Star TSP100III did not match the HTML receipt preview in Admin > Settings > Receipt Printer. Missing logo, no bold/large TOTAL, no "Payment" label, and formatting differences.
+**Bug:** Physical thermal receipt from Star TSP100III did not match the HTML receipt preview in Admin > Settings > Receipt Printer. No bold/large TOTAL, no "Payment" label, and formatting differences.
 
 **Fixes to `receiptToEscPos()` in `receipt-template.ts`:**
-- **Logo**: Skipped for now. Standard `GS v 0` raster command is not recognized by Star TSP100III — raw bitmap bytes print as gibberish text. Server-side conversion logic exists in `escpos-logo.ts` (sharp-based) but is disabled. Needs Star-specific raster commands (`ESC GS S` or `ESC *` bit-image mode).
 - **TOTAL line**: Now renders in bold + double-size (double height + width) to match HTML's bold 15px styling. Column padding uses halved effective width to account for double-width characters.
 - **"Payment" label**: Added bold "Payment" header text before payment rows, matching the HTML preview's `<div>Payment</div>`.
 - **Empty bold separator**: The empty `bold` line before TOTAL now renders as a blank spacer line (matching the HTML's solid `<hr>` between subtotals and grand total).
 - **Right alignment**: Added `CMD_ALIGN_RIGHT` constant for logo alignment support.
-
-**Architecture:** `receiptToEscPos()` accepts optional `imageData` map for pre-converted raster data, but logo is currently disabled (no imageData passed). `escpos-logo.ts` has the sharp-based conversion ready for when Star-specific raster commands are implemented.
-
-**Files changed:**
-- `src/app/pos/lib/receipt-template.ts` — rewritten `receiptToEscPos()` with formatting fixes + `imageData` param
-- `src/lib/utils/escpos-logo.ts` — NEW: `prepareReceiptImages()` + `convertLogoToRaster()` (sharp, server-only, currently unused)
-- `src/app/api/pos/receipts/print-server/route.ts` — logo disabled, formatting fixes active
 
 ---
 
