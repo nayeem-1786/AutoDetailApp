@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Star TSP100 raster logo printing in ESC/POS receipts — 2026-03-04
+
+Rewrote `logo-to-raster.ts` to use the correct Star Line Mode raster protocol instead of the GS v 0 standard ESC/POS raster command which printed gibberish on the Star TSP100III.
+
+- **Star raster protocol**: `ESC * r A` (enter) → `b nL nH [data]` per row → `ESC * r B` (exit)
+- **Full-width rows**: Every row is exactly 576px (72 bytes) — the Star TSP100's full printable width at 203dpi
+- **CSS-to-printer pixel conversion**: `logo_width` (CSS px) × 2 for 203dpi, capped at 576px
+- **Pixel-based alignment**: Left/center/right via white pixel padding (not ESC/POS alignment commands)
+- **5-second fetch timeout**: Prevents receipt printing from hanging on slow image downloads
+- **Graceful fallback**: If image fetch or conversion fails, receipt prints without logo
+
+Files changed:
+- `src/app/api/pos/receipts/logo-to-raster.ts` — Rewritten with Star Line Mode raster protocol
+
+---
+
 ## fix: Add RLS SELECT policies for email template tables — 2026-03-04
 
 The drip builder and automation editor use `createClient()` (browser Supabase) to fetch template lists for dropdowns. With RLS enabled but no policies, these queries returned empty results — template dropdowns appeared empty.

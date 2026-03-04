@@ -748,8 +748,8 @@ export function receiptToEscPos(
         break;
 
       case 'image':
-        // Insert pre-converted logo raster bytes (self-contained: alignment + GS v 0 + data + reset)
-        // Logo bytes are built by logoToEscPosRaster() in the server-side API route.
+        // Insert pre-converted Star raster bytes (ESC * r A + row data + ESC * r B)
+        // Built by logoToEscPosRaster() in the server-side API route.
         // If not provided or empty, the image line is silently skipped.
         if (logoRasterBytes && logoRasterBytes.length > 0) {
           for (let i = 0; i < logoRasterBytes.length; i++) {
