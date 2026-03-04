@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Add RLS SELECT policies for email template tables — 2026-03-04
+
+The drip builder and automation editor use `createClient()` (browser Supabase) to fetch template lists for dropdowns. With RLS enabled but no policies, these queries returned empty results — template dropdowns appeared empty.
+
+- Added `FOR SELECT TO authenticated USING (true)` policies on all 7 email template system tables
+- Write access remains service-role only (via API routes + `createAdminClient()`)
+- Migration: `20260304000001_email_template_rls_policies.sql`
+
+---
+
 ## docs: Email Template System — Sub-phase 9 (Docs + Cleanup) — 2026-03-04
 
 Final documentation pass for the email template system.

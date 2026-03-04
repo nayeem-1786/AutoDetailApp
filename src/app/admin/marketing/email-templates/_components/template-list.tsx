@@ -91,7 +91,6 @@ export function TemplateList() {
 
         <div className="flex gap-2">
           <Button
-            variant="outline"
             size="sm"
             onClick={() => router.push('/admin/marketing/email-templates/layouts')}
           >

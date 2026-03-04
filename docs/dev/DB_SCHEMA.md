@@ -1397,4 +1397,18 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 | `email_brand_social_facebook` | string | `""` | Facebook URL |
 | `email_brand_footer_text` | string | `""` | Optional custom footer line |
 
+### RLS Policies
+
+All email template tables have RLS enabled. Write access is service-role only (via API routes). Read access for authenticated users:
+
+| Table | Policy | Access |
+|-------|--------|--------|
+| email_layouts | `email_layouts_select` | SELECT for authenticated |
+| email_templates | `email_templates_select` | SELECT for authenticated |
+| email_template_assignments | `email_template_assignments_select` | SELECT for authenticated |
+| drip_sequences | `drip_sequences_select` | SELECT for authenticated |
+| drip_steps | `drip_steps_select` | SELECT for authenticated |
+| drip_enrollments | `drip_enrollments_select` | SELECT for authenticated |
+| drip_send_log | `drip_send_log_select` | SELECT for authenticated |
+
 **Files:** `src/lib/email/types.ts` (types), `src/lib/email/block-renderers.ts` (11 block renderers), `src/lib/email/layout-renderer.ts` (full pipeline), `src/lib/email/photo-resolver.ts` (dynamic photo pairs), `src/lib/email/template-resolver.ts` (segment routing), `src/lib/email/send-templated-email.ts` (high-level send), `src/lib/email/variables.ts` (variable definitions)
