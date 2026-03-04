@@ -1036,6 +1036,18 @@ src/components/service-pricing-form.tsx
 
 ---
 
+## POS Lib (`src/app/pos/lib/`)
+
+```
+pos-fetch.ts          — POS API fetch wrapper with 401 redirect
+receipt-image.ts      — imageToStarRaster() — logo URL to Star TSP100 raster bitmap
+receipt-template.ts   — Receipt line generation, plain text, HTML, ESC/POS renderers
+star-printer.ts       — Star WebPRNT SDK helpers
+stripe-terminal.ts    — Stripe Terminal SDK integration
+```
+
+---
+
 ## POS Components (`src/app/pos/components/`)
 
 ```

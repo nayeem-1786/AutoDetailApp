@@ -2,7 +2,7 @@ import sharp from 'sharp';
 
 /**
  * Star TSP100 full printable width at 203dpi for 80mm paper.
- * Every raster row sent to the printer must be exactly this many pixels wide.
+ * Every raster row sent to the printer must be exactly this many pixels wide (72 bytes).
  */
 const PRINTER_WIDTH_PX = 576;
 const ROW_BYTE_COUNT = PRINTER_WIDTH_PX / 8; // 72
@@ -17,44 +17,47 @@ const ROW_BYTE_COUNT = PRINTER_WIDTH_PX / 8; // 72
  *     and d1..dk = pixel data, MSB = leftmost pixel, 1 = black, 0 = white
  *   Exit raster mode:   ESC * r B  (0x1B 0x2A 0x72 0x42)
  *
- * Returns empty Uint8Array on failure (logo silently skipped).
- *
- * @param imageUrl - The image URL (Supabase storage)
- * @param cssWidth - Logo width from receipt config (CSS pixels). Converted to printer pixels (~2x for 203dpi).
+ * @param url - The image URL (Supabase storage)
+ * @param maxWidthPx - Maximum width in pixels (Star TSP100 80mm paper = 576px at 203dpi,
+ *                     but content area is ~546px; use 384 for safe default)
  * @param alignment - 'left' | 'center' | 'right'
+ * @returns Uint8Array of complete raster commands, or null if fetch/processing fails
  */
-export async function logoToEscPosRaster(
-  imageUrl: string,
-  cssWidth = 200,
+export async function imageToStarRaster(
+  url: string,
+  maxWidthPx = 384,
   alignment: 'left' | 'center' | 'right' = 'center'
-): Promise<Uint8Array> {
+): Promise<Uint8Array | null> {
   try {
-    // Convert CSS px to printer px (~2x since 200px CSS ≈ 400px at 203dpi), cap at printer width
-    const maxWidthPx = Math.min(Math.round(cssWidth * 2), PRINTER_WIDTH_PX);
-
-    // 1. Fetch the image with a 5-second timeout
+    // 1. Fetch the image from the URL with a 5-second timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     let response: Response;
     try {
-      response = await fetch(imageUrl, { signal: controller.signal });
+      response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeout);
     } catch {
       clearTimeout(timeout);
-      console.error('Logo fetch failed or timed out:', imageUrl);
-      return new Uint8Array(0);
+      console.error('Logo fetch failed or timed out:', url);
+      return null;
     }
 
     if (!response.ok) {
-      console.error('Logo fetch returned', response.status, imageUrl);
-      return new Uint8Array(0);
+      console.error('Logo fetch returned', response.status, url);
+      return null;
     }
 
+    // 2. Load into sharp from the response buffer
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    // 2. Resize, convert to grayscale, get raw 8-bit pixels
+    // 3. Resize: constrain width to maxWidthPx, maintain aspect ratio
+    // 4. Flatten alpha onto white background, convert to grayscale, get raw 1-channel 8-bit pixels
+    //    CRITICAL: .flatten() composites any alpha channel onto white BEFORE grayscale conversion.
+    //    Without this, PNGs with transparency produce 2-channel (grey+alpha) output and the
+    //    pixel indexing below reads wrong bytes, producing garbage on the printer.
     const { data: pixels, info } = await sharp(buffer)
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
       .resize({ width: maxWidthPx, fit: 'inside', withoutEnlargement: true })
       .grayscale()
       .raw()
@@ -63,7 +66,11 @@ export async function logoToEscPosRaster(
     const imgWidth = info.width;
     const imgHeight = info.height;
 
-    // 3. Calculate alignment padding (in pixels)
+    // 5. Pad the pixel width to a multiple of 8 (raster rows must be byte-aligned)
+    //    Since we send full PRINTER_WIDTH_PX rows (576px, already multiple of 8),
+    //    the image itself doesn't need separate byte-alignment — it's embedded in the full row.
+
+    // 6. Apply alignment via pixel padding
     let leftPad = 0;
     if (alignment === 'center') {
       leftPad = Math.floor((PRINTER_WIDTH_PX - imgWidth) / 2);
@@ -72,17 +79,17 @@ export async function logoToEscPosRaster(
     }
     leftPad = Math.max(0, leftPad);
 
-    // 4. Build the Star raster command sequence
+    // 7. Build the Star raster command sequence
     const parts: number[] = [];
 
-    // Enter raster mode: ESC * r A
+    // 8. Start: ESC * r A — enter raster mode
     parts.push(0x1B, 0x2A, 0x72, 0x41);
 
     // Row byte count in little-endian
     const nL = ROW_BYTE_COUNT & 0xFF;
     const nH = (ROW_BYTE_COUNT >> 8) & 0xFF;
 
-    // 5. Convert each pixel row to 1-bit packed bytes (full printer width)
+    // Convert each pixel row to 1-bit packed bytes (full printer width)
     for (let y = 0; y < imgHeight; y++) {
       // Build a full-width row of pixel values (0-255)
       // Left padding = white (255), image pixels, right padding = white (255)
@@ -116,12 +123,13 @@ export async function logoToEscPosRaster(
       }
     }
 
-    // Exit raster mode: ESC * r B
+    // End: ESC * r B — exit raster mode
     parts.push(0x1B, 0x2A, 0x72, 0x42);
 
+    // 9. Concatenate all bytes into a single Uint8Array and return
     return new Uint8Array(parts);
   } catch (err) {
     console.error('Logo raster conversion failed:', err);
-    return new Uint8Array(0);
+    return null;
   }
 }

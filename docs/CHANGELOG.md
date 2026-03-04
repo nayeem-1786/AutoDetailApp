@@ -6,17 +6,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ## feat: Star TSP100 raster logo printing in ESC/POS receipts — 2026-03-04
 
-Rewrote `logo-to-raster.ts` to use the correct Star Line Mode raster protocol instead of the GS v 0 standard ESC/POS raster command which printed gibberish on the Star TSP100III.
+Created proper Star Line Mode raster image support for receipt logo printing. Previous implementation used wrong ESC/POS protocol (GS v 0) and didn't handle PNG alpha channels, producing gibberish output on the Star TSP100III.
 
+- **New `receipt-image.ts`**: `imageToStarRaster()` — fetches image URL, flattens alpha onto white, converts to monochrome bitmap in Star raster format
+- **Alpha channel fix**: `.flatten({ background: white })` before `.grayscale()` prevents 2-channel output from PNGs with transparency
 - **Star raster protocol**: `ESC * r A` (enter) → `b nL nH [data]` per row → `ESC * r B` (exit)
 - **Full-width rows**: Every row is exactly 576px (72 bytes) — the Star TSP100's full printable width at 203dpi
+- **`receiptToEscPos()` now uses `imageData?: Map<string, Uint8Array>`**: URL-keyed map of pre-processed raster bytes (was single `logoRasterBytes` param)
+- **Print-server route**: Finds all `image` lines, processes in parallel via `Promise.all`, builds URL→raster map
 - **CSS-to-printer pixel conversion**: `logo_width` (CSS px) × 2 for 203dpi, capped at 576px
-- **Pixel-based alignment**: Left/center/right via white pixel padding (not ESC/POS alignment commands)
-- **5-second fetch timeout**: Prevents receipt printing from hanging on slow image downloads
-- **Graceful fallback**: If image fetch or conversion fails, receipt prints without logo
+- **Pixel-based alignment**: Left/center/right via white pixel padding
+- **5-second fetch timeout**: AbortController prevents hanging on slow downloads
+- **Graceful fallback**: Image failure does not block receipt printing
 
 Files changed:
-- `src/app/api/pos/receipts/logo-to-raster.ts` — Rewritten with Star Line Mode raster protocol
+- `src/app/pos/lib/receipt-image.ts` — NEW: `imageToStarRaster()` function
+- `src/app/pos/lib/receipt-template.ts` — `receiptToEscPos()` uses `imageData` Map param
+- `src/app/api/pos/receipts/print-server/route.ts` — Pre-processes images into Map before ESC/POS conversion
+- `src/app/api/pos/receipts/logo-to-raster.ts` — DELETED (replaced by receipt-image.ts)
 
 ---
 

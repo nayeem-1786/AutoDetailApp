@@ -641,7 +641,7 @@ function textToBytes(text: string): number[] {
  * Convert receipt lines to Star TSP100 ESC/POS binary commands.
  * Matches the visual layout of generateReceiptHtml() as closely
  * as a 48-column thermal printer allows:
- * - Logo via pre-converted raster bytes (pass logoRasterBytes from logoToEscPosRaster)
+ * - Logo via pre-converted raster bytes (pass imageData map from imageToStarRaster)
  * - TOTAL line in bold + double-size (matches HTML bold/15px)
  * - "Payment" label before payment rows (matches HTML bold label)
  * - Empty bold line rendered as spacer (matches HTML solid <hr>)
@@ -649,7 +649,7 @@ function textToBytes(text: string): number[] {
 export function receiptToEscPos(
   lines: ReceiptLine[],
   width = 48,
-  logoRasterBytes?: Uint8Array
+  imageData?: Map<string, Uint8Array>
 ): Uint8Array {
   const parts: number[] = [];
 
@@ -748,12 +748,15 @@ export function receiptToEscPos(
         break;
 
       case 'image':
-        // Insert pre-converted Star raster bytes (ESC * r A + row data + ESC * r B)
-        // Built by logoToEscPosRaster() in the server-side API route.
-        // If not provided or empty, the image line is silently skipped.
-        if (logoRasterBytes && logoRasterBytes.length > 0) {
-          for (let i = 0; i < logoRasterBytes.length; i++) {
-            parts.push(logoRasterBytes[i]);
+        // Insert pre-processed raster bytes if available for this image URL.
+        // All async image processing happens in the API route before this function is called.
+        // If no imageData or no entry for this URL, skip entirely (no text, no URL output).
+        if (imageData && line.url) {
+          const rasterBytes = imageData.get(line.url);
+          if (rasterBytes && rasterBytes.length > 0) {
+            for (let i = 0; i < rasterBytes.length; i++) {
+              parts.push(rasterBytes[i]);
+            }
           }
         }
         break;
