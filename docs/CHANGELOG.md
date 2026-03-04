@@ -4,6 +4,53 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Email Template System — Sub-phase 6 (Drip Campaign System) — 2026-03-03
+
+Multi-step automated email/SMS drip sequences with triggers, stop conditions, exit actions, nurture handoff, and analytics.
+
+**Core engine (`src/lib/email/drip-engine.ts`):**
+- `enrollCustomer()` — insert enrollment, calculate `next_send_at`, handle UNIQUE constraint
+- `checkStopConditions()` — query transactions/appointments/conversations since enrolled_at (`on_purchase`, `on_booking`, `on_reply`)
+- `checkExitCondition()` — per-step: `has_transaction`, `has_appointment` (email open/click tracking = TODO, needs Mailgun webhooks)
+- `executeExitAction()` — stop enrollment; `move` re-enrolls in exit sequence; `tag` logs warning (customer tags not yet implemented)
+- `executeStep()` — send email (renderFromBlocks + sendEmail) and/or SMS (sendMarketingSms), generate coupon (clone template pattern), log to `drip_send_log`, advance enrollment
+- `processEnrollments()` — Phase 3: query active enrollments where `next_send_at <= now()`, pre-load sequences+steps, execute
+- `runAutoEnrollments()` — Phase 0: check triggers (`no_visit_days`, `after_service`, `new_customer`) for active sequences, enroll matching customers
+- `checkAllStopConditions()` — Phase 0.5: check all active enrollments against stop conditions, handle nurture transfer
+
+**API routes (7 files under `src/app/api/admin/drip-sequences/`):**
+- `route.ts` — GET list with enrollment counts + POST create with optional `steps[]`
+- `[id]/route.ts` — GET single with steps joined + PATCH (reconcile steps array) + DELETE (blocks if active enrollments)
+- `[id]/steps/route.ts` — GET ordered list + POST with auto step_order
+- `[id]/steps/[stepId]/route.ts` — PATCH + DELETE (renumbers remaining steps)
+- `[id]/enrollments/route.ts` — GET with customer join + POST manual enroll
+- `[id]/enrollments/[enrollId]/route.ts` — PATCH actions: pause/resume/cancel/skip
+- `[id]/analytics/route.ts` — GET funnel, enrollment breakdown, conversion rate
+
+**Lifecycle engine integration (`src/app/api/cron/lifecycle-engine/route.ts`):**
+- Phase 0: `runAutoEnrollments()` — auto-enroll matching customers
+- Phase 0.5: `checkAllStopConditions()` — stop enrollments meeting stop conditions
+- Phase 3: `processEnrollments()` — execute pending drip steps
+- Each phase wrapped in try/catch so failures don't block existing lifecycle rules
+- Response JSON now includes `drip: { enrolled, stopped, processed, sent }`
+
+**Admin UI (8 new files, 2 modified):**
+- `campaign-tabs.tsx` — Tabs: "One-Time" | "Drip" on campaigns list page
+- `drip-builder.tsx` — State-based form: basics, trigger config, steps editor, stop conditions, save/activate
+- `drip-steps-editor.tsx` — Vertical timeline with add/remove/reorder steps
+- `drip-step-card.tsx` — Collapsed/expanded step card: delay, channel, template, SMS with variable chips, exit conditions
+- `drip-analytics.tsx` — Summary cards, bar chart funnel, drop-off reasons, conversion metrics
+- `drip-enrollments-table.tsx` — DataTable with customer link, status, pause/resume/cancel/skip actions, manual enroll button
+- `drip/new/page.tsx` — Create new drip sequence
+- `drip/[id]/page.tsx` — Edit sequence with Builder | Enrollments | Analytics tabs
+
+**Customer detail page (`src/app/admin/customers/[id]/page.tsx`):**
+- Added 7th tab "Sequences" showing customer's drip enrollments
+- Enrollment cards: sequence name, step progress, next send, status badge, pause/resume/cancel actions
+- "Enroll in Sequence" dialog with active sequences dropdown
+
+---
+
 ## feat: Email Template System — Sub-phase 5 (Campaign + Automation Integration) — 2026-03-03
 
 Connected the email template system to campaigns, automations, and the lifecycle engine.

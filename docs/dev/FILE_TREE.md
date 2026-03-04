@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-03-03 (Email Template System — Sub-phase 4)
+> **Last updated:** 2026-03-03 (Email Template System — Sub-phase 6)
 
 ---
 
@@ -73,6 +73,17 @@ src/app/api/admin/email-templates/gallery-photos/route.ts
 src/app/api/admin/email-templates/brand-kit/route.ts
 src/app/api/admin/email-templates/layouts/route.ts
 src/app/api/admin/email-templates/layouts/[id]/route.ts
+```
+
+### Admin — Drip Sequences
+```
+src/app/api/admin/drip-sequences/route.ts
+src/app/api/admin/drip-sequences/[id]/route.ts
+src/app/api/admin/drip-sequences/[id]/steps/route.ts
+src/app/api/admin/drip-sequences/[id]/steps/[stepId]/route.ts
+src/app/api/admin/drip-sequences/[id]/enrollments/route.ts
+src/app/api/admin/drip-sequences/[id]/enrollments/[enrollId]/route.ts
+src/app/api/admin/drip-sequences/[id]/analytics/route.ts
 ```
 
 ### Admin — CMS
@@ -503,6 +514,14 @@ src/app/admin/marketing/campaigns/[id]/edit/page.tsx
 src/app/admin/marketing/campaigns/[id]/page.tsx
 src/app/admin/marketing/campaigns/new/page.tsx
 src/app/admin/marketing/campaigns/page.tsx
+src/app/admin/marketing/campaigns/_components/campaign-tabs.tsx
+src/app/admin/marketing/campaigns/drip/new/page.tsx
+src/app/admin/marketing/campaigns/drip/[id]/page.tsx
+src/app/admin/marketing/campaigns/drip/_components/drip-builder.tsx
+src/app/admin/marketing/campaigns/drip/_components/drip-steps-editor.tsx
+src/app/admin/marketing/campaigns/drip/_components/drip-step-card.tsx
+src/app/admin/marketing/campaigns/drip/_components/drip-analytics.tsx
+src/app/admin/marketing/campaigns/drip/_components/drip-enrollments-table.tsx
 src/app/admin/marketing/compliance/page.tsx
 src/app/admin/marketing/coupons/[id]/page.tsx
 src/app/admin/marketing/coupons/new/page.tsx
@@ -767,6 +786,7 @@ src/lib/email/photo-resolver.ts
 src/lib/email/template-resolver.ts
 src/lib/email/send-templated-email.ts
 src/lib/email/variables.ts
+src/lib/email/drip-engine.ts
 ```
 
 ### Quotes

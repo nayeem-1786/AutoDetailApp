@@ -68,6 +68,7 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import { Pagination } from '@/components/ui/pagination';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { Play, Pause, XCircle } from 'lucide-react';
 import { ReceiptDialog } from '@/components/admin/receipt-dialog';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -915,6 +916,7 @@ export default function CustomerProfilePage() {
           <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>
           <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
           <TabsTrigger value="service-history">Service History</TabsTrigger>
+          <TabsTrigger value="sequences">Sequences</TabsTrigger>
         </TabsList>
 
         {/* ===== INFO TAB ===== */}
@@ -1895,6 +1897,11 @@ export default function CustomerProfilePage() {
         <TabsContent value="service-history">
           <CustomerServiceHistoryTab customerId={id} vehicles={vehicles} />
         </TabsContent>
+
+        {/* ===== SEQUENCES TAB ===== */}
+        <TabsContent value="sequences">
+          <CustomerSequencesTab customerId={id} />
+        </TabsContent>
       </Tabs>
 
       {/* Delete Customer - First Confirmation */}
@@ -2192,6 +2199,283 @@ function CustomerServiceHistoryTab({ customerId, vehicles }: { customerId: strin
           <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Sequences Tab ─────────────────────────────────────────────────────
+
+interface CustomerEnrollment {
+  id: string;
+  sequence_id: string;
+  sequence_name: string;
+  current_step: number;
+  total_steps: number;
+  enrolled_at: string;
+  next_send_at: string | null;
+  status: string;
+  stopped_reason: string | null;
+}
+
+function CustomerSequencesTab({ customerId }: { customerId: string }) {
+  const supabase = createClient();
+  const [enrollments, setEnrollments] = useState<CustomerEnrollment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [availableSequences, setAvailableSequences] = useState<Array<{ id: string; name: string }>>([]);
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [selectedSequenceId, setSelectedSequenceId] = useState('');
+  const [enrolling, setEnrolling] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const loadEnrollments = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch enrollments for this customer
+      const { data: enrData } = await supabase
+        .from('drip_enrollments')
+        .select('id, sequence_id, current_step, enrolled_at, next_send_at, status, stopped_reason')
+        .eq('customer_id', customerId)
+        .order('enrolled_at', { ascending: false });
+
+      if (enrData?.length) {
+        // Fetch sequence names + step counts
+        const seqIds = [...new Set(enrData.map((e: { sequence_id: string }) => e.sequence_id))];
+        const { data: seqData } = await supabase
+          .from('drip_sequences')
+          .select('id, name')
+          .in('id', seqIds);
+
+        const seqMap = new Map((seqData || []).map((s: { id: string; name: string }) => [s.id, s.name]));
+
+        // Count steps per sequence
+        const { data: stepCounts } = await supabase
+          .from('drip_steps')
+          .select('sequence_id')
+          .in('sequence_id', seqIds)
+          .eq('is_active', true);
+
+        const stepCountMap = new Map<string, number>();
+        for (const s of stepCounts || []) {
+          stepCountMap.set((s as { sequence_id: string }).sequence_id, (stepCountMap.get((s as { sequence_id: string }).sequence_id) || 0) + 1);
+        }
+
+        setEnrollments(enrData.map((e: { id: string; sequence_id: string; current_step: number; enrolled_at: string; next_send_at: string | null; status: string; stopped_reason: string | null }) => ({
+          id: e.id,
+          sequence_id: e.sequence_id,
+          sequence_name: seqMap.get(e.sequence_id) || 'Unknown',
+          current_step: e.current_step,
+          total_steps: stepCountMap.get(e.sequence_id) || 0,
+          enrolled_at: e.enrolled_at,
+          next_send_at: e.next_send_at,
+          status: e.status,
+          stopped_reason: e.stopped_reason,
+        })));
+      } else {
+        setEnrollments([]);
+      }
+    } catch (err) {
+      console.error('Failed to load enrollments:', err);
+    }
+    setLoading(false);
+  }, [customerId, supabase]);
+
+  useEffect(() => {
+    loadEnrollments();
+  }, [loadEnrollments]);
+
+  async function loadSequences() {
+    const { data } = await supabase
+      .from('drip_sequences')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    setAvailableSequences(data || []);
+  }
+
+  async function handleEnroll() {
+    if (!selectedSequenceId) return;
+    setEnrolling(true);
+    try {
+      const res = await adminFetch(`/api/admin/drip-sequences/${selectedSequenceId}/enrollments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: customerId }),
+      });
+      if (res.ok) {
+        toast.success('Customer enrolled in sequence');
+        setEnrollDialogOpen(false);
+        setSelectedSequenceId('');
+        loadEnrollments();
+      } else {
+        const { error } = await res.json();
+        toast.error(error || 'Failed to enroll customer');
+      }
+    } catch {
+      toast.error('Failed to enroll customer');
+    }
+    setEnrolling(false);
+  }
+
+  async function handleAction(enrollment: CustomerEnrollment, action: 'pause' | 'resume' | 'cancel') {
+    setActionLoading(enrollment.id);
+    try {
+      const res = await adminFetch(
+        `/api/admin/drip-sequences/${enrollment.sequence_id}/enrollments/${enrollment.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        }
+      );
+      if (res.ok) {
+        toast.success(action === 'pause' ? 'Enrollment paused' : action === 'resume' ? 'Enrollment resumed' : 'Enrollment cancelled');
+        loadEnrollments();
+      } else {
+        const { error } = await res.json();
+        toast.error(error || `Failed to ${action} enrollment`);
+      }
+    } catch {
+      toast.error(`Failed to ${action} enrollment`);
+    }
+    setActionLoading(null);
+  }
+
+  const statusBadgeVariant = (status: string) => {
+    if (status === 'active') return 'success' as const;
+    if (status === 'completed') return 'info' as const;
+    if (status === 'stopped') return 'destructive' as const;
+    if (status === 'paused') return 'warning' as const;
+    return 'default' as const;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Drip Sequences</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            loadSequences();
+            setEnrollDialogOpen(true);
+          }}
+        >
+          <Plus className="h-4 w-4" />
+          Enroll in Sequence
+        </Button>
+      </div>
+
+      {enrollments.length === 0 ? (
+        <EmptyState
+          title="No sequences"
+          description="This customer is not enrolled in any drip sequences."
+        />
+      ) : (
+        <div className="space-y-3">
+          {enrollments.map((enr) => (
+            <Card key={enr.id}>
+              <CardContent className="flex items-center justify-between py-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/admin/marketing/campaigns/drip/${enr.sequence_id}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {enr.sequence_name}
+                    </Link>
+                    <Badge variant={statusBadgeVariant(enr.status)}>
+                      {enr.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span>Step {enr.current_step + 1} of {enr.total_steps}</span>
+                    <span>Enrolled {formatDate(enr.enrolled_at)}</span>
+                    {enr.next_send_at && (
+                      <span>Next: {formatDateTime(enr.next_send_at)}</span>
+                    )}
+                    {enr.stopped_reason && (
+                      <span className="capitalize">Reason: {enr.stopped_reason}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {enr.status === 'active' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAction(enr, 'pause')}
+                      disabled={actionLoading === enr.id}
+                      title="Pause"
+                    >
+                      <Pause className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {enr.status === 'paused' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAction(enr, 'resume')}
+                      disabled={actionLoading === enr.id}
+                      title="Resume"
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {(enr.status === 'active' || enr.status === 'paused') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAction(enr, 'cancel')}
+                      disabled={actionLoading === enr.id}
+                      className="text-red-500 hover:text-red-700"
+                      title="Cancel"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Enroll Dialog */}
+      <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enroll in Drip Sequence</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <FormField label="Sequence" htmlFor="enroll-sequence" required>
+              <Select
+                id="enroll-sequence"
+                value={selectedSequenceId}
+                onChange={(e) => setSelectedSequenceId(e.target.value)}
+              >
+                <option value="">Select a sequence...</option>
+                {availableSequences.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEnrollDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleEnroll} disabled={!selectedSequenceId || enrolling}>
+              {enrolling ? 'Enrolling...' : 'Enroll'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

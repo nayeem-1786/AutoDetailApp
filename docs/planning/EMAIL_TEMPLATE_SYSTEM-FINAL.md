@@ -551,25 +551,25 @@ Dependencies: 1 → 2 → 3/4 (parallel) → 5 → 6 → 7 → 8 → 9
 - [x] Automation API route: accept `email_template_id` (validation schema updated)
 - [x] Lifecycle engine: dual-channel (SMS + email), checks both feature flags, sends via `sendTemplatedEmail()` or `renderFromBlocks()` for template-based rules, legacy plain-text fallback
 
-### Sub-phase 6: Drip Campaign System
+### Sub-phase 6: Drip Campaign System ✅
 
-- [ ] `GET/POST /api/admin/drip-sequences` — List + create sequences
-- [ ] `GET/PATCH/DELETE /api/admin/drip-sequences/[id]` — Single sequence CRUD
-- [ ] `GET/POST /api/admin/drip-sequences/[id]/steps` — Steps CRUD
-- [ ] `GET/PATCH/DELETE /api/admin/drip-sequences/[id]/steps/[stepId]` — Single step CRUD
-- [ ] `GET/POST /api/admin/drip-sequences/[id]/enrollments` — Enrollments list + manual enroll
-- [ ] `PATCH /api/admin/drip-sequences/[id]/enrollments/[enrollId]` — Pause/resume/cancel enrollment
-- [ ] `GET /api/admin/drip-sequences/[id]/analytics` — Funnel + conversion data
-- [ ] Drip builder page (`/admin/marketing/campaigns/drip/new` and `/drip/[id]`)
-- [ ] `drip-builder.tsx` — Main builder with trigger, audience, steps, stop conditions
-- [ ] `drip-steps-editor.tsx` — Visual timeline editor
-- [ ] `drip-step-card.tsx` — Individual step card (delay, channel, template, coupon, exit)
-- [ ] Drip list view under Campaigns "Drip" tab
-- [ ] `drip-analytics.tsx` — Funnel, drop-off, conversion charts
-- [ ] `drip-enrollments-table.tsx` — Enrollment list with actions
-- [ ] `src/lib/email/drip-engine.ts` — Drip enrollment + execution + stop condition logic
-- [ ] Lifecycle engine integration: Phase 0 (enrollment), Phase 0.5 (exit check), Phase 3 (step execution)
-- [ ] Customer detail page: "Active Sequences" section with enrollment actions
+- [x] `GET/POST /api/admin/drip-sequences` — List + create sequences
+- [x] `GET/PATCH/DELETE /api/admin/drip-sequences/[id]` — Single sequence CRUD
+- [x] `GET/POST /api/admin/drip-sequences/[id]/steps` — Steps CRUD
+- [x] `GET/PATCH/DELETE /api/admin/drip-sequences/[id]/steps/[stepId]` — Single step CRUD
+- [x] `GET/POST /api/admin/drip-sequences/[id]/enrollments` — Enrollments list + manual enroll
+- [x] `PATCH /api/admin/drip-sequences/[id]/enrollments/[enrollId]` — Pause/resume/cancel/skip enrollment
+- [x] `GET /api/admin/drip-sequences/[id]/analytics` — Funnel + conversion data
+- [x] Drip builder page (`/admin/marketing/campaigns/drip/new` and `/drip/[id]`)
+- [x] `drip-builder.tsx` — Main builder with trigger, audience, steps, stop conditions
+- [x] `drip-steps-editor.tsx` — Visual timeline editor
+- [x] `drip-step-card.tsx` — Individual step card (delay, channel, template, coupon, exit)
+- [x] Drip list view under Campaigns "Drip" tab (`campaign-tabs.tsx`)
+- [x] `drip-analytics.tsx` — Funnel, drop-off, conversion charts
+- [x] `drip-enrollments-table.tsx` — Enrollment list with actions
+- [x] `src/lib/email/drip-engine.ts` — Drip enrollment + execution + stop condition logic
+- [x] Lifecycle engine integration: Phase 0 (enrollment), Phase 0.5 (exit check), Phase 3 (step execution)
+- [x] Customer detail page: "Sequences" tab with enrollment display + manual enroll actions
 
 ### Sub-phase 7: Sender Migration (backward compatible)
 

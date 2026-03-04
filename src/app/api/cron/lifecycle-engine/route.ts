@@ -8,13 +8,17 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
+import { runAutoEnrollments, checkAllStopConditions, processEnrollments } from '@/lib/email/drip-engine';
 
 /**
  * Lifecycle execution engine cron endpoint.
  *
- * Runs in two phases per invocation:
- *   Phase 1 — Schedule: find recent completions, insert pending lifecycle_executions
- *   Phase 2 — Execute: send SMS for executions whose scheduled_for <= now
+ * Runs in five phases per invocation:
+ *   Phase 0   — Drip: auto-enroll customers into drip sequences
+ *   Phase 0.5 — Drip: check stop conditions on active enrollments
+ *   Phase 1   — Schedule: find recent completions, insert pending lifecycle_executions
+ *   Phase 2   — Execute: send SMS/email for executions whose scheduled_for <= now
+ *   Phase 3   — Drip: execute pending drip steps
  *
  * Designed to be called every 5–15 minutes by an external scheduler or Vercel Cron.
  *
@@ -35,6 +39,32 @@ export async function GET(request: NextRequest) {
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+
+  // Drip stats
+  let dripEnrolled = 0;
+  let dripStopped = 0;
+  let dripProcessed = 0;
+  let dripSent = 0;
+
+  // =========================================================================
+  // Phase 0: Auto-enroll customers into drip sequences
+  // =========================================================================
+
+  try {
+    dripEnrolled = await runAutoEnrollments(admin);
+  } catch (err) {
+    console.error('[Lifecycle] Drip auto-enrollment failed:', err);
+  }
+
+  // =========================================================================
+  // Phase 0.5: Check stop conditions on all active drip enrollments
+  // =========================================================================
+
+  try {
+    dripStopped = await checkAllStopConditions(admin);
+  } catch (err) {
+    console.error('[Lifecycle] Drip stop condition check failed:', err);
+  }
 
   // =========================================================================
   // Phase 1: Schedule new executions from recent trigger events
@@ -101,7 +131,22 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ scheduled, sent, failed, skipped });
+  // =========================================================================
+  // Phase 3: Execute pending drip steps
+  // =========================================================================
+
+  try {
+    const dripResult = await processEnrollments(admin);
+    dripProcessed = dripResult.processed;
+    dripSent = dripResult.sent;
+  } catch (err) {
+    console.error('[Lifecycle] Drip step execution failed:', err);
+  }
+
+  return NextResponse.json({
+    scheduled, sent, failed, skipped,
+    drip: { enrolled: dripEnrolled, stopped: dripStopped, processed: dripProcessed, sent: dripSent },
+  });
 }
 
 // ===========================================================================

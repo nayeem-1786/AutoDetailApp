@@ -16,6 +16,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { CampaignTabs } from './_components/campaign-tabs';
 
 export default function CampaignsListPage() {
   const router = useRouter();
@@ -210,19 +211,8 @@ export default function CampaignsListPage() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Campaigns"
-        description={`${campaigns.length} campaigns total`}
-        action={
-          <Button onClick={() => router.push('/admin/marketing/campaigns/new')}>
-            <Plus className="h-4 w-4" />
-            Create Campaign
-          </Button>
-        }
-      />
-
+  const oneTimeContent = (
+    <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <Select
           value={statusFilter}
@@ -270,6 +260,23 @@ export default function CampaignsListPage() {
         loading={deleting}
         onConfirm={handleDelete}
       />
+    </>
+  );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Campaigns"
+        description={`${campaigns.length} campaigns total`}
+        action={
+          <Button onClick={() => router.push('/admin/marketing/campaigns/new')}>
+            <Plus className="h-4 w-4" />
+            Create Campaign
+          </Button>
+        }
+      />
+
+      <CampaignTabs oneTimeContent={oneTimeContent} />
     </div>
   );
 }
