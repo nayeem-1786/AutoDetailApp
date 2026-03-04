@@ -573,14 +573,14 @@ Dependencies: 1 → 2 → 3/4 (parallel) → 5 → 6 → 7 → 8 → 9
 
 ### Sub-phase 7: Sender Migration (backward compatible)
 
-- [ ] Order: Ready for Pickup (`order-emails.ts`) — template fallback
-- [ ] Order: Shipped (`order-emails.ts`) — template fallback
-- [ ] Order: Delivered (`order-emails.ts`) — template fallback
-- [ ] Order: Refund (`order-emails.ts`) — template fallback
-- [ ] Job Completion (`/api/pos/jobs/[id]/complete/route.ts`) — template fallback
-- [ ] Quote Send (`send-service.ts`) — template fallback + switch to `sendEmail()`
-- [ ] Appointment Notification (`/api/pos/appointments/[id]/notify/route.ts`) — template fallback
-- [ ] Stock Alerts (`/api/cron/stock-alerts/route.ts`) — template fallback
+- [x] Order: Ready for Pickup (`order-emails.ts`) — template fallback
+- [x] Order: Shipped (`order-emails.ts`) — template fallback
+- [x] Order: Delivered (`order-emails.ts`) — template fallback
+- [x] Order: Refund (`order-emails.ts`) — template fallback
+- [x] Job Completion (`/api/pos/jobs/[id]/complete/route.ts`) — template fallback
+- [x] Quote Send (`send-service.ts`) — template fallback + switch to `sendEmail()`
+- [x] Appointment Notification (`/api/pos/appointments/[id]/notify/route.ts`) — template fallback
+- [x] Stock Alerts (`/api/cron/stock-alerts/route.ts`) — template fallback
 
 ### Sub-phase 8: Seed Data + Compliance
 

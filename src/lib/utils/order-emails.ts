@@ -1,4 +1,5 @@
 import { sendEmail } from '@/lib/utils/email';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 import type { Order, OrderItem } from '@/lib/supabase/types';
@@ -49,8 +50,30 @@ function itemsTable(items: OrderItem[]) {
   </table>`;
 }
 
+/** Build the common template variables for order emails */
+function orderTemplateVars(order: OrderWithItems, biz: { name: string; phone: string; email: string | null; address: string; website: string | null }) {
+  return {
+    first_name: order.first_name,
+    last_name: order.last_name || '',
+    customer_name: [order.first_name, order.last_name].filter(Boolean).join(' '),
+    order_number: order.order_number,
+    items_table: order.items?.length ? itemsTable(order.items) : '',
+    business_name: biz.name,
+    business_phone: biz.phone,
+    business_email: biz.email || '',
+    business_address: biz.address,
+    business_website: biz.website || '',
+  };
+}
+
 export async function sendReadyForPickupEmail(order: OrderWithItems) {
   const biz = await getBusinessInfo();
+
+  // Template-first
+  const templated = await sendTemplatedEmail(order.email, 'order_ready_pickup', orderTemplateVars(order, biz));
+  if (templated.usedTemplate) return;
+
+  // Fallback: existing hardcoded HTML
   const html = emailWrapper(
     'Your Order is Ready for Pickup!',
     card(`
@@ -76,6 +99,16 @@ export async function sendReadyForPickupEmail(order: OrderWithItems) {
 export async function sendShippedEmail(order: OrderWithItems) {
   const biz = await getBusinessInfo();
 
+  // Template-first
+  const templated = await sendTemplatedEmail(order.email, 'order_shipped', {
+    ...orderTemplateVars(order, biz),
+    tracking_url: order.tracking_url || '',
+    tracking_number: order.tracking_number || '',
+    shipping_carrier: order.shipping_carrier || '',
+  });
+  if (templated.usedTemplate) return;
+
+  // Fallback: existing hardcoded HTML
   const trackingHtml = order.tracking_url
     ? `<p style="margin:16px 0 0;">
         <a href="${order.tracking_url}" style="display:inline-block;background:#CCFF00;color:#000000;font-weight:bold;padding:12px 24px;border-radius:8px;text-decoration:none;">Track Your Package</a>
@@ -104,6 +137,12 @@ export async function sendShippedEmail(order: OrderWithItems) {
 
 export async function sendDeliveredEmail(order: OrderWithItems) {
   const biz = await getBusinessInfo();
+
+  // Template-first
+  const templated = await sendTemplatedEmail(order.email, 'order_delivered', orderTemplateVars(order, biz));
+  if (templated.usedTemplate) return;
+
+  // Fallback: existing hardcoded HTML
   const html = emailWrapper(
     'Your Order Has Been Delivered!',
     card(`
@@ -125,6 +164,16 @@ export async function sendDeliveredEmail(order: OrderWithItems) {
 export async function sendRefundEmail(order: OrderWithItems, amountCents: number) {
   const biz = await getBusinessInfo();
   const isFullRefund = amountCents >= order.total;
+
+  // Template-first
+  const templated = await sendTemplatedEmail(order.email, 'order_refund', {
+    ...orderTemplateVars(order, biz),
+    refund_amount: formatCurrency(amountCents / 100),
+    refund_type: isFullRefund ? 'full' : 'partial',
+  });
+  if (templated.usedTemplate) return;
+
+  // Fallback: existing hardcoded HTML
   const html = emailWrapper(
     isFullRefund ? 'Refund Processed' : 'Partial Refund Processed',
     card(`

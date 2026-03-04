@@ -3,9 +3,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, type BusinessHours } from '@/lib/data/business-hours';
 import { createShortLink } from '@/lib/utils/short-link';
+import { formatCurrency } from '@/lib/utils/format';
 import crypto from 'crypto';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
@@ -279,70 +281,125 @@ async function sendCompletionNotifications(
       (a: any) => a.status === 'approved'
     );
 
-    const photoHtml = photoPairs.map((pair) => `
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
-        <tr>
-          <td width="49%" style="padding-right: 4px;">
-            <div style="text-align:center;font-size:11px;color:#999;margin-bottom:4px;">BEFORE</div>
-            <img src="${pair.before}" alt="Before" style="width:100%;border-radius:8px;" />
-          </td>
-          <td width="2%"></td>
-          <td width="49%" style="padding-left: 4px;">
-            <div style="text-align:center;font-size:11px;color:#999;margin-bottom:4px;">AFTER</div>
-            <img src="${pair.after}" alt="After" style="width:100%;border-radius:8px;" />
-          </td>
-        </tr>
-      </table>
-    `).join('');
-
+    // Pre-render services + add-ons as items_table for template
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const addonsHtml = approvedAddons.length > 0 ? `
-      <p style="margin-top: 8px; font-size: 14px; color: #374151;">
-        <strong>Add-ons:</strong><br/>
-        ${approvedAddons.map((a: { custom_description: string | null; price: number; discount_amount: number }) =>
-          `${a.custom_description || 'Service'} — $${(a.price - a.discount_amount).toFixed(2)}`
-        ).join('<br/>')}
-      </p>
-    ` : '';
+    const servicesAndAddonsHtml = buildServicesItemsTable(services, approvedAddons as any[]);
 
-    const subject = `Your ${vehicleDisplay} is Ready!`;
-    const plainText = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup!\n\nServices: ${servicesList}\nTime: ${timerDisplay}\n\nView your photos: ${galleryUrl}\n\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
+    // Template-first
+    const templated = await sendTemplatedEmail(customer.email, 'job_complete', {
+      first_name: customer.first_name,
+      last_name: customer.last_name || '',
+      customer_name: `${customer.first_name} ${customer.last_name || ''}`.trim(),
+      customer_id: customer.id,
+      vehicle_info: vehicleInfoFull,
+      services_list: servicesList,
+      timer_display: timerDisplay,
+      items_table: servicesAndAddonsHtml,
+      gallery_url: galleryUrl,
+      business_name: businessInfo.name,
+      business_phone: businessInfo.phone,
+      business_email: businessInfo.email || '',
+      business_address: businessInfo.address,
+      business_website: businessInfo.website || '',
+    });
 
-    const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
-        <h1 style="font-size: 24px; color: #111827; margin-bottom: 8px;">Your ${vehicleDisplay} is Ready!</h1>
-        <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">
-          Hi ${customer.first_name}! Great news — your ${vehicleDisplay} is looking great and ready for pickup.
+    if (!templated.usedTemplate) {
+      // Fallback: existing hardcoded HTML
+      const photoHtml = photoPairs.map((pair) => `
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
+          <tr>
+            <td width="49%" style="padding-right: 4px;">
+              <div style="text-align:center;font-size:11px;color:#999;margin-bottom:4px;">BEFORE</div>
+              <img src="${pair.before}" alt="Before" style="width:100%;border-radius:8px;" />
+            </td>
+            <td width="2%"></td>
+            <td width="49%" style="padding-left: 4px;">
+              <div style="text-align:center;font-size:11px;color:#999;margin-bottom:4px;">AFTER</div>
+              <img src="${pair.after}" alt="After" style="width:100%;border-radius:8px;" />
+            </td>
+          </tr>
+        </table>
+      `).join('');
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const addonsHtml = approvedAddons.length > 0 ? `
+        <p style="margin-top: 8px; font-size: 14px; color: #374151;">
+          <strong>Add-ons:</strong><br/>
+          ${approvedAddons.map((a: { custom_description: string | null; price: number; discount_amount: number }) =>
+            `${a.custom_description || 'Service'} — $${(a.price - a.discount_amount).toFixed(2)}`
+          ).join('<br/>')}
         </p>
+      ` : '';
 
-        ${photoHtml}
+      const subject = `Your ${vehicleDisplay} is Ready!`;
+      const plainText = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup!\n\nServices: ${servicesList}\nTime: ${timerDisplay}\n\nView your photos: ${galleryUrl}\n\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
 
-        <div style="background: #f9fafb; border-radius: 12px; padding: 16px; margin: 24px 0;">
-          <p style="margin: 0; font-size: 14px; color: #374151;">
-            <strong>Services:</strong> ${servicesList}
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+          <h1 style="font-size: 24px; color: #111827; margin-bottom: 8px;">Your ${vehicleDisplay} is Ready!</h1>
+          <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">
+            Hi ${customer.first_name}! Great news — your ${vehicleDisplay} is looking great and ready for pickup.
           </p>
-          <p style="margin: 4px 0 0; font-size: 14px; color: #6b7280;">
-            Total time: ${timerDisplay}
+
+          ${photoHtml}
+
+          <div style="background: #f9fafb; border-radius: 12px; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14px; color: #374151;">
+              <strong>Services:</strong> ${servicesList}
+            </p>
+            <p style="margin: 4px 0 0; font-size: 14px; color: #6b7280;">
+              Total time: ${timerDisplay}
+            </p>
+            ${addonsHtml}
+          </div>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${galleryUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+              View All Photos
+            </a>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
+          <p style="font-size: 13px; color: #9ca3af; text-align: center;">
+            ${businessInfo.name}<br/>
+            ${businessInfo.address ? `${businessInfo.address}<br/>` : ''}
+            ${businessInfo.phone || ''}<br/>
+            ${hoursLine}
           </p>
-          ${addonsHtml}
         </div>
+      `;
 
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${galleryUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-            View All Photos
-          </a>
-        </div>
-
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
-        <p style="font-size: 13px; color: #9ca3af; text-align: center;">
-          ${businessInfo.name}<br/>
-          ${businessInfo.address ? `${businessInfo.address}<br/>` : ''}
-          ${businessInfo.phone || ''}<br/>
-          ${hoursLine}
-        </p>
-      </div>
-    `;
-
-    await sendEmail(customer.email, subject, plainText, html);
+      await sendEmail(customer.email, subject, plainText, html);
+    }
   }
+}
+
+/** Build a services + add-ons HTML table for the {items_table} template variable */
+function buildServicesItemsTable(
+  services: Array<{ name: string }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  approvedAddons: any[]
+): string {
+  const serviceRows = services.map(
+    (s) => `<tr>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.name}</td>
+    </tr>`
+  ).join('');
+
+  const addonRows = approvedAddons.map(
+    (a: { custom_description: string | null; price: number; discount_amount: number }) => `<tr>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; color: #374151;">${a.custom_description || 'Add-on'} — ${formatCurrency(a.price - a.discount_amount)}</td>
+    </tr>`
+  ).join('');
+
+  if (!serviceRows && !addonRows) return '';
+
+  return `<table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background-color: #f3f4f6;">
+        <th style="padding: 8px 12px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Service</th>
+      </tr>
+    </thead>
+    <tbody>${serviceRows}${addonRows}</tbody>
+  </table>`;
 }

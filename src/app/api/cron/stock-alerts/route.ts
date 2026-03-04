@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/utils/email';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { getBusinessInfo } from '@/lib/data/business';
 
 interface LowStockProduct {
@@ -170,13 +171,38 @@ export async function GET(request: NextRequest) {
   const businessInfo = await getBusinessInfo();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const totalCount = lowStockToAlert.length + outOfStockToAlert.length;
-  const subject = `Stock Alert — ${totalCount} product${totalCount !== 1 ? 's' : ''} need${totalCount === 1 ? 's' : ''} attention`;
+  const adminProductsUrl = `${appUrl}/admin/catalog/products?stock=low-stock`;
 
-  const textBody = buildTextEmail(businessInfo.name, lowStockToAlert, outOfStockToAlert, appUrl);
-  const htmlBody = buildHtmlEmail(businessInfo.name, lowStockToAlert, outOfStockToAlert, appUrl);
+  // Pre-render products table HTML for template variable
+  const productsTableHtml = buildProductsTableHtml(lowStockToAlert, outOfStockToAlert);
+
+  const templateVars = {
+    business_name: businessInfo.name,
+    business_phone: businessInfo.phone,
+    business_email: businessInfo.email || '',
+    business_address: businessInfo.address,
+    business_website: businessInfo.website || '',
+    products_table: productsTableHtml,
+    admin_products_url: adminProductsUrl,
+    low_stock_count: String(lowStockToAlert.length),
+    out_of_stock_count: String(outOfStockToAlert.length),
+    total_count: String(totalCount),
+  };
 
   let alertsSent = 0;
   for (const email of recipientEmails) {
+    // Template-first
+    const templated = await sendTemplatedEmail(email, 'stock_alert', templateVars);
+    if (templated.usedTemplate) {
+      if (templated.success) alertsSent++;
+      else console.error(`[STOCK-ALERTS] Template send failed for ${email}:`, templated.error);
+      continue;
+    }
+
+    // Fallback: existing hardcoded HTML
+    const subject = `Stock Alert — ${totalCount} product${totalCount !== 1 ? 's' : ''} need${totalCount === 1 ? 's' : ''} attention`;
+    const textBody = buildTextEmail(businessInfo.name, lowStockToAlert, outOfStockToAlert, appUrl);
+    const htmlBody = buildHtmlEmail(businessInfo.name, lowStockToAlert, outOfStockToAlert, appUrl);
     const result = await sendEmail(email, subject, textBody, htmlBody);
     if (result.success) {
       alertsSent++;
@@ -204,6 +230,45 @@ export async function GET(request: NextRequest) {
     alerts_sent: alertsSent,
     recipients_notified: recipientEmails.length,
   });
+}
+
+/** Build a standalone products table HTML for the {products_table} template variable */
+function buildProductsTableHtml(lowStock: LowStockProduct[], outOfStock: LowStockProduct[]): string {
+  const allProducts = [
+    ...outOfStock.map((p) => ({ ...p, status: 'Out of Stock' as const })),
+    ...lowStock.map((p) => ({ ...p, status: 'Low Stock' as const })),
+  ];
+
+  const rows = allProducts
+    .map((p) => {
+      const statusColor = p.status === 'Out of Stock' ? '#dc2626' : '#d97706';
+      const statusBg = p.status === 'Out of Stock' ? '#fef2f2' : '#fffbeb';
+      return `<tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #374151; font-size: 14px;">${p.name}</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">${p.sku || '—'}</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151; font-size: 14px; font-weight: 600;">${p.quantity_on_hand}</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">${p.reorder_threshold ?? '—'}</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">${p.vendor_name || '—'}</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
+          <span style="display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; color: ${statusColor}; background-color: ${statusBg};">${p.status}</span>
+        </td>
+      </tr>`;
+    })
+    .join('');
+
+  return `<table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background-color: #f3f4f6;">
+        <th style="padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase;">Product</th>
+        <th style="padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase;">SKU</th>
+        <th style="padding: 12px 16px; text-align: center; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase;">Stock</th>
+        <th style="padding: 12px 16px; text-align: center; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase;">Reorder At</th>
+        <th style="padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase;">Vendor</th>
+        <th style="padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase;">Status</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 function buildTextEmail(

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sendEmail } from '@/lib/utils/email';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { sendSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
@@ -88,11 +89,57 @@ export async function POST(
       if (!customer.email) {
         errors.push('Customer has no email address');
       } else {
-        const serviceLines = services
-          .map((s) => `  ${s.service?.name || 'Service'}${s.tier_name ? ` (${s.tier_name})` : ''} — ${formatCurrency(s.price_at_booking)}`)
-          .join('\n');
+        // Pre-render services table for template variable
+        const serviceRowsHtml = services
+          .map((s) => `<tr>
+            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${s.tier_name ? ` <span style="color: #6b7280;">(${s.tier_name})</span>` : ''}</td>
+            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(s.price_at_booking)}</td>
+          </tr>`)
+          .join('');
 
-        const textBody = `Appointment Confirmation from ${business.name}
+        const servicesTableHtml = services.length > 0
+          ? `<table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background-color: #f3f4f6;">
+                  <th style="padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Service</th>
+                  <th style="padding: 10px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Price</th>
+                </tr>
+              </thead>
+              <tbody>${serviceRowsHtml}</tbody>
+            </table>`
+          : '';
+
+        // Template-first
+        const templated = await sendTemplatedEmail(customer.email, 'appointment_confirmed', {
+          first_name: customer.first_name,
+          last_name: customer.last_name,
+          customer_name: customerName,
+          appointment_date: dateStr,
+          appointment_time: displayTime,
+          appointment_total: formatCurrency(appointment.total_amount),
+          vehicle_info: vehicleStr,
+          services_list: services.map((s) => s.service?.name || 'Service').join(', '),
+          items_table: servicesTableHtml,
+          business_name: business.name,
+          business_phone: business.phone,
+          business_email: business.email || '',
+          business_address: business.address,
+          business_website: business.website || '',
+        });
+
+        if (templated.usedTemplate) {
+          if (templated.success) {
+            sentVia.push('email');
+          } else {
+            errors.push(templated.error || 'Template email failed');
+          }
+        } else {
+          // Fallback: existing hardcoded HTML
+          const serviceLines = services
+            .map((s) => `  ${s.service?.name || 'Service'}${s.tier_name ? ` (${s.tier_name})` : ''} — ${formatCurrency(s.price_at_booking)}`)
+            .join('\n');
+
+          const textBody = `Appointment Confirmation from ${business.name}
 
 Hi ${customer.first_name},
 
@@ -110,14 +157,7 @@ If you need to reschedule or have questions, please call us at ${business.phone}
 
 Thank you for choosing ${business.name}!`;
 
-        const serviceRowsHtml = services
-          .map((s) => `<tr>
-            <td class="email-td" style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${s.tier_name ? ` <span class="email-text-muted" style="color: #6b7280;">(${s.tier_name})</span>` : ''}</td>
-            <td class="email-td" style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(s.price_at_booking)}</td>
-          </tr>`)
-          .join('');
-
-        const htmlBody = `<!DOCTYPE html>
+          const htmlBody = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -185,17 +225,18 @@ Thank you for choosing ${business.name}!`;
 </body>
 </html>`;
 
-        const result = await sendEmail(
-          customer.email,
-          `Appointment Confirmed — ${dateStr} at ${displayTime}`,
-          textBody,
-          htmlBody
-        );
+          const result = await sendEmail(
+            customer.email,
+            `Appointment Confirmed — ${dateStr} at ${displayTime}`,
+            textBody,
+            htmlBody
+          );
 
-        if (result.success) {
-          sentVia.push('email');
-        } else {
-          errors.push(result.error);
+          if (result.success) {
+            sentVia.push('email');
+          } else {
+            errors.push(result.error);
+          }
         }
       }
     }

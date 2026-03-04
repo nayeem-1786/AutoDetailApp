@@ -4,6 +4,8 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 import { createShortLink } from '@/lib/utils/short-link';
 import { sendSms } from '@/lib/utils/sms';
+import { sendEmail } from '@/lib/utils/email';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 
 interface QuoteCustomer {
   id: string;
@@ -114,71 +116,84 @@ export async function sendQuote(
   const shouldEmail = method === 'email' || method === 'both';
   const shouldSms = method === 'sms' || method === 'both';
 
-  // --- Send via Email (Mailgun) ---
+  // --- Send via Email ---
   if (shouldEmail) {
     if (!customer?.email) {
       errors.push('Customer has no email address');
     } else {
-      const mailgunDomain = process.env.MAILGUN_DOMAIN;
-      const mailgunKey = process.env.MAILGUN_API_KEY;
+      try {
+        const customerName = `${customer.first_name} ${customer.last_name}`;
+        const vehicle = quote.vehicle as QuoteVehicle | null;
+        const vehicleStr = vehicle
+          ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+          : 'N/A';
 
-      if (!mailgunDomain || !mailgunKey) {
-        errors.push('Email service (Mailgun) not configured');
-      } else {
-        try {
-          const customerName = `${customer.first_name} ${customer.last_name}`;
-          const vehicle = quote.vehicle as QuoteVehicle | null;
-          const vehicleStr = vehicle
-            ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
-            : 'N/A';
+        // Pre-render items table for template variable
+        const itemsTableHtml = buildItemsTableHtml(items);
 
+        // Template-first
+        const templated = await sendTemplatedEmail(customer.email, 'quote_sent', {
+          first_name: customer.first_name,
+          last_name: customer.last_name,
+          customer_name: customerName,
+          quote_number: quote.quote_number,
+          quote_link: quoteLink,
+          quote_subtotal: formatCurrency(quote.subtotal),
+          quote_tax: formatCurrency(quote.tax_amount),
+          quote_total: formatCurrency(quote.total_amount),
+          validity_days: String(validityDays),
+          vehicle_info: vehicleStr,
+          items_table: itemsTableHtml,
+          business_name: business.name,
+          business_phone: business.phone,
+          business_email: business.email || '',
+          business_address: business.address,
+          business_website: business.website || '',
+        });
+
+        let emailSuccess = false;
+        let emailError = '';
+
+        if (templated.usedTemplate) {
+          emailSuccess = templated.success;
+          emailError = templated.error || 'Template email failed';
+        } else {
+          // Fallback: send via sendEmail() (uses noreply@ for consistency)
           const textBody = buildEmailText(business, quote, customerName, vehicleStr, items, quoteLink, validityDays);
           const htmlBody = buildEmailHtml(business, quote, customerName, vehicleStr, items, quoteLink, validityDays);
-
-          const formData = new URLSearchParams();
-          formData.append('from', `${business.name} <quotes@${mailgunDomain}>`);
-          formData.append('to', customer.email);
-          formData.append('subject', `Estimate ${quote.quote_number} from ${business.name}`);
-          formData.append('text', textBody);
-          formData.append('html', htmlBody);
-
-          const mgRes = await fetch(
-            `https://api.mailgun.net/v3/${mailgunDomain}/messages`,
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Basic ${btoa(`api:${mailgunKey}`)}`,
-              },
-              body: formData,
-            }
+          const result = await sendEmail(
+            customer.email,
+            `Estimate ${quote.quote_number} from ${business.name}`,
+            textBody,
+            htmlBody
           );
-
-          if (!mgRes.ok) {
-            const errText = await mgRes.text();
-            console.error('Mailgun error:', errText);
-            errors.push('Failed to send email');
-            const { error: commErr } = await supabase.from('quote_communications').insert({
-              quote_id: quoteId,
-              channel: 'email',
-              sent_to: customer.email,
-              status: 'failed',
-              error_message: 'Mailgun delivery failed',
-            });
-            if (commErr) console.error('Failed to record communication:', commErr.message);
-          } else {
-            sentVia.push('email');
-            const { error: commErr } = await supabase.from('quote_communications').insert({
-              quote_id: quoteId,
-              channel: 'email',
-              sent_to: customer.email,
-              status: 'sent',
-            });
-            if (commErr) console.error('Failed to record communication:', commErr.message);
-          }
-        } catch (emailErr) {
-          console.error('Email send error:', emailErr);
-          errors.push('Failed to send email');
+          emailSuccess = result.success;
+          if (!result.success) emailError = result.error;
         }
+
+        if (emailSuccess) {
+          sentVia.push('email');
+          const { error: commErr } = await supabase.from('quote_communications').insert({
+            quote_id: quoteId,
+            channel: 'email',
+            sent_to: customer.email,
+            status: 'sent',
+          });
+          if (commErr) console.error('Failed to record communication:', commErr.message);
+        } else {
+          errors.push('Failed to send email');
+          const { error: commErr } = await supabase.from('quote_communications').insert({
+            quote_id: quoteId,
+            channel: 'email',
+            sent_to: customer.email,
+            status: 'failed',
+            error_message: emailError,
+          });
+          if (commErr) console.error('Failed to record communication:', commErr.message);
+        }
+      } catch (emailErr) {
+        console.error('Email send error:', emailErr);
+        errors.push('Failed to send email');
       }
     }
   }
@@ -246,6 +261,33 @@ export async function sendQuote(
 // ---------------------------------------------------------------------------
 // Email template builders
 // ---------------------------------------------------------------------------
+
+/** Build a standalone items table HTML for the {items_table} template variable */
+function buildItemsTableHtml(items: QuoteItem[]): string {
+  if (items.length === 0) return '';
+
+  const rows = items
+    .map(
+      (i) =>
+        `<tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${i.item_name}${i.tier_name ? ` <span style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${i.quantity}</td>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(i.total_price)}</td>
+        </tr>`
+    )
+    .join('');
+
+  return `<table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background-color: #f3f4f6;">
+        <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Item</th>
+        <th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Qty</th>
+        <th style="padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Total</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
 
 function buildEmailText(
   business: { name: string; address: string; phone: string },

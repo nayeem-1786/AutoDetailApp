@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Email Template System — Sub-phase 7 (Sender Migration) — 2026-03-03
+
+Migrated all 8 email senders to try the template system first via `sendTemplatedEmail()`. When no customized template exists in the DB, each sender falls back to its existing hardcoded HTML — behavior is unchanged until templates are created in the admin UI.
+
+**Variables (`src/lib/email/variables.ts`):**
+- Expanded `ORDER_VARS` — added `tracking_number`, `shipping_carrier`, `refund_type`
+- Expanded `APPOINTMENT_VARS` — added `appointment_total`
+- Expanded `SERVICE_VARS` — added `timer_display`
+- New `QUOTE_VARS` — `quote_link`, `quote_subtotal`, `quote_tax`, `quote_total`, `validity_days`
+- New `NOTIFICATION_VARS` — `products_table`, `admin_products_url`, `low_stock_count`, `out_of_stock_count`, `total_count`
+- Updated `getVariablesForCategory()`, `getSampleVariables()`, `EMAIL_VARIABLE_GROUPS` with new groups
+
+**Migrated senders (8 total):**
+- `order-emails.ts` — 4 functions: `sendReadyForPickupEmail`, `sendShippedEmail`, `sendDeliveredEmail`, `sendRefundEmail`
+- `stock-alerts/route.ts` — extracted `buildProductsTableHtml()` for `{products_table}` variable
+- `appointments/[id]/notify/route.ts` — pre-renders services table, template-first in email block only
+- `quotes/send-service.ts` — template-first + switched fallback from direct Mailgun API to `sendEmail()` (drops `quotes@`, uses `noreply@`)
+- `jobs/[id]/complete/route.ts` — pre-renders services + add-ons as `items_table`, passes `customer_id` for dynamic photo gallery resolution
+
+---
+
 ## feat: Email Template System — Sub-phase 6 (Drip Campaign System) — 2026-03-03
 
 Multi-step automated email/SMS drip sequences with triggers, stop conditions, exit actions, nurture handoff, and analytics.
