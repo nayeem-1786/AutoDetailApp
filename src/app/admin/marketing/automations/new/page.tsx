@@ -28,11 +28,18 @@ interface CouponOption {
   summary: string;
 }
 
+interface EmailTemplateOption {
+  id: string;
+  name: string;
+  category: string;
+}
+
 export default function NewAutomationPage() {
   const router = useRouter();
   const supabase = createClient();
   const [services, setServices] = useState<Service[]>([]);
   const [coupons, setCoupons] = useState<CouponOption[]>([]);
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplateOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -55,6 +62,7 @@ export default function NewAutomationPage() {
       sms_template: '',
       email_subject: '',
       email_template: '',
+      email_template_id: null,
       coupon_id: null,
       is_active: true,
       is_vehicle_aware: false,
@@ -65,11 +73,12 @@ export default function NewAutomationPage() {
   const watchAction = watch('action');
   const watchSmsTemplate = watch('sms_template') || '';
   const watchEmailTemplate = watch('email_template') || '';
+  const watchEmailTemplateId = watch('email_template_id');
 
   useEffect(() => {
     async function load() {
       setLoadingOptions(true);
-      const [servicesRes, couponsRes] = await Promise.all([
+      const [servicesRes, couponsRes, templatesRes] = await Promise.all([
         supabase
           .from('services')
           .select('id, name')
@@ -80,9 +89,14 @@ export default function NewAutomationPage() {
           .select('id, name, code, coupon_rewards(discount_type, discount_value)')
           .eq('status', 'active')
           .order('name'),
+        supabase
+          .from('email_templates')
+          .select('id, name, category')
+          .order('name'),
       ]);
 
       if (servicesRes.data) setServices(servicesRes.data as Service[]);
+      if (templatesRes.data) setEmailTemplates(templatesRes.data as EmailTemplateOption[]);
       if (couponsRes.data) {
         setCoupons(
           couponsRes.data.map((c: { id: string; name: string | null; code: string; coupon_rewards: Array<{ discount_type: string; discount_value: number }> | null }) => {
@@ -253,20 +267,52 @@ export default function NewAutomationPage() {
 
               {(watchAction === 'email' || watchAction === 'both') && (
                 <>
-                  <FormField label="Email Subject" error={errors.email_subject?.message} htmlFor="email_subject">
-                    <Input id="email_subject" {...register('email_subject')} placeholder="Time for another detail, {first_name}!" />
+                  <FormField label="Email Template" htmlFor="email_template_id" description="Select a pre-built email template, or write a custom plain-text email body below">
+                    <Select
+                      id="email_template_id"
+                      value={watchEmailTemplateId || ''}
+                      onChange={(e) => setValue('email_template_id', e.target.value || null)}
+                    >
+                      <option value="">Custom (plain text below)</option>
+                      {emailTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.category})
+                        </option>
+                      ))}
+                    </Select>
                   </FormField>
-                  <div>
-                    <FormField label="Email Body" error={errors.email_template?.message} htmlFor="email_template">
-                      <Textarea
-                        id="email_template"
-                        {...register('email_template')}
-                        rows={6}
-                        placeholder="Hi {first_name},&#10;&#10;It's been a while since your last visit..."
-                      />
-                    </FormField>
-                    {variableChips('email_template')}
-                  </div>
+                  {watchEmailTemplateId && (
+                    <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                      <p className="text-sm text-blue-700">
+                        Using email template. The subject line and body will come from the template.
+                        You can still set a fallback subject below.
+                      </p>
+                      <Link
+                        href={`/admin/marketing/email-templates/${watchEmailTemplateId}`}
+                        className="mt-1 inline-block text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        Edit template →
+                      </Link>
+                    </div>
+                  )}
+                  {!watchEmailTemplateId && (
+                    <>
+                      <FormField label="Email Subject" error={errors.email_subject?.message} htmlFor="email_subject">
+                        <Input id="email_subject" {...register('email_subject')} placeholder="Time for another detail, {first_name}!" />
+                      </FormField>
+                      <div>
+                        <FormField label="Email Body" error={errors.email_template?.message} htmlFor="email_template">
+                          <Textarea
+                            id="email_template"
+                            {...register('email_template')}
+                            rows={6}
+                            placeholder="Hi {first_name},&#10;&#10;It's been a while since your last visit..."
+                          />
+                        </FormField>
+                        {variableChips('email_template')}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

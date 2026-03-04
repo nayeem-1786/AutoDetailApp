@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-03-03 (ESC/POS Receipt Printer Integration)
+> **Last updated:** 2026-03-03 (Email Template System — Sub-phase 4)
 
 ---
 
@@ -59,6 +59,20 @@ src/app/api/admin/receipt-logo/route.ts
 src/app/api/admin/stock-adjustments/route.ts
 src/app/api/admin/transactions/stats/route.ts
 src/app/api/admin/upload/content-image/route.ts
+```
+
+### Admin — Email Templates
+```
+src/app/api/admin/email-templates/route.ts
+src/app/api/admin/email-templates/[id]/route.ts
+src/app/api/admin/email-templates/[id]/preview/route.ts
+src/app/api/admin/email-templates/[id]/test-send/route.ts
+src/app/api/admin/email-templates/[id]/reset/route.ts
+src/app/api/admin/email-templates/assignments/route.ts
+src/app/api/admin/email-templates/gallery-photos/route.ts
+src/app/api/admin/email-templates/brand-kit/route.ts
+src/app/api/admin/email-templates/layouts/route.ts
+src/app/api/admin/email-templates/layouts/[id]/route.ts
 ```
 
 ### Admin — CMS
@@ -494,6 +508,20 @@ src/app/admin/marketing/coupons/[id]/page.tsx
 src/app/admin/marketing/coupons/new/page.tsx
 src/app/admin/marketing/coupons/page.tsx
 src/app/admin/marketing/promotions/page.tsx
+src/app/admin/marketing/email-templates/page.tsx
+src/app/admin/marketing/email-templates/[id]/page.tsx
+src/app/admin/marketing/email-templates/_components/template-list.tsx
+src/app/admin/marketing/email-templates/_components/brand-settings.tsx
+src/app/admin/marketing/email-templates/_components/email-block-editor.tsx
+src/app/admin/marketing/email-templates/_components/block-palette.tsx
+src/app/admin/marketing/email-templates/_components/block-canvas.tsx
+src/app/admin/marketing/email-templates/_components/block-properties.tsx
+src/app/admin/marketing/email-templates/_components/photo-gallery-picker.tsx
+src/app/admin/marketing/email-templates/_components/variable-inserter.tsx
+src/app/admin/marketing/email-templates/_components/email-preview.tsx
+src/app/admin/marketing/email-templates/_components/template-picker-modal.tsx
+src/app/admin/marketing/email-templates/layouts/page.tsx
+src/app/admin/marketing/email-templates/layouts/[id]/page.tsx
 ```
 
 ### Messaging
@@ -728,6 +756,17 @@ src/lib/qbo/sync-customer.ts
 src/lib/qbo/sync-log.ts
 src/lib/qbo/sync-transaction.ts
 src/lib/qbo/types.ts
+```
+
+### Email Template System
+```
+src/lib/email/types.ts
+src/lib/email/block-renderers.ts
+src/lib/email/layout-renderer.ts
+src/lib/email/photo-resolver.ts
+src/lib/email/template-resolver.ts
+src/lib/email/send-templated-email.ts
+src/lib/email/variables.ts
 ```
 
 ### Quotes
@@ -1176,6 +1215,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260228000006_homepage_settings_expansion.sql
 20260228000007_og_image_setting.sql
 20260301000001_ticker_message_gap.sql
+20260303000001_email_template_system.sql
 ```
 
 ---

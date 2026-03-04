@@ -59,6 +59,11 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'Zap',
       },
       {
+        label: 'Email Templates',
+        href: '/admin/marketing/email-templates',
+        icon: 'Mail',
+      },
+      {
         label: 'Campaigns',
         href: '/admin/marketing/campaigns',
         icon: 'Send',

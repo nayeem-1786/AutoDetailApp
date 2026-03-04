@@ -1,7 +1,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
 > Auto-generated from `supabase/migrations/*.sql`
-> Last updated: Mar 1, 2026
+> Last updated: Mar 3, 2026
 
 ---
 
@@ -1246,3 +1246,155 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 `{business_name}`, `{business_phone}`, `{business_email}`, `{business_website}`
 
 **Files:** `src/lib/data/receipt-config.ts` (types + fetch), `src/app/pos/lib/receipt-template.ts` (renderers + shortcode resolver), `src/app/admin/settings/receipt-printer/page.tsx` (admin UI)
+
+---
+
+## Email Template System
+
+### email_layouts
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| name | TEXT | NOT NULL | "Standard", "Minimal", "Promotional" |
+| slug | TEXT | UNIQUE, NOT NULL | `standard`, `minimal`, `promotional` |
+| description | TEXT | | Use case description |
+| structure_html | TEXT | NOT NULL | HTML skeleton with `{{PLACEHOLDER}}` slots |
+| color_overrides | JSONB | NOT NULL, DEFAULT '{}' | Layout-specific color overrides (layered on Brand Kit) |
+| header_config | JSONB | NOT NULL, DEFAULT '{}' | `{ show_logo, logo_position, show_title, title_style }` |
+| footer_config | JSONB | NOT NULL, DEFAULT '{}' | `{ show_social, compact, custom_text }` |
+| is_default | BOOLEAN | NOT NULL, DEFAULT false | One layout marked default |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Trigger: `update_updated_at()` |
+
+3 system layouts seeded: Standard (default), Minimal, Promotional. Cannot be deleted.
+
+### email_templates
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| template_key | TEXT | UNIQUE | NULL for custom; `booking_confirmation`, `review_request`, etc. for system |
+| category | TEXT | NOT NULL, CHECK IN ('transactional','review','marketing','notification') | |
+| name | TEXT | NOT NULL | Human-readable: "Booking Confirmation" |
+| subject | TEXT | NOT NULL | Subject line with {variables} |
+| preview_text | TEXT | NOT NULL, DEFAULT '' | 90-char inbox snippet |
+| layout_id | UUID | NOT NULL, FK → email_layouts(id) ON DELETE RESTRICT | |
+| body_blocks | JSONB | NOT NULL, DEFAULT '[]' | `[{ id, type, data }]` |
+| body_html | TEXT | | Cached compiled HTML (regenerated on save) |
+| variables | JSONB | NOT NULL, DEFAULT '[]' | Available variables for this template |
+| segment_tag | TEXT | | NULL = universal; 'luxury', 'ceramic', etc. |
+| is_system | BOOLEAN | NOT NULL, DEFAULT false | System templates can't be deleted |
+| is_customized | BOOLEAN | NOT NULL, DEFAULT false | Edited from default → true |
+| version | INTEGER | NOT NULL, DEFAULT 1 | Incremented on each save |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Trigger: `update_updated_at()` |
+| updated_by | UUID | FK → auth.users(id) ON DELETE SET NULL | |
+
+### email_template_assignments
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| trigger_key | TEXT | NOT NULL | `order_shipped`, `review_request`, `job_completion`, etc. |
+| template_id | UUID | NOT NULL, FK → email_templates(id) ON DELETE CASCADE | |
+| segment_filter | JSONB | | `{ vehicle_category: 'luxury' }` — optional |
+| priority | INTEGER | NOT NULL, DEFAULT 0 | Higher priority wins |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+### drip_sequences
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| name | TEXT | NOT NULL | |
+| description | TEXT | | |
+| trigger_condition | TEXT | NOT NULL, CHECK IN ('no_visit_days','after_service','new_customer','manual_enroll','tag_added') | |
+| trigger_value | JSONB | | `{ days: 30 }`, `{ service_id: uuid }`, `{ tag: "vip" }` |
+| stop_conditions | JSONB | NOT NULL, DEFAULT `{"on_purchase":true,"on_booking":true,"on_reply":false}` | |
+| nurture_sequence_id | UUID | FK → drip_sequences(id) ON DELETE SET NULL | On stop, enroll here |
+| is_active | BOOLEAN | NOT NULL, DEFAULT false | |
+| audience_filters | JSONB | | Same format as campaigns |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Trigger: `update_updated_at()` |
+| created_by | UUID | FK → auth.users(id) ON DELETE SET NULL | |
+
+### drip_steps
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| sequence_id | UUID | NOT NULL, FK → drip_sequences(id) ON DELETE CASCADE | |
+| step_order | INTEGER | NOT NULL | 0, 1, 2, 3... |
+| delay_days | INTEGER | NOT NULL | Days after previous step (or trigger for step 0) |
+| delay_hours | INTEGER | NOT NULL, DEFAULT 0 | Fine-tuned timing |
+| channel | TEXT | NOT NULL, CHECK IN ('email','sms','both') | |
+| template_id | UUID | FK → email_templates(id) ON DELETE SET NULL | |
+| sms_template | TEXT | | SMS body with {variables} |
+| coupon_id | UUID | FK → coupons(id) ON DELETE SET NULL | Optional per-step coupon |
+| subject_override | TEXT | | Override template subject |
+| exit_condition | TEXT | | Per-step: `has_transaction`, `has_appointment`, `opened_email`, `clicked_link` |
+| exit_action | TEXT | CHECK IN ('stop','move','tag') | |
+| exit_sequence_id | UUID | FK → drip_sequences(id) ON DELETE SET NULL | For exit_action = 'move' |
+| exit_tag | TEXT | | For exit_action = 'tag' |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+### drip_enrollments
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| sequence_id | UUID | NOT NULL, FK → drip_sequences(id) ON DELETE CASCADE | |
+| customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE CASCADE | |
+| current_step | INTEGER | NOT NULL, DEFAULT 0 | |
+| enrolled_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| next_send_at | TIMESTAMPTZ | | Calculated from cumulative delays |
+| status | TEXT | NOT NULL, CHECK IN ('active','completed','stopped','paused') | |
+| stopped_reason | TEXT | | `purchased`, `booked`, `replied`, `manual`, `unsubscribed` |
+| stopped_at | TIMESTAMPTZ | | |
+| nurture_transferred | BOOLEAN | NOT NULL, DEFAULT false | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| UNIQUE | | (sequence_id, customer_id) | One enrollment per customer per sequence |
+
+### drip_send_log
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| enrollment_id | UUID | NOT NULL, FK → drip_enrollments(id) ON DELETE CASCADE | |
+| step_id | UUID | NOT NULL, FK → drip_steps(id) ON DELETE CASCADE | |
+| step_order | INTEGER | NOT NULL | Denormalized for funnel queries |
+| channel | TEXT | NOT NULL | |
+| status | TEXT | NOT NULL, CHECK IN ('sent','failed','skipped') | |
+| mailgun_message_id | TEXT | | For delivery/open/click tracking |
+| coupon_code | TEXT | | Generated coupon if applicable |
+| sent_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| error_message | TEXT | | |
+
+### Altered tables (Email Template System)
+
+**lifecycle_rules** — added:
+| Column | Type | Notes |
+|--------|------|-------|
+| email_template_id | UUID | FK → email_templates(id) ON DELETE SET NULL |
+
+**campaigns** — added:
+| Column | Type | Notes |
+|--------|------|-------|
+| email_body_blocks | JSONB | Block-based email content (copy model) |
+| email_layout_id | UUID | FK → email_layouts(id) ON DELETE SET NULL |
+| email_preview_text | TEXT | Inbox preview snippet |
+
+### Brand Kit (business_settings keys)
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `email_brand_primary_color` | string | `#1a1a2e` | Header bg, primary buttons |
+| `email_brand_accent_color` | string | `#CCFF00` | Secondary buttons, highlights |
+| `email_brand_text_color` | string | `#333333` | Body text |
+| `email_brand_bg_color` | string | `#f5f5f5` | Outer background |
+| `email_brand_font_family` | string | `Arial, Helvetica, sans-serif` | Email-safe fonts only |
+| `email_brand_logo_url` | string | `""` | Empty = use receipt_config logo |
+| `email_brand_logo_width` | number | `200` | Logo width in px |
+| `email_brand_social_google` | string | `""` | Google Business URL |
+| `email_brand_social_yelp` | string | `""` | Yelp page URL |
+| `email_brand_social_instagram` | string | `""` | Instagram URL |
+| `email_brand_social_facebook` | string | `""` | Facebook URL |
+| `email_brand_footer_text` | string | `""` | Optional custom footer line |
+
+**Files:** `src/lib/email/types.ts` (types), `src/lib/email/block-renderers.ts` (11 block renderers), `src/lib/email/layout-renderer.ts` (full pipeline), `src/lib/email/photo-resolver.ts` (dynamic photo pairs), `src/lib/email/template-resolver.ts` (segment routing), `src/lib/email/send-templated-email.ts` (high-level send), `src/lib/email/variables.ts` (variable definitions)

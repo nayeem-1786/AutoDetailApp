@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
+import { sendEmail } from '@/lib/utils/email';
 import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 
 /**
  * Lifecycle execution engine cron endpoint.
@@ -82,14 +84,17 @@ export async function GET(request: NextRequest) {
   }
 
   if (pendingExecs && pendingExecs.length > 0) {
-    // Check if SMS Marketing is enabled before sending any lifecycle SMS
-    const smsMarketingEnabled = await isFeatureEnabled(FEATURE_FLAGS.SMS_MARKETING);
-    if (!smsMarketingEnabled) {
-      console.log(`[Lifecycle] SMS Marketing disabled — skipping ${pendingExecs.length} pending executions`);
+    // Check marketing feature flags before sending
+    const [smsMarketingEnabled, emailMarketingEnabled] = await Promise.all([
+      isFeatureEnabled(FEATURE_FLAGS.SMS_MARKETING),
+      isFeatureEnabled(FEATURE_FLAGS.EMAIL_MARKETING),
+    ]);
+    if (!smsMarketingEnabled && !emailMarketingEnabled) {
+      console.log(`[Lifecycle] Both SMS and Email Marketing disabled — skipping ${pendingExecs.length} pending executions`);
       // Don't skip Phase 1 (scheduling) — just skip Phase 2 (sending)
-      // When SMS Marketing is re-enabled, pending executions will send
+      // When marketing is re-enabled, pending executions will send
     } else {
-      const results = await executePending(admin, pendingExecs);
+      const results = await executePending(admin, pendingExecs, smsMarketingEnabled, emailMarketingEnabled);
       sent += results.sent;
       failed += results.failed;
       skipped += results.skipped;
@@ -117,14 +122,14 @@ async function scheduleFromAppointments(
   lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
-  // Find recently completed appointments with a customer who has a phone
+  // Find recently completed appointments with a customer
   const { data: appointments, error } = await admin
     .from('appointments')
     .select(`
       id,
       customer_id,
       updated_at,
-      customers!inner(id, phone, sms_consent),
+      customers!inner(id, phone, email, sms_consent, email_consent),
       appointment_services(service_id)
     `)
     .eq('status', 'completed')
@@ -144,7 +149,7 @@ async function scheduleFromAppointments(
       sourceField: 'appointment_id' as const,
       customerId: apt.customer_id!,
       triggeredAt: apt.updated_at,
-      customer: apt.customers as unknown as { phone: string | null; sms_consent: boolean },
+      customer: apt.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
       serviceIds: ((apt.appointment_services || []) as Array<{ service_id: string }>).map(
         (s) => s.service_id
       ),
@@ -170,7 +175,7 @@ async function scheduleFromTransactions(
       id,
       customer_id,
       transaction_date,
-      customers!inner(id, phone, sms_consent),
+      customers!inner(id, phone, email, sms_consent, email_consent),
       transaction_items(service_id)
     `)
     .eq('status', 'completed')
@@ -190,7 +195,7 @@ async function scheduleFromTransactions(
       sourceField: 'transaction_id' as const,
       customerId: tx.customer_id!,
       triggeredAt: tx.transaction_date,
-      customer: tx.customers as unknown as { phone: string | null; sms_consent: boolean },
+      customer: tx.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
       serviceIds: ((tx.transaction_items || []) as Array<{ service_id: string | null }>)
         .map((i) => i.service_id)
         .filter(Boolean) as string[],
@@ -209,7 +214,7 @@ interface TriggerEvent {
   sourceField: 'appointment_id' | 'transaction_id';
   customerId: string;
   triggeredAt: string;
-  customer: { phone: string | null; sms_consent: boolean };
+  customer: { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean };
   serviceIds: string[];
 }
 
@@ -254,7 +259,10 @@ async function scheduleExecutions(
   const toInsert: Array<Record<string, unknown>> = [];
 
   for (const event of events) {
-    if (!event.customer?.phone || !event.customer.sms_consent) continue;
+    // Skip if customer has no contactable channel
+    const hasPhone = event.customer?.phone && event.customer.sms_consent;
+    const hasEmail = event.customer?.email && event.customer.email_consent;
+    if (!hasPhone && !hasEmail) continue;
 
     for (const rule of rules) {
       if (sourceDedupSet.has(`${rule.id}:${event.sourceId}`)) continue;
@@ -316,7 +324,9 @@ interface PendingExecution {
 
 async function executePending(
   admin: ReturnType<typeof createAdminClient>,
-  executions: PendingExecution[]
+  executions: PendingExecution[],
+  smsMarketingEnabled: boolean,
+  emailMarketingEnabled: boolean
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   let sent = 0;
   let failed = 0;
@@ -407,12 +417,15 @@ async function executePending(
       // Load customer (includes loyalty/visit fields for template variables)
       const { data: customer } = await admin
         .from('customers')
-        .select('first_name, last_name, phone, email, sms_consent, loyalty_points_balance, visit_count, last_visit_date, lifetime_spend')
+        .select('first_name, last_name, phone, email, sms_consent, email_consent, loyalty_points_balance, visit_count, last_visit_date, lifetime_spend')
         .eq('id', exec.customer_id)
         .single();
 
-      if (!customer?.phone || !customer.sms_consent) {
-        await markExecution(admin, exec.id, 'skipped', 'No phone or consent revoked');
+      const canSms = customer?.phone && customer.sms_consent && smsMarketingEnabled;
+      const canEmail = customer?.email && customer.email_consent && emailMarketingEnabled;
+
+      if (!canSms && !canEmail) {
+        await markExecution(admin, exec.id, 'skipped', 'No contactable channel (no phone/email or consent revoked)');
         skipped++;
         continue;
       }
@@ -601,8 +614,8 @@ async function executePending(
         daysSinceLastVisit = String(diff);
       }
 
-      // Render template with snake_case variables matching TEMPLATE_VARIABLES
-      let message = renderTemplate(template, {
+      // Build template variables
+      const templateVars: Record<string, string> = {
         first_name: customer.first_name || 'there',
         last_name: customer.last_name || '',
         service_name: serviceName || 'your service',
@@ -625,22 +638,90 @@ async function executePending(
         appointment_date: appointmentDate,
         appointment_time: appointmentTime,
         amount_paid: amountPaid,
-      });
+      };
 
-      // Clean up lines with empty review links (e.g., if URL not configured)
-      message = cleanEmptyReviewLines(message);
+      const ruleAction = (rule.action as string) || 'sms';
+      let smsSent = false;
+      let emailSent = false;
 
-      // Send via marketing SMS (appends STOP footer, wraps URLs for click tracking)
-      const result = await sendMarketingSms(customer.phone, message, exec.customer_id, {
-        lifecycleExecutionId: exec.id,
-        source: 'lifecycle',
-      });
+      // Send SMS if rule action includes SMS
+      if ((ruleAction === 'sms' || ruleAction === 'both') && canSms && template) {
+        let message = renderTemplate(template, templateVars);
+        message = cleanEmptyReviewLines(message);
 
-      if (result.success) {
+        const result = await sendMarketingSms(customer.phone!, message, exec.customer_id, {
+          lifecycleExecutionId: exec.id,
+          source: 'lifecycle',
+        });
+        smsSent = result.success;
+      }
+
+      // Send email if rule action includes email
+      if ((ruleAction === 'email' || ruleAction === 'both') && canEmail) {
+        const emailTemplateId = rule.email_template_id as string | null;
+
+        if (emailTemplateId) {
+          // Use the template system: resolve template → render → send
+          const emailResult = await sendTemplatedEmail(
+            customer.email!,
+            `lifecycle_${rule.id}`,
+            templateVars,
+            {
+              isMarketing: true,
+              tracking: true,
+              mailgunVars: { lifecycle_execution_id: exec.id },
+            }
+          );
+
+          // If template system didn't find a match by trigger key, try direct template fetch
+          if (!emailResult.usedTemplate && emailTemplateId) {
+            const { renderFromBlocks } = await import('@/lib/email/send-templated-email');
+            const { data: tmpl } = await admin
+              .from('email_templates')
+              .select('*, email_layouts(*)')
+              .eq('id', emailTemplateId)
+              .single();
+
+            if (tmpl?.body_blocks && Array.isArray(tmpl.body_blocks)) {
+              const layoutSlug = (tmpl.email_layouts as any)?.slug || 'default';
+              const rendered = await renderFromBlocks(
+                tmpl.body_blocks as any,
+                layoutSlug,
+                templateVars,
+                { isMarketing: true }
+              );
+              if (rendered) {
+                const subject = renderTemplate(tmpl.subject || rule.email_subject || '', templateVars);
+                const result = await sendEmail(customer.email!, subject, rendered.text, rendered.html, {
+                  variables: { lifecycle_execution_id: exec.id },
+                  tracking: true,
+                });
+                emailSent = result.success;
+              }
+            }
+          } else {
+            emailSent = emailResult.success;
+          }
+        } else if (rule.email_template && rule.email_subject) {
+          // Legacy: plain-text email body from lifecycle rule
+          const emailSubject = renderTemplate(rule.email_subject as string, templateVars);
+          const emailBody = cleanEmptyReviewLines(renderTemplate(rule.email_template as string, templateVars));
+          const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
+          const emailHtml = `<html><body>${bodyParagraphs}</body></html>`;
+          const result = await sendEmail(customer.email!, emailSubject, emailBody, emailHtml, {
+            variables: { lifecycle_execution_id: exec.id },
+            tracking: true,
+          });
+          emailSent = result.success;
+        }
+      }
+
+      const anySent = smsSent || emailSent;
+      if (anySent) {
         await markExecution(admin, exec.id, 'sent');
         sent++;
       } else {
-        await markExecution(admin, exec.id, 'failed', result.error);
+        await markExecution(admin, exec.id, 'failed', 'No channel delivered successfully');
         failed++;
       }
     } catch (err) {

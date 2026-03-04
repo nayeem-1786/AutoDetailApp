@@ -13,6 +13,8 @@ import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { renderFromBlocks } from '@/lib/email/send-templated-email';
+import type { EmailBlock } from '@/lib/email/types';
 import type { CampaignChannel, CampaignVariant } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
@@ -23,6 +25,19 @@ function generateCouponCode(): string {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
+}
+
+/** Resolve layout UUID to slug for renderFromBlocks */
+async function getLayoutSlug(
+  admin: ReturnType<typeof createAdminClient>,
+  layoutId: string
+): Promise<string> {
+  const { data } = await admin
+    .from('email_layouts')
+    .select('slug')
+    .eq('id', layoutId)
+    .single();
+  return data?.slug || 'default';
 }
 
 export async function POST(
@@ -347,22 +362,53 @@ export async function POST(
         (campaign.channel === 'email' || campaign.channel === 'both') &&
         customer.email_consent &&
         customer.email &&
-        emailSubjectTemplate &&
-        emailBodyTemplate
+        emailSubjectTemplate
       ) {
-        const emailSubject = renderTemplate(emailSubjectTemplate, templateVars);
-        const emailBody = cleanEmptyReviewLines(renderTemplate(emailBodyTemplate, templateVars));
-        const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
-        const ctaLabel = (productSlug && productCategorySlug) ? 'Shop Now' : 'Book Now';
-        const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${offerUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">${ctaLabel}</a></div>`;
-        const emailHtml = `<html><body>${bodyParagraphs}${ctaButton}</body></html>`;
-        const result = await sendEmail(customer.email, emailSubject, emailBody, emailHtml, {
-          variables: { campaign_id: id, recipient_id: recipientId },
-          tracking: true,
-        });
-        emailDelivered = result.success;
-        if (result.success) {
-          mailgunMessageId = result.id;
+        // Check if campaign uses block-based email (new template system)
+        const hasBlocks = campaign.email_body_blocks &&
+          Array.isArray(campaign.email_body_blocks) &&
+          campaign.email_body_blocks.length > 0;
+
+        if (hasBlocks) {
+          // Render using the email template system (blocks + layout)
+          const layoutSlug = campaign.email_layout_id
+            ? await getLayoutSlug(adminClient, campaign.email_layout_id)
+            : 'default';
+
+          const rendered = await renderFromBlocks(
+            campaign.email_body_blocks as unknown as EmailBlock[],
+            layoutSlug,
+            templateVars,
+            { isMarketing: true }
+          );
+
+          if (rendered) {
+            const emailSubject = renderTemplate(emailSubjectTemplate, templateVars);
+            const result = await sendEmail(customer.email, emailSubject, rendered.text, rendered.html, {
+              variables: { campaign_id: id, recipient_id: recipientId },
+              tracking: true,
+            });
+            emailDelivered = result.success;
+            if (result.success) {
+              mailgunMessageId = result.id;
+            }
+          }
+        } else if (emailBodyTemplate) {
+          // Fallback: legacy plain-text email rendering
+          const emailSubject = renderTemplate(emailSubjectTemplate, templateVars);
+          const emailBody = cleanEmptyReviewLines(renderTemplate(emailBodyTemplate, templateVars));
+          const bodyParagraphs = emailBody.split('\n').map((p: string) => `<p>${p}</p>`).join('');
+          const ctaLabel = (productSlug && productCategorySlug) ? 'Shop Now' : 'Book Now';
+          const ctaButton = `<div style="text-align:center;margin:24px 0;"><a href="${offerUrl}" style="display:inline-block;padding:14px 32px;background-color:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">${ctaLabel}</a></div>`;
+          const emailHtml = `<html><body>${bodyParagraphs}${ctaButton}</body></html>`;
+          const result = await sendEmail(customer.email, emailSubject, emailBody, emailHtml, {
+            variables: { campaign_id: id, recipient_id: recipientId },
+            tracking: true,
+          });
+          emailDelivered = result.success;
+          if (result.success) {
+            mailgunMessageId = result.id;
+          }
         }
       }
 

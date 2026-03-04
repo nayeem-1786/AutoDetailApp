@@ -609,3 +609,63 @@ export async function GET(request: NextRequest) {
 **Refund flow**: `POST /api/admin/orders/[id]/refund` → Stripe refund → update status → insert event → restore stock → send email.
 
 **Cleanup cron**: `GET /api/cron/cleanup-orders` cancels pending orders > 24h old + their Stripe PIs. Runs every 6 hours.
+
+---
+
+## 16. Email Template System (`src/lib/email/`)
+
+3-layer architecture: **Brand Kit** (global colors/logo/fonts in `business_settings`) > **Layout Templates** (`email_layouts` table — structural HTML frames) > **Content Templates** (`email_templates` table — block-based editable emails). POS receipts are NOT part of this system.
+
+### Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `email_layouts` | 3 pre-seeded HTML layout frames (Standard, Minimal, Promotional) with `color_overrides`, `header_config`, `footer_config` |
+| `email_templates` | Block-based templates with `body_blocks` JSONB, `category`, `trigger_key`, `segment_tag`, `is_system` |
+| `email_template_assignments` | Segment routing: maps `trigger_key` → `template_id` with priority + `segment_filter` JSONB |
+| `drip_sequences` / `drip_steps` | Multi-step drip campaigns with delays and stop conditions |
+| `drip_enrollments` / `drip_send_log` | Enrollment tracking and send history |
+
+### Rendering Pipeline
+
+```
+sendTemplatedEmail(to, triggerKey, variables, options)
+  → resolveEmailTemplate(triggerKey, customerAttributes)  // segment routing
+  → fetchBrandKit()                                        // from business_settings
+  → resolveColors(brandKit, layout.color_overrides)        // layout overrides > brand defaults
+  → renderBlocks(blocks, colors, brandKit)                 // 11 block types → TABLE-based HTML
+  → inject into layout HTML skeleton                       // header/footer config applied
+  → replaceVariables()                                     // {{variable}} substitution
+  → htmlToPlainText()                                      // plain text fallback
+  → sendEmail()                                            // via Mailgun
+```
+
+### Lib Files
+
+| File | Purpose |
+|------|---------|
+| `types.ts` | BrandKit, EmailLayout, EmailBlock (11 types), EmailTemplate, drip types |
+| `block-renderers.ts` | 11 renderers: text, heading, button (VML), image, photo_gallery, coupon, divider, spacer, social_links, two_column |
+| `layout-renderer.ts` | `fetchBrandKit()`, `resolveColors()`, `renderEmail()` full pipeline |
+| `photo-resolver.ts` | Dynamic gallery photo pairs from `job_photos` |
+| `template-resolver.ts` | Segment routing + layout fetching |
+| `send-templated-email.ts` | `sendTemplatedEmail()` + `renderFromBlocks()` |
+| `variables.ts` | Variable definitions per category with sample values |
+
+### Block Types
+
+`heading`, `text`, `button`, `image`, `photo_gallery`, `coupon`, `divider`, `spacer`, `social_links`, `two_column`, `review_request`
+
+### Color Resolution Order
+
+Layout `color_overrides` > Brand Kit defaults (`email_brand_*` keys in `business_settings`)
+
+### API Routes (`/api/admin/email-templates/`)
+
+10 routes covering template CRUD, preview rendering, test sends, system template reset, segment routing assignments, layout management, gallery photo browsing, and Brand Kit settings.
+
+### Admin UI (`/admin/marketing/email-templates/`)
+
+- Main page: Templates tab (grid with category filter) + Brand Settings tab (colors, typography, logo, social, footer)
+- Layout manager: 3-card grid → Layout editor (2-column: settings + live iframe preview)
+- Sidebar: Marketing > Email Templates

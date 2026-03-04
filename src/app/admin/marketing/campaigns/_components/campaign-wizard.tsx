@@ -24,10 +24,15 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, ArrowRight, Users, Send, Plus, Eye, ChevronLeft, ChevronRight, Clock, FlaskConical } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Users, Send, Plus, Eye, ChevronLeft, ChevronRight, Clock, FlaskConical, FileText } from 'lucide-react';
 import { SITE_URL, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
+import type { EmailBlock } from '@/lib/email/types';
+import { EmailBlockEditor } from '../../email-templates/_components/email-block-editor';
+import { getVariablesForCategory } from '@/lib/email/variables';
+
+const CAMPAIGN_EMAIL_VARIABLES = getVariablesForCategory('marketing');
 
 type Step = 'basics' | 'audience' | 'message' | 'coupon' | 'review';
 
@@ -54,12 +59,22 @@ export interface InitialCampaignData {
   sms_template: string | null;
   email_subject: string | null;
   email_template: string | null;
+  email_body_blocks: EmailBlock[] | null;
+  email_layout_id: string | null;
+  email_preview_text: string | null;
   coupon_id: string | null;
   scheduled_at: string | null;
   // A/B testing fields
   variants?: CampaignVariant[] | null;
   auto_select_winner?: boolean;
   auto_select_after_hours?: number | null;
+}
+
+interface LayoutOption {
+  id: string;
+  name: string;
+  slug: string;
+  is_default: boolean;
 }
 
 interface CampaignWizardProps {
@@ -117,6 +132,13 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   const [smsTemplate, setSmsTemplate] = useState(initialData?.sms_template ?? '');
   const [emailSubject, setEmailSubject] = useState(initialData?.email_subject ?? '');
   const [emailTemplate, setEmailTemplate] = useState(initialData?.email_template ?? '');
+  const [emailBodyBlocks, setEmailBodyBlocks] = useState<EmailBlock[]>(initialData?.email_body_blocks ?? []);
+  const [emailLayoutId, setEmailLayoutId] = useState(initialData?.email_layout_id ?? '');
+  const [emailPreviewText, setEmailPreviewText] = useState(initialData?.email_preview_text ?? '');
+  const [useBlockEditor, setUseBlockEditor] = useState(
+    !!initialData?.email_body_blocks && initialData.email_body_blocks.length > 0
+  );
+  const [layouts, setLayouts] = useState<LayoutOption[]>([]);
   const [couponId, setCouponId] = useState(initialData?.coupon_id ?? '');
   const [scheduledAt, setScheduledAt] = useState(
     initialData?.scheduled_at ? toLocalDatetime(initialData.scheduled_at) : ''
@@ -189,10 +211,11 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
 
   useEffect(() => {
     async function load() {
-      const [servicesRes, couponsRes, productsRes] = await Promise.all([
+      const [servicesRes, couponsRes, productsRes, layoutsRes] = await Promise.all([
         supabase.from('services').select('id, name').eq('is_active', true).order('name'),
         supabase.from('coupons').select('*, coupon_rewards(*)').eq('status', 'active').order('code'),
         supabase.from('products').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('email_layouts').select('id, name, slug, is_default').order('name'),
       ]);
       if (servicesRes.data) setServices(servicesRes.data as Service[]);
       if (couponsRes.data) {
@@ -200,6 +223,14 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
         setCoupons(couponsRes.data.filter((c: Coupon) => !c.expires_at || new Date(c.expires_at) >= now));
       }
       if (productsRes.data) setProducts(productsRes.data);
+      if (layoutsRes.data) {
+        setLayouts(layoutsRes.data as LayoutOption[]);
+        // Auto-select default layout if none set
+        if (!emailLayoutId) {
+          const defaultLayout = layoutsRes.data.find((l: LayoutOption) => l.is_default);
+          if (defaultLayout) setEmailLayoutId(defaultLayout.id);
+        }
+      }
     }
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -225,7 +256,10 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       audience_filters: buildFilters(),
       sms_template: smsTemplate || null,
       email_subject: emailSubject || null,
-      email_template: emailTemplate || null,
+      email_template: useBlockEditor ? null : (emailTemplate || null),
+      email_body_blocks: useBlockEditor && emailBodyBlocks.length > 0 ? emailBodyBlocks : null,
+      email_layout_id: useBlockEditor && emailLayoutId ? emailLayoutId : null,
+      email_preview_text: emailPreviewText || null,
       coupon_id: couponId || null,
       scheduled_at: scheduledAt || null,
     };
@@ -903,18 +937,74 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                     </FormField>
                     {variableChips(setEmailSubject, 'email_subject')}
                   </div>
+
                   <div>
-                    <FormField label="Email Body" htmlFor="email_template">
-                      <Textarea
-                        id="email_template"
-                        value={emailTemplate}
-                        onChange={(e) => setEmailTemplate(e.target.value)}
-                        rows={8}
-                        placeholder="Hi {first_name},&#10;&#10;We wanted to reach out with a special offer..."
+                    <FormField label="Preview Text" htmlFor="email_preview_text" description="Shown in inbox list — max 90 chars">
+                      <Input
+                        id="email_preview_text"
+                        value={emailPreviewText}
+                        onChange={(e) => setEmailPreviewText(e.target.value)}
+                        placeholder="Optional preview text for inbox..."
+                        maxLength={90}
                       />
                     </FormField>
-                    {variableChips(setEmailTemplate, 'email_template')}
                   </div>
+
+                  {/* Editor mode toggle */}
+                  <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Visual Block Editor</p>
+                        <p className="text-xs text-gray-500">
+                          {useBlockEditor
+                            ? 'Build rich HTML emails with blocks'
+                            : 'Switch to the visual editor for rich HTML emails'}
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={useBlockEditor}
+                      onCheckedChange={setUseBlockEditor}
+                    />
+                  </div>
+
+                  {useBlockEditor ? (
+                    <div className="space-y-3">
+                      <FormField label="Email Layout" htmlFor="email_layout">
+                        <Select
+                          id="email_layout"
+                          value={emailLayoutId}
+                          onChange={(e) => setEmailLayoutId(e.target.value)}
+                        >
+                          <option value="">Default Layout</option>
+                          {layouts.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name}{l.is_default ? ' (default)' : ''}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                      <EmailBlockEditor
+                        blocks={emailBodyBlocks}
+                        onChange={setEmailBodyBlocks}
+                        variables={CAMPAIGN_EMAIL_VARIABLES}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <FormField label="Email Body" htmlFor="email_template">
+                        <Textarea
+                          id="email_template"
+                          value={emailTemplate}
+                          onChange={(e) => setEmailTemplate(e.target.value)}
+                          rows={8}
+                          placeholder="Hi {first_name},&#10;&#10;We wanted to reach out with a special offer..."
+                        />
+                      </FormField>
+                      {variableChips(setEmailTemplate, 'email_template')}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -1245,10 +1335,25 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                     </div>
                   )}
 
-                  {(channel === 'email' || channel === 'both') && emailTemplate && (
+                  {(channel === 'email' || channel === 'both') && useBlockEditor && emailBodyBlocks.length > 0 && (
                     <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
                       <p className="mb-1 text-xs font-medium text-gray-500">
-                        Email Template
+                        Email (Block Editor)
+                      </p>
+                      <p className="mb-1 text-sm font-medium">{emailSubject}</p>
+                      <p className="text-sm text-gray-600">
+                        {emailBodyBlocks.length} block{emailBodyBlocks.length !== 1 ? 's' : ''} configured
+                      </p>
+                      {emailPreviewText && (
+                        <p className="mt-1 text-xs text-gray-400">Preview: {emailPreviewText}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {(channel === 'email' || channel === 'both') && !useBlockEditor && emailTemplate && (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                      <p className="mb-1 text-xs font-medium text-gray-500">
+                        Email Template (Plain Text)
                       </p>
                       <p className="mb-1 text-sm font-medium">{emailSubject}</p>
                       <p className="whitespace-pre-wrap text-sm">
@@ -1259,7 +1364,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                 </>
               )}
 
-              {(smsTemplate || emailTemplate) && (
+              {(smsTemplate || emailTemplate || (useBlockEditor && emailBodyBlocks.length > 0)) && (
                 <Button
                   type="button"
                   variant="outline"

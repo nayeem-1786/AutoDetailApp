@@ -4,6 +4,97 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Email Template System — Sub-phase 5 (Campaign + Automation Integration) — 2026-03-03
+
+Connected the email template system to campaigns, automations, and the lifecycle engine.
+
+**Validation schemas (`src/lib/utils/validation.ts`):**
+- `campaignCreateSchema` — added `email_body_blocks` (JSONB array), `email_layout_id` (UUID), `email_preview_text`
+- `lifecycleRuleSchema` — added `email_template_id` (UUID, nullable)
+
+**Campaign send route (`src/app/api/marketing/campaigns/[id]/send/route.ts`):**
+- When campaign has `email_body_blocks`, renders via `renderFromBlocks()` (full template system pipeline)
+- Resolves layout UUID → slug via `getLayoutSlug()` helper
+- Backward-compatible: campaigns without blocks still use legacy `<p>` tag rendering
+
+**Campaign wizard (`campaign-wizard.tsx`):**
+- Toggle between plain-text email and visual block editor (Switch component)
+- Layout selector dropdown (loads from `email_layouts` table)
+- Preview text input (90 char limit)
+- `EmailBlockEditor` embedded inline with marketing variables
+- `buildPayload()` sends `email_body_blocks`, `email_layout_id`, `email_preview_text`
+- Edit page passes new fields through from API
+
+**Automation editor (both `[id]/page.tsx` and `new/page.tsx`):**
+- Email template dropdown selector (loads from `email_templates` table)
+- When template selected: shows info banner + link to edit template
+- When no template: shows legacy subject + body textarea (unchanged)
+- Form submits `email_template_id` to API
+
+**Lifecycle engine (`src/app/api/cron/lifecycle-engine/route.ts`):**
+- Now checks BOTH `SMS_MARKETING` and `EMAIL_MARKETING` feature flags
+- Scheduling phase: relaxed consent filter — customers with either phone+sms_consent OR email+email_consent are eligible
+- Customer queries now fetch `email`, `email_consent` fields
+- Execution phase: dual-channel support based on rule's `action` field (sms/email/both)
+- Email sending: uses `sendTemplatedEmail()` for template-based rules, falls back to direct `renderFromBlocks()`, then legacy plain-text
+- `executePending()` tracks both SMS and email delivery status
+
+---
+
+## feat: Email Template System — Sub-phases 1-4 (Database + Rendering + API + Admin UI + Block Editor) — 2026-03-03
+
+Foundation for the unified email template system. Replaces hardcoded inline HTML with a 3-layer architecture: Brand Kit (global colors/logo/fonts) > Layout Templates (structural HTML frames) > Content Templates (block-based editable emails).
+
+**Database (migration `20260303000001`):**
+- 7 new tables: `email_layouts`, `email_templates`, `email_template_assignments`, `drip_sequences`, `drip_steps`, `drip_enrollments`, `drip_send_log`
+- ALTER `lifecycle_rules` — added `email_template_id`
+- ALTER `campaigns` — added `email_body_blocks`, `email_layout_id`, `email_preview_text`
+- Seeded 3 layout rows (Standard, Minimal, Promotional) with TABLE-based HTML skeletons
+- Seeded 12 Brand Kit keys in `business_settings` (`email_brand_*`)
+- RLS enabled on all new tables (service role bypasses)
+
+**Rendering engine (`src/lib/email/`):**
+- `types.ts` — Full type definitions: BrandKit, EmailLayout, EmailBlock (11 types), EmailTemplate, drip types, rendering types
+- `block-renderers.ts` — 11 block renderers (text, heading, button, image, photo_gallery, coupon, divider, spacer, social_links, two_column) producing TABLE-based HTML with inline styles, bulletproof buttons (Outlook VML), email-safe fonts
+- `layout-renderer.ts` — Full pipeline: fetchBrandKit() → resolveColors() → renderBlocks() → inject into layout → HTML + plain text output. Color resolution: layout overrides > Brand Kit defaults
+- `photo-resolver.ts` — Dynamic gallery photo resolver: queries `job_photos` for featured before/after pairs by zone, with tag/zone filtering and fallback
+- `template-resolver.ts` — Segment routing: trigger_key → assignments (priority DESC) → segment_filter matching → fallback to template_key
+- `send-templated-email.ts` — High-level `sendTemplatedEmail()`: resolve → render → send via Mailgun. Returns `usedTemplate: false` when no customized template found (callers fall back to hardcoded)
+- `variables.ts` — Variable definitions per category with sample values for preview rendering
+
+**API routes (`src/app/api/admin/email-templates/`) — 10 files:**
+- `route.ts` — GET list (category filter, search, pagination) + POST create template
+- `[id]/route.ts` — GET single + PATCH update (auto-bumps version, marks customized) + DELETE (non-system only)
+- `[id]/preview/route.ts` — POST render preview HTML (supports unsaved editor blocks)
+- `[id]/test-send/route.ts` — POST send test email via Mailgun with sample variables
+- `[id]/reset/route.ts` — POST reset system template to defaults
+- `assignments/route.ts` — GET/POST/PATCH/DELETE segment routing assignments
+- `layouts/route.ts` — GET list all 3 layouts
+- `layouts/[id]/route.ts` — GET single + PATCH (color_overrides, header/footer config)
+- `gallery-photos/route.ts` — GET featured before/after pairs for manual photo gallery picker
+- `brand-kit/route.ts` — GET all Brand Kit settings + PATCH update with cache revalidation
+
+**Admin UI (`src/app/admin/marketing/email-templates/`) — Sub-phase 3:**
+- Main page with 2 tabs: Templates list + Brand Settings
+- `_components/template-list.tsx` — Template grid with category filter, badges (System, category), delete confirmation for non-system templates, "Manage Layouts" link
+- `_components/brand-settings.tsx` — 5 cards: Brand Colors (4 color pickers), Typography (font dropdown), Logo (URL + width + preview), Social Links (4 URLs), Footer (custom text). Dirty-state save
+- `layouts/page.tsx` — Layout manager grid (3 cards with color preview strips, config summary, color swatches)
+- `layouts/[id]/page.tsx` — Layout editor: 2-column (settings + live iframe preview). Color overrides, header/footer config. Refresh Preview + Save buttons
+- Sidebar nav entry added in `src/lib/auth/roles.ts` under Marketing > Email Templates
+
+**Block Editor (Sub-phase 4) — 9 components + template editor page:**
+- `[id]/page.tsx` — Full template editor: settings (name, layout, subject, preview text), block editor, preview panel (desktop/mobile), test send dialog, reset-to-default for system templates
+- `email-block-editor.tsx` — 3-panel orchestrator: palette (left) + canvas (center) + properties (right)
+- `block-palette.tsx` — 10 block types with icons and descriptions
+- `block-canvas.tsx` — Drag-and-drop block list (native HTML5 DnD), inline preview text, move/duplicate/delete actions
+- `block-properties.tsx` — Per-type property editors for all 10 block types (text, heading, button, image, photo_gallery, coupon, divider, spacer, social_links, two_column)
+- `photo-gallery-picker.tsx` — Browse featured before/after pairs with zone/tag filters, select up to 4 pairs
+- `variable-inserter.tsx` — Searchable variable dropdown with category-aware filtering
+- `email-preview.tsx` — iframe preview with desktop (700px) / mobile (375px) viewport toggle
+- `template-picker-modal.tsx` — Shared template picker modal with category filter (for campaigns/drips)
+
+---
+
 ## feat: add logo printing to thermal receipts via server-side raster conversion — 2026-03-03
 
 Logo now prints on physical receipts using `GS v 0` raster command. Sharp-based image conversion runs server-side only to avoid client bundle issues.
