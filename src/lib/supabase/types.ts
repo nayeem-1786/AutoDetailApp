@@ -1572,6 +1572,119 @@ export interface VehicleCategoryRecord {
   updated_at: string;
 }
 
+// Email Template System
+
+export type EmailTemplateCategory = 'transactional' | 'review' | 'marketing' | 'notification';
+export type DripTriggerCondition = 'no_visit_days' | 'after_service' | 'new_customer' | 'manual_enroll' | 'tag_added';
+export type DripEnrollmentStatus = 'active' | 'completed' | 'stopped' | 'paused';
+export type DripSendStatus = 'sent' | 'failed' | 'skipped';
+export type DripStepChannel = 'email' | 'sms' | 'both';
+
+export interface EmailLayoutRow {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  structure_html: string;
+  color_overrides: Record<string, string>;
+  header_config: Record<string, unknown>;
+  footer_config: Record<string, unknown>;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailTemplateRow {
+  id: string;
+  template_key: string | null;
+  category: EmailTemplateCategory;
+  name: string;
+  subject: string;
+  preview_text: string;
+  layout_id: string;
+  body_blocks: Record<string, unknown>[];
+  body_html: string | null;
+  variables: string[];
+  segment_tag: string | null;
+  is_system: boolean;
+  is_customized: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface EmailTemplateAssignmentRow {
+  id: string;
+  trigger_key: string;
+  template_id: string;
+  segment_filter: Record<string, unknown> | null;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DripSequenceRow {
+  id: string;
+  name: string;
+  description: string | null;
+  trigger_condition: DripTriggerCondition;
+  trigger_value: Record<string, unknown> | null;
+  stop_conditions: Record<string, unknown>;
+  nurture_sequence_id: string | null;
+  is_active: boolean;
+  audience_filters: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export interface DripStepRow {
+  id: string;
+  sequence_id: string;
+  step_order: number;
+  delay_days: number;
+  delay_hours: number;
+  channel: DripStepChannel;
+  template_id: string | null;
+  sms_template: string | null;
+  coupon_id: string | null;
+  subject_override: string | null;
+  exit_condition: string | null;
+  exit_action: 'stop' | 'move' | 'tag' | null;
+  exit_sequence_id: string | null;
+  exit_tag: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DripEnrollmentRow {
+  id: string;
+  sequence_id: string;
+  customer_id: string;
+  current_step: number;
+  enrolled_at: string;
+  next_send_at: string | null;
+  status: DripEnrollmentStatus;
+  stopped_reason: string | null;
+  stopped_at: string | null;
+  nurture_transferred: boolean;
+  created_at: string;
+}
+
+export interface DripSendLogRow {
+  id: string;
+  enrollment_id: string;
+  step_id: string;
+  step_order: number;
+  channel: string;
+  status: DripSendStatus;
+  mailgun_message_id: string | null;
+  coupon_code: string | null;
+  sent_at: string;
+  error_message: string | null;
+}
+
 // Generic action result pattern
 export type ActionResult<T> =
   | { success: true; data: T }

@@ -594,10 +594,10 @@ Dependencies: 1 → 2 → 3/4 (parallel) → 5 → 6 → 7 → 8 → 9
 
 ### Sub-phase 9: Docs + Cleanup
 
-- [ ] Update `docs/dev/DB_SCHEMA.md` — Document all new tables
-- [ ] Update `docs/dev/FILE_TREE.md` — Add all new file paths
-- [ ] Update `docs/CHANGELOG.md` — Session changelog entry
-- [ ] Update `src/lib/supabase/types.ts` — Email template + drip TypeScript types
+- [x] Update `docs/dev/DB_SCHEMA.md` — Already documented (lines 1252-1401) during sub-phases 1-6
+- [x] Update `docs/dev/FILE_TREE.md` — Already documented during sub-phases 1-6
+- [x] Update `docs/CHANGELOG.md` — Session changelog entries per sub-phase
+- [x] Update `src/lib/supabase/types.ts` — Added 7 row types + 5 enum types for email template system
 
 ---
 

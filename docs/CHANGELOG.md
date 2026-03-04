@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: Email Template System — Sub-phase 9 (Docs + Cleanup) — 2026-03-04
+
+Final documentation pass for the email template system.
+
+- `src/lib/supabase/types.ts` — Added 7 Supabase row types (`EmailLayoutRow`, `EmailTemplateRow`, `EmailTemplateAssignmentRow`, `DripSequenceRow`, `DripStepRow`, `DripEnrollmentRow`, `DripSendLogRow`) + 5 enum types
+- `docs/dev/DB_SCHEMA.md` — Already complete (all 7 tables documented in sub-phases 1-6)
+- `docs/dev/FILE_TREE.md` — Already complete (all new files documented in sub-phases 1-6)
+- `docs/planning/EMAIL_TEMPLATE_SYSTEM-FINAL.md` — All sub-phase 9 items checked off
+
+---
+
 ## feat: Email Template System — Sub-phase 8 (Seed Data + Compliance) — 2026-03-03
 
 Seeded all email templates, default assignments, and example drip sequences so the template system has content ready for admin customization. Zero-risk migration — all system templates are `is_customized = false`, so senders continue using hardcoded HTML fallbacks until admin edits them.
