@@ -584,11 +584,13 @@ Dependencies: 1 → 2 → 3/4 (parallel) → 5 → 6 → 7 → 8 → 9
 
 ### Sub-phase 8: Seed Data + Compliance
 
-- [ ] Seed: 16 system templates with `body_blocks` matching current hardcoded HTML
-- [ ] Seed: default `email_template_assignments` (one per system template_key)
-- [ ] Seed: example drip sequences (win-back 30-day, welcome series)
-- [ ] `{unsubscribe_url}` variable + auto-injection in marketing layout footers
-- [ ] `{gallery_url}` variable for photo gallery links
+- [x] Seed: 12 templates (8 system + 4 drip) with `body_blocks` matching current hardcoded HTML
+- [x] Seed: 8 default `email_template_assignments` (one per system template_key)
+- [x] Seed: 2 example drip sequences (30-Day Win-Back, Welcome Series) + 5 steps
+- [x] `{unsubscribe_url}` auto-injection verified — `layout-renderer.ts:236-238` handles marketing emails
+- [x] `{gallery_url}` variable verified — defined in variables.ts, passed by job completion sender
+- [x] Added `quote_date` variable to QUOTE_VARS + EMAIL_VARIABLE_GROUPS
+- [x] Pass `quote_date` in quote sender (`send-service.ts`)
 
 ### Sub-phase 9: Docs + Cleanup
 

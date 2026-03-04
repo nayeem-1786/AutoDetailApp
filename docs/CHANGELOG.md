@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Email Template System — Sub-phase 8 (Seed Data + Compliance) — 2026-03-03
+
+Seeded all email templates, default assignments, and example drip sequences so the template system has content ready for admin customization. Zero-risk migration — all system templates are `is_customized = false`, so senders continue using hardcoded HTML fallbacks until admin edits them.
+
+**Migration (`20260303000002_seed_email_templates.sql`):**
+- 8 system templates with `body_blocks` decomposed from current hardcoded HTML:
+  `order_ready_pickup`, `order_shipped`, `order_delivered`, `order_refund`, `stock_alert`, `appointment_confirmed`, `quote_sent`, `job_complete`
+- 4 drip email templates: `drip_winback_1`, `drip_winback_3`, `drip_welcome_1`, `drip_welcome_2`
+- 8 default `email_template_assignments` (one per system trigger key, priority 0, no segment filter)
+- 2 example drip sequences (both `is_active = false`):
+  - "30-Day Win-Back" — 3 steps: email (day 0) → SMS (day 3) → email+coupon (day 7)
+  - "Welcome Series" — 2 steps: welcome email (day 1) → booking CTA (day 5)
+- System templates use Standard layout; drip templates use Promotional layout
+
+**Variables:**
+- Added `quote_date` to `QUOTE_VARS` array and `EMAIL_VARIABLE_GROUPS['Quote Details']`
+- Pass `quote_date` in quote sender (`send-service.ts`)
+
+**Compliance verification:**
+- `{unsubscribe_url}` auto-injection confirmed for marketing emails (`layout-renderer.ts:236-238`)
+- `{gallery_url}` variable confirmed defined and passed by job completion sender
+
+---
+
 ## feat: Email Template System — Sub-phase 7 (Sender Migration) — 2026-03-03
 
 Migrated all 8 email senders to try the template system first via `sendTemplatedEmail()`. When no customized template exists in the DB, each sender falls back to its existing hardcoded HTML — behavior is unchanged until templates are created in the admin UI.

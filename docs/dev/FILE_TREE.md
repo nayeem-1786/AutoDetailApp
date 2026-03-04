@@ -1236,6 +1236,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260228000007_og_image_setting.sql
 20260301000001_ticker_message_gap.sql
 20260303000001_email_template_system.sql
+20260303000002_seed_email_templates.sql
 ```
 
 ---

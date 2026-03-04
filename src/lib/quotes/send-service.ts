@@ -137,6 +137,7 @@ export async function sendQuote(
           last_name: customer.last_name,
           customer_name: customerName,
           quote_number: quote.quote_number,
+          quote_date: new Date(quote.created_at).toLocaleDateString(),
           quote_link: quoteLink,
           quote_subtotal: formatCurrency(quote.subtotal),
           quote_tax: formatCurrency(quote.tax_amount),

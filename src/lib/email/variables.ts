@@ -71,6 +71,7 @@ const ORDER_VARS: VariableDefinition[] = [
 
 const QUOTE_VARS: VariableDefinition[] = [
   { key: 'quote_number', description: 'Quote/estimate number', sample: 'Q-001234' },
+  { key: 'quote_date', description: 'Quote creation date', sample: '3/15/2026' },
   { key: 'quote_link', description: 'Link to view quote online', sample: 'https://smartdetails.com/quote/abc123' },
   { key: 'quote_subtotal', description: 'Quote subtotal', sample: '$450.00' },
   { key: 'quote_tax', description: 'Quote tax amount', sample: '$42.19' },
@@ -148,6 +149,7 @@ export const EMAIL_VARIABLE_GROUPS = {
   },
   'Quote Details': {
     quote_number: 'Quote/estimate number',
+    quote_date: 'Quote creation date',
     quote_link: 'Link to view quote online',
     quote_subtotal: 'Quote subtotal',
     quote_tax: 'Quote tax amount',
