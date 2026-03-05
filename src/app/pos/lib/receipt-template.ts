@@ -1,4 +1,5 @@
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
+import { formatPhone } from '@/lib/utils/format';
 
 interface ReceiptItem {
   item_name: string;
@@ -99,7 +100,7 @@ export function resolveShortcodes(
   const replacements: Record<string, string> = {
     '{customer_name}': customer ? `${customer.first_name} ${customer.last_name}` : '',
     '{customer_first_name}': customer?.first_name || '',
-    '{customer_phone}': customer?.phone || '',
+    '{customer_phone}': customer?.phone ? formatPhone(customer.phone) : '',
     '{customer_email}': customer?.email || '',
     '{customer_type}': customer?.customer_type === 'professional' ? 'Professional' : 'Enthusiast',
     '{customer_since}': customerSince,
@@ -199,7 +200,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     lines.push({
       type: 'columns',
       left: `${tx.customer.first_name} ${tx.customer.last_name}, ${typeLabel}`,
-      right: tx.customer.phone || '',
+      right: tx.customer.phone ? formatPhone(tx.customer.phone) : '',
     });
   }
 
@@ -553,7 +554,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     </tr>
     ${tx.customer ? `<tr>
       <td>${esc(tx.customer.first_name)} ${esc(tx.customer.last_name)}, ${esc(tx.customer.customer_type === 'professional' ? 'Professional' : 'Enthusiast')}</td>
-      <td style="text-align:right;">${tx.customer.phone ? esc(tx.customer.phone) : ''}</td>
+      <td style="text-align:right;">${tx.customer.phone ? esc(formatPhone(tx.customer.phone)) : ''}</td>
     </tr>` : ''}
     ${tx.customer && (tx.customer.email || customerSinceStr) ? `<tr>
       <td>${tx.customer.email ? esc(tx.customer.email) : ''}</td>

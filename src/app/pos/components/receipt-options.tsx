@@ -56,6 +56,7 @@ export function ReceiptOptions({
 
       setPrinted(true);
       toast.success('Receipt printed');
+      setTimeout(() => setPrinted(false), 3000);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         toast.error('Printer unavailable');
@@ -121,6 +122,7 @@ export function ReceiptOptions({
       setEmailed(true);
       setShowEmailInput(false);
       toast.success(`Receipt emailed to ${email}`);
+      setTimeout(() => setEmailed(false), 3000);
     } catch {
       toast.error('Failed to send email');
     } finally {
@@ -147,6 +149,7 @@ export function ReceiptOptions({
       setSmsed(true);
       setShowSmsInput(false);
       toast.success('Receipt sent via SMS');
+      setTimeout(() => setSmsed(false), 3000);
     } catch {
       toast.error('Failed to send SMS');
     } finally {
@@ -180,7 +183,7 @@ export function ReceiptOptions({
               setShowEmailInput(true);
             }
           }}
-          disabled={emailing || emailed}
+          disabled={emailing}
           className="min-h-[44px]"
         >
           {emailing ? (
@@ -202,7 +205,7 @@ export function ReceiptOptions({
               setShowSmsInput(true);
             }
           }}
-          disabled={smsing || smsed}
+          disabled={smsing}
           className="min-h-[44px]"
         >
           {smsing ? (
@@ -218,7 +221,7 @@ export function ReceiptOptions({
         <Button
           variant="outline"
           onClick={handleReceiptPrint}
-          disabled={printing || printed}
+          disabled={printing}
           className="min-h-[44px]"
         >
           {printing ? (

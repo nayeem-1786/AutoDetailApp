@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Allow receipt reprint + format phone numbers in POS UI — 2026-03-04
+
+- **Receipt/Email/SMS buttons no longer permanently disabled**: After successful action, green checkmark shows for 3 seconds then resets to clickable state. Buttons only disable during active send, not after.
+- **Phone number formatting**: Customer phone now displays as `(XXX) XXX-XXXX` instead of `+1XXXXXXXXXX` on thermal receipts (ESC/POS), HTML email receipts, `{customer_phone}` shortcode, and plain text receipts.
+
+Files changed:
+- `src/app/pos/components/receipt-options.tsx` — 3-second checkmark reset, removed permanent disable
+- `src/app/pos/lib/receipt-template.ts` — `formatPhone()` applied to customer phone in `generateReceiptLines()`, `generateReceiptHtml()`, and `resolveShortcodes()`
+
+---
+
 ## chore: Remove raster logo code — logo now in Star NV memory via futurePRNT — 2026-03-04
 
 Receipt logo is now stored in the Star TSP100III printer's NV memory via the Star futurePRNT Configuration Utility on the Optiplex. The printer prints the logo automatically — no image data in the ESC/POS stream.
