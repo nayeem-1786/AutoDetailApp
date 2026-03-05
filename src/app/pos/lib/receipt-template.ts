@@ -641,15 +641,14 @@ function textToBytes(text: string): number[] {
  * Convert receipt lines to Star TSP100 ESC/POS binary commands.
  * Matches the visual layout of generateReceiptHtml() as closely
  * as a 48-column thermal printer allows:
- * - Logo via pre-converted raster bytes (pass imageData map from imageToStarRaster)
+ * - Logo handled by printer NV memory (futurePRNT) — image lines are no-ops
  * - TOTAL line in bold + double-size (matches HTML bold/15px)
  * - "Payment" label before payment rows (matches HTML bold label)
  * - Empty bold line rendered as spacer (matches HTML solid <hr>)
  */
 export function receiptToEscPos(
   lines: ReceiptLine[],
-  width = 48,
-  imageData?: Map<string, Uint8Array>
+  width = 48
 ): Uint8Array {
   const parts: number[] = [];
 
@@ -748,17 +747,7 @@ export function receiptToEscPos(
         break;
 
       case 'image':
-        // Insert pre-processed raster bytes if available for this image URL.
-        // All async image processing happens in the API route before this function is called.
-        // If no imageData or no entry for this URL, skip entirely (no text, no URL output).
-        if (imageData && line.url) {
-          const rasterBytes = imageData.get(line.url);
-          if (rasterBytes && rasterBytes.length > 0) {
-            for (let i = 0; i < rasterBytes.length; i++) {
-              parts.push(rasterBytes[i]);
-            }
-          }
-        }
+        // Logo is stored in printer NV memory via Star futurePRNT — no ESC/POS output needed
         break;
     }
   }

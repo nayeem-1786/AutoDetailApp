@@ -604,78 +604,80 @@ Dependencies: 1 → 2 → 3/4 (parallel) → 5 → 6 → 7 → 8 → 9
 ## New Files
 
 **Lib (rendering engine):**
-- [ ] `src/lib/email/types.ts`
-- [ ] `src/lib/email/block-renderers.ts`
-- [ ] `src/lib/email/layout-renderer.ts`
-- [ ] `src/lib/email/photo-resolver.ts`
-- [ ] `src/lib/email/template-resolver.ts`
-- [ ] `src/lib/email/send-templated-email.ts`
-- [ ] `src/lib/email/variables.ts`
-- [ ] `src/lib/email/drip-engine.ts`
+- [x] `src/lib/email/types.ts`
+- [x] `src/lib/email/block-renderers.ts`
+- [x] `src/lib/email/layout-renderer.ts`
+- [x] `src/lib/email/photo-resolver.ts`
+- [x] `src/lib/email/template-resolver.ts`
+- [x] `src/lib/email/send-templated-email.ts`
+- [x] `src/lib/email/variables.ts`
+- [x] `src/lib/email/drip-engine.ts`
 
 **API routes — Templates + Layouts:**
-- [ ] `src/app/api/admin/email-templates/route.ts`
-- [ ] `src/app/api/admin/email-templates/[id]/route.ts`
-- [ ] `src/app/api/admin/email-templates/[id]/preview/route.ts`
-- [ ] `src/app/api/admin/email-templates/[id]/test-send/route.ts`
-- [ ] `src/app/api/admin/email-templates/[id]/reset/route.ts`
-- [ ] `src/app/api/admin/email-templates/assignments/route.ts`
-- [ ] `src/app/api/admin/email-templates/gallery-photos/route.ts`
-- [ ] `src/app/api/admin/email-templates/brand-kit/route.ts`
-- [ ] `src/app/api/admin/email-templates/layouts/route.ts`
-- [ ] `src/app/api/admin/email-templates/layouts/[id]/route.ts`
+- [x] `src/app/api/admin/email-templates/route.ts`
+- [x] `src/app/api/admin/email-templates/[id]/route.ts`
+- [x] `src/app/api/admin/email-templates/[id]/preview/route.ts`
+- [x] `src/app/api/admin/email-templates/[id]/test-send/route.ts`
+- [x] `src/app/api/admin/email-templates/[id]/reset/route.ts`
+- [x] `src/app/api/admin/email-templates/assignments/route.ts`
+- [x] `src/app/api/admin/email-templates/gallery-photos/route.ts`
+- [x] `src/app/api/admin/email-templates/brand-kit/route.ts`
+- [x] `src/app/api/admin/email-templates/layouts/route.ts`
+- [x] `src/app/api/admin/email-templates/layouts/[id]/route.ts`
 
 **API routes — Drip:**
-- [ ] `src/app/api/admin/drip-sequences/route.ts`
-- [ ] `src/app/api/admin/drip-sequences/[id]/route.ts`
-- [ ] `src/app/api/admin/drip-sequences/[id]/steps/route.ts`
-- [ ] `src/app/api/admin/drip-sequences/[id]/steps/[stepId]/route.ts`
-- [ ] `src/app/api/admin/drip-sequences/[id]/enrollments/route.ts`
-- [ ] `src/app/api/admin/drip-sequences/[id]/enrollments/[enrollId]/route.ts`
-- [ ] `src/app/api/admin/drip-sequences/[id]/analytics/route.ts`
+- [x] `src/app/api/admin/drip-sequences/route.ts`
+- [x] `src/app/api/admin/drip-sequences/[id]/route.ts`
+- [x] `src/app/api/admin/drip-sequences/[id]/steps/route.ts`
+- [x] `src/app/api/admin/drip-sequences/[id]/steps/[stepId]/route.ts`
+- [x] `src/app/api/admin/drip-sequences/[id]/enrollments/route.ts`
+- [x] `src/app/api/admin/drip-sequences/[id]/enrollments/[enrollId]/route.ts`
+- [x] `src/app/api/admin/drip-sequences/[id]/analytics/route.ts`
 
 **Admin pages:**
-- [ ] `src/app/admin/marketing/email-templates/page.tsx`
-- [ ] `src/app/admin/marketing/email-templates/[id]/page.tsx`
-- [ ] `src/app/admin/marketing/email-templates/layouts/page.tsx`
-- [ ] `src/app/admin/marketing/email-templates/layouts/[id]/page.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/page.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/new/page.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/[id]/page.tsx`
+- [x] `src/app/admin/marketing/email-templates/page.tsx`
+- [x] `src/app/admin/marketing/email-templates/[id]/page.tsx`
+- [x] `src/app/admin/marketing/email-templates/layouts/page.tsx`
+- [x] `src/app/admin/marketing/email-templates/layouts/[id]/page.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/page.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/new/page.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/[id]/page.tsx`
 
 **Admin components — Templates:**
-- [ ] `src/app/admin/marketing/email-templates/_components/template-list.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/brand-settings.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/layout-manager.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/layout-editor.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/email-block-editor.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/block-palette.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/block-canvas.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/block-properties.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/email-preview.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/variable-inserter.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/template-picker-modal.tsx`
-- [ ] `src/app/admin/marketing/email-templates/_components/photo-gallery-picker.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/template-list.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/brand-settings.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/layout-manager.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/layout-editor.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/email-block-editor.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/block-palette.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/block-canvas.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/block-properties.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/email-preview.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/variable-inserter.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/template-picker-modal.tsx`
+- [x] `src/app/admin/marketing/email-templates/_components/photo-gallery-picker.tsx`
 
 **Admin components — Drip:**
-- [ ] `src/app/admin/marketing/campaigns/_components/campaign-tabs.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/_components/drip-builder.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/_components/drip-steps-editor.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/_components/drip-step-card.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/_components/drip-analytics.tsx`
-- [ ] `src/app/admin/marketing/campaigns/drip/_components/drip-enrollments-table.tsx`
+- [x] `src/app/admin/marketing/campaigns/_components/campaign-tabs.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/_components/drip-builder.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/_components/drip-steps-editor.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/_components/drip-step-card.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/_components/drip-analytics.tsx`
+- [x] `src/app/admin/marketing/campaigns/drip/_components/drip-enrollments-table.tsx`
 
-**Migration:**
-- [ ] `supabase/migrations/YYYYMMDD_email_template_system.sql`
+**Migrations:**
+- [x] `supabase/migrations/20260303000001_email_template_system.sql`
+- [x] `supabase/migrations/20260303000002_seed_email_templates.sql`
+- [x] `supabase/migrations/20260304000001_email_template_rls_policies.sql`
 
 ---
 
 ## Modified Files
 
-- [ ] `src/lib/auth/roles.ts` — Sidebar nav entry (Email Templates)
-- [ ] `src/lib/supabase/types.ts` — Email template + drip TypeScript types
-- [ ] `src/lib/utils/template.ts` — Add {unsubscribe_url}, {gallery_url} to VARIABLE_GROUPS
-- [ ] `src/app/admin/marketing/campaigns/page.tsx` — Tabs (One-Time | Drip) — deferred to Sub-phase 6
+- [x] `src/lib/auth/roles.ts` — Sidebar nav entry (Email Templates)
+- [x] `src/lib/supabase/types.ts` — Email template + drip TypeScript types
+- [x] `src/lib/utils/template.ts` — Add {unsubscribe_url}, {gallery_url} to VARIABLE_GROUPS
+- [x] `src/app/admin/marketing/campaigns/page.tsx` — Tabs (One-Time | Drip)
 - [x] `src/app/admin/marketing/campaigns/_components/campaign-wizard.tsx` — Block editor toggle + layout selector
 - [x] `src/app/api/marketing/campaigns/route.ts` — Accept email_body_blocks, email_layout_id (via schema)
 - [x] `src/app/api/marketing/campaigns/[id]/route.ts` — Accept email_body_blocks, email_layout_id (via schema)
@@ -684,16 +686,16 @@ Dependencies: 1 → 2 → 3/4 (parallel) → 5 → 6 → 7 → 8 → 9
 - [x] `src/app/admin/marketing/automations/new/page.tsx` — Template dropdown
 - [x] `src/app/api/marketing/automations/[id]/route.ts` — Accept email_template_id (via schema)
 - [x] `src/app/api/cron/lifecycle-engine/route.ts` — Email rendering + dual-channel sending
-- [ ] `src/lib/cron/scheduler.ts` — Ensure lifecycle-engine cron covers drip processing
-- [ ] `src/lib/utils/order-emails.ts` — Template fallback
-- [ ] `src/app/api/pos/jobs/[id]/complete/route.ts` — Template fallback
-- [ ] `src/app/api/pos/appointments/[id]/notify/route.ts` — Template fallback
-- [ ] `src/lib/quotes/send-service.ts` — Template fallback + switch to sendEmail()
-- [ ] `src/app/api/cron/stock-alerts/route.ts` — Template fallback
-- [ ] `src/app/admin/customers/[id]/page.tsx` — Active sequences section
-- [ ] `docs/dev/DB_SCHEMA.md` — Document new tables
-- [ ] `docs/dev/FILE_TREE.md` — Add new file paths
-- [ ] `docs/CHANGELOG.md` — Update
+- [x] `src/lib/cron/scheduler.ts` — Lifecycle-engine cron covers drip processing
+- [x] `src/lib/utils/order-emails.ts` — Template fallback
+- [x] `src/app/api/pos/jobs/[id]/complete/route.ts` — Template fallback
+- [x] `src/app/api/pos/appointments/[id]/notify/route.ts` — Template fallback
+- [x] `src/lib/quotes/send-service.ts` — Template fallback + switch to sendEmail()
+- [x] `src/app/api/cron/stock-alerts/route.ts` — Template fallback
+- [x] `src/lib/email/variables.ts` — Added quote_date variable
+- [x] `docs/dev/DB_SCHEMA.md` — Document new tables + RLS policies
+- [x] `docs/dev/FILE_TREE.md` — Add new file paths
+- [x] `docs/CHANGELOG.md` — Update
 
 ---
 

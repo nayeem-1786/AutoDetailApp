@@ -83,18 +83,19 @@ export function TemplateList() {
         <Select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
+          className="max-w-48"
         >
           {CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>{c.label}</option>
           ))}
         </Select>
 
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Button
             size="sm"
             onClick={() => router.push('/admin/marketing/email-templates/layouts')}
           >
-            Manage Layouts
+            Edit Layouts
           </Button>
         </div>
       </div>

@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { generateReceiptLines, receiptToEscPos } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
-import { imageToStarRaster } from '@/app/pos/lib/receipt-image';
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,33 +80,7 @@ export async function POST(request: NextRequest) {
       payments: tx.payments ?? [],
     }, merged);
 
-    // Pre-process all image lines: fetch + convert to Star raster bytes
-    // This must happen before receiptToEscPos() which is synchronous
-    const imageLines = receiptLines.filter(l => l.type === 'image' && l.url);
-    const imageData = new Map<string, Uint8Array>();
-
-    if (imageLines.length > 0) {
-      try {
-        // Convert CSS px to printer px (~2x for 203dpi), cap at 576
-        const results = await Promise.all(
-          imageLines.map(line => {
-            const printerWidth = Math.min(Math.round((line.width ?? 200) * 2), 576);
-            return imageToStarRaster(line.url!, printerWidth, line.alignment ?? 'center');
-          })
-        );
-        for (let i = 0; i < imageLines.length; i++) {
-          const raster = results[i];
-          if (raster) {
-            imageData.set(imageLines[i].url!, raster);
-          }
-        }
-      } catch (err) {
-        // Image processing failure should not block receipt printing
-        console.error('Image pre-processing error:', err);
-      }
-    }
-
-    const escPosData = receiptToEscPos(receiptLines, 48, imageData);
+    const escPosData = receiptToEscPos(receiptLines, 48);
 
     // Send binary data to local print server with 3-second timeout
     const controller = new AbortController();

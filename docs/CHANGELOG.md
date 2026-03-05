@@ -4,26 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## feat: Star TSP100 raster logo printing in ESC/POS receipts — 2026-03-04
+## chore: Remove raster logo code — logo now in Star NV memory via futurePRNT — 2026-03-04
 
-Created proper Star Line Mode raster image support for receipt logo printing. Previous implementation used wrong ESC/POS protocol (GS v 0) and didn't handle PNG alpha channels, producing gibberish output on the Star TSP100III.
+Receipt logo is now stored in the Star TSP100III printer's NV memory via the Star futurePRNT Configuration Utility on the Optiplex. The printer prints the logo automatically — no image data in the ESC/POS stream.
 
-- **New `receipt-image.ts`**: `imageToStarRaster()` — fetches image URL, flattens alpha onto white, converts to monochrome bitmap in Star raster format
-- **Alpha channel fix**: `.flatten({ background: white })` before `.grayscale()` prevents 2-channel output from PNGs with transparency
-- **Star raster protocol**: `ESC * r A` (enter) → `b nL nH [data]` per row → `ESC * r B` (exit)
-- **Full-width rows**: Every row is exactly 576px (72 bytes) — the Star TSP100's full printable width at 203dpi
-- **`receiptToEscPos()` now uses `imageData?: Map<string, Uint8Array>`**: URL-keyed map of pre-processed raster bytes (was single `logoRasterBytes` param)
-- **Print-server route**: Finds all `image` lines, processes in parallel via `Promise.all`, builds URL→raster map
-- **CSS-to-printer pixel conversion**: `logo_width` (CSS px) × 2 for 203dpi, capped at 576px
-- **Pixel-based alignment**: Left/center/right via white pixel padding
-- **5-second fetch timeout**: AbortController prevents hanging on slow downloads
-- **Graceful fallback**: Image failure does not block receipt printing
+- **Deleted `receipt-image.ts`**: `imageToStarRaster()` and all sharp-based raster conversion removed
+- **Deleted `star-printer.ts`**: Browser Canvas WebPRNT image conversion removed
+- **`receiptToEscPos()`**: Removed `imageData` parameter; `image` case now outputs nothing (just `break`)
+- **Print-server route**: Removed `imageToStarRaster` import, image pre-processing code, and `imageData` Map construction
+- **`sharp` kept**: Still used by `render-annotations.ts` and `job photos` route
+- **No changes** to `generateReceiptLines()`, `receiptToPlainText()`, or `generateReceiptHtml()` — `image` ReceiptLine type still used for HTML/email preview
 
 Files changed:
-- `src/app/pos/lib/receipt-image.ts` — NEW: `imageToStarRaster()` function
-- `src/app/pos/lib/receipt-template.ts` — `receiptToEscPos()` uses `imageData` Map param
-- `src/app/api/pos/receipts/print-server/route.ts` — Pre-processes images into Map before ESC/POS conversion
-- `src/app/api/pos/receipts/logo-to-raster.ts` — DELETED (replaced by receipt-image.ts)
+- `src/app/pos/lib/receipt-image.ts` — DELETED
+- `src/app/pos/lib/star-printer.ts` — DELETED
+- `src/app/pos/lib/receipt-template.ts` — Removed `imageData` param from `receiptToEscPos()`
+- `src/app/api/pos/receipts/print-server/route.ts` — Removed image pre-processing code
 
 ---
 
