@@ -625,8 +625,7 @@ const CMD_BOLD_ON = [ESC, 0x45, 0x01];
 const CMD_BOLD_OFF = [ESC, 0x45, 0x00];
 const CMD_DOUBLE_SIZE = [ESC, 0x69, 0x01, 0x01]; // Double height + width
 const CMD_NORMAL_SIZE = [ESC, 0x69, 0x00, 0x00];
-const CMD_CUT = [ESC, 0x64, 0x02]; // Partial cut
-const CMD_CASH_DRAWER = [ESC, 0x70, 0x00, 0x19, 0xFA]; // Kick pin 2
+const CMD_CUT = [0x1D, 0x56, 0x01]; // GS V partial cut — does NOT trigger futurePRNT logo
 
 function textToBytes(text: string): number[] {
   const bytes: number[] = [];
@@ -764,5 +763,5 @@ export function receiptToEscPos(
  * Generate ESC/POS cash drawer kick command for Star TSP100.
  */
 export function escPosOpenDrawer(): Uint8Array {
-  return new Uint8Array([...CMD_INIT, ...CMD_CASH_DRAWER]);
+  return new Uint8Array([0x07]); // BEL — Star TSP100 drawer kick, no init needed
 }

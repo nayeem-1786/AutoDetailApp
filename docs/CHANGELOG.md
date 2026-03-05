@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Single logo print — use GS V cut + remove init from drawer kick — 2026-03-05
+
+Star futurePRNT inserts the NV logo at every "receipt boundary" (`ESC @` init and `ESC d` cut), causing 4 logos per receipt. Fixed:
+
+- **Cut command**: Changed from `ESC d` (0x1B 0x64) to `GS V` (0x1D 0x56 0x01) — futurePRNT does not treat GS V as a boundary
+- **Cash drawer kick**: Changed `escPosOpenDrawer()` from `[CMD_INIT, CMD_CASH_DRAWER]` to `[0x07]` (BEL) — no init command, no logo trigger
+- **Deleted `CMD_CASH_DRAWER` constant** — drawer kick handled by Optiplex print server
+
+Only `CMD_INIT` at the start of `receiptToEscPos()` remains as a futurePRNT logo trigger (correct — one logo per receipt).
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — cut command, drawer kick, removed constant
+
+---
+
 ## feat: Copier print via print server + reprint fix + phone formatting — 2026-03-04
 
 - **Copier print via print server**: "Print" button now sends receipt HTML to Optiplex print server `/print-copier` endpoint for PDF conversion + bizhub printing. No more browser popup or AirPrint dependency. 15-second timeout for PDF conversion.
