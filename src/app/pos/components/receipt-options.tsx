@@ -7,8 +7,6 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
-import { generateReceiptHtml } from '../lib/receipt-template';
-import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 
 interface ReceiptOptionsProps {
   transactionId: string;
@@ -69,35 +67,32 @@ export function ReceiptOptions({
   }
 
   async function handleCopierPrint() {
-    // Open window immediately in the click handler so Safari/iPad doesn't block it
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      toast.error('Pop-up blocked — allow pop-ups and try again');
-      return;
-    }
-    printWindow.document.write('<html><body><p>Loading receipt…</p></body></html>');
-
     setCopierPrinting(true);
     try {
-      const res = await posFetch(`/api/pos/transactions/${transactionId}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
+      const res = await posFetch('/api/pos/receipts/print-copier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: transactionId }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
       const json = await res.json();
       if (!res.ok) {
-        printWindow.close();
-        toast.error(json.error || 'Failed to load receipt');
+        toast.error(json.error || 'Copier print failed');
         return;
       }
 
-      const tx = json.data;
-      const rcfg: MergedReceiptConfig | undefined = json.receipt_config ?? undefined;
-      const html = generateReceiptHtml(tx, rcfg);
-      printWindow.document.open();
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
+      toast.success('Printed to copier');
     } catch (err) {
-      printWindow.close();
-      toast.error(err instanceof Error ? err.message : 'Print failed');
+      if (err instanceof Error && err.name === 'AbortError') {
+        toast.error('Copier unavailable — timed out');
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Copier unavailable');
+      }
     } finally {
       setCopierPrinting(false);
     }

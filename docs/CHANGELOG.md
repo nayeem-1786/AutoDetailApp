@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Copier print via print server + reprint fix + phone formatting — 2026-03-04
+
+- **Copier print via print server**: "Print" button now sends receipt HTML to Optiplex print server `/print-copier` endpoint for PDF conversion + bizhub printing. No more browser popup or AirPrint dependency. 15-second timeout for PDF conversion.
+- **New API route**: `POST /api/pos/receipts/print-copier` — fetches transaction, generates HTML via `generateReceiptHtml()`, POSTs `{ html }` to print server
+- **Removed unused imports**: `generateReceiptHtml` and `MergedReceiptConfig` no longer imported in `receipt-options.tsx`
+
+Files changed:
+- `src/app/api/pos/receipts/print-copier/route.ts` — NEW: copier print API route
+- `src/app/pos/components/receipt-options.tsx` — `handleCopierPrint()` rewritten to use API route
+
+---
+
 ## fix: Allow receipt reprint + format phone numbers in POS UI — 2026-03-04
 
 - **Receipt/Email/SMS buttons no longer permanently disabled**: After successful action, green checkmark shows for 3 seconds then resets to clickable state. Buttons only disable during active send, not after.

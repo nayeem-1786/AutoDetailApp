@@ -370,6 +370,7 @@ src/app/api/pos/quotes/route.ts
 src/app/api/pos/receipts/cash-drawer/route.ts
 src/app/api/pos/receipts/email/route.ts
 src/app/api/pos/receipts/print/route.ts
+src/app/api/pos/receipts/print-copier/route.ts
 src/app/api/pos/receipts/print-server/route.ts
 src/app/api/pos/receipts/sms/route.ts
 src/app/api/pos/refunds/route.ts
