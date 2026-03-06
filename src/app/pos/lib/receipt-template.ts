@@ -618,14 +618,18 @@ const ESC = 0x1B;
 const LF = 0x0A;
 
 const CMD_INIT = [ESC, 0x40]; // Initialize printer
-const CMD_ALIGN_LEFT = [ESC, 0x1D, 0x61, 0x00];
-const CMD_ALIGN_CENTER = [ESC, 0x1D, 0x61, 0x01];
-const CMD_ALIGN_RIGHT = [ESC, 0x1D, 0x61, 0x02];
-const CMD_BOLD_ON = [ESC, 0x45, 0x01];
-const CMD_BOLD_OFF = [ESC, 0x45, 0x00];
-const CMD_DOUBLE_SIZE = [ESC, 0x69, 0x01, 0x01]; // Double height + width
-const CMD_NORMAL_SIZE = [ESC, 0x69, 0x00, 0x00];
-const CMD_CUT = [0x1D, 0x56, 0x01]; // GS V partial cut — does NOT trigger futurePRNT logo
+// Standard ESC/POS commands — NO 0x1D bytes (except logo trigger and cut)
+// futurePRNT inserts NV logo at every 0x1D after ESC @ init.
+// Only two 0x1D bytes allowed: CMD_LOGO_TRIGGER (logo) and CMD_CUT (cut).
+const CMD_LOGO_TRIGGER = [0x1D, 0x21, 0x00]; // GS ! normal — triggers futurePRNT logo insertion
+const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];     // ESC a 0
+const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];   // ESC a 1
+const CMD_ALIGN_RIGHT = [ESC, 0x61, 0x02];    // ESC a 2
+const CMD_BOLD_ON = [ESC, 0x45, 0x01];         // ESC E 1 (unchanged)
+const CMD_BOLD_OFF = [ESC, 0x45, 0x00];        // ESC E 0 (unchanged)
+const CMD_DOUBLE_SIZE = [ESC, 0x21, 0x30];     // ESC ! 0x30 — double width + double height
+const CMD_NORMAL_SIZE = [ESC, 0x21, 0x00];     // ESC ! 0x00 — normal size
+const CMD_CUT = [0x1D, 0x56, 0x01];            // GS V partial cut (at end only)
 
 function textToBytes(text: string): number[] {
   const bytes: number[] = [];
@@ -654,6 +658,8 @@ export function receiptToEscPos(
 
   // Initialize printer
   parts.push(...CMD_INIT);
+  // Trigger futurePRNT to insert NV logo (must be first 0x1D after init)
+  parts.push(...CMD_LOGO_TRIGGER);
 
   // State tracking to match HTML semantic sections
   let seenTotal = false;
@@ -663,8 +669,8 @@ export function receiptToEscPos(
     switch (line.type) {
       case 'header':
         parts.push(...CMD_ALIGN_CENTER);
-        parts.push(...CMD_BOLD_ON);
         parts.push(...CMD_DOUBLE_SIZE);
+        parts.push(...CMD_BOLD_ON);
         parts.push(...textToBytes(line.text ?? ''));
         parts.push(LF);
         parts.push(...CMD_NORMAL_SIZE);
@@ -715,8 +721,8 @@ export function receiptToEscPos(
         const isTotalLine = left === 'TOTAL';
         if (isTotalLine) {
           seenTotal = true;
-          parts.push(...CMD_BOLD_ON);
           parts.push(...CMD_DOUBLE_SIZE);
+          parts.push(...CMD_BOLD_ON);
         }
 
         let padded: string;
