@@ -4,13 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix: Cash drawer kick for check and split payments — 2026-03-06
+## fix: Cash drawer command + check/split drawer kick — 2026-03-06
 
-Cash drawer only opened for cash payments. Added the same fire-and-forget `POST /api/pos/receipts/cash-drawer` call to check and split payment flows after successful transaction.
+**Cash drawer command:** Changed from BEL (`0x07`) to ESC p (`0x1B 0x70 0x00 0x19 0xFA`) without ESC @ init. BEL was being swallowed by futurePRNT ESC/POS Routing. ESC p without init opens the drawer without triggering a logo printout.
+
+**Check/split drawer kick:** Cash drawer previously only opened for cash payments. Added the same fire-and-forget `POST /api/pos/receipts/cash-drawer` call to check and split payment flows. Now all three payment methods (cash, check, split) open the register.
 
 Files changed:
+- `src/app/pos/lib/receipt-template.ts` — `escPosOpenDrawer()` updated to ESC p
 - `src/app/pos/components/checkout/check-payment.tsx` — added drawer kick after transaction
 - `src/app/pos/components/checkout/split-payment.tsx` — added drawer kick after transaction
+- Print server `server.js` on Optiplex — `/cash-drawer` endpoint updated to ESC p
 
 ---
 

@@ -98,11 +98,13 @@ The receipt ESC/POS stream must contain **exactly two** `0x1D` bytes:
 
 ### Cash Drawer
 
-The cash drawer must be opened with **BEL only** (`0x07`) — no `ESC @` init, no `ESC p`. Sending `ESC @` would trigger futurePRNT to insert a logo and print/cut a receipt with just a logo on it.
+The cash drawer must be opened with **ESC p without ESC @ init** — `[0x1B, 0x70, 0x00, 0x19, 0xFA]`. Do NOT send `ESC @` before it — that would trigger futurePRNT to insert a logo and print/cut a receipt with just a logo on it.
 
-The print server's `/cash-drawer` endpoint sends: `Buffer.from([0x07])`
+**Why not BEL (0x07)?** BEL is the traditional Star drawer kick, but futurePRNT's ESC/POS Routing swallows it — the byte never reaches the printer hardware. ESC p (`0x1B 0x70`) is the standard ESC/POS drawer kick command and is passed through to the printer correctly.
 
-The app's `escPosOpenDrawer()` returns: `new Uint8Array([0x07])`
+The print server's `/cash-drawer` endpoint sends: `Buffer.from([0x1B, 0x70, 0x00, 0x19, 0xFA])`
+
+The app's `escPosOpenDrawer()` returns: `new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA])`
 
 ### Important: ESC ! Resets Bold
 
@@ -159,6 +161,6 @@ The Star printer MUST be shared on Windows for raw binary writes to work:
 
 5. **USB printers on Windows require a printer share** for raw binary writes. Direct port writes to `\\.\\USB003` do not work.
 
-6. **BEL (0x07) opens the Star cash drawer** without any init command. Using `ESC @` + `ESC p` for the drawer triggers futurePRNT logo injection.
+6. **ESC p without ESC @ init opens the cash drawer.** BEL (`0x07`) does NOT work — futurePRNT ESC/POS Routing swallows it. ESC p (`0x1B 0x70 0x00 0x19 0xFA`) is passed through correctly. Never send `ESC @` before the drawer command — it triggers futurePRNT logo injection.
 
 7. **Test at the binary level.** Writing small Node.js scripts that send exact byte sequences directly to the printer share was the fastest way to isolate the problem. Each test changed exactly one variable.

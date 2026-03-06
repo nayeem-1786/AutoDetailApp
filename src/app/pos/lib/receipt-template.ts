@@ -789,7 +789,9 @@ export function receiptToEscPos(
 
 /**
  * Generate ESC/POS cash drawer kick command for Star TSP100.
+ * ESC p without ESC @ init — BEL (0x07) gets swallowed by futurePRNT ESC/POS Routing.
+ * No ESC @ init before this — that would trigger a logo printout.
  */
 export function escPosOpenDrawer(): Uint8Array {
-  return new Uint8Array([0x07]); // BEL — Star TSP100 drawer kick, no init needed
+  return new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]); // ESC p — drawer kick, no init
 }

@@ -271,7 +271,7 @@ All other commands must use `0x1B` (ESC) prefix only. No other `0x1D` bytes anyw
 
 ### Cash Drawer
 
-Use BEL only (`0x07`). Never send `ESC @` for the drawer — it triggers a logo printout.
+Use ESC p without ESC @ init: `[0x1B, 0x70, 0x00, 0x19, 0xFA]`. BEL (`0x07`) does NOT work — futurePRNT ESC/POS Routing swallows it. Never send `ESC @` before the drawer command — it triggers a logo printout.
 
 ### ESC ! Resets Bold
 
