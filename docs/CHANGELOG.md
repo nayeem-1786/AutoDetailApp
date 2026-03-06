@@ -4,21 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix: Single logo — proven 0x1D byte control for futurePRNT — 2026-03-05
+## docs + fix: Star printer logo troubleshooting + fix receipt print width — 2026-03-05
 
-futurePRNT inserts the NV logo every time it encounters a `0x1D` (GS) byte after `ESC @` init, except at the end of the stream (GS V cut). Proven by live testing: N `0x1D` bytes = N logos.
+**Print width fix:** Changed `CMD_LOGO_TRIGGER` from `GS ! 0x00` (`[0x1D, 0x21, 0x00]`) to `GS B 0` (`[0x1D, 0x42, 0x00]`). `GS !` is a character size select command that can interfere with `ESC !` text sizing, causing narrower print width. `GS B 0` disables reverse printing (already off by default) — a true no-op that still contains `0x1D` to trigger futurePRNT logo.
 
-**The fix**: Receipt stream contains exactly two `0x1D` bytes:
-1. `CMD_LOGO_TRIGGER` (`GS ! 0x00`) immediately after `ESC @` init — triggers one logo
-2. `CMD_CUT` (`GS V 0x01`) at the very end — cuts paper, no logo
-
-All other commands converted to `0x1B` (ESC) prefix only:
-- **Alignment**: `[ESC, 0x1D, 0x61, n]` → `[ESC, 0x61, n]` (ESC a)
-- **Text size**: `[ESC, 0x69, n, n]` → `[ESC, 0x21, n]` (ESC !)
-- **Bold ordering**: `ESC !` resets all attributes, so `CMD_BOLD_ON` now comes AFTER `CMD_DOUBLE_SIZE`
+**Troubleshooting docs:** Added "Star TSP100III Receipt Logo" section to `docs/dev/TROUBLESHOOTING.md` covering:
+- `0x1D` byte control rule (exactly 2 allowed)
+- Cash drawer BEL-only rule
+- `ESC !` resets bold ordering
+- Logo trigger must not affect character sizing
+- Reference to `docs/hardware/STAR_PRINTER_LOGO.md`
 
 Files changed:
-- `src/app/pos/lib/receipt-template.ts` — command constants, logo trigger, bold ordering
+- `src/app/pos/lib/receipt-template.ts` — CMD_LOGO_TRIGGER: `GS !` → `GS B`
+- `docs/dev/TROUBLESHOOTING.md` — new Star TSP100III Receipt Logo section
+
+## fix: Single logo — proven 0x1D byte control for futurePRNT — 2026-03-05
+
+(Updated above — logo trigger changed from `GS !` to `GS B` for print width fix)
 
 ## fix: Single logo print — use GS V cut + remove init from drawer kick — 2026-03-05
 

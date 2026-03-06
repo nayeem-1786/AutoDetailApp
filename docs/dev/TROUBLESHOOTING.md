@@ -256,4 +256,43 @@ curl -s -o /dev/null -w "%{http_code}" "$(grep NEXT_PUBLIC_SUPABASE_URL .env.loc
 
 ---
 
-*Last updated: 2026-02-26*
+## Star TSP100III Receipt Logo
+
+The Star TSP100III prints the logo from NV memory via futurePRNT. The logo is NOT embedded in the ESC/POS stream — futurePRNT intercepts the data and injects it.
+
+### Critical Rule: 0x1D Byte Control
+
+futurePRNT inserts the NV logo at every `0x1D` (GS) byte after `ESC @` init, EXCEPT `0x1D` at the very end of the stream (cut command). The receipt stream must contain exactly **two** `0x1D` bytes:
+
+1. `CMD_LOGO_TRIGGER` (`[0x1D, 0x42, 0x00]`) — immediately after `ESC @` init, triggers one logo
+2. `CMD_CUT` (`[0x1D, 0x56, 0x01]`) — at the very end, cuts paper without triggering logo
+
+All other commands must use `0x1B` (ESC) prefix only. No other `0x1D` bytes anywhere.
+
+### Cash Drawer
+
+Use BEL only (`0x07`). Never send `ESC @` for the drawer — it triggers a logo printout.
+
+### ESC ! Resets Bold
+
+`ESC !` (`CMD_DOUBLE_SIZE` / `CMD_NORMAL_SIZE`) is a combined print mode command that resets ALL text attributes including bold. `CMD_DOUBLE_SIZE` must come BEFORE `CMD_BOLD_ON`, not after.
+
+### Logo Trigger Must Not Affect Sizing
+
+The logo trigger must be a `0x1D` command that doesn't change character sizing. `GS B 0` (`[0x1D, 0x42, 0x00]`) disables reverse printing (already off by default) — a true no-op. Do NOT use `GS !` (`[0x1D, 0x21, ...]`) as the logo trigger — it's a character size select command that can interfere with `ESC !` text sizing and cause narrower print width.
+
+### Quick Diagnostic
+
+```bash
+# Verify only 2 definitions contain 0x1D in receipt-template.ts:
+grep -n "0x1D" src/app/pos/lib/receipt-template.ts
+# Expected: CMD_LOGO_TRIGGER and CMD_CUT definitions + their usages only
+```
+
+### Full Reference
+
+Complete troubleshooting history and futurePRNT configuration checklist: `docs/hardware/STAR_PRINTER_LOGO.md`
+
+---
+
+*Last updated: 2026-03-05*

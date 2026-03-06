@@ -621,7 +621,7 @@ const CMD_INIT = [ESC, 0x40]; // Initialize printer
 // Standard ESC/POS commands — NO 0x1D bytes (except logo trigger and cut)
 // futurePRNT inserts NV logo at every 0x1D after ESC @ init.
 // Only two 0x1D bytes allowed: CMD_LOGO_TRIGGER (logo) and CMD_CUT (cut).
-const CMD_LOGO_TRIGGER = [0x1D, 0x21, 0x00]; // GS ! normal — triggers futurePRNT logo insertion
+const CMD_LOGO_TRIGGER = [0x1D, 0x42, 0x00]; // GS B 0 — disable reverse (no-op), triggers futurePRNT logo
 const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];     // ESC a 0
 const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];   // ESC a 1
 const CMD_ALIGN_RIGHT = [ESC, 0x61, 0x02];    // ESC a 2
