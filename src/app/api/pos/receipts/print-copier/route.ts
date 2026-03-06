@@ -3,7 +3,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
+import type { ReceiptImages } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
+import QRCode from 'qrcode';
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,8 +51,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch dynamic receipt config
+    // Fetch dynamic receipt config + review URLs for QR shortcodes
     const { merged, print_server_url } = await fetchReceiptConfig(supabase);
+
+    const { data: reviewUrlRows } = await supabase
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['google_review_url', 'yelp_review_url']);
+
+    const reviewSettings: Record<string, string> = {};
+    for (const r of reviewUrlRows ?? []) {
+      if (typeof r.value === 'string') reviewSettings[r.key] = r.value;
+    }
+    const images: ReceiptImages = {};
+    if (reviewSettings.google_review_url) {
+      images.qrGoogle = await QRCode.toDataURL(reviewSettings.google_review_url, { width: 150, margin: 1 });
+    }
+    if (reviewSettings.yelp_review_url) {
+      images.qrYelp = await QRCode.toDataURL(reviewSettings.yelp_review_url, { width: 150, margin: 1 });
+    }
 
     if (!print_server_url) {
       return NextResponse.json(
@@ -77,7 +96,7 @@ export async function POST(request: NextRequest) {
       vehicle: tx.vehicle,
       items: tx.items ?? [],
       payments: tx.payments ?? [],
-    }, merged);
+    }, merged, images);
 
     // Send HTML to print server for PDF conversion + copier print (15s timeout)
     const controller = new AbortController();

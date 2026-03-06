@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
 import { generateReceiptLines, receiptToPlainText } from '@/app/pos/lib/receipt-template';
+import type { ReceiptContext } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 
 export async function POST(request: NextRequest) {
@@ -50,8 +51,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch dynamic receipt config
+    // Fetch dynamic receipt config + review URLs for QR shortcodes
     const { merged } = await fetchReceiptConfig(supabase);
+
+    const { data: reviewUrlRows } = await supabase
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['google_review_url', 'yelp_review_url']);
+
+    const reviewSettings: Record<string, string> = {};
+    for (const r of reviewUrlRows ?? []) {
+      if (typeof r.value === 'string') reviewSettings[r.key] = r.value;
+    }
+    const context: ReceiptContext = {
+      googleReviewUrl: reviewSettings.google_review_url || undefined,
+      yelpReviewUrl: reviewSettings.yelp_review_url || undefined,
+    };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tx = transaction as any;
@@ -71,7 +86,7 @@ export async function POST(request: NextRequest) {
       vehicle: tx.vehicle,
       items: tx.items ?? [],
       payments: tx.payments ?? [],
-    }, merged);
+    }, merged, context);
     const smsBody = receiptToPlainText(receiptLines, 40);
 
     const result = await sendSms(phone, smsBody);

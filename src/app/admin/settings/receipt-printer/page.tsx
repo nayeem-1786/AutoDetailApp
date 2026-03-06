@@ -22,6 +22,7 @@ const SHORTCODES = [
   '{customer_email}', '{customer_since}', '{staff_name}', '{staff_first_name}',
   '{receipt_number}', '{transaction_date}', '{total_amount}', '{vehicle}',
   '{business_name}', '{business_phone}', '{business_email}', '{business_website}',
+  '{barcode_receipt}', '{qr_google}', '{qr_yelp}',
 ] as const;
 
 interface ReceiptConfigState {

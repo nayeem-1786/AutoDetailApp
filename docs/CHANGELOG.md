@@ -4,6 +4,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Receipt barcode + QR code shortcodes for reviews — 2026-03-06
+
+Three new shortcodes for receipt custom text zones (Admin > Settings > Receipt Printer):
+
+- `{barcode_receipt}` — Code 128 barcode encoding the receipt number (e.g., "SD-001234"). Renders as scannable barcode on thermal receipt, monospace text reference in HTML/email.
+- `{qr_google}` — QR code linking to Google review page. Renders as scannable QR on thermal + inline QR image in HTML.
+- `{qr_yelp}` — QR code linking to Yelp review page. Same rendering as `{qr_google}`.
+
+All shortcodes silently skip rendering when the associated data is not configured (no review URL, no receipt number). Uses `google_review_url` and `yelp_review_url` from business_settings (already exist). ESC/POS barcode/QR commands contain `0x1D` bytes but testing confirmed futurePRNT handles them correctly (no extra logo triggers).
+
+New npm dependency: `qrcode` (for HTML receipt QR code image generation).
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — ReceiptLine types (barcode/qr), ReceiptContext/ReceiptImages interfaces, pushZoneLines helper, ESC/POS barcode+QR rendering, HTML barcode+QR rendering, plain text fallback
+- `src/app/api/pos/receipts/print-server/route.ts` — Fetch review URLs, pass ReceiptContext
+- `src/app/api/pos/receipts/print-copier/route.ts` — Fetch review URLs, pre-gen QR images, pass ReceiptImages
+- `src/app/api/pos/receipts/email/route.ts` — Same as copier
+- `src/app/api/pos/receipts/sms/route.ts` — Fetch review URLs, pass ReceiptContext
+- `src/app/admin/settings/receipt-printer/page.tsx` — Added 3 new shortcodes to SHORTCODES list
+
+---
+
 ## fix: Cash drawer command + check/split drawer kick — 2026-03-06
 
 **Cash drawer command:** Changed from BEL (`0x07`) to ESC p (`0x1B 0x70 0x00 0x19 0xFA`) without ESC @ init. BEL was being swallowed by futurePRNT ESC/POS Routing. ESC p without init opens the drawer without triggering a logo printout.

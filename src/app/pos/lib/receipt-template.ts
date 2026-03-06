@@ -44,7 +44,7 @@ export interface ReceiptTransaction {
 }
 
 export interface ReceiptLine {
-  type: 'header' | 'text' | 'bold' | 'divider' | 'columns' | 'spacer' | 'image';
+  type: 'header' | 'text' | 'bold' | 'divider' | 'columns' | 'spacer' | 'image' | 'barcode' | 'qr';
   text?: string;
   left?: string;
   center?: string;
@@ -52,6 +52,19 @@ export interface ReceiptLine {
   url?: string;
   width?: number;
   alignment?: 'left' | 'center' | 'right';
+  barcodeData?: string;    // Data to encode in barcode
+  qrData?: string;         // URL to encode in QR code
+  qrLabel?: string;        // Label text below QR code (e.g., "Google Reviews")
+}
+
+export interface ReceiptContext {
+  googleReviewUrl?: string;
+  yelpReviewUrl?: string;
+}
+
+export interface ReceiptImages {
+  qrGoogle?: string;  // data:image/png;base64,...
+  qrYelp?: string;    // data:image/png;base64,...
 }
 
 // Fallback when no config is passed (callers should always pass DB config)
@@ -165,12 +178,43 @@ function getZonesForPlacement(
 }
 
 /**
+ * Push zone text lines, detecting barcode/QR shortcodes and converting to typed ReceiptLines.
+ */
+function pushZoneLines(
+  lines: ReceiptLine[],
+  zoneText: string,
+  tx: ReceiptTransaction,
+  reviewUrls: { google?: string; yelp?: string }
+) {
+  const parts = zoneText.split('\n');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed === '{barcode_receipt}') {
+      if (tx.receipt_number) {
+        lines.push({ type: 'barcode', barcodeData: tx.receipt_number, alignment: 'center' });
+      }
+    } else if (trimmed === '{qr_google}') {
+      if (reviewUrls.google) {
+        lines.push({ type: 'qr', qrData: reviewUrls.google, qrLabel: 'Google Reviews', alignment: 'center' });
+      }
+    } else if (trimmed === '{qr_yelp}') {
+      if (reviewUrls.yelp) {
+        lines.push({ type: 'qr', qrData: reviewUrls.yelp, qrLabel: 'Yelp Reviews', alignment: 'center' });
+      }
+    } else if (trimmed) {
+      lines.push({ type: 'text', text: trimmed });
+    }
+  }
+}
+
+/**
  * Generate a structured receipt from transaction data.
  * This can be used by Star WebPRNT or formatted as plain text.
  */
-export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedReceiptConfig): ReceiptLine[] {
+export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedReceiptConfig, context?: ReceiptContext): ReceiptLine[] {
   const c = config ?? FALLBACK_CONFIG;
   const lines: ReceiptLine[] = [];
+  const reviewUrls = { google: context?.googleReviewUrl, yelp: context?.yelpReviewUrl };
 
   // Logo above name
   if (c.logo_url && c.logo_placement === 'above_name') {
@@ -196,7 +240,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   const belowHeaderZones = getZonesForPlacement(c, tx, 'below_header');
   for (let i = 0; i < belowHeaderZones.length; i++) {
     if (i > 0) lines.push({ type: 'divider' });
-    lines.push({ type: 'text', text: belowHeaderZones[i] });
+    pushZoneLines(lines, belowHeaderZones[i], tx, reviewUrls);
   }
   if (belowHeaderZones.length > 0) {
     lines.push({ type: 'divider' });
@@ -357,7 +401,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   for (let i = 0; i < aboveFooterZones.length; i++) {
     if (i === 0) lines.push({ type: 'spacer' });
     else lines.push({ type: 'divider' });
-    lines.push({ type: 'text', text: aboveFooterZones[i] });
+    pushZoneLines(lines, aboveFooterZones[i], tx, reviewUrls);
   }
 
   // Custom text zones: below_footer
@@ -366,7 +410,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     lines.push({ type: 'spacer' });
     for (let i = 0; i < belowFooterZones.length; i++) {
       if (i > 0) lines.push({ type: 'divider' });
-      lines.push({ type: 'text', text: belowFooterZones[i] });
+      pushZoneLines(lines, belowFooterZones[i], tx, reviewUrls);
     }
   }
 
@@ -412,6 +456,14 @@ export function receiptToPlainText(
           return '';
         case 'image':
           return ''; // skip images in plain text
+        case 'barcode':
+          return line.barcodeData ? centerText(`[${line.barcodeData}]`, width) : '';
+        case 'qr':
+          if (line.qrData) {
+            const label = line.qrLabel ? `${line.qrLabel}: ` : '';
+            return centerText(`${label}${line.qrData}`, width);
+          }
+          return '';
         default:
           return '';
       }
@@ -433,7 +485,7 @@ function esc(s: string): string {
  * Uses all inline styles for email client compatibility.
  * Also used for browser print preview and dialog preview.
  */
-export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedReceiptConfig): string {
+export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedReceiptConfig, images?: ReceiptImages): string {
   const c = config ?? FALLBACK_CONFIG;
   const date = new Date(tx.transaction_date).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -505,7 +557,47 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 
   // Build zone HTML for each placement
   const zoneDivider = '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">';
-  const zoneDiv = (t: string) => `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(t)}</div>`;
+  const zoneLineToHtml = (line: string): string => {
+    const trimmed = line.trim();
+    if (trimmed === '{barcode_receipt}' && tx.receipt_number) {
+      return `<div style="text-align:center;margin:12px 0;">
+        <div style="font-family:monospace;font-size:16px;letter-spacing:2px;">${esc(tx.receipt_number)}</div>
+        <div style="font-size:11px;color:#666;">Scan barcode on printed receipt</div>
+      </div>`;
+    }
+    if (trimmed === '{qr_google}' && images?.qrGoogle) {
+      return `<div style="text-align:center;margin:12px 0;">
+        <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Google Reviews</div>
+        <img src="${images.qrGoogle}" alt="Google Reviews QR" style="width:150px;height:150px;" />
+      </div>`;
+    }
+    if (trimmed === '{qr_yelp}' && images?.qrYelp) {
+      return `<div style="text-align:center;margin:12px 0;">
+        <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Yelp Reviews</div>
+        <img src="${images.qrYelp}" alt="Yelp Reviews QR" style="width:150px;height:150px;" />
+      </div>`;
+    }
+    // Skip shortcodes that have no data configured
+    if (trimmed === '{barcode_receipt}' || trimmed === '{qr_google}' || trimmed === '{qr_yelp}') {
+      return '';
+    }
+    return '';
+  };
+  const zoneDiv = (t: string): string => {
+    // Check if zone text contains barcode/QR shortcodes
+    const zoneLines = t.split('\n');
+    const htmlParts: string[] = [];
+    for (const line of zoneLines) {
+      const trimmed = line.trim();
+      if (trimmed === '{barcode_receipt}' || trimmed === '{qr_google}' || trimmed === '{qr_yelp}') {
+        const rendered = zoneLineToHtml(trimmed);
+        if (rendered) htmlParts.push(rendered);
+      } else if (trimmed) {
+        htmlParts.push(`<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(trimmed)}</div>`);
+      }
+    }
+    return htmlParts.join('');
+  };
 
   const belowHeaderZones = getZonesForPlacement(c, tx, 'below_header');
   const belowHeaderHtml = belowHeaderZones.length > 0
@@ -777,6 +869,66 @@ export function receiptToEscPos(
       case 'image':
         // Logo is stored in printer NV memory via Star futurePRNT — no ESC/POS output needed
         break;
+
+      case 'barcode': {
+        if (line.barcodeData) {
+          // Center align
+          parts.push(...CMD_ALIGN_CENTER);
+          // Set barcode height: GS h n (n = 0x50 = 80 dots)
+          parts.push(0x1D, 0x68, 0x50);
+          // Set barcode width: GS w n (n = 2 = module width)
+          parts.push(0x1D, 0x77, 0x02);
+          // Set HRI position: GS H n (2 = below barcode)
+          parts.push(0x1D, 0x48, 0x02);
+          // Print Code 128: GS k m n d1...dn
+          // m = 73 (0x49) for Code 128, n = data length
+          // Prefix with {B for Code 128 subset B (full ASCII)
+          const barcodeStr = '{B' + line.barcodeData;
+          const barcodeLen = barcodeStr.length;
+          parts.push(0x1D, 0x6B, 0x49, barcodeLen);
+          parts.push(...textToBytes(barcodeStr));
+          parts.push(LF);
+        }
+        break;
+      }
+
+      case 'qr': {
+        if (line.qrData) {
+          // Center align
+          parts.push(...CMD_ALIGN_CENTER);
+
+          // Print label above QR code if provided
+          if (line.qrLabel) {
+            parts.push(...textToBytes(line.qrLabel));
+            parts.push(LF);
+          }
+
+          const qrBytes = textToBytes(line.qrData);
+          const qrDataLen = qrBytes.length;
+
+          // QR Code: Function 165 — Select model
+          parts.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+
+          // QR Code: Function 167 — Set module size (4 dots)
+          parts.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x04);
+
+          // QR Code: Function 169 — Set error correction level (M = 49)
+          parts.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31);
+
+          // QR Code: Function 180 — Store data
+          const storeLen = qrDataLen + 3;
+          const pL = storeLen & 0xFF;
+          const pH = (storeLen >> 8) & 0xFF;
+          parts.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
+          parts.push(...qrBytes);
+
+          // QR Code: Function 181 — Print
+          parts.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
+
+          parts.push(LF);
+        }
+        break;
+      }
     }
   }
 
