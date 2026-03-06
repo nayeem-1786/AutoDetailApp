@@ -518,6 +518,10 @@ export default function ReceiptPrinterPage() {
           <p className="mb-4 text-sm text-gray-500">
             Configure receipt branding. Leave blank to use your Business Profile values.
           </p>
+          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <strong>Note:</strong> This logo appears on email and copier receipts only.
+            For the thermal receipt printer logo, use the Star futurePRNT Configuration Utility on the print server PC.
+          </div>
 
           <div className="grid grid-cols-8 gap-6">
             {/* Left — Override text inputs */}
@@ -626,7 +630,7 @@ export default function ReceiptPrinterPage() {
               )}
               <p className="mt-3 text-xs text-muted-foreground">
                 Upload a high-contrast PNG or JPG (max 2MB).<br />
-                Dark logos on white background work best for thermal printing.
+                Used for email and copier receipts.
               </p>
             </div>
 

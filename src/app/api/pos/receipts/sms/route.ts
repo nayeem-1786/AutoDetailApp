@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         *,
         customer:customers(first_name, last_name, phone, email, customer_type, created_at),
         employee:employees(first_name, last_name),
-        vehicle:vehicles(year, make, model, color),
+        vehicle:vehicles(vehicle_type, year, make, model, color),
         items:transaction_items(*),
         payments(*)
       `)

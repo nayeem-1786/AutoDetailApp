@@ -38,7 +38,7 @@ export interface ReceiptTransaction {
     created_at?: string | null;
   } | null;
   employee?: { first_name: string; last_name: string } | null;
-  vehicle?: { year?: number | null; make?: string | null; model?: string | null; color?: string | null } | null;
+  vehicle?: { vehicle_type?: string | null; year?: number | null; make?: string | null; model?: string | null; color?: string | null } | null;
   items: ReceiptItem[];
   payments: ReceiptPayment[];
 }
@@ -71,11 +71,28 @@ const FALLBACK_CONFIG: MergedReceiptConfig = {
 };
 
 /**
- * Build a vehicle description string: "Year Color Make Model"
+ * Map vehicle_type enum to a human-readable label.
+ */
+function getVehicleTypeLabel(vehicleType: string | null | undefined): string {
+  switch (vehicleType) {
+    case 'motorcycle': return 'Motorcycle';
+    case 'rv': return 'RV';
+    case 'boat': return 'Boat';
+    case 'aircraft': return 'Aircraft';
+    case 'standard':
+    default: return 'Vehicle';
+  }
+}
+
+/**
+ * Build a vehicle description string: "Type | Year Color Make Model"
  */
 function buildVehicleDesc(v: ReceiptTransaction['vehicle']): string {
   if (!v) return '';
-  return [v.year, v.color, v.make, v.model].filter(Boolean).join(' ');
+  const typeLabel = getVehicleTypeLabel(v.vehicle_type);
+  const details = [v.year, v.color, v.make, v.model].filter(Boolean).join(' ');
+  if (!details) return typeLabel;
+  return `${typeLabel} | ${details}`;
 }
 
 /**
@@ -219,10 +236,17 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     });
   }
 
-  lines.push({ type: 'divider' });
-
-  // Build vehicle description for line items
+  // Vehicle description — one line under customer info
   const vehicleDesc = buildVehicleDesc(tx.vehicle);
+  if (vehicleDesc) {
+    lines.push({
+      type: 'columns',
+      left: vehicleDesc,
+      right: '',
+    });
+  }
+
+  lines.push({ type: 'divider' });
 
   // Items layout:
   //   qty > 1: line 1 = item name (full width, wraps if long)
@@ -247,10 +271,11 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       });
     }
 
-    // Vehicle description under service line items
-    if (item.item_type === 'service' && vehicleDesc) {
-      lines.push({ type: 'text', text: `   ${vehicleDesc}` });
-    }
+    // TODO: Add-on savings sub-text
+    // Needs: (1) is_addon flag on transaction_items or lookup via service_addon_suggestions
+    // (2) original_price (regular price before combo discount)
+    // (3) combo_price from service_addon_suggestions
+    // Format: "  Add-on: Reg $X.XX, You saved $Y.YY!"
   }
 
   lines.push({ type: 'divider' });
@@ -418,7 +443,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     minute: '2-digit',
   });
 
-  // Build vehicle description for line items
+  // Build vehicle description for customer info section
   const vehicleDesc = buildVehicleDesc(tx.vehicle);
 
   const itemRows = tx.items
@@ -439,13 +464,6 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
         <td style="padding:4px 0;font-size:14px;">${esc(item.item_name)}</td>
         <td style="padding:4px 0;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
         <td style="padding:4px 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
-      </tr>`;
-      }
-
-      // Vehicle description under service line items
-      if (item.item_type === 'service' && vehicleDesc) {
-        rows += `<tr>
-        <td colspan="3" style="padding:0 0 4px 12px;font-size:13px;color:#666;">${esc(vehicleDesc)}</td>
       </tr>`;
       }
 
@@ -559,6 +577,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     ${tx.customer && (tx.customer.email || customerSinceStr) ? `<tr>
       <td>${tx.customer.email ? esc(tx.customer.email) : ''}</td>
       <td style="text-align:right;">${customerSinceStr ? `Customer Since: ${esc(customerSinceStr)}` : ''}</td>
+    </tr>` : ''}
+    ${vehicleDesc ? `<tr>
+      <td colspan="2" style="font-size:13px;color:#444;">${esc(vehicleDesc)}</td>
     </tr>` : ''}
   </table>
 

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         `id, receipt_number, status, subtotal, tax_amount, tip_amount,
          discount_amount, total_amount, payment_method, loyalty_points_earned,
          loyalty_points_redeemed, loyalty_discount, transaction_date, created_at,
-         vehicles(year, make, model, color)`
+         vehicles(vehicle_type, year, make, model, color)`
       )
       .eq('customer_id', customer.id)
       .in('status', ['completed', 'refunded'])

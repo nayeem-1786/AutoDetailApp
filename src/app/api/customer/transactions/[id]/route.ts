@@ -44,7 +44,7 @@ export async function GET(
          payments(
            id, method, amount, tip_amount, card_brand, card_last_four
          ),
-         vehicles(year, make, model, color),
+         vehicles(vehicle_type, year, make, model, color),
          employee:employees(first_name, last_name)`
       )
       .eq('id', id)

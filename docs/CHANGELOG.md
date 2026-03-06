@@ -4,6 +4,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Vehicle type line under customer info on receipts — 2026-03-06
+
+Receipts now show a dedicated vehicle line in the customer info section (format: "Vehicle | 2016 Silver Honda Accord") instead of repeating it under every service line item.
+
+- **`getVehicleTypeLabel()`**: Maps `vehicle_type` enum → display label (standard→Vehicle, motorcycle→Motorcycle, rv→RV, boat→Boat, aircraft→Aircraft)
+- **`buildVehicleDesc()`**: New format `Type | Year Color Make Model`
+- **Vehicle line**: Single line in customer info section (both thermal + HTML receipts), removed per-item vehicle descriptions
+- **Queries**: Added `vehicle_type` to all 8 receipt/transaction vehicle queries (5 POS receipt routes, POS transaction detail, 2 customer transaction routes)
+- **Add-on savings**: TODO comment added — needs `is_addon`/`original_price` on `transaction_items` or lookup via `service_addon_suggestions`
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — interface, helpers, generateReceiptLines, generateReceiptHtml
+- `src/app/api/pos/receipts/{email,print,print-server,print-copier,sms}/route.ts` — vehicle query
+- `src/app/api/pos/transactions/[id]/route.ts` — vehicle query
+- `src/app/api/customer/transactions/{route,[id]/route}.ts` — vehicle query
+
+---
+
+## docs: Clarify receipt logo upload scope — 2026-03-06
+
+Added info callout to admin Receipt Printer settings clarifying that the uploaded logo is for email and copier receipts only. Thermal printer logo is managed via Star futurePRNT on the print server PC. Updated upload hint text to remove misleading "thermal printing" reference.
+
+Files changed:
+- `src/app/admin/settings/receipt-printer/page.tsx` — info callout + updated hint text
+
+---
+
 ## fix: Bold receipt text globally + logo/header spacing — 2026-03-05
 
 Receipt text was too light/thin. Fixed by enabling bold globally and adding spacing:
