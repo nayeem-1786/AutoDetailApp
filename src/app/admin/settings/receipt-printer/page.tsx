@@ -13,9 +13,9 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
-import type { ReceiptImages } from '@/app/pos/lib/receipt-template';
+import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X, CheckCircle2, XCircle, Loader2, Receipt } from 'lucide-react';
+import { generateReceiptHtml, generateReceiptLines, receiptToEscPos } from '@/app/pos/lib/receipt-template';
+import type { ReceiptImages, ReceiptContext } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
 import QRCode from 'qrcode';
 
@@ -155,6 +155,7 @@ export default function ReceiptPrinterPage() {
     business_website: '',
   });
   const [reviewImages, setReviewImages] = useState<ReceiptImages>({});
+  const [reviewContext, setReviewContext] = useState<ReceiptContext>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zoneTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
@@ -257,7 +258,7 @@ export default function ReceiptPrinterPage() {
         custom_text_zones: zones,
       });
 
-      // Pre-generate QR images for preview
+      // Pre-generate QR images for preview + store URLs for ESC/POS context
       const imgs: ReceiptImages = {};
       const googleUrl = typeof settings.google_review_url === 'string' ? settings.google_review_url : '';
       const yelpUrl = typeof settings.yelp_review_url === 'string' ? settings.yelp_review_url : '';
@@ -268,6 +269,10 @@ export default function ReceiptPrinterPage() {
         try { imgs.qrYelp = await QRCode.toDataURL(yelpUrl, { width: 150, margin: 1 }); } catch {}
       }
       setReviewImages(imgs);
+      setReviewContext({
+        googleReviewUrl: googleUrl || undefined,
+        yelpReviewUrl: yelpUrl || undefined,
+      });
 
       setLoading(false);
     }
@@ -416,12 +421,9 @@ export default function ReceiptPrinterPage() {
     updateConfig('logo_url', '');
   }
 
-  // --- Preview ---
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState('');
-
-  function handlePreview() {
-    const merged: MergedReceiptConfig = {
+  // --- Shared sample data for Preview + Test Print ---
+  function buildMergedConfig(): MergedReceiptConfig {
+    return {
       name: config.override_name || defaults.business_name || 'Your Business Name',
       phone: config.override_phone || defaults.business_phone || '(310) 555-1234',
       address: config.override_address || defaults.business_address || '123 Main St, City, ST 00000',
@@ -435,37 +437,80 @@ export default function ReceiptPrinterPage() {
       custom_text_placement: config.custom_text_placement,
       custom_text_zones: config.custom_text_zones,
     };
+  }
 
-    const sampleTx = {
-      receipt_number: '10042',
-      transaction_date: new Date().toISOString(),
-      subtotal: 149.99,
-      tax_amount: 7.69,
-      discount_amount: 0,
-      tip_amount: 20.00,
-      total_amount: 177.68,
-      customer: {
-        first_name: 'Jane',
-        last_name: 'Smith',
-        phone: '(310) 555-0100',
-        email: 'jane@example.com',
-        customer_type: 'enthusiast',
-        created_at: '2023-06-15T00:00:00Z',
-      },
-      employee: { first_name: 'Joselyn', last_name: 'Reyes' },
-      vehicle: { year: 2027, make: 'Honda', model: 'Accord', color: 'Silver' },
-      items: [
-        { item_name: 'Full Detail — Sedan', quantity: 1, unit_price: 129.99, total_price: 129.99, tax_amount: 0, item_type: 'service' },
-        { item_name: 'Air Freshener', quantity: 2, unit_price: 9.99, total_price: 19.99, tax_amount: 2.05, item_type: 'product' },
-      ] as { item_name: string; quantity: number; unit_price: number; total_price: number; tax_amount: number; item_type?: string }[],
-      payments: [
-        { method: 'card', amount: 177.68, tip_amount: 20.00, card_brand: 'Visa', card_last_four: '4242' },
-      ] as { method: string; amount: number; tip_amount: number; card_brand?: string | null; card_last_four?: string | null }[],
-    };
+  const sampleTx = {
+    receipt_number: '10042',
+    transaction_date: new Date().toISOString(),
+    subtotal: 149.99,
+    tax_amount: 7.69,
+    discount_amount: 0,
+    tip_amount: 20.00,
+    total_amount: 177.68,
+    customer: {
+      first_name: 'Jane',
+      last_name: 'Smith',
+      phone: '(310) 555-0100',
+      email: 'jane@example.com',
+      customer_type: 'enthusiast',
+      created_at: '2023-06-15T00:00:00Z',
+    },
+    employee: { first_name: 'Joselyn', last_name: 'Reyes' },
+    vehicle: { year: 2027, make: 'Honda', model: 'Accord', color: 'Silver' },
+    items: [
+      { item_name: 'Full Detail — Sedan', quantity: 1, unit_price: 129.99, total_price: 129.99, tax_amount: 0, item_type: 'service' },
+      { item_name: 'Air Freshener', quantity: 2, unit_price: 9.99, total_price: 19.99, tax_amount: 2.05, item_type: 'product' },
+    ] as { item_name: string; quantity: number; unit_price: number; total_price: number; tax_amount: number; item_type?: string }[],
+    payments: [
+      { method: 'card', amount: 177.68, tip_amount: 20.00, card_brand: 'Visa', card_last_four: '4242' },
+    ] as { method: string; amount: number; tip_amount: number; card_brand?: string | null; card_last_four?: string | null }[],
+  };
 
-    const html = generateReceiptHtml(sampleTx, merged, reviewImages);
+  // --- Preview ---
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
+
+  function handlePreview() {
+    const html = generateReceiptHtml(sampleTx, buildMergedConfig(), reviewImages);
     setPreviewHtml(html);
     setPreviewOpen(true);
+  }
+
+  // --- Test Print (prints the preview receipt on thermal printer) ---
+  const [testPrinting, setTestPrinting] = useState(false);
+
+  async function handleTestPrint() {
+    if (!config.print_server_url) {
+      toast.error('Print Server URL is not configured');
+      return;
+    }
+    setTestPrinting(true);
+
+    try {
+      const receiptLines = generateReceiptLines(sampleTx, buildMergedConfig(), reviewContext);
+      const escPosData = receiptToEscPos(receiptLines, 48);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      const res = await fetch(`${config.print_server_url}/print`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: escPosData.buffer as ArrayBuffer,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        toast.success('Preview receipt sent to printer');
+      } else {
+        toast.error('Test print failed');
+      }
+    } catch {
+      toast.error('Print server unreachable — check URL and that server is running');
+    } finally {
+      setTestPrinting(false);
+    }
   }
 
   if (loading) {
@@ -508,7 +553,6 @@ export default function ReceiptPrinterPage() {
           {config.print_server_url && (
             <div className="flex gap-2">
               <PrintServerTestButton url={config.print_server_url} type="connection" />
-              <PrintServerTestButton url={config.print_server_url} type="print" />
             </div>
           )}
 
@@ -786,6 +830,14 @@ export default function ReceiptPrinterPage() {
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
+        <Button variant="outline" onClick={handleTestPrint} disabled={testPrinting || !config.print_server_url}>
+          {testPrinting ? (
+            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+          ) : (
+            <Receipt className="mr-1.5 h-4 w-4" />
+          )}
+          {testPrinting ? 'Printing...' : 'Test Print'}
+        </Button>
         <Button variant="outline" onClick={handlePreview}>
           <Eye className="mr-1.5 h-4 w-4" />
           Preview Receipt
