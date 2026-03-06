@@ -64,7 +64,18 @@ export async function GET(
     // Fetch receipt config so callers can render branded receipts
     const { merged: receipt_config } = await fetchReceiptConfig(supabase);
 
-    return NextResponse.json({ data: transaction, receipt_config });
+    // Fetch review URLs for QR shortcode rendering in previews
+    const { data: reviewUrlRows } = await supabase
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['google_review_url', 'yelp_review_url']);
+
+    const review_urls: Record<string, string> = {};
+    for (const r of reviewUrlRows ?? []) {
+      if (typeof r.value === 'string') review_urls[r.key] = r.value;
+    }
+
+    return NextResponse.json({ data: transaction, receipt_config, review_urls });
   } catch (err) {
     console.error('Transaction GET error:', err);
     return NextResponse.json(

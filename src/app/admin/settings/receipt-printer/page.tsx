@@ -15,7 +15,9 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogClose } from '@
 import { toast } from 'sonner';
 import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
+import type { ReceiptImages } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
+import QRCode from 'qrcode';
 
 const SHORTCODES = [
   '{customer_name}', '{customer_first_name}', '{customer_type}', '{customer_phone}',
@@ -152,6 +154,7 @@ export default function ReceiptPrinterPage() {
     business_email: '',
     business_website: '',
   });
+  const [reviewImages, setReviewImages] = useState<ReceiptImages>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zoneTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
@@ -170,6 +173,8 @@ export default function ReceiptPrinterPage() {
           'business_email',
           'business_website',
           'star_printer_ip',
+          'google_review_url',
+          'yelp_review_url',
         ]);
 
       if (error) {
@@ -251,6 +256,18 @@ export default function ReceiptPrinterPage() {
         custom_text_placement: (rc.custom_text_placement as ReceiptConfigState['custom_text_placement']) || 'below_footer',
         custom_text_zones: zones,
       });
+
+      // Pre-generate QR images for preview
+      const imgs: ReceiptImages = {};
+      const googleUrl = typeof settings.google_review_url === 'string' ? settings.google_review_url : '';
+      const yelpUrl = typeof settings.yelp_review_url === 'string' ? settings.yelp_review_url : '';
+      if (googleUrl) {
+        try { imgs.qrGoogle = await QRCode.toDataURL(googleUrl, { width: 150, margin: 1 }); } catch {}
+      }
+      if (yelpUrl) {
+        try { imgs.qrYelp = await QRCode.toDataURL(yelpUrl, { width: 150, margin: 1 }); } catch {}
+      }
+      setReviewImages(imgs);
 
       setLoading(false);
     }
@@ -446,7 +463,7 @@ export default function ReceiptPrinterPage() {
       ] as { method: string; amount: number; tip_amount: number; card_brand?: string | null; card_last_four?: string | null }[],
     };
 
-    const html = generateReceiptHtml(sampleTx, merged);
+    const html = generateReceiptHtml(sampleTx, merged, reviewImages);
     setPreviewHtml(html);
     setPreviewOpen(true);
   }

@@ -1,5 +1,6 @@
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
 import { formatPhone } from '@/lib/utils/format';
+import QRCode from 'qrcode';
 
 interface ReceiptItem {
   item_name: string;
@@ -177,8 +178,12 @@ function getZonesForPlacement(
   return [];
 }
 
+/** Regex matching any barcode/QR shortcode inline */
+const SHORTCODE_RE = /\{barcode_receipt\}|\{qr_google\}|\{qr_yelp\}/g;
+
 /**
- * Push zone text lines, detecting barcode/QR shortcodes and converting to typed ReceiptLines.
+ * Push zone text lines, detecting barcode/QR shortcodes inline and converting to typed ReceiptLines.
+ * Supports shortcodes mixed with text on the same line (e.g., "Leave a review! {qr_google}").
  */
 function pushZoneLines(
   lines: ReceiptLine[],
@@ -189,21 +194,53 @@ function pushZoneLines(
   const parts = zoneText.split('\n');
   for (const part of parts) {
     const trimmed = part.trim();
-    if (trimmed === '{barcode_receipt}') {
-      if (tx.receipt_number) {
-        lines.push({ type: 'barcode', barcodeData: tx.receipt_number, alignment: 'center' });
-      }
-    } else if (trimmed === '{qr_google}') {
-      if (reviewUrls.google) {
-        lines.push({ type: 'qr', qrData: reviewUrls.google, qrLabel: 'Google Reviews', alignment: 'center' });
-      }
-    } else if (trimmed === '{qr_yelp}') {
-      if (reviewUrls.yelp) {
-        lines.push({ type: 'qr', qrData: reviewUrls.yelp, qrLabel: 'Yelp Reviews', alignment: 'center' });
-      }
-    } else if (trimmed) {
+    if (!trimmed) continue;
+
+    // If no shortcodes on this line, emit as plain text
+    if (!SHORTCODE_RE.test(trimmed)) {
       lines.push({ type: 'text', text: trimmed });
+      continue;
     }
+
+    // Scan for shortcodes, emitting text segments between them
+    SHORTCODE_RE.lastIndex = 0;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = SHORTCODE_RE.exec(trimmed)) !== null) {
+      // Text before this shortcode
+      const before = trimmed.slice(lastIndex, match.index).trim();
+      if (before) lines.push({ type: 'text', text: before });
+
+      // Emit the shortcode element
+      switch (match[0]) {
+        case '{barcode_receipt}':
+          if (tx.receipt_number) {
+            lines.push({ type: 'barcode', barcodeData: tx.receipt_number, alignment: 'center' });
+          } else {
+            lines.push({ type: 'text', text: '[Receipt Barcode: no receipt number]' });
+          }
+          break;
+        case '{qr_google}':
+          if (reviewUrls.google) {
+            lines.push({ type: 'qr', qrData: reviewUrls.google, qrLabel: 'Google Reviews', alignment: 'center' });
+          } else {
+            lines.push({ type: 'text', text: '[Google Reviews QR: URL not configured]' });
+          }
+          break;
+        case '{qr_yelp}':
+          if (reviewUrls.yelp) {
+            lines.push({ type: 'qr', qrData: reviewUrls.yelp, qrLabel: 'Yelp Reviews', alignment: 'center' });
+          } else {
+            lines.push({ type: 'text', text: '[Yelp Reviews QR: URL not configured]' });
+          }
+          break;
+      }
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Text after the last shortcode
+    const after = trimmed.slice(lastIndex).trim();
+    if (after) lines.push({ type: 'text', text: after });
   }
 }
 
@@ -557,43 +594,65 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 
   // Build zone HTML for each placement
   const zoneDivider = '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">';
-  const zoneLineToHtml = (line: string): string => {
-    const trimmed = line.trim();
-    if (trimmed === '{barcode_receipt}' && tx.receipt_number) {
-      return `<div style="text-align:center;margin:12px 0;">
-        <div style="font-family:monospace;font-size:16px;letter-spacing:2px;">${esc(tx.receipt_number)}</div>
-        <div style="font-size:11px;color:#666;">Scan barcode on printed receipt</div>
-      </div>`;
+  const shortcodeNote = (msg: string) =>
+    `<div style="text-align:center;margin:8px 0;padding:6px;border:1px dashed #ccc;color:#999;font-size:11px;">${esc(msg)}</div>`;
+
+  const renderShortcodeHtml = (code: string): string => {
+    switch (code) {
+      case '{barcode_receipt}':
+        return tx.receipt_number
+          ? `<div style="text-align:center;margin:12px 0;">
+              <div style="font-family:monospace;font-size:16px;letter-spacing:2px;">${esc(tx.receipt_number)}</div>
+              <div style="font-size:11px;color:#666;">Scan barcode on printed receipt</div>
+            </div>`
+          : shortcodeNote('[Receipt Barcode: no receipt number]');
+      case '{qr_google}':
+        return images?.qrGoogle
+          ? `<div style="text-align:center;margin:12px 0;">
+              <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Google Reviews</div>
+              <img src="${images.qrGoogle}" alt="Google Reviews QR" style="width:150px;height:150px;" />
+            </div>`
+          : shortcodeNote('[Google Reviews QR: URL not configured]');
+      case '{qr_yelp}':
+        return images?.qrYelp
+          ? `<div style="text-align:center;margin:12px 0;">
+              <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Yelp Reviews</div>
+              <img src="${images.qrYelp}" alt="Yelp Reviews QR" style="width:150px;height:150px;" />
+            </div>`
+          : shortcodeNote('[Yelp Reviews QR: URL not configured]');
+      default:
+        return '';
     }
-    if (trimmed === '{qr_google}' && images?.qrGoogle) {
-      return `<div style="text-align:center;margin:12px 0;">
-        <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Google Reviews</div>
-        <img src="${images.qrGoogle}" alt="Google Reviews QR" style="width:150px;height:150px;" />
-      </div>`;
-    }
-    if (trimmed === '{qr_yelp}' && images?.qrYelp) {
-      return `<div style="text-align:center;margin:12px 0;">
-        <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Yelp Reviews</div>
-        <img src="${images.qrYelp}" alt="Yelp Reviews QR" style="width:150px;height:150px;" />
-      </div>`;
-    }
-    // Skip shortcodes that have no data configured
-    if (trimmed === '{barcode_receipt}' || trimmed === '{qr_google}' || trimmed === '{qr_yelp}') {
-      return '';
-    }
-    return '';
   };
+
   const zoneDiv = (t: string): string => {
-    // Check if zone text contains barcode/QR shortcodes
     const zoneLines = t.split('\n');
     const htmlParts: string[] = [];
     for (const line of zoneLines) {
       const trimmed = line.trim();
-      if (trimmed === '{barcode_receipt}' || trimmed === '{qr_google}' || trimmed === '{qr_yelp}') {
-        const rendered = zoneLineToHtml(trimmed);
-        if (rendered) htmlParts.push(rendered);
-      } else if (trimmed) {
+      if (!trimmed) continue;
+
+      // No shortcodes on this line — plain text
+      if (!SHORTCODE_RE.test(trimmed)) {
         htmlParts.push(`<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(trimmed)}</div>`);
+        continue;
+      }
+
+      // Scan for inline shortcodes, emitting text and shortcode HTML
+      SHORTCODE_RE.lastIndex = 0;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = SHORTCODE_RE.exec(trimmed)) !== null) {
+        const before = trimmed.slice(lastIndex, match.index).trim();
+        if (before) {
+          htmlParts.push(`<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(before)}</div>`);
+        }
+        htmlParts.push(renderShortcodeHtml(match[0]));
+        lastIndex = match.index + match[0].length;
+      }
+      const after = trimmed.slice(lastIndex).trim();
+      if (after) {
+        htmlParts.push(`<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(after)}</div>`);
       }
     }
     return htmlParts.join('');
@@ -894,6 +953,8 @@ export function receiptToEscPos(
 
       case 'qr': {
         if (line.qrData) {
+          console.log('[ESC/POS] Rendering QR:', line.qrData?.substring(0, 50));
+
           // Center align
           parts.push(...CMD_ALIGN_CENTER);
 
@@ -903,27 +964,50 @@ export function receiptToEscPos(
             parts.push(LF);
           }
 
-          const qrBytes = textToBytes(line.qrData);
-          const qrDataLen = qrBytes.length;
+          // Render QR as raster bitmap — Star TSP100III doesn't support
+          // GS ( k 2D code commands in ESC/POS emulation mode.
+          // Instead, generate the QR matrix and print via GS v 0 (raster bit image).
+          try {
+            const qr = QRCode.create(line.qrData, { errorCorrectionLevel: 'M' });
+            const size = qr.modules.size;
+            const moduleData = qr.modules.data;
 
-          // QR Code: Function 165 — Select model
-          parts.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+            const SCALE = 4;  // each QR module = 4x4 dots
+            const QUIET = 4;  // quiet zone in modules
+            const totalModules = size + 2 * QUIET;
+            const imgWidth = totalModules * SCALE;
+            const imgHeight = totalModules * SCALE;
+            const bytesPerRow = Math.ceil(imgWidth / 8);
 
-          // QR Code: Function 167 — Set module size (4 dots)
-          parts.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x04);
+            // GS v 0 m xL xH yL yH d1...dk — Print raster bit image
+            parts.push(0x1D, 0x76, 0x30, 0x00); // m=0 (normal)
+            parts.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF);
+            parts.push(imgHeight & 0xFF, (imgHeight >> 8) & 0xFF);
 
-          // QR Code: Function 169 — Set error correction level (M = 49)
-          parts.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31);
-
-          // QR Code: Function 180 — Store data
-          const storeLen = qrDataLen + 3;
-          const pL = storeLen & 0xFF;
-          const pH = (storeLen >> 8) & 0xFF;
-          parts.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
-          parts.push(...qrBytes);
-
-          // QR Code: Function 181 — Print
-          parts.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
+            for (let y = 0; y < imgHeight; y++) {
+              const moduleRow = Math.floor(y / SCALE) - QUIET;
+              for (let byteIdx = 0; byteIdx < bytesPerRow; byteIdx++) {
+                let byte = 0;
+                for (let bit = 0; bit < 8; bit++) {
+                  const x = byteIdx * 8 + bit;
+                  if (x >= imgWidth) break;
+                  const moduleCol = Math.floor(x / SCALE) - QUIET;
+                  if (
+                    moduleRow >= 0 && moduleRow < size &&
+                    moduleCol >= 0 && moduleCol < size &&
+                    moduleData[moduleRow * size + moduleCol]
+                  ) {
+                    byte |= (0x80 >> bit);
+                  }
+                }
+                parts.push(byte);
+              }
+            }
+          } catch (qrErr) {
+            console.error('[ESC/POS] QR generation failed:', qrErr);
+            // Fallback: print URL as text
+            parts.push(...textToBytes(line.qrData));
+          }
 
           parts.push(LF);
         }

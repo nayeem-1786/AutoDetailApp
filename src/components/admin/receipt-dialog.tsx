@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { formatPhone } from '@/lib/utils/format';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
+import type { ReceiptImages } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
+import QRCode from 'qrcode';
 import {
   Dialog,
   DialogHeader,
@@ -71,6 +73,7 @@ export function ReceiptDialog({
 
         const tx = json.data;
         const rcfg: MergedReceiptConfig | undefined = json.receipt_config ?? undefined;
+        const reviewUrls: Record<string, string> = json.review_urls ?? {};
         setTransaction(tx);
         setReceiptConfig(rcfg);
         setEmailInput(tx.customer?.email || customerEmail || '');
@@ -81,6 +84,15 @@ export function ReceiptDialog({
               ? formatPhone(customerPhone)
               : ''
         );
+
+        // Generate QR code images for review URL shortcodes
+        const images: ReceiptImages = {};
+        if (reviewUrls.google_review_url) {
+          images.qrGoogle = await QRCode.toDataURL(reviewUrls.google_review_url, { width: 150, margin: 1 });
+        }
+        if (reviewUrls.yelp_review_url) {
+          images.qrYelp = await QRCode.toDataURL(reviewUrls.yelp_review_url, { width: 150, margin: 1 });
+        }
 
         const html = generateReceiptHtml(
           {
@@ -100,7 +112,8 @@ export function ReceiptDialog({
             items: tx.items ?? [],
             payments: tx.payments ?? [],
           },
-          rcfg
+          rcfg,
+          images
         );
         setReceiptHtml(html);
       } catch (err) {
