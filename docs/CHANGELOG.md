@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Cash drawer kick for check and split payments — 2026-03-06
+
+Cash drawer only opened for cash payments. Added the same fire-and-forget `POST /api/pos/receipts/cash-drawer` call to check and split payment flows after successful transaction.
+
+Files changed:
+- `src/app/pos/components/checkout/check-payment.tsx` — added drawer kick after transaction
+- `src/app/pos/components/checkout/split-payment.tsx` — added drawer kick after transaction
+
+---
+
 ## fix: Auto-focus customer search input in POS dialogs — 2026-03-06
 
 The `autoFocus` prop alone is unreliable inside Radix Dialog (focus trap steals focus). Added a `ref` + `useEffect` with 100ms delay to programmatically focus the search input after dialog animation. Applies to all 3 usages: ticket panel, quote builder, and job detail customer change.

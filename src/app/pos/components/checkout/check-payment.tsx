@@ -67,6 +67,12 @@ export function CheckPayment() {
         throw new Error(json.error || 'Failed to process transaction');
       }
 
+      // Fire-and-forget: kick cash drawer open via print server
+      posFetch('/api/pos/receipts/cash-drawer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => { /* drawer kick is best-effort */ });
+
       checkout.setComplete(
         json.data.id,
         json.data.receipt_number,

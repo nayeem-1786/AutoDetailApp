@@ -142,6 +142,12 @@ export function SplitPayment() {
         throw new Error(txJson.error || 'Failed to save transaction');
       }
 
+      // Fire-and-forget: kick cash drawer open via print server
+      posFetch('/api/pos/receipts/cash-drawer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => { /* drawer kick is best-effort */ });
+
       // Card-to-customer matching for the card portion (fire-and-forget)
       const piId = piJson.id;
       const txId = txJson.data.id;
