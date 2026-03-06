@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Auto-focus customer search input in POS dialogs — 2026-03-06
+
+The `autoFocus` prop alone is unreliable inside Radix Dialog (focus trap steals focus). Added a `ref` + `useEffect` with 100ms delay to programmatically focus the search input after dialog animation. Applies to all 3 usages: ticket panel, quote builder, and job detail customer change.
+
+Files changed:
+- `src/app/pos/components/customer-lookup.tsx` — added inputRef + useEffect focus
+
+---
+
 ## feat: Vehicle type line under customer info on receipts — 2026-03-06
 
 Receipts now show a dedicated vehicle line in the customer info section (format: "Vehicle | 2016 Silver Honda Accord") instead of repeating it under every service line item.

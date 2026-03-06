@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Search, UserPlus, UserX, Loader2 } from 'lucide-react';
 import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,13 @@ export function CustomerLookup({
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input after Dialog animation completes (autoFocus alone is unreliable inside Radix Dialog)
+  useEffect(() => {
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const searchCustomers = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -86,6 +93,7 @@ export function CustomerLookup({
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         <input
+          ref={inputRef}
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
