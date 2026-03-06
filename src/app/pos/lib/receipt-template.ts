@@ -660,6 +660,8 @@ export function receiptToEscPos(
   parts.push(...CMD_INIT);
   // Trigger futurePRNT to insert NV logo (must be first 0x1D after init)
   parts.push(...CMD_LOGO_TRIGGER);
+  parts.push(LF); // Space after logo
+  parts.push(...CMD_BOLD_ON); // Bold on globally for crisp dark text
 
   // State tracking to match HTML semantic sections
   let seenTotal = false;
@@ -674,7 +676,8 @@ export function receiptToEscPos(
         parts.push(...textToBytes(line.text ?? ''));
         parts.push(LF);
         parts.push(...CMD_NORMAL_SIZE);
-        parts.push(...CMD_BOLD_OFF);
+        parts.push(...CMD_BOLD_ON); // Re-enable bold (ESC ! reset it)
+        parts.push(LF); // Space after business name
         break;
 
       case 'text':
@@ -689,10 +692,9 @@ export function receiptToEscPos(
           // (matches the solid <hr> in the HTML preview between subtotals and TOTAL)
           parts.push(LF);
         } else {
-          parts.push(...CMD_BOLD_ON);
+          // Bold is already on globally — just output the text
           parts.push(...textToBytes(line.text ?? ''));
           parts.push(LF);
-          parts.push(...CMD_BOLD_OFF);
         }
         break;
 
@@ -704,10 +706,9 @@ export function receiptToEscPos(
         // (matches HTML: <div font-weight:bold>Payment</div>)
         if (seenTotal && !paymentLabelAdded) {
           paymentLabelAdded = true;
-          parts.push(...CMD_BOLD_ON);
+          // Bold is already on globally
           parts.push(...textToBytes('Payment'));
           parts.push(LF);
-          parts.push(...CMD_BOLD_OFF);
         }
         break;
 
@@ -743,7 +744,7 @@ export function receiptToEscPos(
 
         if (isTotalLine) {
           parts.push(...CMD_NORMAL_SIZE);
-          parts.push(...CMD_BOLD_OFF);
+          parts.push(...CMD_BOLD_ON); // Re-enable bold (ESC ! reset it)
         }
         break;
       }

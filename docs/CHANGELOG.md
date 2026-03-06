@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Bold receipt text globally + logo/header spacing — 2026-03-05
+
+Receipt text was too light/thin. Fixed by enabling bold globally and adding spacing:
+
+- **Global bold**: `CMD_BOLD_ON` pushed once after `CMD_LOGO_TRIGGER`; re-enabled after every `CMD_NORMAL_SIZE` (since `ESC !` resets all attributes including bold)
+- **No `CMD_BOLD_OFF`**: Removed all `CMD_BOLD_OFF` from `parts.push()` calls — bold stays on for the entire receipt
+- **Logo spacing**: Added `LF` after `CMD_LOGO_TRIGGER` for space between logo and header
+- **Header spacing**: Added `LF` after header block for space between business name and address
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — `receiptToEscPos()` only
+
+---
+
 ## docs + fix: Star printer logo troubleshooting + fix receipt print width — 2026-03-05
 
 **Print width fix:** Changed `CMD_LOGO_TRIGGER` from `GS ! 0x00` (`[0x1D, 0x21, 0x00]`) to `GS B 0` (`[0x1D, 0x42, 0x00]`). `GS !` is a character size select command that can interfere with `ESC !` text sizing, causing narrower print width. `GS B 0` disables reverse printing (already off by default) — a true no-op that still contains `0x1D` to trigger futurePRNT logo.
