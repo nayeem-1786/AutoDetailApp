@@ -1003,42 +1003,48 @@ export function receiptToEscPos(
         const isPair = nextLine?.type === 'qr' && nextLine?.qrData;
 
         if (isPair) {
-          // --- Side-by-side QR pair (equal-size) ---
-          console.log('[ESC/POS] Rendering QR pair side-by-side');
-          const PRINTER_WIDTH = 384; // 48 bytes * 8 bits
-          const CHAR_WIDTH = 8;      // pixels per character
+          // --- Side-by-side QR pair (equal pixel dimensions) ---
+          const PRINTER_WIDTH = 384; // 48 bytes * 8 bits = 384 px
+          const CHAR_WIDTH = 8;      // pixels per character at normal size
+          const GAP = 20;            // px gap between the two QR codes
+          const QUIET = 2;           // quiet zone modules around each QR
 
           try {
+            // 1. Generate both QR matrices
             const qr1 = QRCode.create(line.qrData, { errorCorrectionLevel: 'M' });
             const qr2 = QRCode.create(nextLine.qrData!, { errorCorrectionLevel: 'M' });
+            const mod1 = qr1.modules.size; // module count for QR1
+            const mod2 = qr2.modules.size; // module count for QR2
 
-            const QUIET = 2;
-            const imgGap = 20;
+            // 2. Shared sizing — use the LARGER module count for BOTH
+            const maxMod = Math.max(mod1, mod2);
+            const totalModulesPerQR = maxMod + 2 * QUIET;
+            // Max module pixel size that fits two QR codes + gap within printer width
+            const moduleSize = Math.floor((PRINTER_WIDTH - GAP) / 2 / totalModulesPerQR);
+            const qrPx = totalModulesPerQR * moduleSize; // identical pixel size for both QR images
 
-            const size1 = qr1.modules.size;
-            const size2 = qr2.modules.size;
-            const maxModuleCount = Math.max(size1, size2);
+            // 3. Center the combined image within the printer width
+            const combinedWidth = qrPx + GAP + qrPx;
+            const leftPad = Math.max(0, Math.floor((PRINTER_WIDTH - combinedWidth) / 2));
 
-            // Both QR codes use the same module size and pixel dimensions
-            const totalModules = maxModuleCount + 2 * QUIET;
-            const SCALE = Math.floor((PRINTER_WIDTH - imgGap) / 2 / totalModules);
-            const qrPixels = totalModules * SCALE;
-            const imgHeight = qrPixels;
+            // 4. For the smaller QR, compute pixel offset to center it within the shared box
+            //    Smaller QR has fewer modules → extra modules of white padding on each side
+            const pad1 = Math.floor((maxMod - mod1) / 2) * moduleSize; // px offset for QR1
+            const pad2 = Math.floor((maxMod - mod2) / 2) * moduleSize; // px offset for QR2
 
-            // Padding offsets to center smaller QR within the shared pixel box
-            const qr1PadModules = maxModuleCount - size1;
-            const qr1ModuleOffset = Math.floor(qr1PadModules / 2);
-            const qr2PadModules = maxModuleCount - size2;
-            const qr2ModuleOffset = Math.floor(qr2PadModules / 2);
+            console.log('[ESC/POS] QR pair:', {
+              mod1, mod2, maxMod, moduleSize,
+              qrPx, combinedWidth, leftPad,
+              pad1, pad2,
+              rasterWidth: PRINTER_WIDTH,
+              rasterHeight: qrPx
+            });
 
-            const totalContentWidth = qrPixels + imgGap + qrPixels;
-            const leftPad = Math.max(0, Math.floor((PRINTER_WIDTH - totalContentWidth) / 2));
-
-            // Print labels centered over each QR code
+            // 5. Print labels as a single text line, each centered above its QR code
             const label1 = line.qrLabel || '';
             const label2 = nextLine.qrLabel || '';
-            const qr1CenterChar = Math.round((leftPad + qrPixels / 2) / CHAR_WIDTH);
-            const qr2CenterChar = Math.round((leftPad + qrPixels + imgGap + qrPixels / 2) / CHAR_WIDTH);
+            const qr1CenterChar = Math.round((leftPad + qrPx / 2) / CHAR_WIDTH);
+            const qr2CenterChar = Math.round((leftPad + qrPx + GAP + qrPx / 2) / CHAR_WIDTH);
 
             const labelChars = new Array(width).fill(' ');
             const l1Start = Math.max(0, qr1CenterChar - Math.floor(label1.length / 2));
@@ -1053,43 +1059,62 @@ export function receiptToEscPos(
             parts.push(...textToBytes(labelChars.join('')));
             parts.push(LF);
 
-            // Combined raster bitmap with both QR codes (same pixel size)
-            const bytesPerRow = Math.ceil(PRINTER_WIDTH / 8);
+            // 6. Build ONE combined raster bitmap — both QR codes on the SAME rows
+            //    Layout per row: [leftPad] [QR1 pixels] [GAP] [QR2 pixels] [rightPad]
+            const bytesPerRow = PRINTER_WIDTH / 8; // 48 bytes (384 is evenly divisible by 8)
+            const imgHeight = qrPx;
 
-            // GS v 0 — Print raster bit image
-            parts.push(0x1D, 0x76, 0x30, 0x00);
-            parts.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF);
-            parts.push(imgHeight & 0xFF, (imgHeight >> 8) & 0xFF);
+            // Pre-build the raster data into a buffer (avoids 0x1D bytes being scattered)
+            const rasterData = new Uint8Array(bytesPerRow * imgHeight);
 
-            for (let y = 0; y < imgHeight; y++) {
+            for (let row = 0; row < imgHeight; row++) {
               for (let byteIdx = 0; byteIdx < bytesPerRow; byteIdx++) {
-                let byte = 0;
+                let b = 0;
                 for (let bit = 0; bit < 8; bit++) {
-                  const x = byteIdx * 8 + bit;
-                  const xRel = x - leftPad;
+                  const px = byteIdx * 8 + bit; // absolute pixel x
                   let isBlack = false;
 
-                  if (xRel >= 0 && xRel < qrPixels && y < qrPixels) {
-                    // QR1 region — center smaller QR within shared box
-                    const moduleCol = Math.floor(xRel / SCALE) - QUIET - qr1ModuleOffset;
-                    const moduleRow = Math.floor(y / SCALE) - QUIET - qr1ModuleOffset;
-                    if (moduleRow >= 0 && moduleRow < size1 && moduleCol >= 0 && moduleCol < size1) {
-                      isBlack = !!qr1.modules.data[moduleRow * size1 + moduleCol];
-                    }
-                  } else if (xRel >= qrPixels + imgGap && xRel < qrPixels + imgGap + qrPixels && y < qrPixels) {
-                    // QR2 region — center smaller QR within shared box
-                    const xInQr2 = xRel - qrPixels - imgGap;
-                    const moduleCol = Math.floor(xInQr2 / SCALE) - QUIET - qr2ModuleOffset;
-                    const moduleRow = Math.floor(y / SCALE) - QUIET - qr2ModuleOffset;
-                    if (moduleRow >= 0 && moduleRow < size2 && moduleCol >= 0 && moduleCol < size2) {
-                      isBlack = !!qr2.modules.data[moduleRow * size2 + moduleCol];
+                  // QR1 region: pixels [leftPad .. leftPad+qrPx)
+                  const x1 = px - leftPad;
+                  if (x1 >= 0 && x1 < qrPx) {
+                    // Map pixel to module within the padded box
+                    const qrLocalX = x1 - pad1; // shift by centering pad
+                    const qrLocalY = row - pad1;
+                    if (qrLocalX >= 0 && qrLocalY >= 0) {
+                      const mCol = Math.floor(qrLocalX / moduleSize) - QUIET;
+                      const mRow = Math.floor(qrLocalY / moduleSize) - QUIET;
+                      if (mRow >= 0 && mRow < mod1 && mCol >= 0 && mCol < mod1) {
+                        isBlack = !!qr1.modules.data[mRow * mod1 + mCol];
+                      }
                     }
                   }
 
-                  if (isBlack) byte |= (0x80 >> bit);
+                  // QR2 region: pixels [leftPad+qrPx+GAP .. leftPad+qrPx+GAP+qrPx)
+                  const x2 = px - leftPad - qrPx - GAP;
+                  if (!isBlack && x2 >= 0 && x2 < qrPx) {
+                    const qrLocalX = x2 - pad2;
+                    const qrLocalY = row - pad2;
+                    if (qrLocalX >= 0 && qrLocalY >= 0) {
+                      const mCol = Math.floor(qrLocalX / moduleSize) - QUIET;
+                      const mRow = Math.floor(qrLocalY / moduleSize) - QUIET;
+                      if (mRow >= 0 && mRow < mod2 && mCol >= 0 && mCol < mod2) {
+                        isBlack = !!qr2.modules.data[mRow * mod2 + mCol];
+                      }
+                    }
+                  }
+
+                  if (isBlack) b |= (0x80 >> bit);
                 }
-                parts.push(byte);
+                rasterData[row * bytesPerRow + byteIdx] = b;
               }
+            }
+
+            // 7. Emit GS v 0 raster command with the combined bitmap
+            parts.push(0x1D, 0x76, 0x30, 0x00);
+            parts.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF);
+            parts.push(imgHeight & 0xFF, (imgHeight >> 8) & 0xFF);
+            for (let i = 0; i < rasterData.length; i++) {
+              parts.push(rasterData[i]);
             }
           } catch (qrErr) {
             console.error('[ESC/POS] QR pair generation failed:', qrErr);

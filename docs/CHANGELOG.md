@@ -4,12 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix: Equal-size QR codes on thermal receipts — 2026-03-06
+## fix: Equal-size side-by-side QR codes centered on receipt — 2026-03-06
 
-Side-by-side QR codes (Google/Yelp) were different sizes because each URL produces a different QR module count, and the code used a fixed pixel scale per module. Now both QR codes share the same pixel dimensions: the module count of the larger QR determines a shared module size (`floor((384 - gap) / 2 / totalModules)`), and the smaller QR is centered within the same-size box with extra quiet zone padding. Gap increased from 16px to 20px.
+Complete rewrite of ESC/POS QR pair rendering. Previous code produced unequal-size QR codes (different module counts → different pixel dimensions) and stacked them vertically instead of side-by-side.
+
+Fix: Both QR matrices are generated, the larger module count determines ONE shared module size (`floor((384 - 20) / 2 / (maxMod + 2*quiet))`), and the smaller QR is pixel-padded to match. Both QR bitmaps are rendered into a SINGLE `GS v 0` raster command — each row contains left_pad + QR1_row + gap + QR2_row + right_pad — so they appear side-by-side on the same rows. Labels ("Review on Google" / "Review on Yelp") printed as a single text line with each label centered above its respective QR code. Debug logging shows module counts, shared module size, and combined raster dimensions.
 
 Files changed:
-- `src/app/pos/lib/receipt-template.ts` — ESC/POS QR pair rendering: shared module size, equal pixel dimensions, centered padding for smaller QR
+- `src/app/pos/lib/receipt-template.ts` — ESC/POS QR pair rendering rewritten from scratch
 
 ---
 
