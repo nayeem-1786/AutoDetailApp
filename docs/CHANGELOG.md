@@ -4,18 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix: Receipt centering parity between admin test and POS print — 2026-03-06
+## revert: Remove GS L/GS W margin commands — violates 0x1D rule — 2026-03-06
 
-POS receipts shifted slightly right vs admin test prints. Root cause: `receiptToEscPos()` relied solely on `ESC @` (init) to reset printer state, but `ESC @` restores the printer's stored defaults — if a previous print job's barcode/QR raster commands (`GS v 0`, `GS k`) left the print area in a state that `ESC @` doesn't fully clear, subsequent prints inherit a residual left margin offset. Admin test prints worked because they were isolated (printer freshly initialized).
+Reverted the previous `GS L 0 0` + `GS W 384` margin/width reset added to the ESC/POS init sequence. These added extra `0x1D` bytes which violates the proven futurePRNT rule (every `0x1D` after `ESC @` triggers a logo insertion). Additionally, `GS W 384` set the print width to 384 dots (48mm) instead of the printer's full 576 dots (72mm), shrinking the receipt to ~36 characters. Removed debug `console.log` statements from both print paths.
 
-Fix: Added explicit `GS L 0 0` (left margin = 0 dots) and `GS W 384` (full 384-dot print width) right after the logo trigger. This ensures a known-good print area on every receipt regardless of residual printer state from previous jobs. Also updated the outdated `0x1D` byte comments — barcode and QR sections legitimately use additional `GS` commands (`GS h`, `GS w`, `GS H`, `GS k`, `GS v 0`) that futurePRNT parses correctly without triggering extra logos.
-
-Debug logging added to both paths (first 20 bytes as hex + total byte count) for future comparison.
+Init sequence restored to: `ESC @` → `GS B 0` (logo trigger) → `LF` → `ESC E 1` (bold on).
 
 Files changed:
-- `src/app/pos/lib/receipt-template.ts` — added `CMD_MARGIN_RESET` + `CMD_WIDTH_RESET` after init, updated comments
-- `src/app/api/pos/receipts/print-server/route.ts` — hex debug logging
-- `src/app/admin/settings/receipt-printer/page.tsx` — hex debug logging
+- `src/app/pos/lib/receipt-template.ts` — removed `CMD_MARGIN_RESET` + `CMD_WIDTH_RESET`, restored original comments
+- `src/app/api/pos/receipts/print-server/route.ts` — removed debug logging
+- `src/app/admin/settings/receipt-printer/page.tsx` — removed debug logging
 
 ---
 
