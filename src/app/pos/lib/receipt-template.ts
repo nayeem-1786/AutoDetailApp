@@ -222,14 +222,14 @@ function pushZoneLines(
           break;
         case '{qr_google}':
           if (reviewUrls.google) {
-            lines.push({ type: 'qr', qrData: reviewUrls.google, qrLabel: 'Google Reviews', alignment: 'center' });
+            lines.push({ type: 'qr', qrData: reviewUrls.google, qrLabel: 'Review on Google', alignment: 'center' });
           } else {
             lines.push({ type: 'text', text: '[Google Reviews QR: URL not configured]' });
           }
           break;
         case '{qr_yelp}':
           if (reviewUrls.yelp) {
-            lines.push({ type: 'qr', qrData: reviewUrls.yelp, qrLabel: 'Yelp Reviews', alignment: 'center' });
+            lines.push({ type: 'qr', qrData: reviewUrls.yelp, qrLabel: 'Review on Yelp', alignment: 'center' });
           } else {
             lines.push({ type: 'text', text: '[Yelp Reviews QR: URL not configured]' });
           }
@@ -464,48 +464,72 @@ export function receiptToPlainText(
   lines: ReceiptLine[],
   width = 48
 ): string {
-  return lines
-    .map((line) => {
-      switch (line.type) {
-        case 'header':
-          return centerText(line.text ?? '', width);
-        case 'text':
-          return centerText(line.text ?? '', width);
-        case 'bold':
-          return line.text ?? '';
-        case 'divider':
-          return '-'.repeat(width);
-        case 'columns': {
-          const left = line.left ?? '';
-          const center = line.center ?? '';
-          const right = line.right ?? '';
-          if (center) {
-            const usedLen = left.length + center.length + right.length;
-            const totalGap = Math.max(2, width - usedLen);
-            const gapLeft = Math.ceil(totalGap / 2);
-            const gapRight = totalGap - gapLeft;
-            return left + ' '.repeat(gapLeft) + center + ' '.repeat(gapRight) + right;
-          }
+  const output: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    switch (line.type) {
+      case 'header':
+        output.push(centerText(line.text ?? '', width));
+        break;
+      case 'text':
+        output.push(centerText(line.text ?? '', width));
+        break;
+      case 'bold':
+        output.push(line.text ?? '');
+        break;
+      case 'divider':
+        output.push('-'.repeat(width));
+        break;
+      case 'columns': {
+        const left = line.left ?? '';
+        const center = line.center ?? '';
+        const right = line.right ?? '';
+        if (center) {
+          const usedLen = left.length + center.length + right.length;
+          const totalGap = Math.max(2, width - usedLen);
+          const gapLeft = Math.ceil(totalGap / 2);
+          const gapRight = totalGap - gapLeft;
+          output.push(left + ' '.repeat(gapLeft) + center + ' '.repeat(gapRight) + right);
+        } else {
           const gap = width - left.length - right.length;
-          return left + ' '.repeat(Math.max(1, gap)) + right;
+          output.push(left + ' '.repeat(Math.max(1, gap)) + right);
         }
-        case 'spacer':
-          return '';
-        case 'image':
-          return ''; // skip images in plain text
-        case 'barcode':
-          return line.barcodeData ? centerText(`[${line.barcodeData}]`, width) : '';
-        case 'qr':
-          if (line.qrData) {
-            const label = line.qrLabel ? `${line.qrLabel}: ` : '';
-            return centerText(`${label}${line.qrData}`, width);
-          }
-          return '';
-        default:
-          return '';
+        break;
       }
-    })
-    .join('\n');
+      case 'spacer':
+        output.push('');
+        break;
+      case 'image':
+        output.push('');
+        break;
+      case 'barcode':
+        output.push(line.barcodeData ? centerText(`[${line.barcodeData}]`, width) : '');
+        break;
+      case 'qr': {
+        if (!line.qrData) { output.push(''); break; }
+        // Side-by-side if next line is also QR
+        const nextLine = i + 1 < lines.length ? lines[i + 1] : null;
+        if (nextLine?.type === 'qr' && nextLine?.qrData) {
+          const half = Math.floor(width / 2);
+          const label1 = line.qrLabel || 'QR';
+          const label2 = nextLine.qrLabel || 'QR';
+          output.push(centerText(label1, half) + centerText(label2, half));
+          output.push(centerText(line.qrData.substring(0, half - 2), half) + centerText(nextLine.qrData.substring(0, half - 2), half));
+          i++; // skip next
+        } else {
+          const label = line.qrLabel ? `${line.qrLabel}: ` : '';
+          output.push(centerText(`${label}${line.qrData}`, width));
+        }
+        break;
+      }
+      default:
+        output.push('');
+        break;
+    }
+  }
+
+  return output.join('\n');
 }
 
 function centerText(text: string, width: number): string {
@@ -597,64 +621,97 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   const shortcodeNote = (msg: string) =>
     `<div style="text-align:center;margin:8px 0;padding:6px;border:1px dashed #ccc;color:#999;font-size:11px;">${esc(msg)}</div>`;
 
-  const renderShortcodeHtml = (code: string): string => {
+  // Returns { type, html } so zoneDiv can batch consecutive QR elements side-by-side
+  type ZoneElement = { type: 'qr' | 'other'; html: string };
+
+  const renderShortcodeElement = (code: string): ZoneElement => {
     switch (code) {
       case '{barcode_receipt}':
-        return tx.receipt_number
-          ? `<div style="text-align:center;margin:12px 0;">
-              <div style="font-family:monospace;font-size:16px;letter-spacing:2px;">${esc(tx.receipt_number)}</div>
-              <div style="font-size:11px;color:#666;">Scan barcode on printed receipt</div>
-            </div>`
-          : shortcodeNote('[Receipt Barcode: no receipt number]');
+        return {
+          type: 'other',
+          html: tx.receipt_number
+            ? `<div style="text-align:center;margin:12px 0;">
+                <div style="font-family:monospace;font-size:16px;letter-spacing:2px;">${esc(tx.receipt_number)}</div>
+                <div style="font-size:11px;color:#666;">Scan barcode on printed receipt</div>
+              </div>`
+            : shortcodeNote('[Receipt Barcode: no receipt number]'),
+        };
       case '{qr_google}':
         return images?.qrGoogle
-          ? `<div style="text-align:center;margin:12px 0;">
-              <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Google Reviews</div>
-              <img src="${images.qrGoogle}" alt="Google Reviews QR" style="width:150px;height:150px;" />
-            </div>`
-          : shortcodeNote('[Google Reviews QR: URL not configured]');
+          ? {
+              type: 'qr',
+              html: `<div style="text-align:center;">
+                <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Review on Google</div>
+                <img src="${images.qrGoogle}" alt="Review on Google QR" style="width:120px;height:120px;" />
+              </div>`,
+            }
+          : { type: 'other', html: shortcodeNote('[Google Reviews QR: URL not configured]') };
       case '{qr_yelp}':
         return images?.qrYelp
-          ? `<div style="text-align:center;margin:12px 0;">
-              <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Yelp Reviews</div>
-              <img src="${images.qrYelp}" alt="Yelp Reviews QR" style="width:150px;height:150px;" />
-            </div>`
-          : shortcodeNote('[Yelp Reviews QR: URL not configured]');
+          ? {
+              type: 'qr',
+              html: `<div style="text-align:center;">
+                <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Review on Yelp</div>
+                <img src="${images.qrYelp}" alt="Review on Yelp QR" style="width:120px;height:120px;" />
+              </div>`,
+            }
+          : { type: 'other', html: shortcodeNote('[Yelp Reviews QR: URL not configured]') };
       default:
-        return '';
+        return { type: 'other', html: '' };
     }
   };
 
   const zoneDiv = (t: string): string => {
     const zoneLines = t.split('\n');
-    const htmlParts: string[] = [];
+    // Collect all elements with type info for batching consecutive QRs
+    const elements: ZoneElement[] = [];
+
     for (const line of zoneLines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
       // No shortcodes on this line — plain text
       if (!SHORTCODE_RE.test(trimmed)) {
-        htmlParts.push(`<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(trimmed)}</div>`);
+        elements.push({ type: 'other', html: `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(trimmed)}</div>` });
         continue;
       }
 
-      // Scan for inline shortcodes, emitting text and shortcode HTML
+      // Scan for inline shortcodes
       SHORTCODE_RE.lastIndex = 0;
       let lastIndex = 0;
       let match: RegExpExecArray | null;
       while ((match = SHORTCODE_RE.exec(trimmed)) !== null) {
         const before = trimmed.slice(lastIndex, match.index).trim();
         if (before) {
-          htmlParts.push(`<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(before)}</div>`);
+          elements.push({ type: 'other', html: `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(before)}</div>` });
         }
-        htmlParts.push(renderShortcodeHtml(match[0]));
+        elements.push(renderShortcodeElement(match[0]));
         lastIndex = match.index + match[0].length;
       }
       const after = trimmed.slice(lastIndex).trim();
       if (after) {
-        htmlParts.push(`<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(after)}</div>`);
+        elements.push({ type: 'other', html: `<div style="text-align:center;font-size:13px;color:#333;margin:8px 0;white-space:pre-wrap;">${esc(after)}</div>` });
       }
     }
+
+    // Compose HTML, batching consecutive QR elements into a side-by-side flex container
+    const htmlParts: string[] = [];
+    let ei = 0;
+    while (ei < elements.length) {
+      if (elements[ei].type === 'qr' && ei + 1 < elements.length && elements[ei + 1].type === 'qr') {
+        // Side-by-side pair
+        htmlParts.push(`<div style="display:flex;justify-content:center;gap:16px;margin:12px 0;">${elements[ei].html}${elements[ei + 1].html}</div>`);
+        ei += 2;
+      } else if (elements[ei].type === 'qr') {
+        // Solo QR — wrap with centering
+        htmlParts.push(`<div style="text-align:center;margin:12px 0;">${elements[ei].html}</div>`);
+        ei++;
+      } else {
+        htmlParts.push(elements[ei].html);
+        ei++;
+      }
+    }
+
     return htmlParts.join('');
   };
 
@@ -839,7 +896,8 @@ export function receiptToEscPos(
   let seenTotal = false;
   let paymentLabelAdded = false;
 
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
     switch (line.type) {
       case 'header':
         parts.push(...CMD_ALIGN_CENTER);
@@ -860,11 +918,8 @@ export function receiptToEscPos(
 
       case 'bold':
         if (!(line.text ?? '').trim()) {
-          // Empty bold line = visual separator before TOTAL
-          // (matches the solid <hr> in the HTML preview between subtotals and TOTAL)
           parts.push(LF);
         } else {
-          // Bold is already on globally — just output the text
           parts.push(...textToBytes(line.text ?? ''));
           parts.push(LF);
         }
@@ -874,11 +929,8 @@ export function receiptToEscPos(
         parts.push(...CMD_ALIGN_LEFT);
         parts.push(...textToBytes('-'.repeat(width)));
         parts.push(LF);
-        // After the divider following TOTAL, add bold "Payment" label
-        // (matches HTML: <div font-weight:bold>Payment</div>)
         if (seenTotal && !paymentLabelAdded) {
           paymentLabelAdded = true;
-          // Bold is already on globally
           parts.push(...textToBytes('Payment'));
           parts.push(LF);
         }
@@ -890,7 +942,6 @@ export function receiptToEscPos(
         const center = line.center ?? '';
         const right = line.right ?? '';
 
-        // TOTAL line — bold + double-size to match HTML bold/15px styling
         const isTotalLine = left === 'TOTAL';
         if (isTotalLine) {
           seenTotal = true;
@@ -906,7 +957,6 @@ export function receiptToEscPos(
           const gapRight = totalGap - gapLeft;
           padded = left + ' '.repeat(gapLeft) + center + ' '.repeat(gapRight) + right;
         } else {
-          // Double-size chars take 2 columns each, so halve effective width
           const effectiveWidth = isTotalLine ? Math.floor(width / 2) : width;
           const gap = effectiveWidth - left.length - right.length;
           padded = left + ' '.repeat(Math.max(1, gap)) + right;
@@ -916,7 +966,7 @@ export function receiptToEscPos(
 
         if (isTotalLine) {
           parts.push(...CMD_NORMAL_SIZE);
-          parts.push(...CMD_BOLD_ON); // Re-enable bold (ESC ! reset it)
+          parts.push(...CMD_BOLD_ON);
         }
         break;
       }
@@ -926,22 +976,14 @@ export function receiptToEscPos(
         break;
 
       case 'image':
-        // Logo is stored in printer NV memory via Star futurePRNT — no ESC/POS output needed
         break;
 
       case 'barcode': {
         if (line.barcodeData) {
-          // Center align
           parts.push(...CMD_ALIGN_CENTER);
-          // Set barcode height: GS h n (n = 0x50 = 80 dots)
           parts.push(0x1D, 0x68, 0x50);
-          // Set barcode width: GS w n (n = 2 = module width)
           parts.push(0x1D, 0x77, 0x02);
-          // Set HRI position: GS H n (2 = below barcode)
           parts.push(0x1D, 0x48, 0x02);
-          // Print Code 128: GS k m n d1...dn
-          // m = 73 (0x49) for Code 128, n = data length
-          // Prefix with {B for Code 128 subset B (full ASCII)
           const barcodeStr = '{B' + line.barcodeData;
           const barcodeLen = barcodeStr.length;
           parts.push(0x1D, 0x6B, 0x49, barcodeLen);
@@ -952,35 +994,128 @@ export function receiptToEscPos(
       }
 
       case 'qr': {
-        if (line.qrData) {
-          console.log('[ESC/POS] Rendering QR:', line.qrData?.substring(0, 50));
+        if (!line.qrData) break;
 
-          // Center align
+        console.log('[ESC/POS] Rendering QR:', line.qrData?.substring(0, 50));
+
+        // Look ahead: if next line is also QR, render them side-by-side
+        const nextLine = li + 1 < lines.length ? lines[li + 1] : null;
+        const isPair = nextLine?.type === 'qr' && nextLine?.qrData;
+
+        if (isPair) {
+          // --- Side-by-side QR pair ---
+          console.log('[ESC/POS] Rendering QR pair side-by-side');
+          const PRINTER_WIDTH = 384; // 48 bytes * 8 bits
+          const CHAR_WIDTH = 8;      // pixels per character
+
+          try {
+            const qr1 = QRCode.create(line.qrData, { errorCorrectionLevel: 'M' });
+            const qr2 = QRCode.create(nextLine.qrData!, { errorCorrectionLevel: 'M' });
+
+            const SCALE = 3;  // smaller modules to fit two QR codes
+            const QUIET = 2;
+            const imgGap = 16;
+
+            const size1 = qr1.modules.size;
+            const size2 = qr2.modules.size;
+            const qr1Width = (size1 + 2 * QUIET) * SCALE;
+            const qr2Width = (size2 + 2 * QUIET) * SCALE;
+            const qr1Height = qr1Width;
+            const qr2Height = qr2Width;
+            const imgHeight = Math.max(qr1Height, qr2Height);
+
+            const totalContentWidth = qr1Width + imgGap + qr2Width;
+            const leftPad = Math.max(0, Math.floor((PRINTER_WIDTH - totalContentWidth) / 2));
+
+            // Print labels centered over each QR code
+            const label1 = line.qrLabel || '';
+            const label2 = nextLine.qrLabel || '';
+            const qr1CenterChar = Math.round((leftPad + qr1Width / 2) / CHAR_WIDTH);
+            const qr2CenterChar = Math.round((leftPad + qr1Width + imgGap + qr2Width / 2) / CHAR_WIDTH);
+
+            const labelChars = new Array(width).fill(' ');
+            const l1Start = Math.max(0, qr1CenterChar - Math.floor(label1.length / 2));
+            for (let j = 0; j < label1.length && l1Start + j < width; j++) {
+              labelChars[l1Start + j] = label1[j];
+            }
+            const l2Start = Math.max(0, qr2CenterChar - Math.floor(label2.length / 2));
+            for (let j = 0; j < label2.length && l2Start + j < width; j++) {
+              labelChars[l2Start + j] = label2[j];
+            }
+            parts.push(...CMD_ALIGN_LEFT);
+            parts.push(...textToBytes(labelChars.join('')));
+            parts.push(LF);
+
+            // Combined raster bitmap with both QR codes
+            const bytesPerRow = Math.ceil(PRINTER_WIDTH / 8);
+
+            // GS v 0 — Print raster bit image
+            parts.push(0x1D, 0x76, 0x30, 0x00);
+            parts.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF);
+            parts.push(imgHeight & 0xFF, (imgHeight >> 8) & 0xFF);
+
+            for (let y = 0; y < imgHeight; y++) {
+              for (let byteIdx = 0; byteIdx < bytesPerRow; byteIdx++) {
+                let byte = 0;
+                for (let bit = 0; bit < 8; bit++) {
+                  const x = byteIdx * 8 + bit;
+                  const xRel = x - leftPad;
+                  let isBlack = false;
+
+                  if (xRel >= 0 && xRel < qr1Width && y < qr1Height) {
+                    // QR1 region
+                    const moduleCol = Math.floor(xRel / SCALE) - QUIET;
+                    const moduleRow = Math.floor(y / SCALE) - QUIET;
+                    if (moduleRow >= 0 && moduleRow < size1 && moduleCol >= 0 && moduleCol < size1) {
+                      isBlack = !!qr1.modules.data[moduleRow * size1 + moduleCol];
+                    }
+                  } else if (xRel >= qr1Width + imgGap && xRel < qr1Width + imgGap + qr2Width && y < qr2Height) {
+                    // QR2 region
+                    const xInQr2 = xRel - qr1Width - imgGap;
+                    const moduleCol = Math.floor(xInQr2 / SCALE) - QUIET;
+                    const moduleRow = Math.floor(y / SCALE) - QUIET;
+                    if (moduleRow >= 0 && moduleRow < size2 && moduleCol >= 0 && moduleCol < size2) {
+                      isBlack = !!qr2.modules.data[moduleRow * size2 + moduleCol];
+                    }
+                  }
+
+                  if (isBlack) byte |= (0x80 >> bit);
+                }
+                parts.push(byte);
+              }
+            }
+          } catch (qrErr) {
+            console.error('[ESC/POS] QR pair generation failed:', qrErr);
+            parts.push(...CMD_ALIGN_CENTER);
+            parts.push(...textToBytes(line.qrData));
+            parts.push(LF);
+            parts.push(...textToBytes(nextLine.qrData!));
+          }
+
+          parts.push(LF);
+          li++; // skip next QR line — consumed as pair
+        } else {
+          // --- Solo QR code (centered) ---
           parts.push(...CMD_ALIGN_CENTER);
 
-          // Print label above QR code if provided
           if (line.qrLabel) {
             parts.push(...textToBytes(line.qrLabel));
             parts.push(LF);
           }
 
-          // Render QR as raster bitmap — Star TSP100III doesn't support
-          // GS ( k 2D code commands in ESC/POS emulation mode.
-          // Instead, generate the QR matrix and print via GS v 0 (raster bit image).
           try {
             const qr = QRCode.create(line.qrData, { errorCorrectionLevel: 'M' });
             const size = qr.modules.size;
             const moduleData = qr.modules.data;
 
-            const SCALE = 4;  // each QR module = 4x4 dots
-            const QUIET = 4;  // quiet zone in modules
+            const SCALE = 4;
+            const QUIET = 4;
             const totalModules = size + 2 * QUIET;
             const imgWidth = totalModules * SCALE;
             const imgHeight = totalModules * SCALE;
             const bytesPerRow = Math.ceil(imgWidth / 8);
 
-            // GS v 0 m xL xH yL yH d1...dk — Print raster bit image
-            parts.push(0x1D, 0x76, 0x30, 0x00); // m=0 (normal)
+            parts.push(0x1D, 0x76, 0x30, 0x00);
             parts.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF);
             parts.push(imgHeight & 0xFF, (imgHeight >> 8) & 0xFF);
 
@@ -1005,7 +1140,6 @@ export function receiptToEscPos(
             }
           } catch (qrErr) {
             console.error('[ESC/POS] QR generation failed:', qrErr);
-            // Fallback: print URL as text
             parts.push(...textToBytes(line.qrData));
           }
 
