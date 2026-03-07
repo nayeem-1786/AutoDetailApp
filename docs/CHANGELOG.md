@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Single-page copier receipt via tall CSS page size — 2026-03-07
+
+Long receipts printed via copier (Konica bizhub) overflowed onto multiple pages. Fix: in the print-copier API route, inject `@page{size:8.5in 100in;margin:0.25in;}` into the HTML `<head>` before sending to the print server. Edge headless renders the receipt as a single tall PDF page. The bizhub then scales that one page to fit letter paper.
+
+Only affects the copier path — `generateReceiptHtml()`, email receipts, and thermal printing are unchanged.
+
+Files changed:
+- `src/app/api/pos/receipts/print-copier/route.ts` — inject `@page` style, send modified HTML
+
+---
+
 ## revert: Remove copier print scaling — restore original receipt styling — 2026-03-06
 
 Reverted all `@media print` CSS, inline `<script>` zoom logic, and copier-specific image sizing added in the previous session. These changes did not successfully constrain the PDF to one page and caused visual regressions.

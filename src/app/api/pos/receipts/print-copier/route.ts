@@ -111,6 +111,12 @@ export async function POST(request: NextRequest) {
       payments: tx.payments ?? [],
     }, merged, images);
 
+    // Inject tall @page so Edge headless renders a single-page PDF.
+    // The bizhub scales that one page to fit letter paper.
+    const copierHtml = html.includes('<head>')
+      ? html.replace('<head>', '<head><style>@page{size:8.5in 100in;margin:0.25in;}</style>')
+      : '<html><head><style>@page{size:8.5in 100in;margin:0.25in;}</style></head>' + html;
+
     // Send HTML to print server for PDF conversion + copier print (15s timeout)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -119,7 +125,7 @@ export async function POST(request: NextRequest) {
       const printRes = await fetch(`${print_server_url}/print-copier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html }),
+        body: JSON.stringify({ html: copierHtml }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
