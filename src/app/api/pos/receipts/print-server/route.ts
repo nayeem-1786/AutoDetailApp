@@ -3,12 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { generateReceiptLines, receiptToEscPos } from '@/app/pos/lib/receipt-template';
-import type { ReceiptContext } from '@/app/pos/lib/receipt-template';
-import { fetchReceiptConfig } from '@/lib/data/receipt-config';
+import { fetchReceiptData } from '@/lib/data/receipt-data';
 
 export async function POST(request: NextRequest) {
   try {
-    // Accept POS token auth OR admin Supabase session auth
     const posEmployee = authenticatePosRequest(request);
     if (!posEmployee) {
       const supabaseSession = await createClient();
@@ -17,7 +15,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
-    const supabase = createAdminClient();
 
     const body = await request.json();
     const { transaction_id } = body;
@@ -29,43 +26,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch transaction with full relations
-    const { data: transaction, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        customer:customers(first_name, last_name, phone, email, customer_type, created_at),
-        employee:employees(first_name, last_name),
-        vehicle:vehicles(vehicle_type, year, make, model, color),
-        items:transaction_items(*),
-        payments(*)
-      `)
-      .eq('id', transaction_id)
-      .single();
-
-    if (error || !transaction) {
-      return NextResponse.json(
-        { error: 'Transaction not found' },
-        { status: 404 }
-      );
-    }
-
-    // Fetch dynamic receipt config + review URLs for barcode/QR shortcodes
-    const { merged, print_server_url } = await fetchReceiptConfig(supabase);
-
-    const { data: reviewUrlRows } = await supabase
-      .from('business_settings')
-      .select('key, value')
-      .in('key', ['google_review_url', 'yelp_review_url']);
-
-    const reviewSettings: Record<string, string> = {};
-    for (const r of reviewUrlRows ?? []) {
-      if (typeof r.value === 'string') reviewSettings[r.key] = r.value;
-    }
-    const context: ReceiptContext = {
-      googleReviewUrl: reviewSettings.google_review_url || undefined,
-      yelpReviewUrl: reviewSettings.yelp_review_url || undefined,
-    };
+    const supabase = createAdminClient();
+    const { tx, config, context, print_server_url } = await fetchReceiptData(supabase, transaction_id);
 
     if (!print_server_url) {
       console.error('print_server_url is null — receipt_config may not have been saved with this field yet');
@@ -75,26 +37,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = transaction as any;
-    const receiptLines = generateReceiptLines({
-      receipt_number: tx.receipt_number,
-      transaction_date: tx.transaction_date,
-      subtotal: tx.subtotal,
-      tax_amount: tx.tax_amount,
-      discount_amount: tx.discount_amount,
-      coupon_code: tx.coupon_code,
-      loyalty_discount: tx.loyalty_discount,
-      loyalty_points_redeemed: tx.loyalty_points_redeemed,
-      tip_amount: tx.tip_amount,
-      total_amount: tx.total_amount,
-      customer: tx.customer,
-      employee: tx.employee,
-      vehicle: tx.vehicle,
-      items: tx.items ?? [],
-      payments: tx.payments ?? [],
-    }, merged, context);
-
+    const receiptLines = generateReceiptLines(tx, config, context);
     const escPosData = receiptToEscPos(receiptLines, 48);
 
     // Send binary data to local print server with 3-second timeout
@@ -128,9 +71,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Receipt print-server error:', err);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    const status = message === 'Transaction not found' ? 404 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

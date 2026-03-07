@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Unify receipt rendering — shared helper + server-side HTML everywhere — 2026-03-07
+
+Created `src/lib/data/receipt-data.ts` with `fetchReceiptData()` — a single helper that consolidates the duplicated transaction fetch, receipt config, review URL query, QR code generation, barcode generation, and ReceiptTransaction mapping that was copy-pasted across all 5 receipt API routes.
+
+**Admin ReceiptDialog** and **Customer Portal** now fetch server-rendered HTML instead of generating it client-side. This fixes:
+- Admin receipts were missing barcode images (bwip-js is server-only)
+- Customer portal receipts were missing both QR codes AND barcode images
+- Customer transaction API was missing `review_urls` in response
+
+New endpoint: `GET /api/customer/receipts/html?transaction_id=...` — customer-authenticated receipt HTML with ownership verification.
+
+Files changed:
+- `src/lib/data/receipt-data.ts` — **NEW** shared helper
+- `src/app/api/pos/receipts/html/route.ts` — uses `fetchReceiptData()`
+- `src/app/api/pos/receipts/email/route.ts` — uses `fetchReceiptData()`
+- `src/app/api/pos/receipts/print-server/route.ts` — uses `fetchReceiptData()`
+- `src/app/api/pos/receipts/print-copier/route.ts` — uses `fetchReceiptData()`
+- `src/app/api/pos/receipts/sms/route.ts` — uses `fetchReceiptData()`
+- `src/app/api/customer/receipts/html/route.ts` — **NEW** customer receipt endpoint
+- `src/app/api/customer/transactions/[id]/route.ts` — added `review_urls` to response
+- `src/components/admin/receipt-dialog.tsx` — removed client-side `generateReceiptHtml` + `QRCode`, fetches server HTML
+- `src/app/(account)/account/transactions/page.tsx` — removed client-side `generateReceiptHtml`, fetches server HTML
+
+---
+
 ## feat: Print button uses native browser dialog (AirPrint supported) — 2026-03-07
 
 POS "Print" button now opens the receipt HTML in a popup window and triggers the native browser print dialog instead of routing through the print server's `/print-copier` endpoint. This enables printing via AirPrint Bridge to the Konica bizhub copier.

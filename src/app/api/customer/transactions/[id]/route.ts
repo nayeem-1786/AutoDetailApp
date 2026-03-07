@@ -58,6 +58,17 @@ export async function GET(
     // Fetch receipt config for generating receipt HTML
     const { merged: receipt_config } = await fetchReceiptConfig(admin);
 
+    // Fetch review URLs for QR shortcode rendering
+    const { data: reviewUrlRows } = await admin
+      .from('business_settings')
+      .select('key, value')
+      .in('key', ['google_review_url', 'yelp_review_url']);
+
+    const review_urls: Record<string, string> = {};
+    for (const r of reviewUrlRows ?? []) {
+      if (typeof r.value === 'string') review_urls[r.key] = r.value;
+    }
+
     // Add customer info to transaction for receipt generation
     const txWithCustomer = {
       ...transaction,
@@ -74,6 +85,7 @@ export async function GET(
     return NextResponse.json({
       data: txWithCustomer,
       receipt_config,
+      review_urls,
     });
   } catch (err) {
     console.error('Transaction detail GET error:', err);

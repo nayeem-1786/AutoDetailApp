@@ -19,8 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { CalendarDays, DollarSign, ShoppingCart, Award, Printer, Mail, Loader2, Check } from 'lucide-react';
-import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
-import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface TransactionSummary {
@@ -57,8 +55,8 @@ export default function AccountTransactionsPage() {
 
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [receiptTransaction, setReceiptTransaction] = useState<any>(null);
+  const [receiptTransactionId, setReceiptTransactionId] = useState<string | null>(null);
+  const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
   const [receiptHtml, setReceiptHtml] = useState('');
   const [loadingReceipt, setLoadingReceipt] = useState(false);
   const [receiptEmailing, setReceiptEmailing] = useState(false);
@@ -87,39 +85,20 @@ export default function AccountTransactionsPage() {
   }, [customer, loadTransactions]);
 
   // Receipt dialog handlers
-  async function openReceiptDialog(transactionId: string) {
+  async function openReceiptDialog(transactionId: string, receiptNum: string | null) {
     setLoadingReceipt(true);
     setReceiptDialogOpen(true);
     setReceiptEmailed(false);
     setShowReceiptEmailInput(false);
+    setReceiptTransactionId(transactionId);
+    setReceiptNumber(receiptNum);
+    setReceiptEmailInput(customer?.email || '');
 
     try {
-      const res = await fetch(`/api/customer/transactions/${transactionId}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to load transaction');
-
-      const tx = json.data;
-      const rcfg: MergedReceiptConfig | undefined = json.receipt_config ?? undefined;
-      setReceiptTransaction(tx);
-      setReceiptEmailInput(customer?.email || '');
-
-      const html = generateReceiptHtml({
-        receipt_number: tx.receipt_number,
-        transaction_date: tx.transaction_date,
-        subtotal: tx.subtotal,
-        tax_amount: tx.tax_amount,
-        discount_amount: tx.discount_amount,
-        coupon_code: tx.coupon_code,
-        loyalty_discount: tx.loyalty_discount,
-        loyalty_points_redeemed: tx.loyalty_points_redeemed,
-        tip_amount: tx.tip_amount,
-        total_amount: tx.total_amount,
-        customer: tx.customer,
-        employee: tx.employee,
-        vehicle: tx.vehicles,
-        items: tx.transaction_items ?? [],
-        payments: tx.payments ?? [],
-      }, rcfg);
+      // Fetch server-rendered HTML (includes barcode + QR codes)
+      const htmlRes = await fetch(`/api/customer/receipts/html?transaction_id=${transactionId}`);
+      if (!htmlRes.ok) throw new Error('Failed to load receipt');
+      const html = await htmlRes.text();
       setReceiptHtml(html);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load receipt');
@@ -142,13 +121,13 @@ export default function AccountTransactionsPage() {
   }
 
   async function handleReceiptEmail(email: string) {
-    if (!email || !receiptTransaction) return;
+    if (!email || !receiptTransactionId) return;
     setReceiptEmailing(true);
     try {
       const res = await fetch('/api/pos/receipts/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: receiptTransaction.id, email }),
+        body: JSON.stringify({ transaction_id: receiptTransactionId, email }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Email failed');
@@ -193,7 +172,7 @@ export default function AccountTransactionsPage() {
           <div className="text-center">
             <button
               type="button"
-              onClick={() => openReceiptDialog(row.original.id)}
+              onClick={() => openReceiptDialog(row.original.id, receiptNum)}
               className="text-sm font-mono text-site-link hover:text-site-link-hover hover:underline"
             >
               {receiptNum}
@@ -322,7 +301,7 @@ export default function AccountTransactionsPage() {
         <DialogClose onClose={() => setReceiptDialogOpen(false)} />
         <DialogHeader>
           <DialogTitle>
-            Receipt {receiptTransaction?.receipt_number ? `#${receiptTransaction.receipt_number}` : ''}
+            Receipt {receiptNumber ? `#${receiptNumber}` : ''}
           </DialogTitle>
         </DialogHeader>
         <DialogContent className="max-h-[60vh] overflow-y-auto">
@@ -337,7 +316,7 @@ export default function AccountTransactionsPage() {
             />
           )}
         </DialogContent>
-        {!loadingReceipt && receiptTransaction && (
+        {!loadingReceipt && receiptTransactionId && (
           <DialogFooter className="flex-col items-stretch gap-3">
             <div className="grid grid-cols-2 gap-2">
               <Button

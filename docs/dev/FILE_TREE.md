@@ -284,6 +284,7 @@ src/app/api/customer/link-account/route.ts
 src/app/api/customer/link-by-phone/route.ts
 src/app/api/customer/loyalty/route.ts
 src/app/api/customer/profile/route.ts
+src/app/api/customer/receipts/html/route.ts
 src/app/api/customer/transactions/[id]/route.ts
 src/app/api/customer/transactions/route.ts
 src/app/api/customer/vehicles/[id]/route.ts
@@ -732,6 +733,7 @@ src/lib/data/homepage-settings.ts
 src/lib/data/page-content.ts
 src/lib/data/products.ts
 src/lib/data/receipt-config.ts
+src/lib/data/receipt-data.ts
 src/lib/data/reviews.ts
 src/lib/data/services.ts
 src/lib/data/team-members.ts

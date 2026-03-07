@@ -3,10 +3,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { formatPhone } from '@/lib/utils/format';
-import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
-import type { ReceiptImages } from '@/app/pos/lib/receipt-template';
-import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
-import QRCode from 'qrcode';
 import {
   Dialog,
   DialogHeader,
@@ -35,10 +31,9 @@ export function ReceiptDialog({
   customerEmail,
   customerPhone,
 }: ReceiptDialogProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [transaction, setTransaction] = useState<any>(null);
   const [receiptHtml, setReceiptHtml] = useState('');
-  const [receiptConfig, setReceiptConfig] = useState<MergedReceiptConfig | undefined>(undefined);
+  const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
+  const [txId, setTxId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [printing, setPrinting] = useState(false);
@@ -53,7 +48,7 @@ export function ReceiptDialog({
   const [showSmsInput, setShowSmsInput] = useState(false);
   const [smsInput, setSmsInput] = useState('');
 
-  // Load transaction data when dialog opens
+  // Fetch server-rendered receipt HTML when dialog opens
   useEffect(() => {
     if (!open || !transactionId) return;
 
@@ -67,15 +62,14 @@ export function ReceiptDialog({
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/pos/transactions/${transactionId}`);
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed to load transaction');
+        // Fetch transaction metadata for email/phone defaults
+        const metaRes = await fetch(`/api/pos/transactions/${transactionId}`);
+        const metaJson = await metaRes.json();
+        if (!metaRes.ok) throw new Error(metaJson.error || 'Failed to load transaction');
 
-        const tx = json.data;
-        const rcfg: MergedReceiptConfig | undefined = json.receipt_config ?? undefined;
-        const reviewUrls: Record<string, string> = json.review_urls ?? {};
-        setTransaction(tx);
-        setReceiptConfig(rcfg);
+        const tx = metaJson.data;
+        setTxId(tx.id);
+        setReceiptNumber(tx.receipt_number);
         setEmailInput(tx.customer?.email || customerEmail || '');
         setSmsInput(
           tx.customer?.phone
@@ -85,36 +79,10 @@ export function ReceiptDialog({
               : ''
         );
 
-        // Generate QR code images for review URL shortcodes
-        const images: ReceiptImages = {};
-        if (reviewUrls.google_review_url) {
-          images.qrGoogle = await QRCode.toDataURL(reviewUrls.google_review_url, { width: 150, margin: 1 });
-        }
-        if (reviewUrls.yelp_review_url) {
-          images.qrYelp = await QRCode.toDataURL(reviewUrls.yelp_review_url, { width: 150, margin: 1 });
-        }
-
-        const html = generateReceiptHtml(
-          {
-            receipt_number: tx.receipt_number,
-            transaction_date: tx.transaction_date,
-            subtotal: tx.subtotal,
-            tax_amount: tx.tax_amount,
-            discount_amount: tx.discount_amount,
-            coupon_code: tx.coupon_code,
-            loyalty_discount: tx.loyalty_discount,
-            loyalty_points_redeemed: tx.loyalty_points_redeemed,
-            tip_amount: tx.tip_amount,
-            total_amount: tx.total_amount,
-            customer: tx.customer,
-            employee: tx.employee,
-            vehicle: tx.vehicle,
-            items: tx.items ?? [],
-            payments: tx.payments ?? [],
-          },
-          rcfg,
-          images
-        );
+        // Fetch server-rendered HTML (includes barcode + QR codes)
+        const htmlRes = await fetch(`/api/pos/receipts/html?transaction_id=${transactionId}`);
+        if (!htmlRes.ok) throw new Error('Failed to generate receipt');
+        const html = await htmlRes.text();
         setReceiptHtml(html);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load receipt');
@@ -140,7 +108,7 @@ export function ReceiptDialog({
   }
 
   async function handleReceiptPrint() {
-    if (!transaction) return;
+    if (!txId) return;
     setPrinting(true);
     try {
       const controller = new AbortController();
@@ -149,7 +117,7 @@ export function ReceiptDialog({
       const res = await fetch('/api/pos/receipts/print-server', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: transaction.id }),
+        body: JSON.stringify({ transaction_id: txId }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -170,13 +138,13 @@ export function ReceiptDialog({
   }
 
   async function handleEmail(email: string) {
-    if (!email || !transaction) return;
+    if (!email || !txId) return;
     setEmailing(true);
     try {
       const res = await fetch('/api/pos/receipts/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: transaction.id, email }),
+        body: JSON.stringify({ transaction_id: txId, email }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Email failed');
@@ -191,13 +159,13 @@ export function ReceiptDialog({
   }
 
   async function handleSms(phone: string) {
-    if (!phone || !transaction) return;
+    if (!phone || !txId) return;
     setSmsing(true);
     try {
       const res = await fetch('/api/pos/receipts/sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: transaction.id, phone }),
+        body: JSON.stringify({ transaction_id: txId, phone }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'SMS failed');
@@ -216,7 +184,7 @@ export function ReceiptDialog({
       <DialogClose onClose={() => onOpenChange(false)} />
       <DialogHeader>
         <DialogTitle>
-          Receipt {transaction?.receipt_number ? `#${transaction.receipt_number}` : ''}
+          Receipt {receiptNumber ? `#${receiptNumber}` : ''}
         </DialogTitle>
       </DialogHeader>
       <DialogContent className="max-h-[60vh] overflow-y-auto">
@@ -231,7 +199,7 @@ export function ReceiptDialog({
           />
         )}
       </DialogContent>
-      {!loading && transaction && (
+      {!loading && txId && (
         <DialogFooter className="flex-col items-stretch gap-3">
           <div className="grid grid-cols-4 gap-2">
             <Button variant="outline" size="sm" onClick={handleCopierPrint}>
@@ -243,9 +211,8 @@ export function ReceiptDialog({
               variant="outline"
               size="sm"
               onClick={() => {
-                const email = transaction.customer?.email || customerEmail;
-                if (email) {
-                  handleEmail(email);
+                if (emailInput) {
+                  handleEmail(emailInput);
                 } else {
                   setShowEmailInput(true);
                 }
@@ -266,9 +233,8 @@ export function ReceiptDialog({
               variant="outline"
               size="sm"
               onClick={() => {
-                const phone = transaction.customer?.phone || customerPhone;
-                if (phone) {
-                  handleSms(phone);
+                if (smsInput) {
+                  handleSms(smsInput);
                 } else {
                   setShowSmsInput(true);
                 }
