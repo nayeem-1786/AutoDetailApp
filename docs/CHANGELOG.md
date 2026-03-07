@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Copier receipt — remove background, add border, proper page sizing — 2026-03-07
+
+Previous 100in tall @page caused the gray `background:#f5f5f5` to fill the entire page height, and the bizhub scaled that to letter paper — shrinking the receipt to ~1.5". Fix: in the copier route, strip the body background, replace the light gray receipt border with a clean black border, and reduce @page height from 100in to 20in (enough for any receipt). All changes are string replacements on the HTML in the copier route only — `generateReceiptHtml()`, email, and thermal paths are unchanged.
+
+Files changed:
+- `src/app/api/pos/receipts/print-copier/route.ts` — copier-specific HTML string replacements
+
+---
+
 ## fix: Single-page copier receipt via tall CSS page size — 2026-03-07
 
 Long receipts printed via copier (Konica bizhub) overflowed onto multiple pages. Fix: in the print-copier API route, inject `@page{size:8.5in 100in;margin:0.25in;}` into the HTML `<head>` before sending to the print server. Edge headless renders the receipt as a single tall PDF page. The bizhub then scales that one page to fit letter paper.

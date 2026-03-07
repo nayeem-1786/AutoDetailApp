@@ -111,11 +111,14 @@ export async function POST(request: NextRequest) {
       payments: tx.payments ?? [],
     }, merged, images);
 
-    // Inject tall @page so Edge headless renders a single-page PDF.
-    // The bizhub scales that one page to fit letter paper.
-    const copierHtml = html.includes('<head>')
-      ? html.replace('<head>', '<head><style>@page{size:8.5in 100in;margin:0.25in;}</style>')
-      : '<html><head><style>@page{size:8.5in 100in;margin:0.25in;}</style></head>' + html;
+    // Copier-specific HTML tweaks — remove gray background (causes 100in page to
+    // scale to tiny), set clean border, use 20in tall @page so Edge renders one page.
+    let copierHtml = html
+      .replace('background:#f5f5f5', 'background:none')
+      .replace('border:1px solid #ddd', 'border:1px solid #000');
+    copierHtml = copierHtml.includes('<head>')
+      ? copierHtml.replace('<head>', '<head><style>@page{size:8.5in 20in;margin:0.25in;}body{background:none !important;padding:0 !important;}.receipt-wrap{border:1px solid #000 !important;}</style>')
+      : '<html><head><style>@page{size:8.5in 20in;margin:0.25in;}body{background:none !important;padding:0 !important;}.receipt-wrap{border:1px solid #000 !important;}</style></head>' + copierHtml;
 
     // Send HTML to print server for PDF conversion + copier print (15s timeout)
     const controller = new AbortController();
