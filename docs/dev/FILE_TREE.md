@@ -369,6 +369,7 @@ src/app/api/pos/quotes/[id]/send/route.ts
 src/app/api/pos/quotes/route.ts
 src/app/api/pos/receipts/cash-drawer/route.ts
 src/app/api/pos/receipts/email/route.ts
+src/app/api/pos/receipts/html/route.ts
 src/app/api/pos/receipts/print/route.ts
 src/app/api/pos/receipts/print-copier/route.ts
 src/app/api/pos/receipts/print-server/route.ts

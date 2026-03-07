@@ -67,32 +67,32 @@ export function ReceiptOptions({
   }
 
   async function handleCopierPrint() {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      toast.error('Pop-up blocked — allow pop-ups and try again');
+      return;
+    }
+    printWindow.document.write('<html><body><p>Loading receipt…</p></body></html>');
+
     setCopierPrinting(true);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-
-      const res = await posFetch('/api/pos/receipts/print-copier', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: transactionId }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      const json = await res.json();
+      const res = await posFetch(`/api/pos/receipts/html?transaction_id=${transactionId}`);
       if (!res.ok) {
-        toast.error(json.error || 'Copier print failed');
+        printWindow.close();
+        const json = await res.json().catch(() => ({ error: 'Failed to load receipt' }));
+        toast.error(json.error || 'Failed to load receipt');
         return;
       }
 
-      toast.success('Printed to copier');
+      const html = await res.text();
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        toast.error('Copier unavailable — timed out');
-      } else {
-        toast.error(err instanceof Error ? err.message : 'Copier unavailable');
-      }
+      printWindow.close();
+      toast.error(err instanceof Error ? err.message : 'Print failed');
     } finally {
       setCopierPrinting(false);
     }

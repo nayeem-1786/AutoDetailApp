@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Print button uses native browser dialog (AirPrint supported) — 2026-03-07
+
+POS "Print" button now opens the receipt HTML in a popup window and triggers the native browser print dialog instead of routing through the print server's `/print-copier` endpoint. This enables printing via AirPrint Bridge to the Konica bizhub copier.
+
+New API route `GET /api/pos/receipts/html?transaction_id=...` returns the fully rendered receipt HTML with QR codes and barcode images. The print-copier route is kept as a fallback.
+
+Files changed:
+- `src/app/pos/components/receipt-options.tsx` — `handleCopierPrint()` now uses `window.open()` + `window.print()`
+- `src/app/api/pos/receipts/html/route.ts` — new route returning receipt HTML as `text/html`
+
+---
+
 ## fix: Copier receipt uses standard letter size — 2026-03-07
 
 Changed `@page` from `size:8.5in 20in` to `size:letter` — the 20in custom page was rejected by the bizhub. The real fix for shrinking was removing `background:#f5f5f5` (done in previous commit). With `background:none`, content height is the actual receipt, so standard letter works. Long receipts may overflow to page 2, which is acceptable.
