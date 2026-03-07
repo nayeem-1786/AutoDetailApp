@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Equal-size centered QR codes matching preview layout — 2026-03-06
+
+Rewrote QR pair raster rendering to match the HTML preview exactly. Root cause: previous code used per-QR scales (`scale1`/`scale2`), which still produced different pixel dimensions for each QR code.
+
+Fix: ONE shared `moduleSize` derived from the MAX module count between both QR codes. Both QR codes render into identical `qrPixelSize x qrPixelSize` canvases. The QR with fewer modules is centered within its canvas via a pixel offset (`Math.floor((qrPixelSize - actualSize) / 2)`). Added debug `console.log` to verify module counts, shared moduleSize, qrPixelSize, and raster dimensions.
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — QR pair rendering rewritten with shared moduleSize + centering offset
+
+---
+
 ## fix: Receipt alignment parity + equal QR sizes + QR centering — 2026-03-06
 
 Three thermal receipt printing fixes:
