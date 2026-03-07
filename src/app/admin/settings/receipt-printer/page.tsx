@@ -490,6 +490,8 @@ export default function ReceiptPrinterPage() {
       const receiptLines = generateReceiptLines(sampleTx, buildMergedConfig(), reviewContext);
       const escPosData = receiptToEscPos(receiptLines, 48);
 
+      console.log('[receipt] Admin test print — first 20 bytes:', Array.from(escPosData.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(''), '| total:', escPosData.length, 'bytes');
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 

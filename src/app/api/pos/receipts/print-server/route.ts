@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
 
     const escPosData = receiptToEscPos(receiptLines, 48);
 
+    console.log('[receipt] POS print — first 20 bytes:', Buffer.from(escPosData.slice(0, 20)).toString('hex'), '| total:', escPosData.length, 'bytes');
+
     // Send binary data to local print server with 3-second timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);

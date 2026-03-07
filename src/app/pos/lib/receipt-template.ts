@@ -847,10 +847,13 @@ const ESC = 0x1B;
 const LF = 0x0A;
 
 const CMD_INIT = [ESC, 0x40]; // Initialize printer
-// Standard ESC/POS commands — NO 0x1D bytes (except logo trigger and cut)
-// futurePRNT inserts NV logo at every 0x1D after ESC @ init.
-// Only two 0x1D bytes allowed: CMD_LOGO_TRIGGER (logo) and CMD_CUT (cut).
+// futurePRNT inserts NV logo at the first 0x1D after ESC @ init.
+// Additional 0x1D bytes (barcode GS h/w/H/k, QR raster GS v 0) are
+// parsed correctly by futurePRNT and do NOT trigger extra logos.
 const CMD_LOGO_TRIGGER = [0x1D, 0x42, 0x00]; // GS B 0 — disable reverse (no-op), triggers futurePRNT logo
+// Explicit margin/width reset — prevents right-shift from residual printer state
+const CMD_MARGIN_RESET = [0x1D, 0x4C, 0x00, 0x00]; // GS L 0 0 — left margin = 0 dots
+const CMD_WIDTH_RESET = [0x1D, 0x57, 0x80, 0x01];   // GS W 384 — print area = full 384 dots
 const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];     // ESC a 0
 const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];   // ESC a 1
 const CMD_ALIGN_RIGHT = [ESC, 0x61, 0x02];    // ESC a 2
@@ -889,6 +892,9 @@ export function receiptToEscPos(
   parts.push(...CMD_INIT);
   // Trigger futurePRNT to insert NV logo (must be first 0x1D after init)
   parts.push(...CMD_LOGO_TRIGGER);
+  // Explicitly reset margins to prevent right-shift from residual printer state
+  parts.push(...CMD_MARGIN_RESET);
+  parts.push(...CMD_WIDTH_RESET);
   parts.push(LF); // Space after logo
   parts.push(...CMD_BOLD_ON); // Bold on globally for crisp dark text
 

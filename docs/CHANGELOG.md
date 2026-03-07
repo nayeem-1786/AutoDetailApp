@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Receipt centering parity between admin test and POS print — 2026-03-06
+
+POS receipts shifted slightly right vs admin test prints. Root cause: `receiptToEscPos()` relied solely on `ESC @` (init) to reset printer state, but `ESC @` restores the printer's stored defaults — if a previous print job's barcode/QR raster commands (`GS v 0`, `GS k`) left the print area in a state that `ESC @` doesn't fully clear, subsequent prints inherit a residual left margin offset. Admin test prints worked because they were isolated (printer freshly initialized).
+
+Fix: Added explicit `GS L 0 0` (left margin = 0 dots) and `GS W 384` (full 384-dot print width) right after the logo trigger. This ensures a known-good print area on every receipt regardless of residual printer state from previous jobs. Also updated the outdated `0x1D` byte comments — barcode and QR sections legitimately use additional `GS` commands (`GS h`, `GS w`, `GS H`, `GS k`, `GS v 0`) that futurePRNT parses correctly without triggering extra logos.
+
+Debug logging added to both paths (first 20 bytes as hex + total byte count) for future comparison.
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — added `CMD_MARGIN_RESET` + `CMD_WIDTH_RESET` after init, updated comments
+- `src/app/api/pos/receipts/print-server/route.ts` — hex debug logging
+- `src/app/admin/settings/receipt-printer/page.tsx` — hex debug logging
+
+---
+
 ## fix: Equal-size side-by-side QR codes centered on receipt — 2026-03-06
 
 Complete rewrite of ESC/POS QR pair rendering. Previous code produced unequal-size QR codes (different module counts → different pixel dimensions) and stacked them vertically instead of side-by-side.
