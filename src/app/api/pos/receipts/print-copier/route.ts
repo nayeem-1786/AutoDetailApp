@@ -6,6 +6,7 @@ import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import type { ReceiptImages } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 import QRCode from 'qrcode';
+import bwipjs from 'bwip-js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,6 +70,18 @@ export async function POST(request: NextRequest) {
     }
     if (reviewSettings.yelp_review_url) {
       images.qrYelp = await QRCode.toDataURL(reviewSettings.yelp_review_url, { width: 150, margin: 1 });
+    }
+    if (transaction.receipt_number) {
+      try {
+        const buf = await bwipjs.toBuffer({
+          bcid: 'code128',
+          text: transaction.receipt_number,
+          scale: 2,
+          height: 10,
+          includetext: false,
+        });
+        images.barcode = `data:image/png;base64,${buf.toString('base64')}`;
+      } catch { /* barcode generation failed — fallback to text */ }
     }
 
     if (!print_server_url) {

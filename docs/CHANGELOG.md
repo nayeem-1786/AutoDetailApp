@@ -4,14 +4,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix: Equal-size centered QR codes matching preview layout — 2026-03-06
+## revert: Remove copier print scaling — restore original receipt styling — 2026-03-06
 
-Rewrote QR pair raster rendering to match the HTML preview exactly. Root cause: previous code used per-QR scales (`scale1`/`scale2`), which still produced different pixel dimensions for each QR code.
+Reverted all `@media print` CSS, inline `<script>` zoom logic, and copier-specific image sizing added in the previous session. These changes did not successfully constrain the PDF to one page and caused visual regressions.
 
-Fix: ONE shared `moduleSize` derived from the MAX module count between both QR codes. Both QR codes render into identical `qrPixelSize x qrPixelSize` canvases. The QR with fewer modules is centered within its canvas via a pixel offset (`Math.floor((qrPixelSize - actualSize) / 2)`). Added debug `console.log` to verify module counts, shared moduleSize, qrPixelSize, and raster dimensions.
+Kept intact: barcode image generation via `bwip-js` (`{barcode_receipt}` shortcode renders Code 128 `<img>` in email and copier receipts).
+
+## feat: Email/copier receipt barcode images — 2026-03-06
+
+`{barcode_receipt}` shortcode now renders an actual Code 128 barcode image (via `bwip-js`) instead of monospace text with "Scan barcode on printed receipt" note. Falls back to text when barcode generation fails or in preview mode.
 
 Files changed:
-- `src/app/pos/lib/receipt-template.ts` — QR pair rendering rewritten with shared moduleSize + centering offset
+- `src/app/pos/lib/receipt-template.ts` — `ReceiptImages.barcode` field, barcode `<img>` in `renderShortcodeElement()`
+- `src/app/api/pos/receipts/email/route.ts` — generate barcode data URL via `bwip-js`
+- `src/app/api/pos/receipts/print-copier/route.ts` — generate barcode data URL via `bwip-js`
+- `package.json` — added `bwip-js` + `@types/bwip-js`
+
+---
+
+## fix: QR label clipping + blank line spacing in custom text zones — 2026-03-06
+
+Two receipt printing fixes:
+
+1. **"R" clipped in "Review on Google"**: At 2x font scale, the 190px-wide label centered over the ~182px QR column started at negative x coordinates, causing the left edge to be clipped. Fixed by clamping `startX` to 0 so the label shifts right instead of overflowing off-canvas.
+
+2. **Blank lines ignored in custom text zones**: Empty lines (Enter key) in zone content were skipped by `if (!trimmed) continue`. Now emits a `LF` for each blank line, giving full control over vertical spacing between content and QR codes.
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — `startX` clamped to 0; blank lines emit `{ type: 'text', text: '' }`
+
+---
+
+## fix: Pixel-perfect QR label centering via raster embedding — 2026-03-06
+
+Labels ("Review on Google" / "Review on Yelp") are now rendered as pixels directly in the raster bitmap instead of as a separate text line. Previous approach used 8px character granularity for labels vs 1px precision for QR codes, causing up to 7px misalignment. Now labels and QR codes share the same pixel coordinate system — a 5x7 bitmap font renders each label centered at `leftPad + targetPx/2` with exact pixel math, guaranteeing pixel-perfect alignment.
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — bitmap font glyphs + raster label rendering, removed text-based label block
+
+---
+
+## fix: Equal-size QR codes via fractional module mapping — 2026-03-06
+
+Rewrote QR pair raster rendering to use fractional pixel-to-module mapping instead of integer `moduleSize`. Previous approaches (shared moduleSize, per-QR scales) always produced visibly different QR pattern sizes due to integer rounding.
+
+Fix: Each output pixel maps to its QR module via `floor(x * totalModules / targetPx)` — the 1-bit equivalent of CSS sub-pixel scaling. Both QR codes produce bitmaps of EXACTLY `targetPx x targetPx` pixels with patterns filling the full canvas. No rounding gaps, no centering offsets needed.
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — QR pair rendering rewritten with fractional module mapping
 
 ---
 
