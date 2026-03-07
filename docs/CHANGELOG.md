@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Equal-size QR codes on thermal receipts — 2026-03-06
+
+Side-by-side QR codes (Google/Yelp) were different sizes because each URL produces a different QR module count, and the code used a fixed pixel scale per module. Now both QR codes share the same pixel dimensions: the module count of the larger QR determines a shared module size (`floor((384 - gap) / 2 / totalModules)`), and the smaller QR is centered within the same-size box with extra quiet zone padding. Gap increased from 16px to 20px.
+
+Files changed:
+- `src/app/pos/lib/receipt-template.ts` — ESC/POS QR pair rendering: shared module size, equal pixel dimensions, centered padding for smaller QR
+
+---
+
 ## feat: Receipt barcode + QR code shortcodes for reviews — 2026-03-06
 
 Three new shortcodes for receipt custom text zones (Admin > Settings > Receipt Printer):

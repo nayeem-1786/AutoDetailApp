@@ -1003,7 +1003,7 @@ export function receiptToEscPos(
         const isPair = nextLine?.type === 'qr' && nextLine?.qrData;
 
         if (isPair) {
-          // --- Side-by-side QR pair ---
+          // --- Side-by-side QR pair (equal-size) ---
           console.log('[ESC/POS] Rendering QR pair side-by-side');
           const PRINTER_WIDTH = 384; // 48 bytes * 8 bits
           const CHAR_WIDTH = 8;      // pixels per character
@@ -1012,26 +1012,33 @@ export function receiptToEscPos(
             const qr1 = QRCode.create(line.qrData, { errorCorrectionLevel: 'M' });
             const qr2 = QRCode.create(nextLine.qrData!, { errorCorrectionLevel: 'M' });
 
-            const SCALE = 3;  // smaller modules to fit two QR codes
             const QUIET = 2;
-            const imgGap = 16;
+            const imgGap = 20;
 
             const size1 = qr1.modules.size;
             const size2 = qr2.modules.size;
-            const qr1Width = (size1 + 2 * QUIET) * SCALE;
-            const qr2Width = (size2 + 2 * QUIET) * SCALE;
-            const qr1Height = qr1Width;
-            const qr2Height = qr2Width;
-            const imgHeight = Math.max(qr1Height, qr2Height);
+            const maxModuleCount = Math.max(size1, size2);
 
-            const totalContentWidth = qr1Width + imgGap + qr2Width;
+            // Both QR codes use the same module size and pixel dimensions
+            const totalModules = maxModuleCount + 2 * QUIET;
+            const SCALE = Math.floor((PRINTER_WIDTH - imgGap) / 2 / totalModules);
+            const qrPixels = totalModules * SCALE;
+            const imgHeight = qrPixels;
+
+            // Padding offsets to center smaller QR within the shared pixel box
+            const qr1PadModules = maxModuleCount - size1;
+            const qr1ModuleOffset = Math.floor(qr1PadModules / 2);
+            const qr2PadModules = maxModuleCount - size2;
+            const qr2ModuleOffset = Math.floor(qr2PadModules / 2);
+
+            const totalContentWidth = qrPixels + imgGap + qrPixels;
             const leftPad = Math.max(0, Math.floor((PRINTER_WIDTH - totalContentWidth) / 2));
 
             // Print labels centered over each QR code
             const label1 = line.qrLabel || '';
             const label2 = nextLine.qrLabel || '';
-            const qr1CenterChar = Math.round((leftPad + qr1Width / 2) / CHAR_WIDTH);
-            const qr2CenterChar = Math.round((leftPad + qr1Width + imgGap + qr2Width / 2) / CHAR_WIDTH);
+            const qr1CenterChar = Math.round((leftPad + qrPixels / 2) / CHAR_WIDTH);
+            const qr2CenterChar = Math.round((leftPad + qrPixels + imgGap + qrPixels / 2) / CHAR_WIDTH);
 
             const labelChars = new Array(width).fill(' ');
             const l1Start = Math.max(0, qr1CenterChar - Math.floor(label1.length / 2));
@@ -1046,7 +1053,7 @@ export function receiptToEscPos(
             parts.push(...textToBytes(labelChars.join('')));
             parts.push(LF);
 
-            // Combined raster bitmap with both QR codes
+            // Combined raster bitmap with both QR codes (same pixel size)
             const bytesPerRow = Math.ceil(PRINTER_WIDTH / 8);
 
             // GS v 0 — Print raster bit image
@@ -1062,18 +1069,18 @@ export function receiptToEscPos(
                   const xRel = x - leftPad;
                   let isBlack = false;
 
-                  if (xRel >= 0 && xRel < qr1Width && y < qr1Height) {
-                    // QR1 region
-                    const moduleCol = Math.floor(xRel / SCALE) - QUIET;
-                    const moduleRow = Math.floor(y / SCALE) - QUIET;
+                  if (xRel >= 0 && xRel < qrPixels && y < qrPixels) {
+                    // QR1 region — center smaller QR within shared box
+                    const moduleCol = Math.floor(xRel / SCALE) - QUIET - qr1ModuleOffset;
+                    const moduleRow = Math.floor(y / SCALE) - QUIET - qr1ModuleOffset;
                     if (moduleRow >= 0 && moduleRow < size1 && moduleCol >= 0 && moduleCol < size1) {
                       isBlack = !!qr1.modules.data[moduleRow * size1 + moduleCol];
                     }
-                  } else if (xRel >= qr1Width + imgGap && xRel < qr1Width + imgGap + qr2Width && y < qr2Height) {
-                    // QR2 region
-                    const xInQr2 = xRel - qr1Width - imgGap;
-                    const moduleCol = Math.floor(xInQr2 / SCALE) - QUIET;
-                    const moduleRow = Math.floor(y / SCALE) - QUIET;
+                  } else if (xRel >= qrPixels + imgGap && xRel < qrPixels + imgGap + qrPixels && y < qrPixels) {
+                    // QR2 region — center smaller QR within shared box
+                    const xInQr2 = xRel - qrPixels - imgGap;
+                    const moduleCol = Math.floor(xInQr2 / SCALE) - QUIET - qr2ModuleOffset;
+                    const moduleRow = Math.floor(y / SCALE) - QUIET - qr2ModuleOffset;
                     if (moduleRow >= 0 && moduleRow < size2 && moduleCol >= 0 && moduleCol < size2) {
                       isBlack = !!qr2.modules.data[moduleRow * size2 + moduleCol];
                     }
