@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Copier receipt uses standard letter size — 2026-03-07
+
+Changed `@page` from `size:8.5in 20in` to `size:letter` — the 20in custom page was rejected by the bizhub. The real fix for shrinking was removing `background:#f5f5f5` (done in previous commit). With `background:none`, content height is the actual receipt, so standard letter works. Long receipts may overflow to page 2, which is acceptable.
+
+Files changed:
+- `src/app/api/pos/receipts/print-copier/route.ts` — `@page{size:letter;margin:0.25in;}`
+
+---
+
 ## fix: Copier receipt — remove background, add border, proper page sizing — 2026-03-07
 
 Previous 100in tall @page caused the gray `background:#f5f5f5` to fill the entire page height, and the bizhub scaled that to letter paper — shrinking the receipt to ~1.5". Fix: in the copier route, strip the body background, replace the light gray receipt border with a clean black border, and reduce @page height from 100in to 20in (enough for any receipt). All changes are string replacements on the HTML in the copier route only — `generateReceiptHtml()`, email, and thermal paths are unchanged.
