@@ -496,7 +496,7 @@ export default function ReceiptPrinterPage() {
       const res = await fetch(`${config.print_server_url}/print`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
-        body: escPosData.buffer as ArrayBuffer,
+        body: escPosData,
         signal: controller.signal,
       });
       clearTimeout(timeout);

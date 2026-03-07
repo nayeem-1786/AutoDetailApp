@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Receipt alignment parity + equal QR sizes + QR centering — 2026-03-06
+
+Three thermal receipt printing fixes:
+
+1. **Receipt alignment parity**: Admin test print and POS receipt now use identical body encoding (`Uint8Array` directly). Previously admin sent `escPosData.buffer as ArrayBuffer` (browser) while POS sent `Buffer.from(escPosData)` (Node.js), potentially causing byte-level differences that shifted the POS receipt right.
+
+2. **Equal QR sizes**: Rewrote QR pair rendering to use per-QR scales instead of a shared module size. Each QR now gets its own scale (`floor(qrPx / (mod + 2*quiet))`) so both fill their allocated box maximally, producing approximately equal visual sizes regardless of different module counts (QR versions).
+
+3. **QR centering**: Fixed via Issue 1 (body encoding parity). The raster itself was already full-width (384px = 48 bytes/row) with built-in leftPad centering.
+
+Also removed stale debug `console.log` statements from QR rendering.
+
+Files changed:
+- `src/app/admin/settings/receipt-printer/page.tsx` — body encoding: `escPosData` (was `escPosData.buffer as ArrayBuffer`)
+- `src/app/api/pos/receipts/print-server/route.ts` — body encoding: `escPosData` (was `Buffer.from(escPosData)`)
+- `src/app/pos/lib/receipt-template.ts` — QR pair rendering rewritten with per-QR scales
+
+---
+
 ## revert: Remove GS L/GS W margin commands — violates 0x1D rule — 2026-03-06
 
 Reverted the previous `GS L 0 0` + `GS W 384` margin/width reset added to the ESC/POS init sequence. These added extra `0x1D` bytes which violates the proven futurePRNT rule (every `0x1D` after `ESC @` triggers a logo insertion). Additionally, `GS W 384` set the print width to 384 dots (48mm) instead of the printer's full 576 dots (72mm), shrinking the receipt to ~36 characters. Removed debug `console.log` statements from both print paths.
