@@ -89,7 +89,36 @@ export function ReceiptOptions({
       printWindow.document.write(html);
       printWindow.document.close();
       printWindow.focus();
-      printWindow.print();
+
+      // Wait for all images to load before printing
+      let printed = false;
+      const triggerPrint = () => {
+        if (printed) return;
+        printed = true;
+        printWindow.print();
+      };
+
+      const images = printWindow.document.querySelectorAll('img');
+      if (images.length === 0) {
+        setTimeout(() => triggerPrint(), 300);
+      } else {
+        let loaded = 0;
+        const total = images.length;
+        const doPrint = () => {
+          loaded++;
+          if (loaded >= total) setTimeout(() => triggerPrint(), 300);
+        };
+        images.forEach(img => {
+          if (img.complete) {
+            doPrint();
+          } else {
+            img.onload = doPrint;
+            img.onerror = doPrint; // print anyway if image fails
+          }
+        });
+        // Hard fallback — print after 3 seconds regardless
+        setTimeout(() => triggerPrint(), 3000);
+      }
     } catch (err) {
       printWindow.close();
       toast.error(err instanceof Error ? err.message : 'Print failed');

@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Prevent duplicate print dialog from fallback timer — 2026-03-07
+
+The 3-second hard fallback `setTimeout` in `handleCopierPrint()` fired `printWindow.print()` a second time even after images had already loaded and triggered the first print, opening a duplicate print dialog.
+
+Added a `printed` guard flag and `triggerPrint()` wrapper so `print()` only fires once regardless of whether images load first or the fallback timer fires first.
+
+Files changed:
+- `src/app/pos/components/receipt-options.tsx`
+
+---
+
 ## fix: Downgrade node-cron 4.x→3.x to eliminate startup event loop blockage — 2026-03-07
 
 node-cron 4.x has a synchronous catch-up while-loop that blocks the entire Node.js event loop on startup (observed 17+ minutes of total blockage). Downgraded to node-cron 3.0.3 which has no catch-up mechanism.
