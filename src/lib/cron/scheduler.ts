@@ -1,11 +1,17 @@
 import cron from 'node-cron';
 
 const CRON_API_KEY = process.env.CRON_API_KEY;
-// Use localhost — cron runs inside the Next.js process, no need for external round-trip
-const BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
+
+function getBaseUrl(): string {
+  return process.env.CRON_BASE_URL
+    || `http://localhost:${process.env.PORT || 3000}`;
+}
 
 const CRON_KEY = '__smartdetails_cron_initialized__';
 const RUNNING_JOBS_KEY = '__smartdetails_cron_running__';
+
+const PROCESS_START_TIME = Date.now();
+const STARTUP_GRACE_MS = 60_000;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getRunningJobs(): Set<string> {
@@ -29,7 +35,7 @@ async function callCronEndpoint(
       if (attempt > 0) {
         console.log(`[CRON] Retrying ${name} (attempt ${attempt + 1})...`);
       }
-      const response = await fetch(`${BASE_URL}${path}`, {
+      const response = await fetch(`${getBaseUrl()}${path}`, {
         method: 'GET',
         headers: { 'x-api-key': CRON_API_KEY || '' },
         signal: AbortSignal.timeout(timeoutMs),
@@ -58,6 +64,11 @@ async function runJob(
   endpoint: string,
   timeoutMs?: number
 ) {
+  if (Date.now() - PROCESS_START_TIME < STARTUP_GRACE_MS) {
+    console.log(`[CRON] Skipping ${name} — startup grace window`);
+    return;
+  }
+
   const runningJobs = getRunningJobs();
 
   if (runningJobs.has(name)) {
@@ -91,54 +102,29 @@ export function setupCronJobs() {
   (globalThis as any)[CRON_KEY] = true;
 
   console.log('[CRON] Initializing internal cron scheduler...');
+  console.log('[CRON] BASE_URL:', getBaseUrl());
 
-  // Lifecycle engine — every 10 minutes
-  cron.schedule('*/10 * * * *', () => {
-    runJob('lifecycle-engine', '/api/cron/lifecycle-engine');
-  }, { scheduled: true, catchUp: false });
+  const tasks: { name: string; expr: string; fn: () => void; timeoutMs?: number }[] = [
+    { name: 'lifecycle-engine', expr: '*/10 * * * *', fn: () => runJob('lifecycle-engine', '/api/cron/lifecycle-engine') },
+    { name: 'quote-reminders', expr: '30 * * * *', fn: () => runJob('quote-reminders', '/api/cron/quote-reminders') },
+    { name: 'stock-alerts', expr: '0 16 * * *', fn: () => runJob('stock-alerts', '/api/cron/stock-alerts') },
+    { name: 'qbo-sync', expr: '*/30 * * * *', fn: () => runJob('qbo-sync', '/api/cron/qbo-sync', 15 * 60 * 1000) },
+    { name: 'theme-activation', expr: '*/15 * * * *', fn: () => runJob('theme-activation', '/api/cron/theme-activation') },
+    { name: 'google-reviews', expr: '0 14 * * *', fn: () => runJob('google-reviews', '/api/cron/google-reviews') },
+    { name: 'cleanup-orders', expr: '0 */6 * * *', fn: () => runJob('cleanup-orders', '/api/cron/cleanup-orders') },
+    { name: 'cleanup-idempotency', expr: '0 11 * * *', fn: () => runJob('cleanup-idempotency', '/api/cron/cleanup-idempotency') },
+    { name: 'cleanup-audit-log', expr: '30 11 * * *', fn: () => runJob('cleanup-audit-log', '/api/cron/cleanup-audit-log') },
+  ];
 
-  // Quote reminders — every hour at :30
-  cron.schedule('30 * * * *', () => {
-    runJob('quote-reminders', '/api/cron/quote-reminders');
-  }, { scheduled: true, catchUp: false });
+  // Stagger task starts 2s apart to avoid aligned schedule bursts
+  tasks.forEach(({ expr, fn, name }, i) => {
+    setTimeout(() => {
+      cron.schedule(expr, fn);
+      console.log(`[CRON] Started ${name}`);
+    }, i * 2000);
+  });
 
-  // Stock alerts — daily at 8:00 AM PST (16:00 UTC)
-  cron.schedule('0 16 * * *', () => {
-    runJob('stock-alerts', '/api/cron/stock-alerts');
-  }, { scheduled: true, catchUp: false });
-
-  // QBO auto-sync — every 30 minutes (15-min timeout for long syncs)
-  cron.schedule('*/30 * * * *', () => {
-    runJob('qbo-sync', '/api/cron/qbo-sync', 15 * 60 * 1000);
-  }, { scheduled: true, catchUp: false });
-
-  // Theme auto-activation — every 15 minutes
-  cron.schedule('*/15 * * * *', () => {
-    runJob('theme-activation', '/api/cron/theme-activation');
-  }, { scheduled: true, catchUp: false });
-
-  // Google reviews refresh — daily at 6:00 AM PST (14:00 UTC)
-  cron.schedule('0 14 * * *', () => {
-    runJob('google-reviews', '/api/cron/google-reviews');
-  }, { scheduled: true, catchUp: false });
-
-  // Abandoned order cleanup — every 6 hours
-  cron.schedule('0 */6 * * *', () => {
-    runJob('cleanup-orders', '/api/cron/cleanup-orders');
-  }, { scheduled: true, catchUp: false });
-
-  // Idempotency key cleanup — daily at 3 AM PST (11:00 UTC)
-  cron.schedule('0 11 * * *', () => {
-    runJob('cleanup-idempotency', '/api/cron/cleanup-idempotency');
-  }, { scheduled: true, catchUp: false });
-
-  // Audit log retention cleanup — daily at 3:30 AM PST (11:30 UTC)
-  cron.schedule('30 11 * * *', () => {
-    runJob('cleanup-audit-log', '/api/cron/cleanup-audit-log');
-  }, { scheduled: true, catchUp: false });
-
-  const jobCount = 9;
-  console.log(`[CRON] Registered ${jobCount} jobs:`);
+  console.log(`[CRON] Registered ${tasks.length} jobs (staggered start, 2s apart):`);
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
   console.log('  - stock-alerts: daily at 8:00 AM PST');

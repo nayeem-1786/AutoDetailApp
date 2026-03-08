@@ -4,12 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix: Disable node-cron catchUp to prevent startup execution flood — 2026-03-07
+## fix: Downgrade node-cron 4.x→3.x to eliminate startup event loop blockage — 2026-03-07
 
-node-cron 4.x defaults `catchUp: true`, which executes all missed schedules on startup. After hours of server downtime, this fires hundreds of simultaneous HTTP requests to cron endpoints, saturating the event loop. Added `{ scheduled: true, catchUp: false }` to all 9 `cron.schedule()` calls so missed executions are skipped and jobs only run on the next scheduled interval.
+node-cron 4.x has a synchronous catch-up while-loop that blocks the entire Node.js event loop on startup (observed 17+ minutes of total blockage). Downgraded to node-cron 3.0.3 which has no catch-up mechanism.
+
+Changes:
+1. **Downgraded**: `node-cron` 4.2.1 → 3.0.3, `@types/node-cron` → 3.0.3
+2. **Rewrote scheduler**: `cron.createTask()` + `noOverlap` (4.x API) → `cron.schedule()` (3.x API)
+3. **Kept overlap prevention**: `runningJobs` Set in `runJob()` — same defense-in-depth
+4. **Kept startup grace**: 60s `STARTUP_GRACE_MS` — skips all cron triggers during server init
+5. **Kept `getBaseUrl()`**: `CRON_BASE_URL` env var fixes port mismatch on alternate ports
+6. **Kept staggered starts**: Jobs start 2s apart via `setTimeout` to avoid aligned bursts
+7. **Declarative job array**: All 9 jobs in a single array, iterated with `forEach`
 
 Files changed:
-- `src/lib/cron/scheduler.ts` — `catchUp: false` on all 9 jobs
+- `src/lib/cron/scheduler.ts` — full rewrite for node-cron 3.x API
+- `package.json` / `package-lock.json` — node-cron 3.0.3
+- `.env.local` — `CRON_BASE_URL=http://localhost:3000`
 
 ---
 
