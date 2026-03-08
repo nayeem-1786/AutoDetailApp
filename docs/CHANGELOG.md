@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: Add AirPrint cross-subnet troubleshooting — 2026-03-08
+
+Documented the full AirPrint cross-subnet printing investigation in `docs/dev/TROUBLESHOOTING.md`. Three root causes: disabled pfSense firewall rule, CUPS 403 from sharing disabled, and IPv6 ULA address causing iOS to connect to unroutable address. Includes verification steps, CUPS duplicate mDNS fix, AirPrint Bridge operational notes, service persistence after reboot, and pfSense reference.
+
+---
+
 ## fix: Auto-close receipt popup after print dialog dismisses — 2026-03-07
 
 After the copier print dialog closed, the popup window with receipt HTML stayed open requiring manual close. Added `printWindow.close()` after `printWindow.print()` in `triggerPrint()` — `print()` is synchronous so `close()` fires only after the user clicks Print or Cancel.

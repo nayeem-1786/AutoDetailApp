@@ -295,4 +295,121 @@ Complete troubleshooting history and futurePRNT configuration checklist: `docs/h
 
 ---
 
-*Last updated: 2026-03-05*
+## AirPrint Cross-Subnet Printing (March 8, 2026)
+
+### Setup
+- Mac Tower (Mac-Pro, 192.168.1.156) runs CUPS + AirPrint Bridge
+- LAN subnet: 192.168.1.x (SD-Auto-Spa Eero WiFi + wired)
+- WIFI subnet: 192.168.2.x (Lomita-PRINT ORBI WiFi)
+- pfSense HP T620 Plus routes between subnets
+- Avahi installed on pfSense for mDNS reflection between LAN and WIFI
+
+### Symptom
+Devices on SD-Auto-Spa WiFi (192.168.1.x) could print fine. Devices on Lomita-PRINT WiFi (192.168.2.x) could DISCOVER printers (Avahi working) but print jobs failed with "Printer no longer available" or printer would not stay selected in iOS print dialog.
+
+### Root Causes Found (in order of discovery)
+
+**1. pfSense WIFI→LAN firewall rule was disabled**
+A rule existed allowing WIFI subnets → LAN subnets but was disabled (red X). Enabled it (Action: Pass, Protocol: any). This allowed TCP traffic from 192.168.2.x to reach Mac Tower at 192.168.1.156:631.
+
+**2. CUPS returning 403 Forbidden from WIFI subnet**
+After enabling the firewall rule, curl from MBP on Lomita-PRINT returned HTTP 403 from 192.168.1.156:631. Root cause: `_share_printers=0` — CUPS sharing had been disabled earlier to suppress duplicate mDNS entries. Re-enabled with:
+```bash
+cupsctl --share-printers
+```
+To prevent CUPS from broadcasting its own mDNS (which causes no-hyphen duplicate entries), also run:
+```bash
+cupsctl BrowseLocalProtocols=none
+```
+This keeps CUPS accepting print jobs while letting AirPrint Bridge be the sole mDNS advertiser.
+
+**3. Mac Tower advertising IPv6 ULA address (most critical)**
+iOS prefers IPv6 over IPv4. Mac Tower was advertising both:
+- 192.168.1.156 (IPv4, routable across subnets) ✅
+- FD97:D0D3:... (IPv6 ULA, NOT routable cross-subnet) ❌
+
+iOS would attempt to connect via the IPv6 address, which pfSense does not route between subnets, causing the connection to silently fail. Confirmed with:
+```bash
+dns-sd -G v4v6 Mac-Pro.local
+```
+Fix: Disable IPv6 on the active Ethernet interface on Mac Tower:
+```bash
+networksetup -listallnetworkservices  # find active interface
+networksetup -setv6off "Ethernet 2"   # disable IPv6
+```
+After this, Mac-Pro.local only resolves to 192.168.1.156 and cross-subnet printing works immediately.
+
+### Verification Steps
+```bash
+# 1. From MBP on Lomita-PRINT WiFi:
+curl -v --ipv4 http://192.168.1.156:631/ --connect-timeout 5
+# Should return 200 OK (not 403 or connection refused)
+
+# 2. Check what addresses Mac-Pro.local resolves to:
+dns-sd -G v4v6 Mac-Pro.local
+# Should only show 192.168.1.156, no FD97: IPv6 address
+
+# 3. Check CUPS is listening on all interfaces:
+netstat -an | grep 631
+# Should show *.631 LISTEN (not just 127.0.0.1.631)
+
+# 4. Check CUPS sharing and browsing settings:
+cupsctl | grep -E "share|browse|remote"
+# _share_printers=1, BrowseLocalProtocols=none
+```
+
+### CUPS Duplicate mDNS Entries
+When `cupsctl --share-printers` is enabled, CUPS broadcasts its own mDNS using the Computer Name ("Mac Pro" with space) while AirPrint Bridge uses the LocalHostName ("Mac-Pro" with hyphen). This causes duplicate entries in the printer list. Fix:
+```bash
+cupsctl BrowseLocalProtocols=none
+sudo killall cupsd
+sudo launchctl start org.cups.cupsd
+```
+
+### AirPrint Bridge — Critical Operational Notes
+- The RUNNING launcher is `/usr/local/bin/airprint_bridge_launcher.sh` NOT `/Applications/Utilities/AirPrint_Bridge/airprint_bridge_launcher.sh`. Always apply sed fixes to BOTH files.
+- After every `airprint_bridge.sh -i` regeneration, apply:
+```bash
+sudo sed -i '' 's/Color=F/Color=T/g' /usr/local/bin/airprint_bridge_launcher.sh
+sudo sed -i '' 's/DM1,DM2,DM3/DM1,DM3/g' /usr/local/bin/airprint_bridge_launcher.sh
+sudo sed -i '' 's/MS_4X6,//g' /usr/local/bin/airprint_bridge_launcher.sh
+```
+- `MS_4X6` in URF string causes iOS to default to 4x6 paper for photos
+- If a printer entry goes missing from the launcher after `-i`, manually add it via sed before the wait line
+- Konica entry silently dropped during one install — had to be added:
+```bash
+sudo sed -i '' '/^wait$/i\ dns-sd -R "Konica..." ...' launcher.sh
+```
+- iOS caches printer capabilities — after changing URF/Color settings, use: any app → Print → tap printer ⓘ → Forget This Printer, then re-discover to pick up new capabilities
+
+### Service Persistence After Reboot
+Both CUPS and AirPrint Bridge survive power cycles and reboots automatically on Mac Tower:
+
+- **CUPS**: Managed by macOS launchd as a system service. Starts automatically at boot before any user logs in. No configuration needed.
+
+- **AirPrint Bridge**: Installed as a LaunchDaemon via `sudo ./airprint_bridge.sh -i` which created: `/Library/LaunchDaemons/com.sapireli.airprint_bridge.plist`. Starts automatically at boot. Both printers are advertising on the network before anyone logs in.
+
+⚠️ **WARNING**: If `airprint_bridge.sh -i` is ever run again (to add a printer, update config, etc.), it regenerates the launcher and resets `Color=F` and re-adds `MS_4X6`. Always re-apply sed fixes immediately after any regeneration:
+```bash
+sudo sed -i '' 's/Color=F/Color=T/g' /usr/local/bin/airprint_bridge_launcher.sh
+sudo sed -i '' 's/DM1,DM2,DM3/DM1,DM3/g' /usr/local/bin/airprint_bridge_launcher.sh
+sudo sed -i '' 's/MS_4X6,//g' /usr/local/bin/airprint_bridge_launcher.sh
+sudo sed -i '' 's/Color=F/Color=T/g' /Applications/Utilities/AirPrint_Bridge/airprint_bridge_launcher.sh
+sudo sed -i '' 's/DM1,DM2,DM3/DM1,DM3/g' /Applications/Utilities/AirPrint_Bridge/airprint_bridge_launcher.sh
+sudo sed -i '' 's/MS_4X6,//g' /Applications/Utilities/AirPrint_Bridge/airprint_bridge_launcher.sh
+```
+Then restart the service:
+```bash
+sudo launchctl unload /Library/LaunchDaemons/com.sapireli.airprint_bridge.plist
+sudo launchctl load /Library/LaunchDaemons/com.sapireli.airprint_bridge.plist
+```
+
+### pfSense Reference for This Setup
+- WAN=igb3, LAN=igb0, WIFI=igb1, WIFI_ORBI=igb2 (disabled)
+- Avahi: mDNS reflection between LAN and WIFI interfaces
+- Firewall → Rules → WIFI: Pass rule from WIFI subnets to LAN subnets
+- WIFI_ORBI (igb2) not in use — only LAN and WIFI active
+
+---
+
+*Last updated: 2026-03-08*
