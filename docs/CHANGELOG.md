@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Singleton guard on cron scheduler prevents duplicate registration during Next.js hot reload — 2026-03-07
+
+Next.js dev mode re-imports `scheduler.ts` on every route compilation, causing duplicate cron job registrations. After enough hot reloads, hundreds of simultaneous cron jobs would fire. Fixed by replacing the module-level `initialized` flag (which doesn't survive HMR re-imports) with a `globalThis` singleton guard that persists across module re-evaluations.
+
+Files changed:
+- `src/lib/cron/scheduler.ts` — `globalThis.__smartdetails_cron_initialized__` guard + job count log
+
+---
+
 ## refactor: Unify receipt rendering — shared helper + server-side HTML everywhere — 2026-03-07
 
 Created `src/lib/data/receipt-data.ts` with `fetchReceiptData()` — a single helper that consolidates the duplicated transaction fetch, receipt config, review URL query, QR code generation, barcode generation, and ReceiptTransaction mapping that was copy-pasted across all 5 receipt API routes.

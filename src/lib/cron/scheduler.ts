@@ -4,7 +4,7 @@ const CRON_API_KEY = process.env.CRON_API_KEY;
 // Use localhost — cron runs inside the Next.js process, no need for external round-trip
 const BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 
-let initialized = false;
+const CRON_KEY = '__smartdetails_cron_initialized__';
 
 async function callCronEndpoint(path: string, name: string, retries = 1) {
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -36,8 +36,13 @@ async function callCronEndpoint(path: string, name: string, retries = 1) {
 }
 
 export function setupCronJobs() {
-  if (initialized) return;
-  initialized = true;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((globalThis as any)[CRON_KEY]) {
+    console.log('[CRON] Already initialized, skipping duplicate registration');
+    return;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any)[CRON_KEY] = true;
 
   console.log('[CRON] Initializing internal cron scheduler...');
 
@@ -86,7 +91,8 @@ export function setupCronJobs() {
     callCronEndpoint('/api/cron/cleanup-audit-log', 'cleanup-audit-log');
   });
 
-  console.log('[CRON] Scheduled jobs:');
+  const jobCount = 9;
+  console.log(`[CRON] Registered ${jobCount} jobs:`);
   console.log('  - lifecycle-engine: every 10 minutes');
   console.log('  - quote-reminders: every hour at :30');
   console.log('  - stock-alerts: daily at 8:00 AM PST');
