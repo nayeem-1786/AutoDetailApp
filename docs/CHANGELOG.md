@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Auto-close receipt popup after print dialog dismisses — 2026-03-07
+
+After the copier print dialog closed, the popup window with receipt HTML stayed open requiring manual close. Added `printWindow.close()` after `printWindow.print()` in `triggerPrint()` — `print()` is synchronous so `close()` fires only after the user clicks Print or Cancel.
+
+Files changed:
+- `src/app/pos/components/receipt-options.tsx`
+
+---
+
 ## fix: Prevent duplicate print dialog from fallback timer — 2026-03-07
 
 The 3-second hard fallback `setTimeout` in `handleCopierPrint()` fired `printWindow.print()` a second time even after images had already loaded and triggered the first print, opening a duplicate print dialog.

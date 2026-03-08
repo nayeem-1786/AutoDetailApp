@@ -96,6 +96,7 @@ export function ReceiptOptions({
         if (printed) return;
         printed = true;
         printWindow.print();
+        printWindow.close();
       };
 
       const images = printWindow.document.querySelectorAll('img');
