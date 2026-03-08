@@ -5,15 +5,34 @@ const CRON_API_KEY = process.env.CRON_API_KEY;
 const BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 
 const CRON_KEY = '__smartdetails_cron_initialized__';
+const RUNNING_JOBS_KEY = '__smartdetails_cron_running__';
 
-async function callCronEndpoint(path: string, name: string, retries = 1) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getRunningJobs(): Set<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (!(globalThis as any)[RUNNING_JOBS_KEY]) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any)[RUNNING_JOBS_KEY] = new Set<string>();
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (globalThis as any)[RUNNING_JOBS_KEY];
+}
+
+async function callCronEndpoint(
+  path: string,
+  name: string,
+  retries = 1,
+  timeoutMs = 30000
+) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      console.log(`[CRON] Running ${name}...${attempt > 0 ? ` (retry ${attempt})` : ''}`);
+      if (attempt > 0) {
+        console.log(`[CRON] Retrying ${name} (attempt ${attempt + 1})...`);
+      }
       const response = await fetch(`${BASE_URL}${path}`, {
         method: 'GET',
         headers: { 'x-api-key': CRON_API_KEY || '' },
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
 
       if (!response.ok) {
@@ -21,17 +40,44 @@ async function callCronEndpoint(path: string, name: string, retries = 1) {
         return;
       }
 
-      const data = await response.json().catch(() => null);
-      console.log(`[CRON] ${name} completed:`, data?.message || 'OK');
+      await response.json().catch(() => null);
       return;
     } catch (err: any) {
       const isLastAttempt = attempt === retries;
-      if (isLastAttempt) {
-        console.error(`[CRON] ${name} failed after ${retries + 1} attempts:`, err.message || err);
-      } else {
+      if (!isLastAttempt) {
         await new Promise((r) => setTimeout(r, 5000));
+      } else {
+        throw err;
       }
     }
+  }
+}
+
+async function runJob(
+  name: string,
+  endpoint: string,
+  timeoutMs?: number
+) {
+  const runningJobs = getRunningJobs();
+
+  if (runningJobs.has(name)) {
+    console.log(`[CRON] Skipping ${name} — previous run still in progress`);
+    return;
+  }
+
+  runningJobs.add(name);
+  const start = Date.now();
+  console.log(`[CRON] Starting ${name}`);
+
+  try {
+    await callCronEndpoint(endpoint, name, 1, timeoutMs);
+    const duration = Date.now() - start;
+    console.log(`[CRON] Completed ${name} in ${duration}ms`);
+  } catch (err: any) {
+    const duration = Date.now() - start;
+    console.error(`[CRON] Failed ${name} after ${duration}ms:`, err.message || err);
+  } finally {
+    runningJobs.delete(name);
   }
 }
 
@@ -48,48 +94,48 @@ export function setupCronJobs() {
 
   // Lifecycle engine — every 10 minutes
   cron.schedule('*/10 * * * *', () => {
-    callCronEndpoint('/api/cron/lifecycle-engine', 'lifecycle-engine');
-  });
+    runJob('lifecycle-engine', '/api/cron/lifecycle-engine');
+  }, { scheduled: true, catchUp: false });
 
   // Quote reminders — every hour at :30
   cron.schedule('30 * * * *', () => {
-    callCronEndpoint('/api/cron/quote-reminders', 'quote-reminders');
-  });
+    runJob('quote-reminders', '/api/cron/quote-reminders');
+  }, { scheduled: true, catchUp: false });
 
   // Stock alerts — daily at 8:00 AM PST (16:00 UTC)
   cron.schedule('0 16 * * *', () => {
-    callCronEndpoint('/api/cron/stock-alerts', 'stock-alerts');
-  });
+    runJob('stock-alerts', '/api/cron/stock-alerts');
+  }, { scheduled: true, catchUp: false });
 
-  // QBO auto-sync — every 30 minutes
+  // QBO auto-sync — every 30 minutes (15-min timeout for long syncs)
   cron.schedule('*/30 * * * *', () => {
-    callCronEndpoint('/api/cron/qbo-sync', 'qbo-sync');
-  });
+    runJob('qbo-sync', '/api/cron/qbo-sync', 15 * 60 * 1000);
+  }, { scheduled: true, catchUp: false });
 
   // Theme auto-activation — every 15 minutes
   cron.schedule('*/15 * * * *', () => {
-    callCronEndpoint('/api/cron/theme-activation', 'theme-activation');
-  });
+    runJob('theme-activation', '/api/cron/theme-activation');
+  }, { scheduled: true, catchUp: false });
 
   // Google reviews refresh — daily at 6:00 AM PST (14:00 UTC)
   cron.schedule('0 14 * * *', () => {
-    callCronEndpoint('/api/cron/google-reviews', 'google-reviews');
-  });
+    runJob('google-reviews', '/api/cron/google-reviews');
+  }, { scheduled: true, catchUp: false });
 
   // Abandoned order cleanup — every 6 hours
   cron.schedule('0 */6 * * *', () => {
-    callCronEndpoint('/api/cron/cleanup-orders', 'cleanup-orders');
-  });
+    runJob('cleanup-orders', '/api/cron/cleanup-orders');
+  }, { scheduled: true, catchUp: false });
 
   // Idempotency key cleanup — daily at 3 AM PST (11:00 UTC)
   cron.schedule('0 11 * * *', () => {
-    callCronEndpoint('/api/cron/cleanup-idempotency', 'cleanup-idempotency');
-  });
+    runJob('cleanup-idempotency', '/api/cron/cleanup-idempotency');
+  }, { scheduled: true, catchUp: false });
 
   // Audit log retention cleanup — daily at 3:30 AM PST (11:30 UTC)
   cron.schedule('30 11 * * *', () => {
-    callCronEndpoint('/api/cron/cleanup-audit-log', 'cleanup-audit-log');
-  });
+    runJob('cleanup-audit-log', '/api/cron/cleanup-audit-log');
+  }, { scheduled: true, catchUp: false });
 
   const jobCount = 9;
   console.log(`[CRON] Registered ${jobCount} jobs:`);

@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Disable node-cron catchUp to prevent startup execution flood — 2026-03-07
+
+node-cron 4.x defaults `catchUp: true`, which executes all missed schedules on startup. After hours of server downtime, this fires hundreds of simultaneous HTTP requests to cron endpoints, saturating the event loop. Added `{ scheduled: true, catchUp: false }` to all 9 `cron.schedule()` calls so missed executions are skipped and jobs only run on the next scheduled interval.
+
+Files changed:
+- `src/lib/cron/scheduler.ts` — `catchUp: false` on all 9 jobs
+
+---
+
+## fix: Cron job execution locks, per-job timeouts, and duration logging — 2026-03-07
+
+The `globalThis` singleton guard (previous commit) prevented duplicate cron **registration** during HMR, but didn't prevent **overlapping execution** of the same job. QBO sync was taking 11+ minutes, overlapping with the next 30-minute cycle.
+
+Three fixes in `src/lib/cron/scheduler.ts`:
+1. **Per-job execution lock**: `globalThis.__smartdetails_cron_running__` Set tracks running jobs. If a job fires while still running, it logs a skip message instead of spawning a duplicate.
+2. **Per-job timeout**: `callCronEndpoint()` accepts optional `timeoutMs` (default 30s). QBO sync gets 15 minutes. All others keep 30s.
+3. **Duration logging**: `runJob()` wrapper logs `[CRON] Starting {name}`, `Completed {name} in {duration}ms`, or `Failed {name} after {duration}ms`. Removed duplicate logs from `callCronEndpoint()`.
+
+---
+
 ## fix: Singleton guard on cron scheduler prevents duplicate registration during Next.js hot reload — 2026-03-07
 
 Next.js dev mode re-imports `scheduler.ts` on every route compilation, causing duplicate cron job registrations. After enough hot reloads, hundreds of simultaneous cron jobs would fire. Fixed by replacing the module-level `initialized` flag (which doesn't survive HMR re-imports) with a `globalThis` singleton guard that persists across module re-evaluations.
