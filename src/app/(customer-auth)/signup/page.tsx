@@ -323,37 +323,41 @@ export default function CustomerSignUpPage() {
     setError(null);
     setHint(null);
 
-    const e164 = normalizePhone(data.phone);
-    if (!e164) {
-      setError('Please enter a valid 10-digit phone number.');
-      setLoading(false);
-      return;
-    }
-
-    const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      phone: e164,
-      token: data.code,
-      type: 'sms',
-    });
-
-    if (verifyError) {
-      if (verifyError.message.includes('expired')) {
-        setError('Your verification code has expired. Please request a new one.');
-      } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
-        setError('That code didn\u2019t work. Please check and try again, or request a new code.');
-      } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong verifying your code. Please try again.');
+    try {
+      const e164 = normalizePhone(data.phone);
+      if (!e164) {
+        setError('Please enter a valid 10-digit phone number.');
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    // OTP verified — switch to profile completion
-    setMode('otp-profile');
-    setLoading(false);
+      const supabase = createClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        phone: e164,
+        token: data.code,
+        type: 'sms',
+      });
+
+      if (verifyError) {
+        if (verifyError.message.includes('expired')) {
+          setError('Your verification code has expired. Please request a new one.');
+        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
+          setError('That code didn\u2019t work. Please check and try again, or request a new code.');
+        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setError('Something went wrong verifying your code. Please try again.');
+        }
+        return;
+      }
+
+      // OTP verified — switch to profile completion
+      setMode('otp-profile');
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resendOtp = async () => {
@@ -385,49 +389,61 @@ export default function CustomerSignUpPage() {
     setError(null);
     setHint(null);
 
-    const linkRes = await fetch('/api/customer/link-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        first_name: data.first_name,
-        last_name: data.last_name,
-        email: data.email,
-        phone: otpPhone || phoneParam,
-      }),
-    });
-
-    const linkData = await linkRes.json();
-
-    if (!linkRes.ok) {
-      if (linkRes.status === 401) {
-        setError(
-          <>
-            Your session has expired. Please{' '}
-            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              start over
-            </Link>{' '}
-            to try again.
-          </>
-        );
-      } else if (linkData.error?.includes('staff account')) {
-        setError(
-          <>
-            This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
-            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              sign in as staff
-            </Link>
-            .
-          </>
-        );
-      } else {
-        setError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
-      }
+    const fallbackTimer = setTimeout(() => {
       setLoading(false);
-      return;
-    }
+      setError('Something went wrong. Please try again.');
+    }, 15000);
 
-    router.push('/account');
-    router.refresh();
+    try {
+      const linkRes = await fetch('/api/customer/link-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: data.first_name,
+          last_name: data.last_name,
+          email: data.email,
+          phone: otpPhone || phoneParam,
+        }),
+      });
+
+      const linkData = await linkRes.json();
+
+      if (!linkRes.ok) {
+        if (linkRes.status === 401) {
+          setError(
+            <>
+              Your session has expired. Please{' '}
+              <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
+                start over
+              </Link>{' '}
+              to try again.
+            </>
+          );
+        } else if (linkData.error?.includes('staff account')) {
+          setError(
+            <>
+              This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
+              <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
+                sign in as staff
+              </Link>
+              .
+            </>
+          );
+        } else {
+          setError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
+        }
+        return;
+      }
+
+      router.push('/account');
+      router.refresh();
+    } catch (err) {
+      console.error('Profile completion error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      clearTimeout(fallbackTimer);
+      setLoading(false);
+    }
   };
 
   if (checkingAuth) {

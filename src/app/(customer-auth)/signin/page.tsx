@@ -153,71 +153,74 @@ export default function CustomerSignInPage() {
     setLoading(true);
     setError(null);
 
-    const e164 = normalizePhone(data.phone);
-    if (!e164) {
-      setError('Please enter a valid 10-digit phone number.');
+    // Fallback timeout — if anything hangs, clear spinner after 15s
+    const fallbackTimer = setTimeout(() => {
       setLoading(false);
-      return;
-    }
+      setError('Something went wrong. Please try again.');
+    }, 15000);
 
-    const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      phone: e164,
-      token: data.code,
-      type: 'sms',
-    });
-
-    if (verifyError) {
-      if (verifyError.message.includes('expired')) {
-        setError('Your verification code has expired. Please request a new one.');
-      } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
-        setError('That code didn\u2019t work. Please check and try again, or request a new code.');
-      } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong verifying your code. Please try again.');
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Staff guard check
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const { data: emp } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (emp) {
-        await supabase.auth.signOut();
-        setError(
-          <>
-            This phone number is linked to a staff account.{' '}
-            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Sign in as staff
-            </Link>{' '}
-            instead, or use a different number.
-          </>
-        );
-        setLoading(false);
+    try {
+      const e164 = normalizePhone(data.phone);
+      if (!e164) {
+        setError('Please enter a valid 10-digit phone number.');
         return;
       }
 
-      // Check for customer record by auth_user_id first
-      const { data: cust } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
+      const supabase = createClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        phone: e164,
+        token: data.code,
+        type: 'sms',
+      });
 
-      if (!cust) {
-        // No linked customer — try to link via API (bypasses RLS)
-        try {
+      if (verifyError) {
+        if (verifyError.message.includes('expired')) {
+          setError('Your verification code has expired. Please request a new one.');
+        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
+          setError('That code didn\u2019t work. Please check and try again, or request a new code.');
+        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setError('Something went wrong verifying your code. Please try again.');
+        }
+        return;
+      }
+
+      // Staff guard check
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (emp) {
+          await supabase.auth.signOut();
+          setError(
+            <>
+              This phone number is linked to a staff account.{' '}
+              <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
+                Sign in as staff
+              </Link>{' '}
+              instead, or use a different number.
+            </>
+          );
+          return;
+        }
+
+        // Check for customer record by auth_user_id first
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (!cust) {
+          // No linked customer — try to link via API (bypasses RLS)
           const linkRes = await fetch('/api/customer/link-by-phone', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -243,7 +246,6 @@ export default function CustomerSignInPage() {
                 </span>
               </>
             );
-            setLoading(false);
             return;
           }
 
@@ -256,18 +258,19 @@ export default function CustomerSignInPage() {
 
           // Other error
           setError('Something went wrong linking your account. Please try again. If the problem continues, contact us.');
-          setLoading(false);
-          return;
-        } catch {
-          setError('Something went wrong linking your account. Please try again. If the problem continues, contact us.');
-          setLoading(false);
           return;
         }
       }
-    }
 
-    router.push(redirectTo);
-    router.refresh();
+      router.push(redirectTo);
+      router.refresh();
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      clearTimeout(fallbackTimer);
+      setLoading(false);
+    }
   }, [redirectTo, router]);
 
   const resendOtp = async () => {
@@ -296,83 +299,93 @@ export default function CustomerSignInPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
-
-    if (authError) {
-      if (authError.message.includes('Invalid login') || authError.message.includes('invalid')) {
-        setError(
-          <>
-            Incorrect email or password. Please try again, or{' '}
-            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              create a new account
-            </Link>
-            .
-          </>
-        );
-      } else if (authError.message.includes('rate') || authError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong signing you in. Please try again.');
-      }
+    const fallbackTimer = setTimeout(() => {
       setLoading(false);
-      return;
-    }
+      setError('Something went wrong. Please try again.');
+    }, 15000);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const supabase = createClient();
 
-    if (user) {
-      const { data: emp } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
-      if (emp) {
-        await supabase.auth.signOut();
-        setError(
-          <>
-            This email is linked to a staff account.{' '}
-            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Sign in as staff
-            </Link>{' '}
-            instead, or use a different email.
-          </>
-        );
-        setLoading(false);
+      if (authError) {
+        if (authError.message.includes('Invalid login') || authError.message.includes('invalid')) {
+          setError(
+            <>
+              Incorrect email or password. Please try again, or{' '}
+              <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
+                create a new account
+              </Link>
+              .
+            </>
+          );
+        } else if (authError.message.includes('rate') || authError.message.includes('too many')) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setError('Something went wrong signing you in. Please try again.');
+        }
         return;
       }
 
-      const { data: cust } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (!cust) {
-        await supabase.auth.signOut();
-        setError(
-          <>
-            We couldn&apos;t find a customer account with that email.{' '}
-            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Create a new account
-            </Link>{' '}
-            to get started.
-          </>
-        );
-        setLoading(false);
-        return;
+      if (user) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (emp) {
+          await supabase.auth.signOut();
+          setError(
+            <>
+              This email is linked to a staff account.{' '}
+              <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
+                Sign in as staff
+              </Link>{' '}
+              instead, or use a different email.
+            </>
+          );
+          return;
+        }
+
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (!cust) {
+          await supabase.auth.signOut();
+          setError(
+            <>
+              We couldn&apos;t find a customer account with that email.{' '}
+              <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
+                Create a new account
+              </Link>{' '}
+              to get started.
+            </>
+          );
+          return;
+        }
       }
-    }
 
-    router.push(redirectTo);
-    router.refresh();
+      router.push(redirectTo);
+      router.refresh();
+    } catch (err) {
+      console.error('Email sign-in error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      clearTimeout(fallbackTimer);
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {

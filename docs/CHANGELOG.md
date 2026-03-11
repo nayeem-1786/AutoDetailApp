@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Customer portal OTP spinner never resolves — 2026-03-10
+
+The customer portal sign-in OTP verification spinner would hang indefinitely after submitting a valid code. Root cause: the `verifyOtp` function had no `try/catch` wrapping the post-verification logic (getUser, employee check, customer linking). If any of those async calls threw, the spinner was never cleared. Additionally, success paths relied on `router.push()` to unmount the component rather than explicitly calling `setLoading(false)`.
+
+Fix:
+- Wrapped all auth submit handlers (`verifyOtp`, `onEmailSubmit`, `onOtpProfileSubmit`) in `try/catch/finally` with `setLoading(false)` in `finally` — covers all exit paths
+- Added 15-second fallback timeout that clears spinner and shows error message — prevents infinite hangs from any future unknown cause
+- Applied same fix to signup page OTP verification and profile completion flows
+
+Files changed:
+- `src/app/(customer-auth)/signin/page.tsx`
+- `src/app/(customer-auth)/signup/page.tsx`
+
+---
+
 ## docs: Add AirPrint cross-subnet troubleshooting — 2026-03-08
 
 Documented the full AirPrint cross-subnet printing investigation in `docs/dev/TROUBLESHOOTING.md`. Three root causes: disabled pfSense firewall rule, CUPS 403 from sharing disabled, and IPv6 ULA address causing iOS to connect to unroutable address. Includes verification steps, CUPS duplicate mDNS fix, AirPrint Bridge operational notes, service persistence after reboot, and pfSense reference.
