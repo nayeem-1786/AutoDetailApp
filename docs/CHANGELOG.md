@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## audit: Full login & session system deep audit — 2026-03-10
+
+Comprehensive audit of all auth entry points, Supabase client instances, cookie/session lifecycle, admin vs POS session isolation, OTP resend timer behavior, and private vs normal browser differences.
+
+Key findings:
+- **Critical**: Admin, Customer Portal, and Booking all share the same Supabase cookie — logging into one overwrites the other
+- **Critical**: Stale session cookies from prior admin/staff sessions interfere with customer OTP verification (root cause of "works in private, fails in normal" bug)
+- **High**: `customer-auth-provider.tsx` missing `.catch()` on `getSession()` and `.finally(() => setLoading(false))` on `loadCustomerData()` — same bug class fixed in admin provider but never applied to customer provider
+- **High**: Middleware only checks user existence for `/admin` routes, not role — customer sessions pass middleware
+
+Full report: `docs/audits/Login-Sessions.md`
+
+---
+
 ## fix: Customer portal OTP spinner never resolves — 2026-03-10
 
 The customer portal sign-in OTP verification spinner would hang indefinitely after submitting a valid code. Root cause: the `verifyOtp` function had no `try/catch` wrapping the post-verification logic (getUser, employee check, customer linking). If any of those async calls threw, the spinner was never cleared. Additionally, success paths relied on `router.push()` to unmount the component rather than explicitly calling `setLoading(false)`.
