@@ -200,15 +200,24 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
 
   // Resolve display price for the Add button
   let resolvedPrice: number | null;
+  let resolvedStandardPrice: number | null = null;
+  let isSalePrice = false;
   if (isPerUnit) {
     resolvedPrice = perUnitQty * service.per_unit_price!;
+  } else if (selectedTier) {
+    resolvedPrice = getDisplayPrice(selectedTier);
+    resolvedStandardPrice = resolveServicePrice(selectedTier, vehicleSizeClass);
+    const saleInfo = getTierSaleInfo(resolvedStandardPrice, selectedTier.sale_price, isOnSale);
+    isSalePrice = saleInfo?.isDiscounted ?? false;
   } else {
-    resolvedPrice = selectedTier ? getDisplayPrice(selectedTier) : null;
+    resolvedPrice = null;
   }
 
   // Show combo price if it's lower than the resolved standard price
   const showComboPrice = !isPerUnit && comboPrice != null && resolvedPrice != null && comboPrice < resolvedPrice;
   const displayPrice = showComboPrice ? comboPrice : resolvedPrice;
+  // Show standard strikethrough on button when sale or combo is active
+  const showButtonStrikethrough = !showComboPrice && isSalePrice && resolvedStandardPrice != null && resolvedStandardPrice !== displayPrice;
 
   const perUnitMax = service.per_unit_max ?? 10;
   const perUnitLabel = service.per_unit_label || 'unit';
@@ -310,7 +319,9 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
               </h3>
               <div className="flex flex-col gap-2">
                 {tiers.map((tier, idx) => {
-                  const price = getDisplayPrice(tier);
+                  const effectivePrice = getDisplayPrice(tier);
+                  const standardPrice = resolveServicePrice(tier, vehicleSizeClass);
+                  const saleInfo = getTierSaleInfo(standardPrice, tier.sale_price, isOnSale);
                   const isSelected = idx === selectedTierIdx;
                   const isVehicleAware = tier.is_vehicle_size_aware && vehicleSizeClass;
                   // Disable non-matching vehicle-size tiers when vehicle is known
@@ -343,7 +354,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                             <div className="h-2.5 w-2.5 rounded-full bg-blue-500 dark:bg-blue-600" />
                           )}
                         </div>
-                        <div>
+                        <div className="flex items-center gap-2">
                           <span className={cn(
                             'text-sm font-medium',
                             isDisabled ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'
@@ -351,18 +362,34 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                             {tier.tier_label || VEHICLE_SIZE_LABELS[tier.tier_name] || tier.tier_name}
                           </span>
                           {isVehicleAware && !isDisabled && (
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
+                            <span className="text-xs text-blue-600 dark:text-blue-400">
                               {VEHICLE_SIZE_LABELS[vehicleSizeClass as VehicleSizeClass]}
+                            </span>
+                          )}
+                          {saleInfo?.isDiscounted && !isDisabled && (
+                            <span className="rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
+                              Sale
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className={cn(
-                        'text-sm font-semibold',
-                        isDisabled ? 'text-gray-300 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                      )}>
-                        ${price.toFixed(2)}
-                      </span>
+                      {saleInfo?.isDiscounted && !isDisabled ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-sm text-gray-400 dark:text-gray-500 line-through">
+                            ${saleInfo.originalPrice.toFixed(2)}
+                          </span>
+                          <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                            ${saleInfo.currentPrice.toFixed(2)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className={cn(
+                          'text-sm font-semibold',
+                          isDisabled ? 'text-gray-300 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                        )}>
+                          ${effectivePrice.toFixed(2)}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -436,9 +463,15 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                 : 'cursor-not-allowed bg-gray-300 dark:bg-gray-600'
             )}
           >
-            {displayPrice != null
-              ? `+ Add to Ticket — $${displayPrice.toFixed(2)}`
-              : '+ Add to Ticket'}
+            {displayPrice != null ? (
+              <>
+                + Add to Ticket —{' '}
+                {showButtonStrikethrough && (
+                  <span className="line-through opacity-60 mr-1">${resolvedStandardPrice!.toFixed(2)}</span>
+                )}
+                ${displayPrice.toFixed(2)}
+              </>
+            ) : '+ Add to Ticket'}
           </button>
         </div>
       </div>

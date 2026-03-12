@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Stacked sale price layout in catalog cards + sale display in service detail modal — 2026-03-12
+
+- **catalog-card.tsx** — Sale prices now render in a stacked two-line layout (strikethrough standard on top, sale price + Sale badge below) instead of inline, preventing text overflow on narrow catalog cards
+- **service-detail-dialog.tsx** — Tier selection buttons now show strikethrough standard price + red sale price + "Sale" badge when service has an active sale window. "Add to Ticket" button shows strikethrough standard price next to sale price.
+
+---
+
 ## fix: Show sale prices in POS catalog cards, tier picker, and toast messages — 2026-03-12
 
 - **catalog-card.tsx** — `ServiceCard` now renders sale-aware prices via `getSaleStatus()` + `getTierSaleInfo()`. Active sales show strikethrough of standard price, red sale price, and "Sale" badge. Works for single-tier, multi-tier, and vehicle-size-aware services.

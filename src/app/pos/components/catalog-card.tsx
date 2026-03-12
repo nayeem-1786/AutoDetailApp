@@ -128,19 +128,7 @@ function ServicePriceDisplay({
       const resolved = resolveServicePrice(tier, vehicleSizeClass as VehicleSizeClass);
       const saleInfo = getTierSaleInfo(resolved, tier.sale_price, isOnSale);
       if (saleInfo?.isDiscounted) {
-        return (
-          <span className="text-sm font-semibold">
-            <span className="line-through text-gray-400 dark:text-gray-500 font-normal mr-1">
-              ${saleInfo.originalPrice.toFixed(2)}
-            </span>
-            <span className="text-red-600 dark:text-red-400">
-              ${saleInfo.currentPrice.toFixed(2)}
-            </span>
-            <span className="ml-1 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
-              Sale
-            </span>
-          </span>
-        );
+        return <SalePriceStack standardLabel={`$${saleInfo.originalPrice.toFixed(2)}`} saleLabel={`$${saleInfo.currentPrice.toFixed(2)}`} />;
       }
       return (
         <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -160,19 +148,7 @@ function ServicePriceDisplay({
     // Not vehicle-size-aware single tier — check sale
     const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, isOnSale);
     if (saleInfo?.isDiscounted) {
-      return (
-        <span className="text-sm font-semibold">
-          <span className="line-through text-gray-400 dark:text-gray-500 font-normal mr-1">
-            ${saleInfo.originalPrice.toFixed(2)}
-          </span>
-          <span className="text-red-600 dark:text-red-400">
-            ${saleInfo.currentPrice.toFixed(2)}
-          </span>
-          <span className="ml-1 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
-            Sale
-          </span>
-        </span>
-      );
+      return <SalePriceStack standardLabel={`$${saleInfo.originalPrice.toFixed(2)}`} saleLabel={`$${saleInfo.currentPrice.toFixed(2)}`} />;
     }
     return (
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -207,19 +183,7 @@ function ServicePriceDisplay({
     const standardLabel = standardMin === standardMax
       ? `$${standardMin.toFixed(2)}`
       : `$${standardMin.toFixed(2)}–$${standardMax.toFixed(2)}`;
-    return (
-      <span className="text-sm font-semibold">
-        <span className="line-through text-gray-400 dark:text-gray-500 font-normal mr-1">
-          {standardLabel}
-        </span>
-        <span className="text-red-600 dark:text-red-400">
-          {effectiveLabel}
-        </span>
-        <span className="ml-1 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
-          Sale
-        </span>
-      </span>
-    );
+    return <SalePriceStack standardLabel={standardLabel} saleLabel={effectiveLabel} />;
   }
 
   const label = effectiveMin === effectiveMax
@@ -229,5 +193,24 @@ function ServicePriceDisplay({
     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
       {label}
     </span>
+  );
+}
+
+/** Stacked sale price display: strikethrough standard on line 1, sale price + badge on line 2 */
+function SalePriceStack({ standardLabel, saleLabel }: { standardLabel: string; saleLabel: string }) {
+  return (
+    <div className="flex flex-col items-start">
+      <span className="text-xs line-through text-gray-400 dark:text-gray-500">
+        {standardLabel}
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+          {saleLabel}
+        </span>
+        <span className="rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
+          Sale
+        </span>
+      </span>
+    </div>
   );
 }
