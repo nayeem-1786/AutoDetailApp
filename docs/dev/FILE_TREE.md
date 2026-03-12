@@ -363,6 +363,7 @@ src/app/api/pos/jobs/settings/route.ts
 src/app/api/pos/loyalty/earn/route.ts
 src/app/api/pos/loyalty/redeem/route.ts
 src/app/api/pos/my-permissions/route.ts
+src/app/api/pos/products/barcode-lookup/route.ts
 src/app/api/pos/promotions/available/route.ts
 src/app/api/pos/quotes/[id]/communications/route.ts
 src/app/api/pos/quotes/[id]/convert/route.ts

@@ -17,6 +17,10 @@ interface UseBarcodeOptions {
  * Detects USB barcode scanner input (keyboard emulation mode).
  * Scanners type characters very rapidly (< 50ms apart) and end with Enter.
  * This distinguishes scanner input from normal keyboard typing.
+ *
+ * Works globally — attaches on `document` regardless of focus.
+ * Uses timing threshold to distinguish scanner (~10ms/char) from human typing (100-300ms).
+ * Prevents characters from echoing into focused input fields during rapid sequences.
  */
 export function useBarcodeScanner({
   onScan,
@@ -26,38 +30,40 @@ export function useBarcodeScanner({
 }: UseBarcodeOptions) {
   const bufferRef = useRef('');
   const lastKeystrokeRef = useRef(0);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 
   useEffect(() => {
     if (!enabled) return;
 
-    function handleKeyDown(e: KeyboardEvent) {
-      // Ignore if user is typing in an input/textarea
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        // Exception: allow if it's the POS search bar (has data-barcode-target)
-        if (!target.hasAttribute('data-barcode-target')) {
-          return;
-        }
-      }
+    function clearBuffer() {
+      bufferRef.current = '';
+    }
 
+    function isRapidSequence() {
+      return bufferRef.current.length >= 2;
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
       const now = Date.now();
+      const gap = now - lastKeystrokeRef.current;
 
       // If too much time passed since last keystroke, reset buffer
-      if (now - lastKeystrokeRef.current > maxKeystrokeGap) {
+      if (gap > maxKeystrokeGap) {
         bufferRef.current = '';
       }
       lastKeystrokeRef.current = now;
 
+      // Clear idle timer on every keystroke
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+
       if (e.key === 'Enter') {
-        if (bufferRef.current.length >= minLength) {
+        const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();
+        if (barcode.length >= minLength) {
           e.preventDefault();
-          onScanRef.current(bufferRef.current);
+          e.stopPropagation();
+          onScanRef.current(barcode);
           window.dispatchEvent(new Event('pos-scanner-detected'));
         }
         bufferRef.current = '';
@@ -67,10 +73,21 @@ export function useBarcodeScanner({
       // Only accumulate printable single characters
       if (e.key.length === 1) {
         bufferRef.current += e.key;
+
+        // Prevent characters from echoing into focused inputs during rapid sequences
+        if (isRapidSequence()) {
+          e.preventDefault();
+        }
       }
+
+      // Set idle timeout to clear buffer after 100ms of inactivity
+      idleTimerRef.current = setTimeout(clearBuffer, 100);
     }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
   }, [enabled, maxKeystrokeGap, minLength]);
 }

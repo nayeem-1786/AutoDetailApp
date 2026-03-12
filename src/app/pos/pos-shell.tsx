@@ -28,6 +28,8 @@ import { HeldTicketsPanel } from './components/held-tickets-panel';
 import { PinScreen } from './components/pin-screen';
 import { OfflineIndicator } from './components/offline-indicator';
 import { OfflineQueueBadge } from './components/offline-queue-badge';
+import { useBarcodeScanner } from './hooks/use-barcode-scanner';
+import { posFetch } from './lib/pos-fetch';
 
 function PosShellInner({ children }: { children: React.ReactNode }) {
   const { employee, role, loading, locked, lock, replaceSession } = usePosAuth();
@@ -181,7 +183,7 @@ function PosShellContent({
   role: string;
 }) {
   const router = useRouter();
-  const { signOut: posSignOut } = usePosAuth();
+  const { signOut: posSignOut, locked } = usePosAuth();
   const { ticket, dispatch } = useTicket();
   const { openCheckout, isOpen: checkoutOpen } = useCheckout();
   const { connectedReader, isConnecting, discoverAndConnect } = useReader();
@@ -219,6 +221,46 @@ function PosShellContent({
     window.addEventListener('pos-scanner-detected', handler);
     return () => window.removeEventListener('pos-scanner-detected', handler);
   }, []);
+
+  // Barcode scanner — global handler with API lookup
+  const handleBarcodeScan = useCallback(async (barcode: string) => {
+    try {
+      const res = await posFetch('/api/pos/products/barcode-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode }),
+      });
+
+      if (res.status === 404) {
+        toast.error(`Product not found: ${barcode}`);
+        return;
+      }
+
+      if (!res.ok) {
+        toast.error('Scan failed — try again');
+        return;
+      }
+
+      const { product } = await res.json();
+
+      // Check inventory (only if tracking is enabled)
+      if (product.quantity_on_hand != null && product.quantity_on_hand <= 0) {
+        toast.warning(`Out of stock: ${product.name}`);
+        return;
+      }
+
+      // ADD_PRODUCT handles duplicate detection (increments qty if already on ticket)
+      dispatch({ type: 'ADD_PRODUCT', product });
+      toast.success(`Added ${product.name}`);
+    } catch {
+      toast.error('Scan failed — try again');
+    }
+  }, [dispatch]);
+
+  useBarcodeScanner({
+    onScan: handleBarcodeScan,
+    enabled: !locked,
+  });
 
   const handleHeaderLogout = useCallback(() => {
     posSignOut();

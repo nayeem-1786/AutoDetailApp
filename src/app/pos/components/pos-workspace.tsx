@@ -5,7 +5,6 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { useCatalog } from '../hooks/use-catalog';
-import { useBarcodeScanner } from '../hooks/use-barcode-scanner';
 import { useTicket } from '../context/ticket-context';
 import type { CatalogProduct, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
@@ -45,40 +44,7 @@ export function PosWorkspace() {
     return () => window.removeEventListener('pos-reset-register', handler);
   }, []);
 
-  // Barcode scanner
-  useBarcodeScanner({
-    onScan: (barcode) => {
-      // 1. Exact match on barcode or SKU field
-      const product = products.find(
-        (p) => p.barcode === barcode || p.sku === barcode
-      );
-
-      if (product) {
-        dispatch({ type: 'ADD_PRODUCT', product });
-        toast.success(`Added ${product.name}`);
-        setSearch('');
-        return;
-      }
-
-      // 2. No exact match — check if text search has results
-      //    (search bar already has the barcode text from scanner typing)
-      const q = barcode.toLowerCase();
-      const hasTextResults = products.some(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku?.toLowerCase().includes(q) ||
-          p.barcode?.toLowerCase().includes(q)
-      );
-
-      if (hasTextResults) {
-        // Text search found something — stay silent, let user pick from results
-        return;
-      }
-
-      // 3. Nothing found anywhere — show error
-      toast.error(`No product found for barcode: ${barcode}`);
-    },
-  });
+  // Barcode scanner is mounted globally in PosShellContent (pos-shell.tsx)
 
   // Determine search scope
   const searchScope = tab === 'products' ? 'products' : tab === 'services' ? 'services' : 'all';

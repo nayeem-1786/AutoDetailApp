@@ -90,8 +90,12 @@
 | sale_ends_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
 | quantity_on_hand | INTEGER | NOT NULL, DEFAULT 0 | |
 | image_url | TEXT | | Synced from product_images primary |
+| barcode | TEXT | | UPC/EAN for barcode scanner lookup |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
+
+**Indexes:** `idx_products_barcode` on `(barcode)` WHERE `barcode IS NOT NULL`
 
 ### product_images
 | Column | Type | Constraints | Notes |

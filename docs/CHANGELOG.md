@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: USB barcode scanner support for POS — 2026-03-12
+
+- **Barcode scanner hook** (`src/app/pos/hooks/use-barcode-scanner.ts`) — global keydown listener on `document` (capture phase) that distinguishes USB scanner input (~10ms/char) from human typing (100-300ms) via timing threshold
+  - `preventDefault()` during rapid keystroke sequences to prevent characters echoing into focused inputs
+  - Idle timeout clears buffer after 100ms of inactivity
+  - Sanitizes `\r\n` and whitespace from final barcode string
+  - Disabled when POS is locked (PIN screen)
+- **Barcode lookup API** (`POST /api/pos/products/barcode-lookup`) — HMAC-authenticated POS endpoint that looks up products by `barcode` or `sku` field
+- **Shell-level mounting** — `useBarcodeScanner` mounted in `PosShellContent` (works on all POS pages, not just register)
+  - Found product → `ADD_PRODUCT` dispatch (auto-increments qty if already on ticket)
+  - Not found → error toast with barcode value
+  - Out of stock → warning toast with product name
+- **DB index** — `idx_products_barcode` on `products(barcode) WHERE barcode IS NOT NULL`
+- Removed duplicate barcode scanner usage from `pos-workspace.tsx` and `catalog-panel.tsx`
+
+---
+
 ## fix: Resolve all pre-existing lint warnings — 2026-03-12
 
 - Configured ESLint flat config (`eslint.config.mjs`) to disable React compiler strictness rules (`immutability`, `static-components`, `refs`), `set-state-in-effect`, `no-img-element`, `no-before-interactive-script`
