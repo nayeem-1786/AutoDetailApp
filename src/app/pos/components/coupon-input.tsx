@@ -31,6 +31,8 @@ export function CouponInput({ renderCollapsedInline }: CouponInputProps) {
         unit_price: item.unitPrice,
         quantity: item.quantity,
         item_name: item.itemName,
+        standard_price: item.standardPrice,
+        pricing_type: item.pricingType,
       }));
 
       const res = await posFetch('/api/pos/coupons/validate', {
@@ -64,6 +66,10 @@ export function CouponInput({ renderCollapsedInline }: CouponInputProps) {
       setExpanded(false);
       if (json.data.warning) {
         toast.warning(json.data.warning);
+      } else if (json.data.excluded_count > 0) {
+        const total = ticket.items.length;
+        const applied = total - json.data.excluded_count;
+        toast.success(`Coupon applied to ${applied} of ${total} items (special pricing excluded)`);
       } else {
         toast.success(`Coupon applied: ${json.data.description}`);
       }

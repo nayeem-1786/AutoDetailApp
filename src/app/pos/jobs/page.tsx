@@ -110,6 +110,10 @@ export default function JobsPage() {
           perUnitPrice: null,
           perUnitMax: null,
           parentItemId: null,
+          standardPrice: item.unit_price,
+          pricingType: 'standard' as const,
+          comboSourcePrimaryId: null,
+          saleEffectivePrice: null,
         };
       });
 

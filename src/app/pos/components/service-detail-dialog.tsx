@@ -23,9 +23,13 @@ interface ServiceDetailDialogProps {
   vehicleSpecialtyTierOverride?: string | null;
   /** When set, the added service becomes a child addon of this parent item */
   parentItemId?: string;
+  /** Combo price from addon suggestion pairing */
+  comboPrice?: number;
+  /** Primary service ID that triggered the combo price */
+  comboPrimaryServiceId?: string;
 }
 
-export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride, parentItemId }: ServiceDetailDialogProps) {
+export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride, parentItemId, comboPrice, comboPrimaryServiceId }: ServiceDetailDialogProps) {
   const { ticket, dispatch: ticketDispatch } = useTicket();
   const dispatch = onAdd ? undefined : ticketDispatch;
   const pricing = service.pricing ?? [];
@@ -176,6 +180,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         pricing: selectedTier,
         vehicleSizeClass,
         parentItemId,
+        comboPrice,
+        comboPrimaryServiceId,
       });
       toast.success(`Added ${service.name}`);
     }
@@ -189,6 +195,10 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   } else {
     resolvedPrice = selectedTier ? getDisplayPrice(selectedTier) : null;
   }
+
+  // Show combo price if it's lower than the resolved standard price
+  const showComboPrice = !isPerUnit && comboPrice != null && resolvedPrice != null && comboPrice < resolvedPrice;
+  const displayPrice = showComboPrice ? comboPrice : resolvedPrice;
 
   const perUnitMax = service.per_unit_max ?? 10;
   const perUnitLabel = service.per_unit_label || 'unit';
@@ -404,8 +414,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                 : 'cursor-not-allowed bg-gray-300 dark:bg-gray-600'
             )}
           >
-            {resolvedPrice != null
-              ? `+ Add to Ticket — $${resolvedPrice.toFixed(2)}`
+            {displayPrice != null
+              ? `+ Add to Ticket — $${displayPrice.toFixed(2)}`
               : '+ Add to Ticket'}
           </button>
         </div>

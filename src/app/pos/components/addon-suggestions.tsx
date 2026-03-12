@@ -79,11 +79,24 @@ export function AddonSuggestions() {
     return null;
   }
 
+  // Track combo price for the currently picked addon
+  const [pickerComboPrice, setPickerComboPrice] = useState<number | null>(null);
+  const [pickerPrimaryServiceId, setPickerPrimaryServiceId] = useState<string | null>(null);
+
   function handleChipClick(addon: AddonSuggestionEntry) {
     // Find the full CatalogService for this addon so we can open the pricing picker
     const service = services.find((s) => s.id === addon.addonServiceId);
     if (!service) return;
     setPickerService(service);
+    setPickerComboPrice(addon.comboPrice);
+    // Find which primary service on the ticket triggered this suggestion
+    for (const serviceId of ticketServiceIds) {
+      const addons = suggestionsMap.get(serviceId);
+      if (addons?.some((a) => a.addonServiceId === addon.addonServiceId && a.comboPrice != null)) {
+        setPickerPrimaryServiceId(serviceId);
+        break;
+      }
+    }
   }
 
   return (
@@ -128,7 +141,9 @@ export function AddonSuggestions() {
         <ServiceDetailDialog
           service={pickerService}
           open={!!pickerService}
-          onClose={() => setPickerService(null)}
+          onClose={() => { setPickerService(null); setPickerComboPrice(null); setPickerPrimaryServiceId(null); }}
+          comboPrice={pickerComboPrice ?? undefined}
+          comboPrimaryServiceId={pickerPrimaryServiceId ?? undefined}
         />
       )}
     </>

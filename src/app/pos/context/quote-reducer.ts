@@ -1,6 +1,6 @@
 import type { QuoteState, QuoteAction, TicketItem } from '../types';
 import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
-import { resolveServicePrice } from '../utils/pricing';
+import { resolveServicePrice, resolveServicePriceWithSale } from '../utils/pricing';
 
 export const initialQuoteState: QuoteState = {
   items: [],
@@ -99,6 +99,10 @@ export function quoteReducer(
           perUnitPrice: null,
           perUnitMax: null,
           parentItemId: null,
+          standardPrice: product.retail_price,
+          pricingType: 'standard',
+          comboSourcePrimaryId: null,
+          saleEffectivePrice: null,
         };
         items = [...state.items, newItem];
       }
@@ -106,11 +110,32 @@ export function quoteReducer(
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId } = action;
+      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId } = action;
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
-      const unitPrice = isPerUnit
-        ? service.per_unit_price! * perUnitQty
-        : resolveServicePrice(pricing, vehicleSizeClass);
+
+      // Resolve pricing with sale awareness
+      const saleWindow = (service.sale_starts_at || service.sale_ends_at)
+        ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
+        : null;
+      const resolved = isPerUnit
+        ? { standardPrice: service.per_unit_price! * perUnitQty, effectivePrice: service.per_unit_price! * perUnitQty, isOnSale: false, saleSavings: 0 }
+        : resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
+
+      // Determine effective price: lowest of sale vs combo wins
+      let effectivePrice = resolved.effectivePrice;
+      let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
+      let comboSourceId: string | null = null;
+      const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
+
+      if (!isPerUnit && comboPrice != null && comboPrice < resolved.standardPrice) {
+        if (comboPrice <= effectivePrice) {
+          effectivePrice = comboPrice;
+          pricingType = 'combo';
+          comboSourceId = comboPrimaryServiceId ?? null;
+        }
+      }
+
+      const unitPrice = effectivePrice;
       const totalPrice = unitPrice;
       const newItem: TicketItem = {
         id: generateId(),
@@ -132,6 +157,10 @@ export function quoteReducer(
         perUnitPrice: isPerUnit ? service.per_unit_price! : null,
         perUnitMax: isPerUnit ? (service.per_unit_max ?? null) : null,
         parentItemId: parentItemId ?? null,
+        standardPrice: resolved.standardPrice,
+        pricingType,
+        comboSourcePrimaryId: comboSourceId,
+        saleEffectivePrice: saleEffective,
       };
 
       // If this is a child addon, insert immediately after the parent's last child
@@ -176,6 +205,10 @@ export function quoteReducer(
         perUnitPrice: null,
         perUnitMax: null,
         parentItemId: null,
+        standardPrice: price,
+        pricingType: 'standard',
+        comboSourcePrimaryId: null,
+        saleEffectivePrice: null,
       };
       return recalculateTotals({
         ...state,
@@ -226,10 +259,38 @@ export function quoteReducer(
     }
 
     case 'REMOVE_ITEM': {
-      // Remove the item AND any children whose parentItemId matches
-      const items = state.items.filter(
-        (i) => i.id !== action.itemId && i.parentItemId !== action.itemId
+      // Find any children of the removed item
+      const children = state.items.filter((i) => i.parentItemId === action.itemId);
+
+      // Combo-priced children get promoted to standalone; others are removed
+      const promotedChildren = children
+        .filter((child) => child.pricingType === 'combo')
+        .map((child) => {
+          const revertPrice = child.saleEffectivePrice ?? child.standardPrice;
+          const newPricingType: 'sale' | 'standard' = child.saleEffectivePrice != null ? 'sale' : 'standard';
+          const totalPrice = revertPrice * child.quantity;
+          return {
+            ...child,
+            parentItemId: null,
+            unitPrice: revertPrice,
+            totalPrice,
+            taxAmount: calculateItemTax(totalPrice, child.isTaxable),
+            pricingType: newPricingType,
+            comboSourcePrimaryId: null,
+          };
+        });
+
+      const removedChildIds = new Set(
+        children.filter((child) => child.pricingType !== 'combo').map((c) => c.id)
       );
+
+      const items = state.items
+        .filter((i) => i.id !== action.itemId && !removedChildIds.has(i.id))
+        .map((i) => {
+          const promoted = promotedChildren.find((p) => p.id === i.id);
+          return promoted ?? i;
+        });
+
       return recalculateTotals({ ...state, items });
     }
 
@@ -249,13 +310,35 @@ export function quoteReducer(
         if (item.itemType !== 'service' || !item.serviceId || !item.tierName) {
           return item;
         }
+        if (item.perUnitQty != null && item.perUnitPrice != null) return item;
+
         const service = services.find((s) => s.id === item.serviceId);
         const pricingTier = service?.pricing?.find(
           (p) => p.tier_name === item.tierName
         );
         if (!pricingTier) return item;
 
-        const unitPrice = resolveServicePrice(pricingTier, sizeClass);
+        const saleWindow = service && (service.sale_starts_at || service.sale_ends_at)
+          ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
+          : null;
+        const resolved = resolveServicePriceWithSale(pricingTier, sizeClass, saleWindow);
+
+        let effectivePrice = resolved.effectivePrice;
+        let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
+        let comboSourceId = item.comboSourcePrimaryId;
+        const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
+
+        if (item.comboSourcePrimaryId && item.parentItemId) {
+          const currentComboPrice = item.unitPrice;
+          if (currentComboPrice <= effectivePrice) {
+            effectivePrice = currentComboPrice;
+            pricingType = 'combo';
+          } else {
+            comboSourceId = null;
+          }
+        }
+
+        const unitPrice = effectivePrice;
         const totalPrice = unitPrice * item.quantity;
         return {
           ...item,
@@ -263,6 +346,10 @@ export function quoteReducer(
           totalPrice,
           taxAmount: calculateItemTax(totalPrice, item.isTaxable),
           vehicleSizeClass: sizeClass,
+          standardPrice: resolved.standardPrice,
+          pricingType,
+          comboSourcePrimaryId: comboSourceId,
+          saleEffectivePrice: saleEffective,
         };
       });
 

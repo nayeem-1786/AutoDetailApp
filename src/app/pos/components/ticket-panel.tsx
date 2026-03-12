@@ -46,6 +46,7 @@ interface TicketPanelProps {
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
+  const { granted: canOverridePricing } = usePosPermission('pos.override_pricing');
   const { heldTickets } = useHeldTickets();
   const heldCount = heldTickets.length;
   const { ticket, dispatch } = useTicket();
@@ -62,6 +63,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [addonPickerService, setAddonPickerService] = useState<CatalogService | null>(null);
   const [addonParentItemId, setAddonParentItemId] = useState<string | null>(null);
+  const [addonComboPrice, setAddonComboPrice] = useState<number | null>(null);
+  const [addonComboPrimaryServiceId, setAddonComboPrimaryServiceId] = useState<string | null>(null);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
@@ -230,6 +233,12 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       toast.error('Percentage discount cannot exceed 100%');
       return;
     }
+    // If ticket has sale/combo priced items, require override_pricing permission
+    const hasSpecialPricing = ticket.items.some((i) => i.pricingType === 'sale' || i.pricingType === 'combo');
+    if (hasSpecialPricing && !canOverridePricing) {
+      toast.error('Override pricing permission required to discount sale/combo items');
+      return;
+    }
     dispatch({
       type: 'APPLY_MANUAL_DISCOUNT',
       discountType,
@@ -338,6 +347,11 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                               if (svc) {
                                 setAddonPickerService(svc);
                                 setAddonParentItemId(item.id);
+                                // Look up combo price from suggestions for this primary service
+                                const addons = item.serviceId ? suggestionsMap.get(item.serviceId) : undefined;
+                                const match = addons?.find((a) => a.addonServiceId === addonServiceId);
+                                setAddonComboPrice(match?.comboPrice ?? null);
+                                setAddonComboPrimaryServiceId(item.serviceId ?? null);
                               }
                             }}
                           />
@@ -590,8 +604,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         <ServiceDetailDialog
           service={addonPickerService}
           open={!!addonPickerService}
-          onClose={() => { setAddonPickerService(null); setAddonParentItemId(null); }}
+          onClose={() => { setAddonPickerService(null); setAddonParentItemId(null); setAddonComboPrice(null); setAddonComboPrimaryServiceId(null); }}
           parentItemId={addonParentItemId ?? undefined}
+          comboPrice={addonComboPrice ?? undefined}
+          comboPrimaryServiceId={addonComboPrimaryServiceId ?? undefined}
         />
       )}
 

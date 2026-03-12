@@ -10,6 +10,8 @@ interface CartItem {
   unit_price: number;
   quantity: number;
   item_name: string;
+  standard_price?: number;
+  pricing_type?: string;
 }
 
 interface CouponReward {
@@ -465,7 +467,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 8. Calculate discounts from coupon_rewards
+    // 8. No-stacking: filter out items already on sale/combo pricing
+    const excludedCount = cartItems.filter(
+      (i) => i.pricing_type === 'sale' || i.pricing_type === 'combo'
+    ).length;
+    const eligibleItems = cartItems.filter(
+      (i) => !i.pricing_type || i.pricing_type === 'standard'
+    );
+
+    // If ALL items are specially priced, reject the coupon
+    if (cartItems.length > 0 && eligibleItems.length === 0) {
+      return NextResponse.json(
+        { error: 'Coupon cannot be applied — all items already have special pricing' },
+        { status: 400 }
+      );
+    }
+
+    // Calculate eligible subtotal (standard-priced items only)
+    const eligibleSubtotal = eligibleItems.reduce(
+      (sum, item) => sum + item.unit_price * item.quantity,
+      0
+    );
+
+    // 9. Calculate discounts from coupon_rewards (using eligible items only)
     const rewards: CouponReward[] = coupon.coupon_rewards || [];
     const rewardResults: RewardResult[] = [];
 
@@ -475,10 +499,10 @@ export async function POST(request: NextRequest) {
 
       if (reward.applies_to === 'order') {
         targetName = 'Order';
-        discountAmount = calculateRewardDiscount(reward, subtotal);
+        discountAmount = calculateRewardDiscount(reward, eligibleSubtotal);
       } else if (reward.applies_to === 'product') {
         const matchingItems = getMatchingItems(
-          cartItems,
+          eligibleItems,
           'product',
           reward.target_product_id,
           reward.target_product_category_id
@@ -499,7 +523,7 @@ export async function POST(request: NextRequest) {
         }
       } else if (reward.applies_to === 'service') {
         const matchingItems = getMatchingItems(
-          cartItems,
+          eligibleItems,
           'service',
           reward.target_service_id,
           reward.target_service_category_id
@@ -552,6 +576,7 @@ export async function POST(request: NextRequest) {
         rewards: rewardResults,
         total_discount: totalDiscount,
         description,
+        excluded_count: excludedCount,
         ...(customerTypeWarning ? { warning: customerTypeWarning } : {}),
       },
     });

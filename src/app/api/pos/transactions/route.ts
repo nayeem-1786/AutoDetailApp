@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
         tier_name?: string | null;
         vehicle_size_class?: string | null;
         notes?: string | null;
+        standard_price?: number | null;
+        pricing_type?: string | null;
       }) => ({
         transaction_id: transaction.id,
         item_type: item.item_type,
@@ -89,6 +91,8 @@ export async function POST(request: NextRequest) {
         tier_name: item.tier_name || null,
         vehicle_size_class: item.vehicle_size_class || null,
         notes: item.notes || null,
+        standard_price: item.standard_price ?? null,
+        pricing_type: item.pricing_type || 'standard',
       }));
 
       const { error: itemsError } = await supabase

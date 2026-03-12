@@ -37,6 +37,7 @@ interface QuoteTicketPanelProps {
 export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps) {
   const router = useRouter();
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
+  const { granted: canOverridePricing } = usePosPermission('pos.override_pricing');
   const { quote, dispatch, quoteValidityDays } = useQuote();
   const { services } = useCatalog();
 
@@ -97,6 +98,11 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     }
     if (discountType === 'percent' && parsed > 100) {
       toast.error('Percentage discount cannot exceed 100%');
+      return;
+    }
+    const hasSpecialPricing = quote.items.some((i) => i.pricingType === 'sale' || i.pricingType === 'combo');
+    if (hasSpecialPricing && !canOverridePricing) {
+      toast.error('Override pricing permission required to discount sale/combo items');
       return;
     }
     dispatch({

@@ -9,6 +9,8 @@ interface ReceiptItem {
   total_price: number;
   tax_amount: number;
   item_type?: string | null;
+  standard_price?: number | null;
+  pricing_type?: string | null;
 }
 
 interface ReceiptPayment {
@@ -375,11 +377,15 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       });
     }
 
-    // TODO: Add-on savings sub-text
-    // Needs: (1) is_addon flag on transaction_items or lookup via service_addon_suggestions
-    // (2) original_price (regular price before combo discount)
-    // (3) combo_price from service_addon_suggestions
-    // Format: "  Add-on: Reg $X.XX, You saved $Y.YY!"
+    // Sale/combo savings sub-text
+    if (item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price) {
+      const savings = item.standard_price - item.unit_price;
+      const label = item.pricing_type === 'combo' ? 'Combo' : 'Sale';
+      lines.push({
+        type: 'text',
+        text: `  ${label}: Reg $${item.standard_price.toFixed(2)} — Save $${savings.toFixed(2)}!`,
+      });
+    }
   }
 
   lines.push({ type: 'divider' });

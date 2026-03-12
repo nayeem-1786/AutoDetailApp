@@ -120,6 +120,8 @@ export function SplitPayment() {
             tier_name: i.tierName,
             vehicle_size_class: i.vehicleSizeClass,
             notes: i.notes,
+            standard_price: i.standardPrice,
+            pricing_type: i.pricingType,
           })),
           payments: [
             {

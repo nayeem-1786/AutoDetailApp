@@ -26,6 +26,8 @@ export function QuoteCouponInput() {
         unit_price: item.unitPrice,
         quantity: item.quantity,
         item_name: item.itemName,
+        standard_price: item.standardPrice,
+        pricing_type: item.pricingType,
       }));
 
       const res = await posFetch('/api/pos/coupons/validate', {

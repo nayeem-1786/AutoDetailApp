@@ -10,6 +10,8 @@ export interface CartItem {
   unit_price: number;
   quantity: number;
   item_name: string;
+  standard_price?: number;
+  pricing_type?: string;
 }
 
 export interface CouponRewardRow {
@@ -231,21 +233,30 @@ export function calculateCouponDiscount(
   items: CartItem[],
   subtotal: number
 ): number {
+  // No-stacking: filter out items with sale/combo pricing
+  const eligibleItems = items.filter(
+    (i) => !i.pricing_type || i.pricing_type === 'standard'
+  );
+  const eligibleSubtotal = eligibleItems.reduce(
+    (sum, item) => sum + item.unit_price * item.quantity,
+    0
+  );
+
   let totalDiscount = 0;
 
   for (const reward of rewards) {
     let discountAmount = 0;
 
     if (reward.applies_to === 'order') {
-      discountAmount = calculateRewardDiscount(reward, subtotal);
+      discountAmount = calculateRewardDiscount(reward, eligibleSubtotal);
     } else if (reward.applies_to === 'product') {
-      const matching = getMatchingItems(items, 'product', reward.target_product_id, reward.target_product_category_id);
+      const matching = getMatchingItems(eligibleItems, 'product', reward.target_product_id, reward.target_product_category_id);
       if (matching.length > 0) {
         const totalItemPrice = matching.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
         discountAmount = calculateRewardDiscount(reward, totalItemPrice);
       }
     } else if (reward.applies_to === 'service') {
-      const matching = getMatchingItems(items, 'service', reward.target_service_id, reward.target_service_category_id);
+      const matching = getMatchingItems(eligibleItems, 'service', reward.target_service_id, reward.target_service_category_id);
       if (matching.length > 0) {
         const totalItemPrice = matching.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
         discountAmount = calculateRewardDiscount(reward, totalItemPrice);

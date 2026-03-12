@@ -445,6 +445,8 @@ const transactionItemSchema = z.object({
   tier_name: optionalString,
   vehicle_size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
   notes: optionalString,
+  standard_price: z.coerce.number().optional().nullable(),
+  pricing_type: z.enum(['standard', 'sale', 'combo']).optional().default('standard'),
 });
 
 export const paymentSchema = z.object({

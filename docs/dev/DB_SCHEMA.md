@@ -287,6 +287,8 @@
 | tier_name | TEXT | | Pricing tier used |
 | vehicle_size_class | vehicle_size_class (enum) | | |
 | notes | TEXT | | |
+| standard_price | DECIMAL(10,2) | DEFAULT NULL | Catalog price before sale/combo discount |
+| pricing_type | TEXT | DEFAULT 'standard' | standard, sale, or combo |
 | created_at | TIMESTAMPTZ | | |
 
 ### payments

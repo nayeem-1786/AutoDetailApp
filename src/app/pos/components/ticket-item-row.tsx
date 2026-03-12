@@ -108,10 +108,22 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
 
   return (
     <div className="border-b border-gray-100 dark:border-gray-800 py-2">
-      {/* Line 1: Full item name */}
-      <p className="text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">
-        {item.itemName}
-      </p>
+      {/* Line 1: Full item name + pricing badge */}
+      <div className="flex items-center gap-1.5">
+        <p className="text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">
+          {item.itemName}
+        </p>
+        {item.pricingType === 'sale' && (
+          <span className="shrink-0 rounded bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
+            Sale
+          </span>
+        )}
+        {item.pricingType === 'combo' && (
+          <span className="shrink-0 rounded bg-green-100 dark:bg-green-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-600 dark:text-green-400">
+            Combo
+          </span>
+        )}
+      </div>
 
       {/* Line 2: Sub-text + note icon | qty + price + remove */}
       <div className="mt-1 flex items-center gap-2">
@@ -234,8 +246,20 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
           )}
 
           {/* Price */}
-          <div className="w-16 text-right">
-            <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
+          <div className="w-20 text-right">
+            {item.pricingType !== 'standard' && item.standardPrice !== item.unitPrice && (
+              <p className="text-[10px] tabular-nums text-gray-400 dark:text-gray-500 line-through">
+                ${item.standardPrice.toFixed(2)}
+              </p>
+            )}
+            <p className={cn(
+              'text-sm font-medium tabular-nums',
+              item.pricingType === 'sale'
+                ? 'text-red-600 dark:text-red-400'
+                : item.pricingType === 'combo'
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-gray-900 dark:text-gray-100'
+            )}>
               ${item.totalPrice.toFixed(2)}
             </p>
             {item.taxAmount > 0 && (
@@ -302,28 +326,57 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
       {/* Child addon items — rendered indented under this parent */}
       {childItems && childItems.length > 0 && (
         <div className="ml-3 mt-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2.5">
-          {childItems.map((child) => (
-            <div key={child.id} className="flex items-center justify-between py-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">&darr;</span>
-                <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {child.itemName}
-                </span>
+          {childItems.map((child) => {
+            const childSavings = child.pricingType !== 'standard' && child.standardPrice > child.unitPrice
+              ? child.standardPrice - child.unitPrice
+              : 0;
+            return (
+              <div key={child.id} className="py-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">&darr;</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                      {child.itemName}
+                    </span>
+                    {child.pricingType === 'combo' && (
+                      <span className="shrink-0 rounded bg-green-100 dark:bg-green-900/40 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-600 dark:text-green-400">
+                        Combo
+                      </span>
+                    )}
+                    {child.pricingType === 'sale' && (
+                      <span className="shrink-0 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[9px] font-semibold uppercase text-red-600 dark:text-red-400">
+                        Sale
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={cn(
+                      'text-xs tabular-nums',
+                      child.pricingType === 'combo'
+                        ? 'text-green-600 dark:text-green-400'
+                        : child.pricingType === 'sale'
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-gray-600 dark:text-gray-400'
+                    )}>
+                      ${child.totalPrice.toFixed(2)}
+                    </span>
+                    <button
+                      onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: child.id })}
+                      className="h-7 w-7 flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
+                      aria-label={`Remove ${child.itemName}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+                {childSavings > 0 && (
+                  <p className="ml-5 text-[10px] text-green-600 dark:text-green-400">
+                    Reg ${child.standardPrice.toFixed(2)} — Save ${childSavings.toFixed(2)}
+                  </p>
+                )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400">
-                  ${child.totalPrice.toFixed(2)}
-                </span>
-                <button
-                  onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: child.id })}
-                  className="h-7 w-7 flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
-                  aria-label={`Remove ${child.itemName}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

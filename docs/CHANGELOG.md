@@ -4,6 +4,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Sale pricing, combo pricing & coupon no-stacking in POS — 2026-03-12
+
+### Sale Pricing
+- `resolveServicePriceWithSale()` — new utility in `src/app/pos/utils/pricing.ts` that checks `service_pricing.sale_price` against the service's `sale_starts_at`/`sale_ends_at` window
+- ADD_SERVICE in both ticket-reducer and quote-reducer now uses sale-aware pricing automatically
+- RECALCULATE_VEHICLE_PRICES re-evaluates sale prices when vehicle changes
+- Red "Sale" badge and strikethrough original price shown on ticket items
+
+### Combo Pricing
+- Addon suggestions now pass `comboPrice` and `comboPrimaryServiceId` through the full flow: `addon-suggestions.tsx` → `service-detail-dialog.tsx` → `ticket-panel.tsx` → reducer dispatch
+- **Lowest price wins**: When both sale and combo prices are available, the lower one is applied
+- Green "Combo" badge shown on combo-priced items, with savings sub-line (`Reg $X.XX — Save $Y.YY`)
+- Removing a parent service **promotes** combo-priced children to standalone (reverts to sale or standard price) instead of deleting them
+
+### Coupon No-Stacking
+- Items with `pricingType === 'sale'` or `pricingType === 'combo'` are excluded from coupon discounts
+- Coupon validate API (`/api/pos/coupons/validate`) filters eligible items before calculating rewards
+- If all items are specially priced, coupon is rejected: "all items already have special pricing"
+- Mixed tickets show toast: "Coupon applied to X of Y items (special pricing excluded)"
+- `calculateCouponDiscount()` in `coupon-helpers.ts` mirrors the same filtering
+
+### Manual Discount Override Permission
+- `pos.override_pricing` permission required to apply manual discounts when ticket has sale/combo items
+- Standard-only tickets still only need `pos.manual_discounts` (unchanged behavior)
+
+### Pricing Provenance
+- **TicketItem** now tracks: `standardPrice`, `pricingType` ('standard'|'sale'|'combo'), `comboSourcePrimaryId`, `saleEffectivePrice`
+- **transaction_items** DB table: new `standard_price DECIMAL(10,2)` and `pricing_type TEXT` columns
+- All checkout flows (card, cash, check, split) persist these fields
+- Receipt template shows savings sub-lines for sale/combo items
+
+### Migration
+- `20260312000001_add_transaction_items_pricing_fields.sql`
+
+---
+
 ## feat: SMS receipt redesign + receipt logo base64 + footer cleanup — 2026-03-11
 
 ### SMS Receipt Redesign (Task C)
