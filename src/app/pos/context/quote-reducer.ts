@@ -1,6 +1,6 @@
 import type { QuoteState, QuoteAction, TicketItem } from '../types';
 import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
-import { resolveServicePrice, resolveServicePriceWithSale } from '../utils/pricing';
+import { resolveServicePriceWithSale } from '../utils/pricing';
 
 export const initialQuoteState: QuoteState = {
   items: [],

@@ -19,6 +19,9 @@ export function AddonSuggestions() {
 
   const [dismissed, setDismissed] = useState(false);
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
+  // Track combo price for the currently picked addon
+  const [pickerComboPrice, setPickerComboPrice] = useState<number | null>(null);
+  const [pickerPrimaryServiceId, setPickerPrimaryServiceId] = useState<string | null>(null);
 
   // Track the set of service IDs that were on the ticket last time suggestions were shown,
   // so we can reset dismissed state when new services are added
@@ -78,10 +81,6 @@ export function AddonSuggestions() {
   if (dismissed || suggestions.length === 0) {
     return null;
   }
-
-  // Track combo price for the currently picked addon
-  const [pickerComboPrice, setPickerComboPrice] = useState<number | null>(null);
-  const [pickerPrimaryServiceId, setPickerPrimaryServiceId] = useState<string | null>(null);
 
   function handleChipClick(addon: AddonSuggestionEntry) {
     // Find the full CatalogService for this addon so we can open the pricing picker
