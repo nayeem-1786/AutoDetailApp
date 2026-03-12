@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-03-03 (Email Template System — Sub-phase 6)
+> **Last updated:** 2026-03-12 (Comprehensive file tree audit — all missing files added)
 
 ---
 
@@ -333,6 +333,7 @@ src/app/api/migration/vehicles/route.ts
 
 ### POS
 ```
+src/app/api/pos/appointments/[id]/notify/route.ts
 src/app/api/pos/auth/logout/route.ts
 src/app/api/pos/auth/pin-login/route.ts
 src/app/api/pos/card-customer/route.ts
@@ -451,6 +452,13 @@ src/app/api/voice-agent/quotes/route.ts
 src/app/api/voice-agent/services/route.ts
 src/app/api/waitlist/[id]/route.ts
 src/app/api/waitlist/route.ts
+```
+
+### Top-Level Route Handlers (`src/app/`)
+```
+src/app/ai.txt/route.ts                 — AI crawler instructions
+src/app/robots.txt/route.ts             — Dynamic robots.txt
+src/app/sitemap.xml/route.ts            — Dynamic sitemap
 ```
 
 ---
@@ -667,6 +675,13 @@ src/app/(customer-auth)/signin/reset-password/page.tsx
 src/app/(customer-auth)/signup/page.tsx
 ```
 
+### Admin Login (`src/app/(auth)/`)
+```
+src/app/(auth)/layout.tsx
+src/app/(auth)/login/page.tsx               — Admin login page
+src/app/(auth)/login/reset-password/page.tsx — Admin password reset
+```
+
 ### Auth (`src/app/auth/`)
 ```
 src/app/auth/callback/route.ts              — OAuth/magic-link code exchange
@@ -676,22 +691,39 @@ src/app/auth/reset-password/page.tsx        — Staff password reset landing pag
 ### Customer Portal (`src/app/(account)/`)
 ```
 src/app/(account)/layout.tsx
-src/app/(account)/account/page.tsx           — Dashboard / overview
-src/app/(account)/account/services/page.tsx  — Service history
-src/app/(account)/account/orders/page.tsx    — Order history
-src/app/(account)/account/vehicles/page.tsx  — My vehicles
-src/app/(account)/account/loyalty/page.tsx   — Loyalty points
-src/app/(account)/account/coupons/page.tsx   — My coupons
-src/app/(account)/account/settings/page.tsx  — Profile settings
+src/app/(account)/account/page.tsx              — Dashboard / overview
+src/app/(account)/account/appointments/page.tsx — Upcoming & past appointments
+src/app/(account)/account/loyalty/page.tsx      — Loyalty points
+src/app/(account)/account/orders/page.tsx       — Order history
+src/app/(account)/account/orders/[id]/page.tsx  — Order detail
+src/app/(account)/account/photos/page.tsx       — My photos
+src/app/(account)/account/profile/page.tsx      — Profile settings
+src/app/(account)/account/services/page.tsx     — Service history
+src/app/(account)/account/services/[jobId]/page.tsx — Service detail
+src/app/(account)/account/transactions/page.tsx — Transaction history
+src/app/(account)/account/vehicles/page.tsx     — My vehicles
+```
+
+### POS Pages (`src/app/pos/`)
+```
+src/app/pos/page.tsx                     — POS main workspace
+src/app/pos/login/page.tsx               — POS PIN login
+src/app/pos/end-of-day/page.tsx          — End-of-day cash count & reconciliation
+src/app/pos/jobs/page.tsx                — Jobs management
+src/app/pos/offline/page.tsx             — Offline fallback page
+src/app/pos/quotes/page.tsx              — Quote builder & list
+src/app/pos/transactions/page.tsx        — Transaction list
+src/app/pos/transactions/[id]/page.tsx   — Transaction detail
 ```
 
 ### Standalone Public Pages
 ```
-src/app/quote/[token]/page.tsx           — Public quote view/accept
-src/app/(public)/receipt/[token]/page.tsx       — Public receipt view (token-based, no login)
+src/app/(public)/quote/[token]/page.tsx         — Public quote view/accept
+src/app/(public)/quote/[token]/accept-button.tsx — Accept quote button component
+src/app/(public)/receipt/[token]/page.tsx        — Public receipt view (token-based, no login)
 src/app/(public)/receipt/[token]/print-button.tsx — Print/save-as-PDF button
 src/app/q/[token]/page.tsx               — Short quote URL redirect
-src/app/s/[code]/page.tsx                — Short link redirect
+src/app/s/[code]/route.ts               — Short link redirect (route handler)
 src/app/authorize/[token]/page.tsx       — Job authorization (approve/decline)
 src/app/jobs/[token]/photos/page.tsx     — Customer photo upload for jobs
 src/app/unsubscribe/[customerId]/page.tsx — Email/SMS unsubscribe
@@ -704,9 +736,12 @@ src/app/unsubscribe/[customerId]/page.tsx — Email/SMS unsubscribe
 ### Auth
 ```
 src/lib/auth/api-key.ts
+src/lib/auth/auth-provider.tsx             — Admin auth context provider
 src/lib/auth/check-permission.ts
+src/lib/auth/customer-auth-provider.tsx    — Customer auth context provider
 src/lib/auth/customer-helpers.ts
 src/lib/auth/get-employee.ts
+src/lib/auth/permission-context.tsx        — Permission context & provider
 src/lib/auth/permissions.ts
 src/lib/auth/require-permission.ts
 src/lib/auth/roles.ts
@@ -743,8 +778,14 @@ src/lib/data/vehicle-count.ts
 src/lib/data/website-pages.ts
 ```
 
+### Contexts
+```
+src/lib/contexts/cart-context.tsx           — Shopping cart context provider
+```
+
 ### Hooks
 ```
+src/lib/hooks/feature-flag-provider.tsx     — Feature flag context provider
 src/lib/hooks/use-async-action.ts
 src/lib/hooks/use-business-info.ts
 src/lib/hooks/use-drag-drop-reorder.ts
@@ -1251,9 +1292,13 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260228000006_homepage_settings_expansion.sql
 20260228000007_og_image_setting.sql
 20260301000001_ticker_message_gap.sql
+20260301000002_drop_orphaned_photos_table.sql
+20260301000003_add_job_photos_tags.sql
 20260303000001_email_template_system.sql
 20260303000002_seed_email_templates.sql
 20260304000001_email_template_rls_policies.sql
+20260311000001_add_transaction_access_token.sql
+20260312000001_add_transaction_items_pricing_fields.sql
 ```
 
 ---
