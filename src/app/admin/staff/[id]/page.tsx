@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
@@ -435,49 +436,6 @@ export default function StaffDetailPage() {
   const sortedCategories = Object.entries(permissionsByCategory).sort(
     ([, a], [, b]) => (a[0]?.sort_order ?? 0) - (b[0]?.sort_order ?? 0)
   );
-
-  // Check if overrides have changed from the loaded state
-  const hasOverrideChanges = permissionDefinitions.length > 0;
-
-  async function handleSavePermissions() {
-    setSavingPermissions(true);
-    try {
-      // Build the overrides payload — include all keys that have overrides
-      // and send null for keys that were previously overridden but reverted to default
-      const payload: Array<{ key: string; granted: boolean | null }> = [];
-
-      for (const def of permissionDefinitions) {
-        const state = overrides[def.key];
-        if (state === 'grant') {
-          payload.push({ key: def.key, granted: true });
-        } else if (state === 'deny') {
-          payload.push({ key: def.key, granted: false });
-        } else {
-          // Default — send null to clear any existing override
-          payload.push({ key: def.key, granted: null });
-        }
-      }
-
-      const res = await adminFetch(`/api/admin/staff/${id}/permissions`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ overrides: payload }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to save permissions');
-      }
-
-      toast.success('Permission overrides saved');
-      await loadEmployee();
-    } catch (err) {
-      console.error('Save permissions error:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to save permissions');
-    } finally {
-      setSavingPermissions(false);
-    }
-  }
 
   function updateScheduleDay(dayOfWeek: number, field: keyof DaySchedule, value: string | boolean) {
     setSchedule((prev) => {
@@ -1012,13 +970,13 @@ export default function StaffDetailPage() {
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <span>Role:</span>
                     <Badge variant="info">{roleDisplayName}</Badge>
-                    <a
+                    <Link
                       href="/admin/staff/roles"
                       className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
                     >
                       View role defaults
                       <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </CardHeader>
@@ -1079,7 +1037,6 @@ export default function StaffDetailPage() {
                             <div className="border-t border-gray-100">
                               {definitions.map((def, idx) => {
                                 const overrideState = overrides[def.key] || 'default';
-                                const roleDefault = getRoleDefault(def.key);
                                 const isSuperAdmin = employee.role === 'super_admin';
 
                                 return (

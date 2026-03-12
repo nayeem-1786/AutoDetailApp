@@ -7,7 +7,6 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendSms } from '@/lib/utils/sms';
-import { getBusinessInfo } from '@/lib/data/business';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -294,7 +293,7 @@ export function buildAddonPromptSection(addons: AddonWithContext[]): string {
 
       const employeeName = addon.employee_name || 'our team';
 
-      let section = `\nPENDING SERVICE AUTHORIZATION:
+      const section = `\nPENDING SERVICE AUTHORIZATION:
 This customer has a pending add-on authorization for their current vehicle service visit.
 - Add-on: ${name}
 - Price: $${price.toFixed(2)}${addon.discount_amount > 0 ? ` ($${addon.discount_amount.toFixed(2)} off)` : ''}

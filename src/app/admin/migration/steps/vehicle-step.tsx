@@ -18,8 +18,9 @@ interface VehicleStepProps {
 
 export function VehicleStep({ state, onStateChange, onContinue }: VehicleStepProps) {
   const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [_progress, setProgress] = useState(0);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const transactionItems = state.parsedData.transactionItems || [];
 
   // Infer vehicles from service transaction items
@@ -31,8 +32,6 @@ export function VehicleStep({ state, onStateChange, onContinue }: VehicleStepPro
       const custRefId = (row['Customer Reference ID'] || '').trim();
       const custName = (row['Customer Name'] || '').trim();
       const pricePointName = (row['Price Point Name'] || '').trim();
-      const itemType = (row['Itemization Type'] || '').trim();
-
       // Only look at service items with vehicle size price points
       if (!custRefId || !pricePointName) return;
 

@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type {
   EmailTemplate,
   EmailLayout,
-  EmailTemplateAssignment,
   CustomerAttributes,
 } from './types';
 

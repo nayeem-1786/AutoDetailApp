@@ -25,7 +25,6 @@ import {
   Car,
   FileText,
   Search,
-  Plus,
   ShoppingCart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -670,9 +669,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const servicesTotal = job.services.reduce((sum, s) => sum + s.price, 0);
   const allAddons = job.addons ?? [];
   const pendingAddons = allAddons.filter((a) => a.status === 'pending');
-  const approvedAddons = allAddons.filter((a) => a.status === 'approved');
-  const declinedAddons = allAddons.filter((a) => a.status === 'declined');
-  const expiredAddons = allAddons.filter((a) => a.status === 'expired');
+  const _approvedAddons = allAddons.filter((a) => a.status === 'approved');
+  const _declinedAddons = allAddons.filter((a) => a.status === 'declined');
+  const _expiredAddons = allAddons.filter((a) => a.status === 'expired');
 
   const showTimer = job.status === 'in_progress' && (job.work_started_at || job.timer_paused_at);
 

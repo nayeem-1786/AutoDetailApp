@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { lifecycleRuleSchema } from '@/lib/utils/validation';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

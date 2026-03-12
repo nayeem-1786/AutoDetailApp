@@ -34,6 +34,7 @@ export function PhotoGalleryPicker({ selectedPairs, onSelect, maxPairs = 4 }: Ph
 
   useEffect(() => {
     loadPhotos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoneFilter, tagFilter]);
 
   async function loadPhotos() {
@@ -137,7 +138,6 @@ export function PhotoGalleryPicker({ selectedPairs, onSelect, maxPairs = 4 }: Ph
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wider text-gray-400">Before</p>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={photo.before_thumbnail || photo.before_url}
                       alt="Before"
@@ -146,7 +146,6 @@ export function PhotoGalleryPicker({ selectedPairs, onSelect, maxPairs = 4 }: Ph
                   </div>
                   <div className="flex-1">
                     <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wider text-gray-400">After</p>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={photo.after_thumbnail || photo.after_url}
                       alt="After"

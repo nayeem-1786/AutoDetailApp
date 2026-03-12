@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import Stripe from 'stripe';
 
@@ -13,8 +12,6 @@ export async function POST(request: NextRequest) {
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const supabase = createAdminClient();
-
     const body = await request.json();
     const { amount, description } = body;
 

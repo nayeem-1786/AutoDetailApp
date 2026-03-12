@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { formatCurrency } from '@/lib/utils/format';
-import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';

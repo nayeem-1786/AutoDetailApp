@@ -150,7 +150,6 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
 
       {/* Photo preview */}
       <div className="relative flex-1 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={previewUrl}
           alt="Captured photo preview"

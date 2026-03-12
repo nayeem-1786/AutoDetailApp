@@ -207,7 +207,6 @@ export function HeroImageUpload({
       {imageUrl ? (
         /* Preview with replace/remove actions */
         <div className={cn('relative w-full rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-100 dark:bg-gray-700 group', aspectClass)}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
             alt={label}

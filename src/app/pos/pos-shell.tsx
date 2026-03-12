@@ -180,7 +180,6 @@ function PosShellContent({
   displayName: string;
   role: string;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
   const { signOut: posSignOut } = usePosAuth();
   const { ticket, dispatch } = useTicket();

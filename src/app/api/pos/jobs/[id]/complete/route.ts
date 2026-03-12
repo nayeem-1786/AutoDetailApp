@@ -321,7 +321,6 @@ async function sendCompletionNotifications(
         </table>
       `).join('');
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const addonsHtml = approvedAddons.length > 0 ? `
         <p style="margin-top: 8px; font-size: 14px; color: #374151;">
           <strong>Add-ons:</strong><br/>

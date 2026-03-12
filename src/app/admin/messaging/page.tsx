@@ -37,7 +37,7 @@ export default function MessagingPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [messagesCache, setMessagesCache] = useState<Record<string, Message[]>>({});
+  const [_messagesCache, setMessagesCache] = useState<Record<string, Message[]>>({});
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [search, setSearch] = useState('');

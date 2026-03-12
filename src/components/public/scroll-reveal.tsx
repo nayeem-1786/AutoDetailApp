@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, type ReactNode } from 'react';
-import { motion, useInView, useAnimation, type Variant } from 'motion/react';
+import { motion, useInView, type Variant } from 'motion/react';
 
 // ─── ScrollReveal ────────────────────────────────────────────────
 interface ScrollRevealProps {

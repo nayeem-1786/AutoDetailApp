@@ -19,7 +19,7 @@ const BRAND_KIT_KEYS = [
 ];
 
 // GET /api/admin/email-templates/brand-kit — Get all Brand Kit settings
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const employee = await getEmployeeFromSession();
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

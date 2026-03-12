@@ -76,7 +76,6 @@ export function ContentBlockEditor({
   pageType,
   pageTitle,
   pageMetaDescription,
-  onClose,
 }: ContentBlockEditorProps) {
   const [blocks, setBlocks] = useState<PageContentBlock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1097,7 +1096,6 @@ function CtaEditor({
   content,
   onChange,
   isAiLoading,
-  onAiGenerate,
   pagePath,
   pageType,
 }: {
@@ -1225,7 +1223,6 @@ function TestimonialEditor({
   content,
   onChange,
   isAiLoading,
-  onAiGenerate,
   pagePath,
   pageType,
 }: {

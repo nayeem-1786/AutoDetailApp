@@ -79,7 +79,6 @@ export function GalleryLightbox({ images }: GalleryLightboxProps) {
             onClick={() => setSelectedIdx(idx)}
             className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-site-border bg-brand-surface cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent-ui focus:ring-offset-2 focus:ring-offset-brand-dark"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image.image_url}
               alt={image.alt_text || image.caption || 'Gallery image'}
@@ -144,7 +143,6 @@ export function GalleryLightbox({ images }: GalleryLightboxProps) {
             className="max-h-[85vh] max-w-[90vw] flex flex-col items-center"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={selectedImage.image_url}
               alt={selectedImage.alt_text || selectedImage.caption || 'Gallery image'}

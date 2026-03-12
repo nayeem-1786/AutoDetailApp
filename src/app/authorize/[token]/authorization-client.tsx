@@ -16,6 +16,7 @@ export function AuthorizationClient({ token, initialAction }: AuthorizationClien
     if (initialAction === 'approve' || initialAction === 'decline') {
       handleAction(initialAction);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAction]);
 
   async function handleAction(action: 'approve' | 'decline') {

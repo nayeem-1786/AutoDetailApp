@@ -448,7 +448,6 @@ export default function AdCreativeEditorPage() {
               />
               {form.image_url ? (
                 <div className="relative group rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-100 dark:bg-gray-700">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={form.image_url}
                     alt={form.alt_text || form.name || 'Ad preview'}
@@ -529,7 +528,6 @@ export default function AdCreativeEditorPage() {
               />
               {form.image_url_mobile ? (
                 <div className="relative group rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-100 dark:bg-gray-700">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={form.image_url_mobile}
                     alt={form.alt_text || form.name || 'Ad mobile preview'}
@@ -699,7 +697,6 @@ export default function AdCreativeEditorPage() {
                 }}
               >
                 {form.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={form.image_url}
                     alt={form.alt_text || form.name || 'Ad preview'}

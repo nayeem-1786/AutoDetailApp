@@ -345,7 +345,7 @@ class AdminErrorBoundary extends React.Component<
 }
 
 function AdminContent({ children }: { children: React.ReactNode }) {
-  const { employee, role, isSuper, roleName, canAccessPos, loading, signOut } = useAuth();
+  const { employee, role, roleName, canAccessPos, loading, signOut } = useAuth();
   const { info: businessInfo } = useBusinessInfo();
   const { enabled: twoWaySmsEnabled } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
   const { enabled: inventoryEnabled } = useFeatureFlag(FEATURE_FLAGS.INVENTORY_MANAGEMENT);
@@ -361,6 +361,9 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
   // Global fetch interceptor for 401 errors - redirect to login on session expiry
   useEffect(() => {
+    if (window.__fetchIntercepted) return;
+    window.__fetchIntercepted = 'admin';
+
     const originalFetch = window.fetch;
 
     window.fetch = async (...args) => {
@@ -382,6 +385,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
     return () => {
       window.fetch = originalFetch;
+      delete window.__fetchIntercepted;
     };
   }, []);
 

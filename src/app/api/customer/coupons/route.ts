@@ -151,16 +151,14 @@ export async function GET(request: NextRequest) {
       }
 
       // Remove internal fields before returning
-      const {
-        customer_id: _customerId,
-        customer_tags: _tags,
-        tag_match_mode: _matchMode,
-        requires_service_ids: _reqSvcIds,
-        requires_service_category_ids: _reqCatIds,
-        ...rest
-      } = coupon;
+      const publicCoupon = { ...coupon };
+      delete (publicCoupon as Record<string, unknown>).customer_id;
+      delete (publicCoupon as Record<string, unknown>).customer_tags;
+      delete (publicCoupon as Record<string, unknown>).tag_match_mode;
+      delete (publicCoupon as Record<string, unknown>).requires_service_ids;
+      delete (publicCoupon as Record<string, unknown>).requires_service_category_ids;
 
-      filteredCoupons.push(rest);
+      filteredCoupons.push(publicCoupon);
     }
 
     return NextResponse.json({ data: filteredCoupons });

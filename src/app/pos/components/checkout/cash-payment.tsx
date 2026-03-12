@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
-import { usePosAuth } from '../../context/pos-auth-context';
 import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 import { queueTransaction } from '@/lib/pos/offline-queue';
 
@@ -17,7 +16,6 @@ const QUICK_TENDERS = [20, 50, 100];
 export function CashPayment() {
   const { ticket, dispatch } = useTicket();
   const checkout = useCheckout();
-  const { employee } = usePosAuth();
   const isOnline = useOnlineStatus();
 
   const amountDue = ticket.total;

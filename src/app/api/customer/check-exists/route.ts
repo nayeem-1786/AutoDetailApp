@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 
+function noStoreJson(data: unknown, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: { ...init?.headers, 'Cache-Control': 'no-store' },
+  });
+}
+
 // In-memory rate limiter: max 10 lookups per IP per minute
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -31,7 +38,7 @@ export async function GET(request: NextRequest) {
       'unknown';
 
     if (isRateLimited(ip)) {
-      return NextResponse.json(
+      return noStoreJson(
         { exists: false, hasAuthAccount: false },
         { status: 429 }
       );
@@ -42,7 +49,7 @@ export async function GET(request: NextRequest) {
     const email = searchParams.get('email');
 
     if (!phone && !email) {
-      return NextResponse.json(
+      return noStoreJson(
         { exists: false, hasAuthAccount: false },
         { status: 400 }
       );
@@ -54,7 +61,7 @@ export async function GET(request: NextRequest) {
     if (phone) {
       const e164 = normalizePhone(phone);
       if (!e164) {
-        return NextResponse.json({ exists: false, hasAuthAccount: false });
+        return noStoreJson({ exists: false, hasAuthAccount: false });
       }
 
       const { data: customer } = await supabase
@@ -64,10 +71,10 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
       if (!customer) {
-        return NextResponse.json({ exists: false, hasAuthAccount: false });
+        return noStoreJson({ exists: false, hasAuthAccount: false });
       }
 
-      return NextResponse.json({
+      return noStoreJson({
         exists: true,
         hasAuthAccount: !!customer.auth_user_id,
       });
@@ -84,18 +91,18 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
       if (!customer) {
-        return NextResponse.json({ exists: false, hasAuthAccount: false });
+        return noStoreJson({ exists: false, hasAuthAccount: false });
       }
 
-      return NextResponse.json({
+      return noStoreJson({
         exists: true,
         hasAuthAccount: !!customer.auth_user_id,
       });
     }
 
-    return NextResponse.json({ exists: false, hasAuthAccount: false });
+    return noStoreJson({ exists: false, hasAuthAccount: false });
   } catch {
     // Fail silently — don't reveal internal errors
-    return NextResponse.json({ exists: false, hasAuthAccount: false });
+    return noStoreJson({ exists: false, hasAuthAccount: false });
   }
 }

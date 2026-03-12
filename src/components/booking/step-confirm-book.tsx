@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { formatCurrency, formatDate, formatTime, formatPhone } from '@/lib/utils/format';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -15,7 +15,6 @@ import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } fro
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import {
   Gift,
-  CheckCircle2,
   Info,
   Tag,
   Coins,
@@ -100,7 +99,7 @@ export interface StepConfirmBookProps {
 export function StepConfirmBook({
   serviceName,
   serviceId,
-  tierName,
+  tierName: _tierName,
   price,
   durationMinutes,
   isMobile,

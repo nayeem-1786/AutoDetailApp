@@ -59,16 +59,16 @@ export default function CustomerSignInPage() {
   const signedOutRef = useRef(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  // When redirected here due to session expiry, sign out to clear the
-  // refresh token from cookies. Without this, navigating back to /account
-  // would silently auto-refresh the token and bypass the login screen.
+  // Clear any stale session on mount — prevents cross-surface cookie
+  // conflicts (e.g. admin session blocking customer OTP verification).
   useEffect(() => {
-    if (sessionExpired && !signedOutRef.current) {
-      signedOutRef.current = true;
-      const supabase = createClient();
-      supabase.auth.signOut();
-    }
-  }, [sessionExpired]);
+    if (signedOutRef.current) return;
+    signedOutRef.current = true;
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: unknown } }) => {
+      if (session) supabase.auth.signOut();
+    }).catch(() => {});
+  }, []);
 
   // Auto-focus OTP input when entering verification mode
   useEffect(() => {

@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatCurrency } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { Select } from '@/components/ui/select';
@@ -17,7 +16,6 @@ import {
   Camera,
   Puzzle,
   Clock,
-  Calendar,
   Briefcase,
 } from 'lucide-react';
 import Link from 'next/link';

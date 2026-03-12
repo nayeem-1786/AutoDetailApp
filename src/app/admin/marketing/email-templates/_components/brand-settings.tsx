@@ -205,7 +205,6 @@ export function BrandSettings() {
           {effectiveLogoUrl && (
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
               <p className="mb-2 text-xs font-medium text-gray-500">Preview</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={effectiveLogoUrl}
                 alt="Logo preview"

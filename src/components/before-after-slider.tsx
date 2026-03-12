@@ -72,7 +72,6 @@ export function BeforeAfterSlider({
       onPointerCancel={() => setIsDragging(false)}
     >
       {/* After image (full width, bottom layer) */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={afterSrc}
         alt={afterLabel}
@@ -85,7 +84,6 @@ export function BeforeAfterSlider({
         className="absolute inset-0 overflow-hidden"
         style={{ width: `${position}%` }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={beforeSrc}
           alt={beforeLabel}

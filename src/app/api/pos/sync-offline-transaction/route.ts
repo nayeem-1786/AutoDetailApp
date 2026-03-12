@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
-import { CC_FEE_RATE, LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';

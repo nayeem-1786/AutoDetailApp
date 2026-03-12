@@ -30,7 +30,7 @@ interface AppointmentStatsData {
 
 export default function AppointmentsPage() {
   const supabase = createClient();
-  const { role } = useAuth();
+  useAuth();
   const { granted: canViewFullCalendar } = usePermission('appointments.view_calendar');
   const { granted: canReschedule } = usePermission('appointments.reschedule');
   const { granted: canCancel } = usePermission('appointments.cancel');

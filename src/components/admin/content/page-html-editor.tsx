@@ -33,7 +33,7 @@ export function PageHtmlEditor({
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTone, setAiTone] = useState<'professional' | 'casual' | 'friendly'>('professional');
   const [aiLoading, setAiLoading] = useState(false);
-  const [pendingHtml, setPendingHtml] = useState<string | null>(null);
+  const [_pendingHtml, setPendingHtml] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
 

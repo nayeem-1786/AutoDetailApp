@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Eye, EyeOff, Star, StarOff } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
 import { getZoneLabel, getZoneGroup } from '@/lib/utils/job-zones';
 import type { Annotation } from '@/lib/utils/job-zones';
 import type { JobPhoto } from '@/lib/supabase/types';
@@ -97,7 +96,6 @@ export function PhotoGallery({
                     onClick={() => setSelectedIndex(flatIndex)}
                     className="group relative aspect-square overflow-hidden rounded-lg bg-gray-200"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={photo.thumbnail_url || photo.image_url}
                       alt={`${getZoneLabel(photo.zone)} photo`}
@@ -224,7 +222,6 @@ function PhotoModal({
 
       {/* Image */}
       <div className="relative flex-1 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photo.image_url}
           alt={`${getZoneLabel(photo.zone)} photo`}

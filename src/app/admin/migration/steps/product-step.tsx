@@ -37,8 +37,9 @@ interface ProcessedProduct {
 
 export function ProductStep({ state, onStateChange, onContinue }: ProductStepProps) {
   const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [_progress, setProgress] = useState(0);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const products = state.parsedData.products || [];
 
   // Process products

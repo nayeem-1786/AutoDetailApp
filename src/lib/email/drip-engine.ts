@@ -9,7 +9,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { renderFromBlocks } from './send-templated-email';
-import type { DripStopConditions, DripStep } from './types';
+import type { DripStopConditions, DripStep, EmailBlock } from './types';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -371,7 +371,7 @@ async function sendDripEmail(
       if (tmpl?.body_blocks && Array.isArray(tmpl.body_blocks)) {
         const layoutSlug = (tmpl.email_layouts as Record<string, unknown>)?.slug as string || 'standard';
         const rendered = await renderFromBlocks(
-          tmpl.body_blocks as any,
+          tmpl.body_blocks as EmailBlock[],
           layoutSlug,
           vars,
           { isMarketing: true }
@@ -387,11 +387,13 @@ async function sendDripEmail(
             tracking: true,
           });
 
+          const emailId = result.success ? (result as { success: true; id: string }).id : null;
+          const emailErr = result.success ? null : (result as { success: false; error: string }).error;
           await logSend(db, enrollment.id, step.id, step.step_order, 'email',
             result.success ? 'sent' : 'failed',
-            result.success ? (result as any).id : null,
+            emailId,
             couponCode || null,
-            result.success ? null : (result as any).error
+            emailErr
           );
 
           return result.success;
@@ -467,7 +469,8 @@ async function generateCoupon(
   }).select().single();
 
   if (newCoupon && template.coupon_rewards) {
-    const rewards = (template.coupon_rewards as any[]).map((r) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rewards = (template.coupon_rewards as any[]).map((r: Record<string, unknown>) => ({
       coupon_id: newCoupon.id,
       applies_to: r.applies_to,
       discount_type: r.discount_type,
@@ -489,7 +492,7 @@ async function generateCoupon(
 async function advanceEnrollment(
   db: AdminClient,
   enrollment: FullEnrollment,
-  currentStep: DripStep
+  _currentStep: DripStep
 ): Promise<void> {
   const nextStepOrder = enrollment.current_step + 1;
 
@@ -694,7 +697,7 @@ export async function runAutoEnrollments(
       let customerIds: string[] = [];
 
       if (condition === 'no_visit_days') {
-        const days = (seq.trigger_value as any)?.days;
+        const days = (seq.trigger_value as Record<string, unknown>)?.days;
         if (!days || typeof days !== 'number') continue;
 
         const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -709,7 +712,7 @@ export async function runAutoEnrollments(
 
         customerIds = (customers || []).map((c) => c.id);
       } else if (condition === 'after_service') {
-        const serviceId = (seq.trigger_value as any)?.service_id;
+        const serviceId = (seq.trigger_value as Record<string, unknown>)?.service_id;
         if (!serviceId) continue;
 
         // Find customers with completed appointments in last 24h matching service
@@ -720,16 +723,17 @@ export async function runAutoEnrollments(
           .select('appointments!inner(customer_id, status, updated_at)')
           .eq('service_id', serviceId);
 
-        const matchingCustomerIds = (aptServices || [])
-          .filter((as: any) => {
-            const apt = as.appointments;
+        type AptServiceRow = { appointments: { customer_id: string | null; status: string; updated_at: string } };
+        const matchingCustomerIds = (aptServices as unknown as AptServiceRow[] || [])
+          .filter((row) => {
+            const apt = row.appointments;
             return apt?.status === 'completed' && apt.updated_at >= lookback && apt.customer_id;
           })
-          .map((as: any) => as.appointments.customer_id as string);
+          .map((row) => row.appointments.customer_id as string);
 
         customerIds = [...new Set(matchingCustomerIds)];
       } else if (condition === 'new_customer') {
-        const days = (seq.trigger_value as any)?.days || 7;
+        const days = (seq.trigger_value as Record<string, unknown>)?.days as number || 7;
         const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
         const { data: customers } = await db

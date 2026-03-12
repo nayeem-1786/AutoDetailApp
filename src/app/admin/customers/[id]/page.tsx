@@ -61,7 +61,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, User, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
 import { adminFetch } from '@/lib/utils/admin-fetch';
@@ -95,9 +95,7 @@ export default function CustomerProfilePage() {
   const supabase = createClient();
   const { employee: adminEmployee } = useAuth();
   const { granted: canDeleteCustomer } = usePermission('customers.delete');
-  const { granted: canEditCustomer } = usePermission('customers.edit');
   const { granted: canAdjustLoyalty } = usePermission('customers.adjust_loyalty');
-  const { granted: canExportCustomers } = usePermission('customers.export');
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);

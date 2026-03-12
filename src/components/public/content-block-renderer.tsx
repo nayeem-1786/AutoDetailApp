@@ -601,21 +601,6 @@ function GalleryBlock({ block }: { block: PageContentBlock }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Placeholder Block — stub for block types awaiting full renderers
-// ---------------------------------------------------------------------------
-
-function PlaceholderBlock({ block }: { block: PageContentBlock }) {
-  return (
-    <div className="content-block">
-      {block.title && (
-        <h2 className="font-display text-2xl font-bold tracking-tight text-site-text sm:text-3xl mb-6">
-          {block.title}
-        </h2>
-      )}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Master Renderer

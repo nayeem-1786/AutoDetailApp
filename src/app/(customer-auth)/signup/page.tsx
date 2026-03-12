@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -62,6 +62,18 @@ export default function CustomerSignUpPage() {
   const [otpPhone, setOtpPhone] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [checkingAuth, setCheckingAuth] = useState(!!phoneParam);
+  const signedOutRef = useRef(false);
+
+  // Clear any stale session on mount — prevents cross-surface cookie
+  // conflicts (e.g. admin session blocking customer OTP verification).
+  useEffect(() => {
+    if (signedOutRef.current) return;
+    signedOutRef.current = true;
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: unknown } }) => {
+      if (session) supabase.auth.signOut();
+    }).catch(() => {});
+  }, []);
 
   // Determine initial mode based on params and auth state
   useEffect(() => {
@@ -81,6 +93,9 @@ export default function CustomerSignUpPage() {
         setMode('phone-otp');
       }
       setCheckingAuth(false);
+    }).catch(() => {
+      setCheckingAuth(false);
+      setMode('phone-otp');
     });
   }, [phoneParam]);
 

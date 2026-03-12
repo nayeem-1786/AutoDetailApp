@@ -24,7 +24,7 @@ interface SwipeableCartItemProps {
 
 export function SwipeableCartItem({
   itemId,
-  itemName,
+  itemName: _itemName,
   disabled,
   onRemove,
   children,

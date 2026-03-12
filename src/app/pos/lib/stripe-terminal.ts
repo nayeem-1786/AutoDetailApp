@@ -16,7 +16,7 @@ let connectedReader: Reader | null = null;
 let connectionPromise: Promise<Reader> | null = null;
 let initPromise: Promise<TerminalInstance> | null = null;
 let collectInProgress = false;
-let cancelRequested = false;
+let _cancelRequested = false;
 
 async function fetchConnectionToken(): Promise<string> {
   console.log('[Terminal] Fetching new connection token...');
@@ -201,7 +201,7 @@ export async function collectPaymentMethod(
   const t = await getTerminal();
 
   collectInProgress = true;
-  cancelRequested = false;
+  _cancelRequested = false;
 
   console.log('[Terminal] Collecting payment method...');
 
@@ -245,7 +245,7 @@ export async function processPayment(
 export async function cancelCollect(): Promise<void> {
   if (!terminal) return;
 
-  cancelRequested = true;
+  _cancelRequested = true;
 
   if (!collectInProgress) {
     console.log('[Terminal] No collect in progress to cancel');

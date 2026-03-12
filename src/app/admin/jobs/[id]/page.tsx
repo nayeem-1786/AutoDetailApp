@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { formatCurrency } from '@/lib/utils/format';
 import { getZoneLabel } from '@/lib/utils/job-zones';
-import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -864,7 +863,6 @@ function PhotoSection({
   title,
   subtitle,
   photos,
-  creators,
   onPhotoClick,
   onToggleFeatured,
 }: {

@@ -9,7 +9,7 @@ import { useQuote } from '../../context/quote-context';
 
 export function QuoteLoyaltyPanel() {
   const { quote, dispatch } = useQuote();
-  const [redeeming, setRedeeming] = useState(false);
+  const [_redeeming, setRedeeming] = useState(false);
   const { enabled: loyaltyEnabled, loading: flagLoading } = useFeatureFlag(FEATURE_FLAGS.LOYALTY_REWARDS);
 
   const customer = quote.customer;

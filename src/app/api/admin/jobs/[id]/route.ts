@@ -97,7 +97,7 @@ export async function GET(
   const creatorIds = [
     ...new Set((photos || []).map((p) => p.created_by).filter(Boolean)),
   ];
-  let photoCreators: Record<string, string> = {};
+  const photoCreators: Record<string, string> = {};
   if (creatorIds.length > 0) {
     const { data: creators } = await admin
       .from('employees')

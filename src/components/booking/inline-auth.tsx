@@ -92,7 +92,6 @@ function SignInFlow({
   initialPhone,
   onSuccess,
   onSwitchToSignUp,
-  businessName,
 }: {
   initialPhone?: string;
   onSuccess: () => void;
@@ -697,7 +696,6 @@ type SignUpMode = 'phone-otp' | 'phone-verify' | 'otp-profile' | 'full';
 function SignUpFlow({
   onSuccess,
   onSwitchToSignIn,
-  businessName,
 }: {
   onSuccess: () => void;
   onSwitchToSignIn: (phone?: string) => void;

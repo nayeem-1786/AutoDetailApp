@@ -120,6 +120,7 @@ export function VehicleFormDialog({
         color: '',
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, vehicle, reset]);
 
   const handleMakeChange = useCallback((val: string) => {

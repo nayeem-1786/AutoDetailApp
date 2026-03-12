@@ -31,7 +31,9 @@ interface CustomerLoyalty {
 export function LoyaltyStep({ state, onStateChange, onContinue }: LoyaltyStepProps) {
   const [importing, setImporting] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const transactionItems = state.parsedData.transactionItems || [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const transactions = state.parsedData.transactions || [];
 
   // Calculate loyalty per customer

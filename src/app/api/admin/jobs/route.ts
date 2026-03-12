@@ -124,8 +124,8 @@ export async function GET(req: NextRequest) {
   // Batch fetch photo counts and addon counts for these jobs
   const jobIds = (jobs || []).map((j) => j.id);
 
-  let photoCounts: Record<string, number> = {};
-  let addonCounts: Record<string, number> = {};
+  const photoCounts: Record<string, number> = {};
+  const addonCounts: Record<string, number> = {};
 
   if (jobIds.length > 0) {
     // Photo counts per job

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { formResolver } from '@/lib/utils/form';
 import { createClient } from '@/lib/supabase/client';
 import { taxConfigSchema, type TaxConfigInput } from '@/lib/utils/validation';
 import { PageHeader } from '@/components/ui/page-header';

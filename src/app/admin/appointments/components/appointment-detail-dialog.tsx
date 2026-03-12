@@ -12,26 +12,17 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
-import { formatTime, formatCurrency, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { appointmentUpdateSchema, type AppointmentUpdateInput } from '@/lib/utils/validation';
 import { APPOINTMENT_STATUS_LABELS, ROLE_LABELS } from '@/lib/utils/constants';
 import { STATUS_TRANSITIONS } from '../types';
 import type { AppointmentWithRelations } from '../types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
-const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
-  pending: 'warning',
-  confirmed: 'info',
-  in_progress: 'info',
-  completed: 'success',
-  cancelled: 'destructive',
-  no_show: 'secondary',
-};
 
 const CHANNEL_LABELS: Record<string, string> = {
   online: 'Client (Online Booking)',

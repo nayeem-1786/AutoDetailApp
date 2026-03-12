@@ -124,6 +124,7 @@ export async function GET(request: Request) {
       const { error: upsertError } = await supabase
         .from('business_settings')
         .upsert(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           { key: s.key, value: s.value as any, updated_at: now },
           { onConflict: 'key' }
         );

@@ -12,7 +12,7 @@ interface BreadcrumbsProps {
   variant?: 'default' | 'light';
 }
 
-export function Breadcrumbs({ items, variant = 'default' }: BreadcrumbsProps) {
+export function Breadcrumbs({ items, variant: _variant = 'default' }: BreadcrumbsProps) {
   const allItems: BreadcrumbItem[] = [{ label: 'Home', href: '/' }, ...items];
 
   const jsonLd = {

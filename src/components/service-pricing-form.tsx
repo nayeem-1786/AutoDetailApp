@@ -284,7 +284,7 @@ function PerUnitForm({ value, onChange }: {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Price per unit with optional maximum. Example: "$150/panel, max 4 panels."
+        Price per unit with optional maximum. Example: &quot;$150/panel, max 4 panels.&quot;
       </p>
       <FormField label="Price Per Unit">
         <div className="relative">
@@ -454,7 +454,7 @@ function CustomForm({ value, onChange }: {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Display a "starting at" price. Final quote is determined after inspection.
+        Display a &quot;starting at&quot; price. Final quote is determined after inspection.
       </p>
       <FormField label="Starting Price" description="Displayed as 'Starting at $X'">
         <div className="relative">

@@ -1,6 +1,5 @@
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
-import { DISCOUNT_TYPE_LABELS } from '@/lib/utils/constants';
 
 interface CouponRewardSummary {
   applies_to: string;

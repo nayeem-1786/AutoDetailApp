@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { verifyPosToken, type PosTokenPayload } from './session';
+import { verifyPosToken } from './session';
 
 export interface PosEmployee {
   employee_id: string;

@@ -15,7 +15,6 @@ import {
   Archive,
   RotateCcw,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
 import { formatPhone, formatCurrency } from '@/lib/utils/format';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { Conversation, Message } from '@/lib/supabase/types';
@@ -81,6 +80,7 @@ export function ThreadView({
     setSummary(null);
     fetchSummary();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation?.id]);
 
   // Auto-scroll to bottom on new messages

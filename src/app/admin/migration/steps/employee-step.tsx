@@ -16,7 +16,9 @@ interface EmployeeStepProps {
 export function EmployeeStep({ state, onStateChange, onContinue }: EmployeeStepProps) {
   const [confirmed, setConfirmed] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const transactionItems = state.parsedData.transactionItems || [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const transactions = state.parsedData.transactions || [];
 
   // Extract unique employee names from transaction data
@@ -112,7 +114,7 @@ export function EmployeeStep({ state, onStateChange, onContinue }: EmployeeStepP
           <CardContent className="pt-6">
             <p className="text-sm text-gray-500">
               No employee/staff names found in transaction data. This may mean no transaction CSVs
-              were uploaded, or the transactions don't have staff assignments.
+              were uploaded, or the transactions don&apos;t have staff assignments.
             </p>
           </CardContent>
         </Card>

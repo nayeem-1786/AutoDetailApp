@@ -59,7 +59,7 @@ function calculateRewardDiscount(
 }
 
 function buildRewardDescription(result: RewardResult): string {
-  const { applies_to, discount_type, target_name, discount_amount } = result;
+  const { discount_type, target_name, discount_amount } = result;
   if (discount_type === 'free') {
     return `Free ${target_name}`;
   }

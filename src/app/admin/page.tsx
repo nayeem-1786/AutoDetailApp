@@ -16,9 +16,7 @@ import {
   AlertTriangle,
   FileText,
   UserPlus,
-  TrendingUp,
   ShoppingCart,
-  DollarSign,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/auth-provider';
@@ -31,7 +29,7 @@ import { formatTime, formatCurrency } from '@/lib/utils/format';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import { AppointmentDetailDialog } from './appointments/components/appointment-detail-dialog';
 import type { AppointmentWithRelations } from './appointments/types';
-import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
+import type { AppointmentStatus } from '@/lib/supabase/types';
 
 interface WeekDay {
   date: string; // YYYY-MM-DD
@@ -50,7 +48,7 @@ const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 
 };
 
 export default function AdminDashboard() {
-  const { employee, role, isSuper } = useAuth();
+  const { employee } = useAuth();
   const { granted: canViewReports } = usePermission('reports.view');
   const supabase = createClient();
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([]);
@@ -200,7 +198,7 @@ export default function AdminDashboard() {
       ordersToday: todayOrders.length,
       revenueToday: paidTodayOrders.reduce((sum: number, o: { total: number }) => sum + o.total, 0),
       pendingFulfillment: ordersPendingRes.count ?? 0,
-      recentOrders: (recentOrdersRes.data || []) as typeof orderStats.recentOrders,
+      recentOrders: (recentOrdersRes.data || []) as Array<{ id: string; order_number: string; first_name: string; last_name: string; total: number; fulfillment_status: string; created_at: string }>,
     });
 
     setLoading(false);

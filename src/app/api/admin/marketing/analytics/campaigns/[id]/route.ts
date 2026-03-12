@@ -178,13 +178,6 @@ export async function GET(
         const bucketStart = sentTime + h * 3600_000;
         const bucketEnd = bucketStart + 3600_000;
 
-        const deliveries = (smsLogs ?? []).filter(l => {
-          if (l.status !== 'delivered') return false;
-          // sms_delivery_log doesn't have a precise delivered_at, use created_at via updated_at pattern
-          // We approximate using the log existence within the campaign
-          return true; // All deliveries counted in hour 0 since we don't have per-hour delivery timestamps
-        }).length;
-
         const hourClicks = clicks.filter(c => {
           const t = new Date(c.clicked_at).getTime();
           return t >= bucketStart && t < bucketEnd;

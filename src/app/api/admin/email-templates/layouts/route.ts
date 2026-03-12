@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
 // GET /api/admin/email-templates/layouts — List all layouts
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const employee = await getEmployeeFromSession();
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

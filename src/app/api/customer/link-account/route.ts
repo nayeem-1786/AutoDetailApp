@@ -1,8 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+
+function noStoreJson(data: unknown, init?: ResponseInit) {
+  return noStoreJson(data, {
+    ...init,
+    headers: { ...init?.headers, 'Cache-Control': 'no-store' },
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,14 +19,14 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      return noStoreJson({ error: 'Not authenticated' }, { status: 401 });
     }
 
     const body = await request.json();
     const { first_name, last_name, email, phone } = body;
 
     if (!first_name || !last_name || !email) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: 'First name, last name, and email are required' },
         { status: 400 }
       );
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (emp) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: 'This email is used for a staff account and can\'t be used for customer registration.' },
         { status: 403 }
       );
@@ -51,7 +58,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (alreadyLinked) {
-      return NextResponse.json({ success: true, customer_id: alreadyLinked.id });
+      return noStoreJson({ success: true, customer_id: alreadyLinked.id });
     }
 
     // Normalize phone
@@ -90,7 +97,7 @@ export async function POST(request: NextRequest) {
           source: 'customer_portal',
         });
 
-        return NextResponse.json({ success: true, customer_id: existingByPhone.id });
+        return noStoreJson({ success: true, customer_id: existingByPhone.id });
       }
     }
 
@@ -126,7 +133,7 @@ export async function POST(request: NextRequest) {
         source: 'customer_portal',
       });
 
-      return NextResponse.json({ success: true, customer_id: existingByEmail.id });
+      return noStoreJson({ success: true, customer_id: existingByEmail.id });
     }
 
     // (4) No existing customer found — create a new one
@@ -144,7 +151,7 @@ export async function POST(request: NextRequest) {
 
     if (custErr || !newCustomer) {
       console.error('Customer creation failed:', custErr?.message);
-      return NextResponse.json(
+      return noStoreJson(
         { error: 'Something went wrong creating your account. Please try again.' },
         { status: 500 }
       );
@@ -162,12 +169,12 @@ export async function POST(request: NextRequest) {
       source: 'customer_portal',
     });
 
-    return NextResponse.json(
+    return noStoreJson(
       { success: true, customer_id: newCustomer.id },
       { status: 201 }
     );
   } catch (err) {
     console.error('Link account error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return noStoreJson({ error: 'Internal server error' }, { status: 500 });
   }
 }

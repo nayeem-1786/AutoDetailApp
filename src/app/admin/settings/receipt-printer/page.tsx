@@ -496,7 +496,7 @@ export default function ReceiptPrinterPage() {
       const res = await fetch(`${config.print_server_url}/print`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
-        body: escPosData,
+        body: escPosData as Uint8Array<ArrayBuffer>,
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -647,7 +647,6 @@ export default function ReceiptPrinterPage() {
               {config.logo_url ? (
                 <div className="w-full space-y-3 text-center">
                   <div className="flex min-h-[200px] w-full items-center justify-center rounded border border-gray-200 bg-gray-50 p-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={config.logo_url}
                       alt="Receipt logo preview"

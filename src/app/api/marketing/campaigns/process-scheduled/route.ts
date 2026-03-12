@@ -12,6 +12,26 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import type { CampaignChannel } from '@/lib/supabase/types';
 import crypto from 'crypto';
 
+interface CouponTemplateReward {
+  applies_to: string;
+  discount_type: string;
+  discount_value: number;
+  max_discount: number | null;
+  target_product_id: string | null;
+  target_service_id: string | null;
+  target_product_category_id: string | null;
+  target_service_category_id: string | null;
+}
+
+interface CouponTemplate {
+  id: string;
+  name: string | null;
+  min_purchase: number | null;
+  expires_at: string | null;
+  coupon_rewards?: CouponTemplateReward[];
+  [key: string]: unknown;
+}
+
 function generateCouponCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -104,8 +124,6 @@ export async function POST(request: NextRequest) {
 
     for (const campaign of campaigns) {
       // Skip campaigns whose channels are entirely disabled
-      const campNeedsSms = campaign.channel === 'sms' || campaign.channel === 'both';
-      const campNeedsEmail = campaign.channel === 'email' || campaign.channel === 'both';
       if (
         (campaign.channel === 'sms' && !smsEnabled) ||
         (campaign.channel === 'email' && !emailEnabled) ||
@@ -129,7 +147,7 @@ export async function POST(request: NextRequest) {
       );
 
       // Get coupon template (with rewards) if attached
-      let couponTemplate: any = null;
+      let couponTemplate: CouponTemplate | null = null;
       if (campaign.coupon_id) {
         const { data: coupon } = await adminClient
           .from('coupons')
@@ -144,7 +162,7 @@ export async function POST(request: NextRequest) {
       let targetServiceName = '';
       let productSlug: string | null = null;
       let productCategorySlug: string | null = null;
-      if (couponTemplate?.coupon_rewards?.length > 0) {
+      if (couponTemplate?.coupon_rewards && couponTemplate.coupon_rewards.length > 0) {
         const reward = couponTemplate.coupon_rewards[0];
         if (reward.target_service_id) {
           const { data: svc } = await adminClient
@@ -156,7 +174,7 @@ export async function POST(request: NextRequest) {
           const { data: prod } = await adminClient
             .from('products').select('slug, product_categories(slug)').eq('id', reward.target_product_id).single();
           productSlug = prod?.slug ?? null;
-          productCategorySlug = (prod?.product_categories as any)?.slug ?? null;
+          productCategorySlug = (prod?.product_categories as unknown as { slug: string } | null)?.slug ?? null;
         }
       }
 
@@ -188,7 +206,7 @@ export async function POST(request: NextRequest) {
 
           // Clone rewards from template coupon to new coupon
           if (newCoupon && couponTemplate.coupon_rewards) {
-            const rewards = couponTemplate.coupon_rewards.map((r: any) => ({
+            const rewards = couponTemplate.coupon_rewards.map((r: CouponTemplateReward) => ({
               coupon_id: newCoupon.id,
               applies_to: r.applies_to,
               discount_type: r.discount_type,

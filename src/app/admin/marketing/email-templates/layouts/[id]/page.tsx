@@ -32,6 +32,7 @@ export default function LayoutEditorPage() {
 
   useEffect(() => {
     loadLayout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function loadLayout() {
@@ -84,6 +85,7 @@ export default function LayoutEditorPage() {
 
   useEffect(() => {
     if (layout) loadPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout?.id]); // Only on initial load
 
   async function handleSave() {

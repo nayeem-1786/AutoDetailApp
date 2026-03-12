@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
-import { getIssueHumanReadable, friendlyServiceName } from '@/lib/utils/issue-types';
+import { getIssueHumanReadable } from '@/lib/utils/issue-types';
 import { AuthorizationClient } from './authorization-client';
 import { AnnotationOverlay } from '@/app/pos/jobs/components/photo-annotation';
 import type { Annotation } from '@/lib/utils/job-zones';
@@ -12,7 +12,7 @@ interface PageProps {
   searchParams: Promise<{ action?: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata(): Promise<Metadata> {
   const biz = await getBusinessInfo();
   return {
     title: `Additional Service Authorization — ${biz.name}`,

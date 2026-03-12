@@ -66,7 +66,6 @@ export async function POST(
       service: { name: string } | null;
     }[]) ?? [];
 
-    const customerName = `${customer.first_name} ${customer.last_name}`;
     const dateStr = new Date(appointment.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });

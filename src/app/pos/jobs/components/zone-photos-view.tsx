@@ -21,7 +21,7 @@ interface ZonePhotosViewProps {
 export function ZonePhotosView({
   jobId,
   zone,
-  phase,
+  phase: _phase,
   photos,
   onAddPhoto,
   onBack,
@@ -66,7 +66,6 @@ export function ZonePhotosView({
           </button>
         </div>
         <div className="relative flex-1 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={selectedPhoto.image_url}
             alt={`${getZoneLabel(zone)} photo`}
@@ -133,7 +132,6 @@ export function ZonePhotosView({
                   onClick={() => setSelectedPhoto(photo)}
                   className="group relative aspect-square overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo.thumbnail_url || photo.image_url}
                     alt={`${getZoneLabel(zone)} photo`}

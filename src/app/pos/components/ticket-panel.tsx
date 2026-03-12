@@ -158,7 +158,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     [ticket.items, dispatch]
   );
 
-  const handleSwipeUndo = useCallback((_itemId: string) => {
+  const handleSwipeUndo = useCallback(() => {
     // Undo is handled via the toast action
   }, []);
 

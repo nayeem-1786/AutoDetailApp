@@ -359,7 +359,7 @@ export default function CouponDetailPage() {
     coupon.status === 'disabled' ? 'destructive' :
     'secondary';
 
-  const rewards: CouponReward[] = (coupon as any).coupon_rewards || coupon.rewards || [];
+  const rewards: CouponReward[] = (coupon as Coupon & { coupon_rewards?: CouponReward[] }).coupon_rewards || coupon.rewards || [];
 
   return (
     <div className="space-y-6">

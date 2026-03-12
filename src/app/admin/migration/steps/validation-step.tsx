@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -13,10 +12,9 @@ import {
   Users,
   Package,
   Receipt,
-  Star,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency, formatPoints } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { parseDollarAmount } from '@/lib/migration/phone-utils';
 import type { MigrationState } from '@/lib/migration/types';
 
@@ -50,11 +48,11 @@ export function ValidationStep({ state, onStateChange }: ValidationStepProps) {
     dbTotal: number | null;
   } | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const customers = state.parsedData.customers || [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const products = state.parsedData.products || [];
   const transactions = state.parsedData.transactions || [];
-  const transactionItems = state.parsedData.transactionItems || [];
-
   // CSV-side counts
   const csvCustomerCount = customers.length;
   const csvProductCount = products.filter(
@@ -218,8 +216,6 @@ export function ValidationStep({ state, onStateChange }: ValidationStepProps) {
   }, []);
 
   const allPassed = checks.length > 0 && checks.every((c) => c.status !== 'fail');
-  const isCompleted = state.steps.validation.status === 'completed';
-
   return (
     <div className="space-y-6">
       <div>

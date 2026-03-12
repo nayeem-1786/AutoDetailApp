@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

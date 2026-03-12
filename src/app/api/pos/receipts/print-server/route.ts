@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       const printRes = await fetch(`${print_server_url}/print`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
-        body: escPosData,
+        body: escPosData as Uint8Array<ArrayBuffer>,
         signal: controller.signal,
       });
       clearTimeout(timeout);

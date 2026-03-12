@@ -1,5 +1,5 @@
 // Role management types — re-exports from supabase types + derived types
-import type { Role, PermissionDefinition, Permission, UserRole } from '@/lib/supabase/types';
+import type { Role, PermissionDefinition, Permission } from '@/lib/supabase/types';
 import type { PermissionCategory } from '@/lib/utils/constants';
 
 export type { Role, PermissionDefinition, Permission };

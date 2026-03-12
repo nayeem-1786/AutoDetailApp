@@ -945,7 +945,6 @@ function PhotoCard({
             selected && 'ring-2 ring-blue-500 ring-offset-1'
           )}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={photo.thumbnail_url || photo.image_url}
             alt={`${getZoneLabel(photo.zone)} - ${photo.phase}`}
@@ -1137,7 +1136,6 @@ function PhotoDetailModal({
         className="relative flex flex-1 items-center justify-center overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photo.image_url}
           alt={`${getZoneLabel(photo.zone)} photo`}

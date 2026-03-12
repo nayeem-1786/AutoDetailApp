@@ -68,7 +68,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     // Batch-fetch customer data (can't join due to Supabase FK issues)
     const customerIds = [...new Set((enrollments || []).map((e) => e.customer_id))];
-    let customerMap: Record<string, { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null }> = {};
+    const customerMap: Record<string, { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null }> = {};
 
     if (customerIds.length > 0) {
       const { data: customers } = await admin

@@ -67,7 +67,7 @@ export function formatPhoneInput(value: string): string {
  * Returns the original string if it can't be parsed as a 10-digit US number.
  */
 export function phoneToE164(phone: string): string {
-  let digits = phone.replace(/\D/g, '');
+  const digits = phone.replace(/\D/g, '');
 
   if (digits.length === 10) {
     return `+1${digits}`;

@@ -1,7 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+
+function noStoreJson(data: unknown, init?: ResponseInit) {
+  return noStoreJson(data, {
+    ...init,
+    headers: { ...init?.headers, 'Cache-Control': 'no-store' },
+  });
+}
 
 // POST - Link authenticated user to existing customer by phone number
 export async function POST(request: NextRequest) {
@@ -11,13 +18,13 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabaseSession.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return noStoreJson({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { phone } = await request.json();
 
     if (!phone) {
-      return NextResponse.json({ error: 'Phone number required' }, { status: 400 });
+      return noStoreJson({ error: 'Phone number required' }, { status: 400 });
     }
 
     // Use admin client to bypass RLS
@@ -31,7 +38,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingLink) {
-      return NextResponse.json({
+      return noStoreJson({
         success: true,
         customer_id: existingLink.id,
         already_linked: true
@@ -61,20 +68,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (!customer) {
-      return NextResponse.json({
+      return noStoreJson({
         found: false,
         message: 'No customer found with this phone number'
       });
     }
 
     if (customer.auth_user_id && customer.auth_user_id !== user.id) {
-      return NextResponse.json({
+      return noStoreJson({
         error: 'This phone number is already linked to another account'
       }, { status: 400 });
     }
 
     if (customer.auth_user_id === user.id) {
-      return NextResponse.json({
+      return noStoreJson({
         success: true,
         customer_id: customer.id,
         already_linked: true
@@ -89,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     if (linkError) {
       console.error('Failed to link customer:', linkError);
-      return NextResponse.json({
+      return noStoreJson({
         error: 'Failed to link account'
       }, { status: 500 });
     }
@@ -105,13 +112,13 @@ export async function POST(request: NextRequest) {
       source: 'customer_portal',
     });
 
-    return NextResponse.json({
+    return noStoreJson({
       success: true,
       customer_id: customer.id,
       linked: true
     });
   } catch (err) {
     console.error('Link by phone error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return noStoreJson({ error: 'Internal server error' }, { status: 500 });
   }
 }

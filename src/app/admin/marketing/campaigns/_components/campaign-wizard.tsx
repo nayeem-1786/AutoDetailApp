@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
-import type { Coupon, Service } from '@/lib/supabase/types';
+import type { Coupon, CouponReward, Service } from '@/lib/supabase/types';
 import { VARIABLE_GROUPS, CAMPAIGN_GROUPS, renderTemplate } from '@/lib/utils/template';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -88,10 +88,10 @@ function toLocalDatetime(isoString: string): string {
 }
 
 /** Build a human-readable discount summary from coupon rewards */
-function couponRewardsSummary(coupon: Coupon): string {
-  const rewards = (coupon as any).coupon_rewards || [];
+function couponRewardsSummary(coupon: Coupon & { coupon_rewards?: CouponReward[] }): string {
+  const rewards = coupon.coupon_rewards || [];
   if (rewards.length === 0) return 'No rewards';
-  return rewards.map((r: any) => {
+  return rewards.map((r: CouponReward) => {
     if (r.discount_type === 'free') return 'Free';
     if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
     return `$${r.discount_value} off`;
@@ -1187,8 +1187,8 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
               >
                 <option value="">No coupon</option>
                 {coupons.map((c) => {
-                  const rewards = (c as any).coupon_rewards || [];
-                  const summary = rewards.map((r: any) => {
+                  const rewards = (c as { coupon_rewards?: CouponReward[] }).coupon_rewards || [];
+                  const summary = rewards.map((r: CouponReward) => {
                     if (r.discount_type === 'free') return 'Free';
                     if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
                     return `$${r.discount_value} off`;

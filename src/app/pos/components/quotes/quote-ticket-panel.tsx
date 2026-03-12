@@ -415,7 +415,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         throw new Error(data.error || 'Failed to create job');
       }
 
-      const { data: job } = await jobRes.json();
+      await jobRes.json();
 
       // Step 5: Notify about products + coupon carryover
       const productItems = quote.items.filter((i) => i.itemType === 'product');

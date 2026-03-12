@@ -12,8 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ArrowLeft, ArrowRight, Plus, X, Info, AlertTriangle } from 'lucide-react';
+import type { CouponReward } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -377,6 +377,7 @@ export default function NewCouponPage() {
         supabase.from('service_categories').select('id, name').eq('is_active', true).order('name'),
         supabase.from('customers').select('tags'),
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (prodRes.data) setProducts(prodRes.data.map((p: any) => ({
         ...p,
         vendor: Array.isArray(p.vendor) ? p.vendor[0] ?? null : p.vendor ?? null,
@@ -461,7 +462,7 @@ export default function NewCouponPage() {
         // Rewards
         const rw = c.coupon_rewards || [];
         if (rw.length > 0) {
-          setRewards(rw.map((r: any) => ({
+          setRewards(rw.map((r: CouponReward) => ({
             id: r.id || crypto.randomUUID(),
             appliesTo: r.applies_to || 'order',
             targetProductId: r.target_product_id || '',

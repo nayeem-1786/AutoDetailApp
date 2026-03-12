@@ -122,7 +122,6 @@ export function ImageUploadField({
       {value ? (
         /* Preview state */
         <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={value}
             alt="Preview"

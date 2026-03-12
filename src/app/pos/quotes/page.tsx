@@ -37,7 +37,7 @@ function QuotesPageInner() {
         quoteId={view.quoteId}
         onBack={() => setView({ mode: 'list' })}
         onEdit={(quoteId) => setView({ mode: 'builder', quoteId })}
-        onReQuote={(quoteId) => setView({ mode: 'builder', quoteId: null })}
+        onReQuote={() => setView({ mode: 'builder', quoteId: null })}
       />
     );
   }

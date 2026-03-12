@@ -204,7 +204,7 @@ export default function ProductDetailPage() {
       : Math.max(0.01, Math.round((std - saleDiscountValue) * 100) / 100);
 
     setSalePrice(newPrice);
-  }, [saleDiscountType, saleDiscountValue, product]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [saleDiscountType, saleDiscountValue, product]);
 
   // --- Multi-image handlers (immediate operations) ---
 

@@ -56,7 +56,7 @@ export function PhotoAnnotation({
     }
   }
 
-  function handlePointerMove(e: React.PointerEvent) {
+  function handlePointerMove(_e: React.PointerEvent) {
     // For visual feedback during drag — not strictly needed since we finalize on pointerUp
   }
 
@@ -181,7 +181,6 @@ export function PhotoAnnotation({
           onPointerUp={handlePointerUp}
           style={{ touchAction: 'none' }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
             alt="Photo to annotate"

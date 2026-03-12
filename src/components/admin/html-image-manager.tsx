@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, type DragEvent } from 'react';
-import { ImagePlus, Loader2, Trash2, Link2, Search } from 'lucide-react';
+import { ImagePlus, Loader2, Trash2, Search } from 'lucide-react';
 import {
   Dialog,
   DialogHeader,
@@ -336,7 +336,6 @@ export function HtmlImageManager({
                     className="group relative aspect-square rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden hover:ring-2 hover:ring-brand-500"
                     title={`${img.filename}\n${formatSize(img.size)}`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={img.url}
                       alt={img.filename}
@@ -357,7 +356,6 @@ export function HtmlImageManager({
           <div className="space-y-4">
             {/* Preview */}
             <div className="flex justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={selectedImage.url}
                 alt="Preview"

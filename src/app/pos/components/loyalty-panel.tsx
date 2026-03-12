@@ -9,7 +9,7 @@ import { useTicket } from '../context/ticket-context';
 
 export function LoyaltyPanel() {
   const { ticket, dispatch } = useTicket();
-  const [redeeming, setRedeeming] = useState(false);
+  const [_redeeming, setRedeeming] = useState(false);
   const { enabled: loyaltyEnabled, loading: flagLoading } = useFeatureFlag(FEATURE_FLAGS.LOYALTY_REWARDS);
 
   const customer = ticket.customer;

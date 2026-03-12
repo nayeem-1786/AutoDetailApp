@@ -201,7 +201,6 @@ export default async function JobPhotosGalleryPage({ params }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   {[...zonePhotos.intake, ...zonePhotos.completion, ...zonePhotos.progress].map((photo) => (
                     <div key={photo.id} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={photo.image_url}
                         alt={`${label} - ${photo.phase}`}

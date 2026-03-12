@@ -272,7 +272,6 @@ export default function ServiceDetailPage() {
                               key={photo!.id}
                               className="relative aspect-square overflow-hidden rounded-lg bg-brand-dark"
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={photo!.thumbnail_url || photo!.image_url}
                                 alt={getZoneLabel(photo!.zone)}

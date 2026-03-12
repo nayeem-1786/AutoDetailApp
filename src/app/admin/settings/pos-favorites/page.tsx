@@ -12,7 +12,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowUp, ArrowDown, Trash2, Plus, Pencil, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { TILE_COLORS, TYPE_ICONS, getTileColors } from '@/lib/pos/tile-colors';
+import { TYPE_ICONS, getTileColors } from '@/lib/pos/tile-colors';
 import type { FavoriteItem, FavoriteActionType, FavoriteColor, FavoriteColorShade } from '@/app/pos/types';
 
 const SETTINGS_KEY = 'pos_favorites';

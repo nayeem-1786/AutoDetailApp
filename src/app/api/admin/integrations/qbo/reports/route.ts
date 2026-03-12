@@ -97,10 +97,6 @@ export async function GET(request: NextRequest) {
 
     // Daily breakdown — group transactions by date
     const dailyMap = new Map<string, { revenue: number; synced_count: number; failed_count: number }>();
-    for (const txn of allTxns || []) {
-      // We don't have created_at in our select — use qbo_synced_at or approximate
-      // Re-query to get created_at is expensive; use the txn data we have
-    }
 
     // Get daily breakdown with a separate query
     let dailyQuery = admin

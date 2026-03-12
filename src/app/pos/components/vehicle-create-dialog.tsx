@@ -124,10 +124,6 @@ export function VehicleCreateDialog({
 
     setSaving(true);
     try {
-      const url = isEdit
-        ? `/api/pos/customers/${customerId}/vehicles`
-        : `/api/pos/customers/${customerId}/vehicles`;
-
       const body = {
         vehicle_category: category,
         vehicle_type: isSpecialty ? category : 'standard',

@@ -131,24 +131,6 @@ function cityToForm(city: CityLandingPage): CityFormData {
 }
 
 // ---------------------------------------------------------------------------
-// Keyword density checker
-// ---------------------------------------------------------------------------
-
-function countKeywordOccurrences(text: string, keyword: string): number {
-  if (!text || !keyword) return 0;
-  const plain = text.replace(/<[^>]*>/g, ' ').toLowerCase();
-  const kw = keyword.toLowerCase().trim();
-  if (!kw) return 0;
-  let count = 0;
-  let pos = 0;
-  while ((pos = plain.indexOf(kw, pos)) !== -1) {
-    count++;
-    pos += kw.length;
-  }
-  return count;
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 

@@ -41,9 +41,6 @@ const VEHICLE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   aircraft: Plane,
 };
 
-// Service category form uses the same shape as product category
-const serviceCategorySchema = productCategorySchema;
-type ServiceCategoryInput = ProductCategoryInput;
 
 export default function CategoriesPage() {
   const supabase = createClient();
@@ -552,7 +549,6 @@ export default function CategoriesPage() {
                   {/* Image / Placeholder */}
                   <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-ui-bg-muted">
                     {vc.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={vc.image_url}
                         alt={vc.image_alt || vc.display_name}
@@ -619,7 +615,6 @@ export default function CategoriesPage() {
               <div className="flex items-start gap-4">
                 <div className="flex h-24 w-36 shrink-0 items-center justify-center overflow-hidden rounded-md border border-ui-border bg-ui-bg-muted">
                   {editingVehicle?.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={editingVehicle.image_url}
                       alt={editingVehicle.image_alt || editingVehicle.display_name}

@@ -34,6 +34,7 @@ export function CustomerStep({ state, onStateChange, onContinue }: CustomerStepP
   const [progress, setProgress] = useState(0);
   const [viewTier, setViewTier] = useState<CustomerTier | 'duplicates' | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const customers = state.parsedData.customers || [];
 
   // Classify all customers

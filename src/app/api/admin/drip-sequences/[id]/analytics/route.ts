@@ -135,7 +135,7 @@ export async function GET(_request: Request, { params }: Params) {
       .map((s) => s.template_id)
       .filter((tid): tid is string => tid !== null);
 
-    let templateNameMap: Record<string, string> = {};
+    const templateNameMap: Record<string, string> = {};
 
     if (templateIds.length > 0) {
       const { data: templates } = await admin

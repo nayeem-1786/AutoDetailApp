@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Coupon } from '@/lib/supabase/types';
+import type { Coupon, CouponReward } from '@/lib/supabase/types';
 import { formatDate } from '@/lib/utils/format';
-import { COUPON_STATUS_LABELS, DISCOUNT_TYPE_LABELS } from '@/lib/utils/constants';
+import { COUPON_STATUS_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
@@ -18,10 +18,10 @@ import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 
-function discountSummary(coupon: Coupon): string {
-  const rewards = (coupon as any).coupon_rewards || coupon.rewards || [];
+function discountSummary(coupon: Coupon & { coupon_rewards?: CouponReward[] }): string {
+  const rewards = coupon.coupon_rewards || coupon.rewards || [];
   if (rewards.length === 0) return '--';
-  return rewards.map((r: any) => {
+  return rewards.map((r: CouponReward) => {
     if (r.discount_type === 'free') return 'Free';
     if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
     return `$${r.discount_value} off`;

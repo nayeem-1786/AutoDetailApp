@@ -26,17 +26,18 @@ export default function LoginPage() {
   const signedOutRef = useRef(false);
 
   const sessionExpired = reason === 'session_expired';
+  const notAuthorized = reason === 'not_authorized';
 
-  // When redirected here due to session expiry, sign out to clear the
-  // refresh token from cookies. Without this, navigating back to /admin
-  // would silently auto-refresh the token and bypass the login screen.
+  // Clear any stale session on mount — prevents cross-surface cookie
+  // conflicts (e.g. customer session interfering with admin login).
   useEffect(() => {
-    if (sessionExpired && !signedOutRef.current) {
-      signedOutRef.current = true;
-      const supabase = createClient();
-      supabase.auth.signOut();
-    }
-  }, [sessionExpired]);
+    if (signedOutRef.current) return;
+    signedOutRef.current = true;
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: unknown } }) => {
+      if (session) supabase.auth.signOut();
+    }).catch(() => {});
+  }, []);
 
   const {
     register,
@@ -50,21 +51,33 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
-
-    if (authError) {
-      setError(authError.message);
+    const fallbackTimer = setTimeout(() => {
       setLoading(false);
-      return;
-    }
+      setError('Something went wrong. Please try again.');
+    }, 15000);
 
-    router.push(redirectTo);
-    router.refresh();
+    try {
+      const supabase = createClient();
+
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+
+      router.push(redirectTo);
+      router.refresh();
+    } catch (err) {
+      console.error('Admin sign-in error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      clearTimeout(fallbackTimer);
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -167,6 +180,12 @@ export default function LoginPage() {
               {sessionExpired && (
                 <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
                   Your session has expired. Please sign in again.
+                </div>
+              )}
+
+              {notAuthorized && (
+                <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                  Your account does not have staff access.
                 </div>
               )}
 

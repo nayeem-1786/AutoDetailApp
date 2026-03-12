@@ -59,6 +59,9 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       } else {
         setLoading(false);
       }
+    }).catch((error: unknown) => {
+      console.warn('[customer-auth] getSession error:', error instanceof Error ? error.message : error);
+      setLoading(false);
     });
 
     const {
@@ -67,9 +70,10 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        loadCustomerData(s.user.id);
+        loadCustomerData(s.user.id).finally(() => setLoading(false));
       } else {
         setCustomer(null);
+        setLoading(false);
       }
     });
 
@@ -117,6 +121,8 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   // Global fetch interceptor for 401 errors - redirect to signin on session expiry
   useEffect(() => {
     if (!session || loading) return;
+    if (window.__fetchIntercepted) return;
+    window.__fetchIntercepted = 'customer';
 
     const originalFetch = window.fetch;
 
@@ -136,6 +142,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
 
     return () => {
       window.fetch = originalFetch;
+      delete window.__fetchIntercepted;
     };
   }, [session, loading]);
 

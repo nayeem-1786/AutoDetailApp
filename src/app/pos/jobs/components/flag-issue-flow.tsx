@@ -21,7 +21,7 @@ import { posFetch } from '../../lib/pos-fetch';
 import { PhotoCapture } from './photo-capture';
 import { AnnotationOverlay } from './photo-annotation';
 import { CatalogBrowser } from '../../components/catalog-browser';
-import { EXTERIOR_ZONES, INTERIOR_ZONES, getZoneLabel } from '@/lib/utils/job-zones';
+import { EXTERIOR_ZONES, INTERIOR_ZONES } from '@/lib/utils/job-zones';
 import { ISSUE_TYPES, getIssueHumanReadable, friendlyServiceName } from '@/lib/utils/issue-types';
 import { resolveServicePrice } from '../../utils/pricing';
 import type { Annotation } from '@/lib/utils/job-zones';

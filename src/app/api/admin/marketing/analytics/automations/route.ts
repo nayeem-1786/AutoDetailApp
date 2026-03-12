@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         .lte('created_at', end);
 
       // Sent executions
-      const { count: sentCount } = await adminClient
+      const { count: _sentCount } = await adminClient
         .from('lifecycle_executions')
         .select('id', { count: 'exact', head: true })
         .eq('lifecycle_rule_id', rule.id)

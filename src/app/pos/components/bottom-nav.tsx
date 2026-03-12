@@ -89,26 +89,30 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
   useEffect(() => {
     setIsStandalone(
       window.matchMedia('(display-mode: standalone)').matches ||
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window.navigator as any).standalone === true
     );
   }, []);
 
   // Detect fullscreen capability and state
   useEffect(() => {
+    const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+    const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => Promise<void> };
+    const nav = window.navigator as Navigator & { standalone?: boolean };
+
     const supportsFullscreen = !!(
-      document.documentElement.requestFullscreen ||
-      (document.documentElement as any).webkitRequestFullscreen
+      el.requestFullscreen || el.webkitRequestFullscreen
     );
     const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
+      nav.standalone === true;
 
     setShowFullscreen(supportsFullscreen && hasFinePointer && !standalone);
 
     const handler = () =>
       setIsFullscreen(
-        !!document.fullscreenElement || !!(document as any).webkitFullscreenElement
+        !!document.fullscreenElement || !!doc.webkitFullscreenElement
       );
 
     document.addEventListener('fullscreenchange', handler);
@@ -121,13 +125,14 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
 
   const toggleFullscreen = useCallback(async () => {
     try {
-      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
-        const el = document.documentElement;
+      const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+      const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => Promise<void> };
+      if (!document.fullscreenElement && !doc.webkitFullscreenElement) {
         if (el.requestFullscreen) await el.requestFullscreen();
-        else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen();
+        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
       } else {
         if (document.exitFullscreen) await document.exitFullscreen();
-        else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
       }
     } catch (err) {
       console.error('Fullscreen error:', err);

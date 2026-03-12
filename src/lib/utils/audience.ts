@@ -239,7 +239,7 @@ export async function buildAudienceQuery(
     return { count: count ?? 0, customerIds: [] };
   }
 
-  const { data, count } = await query;
+  const { data } = await query;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const customerIds = (data ?? []).map((c: any) => c.id as string);
 

@@ -100,10 +100,10 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
 
   const refundEligible =
     transaction.status === 'completed' || transaction.status === 'partial_refund';
-  const canRefund = hasRefundPerm && refundEligible;
+  const _canRefund = hasRefundPerm && refundEligible;
 
   const voidEligible = transaction.status === 'completed';
-  const canVoid = hasVoidPerm && voidEligible;
+  const _canVoid = hasVoidPerm && voidEligible;
 
   const showReceipt =
     transaction.status === 'completed' ||

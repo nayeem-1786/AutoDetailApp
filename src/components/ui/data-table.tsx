@@ -93,6 +93,7 @@ function DataTable<TData>({
 
   const selectedRows = React.useMemo(() => {
     return table.getSelectedRowModel().rows.map((row) => row.original);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table, rowSelection]);
 
   const handleExportCsv = React.useCallback(() => {

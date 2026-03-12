@@ -13,7 +13,6 @@ const RUNNING_JOBS_KEY = '__smartdetails_cron_running__';
 const PROCESS_START_TIME = Date.now();
 const STARTUP_GRACE_MS = 60_000;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getRunningJobs(): Set<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (!(globalThis as any)[RUNNING_JOBS_KEY]) {
@@ -48,7 +47,7 @@ async function callCronEndpoint(
 
       await response.json().catch(() => null);
       return;
-    } catch (err: any) {
+    } catch (err: unknown) {
       const isLastAttempt = attempt === retries;
       if (!isLastAttempt) {
         await new Promise((r) => setTimeout(r, 5000));
@@ -84,9 +83,10 @@ async function runJob(
     await callCronEndpoint(endpoint, name, 1, timeoutMs);
     const duration = Date.now() - start;
     console.log(`[CRON] Completed ${name} in ${duration}ms`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     const duration = Date.now() - start;
-    console.error(`[CRON] Failed ${name} after ${duration}ms:`, err.message || err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[CRON] Failed ${name} after ${duration}ms:`, message);
   } finally {
     runningJobs.delete(name);
   }

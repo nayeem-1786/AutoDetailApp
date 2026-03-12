@@ -137,14 +137,6 @@ export function BookingWizard({
     return null;
   }
 
-  function findServiceBySlug(slug: string): BookableService | null {
-    for (const cat of categories) {
-      const found = cat.services.find((s) => s.slug === slug);
-      if (found) return found;
-    }
-    return null;
-  }
-
   // Whether this is a portal booking (logged-in customer) — starts from server data,
   // but can become true when user authenticates inline
   const [isPortalDynamic, setIsPortalDynamic] = useState(!!customerData);

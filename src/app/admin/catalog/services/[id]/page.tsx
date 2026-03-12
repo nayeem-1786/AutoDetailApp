@@ -172,7 +172,6 @@ export default function ServiceDetailPage() {
   });
 
   const vehicleCompatibility = watch('vehicle_compatibility') || [];
-  const isActive = watch('is_active');
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -357,7 +356,7 @@ export default function ServiceDetailPage() {
     }
 
     setSalePrices(newSP);
-  }, [saleDiscountType, saleDiscountValue, pricingValue, pricing]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [saleDiscountType, saleDiscountValue, pricingValue, pricing]);
 
   function toggleVehicleType(type: VehicleType) {
     const current = vehicleCompatibility;
@@ -863,58 +862,6 @@ export default function ServiceDetailPage() {
     }
   }
 
-  // ---- Save Sale Pricing ----
-  async function onSaveSalePricing() {
-    if (!service) return;
-    setSavingSale(true);
-    try {
-      // Validate: each sale price must be less than its standard price
-      for (const row of pricing) {
-        const sp = salePrices[row.tier_name];
-        if (sp !== '' && sp !== undefined && typeof sp === 'number') {
-          if (sp >= row.price) {
-            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be less than standard price (${formatCurrency(row.price)})`);
-            setSavingSale(false);
-            return;
-          }
-          if (sp <= 0) {
-            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be greater than $0`);
-            setSavingSale(false);
-            return;
-          }
-        }
-      }
-
-      // Update sale_price on each pricing row
-      for (const row of pricing) {
-        const sp = salePrices[row.tier_name];
-        const salePrice = (sp !== '' && typeof sp === 'number') ? sp : null;
-        const { error } = await supabase
-          .from('service_pricing')
-          .update({ sale_price: salePrice })
-          .eq('id', row.id);
-        if (error) throw error;
-      }
-
-      // Update sale dates on service
-      const startTs = saleStartsAt ? new Date(saleStartsAt + 'T00:00:00-08:00').toISOString() : null;
-      const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
-      const { error: svcError } = await supabase
-        .from('services')
-        .update({ sale_starts_at: startTs, sale_ends_at: endTs })
-        .eq('id', serviceId);
-      if (svcError) throw svcError;
-
-      toast.success('Sale pricing updated');
-      loadData();
-    } catch (err) {
-      console.error('Failed to update sale pricing:', err);
-      toast.error('Failed to update sale pricing');
-    } finally {
-      setSavingSale(false);
-    }
-  }
-
   // ---- Clear All Sale Prices ----
   async function clearAllSalePrices() {
     setSavingSale(true);
@@ -1257,7 +1204,6 @@ export default function ServiceDetailPage() {
                   onPricingChange={(data) => setPricingValue({ model: 'vehicle_size', data })}
                   salePrices={salePrices}
                   setSalePrices={setSalePrices}
-                  pricing={pricing}
                   discountType={saleDiscountType}
                   setDiscountType={setSaleDiscountType}
                   discountValue={saleDiscountValue}
@@ -1818,7 +1764,6 @@ function VehicleSizeUnifiedPricing({
   onPricingChange,
   salePrices,
   setSalePrices,
-  pricing,
   discountType,
   setDiscountType,
   discountValue,
@@ -1828,7 +1773,6 @@ function VehicleSizeUnifiedPricing({
   onPricingChange: (data: VehicleSizePricing) => void;
   salePrices: Record<string, number | ''>;
   setSalePrices: (v: Record<string, number | ''>) => void;
-  pricing: ServicePricing[];
   discountType: 'percentage' | 'fixed' | 'direct';
   setDiscountType: (v: 'percentage' | 'fixed' | 'direct') => void;
   discountValue: number | '';

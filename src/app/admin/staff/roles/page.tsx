@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/dialog';
 import { Select } from '@/components/ui/select';
 import {
-  Shield,
   Lock,
   Trash2,
   Plus,

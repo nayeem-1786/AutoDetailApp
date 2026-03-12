@@ -22,10 +22,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
 import { formatCurrency } from '@/lib/utils/format';
 import {
-  getSaleStatus,
-  getTierSaleInfo,
-  getSaleStatusDisplay,
-  getSaleEndDescription,
   isEndingSoon,
 } from '@/lib/utils/sale-pricing';
 import {
@@ -355,11 +351,6 @@ function PromotionRow({
   const tiers = item.service_pricing
     ? [...item.service_pricing].sort((a, b) => a.display_order - b.display_order)
     : [];
-
-  const saleStatus = getSaleStatus({
-    sale_starts_at: item.sale_starts_at,
-    sale_ends_at: item.sale_ends_at,
-  });
 
   function renderPrice(standard: number, sale: number | null) {
     if (sale === null || item.sale_status === 'no_sale') {

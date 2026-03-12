@@ -15,7 +15,6 @@ import {
   MapPin,
   CheckCircle2,
   AlertCircle,
-  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,7 +36,7 @@ interface StripeReader {
 }
 
 export default function CardReaderSettingsPage() {
-  const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
+  const { dialogProps, ConfirmDialog } = useConfirmDialog();
   // Location state
   const [locations, setLocations] = useState<StripeLocation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
@@ -55,6 +54,7 @@ export default function CardReaderSettingsPage() {
   // Load locations on mount
   useEffect(() => {
     loadLocations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load readers when location changes
@@ -62,6 +62,7 @@ export default function CardReaderSettingsPage() {
     if (selectedLocation) {
       loadRegisteredReaders();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocation]);
 
   async function loadLocations() {
@@ -104,31 +105,6 @@ export default function CardReaderSettingsPage() {
     } finally {
       setLoadingReaders(false);
     }
-  }
-
-  function handleDeleteReader(readerId: string, label: string) {
-    confirm({
-      title: 'Delete Reader',
-      description: `Delete reader "${label}"? This cannot be undone.`,
-      confirmLabel: 'Delete',
-      variant: 'destructive',
-      onConfirm: async () => {
-        try {
-          const res = await fetch(`/api/admin/stripe/readers/${readerId}`, {
-            method: 'DELETE',
-          });
-          if (res.ok) {
-            toast.success('Reader deleted');
-            setRegisteredReaders((prev) => prev.filter((r) => r.id !== readerId));
-          } else {
-            const data = await res.json();
-            toast.error(data.error || 'Failed to delete reader');
-          }
-        } catch {
-          toast.error('Failed to delete reader');
-        }
-      },
-    });
   }
 
   async function handleCreateLocation() {

@@ -141,7 +141,7 @@ export async function generateSeoForPage(input: PageContentForSeo): Promise<AiSe
       throw new Error('AI returned incomplete SEO data');
     }
     return result;
-  } catch (parseError) {
+  } catch {
     console.error('Failed to parse AI SEO response:', text);
     throw new Error('AI returned invalid JSON for SEO data');
   }

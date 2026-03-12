@@ -144,7 +144,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
     fetchQuote(); // Refresh
   }
 
-  function handleConvertComplete(_appointmentId?: string) {
+  function handleConvertComplete() {
     setConvertDialogOpen(false);
     fetchQuote(); // Refresh
   }

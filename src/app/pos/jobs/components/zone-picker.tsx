@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Check, Camera, ChevronRight, X, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Check, Camera, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { posFetch } from '../../lib/pos-fetch';
 import {
   EXTERIOR_ZONES,
   INTERIOR_ZONES,
   countCoveredZones,
-  getZoneLabel,
 } from '@/lib/utils/job-zones';
 import { PhotoCapture } from './photo-capture';
 import { ZonePhotosView } from './zone-photos-view';

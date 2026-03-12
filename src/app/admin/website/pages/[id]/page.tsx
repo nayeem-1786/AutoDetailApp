@@ -14,7 +14,7 @@ import { PageHtmlEditor } from '@/components/admin/content/page-html-editor';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { ConfirmDialog, useConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useFormValidation } from '@/lib/hooks/use-form-validation';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { adminFetch } from '@/lib/utils/admin-fetch';

@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
-import { Plus, Tag, X, Check, ChevronDown, Tags, Minus, Users } from 'lucide-react';
+import { Plus, Tag, X, Check, ChevronDown, Users } from 'lucide-react';
 import { CustomerStats } from './components/customer-stats';
 import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';

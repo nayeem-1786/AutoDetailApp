@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -251,12 +252,12 @@ export default function ThemeSettingsPage() {
               This seasonal theme is overriding some of the colors below. Changes you make here will take effect after the seasonal theme is deactivated.
             </p>
           </div>
-          <a
+          <Link
             href="/admin/website/themes"
             className="text-sm font-medium text-amber-700 hover:text-amber-900 underline whitespace-nowrap"
           >
             Manage Seasonal Themes
-          </a>
+          </Link>
         </div>
       )}
 

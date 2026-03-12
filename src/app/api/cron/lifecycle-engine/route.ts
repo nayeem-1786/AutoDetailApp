@@ -9,6 +9,27 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { runAutoEnrollments, checkAllStopConditions, processEnrollments } from '@/lib/email/drip-engine';
+import type { EmailBlock } from '@/lib/email/types';
+
+interface CouponTemplate {
+  id: string;
+  name: string | null;
+  min_purchase: number | null;
+  expires_at: string | null;
+  coupon_rewards?: CouponTemplateReward[];
+  [key: string]: unknown;
+}
+
+interface CouponTemplateReward {
+  applies_to: string;
+  discount_type: string;
+  discount_value: number;
+  max_discount: number | null;
+  target_product_id: string | null;
+  target_service_id: string | null;
+  target_product_category_id: string | null;
+  target_service_category_id: string | null;
+}
 
 /**
  * Lifecycle execution engine cron endpoint.
@@ -392,7 +413,7 @@ async function executePending(
       .filter((r) => r.coupon_id)
       .map((r) => r.coupon_id as string)
   )];
-  const couponTemplatesMap = new Map<string, Record<string, unknown>>();
+  const couponTemplatesMap = new Map<string, CouponTemplate>();
   if (couponIds.length > 0) {
     const { data: couponData } = await admin
       .from('coupons')
@@ -586,19 +607,19 @@ async function executePending(
         // Create unique single-use coupon for this customer
         const { data: newCoupon } = await admin.from('coupons').insert({
           code: couponCode,
-          name: (couponTemplate as any).name,
+          name: couponTemplate.name,
           auto_apply: false,
-          min_purchase: (couponTemplate as any).min_purchase,
+          min_purchase: couponTemplate.min_purchase,
           is_single_use: true,
           max_uses: 1,
-          expires_at: (couponTemplate as any).expires_at,
+          expires_at: couponTemplate.expires_at,
           customer_id: exec.customer_id,
           status: 'active',
         }).select().single();
 
         // Clone rewards from template coupon
-        if (newCoupon && (couponTemplate as any).coupon_rewards) {
-          const rewards = ((couponTemplate as any).coupon_rewards as any[]).map((r) => ({
+        if (newCoupon && couponTemplate.coupon_rewards) {
+          const rewards = couponTemplate.coupon_rewards.map((r) => ({
             coupon_id: newCoupon.id,
             applies_to: r.applies_to,
             discount_type: r.discount_type,
@@ -617,13 +638,13 @@ async function executePending(
       let couponProductSlug: string | null = null;
       let couponProductCategorySlug: string | null = null;
       if (couponTemplate) {
-        const rewards = (couponTemplate as any).coupon_rewards as any[] | undefined;
+        const rewards = couponTemplate.coupon_rewards;
         const targetProductId = rewards?.[0]?.target_product_id;
         if (targetProductId) {
           const { data: prod } = await admin
             .from('products').select('slug, product_categories(slug)').eq('id', targetProductId).single();
           couponProductSlug = prod?.slug ?? null;
-          couponProductCategorySlug = (prod?.product_categories as any)?.slug ?? null;
+          couponProductCategorySlug = (prod?.product_categories as unknown as { slug: string } | null)?.slug ?? null;
         }
       }
 
@@ -728,9 +749,9 @@ async function executePending(
               .single();
 
             if (tmpl?.body_blocks && Array.isArray(tmpl.body_blocks)) {
-              const layoutSlug = (tmpl.email_layouts as any)?.slug || 'default';
+              const layoutSlug = (tmpl.email_layouts as { slug: string } | null)?.slug || 'default';
               const rendered = await renderFromBlocks(
-                tmpl.body_blocks as any,
+                tmpl.body_blocks as EmailBlock[],
                 layoutSlug,
                 templateVars,
                 { isMarketing: true }
