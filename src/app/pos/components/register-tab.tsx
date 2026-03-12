@@ -10,12 +10,21 @@ import { useTicket } from '../context/ticket-context';
 import { usePosTheme } from '../context/pos-theme-context';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { PinPad } from './pin-pad';
-import { resolveServicePrice } from '../utils/pricing';
+import { resolveServicePriceWithSale } from '../utils/pricing';
+import { getSaleStatus } from '@/lib/utils/sale-pricing';
 import { getTileColors, TYPE_ICONS } from '@/lib/pos/tile-colors';
 import type { FavoriteItem, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 
 const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
+
+/** Resolve sale-aware price for toast messages */
+function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {
+  const saleWindow = (service.sale_starts_at || service.sale_ends_at)
+    ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
+    : null;
+  return resolveServicePriceWithSale(tier, vsc, saleWindow).effectivePrice;
+}
 
 interface RegisterTabProps {
   onOpenCustomerLookup: () => void;
@@ -101,7 +110,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           if (isVehicleSizeTiers) {
             const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
             if (matchingTier) {
-              const price = resolveServicePrice(matchingTier, vehicleSizeClass);
+              const price = getToastPrice(service, matchingTier, vehicleSizeClass);
               dispatch({ type: 'ADD_SERVICE', service, pricing: matchingTier, vehicleSizeClass });
               toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
               return;
@@ -111,7 +120,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           // Case 2: Single tier that IS vehicle-size-aware — resolve price by vehicle size
           if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
             dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass });
-            const price = resolveServicePrice(pricing[0], vehicleSizeClass);
+            const price = getToastPrice(service, pricing[0], vehicleSizeClass);
             toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
             return;
           }

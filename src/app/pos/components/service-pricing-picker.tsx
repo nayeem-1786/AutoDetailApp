@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils/cn';
 import type { CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { resolveServicePrice } from '../utils/pricing';
+import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 
 interface ServicePricingPickerProps {
@@ -38,6 +39,12 @@ export function ServicePricingPicker({
 
   const VEHICLE_SIZES: VehicleSizeClass[] = ['sedan', 'truck_suv_2row', 'suv_3row_van'];
 
+  // Check sale status for this service
+  const { isOnSale } = getSaleStatus({
+    sale_starts_at: service.sale_starts_at,
+    sale_ends_at: service.sale_ends_at,
+  });
+
   function handleSelect(tier: ServicePricing, sizeOverride?: VehicleSizeClass) {
     onSelect(tier, sizeOverride ?? vehicleSizeClass);
     onClose();
@@ -60,7 +67,14 @@ export function ServicePricingPicker({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogClose onClose={onClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
-        <DialogTitle>{service.name}</DialogTitle>
+        <DialogTitle>
+          {service.name}
+          {isOnSale && (
+            <span className="ml-2 inline-flex rounded bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400 align-middle">
+              Sale
+            </span>
+          )}
+        </DialogTitle>
       </DialogHeader>
       <DialogContent>
         {vehicleSizeClass && (
@@ -97,6 +111,7 @@ export function ServicePricingPicker({
                       )}
                       {VEHICLE_SIZES.map((size) => {
                         const sizePrice = resolveServicePrice(tier, size);
+                        const saleInfo = getTierSaleInfo(sizePrice, tier.sale_price, isOnSale);
                         return (
                           <button
                             key={`${tier.id}-${size}`}
@@ -110,9 +125,20 @@ export function ServicePricingPicker({
                             <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                               {VEHICLE_SIZE_LABELS[size]}
                             </span>
-                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                              ${sizePrice.toFixed(2)}
-                            </span>
+                            {saleInfo?.isDiscounted ? (
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-sm text-gray-400 dark:text-gray-500 line-through">
+                                  ${saleInfo.originalPrice.toFixed(2)}
+                                </span>
+                                <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                                  ${saleInfo.currentPrice.toFixed(2)}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                ${sizePrice.toFixed(2)}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -122,6 +148,7 @@ export function ServicePricingPicker({
 
                 // Vehicle is set or tier is not vehicle-size-aware — single button
                 const price = resolveServicePrice(tier, vehicleSizeClass);
+                const saleInfo = getTierSaleInfo(price, tier.sale_price, isOnSale);
                 const sizeLabel =
                   vehicleSizeClass && tier.is_vehicle_size_aware
                     ? VEHICLE_SIZE_LABELS[vehicleSizeClass]
@@ -163,9 +190,20 @@ export function ServicePricingPicker({
                         </span>
                       )}
                     </div>
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      ${price.toFixed(2)}
-                    </span>
+                    {saleInfo?.isDiscounted ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-sm text-gray-400 dark:text-gray-500 line-through">
+                          ${saleInfo.originalPrice.toFixed(2)}
+                        </span>
+                        <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                          ${saleInfo.currentPrice.toFixed(2)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        ${price.toFixed(2)}
+                      </span>
+                    )}
                   </button>
                 );
               })}

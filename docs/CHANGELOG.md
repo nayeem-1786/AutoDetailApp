@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Show sale prices in POS catalog cards, tier picker, and toast messages — 2026-03-12
+
+- **catalog-card.tsx** — `ServiceCard` now renders sale-aware prices via `getSaleStatus()` + `getTierSaleInfo()`. Active sales show strikethrough of standard price, red sale price, and "Sale" badge. Works for single-tier, multi-tier, and vehicle-size-aware services.
+- **service-pricing-picker.tsx** — Each tier button now shows sale price with strikethrough of standard price when service has an active sale window. "Sale" badge in dialog title.
+- **service-detail-dialog.tsx** — `getDisplayPrice()` now uses `resolveServicePriceWithSale()`. Vehicle size pricing section shows sale prices with strikethrough.
+- **register-tab.tsx** / **catalog-browser.tsx** — Toast messages now show sale-aware prices (`getToastPrice()` helper using `resolveServicePriceWithSale()`).
+- Removed debug console.log statements from `ticket-reducer.ts` and `ticket-item-row.tsx`.
+
+---
+
 ## feat: USB barcode scanner support for POS — 2026-03-12
 
 - **Barcode scanner hook** (`src/app/pos/hooks/use-barcode-scanner.ts`) — global keydown listener on `document` (capture phase) that distinguishes USB scanner input (~10ms/char) from human typing (100-300ms) via timing threshold

@@ -6,7 +6,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { useTicket } from '../context/ticket-context';
-import { resolveServicePrice } from '../utils/pricing';
+import { resolveServicePrice, resolveServicePriceWithSale } from '../utils/pricing';
+import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import type { CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
@@ -96,8 +97,17 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
 
   const selectedTier = tiers[selectedTierIdx] ?? null;
 
+  // Sale status for this service
+  const { isOnSale } = getSaleStatus({
+    sale_starts_at: service.sale_starts_at,
+    sale_ends_at: service.sale_ends_at,
+  });
+
   function getDisplayPrice(tier: ServicePricing): number {
-    return resolveServicePrice(tier, vehicleSizeClass);
+    const saleWindow = (service.sale_starts_at || service.sale_ends_at)
+      ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
+      : null;
+    return resolveServicePriceWithSale(tier, vehicleSizeClass, saleWindow).effectivePrice;
   }
 
   function handleAdd() {
@@ -373,7 +383,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
               <h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Vehicle Size Pricing</h3>
               <div className="flex flex-wrap gap-2">
                 {(['sedan', 'truck_suv_2row', 'suv_3row_van'] as VehicleSizeClass[]).map((size) => {
-                  const price = resolveServicePrice(tiers[0], size);
+                  const standardPrice = resolveServicePrice(tiers[0], size);
+                  const saleInfo = getTierSaleInfo(standardPrice, tiers[0].sale_price, isOnSale);
                   const isActive = vehicleSizeClass === size;
                   return (
                     <div
@@ -386,7 +397,18 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                       )}
                     >
                       <span className="font-medium">{VEHICLE_SIZE_LABELS[size]}:</span>{' '}
-                      ${price.toFixed(2)}
+                      {saleInfo?.isDiscounted ? (
+                        <>
+                          <span className="line-through text-gray-400 dark:text-gray-500 mr-1">
+                            ${saleInfo.originalPrice.toFixed(2)}
+                          </span>
+                          <span className="text-red-600 dark:text-red-400 font-semibold">
+                            ${saleInfo.currentPrice.toFixed(2)}
+                          </span>
+                        </>
+                      ) : (
+                        <>${standardPrice.toFixed(2)}</>
+                      )}
                     </div>
                   );
                 })}

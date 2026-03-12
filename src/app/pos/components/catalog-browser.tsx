@@ -12,12 +12,20 @@ import { ProductGrid, ServiceGrid } from './catalog-grid';
 import { ProductDetail } from './product-detail';
 import { ServiceDetailDialog } from './service-detail-dialog';
 import { ServicePricingPicker } from './service-pricing-picker';
-import { resolveServicePrice } from '../utils/pricing';
+import { resolveServicePriceWithSale } from '../utils/pricing';
 import { categoryToCompatibilityKey, VEHICLE_CATEGORY_LABELS, type VehicleCategory } from '@/lib/utils/vehicle-categories';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
+
+/** Resolve sale-aware price for toast messages */
+function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {
+  const saleWindow = (service.sale_starts_at || service.sale_ends_at)
+    ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
+    : null;
+  return resolveServicePriceWithSale(tier, vsc, saleWindow).effectivePrice;
+}
 
 type BrowseState =
   | { view: 'categories' }
@@ -259,7 +267,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         if (matchingTier) {
           quickAdd(service, matchingTier, vehicleSizeClass);
           if (!onAddService) {
-            const price = resolveServicePrice(matchingTier, vehicleSizeClass);
+            const price = getToastPrice(service, matchingTier, vehicleSizeClass);
             toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
           }
           return;
@@ -268,7 +276,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
         quickAdd(service, pricing[0], vehicleSizeClass);
         if (!onAddService) {
-          const price = resolveServicePrice(pricing[0], vehicleSizeClass);
+          const price = getToastPrice(service, pricing[0], vehicleSizeClass);
           toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
         }
         return;
@@ -391,13 +399,13 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
         if (matchingTier) {
           quickAdd(service, matchingTier, vehicleSizeClass);
-          if (!onAddService) { const price = resolveServicePrice(matchingTier, vehicleSizeClass); toast.success(`Added ${service.name} — $${price.toFixed(2)}`); }
+          if (!onAddService) { const price = getToastPrice(service, matchingTier, vehicleSizeClass); toast.success(`Added ${service.name} — $${price.toFixed(2)}`); }
           return;
         }
       }
       if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
         quickAdd(service, pricing[0], vehicleSizeClass);
-        if (!onAddService) { const price = resolveServicePrice(pricing[0], vehicleSizeClass); toast.success(`Added ${service.name} — $${price.toFixed(2)}`); }
+        if (!onAddService) { const price = getToastPrice(service, pricing[0], vehicleSizeClass); toast.success(`Added ${service.name} — $${price.toFixed(2)}`); }
         return;
       }
     }

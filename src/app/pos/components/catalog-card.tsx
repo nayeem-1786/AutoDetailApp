@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn';
 import type { CatalogProduct, CatalogService } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import { getServicePriceRange, resolveServicePrice } from '../utils/pricing';
+import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 
 interface ProductCardProps {
   product: CatalogProduct;
@@ -48,8 +49,6 @@ export function ServiceCard({
   onTap,
   isAdded,
 }: ServiceCardProps) {
-  const priceDisplay = getServicePriceDisplay(service, vehicleSizeClass);
-
   return (
     <button
       onClick={() => onTap(service)}
@@ -69,67 +68,166 @@ export function ServiceCard({
       <span className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
         {service.name}
       </span>
-      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-        {priceDisplay}
-      </span>
+      <ServicePriceDisplay service={service} vehicleSizeClass={vehicleSizeClass} />
     </button>
   );
 }
 
-function getServicePriceDisplay(
-  service: CatalogService,
-  vehicleSizeClass: string | null
-): string {
+function ServicePriceDisplay({
+  service,
+  vehicleSizeClass,
+}: {
+  service: CatalogService;
+  vehicleSizeClass: string | null;
+}) {
   // Per-unit pricing: "$150/panel"
   if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
     const label = service.per_unit_label || 'unit';
-    return `$${service.per_unit_price.toFixed(2)}/${label}`;
+    return (
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        ${service.per_unit_price.toFixed(2)}/{label}
+      </span>
+    );
   }
 
   if (service.flat_price != null) {
-    return `$${service.flat_price.toFixed(2)}`;
+    return (
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        ${service.flat_price.toFixed(2)}
+      </span>
+    );
   }
 
   if (service.custom_starting_price != null) {
-    return `From $${service.custom_starting_price.toFixed(2)}`;
+    return (
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        From ${service.custom_starting_price.toFixed(2)}
+      </span>
+    );
   }
 
   const pricing = service.pricing;
   if (!pricing || pricing.length === 0) {
-    return 'Quote';
+    return (
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        Quote
+      </span>
+    );
   }
 
-  // Single tier — show resolved price or range
+  // Check sale status for this service
+  const { isOnSale } = getSaleStatus({
+    sale_starts_at: service.sale_starts_at,
+    sale_ends_at: service.sale_ends_at,
+  });
+
+  // Single tier
   if (pricing.length === 1) {
     const tier = pricing[0];
     if (vehicleSizeClass && tier.is_vehicle_size_aware) {
       const resolved = resolveServicePrice(tier, vehicleSizeClass as VehicleSizeClass);
-      return `$${resolved.toFixed(2)}`;
+      const saleInfo = getTierSaleInfo(resolved, tier.sale_price, isOnSale);
+      if (saleInfo?.isDiscounted) {
+        return (
+          <span className="text-sm font-semibold">
+            <span className="line-through text-gray-400 dark:text-gray-500 font-normal mr-1">
+              ${saleInfo.originalPrice.toFixed(2)}
+            </span>
+            <span className="text-red-600 dark:text-red-400">
+              ${saleInfo.currentPrice.toFixed(2)}
+            </span>
+            <span className="ml-1 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
+              Sale
+            </span>
+          </span>
+        );
+      }
+      return (
+        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          ${resolved.toFixed(2)}
+        </span>
+      );
     }
     if (tier.is_vehicle_size_aware) {
       const [min, max] = getServicePriceRange(tier);
-      if (min === max) return `$${min.toFixed(2)}`;
-      return `$${min.toFixed(2)}–$${max.toFixed(2)}`;
+      const label = min === max ? `$${min.toFixed(2)}` : `$${min.toFixed(2)}–$${max.toFixed(2)}`;
+      return (
+        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          {label}
+        </span>
+      );
     }
-    return `$${tier.price.toFixed(2)}`;
-  }
-
-  // Multiple tiers — show resolved range if vehicle selected, base range otherwise
-  if (vehicleSizeClass) {
-    const resolvedPrices = pricing.map((p) =>
-      p.is_vehicle_size_aware
-        ? resolveServicePrice(p, vehicleSizeClass as VehicleSizeClass)
-        : p.price
+    // Not vehicle-size-aware single tier — check sale
+    const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, isOnSale);
+    if (saleInfo?.isDiscounted) {
+      return (
+        <span className="text-sm font-semibold">
+          <span className="line-through text-gray-400 dark:text-gray-500 font-normal mr-1">
+            ${saleInfo.originalPrice.toFixed(2)}
+          </span>
+          <span className="text-red-600 dark:text-red-400">
+            ${saleInfo.currentPrice.toFixed(2)}
+          </span>
+          <span className="ml-1 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
+            Sale
+          </span>
+        </span>
+      );
+    }
+    return (
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        ${tier.price.toFixed(2)}
+      </span>
     );
-    const min = Math.min(...resolvedPrices);
-    const max = Math.max(...resolvedPrices);
-    if (min === max) return `$${min.toFixed(2)}`;
-    return `$${min.toFixed(2)}–$${max.toFixed(2)}`;
   }
 
-  const prices = pricing.map((p) => p.price);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  if (min === max) return `$${min.toFixed(2)}`;
-  return `$${min.toFixed(2)}–$${max.toFixed(2)}`;
+  // Multiple tiers — compute sale-aware price range
+  const salePrices = pricing.map((p) => {
+    const base = vehicleSizeClass && p.is_vehicle_size_aware
+      ? resolveServicePrice(p, vehicleSizeClass as VehicleSizeClass)
+      : p.price;
+    const saleInfo = getTierSaleInfo(base, p.sale_price, isOnSale);
+    return {
+      standard: base,
+      effective: saleInfo?.currentPrice ?? base,
+      isDiscounted: saleInfo?.isDiscounted ?? false,
+    };
+  });
+
+  const anyOnSale = salePrices.some((s) => s.isDiscounted);
+  const effectiveMin = Math.min(...salePrices.map((s) => s.effective));
+  const effectiveMax = Math.max(...salePrices.map((s) => s.effective));
+  const standardMin = Math.min(...salePrices.map((s) => s.standard));
+  const standardMax = Math.max(...salePrices.map((s) => s.standard));
+
+  if (anyOnSale) {
+    const effectiveLabel = effectiveMin === effectiveMax
+      ? `$${effectiveMin.toFixed(2)}`
+      : `$${effectiveMin.toFixed(2)}–$${effectiveMax.toFixed(2)}`;
+    const standardLabel = standardMin === standardMax
+      ? `$${standardMin.toFixed(2)}`
+      : `$${standardMin.toFixed(2)}–$${standardMax.toFixed(2)}`;
+    return (
+      <span className="text-sm font-semibold">
+        <span className="line-through text-gray-400 dark:text-gray-500 font-normal mr-1">
+          {standardLabel}
+        </span>
+        <span className="text-red-600 dark:text-red-400">
+          {effectiveLabel}
+        </span>
+        <span className="ml-1 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
+          Sale
+        </span>
+      </span>
+    );
+  }
+
+  const label = effectiveMin === effectiveMax
+    ? `$${effectiveMin.toFixed(2)}`
+    : `$${effectiveMin.toFixed(2)}–$${effectiveMax.toFixed(2)}`;
+  return (
+    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+      {label}
+    </span>
+  );
 }
