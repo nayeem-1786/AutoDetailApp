@@ -10,6 +10,7 @@ interface ConditionalFooterProps {
 
 export function ConditionalFooter({ children }: ConditionalFooterProps) {
   const pathname = usePathname();
-  if (pathname.startsWith('/book')) return null;
+  const hideFooterPaths = ['/book', '/quote', '/receipt'];
+  if (hideFooterPaths.some(p => pathname.startsWith(p))) return null;
   return <>{children}</>;
 }

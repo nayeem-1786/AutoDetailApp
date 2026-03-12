@@ -4,6 +4,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: SMS receipt redesign + receipt logo base64 + footer cleanup — 2026-03-11
+
+### SMS Receipt Redesign (Task C)
+- **Short SMS receipts**: Replaced full plain-text receipt (~1600 chars, multiple segments) with short summary + link (~100 chars, 1 segment)
+- **Public receipt page**: New `/receipt/[token]` page matching quote page style — line items, totals, payments, print/save button
+- **Token-based access**: Added `access_token UUID` column to `transactions` table (no login required to view)
+- **Short links**: Receipt URL shortened via `createShortLink()` for SMS-friendly URLs
+- **Two SMS formats**: Vehicle transactions show `{year make model} — $total`, product-only show `Your total — $total`
+- **Migration**: `20260311000001_add_transaction_access_token.sql` — adds column, unique index, backfills existing rows
+
+### Logo Base64 (Task H)
+- **Inline logo for print paths**: Added `fetchLogoAsBase64()` helper to convert Supabase storage logo URL to base64 data URI
+- **Print-path callers** (POS HTML, copier, customer portal) now embed logo inline — no external network dependency
+- **Email path** keeps URL (base64 breaks in many email clients)
+- **Graceful degradation**: Falls back to original URL on fetch failure
+
+### Footer Cleanup
+- **Hidden footer** on `/quote` and `/receipt` pages (mobile users don't need full footer on receipts/estimates)
+- Updated `ConditionalFooter` to suppress on `/book`, `/quote`, `/receipt` paths
+
+Files changed:
+- `supabase/migrations/20260311000001_add_transaction_access_token.sql` — New
+- `src/app/(public)/receipt/[token]/page.tsx` — New
+- `src/app/(public)/receipt/[token]/print-button.tsx` — New
+- `src/app/api/pos/receipts/sms/route.ts` — Redesigned SMS body
+- `src/app/pos/lib/receipt-template.ts` — Added `fetchLogoAsBase64()`, `logoBase64` in ReceiptImages
+- `src/app/api/pos/receipts/html/route.ts` — Logo base64 for print
+- `src/app/api/pos/receipts/print-copier/route.ts` — Logo base64 for copier
+- `src/app/api/customer/receipts/html/route.ts` — Logo base64 for customer portal
+- `src/components/public/conditional-footer.tsx` — Hide footer on /quote, /receipt
+
+---
+
 ## audit: Full login & session system deep audit — 2026-03-10
 
 Comprehensive audit of all auth entry points, Supabase client instances, cookie/session lifecycle, admin vs POS session isolation, OTP resend timer behavior, and private vs normal browser differences.

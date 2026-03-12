@@ -261,6 +261,7 @@
 | notes | TEXT | | |
 | offline_id | TEXT | | For offline POS sync |
 | transaction_date | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| access_token | UUID | NOT NULL, UNIQUE, DEFAULT gen_random_uuid() | Token for public receipt link |
 | qbo_id | TEXT | | QuickBooks Online ID |
 | qbo_sync_status | TEXT | DEFAULT NULL | |
 | qbo_sync_error | TEXT | | |

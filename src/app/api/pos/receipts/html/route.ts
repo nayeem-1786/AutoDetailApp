@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
-import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
+import { generateReceiptHtml, fetchLogoAsBase64 } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptData } from '@/lib/data/receipt-data';
 
 /**
@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
     const { tx, config, images } = await fetchReceiptData(supabase, transactionId);
+    // Inline logo as base64 for print/AirPrint (no external network dependency)
+    if (config.logo_url) {
+      images.logoBase64 = await fetchLogoAsBase64(config.logo_url) ?? undefined;
+    }
     const html = generateReceiptHtml(tx, config, images);
 
     return new NextResponse(html, {

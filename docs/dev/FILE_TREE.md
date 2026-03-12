@@ -688,6 +688,8 @@ src/app/(account)/account/settings/page.tsx  — Profile settings
 ### Standalone Public Pages
 ```
 src/app/quote/[token]/page.tsx           — Public quote view/accept
+src/app/(public)/receipt/[token]/page.tsx       — Public receipt view (token-based, no login)
+src/app/(public)/receipt/[token]/print-button.tsx — Print/save-as-PDF button
 src/app/q/[token]/page.tsx               — Short quote URL redirect
 src/app/s/[code]/page.tsx                — Short link redirect
 src/app/authorize/[token]/page.tsx       — Job authorization (approve/decline)

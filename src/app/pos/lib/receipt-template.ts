@@ -67,6 +67,24 @@ export interface ReceiptImages {
   qrGoogle?: string;  // data:image/png;base64,...
   qrYelp?: string;    // data:image/png;base64,...
   barcode?: string;   // data:image/png;base64,... (Code 128 via bwip-js)
+  logoBase64?: string; // data:image/{type};base64,... (inline logo for print paths)
+}
+
+/**
+ * Fetch a logo URL and convert to base64 data URI for inline embedding.
+ * Falls back to null on any failure (caller should use original URL).
+ */
+export async function fetchLogoAsBase64(logoUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(logoUrl);
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || 'image/png';
+    const buffer = await res.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    return `data:${contentType};base64,${base64}`;
+  } catch {
+    return null;
+  }
 }
 
 // Fallback when no config is passed (callers should always pass DB config)
@@ -613,8 +631,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     .join('');
 
   const logoAlign = c.logo_alignment || 'center';
-  const logoHtml = c.logo_url
-    ? `<div style="text-align:${logoAlign};margin:8px 0;"><img src="${esc(c.logo_url)}" alt="" style="display:inline-block;width:${c.logo_width}px;max-width:100%;height:auto;" /></div>`
+  const logoSrc = images?.logoBase64 || c.logo_url;
+  const logoHtml = logoSrc
+    ? `<div style="text-align:${logoAlign};margin:8px 0;"><img src="${esc(logoSrc)}" alt="" style="display:inline-block;width:${c.logo_width}px;max-width:100%;height:auto;" /></div>`
     : '';
 
   const linkStyle = 'color:#444444;text-decoration:none;';

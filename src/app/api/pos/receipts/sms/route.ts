@@ -3,8 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
-import { generateReceiptLines, receiptToPlainText } from '@/app/pos/lib/receipt-template';
-import { fetchReceiptData } from '@/lib/data/receipt-data';
+import { getBusinessInfo } from '@/lib/data/business';
+import { createShortLink } from '@/lib/utils/short-link';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,10 +29,51 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const { tx, config, context } = await fetchReceiptData(supabase, transaction_id);
 
-    const receiptLines = generateReceiptLines(tx, config, context);
-    const smsBody = receiptToPlainText(receiptLines, 40);
+    // Fetch transaction with vehicle and access_token for the short SMS
+    const { data: transaction, error } = await supabase
+      .from('transactions')
+      .select(`
+        access_token,
+        total_amount,
+        vehicle:vehicles(year, make, model)
+      `)
+      .eq('id', transaction_id)
+      .single();
+
+    if (error || !transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    const businessInfo = await getBusinessInfo();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const receiptUrl = `${appUrl}/receipt/${transaction.access_token}`;
+    const shortUrl = await createShortLink(receiptUrl);
+
+    // Format total
+    const total = `$${Number(transaction.total_amount).toFixed(2)}`;
+
+    // Build SMS body — vehicle line or "Your total"
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vehicle = transaction.vehicle as any;
+    let summaryLine: string;
+    if (vehicle?.year || vehicle?.make || vehicle?.model) {
+      const vehicleStr = [vehicle.year, vehicle.make, vehicle.model]
+        .filter(Boolean)
+        .join(' ');
+      summaryLine = `${vehicleStr} — ${total}`;
+      // If the full message would exceed 160 chars, truncate vehicle info
+      const testMsg = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;
+      if (testMsg.length > 160) {
+        const maxVehicle = 160 - businessInfo.name.length - total.length - shortUrl.length - 30; // account for fixed text
+        const truncated = vehicleStr.slice(0, Math.max(10, maxVehicle)) + '...';
+        summaryLine = `${truncated} — ${total}`;
+      }
+    } else {
+      summaryLine = `Your total — ${total}`;
+    }
+
+    const smsBody = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;
 
     const result = await sendSms(phone, smsBody);
 
