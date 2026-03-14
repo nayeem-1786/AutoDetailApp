@@ -248,7 +248,7 @@ Permissions are organized into categories. Here is every permission key in the s
 | `pos.issue_refunds` | Issue refunds on completed transactions |
 | `pos.void_transactions` | Void entire transactions |
 | `pos.manual_discounts` | Apply ad-hoc manual discounts |
-| `pos.override_pricing` | Override service/product pricing |
+| `pos.discount_override` | Allow manual discounts on items with special pricing |
 | `pos.end_of_day` | Run end-of-day cash reconciliation |
 | `pos.jobs.view` | View job cards in POS |
 | `pos.jobs.manage` | Start work, complete jobs, manage job flow |
@@ -2052,7 +2052,7 @@ Each POS action is gated by a specific permission key. If a staff member's role 
 | `pos.issue_refunds` | Issuing refunds |
 | `pos.void_transactions` | Voiding transactions |
 | `pos.manual_discounts` | Applying manual discounts |
-| `pos.override_pricing` | Overriding prices |
+| `pos.discount_override` | Discount override on special-priced items |
 | `pos.end_of_day` | Running end-of-day reconciliation |
 | `pos.jobs.view` | Viewing the jobs tab |
 | `pos.jobs.manage` | Managing jobs (start, complete, create walk-ins) |
@@ -6255,7 +6255,7 @@ Permissions are organized into these categories:
 | `pos.issue_refunds` | Yes | Yes | No | No |
 | `pos.void_transactions` | Yes | No | No | No |
 | `pos.manual_discounts` | Yes | Yes | No | No |
-| `pos.override_pricing` | Yes | No | No | No |
+| `pos.discount_override` | Yes | No | No | No |
 | `pos.end_of_day` | Yes | Yes | Yes | No |
 | `pos.jobs.view` | Yes | Yes | Yes | Yes |
 | `pos.jobs.manage` | Yes | Yes | No | Yes |

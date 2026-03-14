@@ -46,7 +46,7 @@ interface TicketPanelProps {
 
 export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: TicketPanelProps) {
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
-  const { granted: canOverridePricing } = usePosPermission('pos.override_pricing');
+  const { granted: canOverridePricing } = usePosPermission('pos.discount_override');
   const { heldTickets } = useHeldTickets();
   const heldCount = heldTickets.length;
   const { ticket, dispatch } = useTicket();
@@ -237,7 +237,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       toast.error('Percentage discount cannot exceed 100%');
       return;
     }
-    // If ticket has sale/combo priced items, require override_pricing permission
+    // If ticket has sale/combo priced items, require discount_override permission
     if (hasSpecialPricingWithoutOverride) {
       toast.error('Override permission required — ticket has special pricing');
       return;

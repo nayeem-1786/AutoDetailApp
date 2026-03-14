@@ -37,7 +37,7 @@ interface QuoteTicketPanelProps {
 export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps) {
   const router = useRouter();
   const { granted: canManualDiscount } = usePosPermission('pos.manual_discounts');
-  const { granted: canOverridePricing } = usePosPermission('pos.override_pricing');
+  const { granted: canOverridePricing } = usePosPermission('pos.discount_override');
   const { quote, dispatch, quoteValidityDays } = useQuote();
   const { services } = useCatalog();
 

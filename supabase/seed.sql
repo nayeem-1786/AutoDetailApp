@@ -118,11 +118,11 @@ INSERT INTO permissions (permission_key, role, granted) VALUES
   ('pos.manual_discounts', 'admin', true),
   ('pos.manual_discounts', 'cashier', false),
   ('pos.manual_discounts', 'detailer', false),
-  -- override_pricing
-  ('pos.override_pricing', 'super_admin', true),
-  ('pos.override_pricing', 'admin', false),
-  ('pos.override_pricing', 'cashier', false),
-  ('pos.override_pricing', 'detailer', false),
+  -- discount_override
+  ('pos.discount_override', 'super_admin', true),
+  ('pos.discount_override', 'admin', false),
+  ('pos.discount_override', 'cashier', false),
+  ('pos.discount_override', 'detailer', false),
   -- end_of_day
   ('pos.end_of_day', 'super_admin', true),
   ('pos.end_of_day', 'admin', true),

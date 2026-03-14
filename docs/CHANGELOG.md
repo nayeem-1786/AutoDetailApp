@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Rename pos.override_pricing to pos.discount_override with clearer description — 2026-03-14
+
+- Renamed permission key `pos.override_pricing` → `pos.discount_override` everywhere (code, migrations, seeds, docs)
+- Updated label: "Override Pricing" → "Discount Override"
+- Updated description: "Allow manual discounts on items that already have special pricing (sale, combo, or coupon)"
+- New migration `20260314000001` renames the key and description in live DB (`permission_definitions` + `permissions` tables)
+
 ## fix: Enforce pos.override_pricing permission for manual discounts on sale/combo items — 2026-03-14
 
 - **ticket-panel.tsx** — "Add Discount" buttons now check for special pricing (sale/combo) without override permission and show toast before opening the discount form. Previously only the Apply handler checked.
@@ -82,7 +89,7 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - `calculateCouponDiscount()` in `coupon-helpers.ts` mirrors the same filtering
 
 ### Manual Discount Override Permission
-- `pos.override_pricing` permission required to apply manual discounts when ticket has sale/combo items
+- `pos.discount_override` permission required to apply manual discounts when ticket has sale/combo items
 - Standard-only tickets still only need `pos.manual_discounts` (unchanged behavior)
 
 ### Pricing Provenance

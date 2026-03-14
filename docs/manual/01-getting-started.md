@@ -91,7 +91,7 @@ Permissions are organized into categories. Here is every permission key in the s
 | `pos.issue_refunds` | Issue refunds on completed transactions |
 | `pos.void_transactions` | Void entire transactions |
 | `pos.manual_discounts` | Apply ad-hoc manual discounts |
-| `pos.override_pricing` | Override service/product pricing |
+| `pos.discount_override` | Allow manual discounts on items with special pricing |
 | `pos.end_of_day` | Run end-of-day cash reconciliation |
 | `pos.jobs.view` | View job cards in POS |
 | `pos.jobs.manage` | Start work, complete jobs, manage job flow |

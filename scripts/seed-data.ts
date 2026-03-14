@@ -98,7 +98,7 @@ async function seed() {
     'pos.issue_refunds': { super_admin: true, admin: true, cashier: false, detailer: false },
     'pos.void_transactions': { super_admin: true, admin: false, cashier: false, detailer: false },
     'pos.manual_discounts': { super_admin: true, admin: true, cashier: false, detailer: false },
-    'pos.override_pricing': { super_admin: true, admin: false, cashier: false, detailer: false },
+    'pos.discount_override': { super_admin: true, admin: false, cashier: false, detailer: false },
     'pos.end_of_day': { super_admin: true, admin: true, cashier: true, detailer: false },
     'customers.view': { super_admin: true, admin: true, cashier: true, detailer: true },
     'customers.create': { super_admin: true, admin: true, cashier: true, detailer: false },

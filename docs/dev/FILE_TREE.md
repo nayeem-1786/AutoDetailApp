@@ -1300,6 +1300,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260304000001_email_template_rls_policies.sql
 20260311000001_add_transaction_access_token.sql
 20260312000001_add_transaction_items_pricing_fields.sql
+20260312000002_add_products_barcode_index.sql
+20260314000001_rename_override_pricing_to_discount_override.sql
 ```
 
 ---

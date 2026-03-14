@@ -238,7 +238,7 @@ Permissions are organized into these categories:
 | `pos.issue_refunds` | Yes | Yes | No | No |
 | `pos.void_transactions` | Yes | No | No | No |
 | `pos.manual_discounts` | Yes | Yes | No | No |
-| `pos.override_pricing` | Yes | No | No | No |
+| `pos.discount_override` | Yes | No | No | No |
 | `pos.end_of_day` | Yes | Yes | Yes | No |
 | `pos.jobs.view` | Yes | Yes | Yes | Yes |
 | `pos.jobs.manage` | Yes | Yes | No | Yes |

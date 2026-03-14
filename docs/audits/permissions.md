@@ -171,7 +171,7 @@ These exist in the database but have no toggle in the Permissions Tab:
 | `pos.issue_refunds` | Issue refunds | NO | NO | **DEAD** |
 | `pos.void_transactions` | Void transactions | NO | NO | **DEAD** |
 | `pos.manual_discounts` | Apply manual discounts | NO | NO | **DEAD** |
-| `pos.override_pricing` | Override pricing | NO | NO | **DEAD** |
+| `pos.discount_override` | Discount override | NO | NO | **DEAD** |
 | `pos.end_of_day` | End-of-day cash count | NO | NO | **DEAD** |
 
 #### Customer Management (8 keys — 0 enforced)
@@ -316,7 +316,7 @@ The seed data defines 80 permission keys across 4 roles. Full matrix from `supab
 | pos.issue_refunds | true | true | **false** | false |
 | pos.void_transactions | true | **false** | false | false |
 | pos.manual_discounts | true | true | **false** | false |
-| pos.override_pricing | true | **false** | false | false |
+| pos.discount_override | true | **false** | false | false |
 | pos.end_of_day | true | true | true | false |
 | **Customer Management** | | | | |
 | customers.view | true | true | true | **true** |
@@ -533,7 +533,7 @@ Based on the PROJECT.md spec, these actions exist in the codebase with NO permis
 | POS refunds | POS interface | `pos.issue_refunds` | POS route access only (cashier can access but spec says denied) |
 | POS void | POS interface | `pos.void_transactions` | POS route access only |
 | POS manual discounts | POS interface | `pos.manual_discounts` | POS route access only |
-| POS price override | POS interface | `pos.override_pricing` | POS route access only |
+| POS discount override | POS interface | `pos.discount_override` | POS route access only |
 | Delete product | Admin product detail | `products.delete` | Route access only |
 | Delete service | Admin service detail | `services.delete` | Route access only |
 | Adjust stock | Admin inventory | `inventory.adjust_stock` | Route access only |

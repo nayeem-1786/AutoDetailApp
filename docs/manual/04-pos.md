@@ -831,7 +831,7 @@ Each POS action is gated by a specific permission key. If a staff member's role 
 | `pos.issue_refunds` | Issuing refunds |
 | `pos.void_transactions` | Voiding transactions |
 | `pos.manual_discounts` | Applying manual discounts |
-| `pos.override_pricing` | Overriding prices |
+| `pos.discount_override` | Discount override on special-priced items |
 | `pos.end_of_day` | Running end-of-day reconciliation |
 | `pos.jobs.view` | Viewing the jobs tab |
 | `pos.jobs.manage` | Managing jobs (start, complete, create walk-ins) |
