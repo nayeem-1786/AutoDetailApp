@@ -46,6 +46,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const hasSpecialPricingWithoutOverride = !canOverridePricing && quote.items.some((i) => i.pricingType === 'sale' || i.pricingType === 'combo');
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
   const [discountValue, setDiscountValue] = useState('');
   const [discountLabel, setDiscountLabel] = useState('');
@@ -100,9 +101,8 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       toast.error('Percentage discount cannot exceed 100%');
       return;
     }
-    const hasSpecialPricing = quote.items.some((i) => i.pricingType === 'sale' || i.pricingType === 'combo');
-    if (hasSpecialPricing && !canOverridePricing) {
-      toast.error('Override pricing permission required to discount sale/combo items');
+    if (hasSpecialPricingWithoutOverride) {
+      toast.error('Override permission required — ticket has special pricing');
       return;
     }
     dispatch({
@@ -583,7 +583,13 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
                 </div>
               ) : (
                 <button
-                  onClick={() => setShowDiscountForm(true)}
+                  onClick={() => {
+                    if (hasSpecialPricingWithoutOverride) {
+                      toast.error('Override permission required — ticket has special pricing');
+                      return;
+                    }
+                    setShowDiscountForm(true);
+                  }}
                   className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                 >
                   <Tag className="h-4 w-4" />

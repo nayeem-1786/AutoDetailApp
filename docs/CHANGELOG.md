@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Enforce pos.override_pricing permission for manual discounts on sale/combo items — 2026-03-14
+
+- **ticket-panel.tsx** — "Add Discount" buttons now check for special pricing (sale/combo) without override permission and show toast before opening the discount form. Previously only the Apply handler checked.
+- **quote-ticket-panel.tsx** — Same gating applied to the quote builder's "Add Discount" button.
+- Toast message updated: "Override permission required — ticket has special pricing"
+
+---
+
 ## fix: Stacked sale price layout in catalog cards + sale display in service detail modal — 2026-03-12
 
 - **catalog-card.tsx** — Sale prices now render in a stacked two-line layout (strikethrough standard on top, sale price + Sale badge below) instead of inline, preventing text overflow on narrow catalog cards

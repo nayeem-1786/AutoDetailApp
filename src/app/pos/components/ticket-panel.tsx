@@ -66,6 +66,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [addonComboPrice, setAddonComboPrice] = useState<number | null>(null);
   const [addonComboPrimaryServiceId, setAddonComboPrimaryServiceId] = useState<string | null>(null);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const hasSpecialPricingWithoutOverride = useMemo(
+    () => !canOverridePricing && ticket.items.some((i) => i.pricingType === 'sale' || i.pricingType === 'combo'),
+    [canOverridePricing, ticket.items]
+  );
   const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
   const [discountValue, setDiscountValue] = useState('');
@@ -234,9 +238,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       return;
     }
     // If ticket has sale/combo priced items, require override_pricing permission
-    const hasSpecialPricing = ticket.items.some((i) => i.pricingType === 'sale' || i.pricingType === 'combo');
-    if (hasSpecialPricing && !canOverridePricing) {
-      toast.error('Override pricing permission required to discount sale/combo items');
+    if (hasSpecialPricingWithoutOverride) {
+      toast.error('Override permission required — ticket has special pricing');
       return;
     }
     dispatch({
@@ -379,7 +382,13 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
               canManualDiscount && !ticket.manualDiscount && !showDiscountForm
                 ? (
                   <button
-                    onClick={() => setShowDiscountForm(true)}
+                    onClick={() => {
+                      if (hasSpecialPricingWithoutOverride) {
+                        toast.error('Override permission required — ticket has special pricing');
+                        return;
+                      }
+                      setShowDiscountForm(true);
+                    }}
                     className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   >
                     <Tag className="h-4 w-4" />
@@ -496,7 +505,13 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                 /* Standalone "Add Discount" — only when coupon IS applied (otherwise rendered inline) */
                 ticket.coupon && (
                   <button
-                    onClick={() => setShowDiscountForm(true)}
+                    onClick={() => {
+                      if (hasSpecialPricingWithoutOverride) {
+                        toast.error('Override permission required — ticket has special pricing');
+                        return;
+                      }
+                      setShowDiscountForm(true);
+                    }}
                     className="flex min-h-[44px] items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   >
                     <Tag className="h-4 w-4" />
