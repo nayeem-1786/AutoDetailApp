@@ -830,7 +830,7 @@ Each POS action is gated by a specific permission key. If a staff member's role 
 | `pos.process_split` | Processing split payments |
 | `pos.issue_refunds` | Issuing refunds |
 | `pos.void_transactions` | Voiding transactions |
-| `pos.manual_discounts` | Applying manual discounts |
+| `pos.manual_discounts` | Show the Add Discount button in POS tickets and quotes |
 | `pos.discount_override` | Discount override on special-priced items |
 | `pos.end_of_day` | Running end-of-day reconciliation |
 | `pos.jobs.view` | Viewing the jobs tab |

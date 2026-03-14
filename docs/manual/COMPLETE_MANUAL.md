@@ -247,7 +247,7 @@ Permissions are organized into categories. Here is every permission key in the s
 | `pos.process_split` | Process split payments (part cash, part card) |
 | `pos.issue_refunds` | Issue refunds on completed transactions |
 | `pos.void_transactions` | Void entire transactions |
-| `pos.manual_discounts` | Apply ad-hoc manual discounts |
+| `pos.manual_discounts` | Show the Add Discount button in POS tickets and quotes |
 | `pos.discount_override` | Allow manual discounts on items with special pricing |
 | `pos.end_of_day` | Run end-of-day cash reconciliation |
 | `pos.jobs.view` | View job cards in POS |
@@ -2051,7 +2051,7 @@ Each POS action is gated by a specific permission key. If a staff member's role 
 | `pos.process_split` | Processing split payments |
 | `pos.issue_refunds` | Issuing refunds |
 | `pos.void_transactions` | Voiding transactions |
-| `pos.manual_discounts` | Applying manual discounts |
+| `pos.manual_discounts` | Show the Add Discount button in POS tickets and quotes |
 | `pos.discount_override` | Discount override on special-priced items |
 | `pos.end_of_day` | Running end-of-day reconciliation |
 | `pos.jobs.view` | Viewing the jobs tab |

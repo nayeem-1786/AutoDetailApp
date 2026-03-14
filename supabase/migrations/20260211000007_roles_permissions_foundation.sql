@@ -80,7 +80,7 @@ INSERT INTO permission_definitions (key, name, description, category, sort_order
   ('pos.process_card', 'Process Card Payments', 'Accept card payments via terminal', 'POS Operations', 105),
   ('pos.process_cash', 'Process Cash Payments', 'Accept cash payments', 'POS Operations', 106),
   ('pos.process_split', 'Process Split Payments', 'Split payments between multiple methods', 'POS Operations', 107),
-  ('pos.manual_discounts', 'Manual Discounts', 'Apply manual discounts without coupon codes', 'POS Operations', 108),
+  ('pos.manual_discounts', 'Manual Discounts', 'Show the Add Discount button in POS tickets and quotes', 'POS Operations', 108),
   ('pos.discount_override', 'Discount Override', 'Allow manual discounts on items that already have special pricing (sale, combo, or coupon)', 'POS Operations', 109),
   ('pos.issue_refunds', 'Issue Refunds', 'Process refunds on completed transactions', 'POS Operations', 110),
   ('pos.void_transactions', 'Void Transactions', 'Void entire transactions', 'POS Operations', 111),
