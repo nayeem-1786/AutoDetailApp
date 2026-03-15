@@ -90,7 +90,9 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           pricingType: 'standard' as const,
           comboSourcePrimaryId: null,
           saleEffectivePrice: null,
-        } as TicketItem));
+          prerequisiteNote: null,
+          prerequisiteForServiceId: null,
+        }));
 
         const loadState: QuoteState = {
           items,
