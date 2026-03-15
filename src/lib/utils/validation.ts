@@ -447,6 +447,7 @@ const transactionItemSchema = z.object({
   notes: optionalString,
   standard_price: z.coerce.number().optional().nullable(),
   pricing_type: z.enum(['standard', 'sale', 'combo']).optional().default('standard'),
+  is_addon: z.boolean().optional().default(false),
 });
 
 export const paymentSchema = z.object({

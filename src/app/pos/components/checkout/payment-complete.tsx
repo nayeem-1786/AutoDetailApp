@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter, usePathname } from 'next/navigation';
 import { CheckCircle2, CloudOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCheckout } from '../../context/checkout-context';
@@ -7,6 +8,8 @@ import { ReceiptOptions } from '../receipt-options';
 
 export function PaymentComplete() {
   const checkout = useCheckout();
+  const router = useRouter();
+  const pathname = usePathname();
   const isOfflineTx = checkout.transactionId?.startsWith('offline-');
 
   return (
@@ -102,7 +105,12 @@ export function PaymentComplete() {
       {/* New ticket */}
       <Button
         size="lg"
-        onClick={checkout.closeCheckout}
+        onClick={() => {
+          checkout.closeCheckout();
+          if (pathname !== '/pos') {
+            router.push('/pos');
+          }
+        }}
         className="min-w-[200px] bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
       >
         New Ticket

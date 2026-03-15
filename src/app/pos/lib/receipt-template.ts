@@ -383,7 +383,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       const label = item.pricing_type === 'combo' ? 'Combo' : 'Sale';
       lines.push({
         type: 'text',
-        text: `  ${label}: Reg $${item.standard_price.toFixed(2)} — Save $${savings.toFixed(2)}!`,
+        text: `  ${label}: Reg $${item.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!`,
       });
     }
   }
@@ -607,6 +607,15 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
         <td style="padding:4px 0;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
         <td style="padding:4px 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
       </tr>`;
+      }
+
+      // Sale/combo savings sub-text
+      if (item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price) {
+        const savings = item.standard_price - item.unit_price;
+        const label = item.pricing_type === 'combo' ? 'Combo' : 'Sale';
+        rows += `<tr>
+          <td colspan="3" style="padding:0 0 4px 12px;font-size:11px;color:#16a34a;">${label}: Reg $${item.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!</td>
+        </tr>`;
       }
 
       return rows;

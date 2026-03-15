@@ -1303,6 +1303,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260312000002_add_products_barcode_index.sql
 20260314000001_rename_override_pricing_to_discount_override.sql
 20260314000002_update_manual_discounts_description.sql
+20260314000003_add_transaction_items_is_addon.sql
 ```
 
 ---

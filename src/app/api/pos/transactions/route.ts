@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
         notes?: string | null;
         standard_price?: number | null;
         pricing_type?: string | null;
+        is_addon?: boolean;
       }) => ({
         transaction_id: transaction.id,
         item_type: item.item_type,
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
         notes: item.notes || null,
         standard_price: item.standard_price ?? null,
         pricing_type: item.pricing_type || 'standard',
+        is_addon: item.is_addon ?? false,
       }));
 
       const { error: itemsError } = await supabase

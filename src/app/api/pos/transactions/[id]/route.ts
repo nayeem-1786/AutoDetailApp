@@ -119,6 +119,53 @@ export async function PATCH(
         );
       }
 
+      // Restore loyalty points on void
+      if (transaction.customer_id) {
+        const { data: custForLoyalty } = await supabase
+          .from('customers')
+          .select('loyalty_points_balance')
+          .eq('id', transaction.customer_id)
+          .single();
+
+        if (custForLoyalty) {
+          let currentBalance = custForLoyalty.loyalty_points_balance ?? 0;
+
+          // Restore redeemed points
+          if (transaction.loyalty_points_redeemed > 0) {
+            currentBalance += transaction.loyalty_points_redeemed;
+            await supabase.from('loyalty_ledger').insert({
+              customer_id: transaction.customer_id,
+              transaction_id: id,
+              action: 'adjusted',
+              points_change: transaction.loyalty_points_redeemed,
+              points_balance: currentBalance,
+              description: `Void: restored ${transaction.loyalty_points_redeemed} redeemed pts`,
+            });
+          }
+
+          // Reverse earned points
+          if (transaction.loyalty_points_earned > 0) {
+            currentBalance = Math.max(0, currentBalance - transaction.loyalty_points_earned);
+            await supabase.from('loyalty_ledger').insert({
+              customer_id: transaction.customer_id,
+              transaction_id: id,
+              action: 'adjusted',
+              points_change: -transaction.loyalty_points_earned,
+              points_balance: currentBalance,
+              description: `Void: reversed ${transaction.loyalty_points_earned} earned pts`,
+            });
+          }
+
+          // Update customer balance
+          if (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0) {
+            await supabase
+              .from('customers')
+              .update({ loyalty_points_balance: currentBalance })
+              .eq('id', transaction.customer_id);
+          }
+        }
+      }
+
       logAudit({
         userId: posEmployee?.auth_user_id ?? null,
         userEmail: posEmployee?.email ?? null,

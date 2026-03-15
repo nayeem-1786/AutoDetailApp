@@ -52,6 +52,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   const [discountLabel, setDiscountLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [pendingVehicleChange, setPendingVehicleChange] = useState<Vehicle | null>(null);
 
   function handleSelectCustomer(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
@@ -65,7 +66,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     setShowVehicleSelector(true);
   }
 
-  function handleSelectVehicle(vehicle: Vehicle) {
+  function applyVehicleSelection(vehicle: Vehicle) {
     dispatch({ type: 'SET_VEHICLE', vehicle });
 
     const hasServices = quote.items.some((i) => i.itemType === 'service');
@@ -79,6 +80,31 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     }
 
     setShowVehicleSelector(false);
+  }
+
+  function handleSelectVehicle(vehicle: Vehicle) {
+    const hasServices = quote.items.some((i) => i.itemType === 'service');
+    const categoryChanged = quote.vehicle && vehicle.vehicle_category !== quote.vehicle.vehicle_category;
+
+    if (hasServices && categoryChanged) {
+      setPendingVehicleChange(vehicle);
+      return;
+    }
+
+    applyVehicleSelection(vehicle);
+  }
+
+  function handleConfirmVehicleChange() {
+    if (!pendingVehicleChange) return;
+    for (const item of quote.items) {
+      if (item.itemType === 'service') {
+        dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+      }
+    }
+    dispatch({ type: 'SET_VEHICLE', vehicle: pendingVehicleChange });
+    setPendingVehicleChange(null);
+    setShowVehicleSelector(false);
+    toast.info('Services cleared — vehicle type changed');
   }
 
   function handleVehicleCreated(vehicle: Vehicle) {
@@ -739,6 +765,34 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           customerPhone={quote.customer?.phone ?? null}
           onSent={handleSendComplete}
         />
+      )}
+
+      {/* Vehicle Type Change Confirmation */}
+      {pendingVehicleChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-6 shadow-2xl dark:shadow-gray-950/60">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Change vehicle type?
+            </h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Changing vehicle type will clear all services from this quote. Products will be kept.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setPendingVehicleChange(null)}
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmVehicleChange}
+                className="flex-1 rounded-lg bg-amber-500 dark:bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-600 dark:hover:bg-amber-500"
+              >
+                Clear Services
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

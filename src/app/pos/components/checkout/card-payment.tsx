@@ -116,6 +116,7 @@ export function CardPayment() {
             notes: i.notes,
             standard_price: i.standardPrice,
             pricing_type: i.pricingType,
+            is_addon: !!i.parentItemId,
           })),
           payments: [
             {

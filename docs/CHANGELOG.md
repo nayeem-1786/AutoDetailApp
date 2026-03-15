@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Vehicle change warning, receipt sub-text formatting, new ticket navigation — 2026-03-14
+
+- **Vehicle type change warning** — changing vehicle category (e.g., automobile → motorcycle) on a ticket/quote with services now shows confirmation dialog. "Clear Services" removes all service items (keeps products), "Cancel" aborts the change. Same-category changes (e.g., sedan → SUV) still recalculate prices silently.
+- **Receipt savings sub-text** — fixed encoding issue where em-dash rendered as "?" on thermal printer. Changed separator to " | " and verb to "Saved" (e.g., `Sale: Reg $425.00 | Saved $85.00!`). Fixed in both plain text and HTML receipt templates.
+- **New Ticket navigation** — "New Ticket" button on payment complete now navigates to `/pos` (main register) instead of just closing the overlay, so it works correctly when checkout was initiated from Jobs or Quotes pages.
+
+---
+
+## feat: Loyalty partial redemption + add-on savings sub-text — 2026-03-14
+
+### Loyalty Partial Redemption (Task E)
+- **LoyaltyPanel** — upgraded from all-or-nothing toggle to partial dollar-amount input with min/max constraints
+- **Void restoration** — voiding a transaction now restores redeemed loyalty points and reverses earned points with `adjusted` ledger entries
+- **$0 charge flow** — when loyalty covers the full ticket total, shows "Complete (Loyalty)" button that bypasses checkout overlay entirely
+- Minimum redemption enforced: 100 pts ($5.00), max capped at lesser of balance value or ticket total
+
+### Add-on Savings Sub-text (Task F)
+- **`is_addon` column** — new `BOOLEAN DEFAULT false` on `transaction_items`, backfilled from `pricing_type='combo'`
+- **Checkout components** — all 4 payment flows (card, cash, check, split) + loyalty complete now persist `is_addon: !!parentItemId`
+- **HTML receipt** — savings sub-text ("Combo: Reg $X — Save $Y!") now renders in green below combo/sale items (plain text receipt already had this)
+- **Validation** — `is_addon` added to Zod `transactionItemSchema`
+
+---
+
 ## refactor: Rename pos.override_pricing to pos.discount_override with clearer description — 2026-03-14
 
 - Renamed permission key `pos.override_pricing` → `pos.discount_override` everywhere (code, migrations, seeds, docs)

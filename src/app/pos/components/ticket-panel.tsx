@@ -71,6 +71,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     [canOverridePricing, ticket.items]
   );
   const [showTypePrompt, setShowTypePrompt] = useState(false);
+  const [pendingVehicleChange, setPendingVehicleChange] = useState<Vehicle | null>(null);
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
   const [discountValue, setDiscountValue] = useState('');
   const [discountLabel, setDiscountLabel] = useState('');
@@ -194,7 +195,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     setShowVehicleSelector(true);
   }
 
-  function handleSelectVehicle(vehicle: Vehicle) {
+  function applyVehicleSelection(vehicle: Vehicle) {
     dispatch({ type: 'SET_VEHICLE', vehicle });
 
     // Recalculate service prices if ticket has service items
@@ -209,6 +210,32 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     }
 
     setShowVehicleSelector(false);
+  }
+
+  function handleSelectVehicle(vehicle: Vehicle) {
+    const hasServices = ticket.items.some((i) => i.itemType === 'service');
+    const categoryChanged = ticket.vehicle && vehicle.vehicle_category !== ticket.vehicle.vehicle_category;
+
+    if (hasServices && categoryChanged) {
+      setPendingVehicleChange(vehicle);
+      return;
+    }
+
+    applyVehicleSelection(vehicle);
+  }
+
+  function handleConfirmVehicleChange() {
+    if (!pendingVehicleChange) return;
+    // Remove all service items (keep products and custom items)
+    for (const item of ticket.items) {
+      if (item.itemType === 'service') {
+        dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+      }
+    }
+    dispatch({ type: 'SET_VEHICLE', vehicle: pendingVehicleChange });
+    setPendingVehicleChange(null);
+    setShowVehicleSelector(false);
+    toast.info('Services cleared — vehicle type changed');
   }
 
   function handleVehicleCreated(vehicle: Vehicle) {
@@ -639,6 +666,34 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
             }
           }}
         />
+      )}
+
+      {/* Vehicle Type Change Confirmation */}
+      {pendingVehicleChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-6 shadow-2xl dark:shadow-gray-950/60">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Change vehicle type?
+            </h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Changing vehicle type will clear all services from this ticket. Products will be kept.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setPendingVehicleChange(null)}
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmVehicleChange}
+                className="flex-1 rounded-lg bg-amber-500 dark:bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-600 dark:hover:bg-amber-500"
+              >
+                Clear Services
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
