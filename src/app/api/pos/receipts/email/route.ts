@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendEmail } from '@/lib/utils/email';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
+import { LOYALTY } from '@/lib/utils/constants';
 import { fetchReceiptData } from '@/lib/data/receipt-data';
 
 export async function POST(request: NextRequest) {
@@ -39,12 +40,17 @@ export async function POST(request: NextRequest) {
       : 'Guest';
 
     const itemLines = tx.items
-      .map(
-        (i) =>
-          i.quantity > 1
-            ? `${i.item_name}\n  ${i.quantity} x $${i.unit_price.toFixed(2)} each${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`
-            : `${i.item_name}${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`
-      )
+      .map((i) => {
+        let line = i.quantity > 1
+          ? `${i.item_name}\n  ${i.quantity} x $${i.unit_price.toFixed(2)} each${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`
+          : `${i.item_name}${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`;
+        if (i.pricing_type && i.pricing_type !== 'standard' && i.standard_price != null && i.standard_price > i.unit_price) {
+          const savings = i.standard_price - i.unit_price;
+          const label = i.pricing_type === 'combo' ? 'Combo' : 'Sale';
+          line += `\n  ${label}: Reg $${i.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!`;
+        }
+        return line;
+      })
       .join('\n');
 
     const paymentLines = tx.payments
@@ -63,11 +69,23 @@ ${itemLines}
 
 Subtotal: $${tx.subtotal.toFixed(2)}
 Tax: $${tx.tax_amount.toFixed(2)}
-${tx.discount_amount > 0 ? `${tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount'}: -$${tx.discount_amount.toFixed(2)}\n` : ''}${tx.loyalty_discount && tx.loyalty_discount > 0 ? `Loyalty (${tx.loyalty_points_redeemed || 0} pts): -$${tx.loyalty_discount.toFixed(2)}\n` : ''}${tx.tip_amount > 0 ? `Tip: $${tx.tip_amount.toFixed(2)}\n` : ''}Total: $${tx.total_amount.toFixed(2)}
+${(() => { const nld = tx.discount_amount - (tx.loyalty_discount || 0); return nld > 0 ? `${tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount'}: -$${nld.toFixed(2)}\n` : ''; })()}${tx.loyalty_discount && tx.loyalty_discount > 0 ? `Loyalty (${tx.loyalty_points_redeemed || 0} pts): -$${tx.loyalty_discount.toFixed(2)}\n` : ''}${tx.tip_amount > 0 ? `Tip: $${tx.tip_amount.toFixed(2)}\n` : ''}Total: $${tx.total_amount.toFixed(2)}
 
 Payment:
 ${paymentLines}
-
+${(() => {
+  if (tx.customer && (tx.loyalty_points_earned ?? 0) > 0) {
+    const dollarValue = (tx.loyalty_points_earned! * LOYALTY.REDEEM_RATE).toFixed(2);
+    return `\nPoints Earned Today: ${tx.loyalty_points_earned} ($${dollarValue} loyalty cash)\n`;
+  } else if (!tx.customer) {
+    const hypotheticalPoints = Math.floor(tx.subtotal * LOYALTY.EARN_RATE);
+    if (hypotheticalPoints > 0) {
+      const dollarValue = (hypotheticalPoints * LOYALTY.REDEEM_RATE).toFixed(2);
+      return `\nJoin our rewards program — this visit would've earned you $${dollarValue} off!\n`;
+    }
+  }
+  return '';
+})()}
 Thank you for choosing ${config.name}!`;
 
     const subject = `Receipt #${tx.receipt_number || transaction_id.slice(0, 8)} from ${config.name}`;

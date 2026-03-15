@@ -216,10 +216,12 @@
 
 **Admin UI:** Managed via Admin > Catalog > Services > [service] > Prerequisites tab.
 
+**POS enforcement:** Checked via `POST /api/pos/services/check-prerequisites` before adding services to tickets/quotes. OR logic — any ONE prerequisite met satisfies the requirement. Warning dialog offers: add prerequisite to ticket, override (requires `pos.override_prerequisites` permission), or cancel.
+
 **Enforcement types:**
-- `required_same_ticket` — Must be on the same ticket
-- `required_history` — Must exist in vehicle's service history within `history_window_days`
-- `recommended` — System shows warning but allows proceeding
+- `required_same_ticket` — Must be on the same ticket (only checks current ticket, not history)
+- `required_history` — Must exist in customer+vehicle service history within `history_window_days`
+- `recommended` — System shows warning but allows proceeding without override permission
 
 ### packages
 | Column | Type | Constraints | Notes |

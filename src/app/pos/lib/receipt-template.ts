@@ -1,5 +1,6 @@
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
 import { formatPhone } from '@/lib/utils/format';
+import { LOYALTY } from '@/lib/utils/constants';
 import QRCode from 'qrcode';
 
 interface ReceiptItem {
@@ -44,6 +45,7 @@ export interface ReceiptTransaction {
   vehicle?: { vehicle_type?: string | null; year?: number | null; make?: string | null; model?: string | null; color?: string | null } | null;
   items: ReceiptItem[];
   payments: ReceiptPayment[];
+  loyalty_points_earned?: number;
 }
 
 export interface ReceiptLine {
@@ -405,12 +407,13 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     });
   }
 
-  if (tx.discount_amount > 0) {
+  const nonLoyaltyDiscount = tx.discount_amount - (tx.loyalty_discount || 0);
+  if (nonLoyaltyDiscount > 0) {
     const discountLabel = tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount';
     lines.push({
       type: 'columns',
       left: discountLabel,
-      right: `-$${tx.discount_amount.toFixed(2)}`,
+      right: `-$${nonLoyaltyDiscount.toFixed(2)}`,
     });
   }
 
@@ -454,6 +457,28 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       left: label,
       right: `$${p.amount.toFixed(2)}`,
     });
+  }
+
+  // Points earned line
+  if (tx.customer && (tx.loyalty_points_earned ?? 0) > 0) {
+    const dollarValue = (tx.loyalty_points_earned! * LOYALTY.REDEEM_RATE).toFixed(2);
+    lines.push({ type: 'divider' });
+    lines.push({
+      type: 'text',
+      text: `Points Earned Today: ${tx.loyalty_points_earned} ($${dollarValue} loyalty cash)`,
+      alignment: 'center',
+    });
+  } else if (!tx.customer) {
+    const hypotheticalPoints = Math.floor(tx.subtotal * LOYALTY.EARN_RATE);
+    if (hypotheticalPoints > 0) {
+      const dollarValue = (hypotheticalPoints * LOYALTY.REDEEM_RATE).toFixed(2);
+      lines.push({ type: 'divider' });
+      lines.push({
+        type: 'text',
+        text: `Join our rewards program — this visit would've earned you $${dollarValue} off!`,
+        alignment: 'center',
+      });
+    }
   }
 
   // Logo above footer
@@ -625,9 +650,10 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   const totals: string[] = [];
   totals.push(row('Subtotal', `$${tx.subtotal.toFixed(2)}`));
   if (tx.tax_amount > 0) totals.push(row('Tax', `$${tx.tax_amount.toFixed(2)}`));
-  if (tx.discount_amount > 0) {
+  const htmlNonLoyaltyDiscount = tx.discount_amount - (tx.loyalty_discount || 0);
+  if (htmlNonLoyaltyDiscount > 0) {
     const discountLabel = tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount';
-    totals.push(row(discountLabel, `-$${tx.discount_amount.toFixed(2)}`, '#16a34a'));
+    totals.push(row(discountLabel, `-$${htmlNonLoyaltyDiscount.toFixed(2)}`, '#16a34a'));
   }
   if (tx.loyalty_discount && tx.loyalty_discount > 0) {
     const ptsLabel = tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : '';
@@ -864,6 +890,23 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   <table style="width:100%;border-collapse:collapse;">
     ${paymentRows}
   </table>
+
+  ${(() => {
+    if (tx.customer && (tx.loyalty_points_earned ?? 0) > 0) {
+      const dollarValue = (tx.loyalty_points_earned! * LOYALTY.REDEEM_RATE).toFixed(2);
+      return `<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
+  <div style="text-align:center;font-size:13px;color:#16a34a;padding:4px 0;">Points Earned Today: ${tx.loyalty_points_earned} ($${dollarValue} loyalty cash)</div>`;
+    } else if (!tx.customer) {
+      const hypotheticalPoints = Math.floor(tx.subtotal * LOYALTY.EARN_RATE);
+      if (hypotheticalPoints > 0) {
+        const dollarValue = (hypotheticalPoints * LOYALTY.REDEEM_RATE).toFixed(2);
+        return `<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
+  <div style="text-align:center;font-size:13px;color:#16a34a;padding:4px 0;">Join our rewards program &mdash; this visit would&rsquo;ve earned you $${dollarValue} off!</div>`;
+      }
+      return '';
+    }
+    return '';
+  })()}
 
   ${c.logo_placement === 'above_footer' ? logoHtml : ''}
   ${aboveFooterHtml}

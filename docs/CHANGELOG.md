@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Service prerequisites — admin config + POS enforcement — 2026-03-14
+
+- **POS prerequisite enforcement** — when adding a service with prerequisites to a ticket or quote, the system checks current ticket items and customer+vehicle transaction history. If unmet, shows warning dialog with 3 options: add the prerequisite service, override (requires `pos.override_prerequisites` permission), or cancel.
+- **Prerequisite check API** — `POST /api/pos/services/check-prerequisites` with OR logic (any ONE prerequisite met = satisfied), history lookback within configurable window days, and fail-open on errors.
+- **New permission** — `pos.override_prerequisites` added to permission_definitions (default: super_admin only).
+- **Quote support** — same prerequisite enforcement in quote builder search flow and catalog browser.
+- **Receipt unification** — Bug #6 (sale/combo savings sub-text on SMS + email), Bug #7 (discount/loyalty double-counting fix), points earned line on all 4 receipt paths, refund handler restores redeemed loyalty points proportionally.
+- **Loyalty earning fix** — points now earned on out-of-pocket amount only (`subtotal - loyalty_discount`), not full subtotal.
+
+---
+
 ## fix: Vehicle change warning, receipt sub-text formatting, new ticket navigation — 2026-03-14
 
 - **Vehicle type change warning** — changing vehicle category (e.g., automobile → motorcycle) on a ticket/quote with services now shows confirmation dialog. "Clear Services" removes all service items (keeps products), "Cancel" aborts the change. Same-category changes (e.g., sedan → SUV) still recalculate prices silently.

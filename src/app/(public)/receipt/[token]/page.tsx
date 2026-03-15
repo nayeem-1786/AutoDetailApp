@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { LOYALTY } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { PrintButton } from './print-button';
 
@@ -16,6 +17,7 @@ interface TransactionWithRelations {
   loyalty_points_redeemed: number | null;
   tip_amount: number;
   total_amount: number;
+  loyalty_points_earned: number;
   customer: { first_name: string; last_name: string } | null;
   employee: { first_name: string; last_name: string } | null;
   vehicle: { year: number | null; make: string | null; model: string | null; color: string | null } | null;
@@ -27,6 +29,8 @@ interface TransactionWithRelations {
     total_price: number;
     tax_amount: number;
     item_type: string | null;
+    standard_price: number | null;
+    pricing_type: string | null;
   }[];
   payments: {
     id: string;
@@ -163,6 +167,11 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 <tr key={item.id} className="border-b border-site-border">
                   <td className="px-6 py-4">
                     <div className="font-medium text-site-text">{item.item_name}</div>
+                    {item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price && (
+                      <div className="text-xs text-green-500 mt-0.5">
+                        {item.pricing_type === 'combo' ? 'Combo' : 'Sale'}: Reg {formatCurrency(item.standard_price)} | Saved {formatCurrency(item.standard_price - item.unit_price)}!
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>
                   <td className="px-4 py-4 text-right text-site-text-muted">
@@ -192,16 +201,19 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 </span>
               </div>
             )}
-            {tx.discount_amount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-site-text-muted">
-                  {tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount'}
-                </span>
-                <span className="font-medium text-amber-400">
-                  -{formatCurrency(tx.discount_amount)}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const nonLoyaltyDiscount = tx.discount_amount - (tx.loyalty_discount || 0);
+              return nonLoyaltyDiscount > 0 ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-site-text-muted">
+                    {tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount'}
+                  </span>
+                  <span className="font-medium text-amber-400">
+                    -{formatCurrency(nonLoyaltyDiscount)}
+                  </span>
+                </div>
+              ) : null;
+            })()}
             {tx.loyalty_discount && tx.loyalty_discount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-site-text-muted">
@@ -250,6 +262,26 @@ export default async function PublicReceiptPage({ params }: PageProps) {
           </div>
         </div>
       )}
+
+      {/* Points Earned */}
+      {tx.customer && tx.loyalty_points_earned > 0 && (
+        <div className="mb-8 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm text-center">
+          <p className="text-sm text-green-500 font-medium">
+            Points Earned Today: {tx.loyalty_points_earned} ({formatCurrency(tx.loyalty_points_earned * LOYALTY.REDEEM_RATE)} loyalty cash)
+          </p>
+        </div>
+      )}
+      {!tx.customer && (() => {
+        const hypotheticalPoints = Math.floor(tx.subtotal * LOYALTY.EARN_RATE);
+        if (hypotheticalPoints <= 0) return null;
+        return (
+          <div className="mb-8 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm text-center">
+            <p className="text-sm text-green-500 font-medium">
+              Join our rewards program — this visit would&apos;ve earned you {formatCurrency(hypotheticalPoints * LOYALTY.REDEEM_RATE)} off!
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Print Button */}
       <div className="text-center">

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCatalog } from '../hooks/use-catalog';
 import { useTicket } from '../context/ticket-context';
+import { usePrerequisiteCheck } from '../hooks/use-prerequisite-check';
+import { PrerequisiteWarningDialog } from './prerequisite-warning-dialog';
 import type { CatalogProduct, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { CategoryTile } from './category-tile';
@@ -56,6 +58,17 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
   const [detailService, setDetailService] = useState<CatalogService | null>(null);
   const [compatWarning, setCompatWarning] = useState<{ service: CatalogService; mode: 'direct' | 'detail' } | null>(null);
+
+  // Prerequisite check hook
+  const ticketServiceIds = useMemo(
+    () => ticket.items.filter((i) => i.itemType === 'service' && i.serviceId).map((i) => i.serviceId!),
+    [ticket.items]
+  );
+  const { warning: prereqWarning, checkPrerequisites, clearWarning: clearPrereqWarning } = usePrerequisiteCheck({
+    customerId: ticket.customer?.id ?? null,
+    vehicleId: ticket.vehicle?.id ?? null,
+    ticketServiceIds,
+  });
 
   // Auto-compute addedServiceIds from ticket when no external prop provided
   const resolvedAddedServiceIds = useMemo(() => {
@@ -170,6 +183,110 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     return labels.join(', ');
   }
 
+  /**
+   * Core service add with prerequisite check. All add paths funnel through here.
+   * Returns true if the service was added, false if blocked by prerequisites.
+   */
+  const addServiceChecked = useCallback(async (
+    svc: CatalogService,
+    p: ServicePricing,
+    vsc: VehicleSizeClass | null,
+    perUnitQty?: number,
+    skipPrereqCheck?: boolean,
+  ): Promise<boolean> => {
+    // Skip prerequisites for addons (parentItemId cases don't come through here)
+    if (!skipPrereqCheck) {
+      const canAdd = await checkPrerequisites(svc, p, vsc, perUnitQty);
+      if (!canAdd) return false;
+    }
+
+    if (onAddService) {
+      onAddService(svc, p, vsc, perUnitQty);
+    } else if (dispatch) {
+      // Duplicate check for POS ticket path
+      const existingItem = ticket.items.find(
+        (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId
+      );
+      if (existingItem) {
+        const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
+        if (isPerUnit) {
+          const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
+          if (existingItem.perUnitQty! >= max) {
+            const label = svc.per_unit_label || 'unit';
+            toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
+          } else {
+            const newQty = perUnitQty ?? (existingItem.perUnitQty! + 1);
+            dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: newQty });
+            const label = svc.per_unit_label || 'unit';
+            toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
+          }
+        } else {
+          toast.warning('Already on ticket');
+        }
+        return true;
+      }
+      dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty });
+    }
+    return true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onAddService, dispatch, ticket.items, checkPrerequisites]);
+
+  /** Handle prerequisite warning: override → add the original service */
+  const handlePrereqOverride = useCallback(() => {
+    if (!prereqWarning) return;
+    const { service, pricing, vehicleSizeClass, perUnitQty } = prereqWarning;
+    clearPrereqWarning();
+    addServiceChecked(service, pricing, vehicleSizeClass, perUnitQty, true).then((added) => {
+      if (added && !onAddService) toast.success(`Added ${service.name}`);
+    });
+  }, [prereqWarning, clearPrereqWarning, addServiceChecked, onAddService]);
+
+  /** Handle prerequisite warning: add a prerequisite service to the ticket first */
+  const handleAddPrerequisite = useCallback((prereqServiceName: string) => {
+    if (!prereqWarning) return;
+    const { service: originalService, pricing: originalPricing, vehicleSizeClass: originalVsc, perUnitQty: originalPerUnitQty } = prereqWarning;
+    clearPrereqWarning();
+
+    // Find the prerequisite service in catalog
+    const prereqService = services.find((s) => s.name === prereqServiceName);
+    if (!prereqService) {
+      toast.error(`Service "${prereqServiceName}" not found in catalog`);
+      return;
+    }
+
+    // Add the prerequisite service first (skip its own prereq check)
+    const prereqPricing = prereqService.pricing ?? [];
+    if (prereqPricing.length > 0) {
+      const tier = prereqPricing[0];
+      if (onAddService) {
+        onAddService(prereqService, tier, vehicleSizeClass);
+      } else if (dispatch) {
+        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: tier, vehicleSizeClass });
+      }
+      if (!onAddService) toast.success(`Added ${prereqService.name}`);
+    } else if (prereqService.flat_price != null) {
+      const syntheticPricing: ServicePricing = {
+        id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
+        price: prereqService.flat_price, sale_price: null, display_order: 0, is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, created_at: '',
+      };
+      if (onAddService) {
+        onAddService(prereqService, syntheticPricing, vehicleSizeClass);
+      } else if (dispatch) {
+        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass });
+      }
+      if (!onAddService) toast.success(`Added ${prereqService.name}`);
+    } else {
+      toast.error(`Cannot auto-add ${prereqService.name} — no pricing available`);
+      return;
+    }
+
+    // Then add the original service (skip prereq check since we just added the prerequisite)
+    addServiceChecked(originalService, originalPricing, originalVsc, originalPerUnitQty, true).then((added) => {
+      if (added && !onAddService) toast.success(`Added ${originalService.name}`);
+    });
+  }, [prereqWarning, clearPrereqWarning, services, onAddService, dispatch, vehicleSizeClass, addServiceChecked]);
+
   function handleTapProduct(product: CatalogProduct) {
     if (onAddProduct) {
       onAddProduct(product);
@@ -199,41 +316,15 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
 
     const pricing = service.pricing ?? [];
 
-    // Quick-add helper
-    function quickAdd(svc: CatalogService, p: ServicePricing, vsc: VehicleSizeClass | null) {
-      if (onAddService) {
-        onAddService(svc, p, vsc);
-      } else if (dispatch) {
-        // Duplicate check for POS ticket path
-        const existingItem = ticket.items.find(
-          (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId
-        );
-        if (existingItem) {
-          const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
-          if (isPerUnit) {
-            const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
-            if (existingItem.perUnitQty! >= max) {
-              const label = svc.per_unit_label || 'unit';
-              toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
-            } else {
-              dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: existingItem.perUnitQty! + 1 });
-              const label = svc.per_unit_label || 'unit';
-              const newQty = existingItem.perUnitQty! + 1;
-              toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
-            }
-          } else {
-            toast.warning('Already on ticket');
-          }
-          return;
-        }
-        dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc });
-      }
+    // Quick-add via prerequisite-aware addServiceChecked
+    async function quickAdd(svc: CatalogService, p: ServicePricing, vsc: VehicleSizeClass | null, toastMsg?: string) {
+      const added = await addServiceChecked(svc, p, vsc);
+      if (added && !onAddService) toast.success(toastMsg || `Added ${svc.name}`);
     }
 
     // Quick-add: single tier, not vehicle-size-aware
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
       quickAdd(service, pricing[0], vehicleSizeClass);
-      if (!onAddService) toast.success(`Added ${service.name}`);
       return;
     }
 
@@ -254,7 +345,6 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         created_at: '',
       };
       quickAdd(service, syntheticPricing, vehicleSizeClass);
-      if (!onAddService) toast.success(`Added ${service.name}`);
       return;
     }
 
@@ -265,20 +355,14 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       if (isVehicleSizeTiers) {
         const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
         if (matchingTier) {
-          quickAdd(service, matchingTier, vehicleSizeClass);
-          if (!onAddService) {
-            const price = getToastPrice(service, matchingTier, vehicleSizeClass);
-            toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
-          }
+          const price = getToastPrice(service, matchingTier, vehicleSizeClass);
+          quickAdd(service, matchingTier, vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
           return;
         }
       }
       if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
-        quickAdd(service, pricing[0], vehicleSizeClass);
-        if (!onAddService) {
-          const price = getToastPrice(service, pricing[0], vehicleSizeClass);
-          toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
-        }
+        const price = getToastPrice(service, pricing[0], vehicleSizeClass);
+        quickAdd(service, pricing[0], vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
         return;
       }
     }
@@ -287,48 +371,16 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     setPickerService(service);
   }
 
-  function handlePricingSelect(
+  async function handlePricingSelect(
     pricing: ServicePricing,
     vsc: VehicleSizeClass | null,
     perUnitQty?: number
   ) {
     if (!pickerService) return;
-    if (onAddService) {
-      onAddService(pickerService, pricing, vsc, perUnitQty);
-    } else if (dispatch) {
-      // Duplicate check for POS ticket path
-      const existingItem = ticket.items.find(
-        (i) => i.itemType === 'service' && i.serviceId === pickerService.id && !i.parentItemId
-      );
-      if (existingItem) {
-        const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
-        if (isPerUnit) {
-          const max = existingItem.perUnitMax ?? pickerService.per_unit_max ?? 10;
-          if (existingItem.perUnitQty! >= max) {
-            const label = pickerService.per_unit_label || 'unit';
-            toast.warning(`${pickerService.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
-          } else {
-            const newQty = perUnitQty ?? (existingItem.perUnitQty! + 1);
-            dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: newQty });
-            const label = pickerService.per_unit_label || 'unit';
-            toast.success(`${pickerService.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
-          }
-        } else {
-          toast.warning('Already on ticket');
-        }
-        setPickerService(null);
-        return;
-      }
-      dispatch({
-        type: 'ADD_SERVICE',
-        service: pickerService,
-        pricing,
-        vehicleSizeClass: vsc,
-        perUnitQty,
-      });
-    }
-    if (!onAddService) toast.success(`Added ${pickerService.name}`);
+    const svc = pickerService;
     setPickerService(null);
+    const added = await addServiceChecked(svc, pricing, vsc, perUnitQty);
+    if (added && !onAddService) toast.success(`Added ${svc.name}`);
   }
 
   function handleCompatConfirm() {
@@ -343,44 +395,21 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     }
   }
 
-  // Same as handleTapServiceDirect but without the compatibility check (used after user confirms)
+  // Same as handleTapServiceDirect but without the vehicle compatibility check (used after user confirms compat warning)
   function handleTapServiceDirectUnchecked(service: CatalogService) {
     if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
       setPickerService(service);
       return;
     }
     const pricing = service.pricing ?? [];
-    function quickAdd(svc: CatalogService, p: ServicePricing, vsc: VehicleSizeClass | null) {
-      if (onAddService) { onAddService(svc, p, vsc); }
-      else if (dispatch) {
-        // Duplicate check for POS ticket path
-        const existingItem = ticket.items.find(
-          (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId
-        );
-        if (existingItem) {
-          const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
-          if (isPerUnit) {
-            const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
-            if (existingItem.perUnitQty! >= max) {
-              const label = svc.per_unit_label || 'unit';
-              toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
-            } else {
-              dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: existingItem.perUnitQty! + 1 });
-              const label = svc.per_unit_label || 'unit';
-              const newQty = existingItem.perUnitQty! + 1;
-              toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
-            }
-          } else {
-            toast.warning('Already on ticket');
-          }
-          return;
-        }
-        dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc });
-      }
+
+    async function quickAdd(svc: CatalogService, p: ServicePricing, vsc: VehicleSizeClass | null, toastMsg?: string) {
+      const added = await addServiceChecked(svc, p, vsc);
+      if (added && !onAddService) toast.success(toastMsg || `Added ${svc.name}`);
     }
+
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
       quickAdd(service, pricing[0], vehicleSizeClass);
-      if (!onAddService) toast.success(`Added ${service.name}`);
       return;
     }
     if (pricing.length === 0 && service.flat_price != null) {
@@ -390,7 +419,6 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, created_at: '',
       };
       quickAdd(service, syntheticPricing, vehicleSizeClass);
-      if (!onAddService) toast.success(`Added ${service.name}`);
       return;
     }
     if (vehicleSizeClass) {
@@ -398,14 +426,14 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       if (isVehicleSizeTiers) {
         const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
         if (matchingTier) {
-          quickAdd(service, matchingTier, vehicleSizeClass);
-          if (!onAddService) { const price = getToastPrice(service, matchingTier, vehicleSizeClass); toast.success(`Added ${service.name} — $${price.toFixed(2)}`); }
+          const price = getToastPrice(service, matchingTier, vehicleSizeClass);
+          quickAdd(service, matchingTier, vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
           return;
         }
       }
       if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
-        quickAdd(service, pricing[0], vehicleSizeClass);
-        if (!onAddService) { const price = getToastPrice(service, pricing[0], vehicleSizeClass); toast.success(`Added ${service.name} — $${price.toFixed(2)}`); }
+        const price = getToastPrice(service, pricing[0], vehicleSizeClass);
+        quickAdd(service, pricing[0], vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
         return;
       }
     }
@@ -469,6 +497,15 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
           onAdd={onAddService}
           vehicleSizeOverride={vehicleSizeOverride}
           vehicleSpecialtyTierOverride={vehicleSpecialtyTierOverride}
+          onPrerequisiteCheck={checkPrerequisites}
+        />
+      )}
+      {prereqWarning && (
+        <PrerequisiteWarningDialog
+          warning={prereqWarning}
+          onClose={clearPrereqWarning}
+          onOverride={handlePrereqOverride}
+          onAddPrerequisite={handleAddPrerequisite}
         />
       )}
     </>

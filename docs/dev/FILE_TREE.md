@@ -378,6 +378,7 @@ src/app/api/pos/receipts/print-copier/route.ts
 src/app/api/pos/receipts/print-server/route.ts
 src/app/api/pos/receipts/sms/route.ts
 src/app/api/pos/refunds/route.ts
+src/app/api/pos/services/check-prerequisites/route.ts
 src/app/api/pos/services/durations/route.ts
 src/app/api/pos/services/route.ts
 src/app/api/pos/staff/available/route.ts
@@ -1094,6 +1095,15 @@ stripe-terminal.ts    — Stripe Terminal SDK integration
 
 ---
 
+## POS Hooks (`src/app/pos/hooks/`)
+
+```
+use-catalog.ts              — Shared catalog data hook (products, services)
+use-prerequisite-check.ts   — Service prerequisite check before adding to ticket/quote
+```
+
+---
+
 ## POS Components (`src/app/pos/components/`)
 
 ```
@@ -1106,7 +1116,8 @@ catalog-panel.tsx           keypad-tab.tsx              register-tab.tsx
 category-tabs.tsx           loyalty-panel.tsx           search-bar.tsx
 category-tile.tsx           offline-indicator.tsx       service-detail-dialog.tsx
 checkout/                   offline-queue-badge.tsx     service-pricing-picker.tsx
-coupon-input.tsx            pin-screen.tsx              swipeable-cart-item.tsx
+coupon-input.tsx            pin-screen.tsx              prerequisite-warning-dialog.tsx
+                                                        swipeable-cart-item.tsx
 customer-create-dialog.tsx  pin-pad.tsx                 ticket-actions.tsx
 customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         ticket-panel.tsx
@@ -1304,6 +1315,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260314000001_rename_override_pricing_to_discount_override.sql
 20260314000002_update_manual_discounts_description.sql
 20260314000003_add_transaction_items_is_addon.sql
+20260314000004_add_pos_override_prerequisites_permission.sql
 ```
 
 ---

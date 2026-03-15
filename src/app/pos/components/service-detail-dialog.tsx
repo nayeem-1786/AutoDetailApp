@@ -28,9 +28,11 @@ interface ServiceDetailDialogProps {
   comboPrice?: number;
   /** Primary service ID that triggered the combo price */
   comboPrimaryServiceId?: string;
+  /** Prerequisite check function — when provided, called before adding. Returns false to block add. */
+  onPrerequisiteCheck?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => Promise<boolean>;
 }
 
-export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride, parentItemId, comboPrice, comboPrimaryServiceId }: ServiceDetailDialogProps) {
+export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride, parentItemId, comboPrice, comboPrimaryServiceId, onPrerequisiteCheck }: ServiceDetailDialogProps) {
   const { ticket, dispatch: ticketDispatch } = useTicket();
   const dispatch = onAdd ? undefined : ticketDispatch;
   const pricing = service.pricing ?? [];
@@ -110,7 +112,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     return resolveServicePriceWithSale(tier, vehicleSizeClass, saleWindow).effectivePrice;
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     // Duplicate check for POS ticket path (not callback mode)
     if (!onAdd && dispatch) {
       const existingItem = ticket.items.find(
@@ -163,6 +165,11 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
       if (onAdd) {
         onAdd(service, syntheticPricing, vehicleSizeClass, perUnitQty);
       } else if (dispatch) {
+        // Prerequisite check for non-addon services
+        if (!parentItemId && onPrerequisiteCheck) {
+          const canAdd = await onPrerequisiteCheck(service, syntheticPricing, vehicleSizeClass, perUnitQty);
+          if (!canAdd) { onClose(); return; }
+        }
         dispatch({
           type: 'ADD_SERVICE',
           service,
@@ -184,6 +191,11 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     if (onAdd) {
       onAdd(service, selectedTier, vehicleSizeClass);
     } else if (dispatch) {
+      // Prerequisite check for non-addon services
+      if (!parentItemId && onPrerequisiteCheck) {
+        const canAdd = await onPrerequisiteCheck(service, selectedTier, vehicleSizeClass);
+        if (!canAdd) { onClose(); return; }
+      }
       dispatch({
         type: 'ADD_SERVICE',
         service,

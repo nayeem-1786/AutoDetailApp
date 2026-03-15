@@ -166,39 +166,65 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Adjust loyalty points if applicable
-    if (transaction.customer_id && transaction.loyalty_points_earned > 0) {
-      const proportionalPoints = Math.floor(
-        transaction.loyalty_points_earned * (totalRefundAmount / transaction.total_amount)
-      );
+    if (transaction.customer_id && (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0)) {
+      // Get current customer balance
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('loyalty_points_balance')
+        .eq('id', transaction.customer_id)
+        .single();
 
-      if (proportionalPoints > 0) {
-        // Get current customer balance
-        const { data: customer } = await supabase
-          .from('customers')
-          .select('loyalty_points_balance')
-          .eq('id', transaction.customer_id)
-          .single();
+      if (customer) {
+        let runningBalance = customer.loyalty_points_balance;
+        const isFullRefund = totalRefundAmount >= transaction.total_amount;
 
-        if (customer) {
-          const newBalance = Math.max(0, customer.loyalty_points_balance - proportionalPoints);
+        // 5a. Restore redeemed points
+        if (transaction.loyalty_points_redeemed > 0) {
+          const restoredPoints = isFullRefund
+            ? transaction.loyalty_points_redeemed
+            : Math.floor(transaction.loyalty_points_redeemed * (totalRefundAmount / transaction.total_amount));
 
-          // Insert loyalty ledger entry
-          await supabase.from('loyalty_ledger').insert({
-            customer_id: transaction.customer_id,
-            transaction_id: transaction.id,
-            action: 'adjusted',
-            points_change: -proportionalPoints,
-            points_balance: newBalance,
-            description: `Adjusted for refund of $${totalRefundAmount.toFixed(2)}`,
-            created_by: posEmployee.employee_id,
-          });
+          if (restoredPoints > 0) {
+            runningBalance = runningBalance + restoredPoints;
 
-          // Update customer balance
-          await supabase
-            .from('customers')
-            .update({ loyalty_points_balance: newBalance })
-            .eq('id', transaction.customer_id);
+            await supabase.from('loyalty_ledger').insert({
+              customer_id: transaction.customer_id,
+              transaction_id: transaction.id,
+              action: 'adjusted',
+              points_change: restoredPoints,
+              points_balance: runningBalance,
+              description: `Refund: restored ${restoredPoints} redeemed pts`,
+              created_by: posEmployee.employee_id,
+            });
+          }
         }
+
+        // 5b. Claw back earned points
+        if (transaction.loyalty_points_earned > 0) {
+          const clawbackPoints = isFullRefund
+            ? transaction.loyalty_points_earned
+            : Math.floor(transaction.loyalty_points_earned * (totalRefundAmount / transaction.total_amount));
+
+          if (clawbackPoints > 0) {
+            runningBalance = Math.max(0, runningBalance - clawbackPoints);
+
+            await supabase.from('loyalty_ledger').insert({
+              customer_id: transaction.customer_id,
+              transaction_id: transaction.id,
+              action: 'adjusted',
+              points_change: -clawbackPoints,
+              points_balance: runningBalance,
+              description: `Refund: reversed ${clawbackPoints} earned pts`,
+              created_by: posEmployee.employee_id,
+            });
+          }
+        }
+
+        // Single customer balance update
+        await supabase
+          .from('customers')
+          .update({ loyalty_points_balance: Math.max(0, runningBalance) })
+          .eq('id', transaction.customer_id);
       }
     }
 

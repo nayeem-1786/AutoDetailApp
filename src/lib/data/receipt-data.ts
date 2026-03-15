@@ -102,6 +102,7 @@ export async function fetchReceiptData(
     loyalty_points_redeemed: raw.loyalty_points_redeemed,
     tip_amount: raw.tip_amount,
     total_amount: raw.total_amount,
+    loyalty_points_earned: raw.loyalty_points_earned ?? 0,
     customer: raw.customer,
     employee: raw.employee,
     vehicle: raw.vehicle,

@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { useQuote } from '../../context/quote-context';
 import { useCatalog } from '../../hooks/use-catalog';
+import { usePrerequisiteCheck } from '../../hooks/use-prerequisite-check';
+import { PrerequisiteWarningDialog } from '../prerequisite-warning-dialog';
 import { posFetch } from '../../lib/pos-fetch';
 import { SearchBar } from '../search-bar';
 import { CatalogBrowser } from '../catalog-browser';
@@ -139,6 +141,17 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     [quote.items]
   );
 
+  // Prerequisite check for quote search flow (catalog browser handles its own checks)
+  const quoteServiceIds = useMemo(
+    () => quote.items.filter((i) => i.itemType === 'service' && i.serviceId).map((i) => i.serviceId!),
+    [quote.items]
+  );
+  const { warning: prereqWarning, checkPrerequisites, clearWarning: clearPrereqWarning } = usePrerequisiteCheck({
+    customerId: quote.customer?.id ?? null,
+    vehicleId: quote.vehicle?.id ?? null,
+    ticketServiceIds: quoteServiceIds,
+  });
+
   // Callbacks for catalog browser to dispatch to quote context
   const handleAddProduct = useCallback((product: CatalogProduct) => {
     dispatch({ type: 'ADD_PRODUCT', product });
@@ -190,7 +203,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     ? services.filter((s) => s.name.toLowerCase().includes(searchLower))
     : [];
 
-  function handleTapServiceSearch(service: CatalogService) {
+  async function handleTapServiceSearch(service: CatalogService) {
     // Per-unit services always need the quantity picker
     if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
       setPickerService(service);
@@ -199,7 +212,8 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
 
     const pricing = service.pricing ?? [];
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
-      handleAddService(service, pricing[0], vehicleSizeClass);
+      const canAdd = await checkPrerequisites(service, pricing[0], vehicleSizeClass);
+      if (canAdd) handleAddService(service, pricing[0], vehicleSizeClass);
       return;
     }
     if (pricing.length === 0 && service.flat_price != null) {
@@ -217,16 +231,57 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
         vehicle_size_suv_van_price: null,
         created_at: '',
       };
-      handleAddService(service, syntheticPricing, vehicleSizeClass);
+      const canAdd = await checkPrerequisites(service, syntheticPricing, vehicleSizeClass);
+      if (canAdd) handleAddService(service, syntheticPricing, vehicleSizeClass);
       return;
     }
     setPickerService(service);
   }
 
-  function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) {
+  async function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) {
     if (!pickerService) return;
-    handleAddService(pickerService, pricing, vsc, perUnitQty);
+    const svc = pickerService;
     setPickerService(null);
+    const canAdd = await checkPrerequisites(svc, pricing, vsc, perUnitQty);
+    if (canAdd) handleAddService(svc, pricing, vsc, perUnitQty);
+  }
+
+  function handlePrereqOverride() {
+    if (!prereqWarning) return;
+    const { service, pricing, vehicleSizeClass: vsc, perUnitQty } = prereqWarning;
+    clearPrereqWarning();
+    handleAddService(service, pricing, vsc, perUnitQty);
+  }
+
+  function handleAddPrerequisite(prereqServiceName: string) {
+    if (!prereqWarning) return;
+    const { service: originalService, pricing: originalPricing, vehicleSizeClass: originalVsc, perUnitQty: originalPerUnitQty } = prereqWarning;
+    clearPrereqWarning();
+
+    const prereqService = services.find((s) => s.name === prereqServiceName);
+    if (!prereqService) {
+      toast.error(`Service "${prereqServiceName}" not found in catalog`);
+      return;
+    }
+
+    // Add prerequisite
+    const prereqPricing = prereqService.pricing ?? [];
+    if (prereqPricing.length > 0) {
+      handleAddService(prereqService, prereqPricing[0], vehicleSizeClass);
+    } else if (prereqService.flat_price != null) {
+      const syntheticPricing: ServicePricing = {
+        id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
+        price: prereqService.flat_price, sale_price: null, display_order: 0, is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, created_at: '',
+      };
+      handleAddService(prereqService, syntheticPricing, vehicleSizeClass);
+    } else {
+      toast.error(`Cannot auto-add ${prereqService.name} — no pricing available`);
+      return;
+    }
+
+    // Add original service
+    handleAddService(originalService, originalPricing, originalVsc, originalPerUnitQty);
   }
 
   if (loadingQuote) {
@@ -335,6 +390,16 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
           onSelect={handlePricingSelect}
+        />
+      )}
+
+      {/* Prerequisite Warning Dialog (for search flow — catalog browser handles its own) */}
+      {prereqWarning && (
+        <PrerequisiteWarningDialog
+          warning={prereqWarning}
+          onClose={clearPrereqWarning}
+          onOverride={handlePrereqOverride}
+          onAddPrerequisite={handleAddPrerequisite}
         />
       )}
     </div>
