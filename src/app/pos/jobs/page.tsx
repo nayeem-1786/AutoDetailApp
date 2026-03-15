@@ -114,6 +114,8 @@ export default function JobsPage() {
           pricingType: 'standard' as const,
           comboSourcePrimaryId: null,
           saleEffectivePrice: null,
+          prerequisiteNote: null,
+          prerequisiteForServiceId: null,
         };
       });
 
