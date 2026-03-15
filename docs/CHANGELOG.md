@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Exclude refunded transactions from prerequisite history + fix deletion guard — 2026-03-15
+
+- **Bug A — Prerequisite history now excludes partial refunds**: Changed check-prerequisites query from `.in('transactions.status', ['completed', 'partial_refund'])` to `.eq('transactions.status', 'completed')`. Partial refunds can't confirm which items were refunded, so they shouldn't satisfy prerequisites.
+- **Bug B — Deletion guard logic was reversed**: The prerequisite item (e.g., Polish) is tagged with `prerequisiteForServiceId` pointing to the dependent (e.g., Ceramic Coating). The guard was checking `items.prerequisiteForServiceId === removedItem.serviceId` (wrong direction). Fixed to check `removedItem.prerequisiteForServiceId` and find the dependent by `i.serviceId === removedItem.prerequisiteForServiceId`. Fixed in 3 places: `handleRemoveItem` + `handleSwipeRemove` in ticket-panel.tsx, and `handleRemoveItem` in quote-ticket-panel.tsx.
+- **DB_SCHEMA.md**: Added missing `partial_refund` to `transaction_status` enum documentation.
+
+---
+
 ## feat: Prerequisites — history notes, all dialog options, deletion guard, manager PIN override — 2026-03-14
 
 - **History satisfaction notes** — when a prerequisite is met via customer transaction history, the line item shows a blue sub-text like "Prereq met: Single-Stage Polish (3/1/26)". Persisted to `transaction_items.prerequisite_note` column and shown on all 4 receipt paths.

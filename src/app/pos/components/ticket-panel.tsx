@@ -110,6 +110,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   /**
    * Check if removing this item would leave a dependent service without its prerequisite.
    * If so, show confirmation dialog. Otherwise, proceed with removal.
+   *
+   * The prerequisite item (e.g. Polish) is tagged with prerequisiteForServiceId pointing
+   * to the dependent service (e.g. Ceramic Coating). So when removing the prerequisite,
+   * we check if the dependent is still on the ticket.
    */
   const handleRemoveItem = useCallback((itemId: string) => {
     const item = ticket.items.find((i) => i.id === itemId);
@@ -118,18 +122,20 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       return;
     }
 
-    // Check if any other item on the ticket was added as a dependent that relies on this item
-    const dependent = ticket.items.find(
-      (i) => i.prerequisiteForServiceId === item.serviceId && i.id !== itemId
-    );
-    if (dependent) {
-      setPrereqRemoval({
-        prerequisiteItemId: itemId,
-        prerequisiteName: item.itemName,
-        dependentItemId: dependent.id,
-        dependentName: dependent.itemName,
-      });
-      return;
+    // This item was added as a prerequisite FOR another service — check if that dependent is still on the ticket
+    if (item.prerequisiteForServiceId) {
+      const dependent = ticket.items.find(
+        (i) => i.serviceId === item.prerequisiteForServiceId && i.id !== itemId
+      );
+      if (dependent) {
+        setPrereqRemoval({
+          prerequisiteItemId: itemId,
+          prerequisiteName: item.itemName,
+          dependentItemId: dependent.id,
+          dependentName: dependent.itemName,
+        });
+        return;
+      }
     }
 
     dispatch({ type: 'REMOVE_ITEM', itemId });
@@ -146,10 +152,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       if (index === -1) return;
       const item = ticket.items[index];
 
-      // Prerequisite guard: check if a dependent service relies on this item
-      if (item.serviceId) {
+      // Prerequisite guard: this item was added as a prerequisite FOR another service
+      if (item.prerequisiteForServiceId) {
         const dependent = ticket.items.find(
-          (i) => i.prerequisiteForServiceId === item.serviceId && i.id !== itemId
+          (i) => i.serviceId === item.prerequisiteForServiceId && i.id !== itemId
         );
         if (dependent) {
           setPrereqRemoval({

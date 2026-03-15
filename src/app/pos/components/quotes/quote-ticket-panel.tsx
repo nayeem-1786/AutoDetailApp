@@ -73,18 +73,20 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       return;
     }
 
-    // Check if any other item on the quote was added as a dependent that relies on this item
-    const dependent = quote.items.find(
-      (i) => i.prerequisiteForServiceId === item.serviceId && i.id !== itemId
-    );
-    if (dependent) {
-      setPrereqRemoval({
-        prerequisiteItemId: itemId,
-        prerequisiteName: item.itemName,
-        dependentItemId: dependent.id,
-        dependentName: dependent.itemName,
-      });
-      return;
+    // This item was added as a prerequisite FOR another service — check if that dependent is still on the quote
+    if (item.prerequisiteForServiceId) {
+      const dependent = quote.items.find(
+        (i) => i.serviceId === item.prerequisiteForServiceId && i.id !== itemId
+      );
+      if (dependent) {
+        setPrereqRemoval({
+          prerequisiteItemId: itemId,
+          prerequisiteName: item.itemName,
+          dependentItemId: dependent.id,
+          dependentName: dependent.itemName,
+        });
+        return;
+      }
     }
 
     dispatch({ type: 'REMOVE_ITEM', itemId });

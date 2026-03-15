@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
           .eq('service_id', prereqServiceId)
           .eq('transactions.customer_id', customer_id)
           .eq('transactions.vehicle_id', vehicle_id)
-          .in('transactions.status', ['completed', 'partial_refund'])
+          .eq('transactions.status', 'completed')
           .gte('transactions.transaction_date', cutoffDate.toISOString())
           .order('transactions(transaction_date)', { ascending: false })
           .limit(1);
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           `)
           .eq('service_id', prereqServiceId)
           .eq('transactions.customer_id', customer_id)
-          .in('transactions.status', ['completed', 'partial_refund'])
+          .eq('transactions.status', 'completed')
           .gte('transactions.transaction_date', cutoffDate.toISOString())
           .order('transactions(transaction_date)', { ascending: false })
           .limit(1);

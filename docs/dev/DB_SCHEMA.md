@@ -1195,7 +1195,7 @@ Seeded with 45 common makes. Used in POS, admin, booking, and customer portal ve
 - **pricing_model**: flat, vehicle_size, scope, specialty, per_unit, custom
 - **service_classification**: primary, addon_only, both
 - **prerequisite_enforcement**: required_same_ticket, required_history, recommended
-- **transaction_status**: open, completed, voided, refunded
+- **transaction_status**: open, completed, voided, refunded, partial_refund
 - **transaction_item_type**: product, service, package
 - **payment_method**: cash, card, split
 - **refund_status**: pending, completed, failed
