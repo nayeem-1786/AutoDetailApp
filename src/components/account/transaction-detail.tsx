@@ -14,6 +14,7 @@ interface TransactionItem {
   tax_amount: number;
   tier_name: string | null;
   vehicle_size_class: string | null;
+  prerequisite_note: string | null;
 }
 
 interface TransactionPayment {
@@ -99,6 +100,9 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
                   )}
                   {item.tier_name && (
                     <span className="ml-1 text-xs text-site-text-faint">({item.tier_name})</span>
+                  )}
+                  {item.prerequisite_note && (
+                    <p className="text-xs text-blue-500 mt-0.5">{item.prerequisite_note}</p>
                   )}
                 </div>
                 <span className="ml-3 text-site-text-muted">{formatCurrency(item.total_price)}</span>

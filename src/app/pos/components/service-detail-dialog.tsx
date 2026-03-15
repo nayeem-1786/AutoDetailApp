@@ -28,8 +28,8 @@ interface ServiceDetailDialogProps {
   comboPrice?: number;
   /** Primary service ID that triggered the combo price */
   comboPrimaryServiceId?: string;
-  /** Prerequisite check function — when provided, called before adding. Returns false to block add. */
-  onPrerequisiteCheck?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => Promise<boolean>;
+  /** Prerequisite check function — when provided, called before adding. Returns { canAdd, prerequisiteNote }. */
+  onPrerequisiteCheck?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => Promise<{ canAdd: boolean; prerequisiteNote?: string }>;
 }
 
 export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSizeOverride, vehicleSpecialtyTierOverride, parentItemId, comboPrice, comboPrimaryServiceId, onPrerequisiteCheck }: ServiceDetailDialogProps) {
@@ -166,9 +166,11 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         onAdd(service, syntheticPricing, vehicleSizeClass, perUnitQty);
       } else if (dispatch) {
         // Prerequisite check for non-addon services
+        let prerequisiteNote: string | undefined;
         if (!parentItemId && onPrerequisiteCheck) {
-          const canAdd = await onPrerequisiteCheck(service, syntheticPricing, vehicleSizeClass, perUnitQty);
-          if (!canAdd) { onClose(); return; }
+          const result = await onPrerequisiteCheck(service, syntheticPricing, vehicleSizeClass, perUnitQty);
+          if (!result.canAdd) { onClose(); return; }
+          prerequisiteNote = result.prerequisiteNote;
         }
         dispatch({
           type: 'ADD_SERVICE',
@@ -177,6 +179,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
           vehicleSizeClass,
           perUnitQty,
           parentItemId,
+          prerequisiteNote,
         });
         toast.success(`Added ${service.name}`);
       }
@@ -192,9 +195,11 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
       onAdd(service, selectedTier, vehicleSizeClass);
     } else if (dispatch) {
       // Prerequisite check for non-addon services
+      let prerequisiteNote: string | undefined;
       if (!parentItemId && onPrerequisiteCheck) {
-        const canAdd = await onPrerequisiteCheck(service, selectedTier, vehicleSizeClass);
-        if (!canAdd) { onClose(); return; }
+        const result = await onPrerequisiteCheck(service, selectedTier, vehicleSizeClass);
+        if (!result.canAdd) { onClose(); return; }
+        prerequisiteNote = result.prerequisiteNote;
       }
       dispatch({
         type: 'ADD_SERVICE',
@@ -204,6 +209,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         parentItemId,
         comboPrice,
         comboPrimaryServiceId,
+        prerequisiteNote,
       });
       toast.success(`Added ${service.name}`);
     }

@@ -31,6 +31,8 @@ import { LoyaltyPanel } from './loyalty-panel';
 import { ServiceDetailDialog } from './service-detail-dialog';
 import { CustomerTypePrompt } from './customer-type-prompt';
 import { useAddonSuggestions } from '../hooks/use-addon-suggestions';
+import { PrerequisiteRemovalDialog } from './prerequisite-removal-dialog';
+import { ManagerPinDialog } from './manager-pin-dialog';
 import {
   SwipeableCartItem,
   SwipeableCartList,
@@ -75,6 +77,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const [discountType, setDiscountType] = useState<'dollar' | 'percent'>('dollar');
   const [discountValue, setDiscountValue] = useState('');
   const [discountLabel, setDiscountLabel] = useState('');
+  const [discountOverrideGranted, setDiscountOverrideGranted] = useState(false);
+  const [showDiscountOverridePin, setShowDiscountOverridePin] = useState(false);
 
   // Scroll fade indicator state
   const [showTopFade, setShowTopFade] = useState(false);
@@ -95,6 +99,42 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 10);
   }, [ticket.items.length]);
 
+  // Prerequisite removal guard state
+  const [prereqRemoval, setPrereqRemoval] = useState<{
+    prerequisiteItemId: string;
+    prerequisiteName: string;
+    dependentItemId: string;
+    dependentName: string;
+  } | null>(null);
+
+  /**
+   * Check if removing this item would leave a dependent service without its prerequisite.
+   * If so, show confirmation dialog. Otherwise, proceed with removal.
+   */
+  const handleRemoveItem = useCallback((itemId: string) => {
+    const item = ticket.items.find((i) => i.id === itemId);
+    if (!item || !item.serviceId) {
+      dispatch({ type: 'REMOVE_ITEM', itemId });
+      return;
+    }
+
+    // Check if any other item on the ticket was added as a dependent that relies on this item
+    const dependent = ticket.items.find(
+      (i) => i.prerequisiteForServiceId === item.serviceId && i.id !== itemId
+    );
+    if (dependent) {
+      setPrereqRemoval({
+        prerequisiteItemId: itemId,
+        prerequisiteName: item.itemName,
+        dependentItemId: dependent.id,
+        dependentName: dependent.itemName,
+      });
+      return;
+    }
+
+    dispatch({ type: 'REMOVE_ITEM', itemId });
+  }, [ticket.items, dispatch]);
+
   // Swipe-to-delete undo state
   const undoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pendingUndoRef = useRef<{ item: TicketItem; index: number; children: { item: TicketItem; index: number }[] } | null>(null);
@@ -105,6 +145,22 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       const index = ticket.items.findIndex((i) => i.id === itemId);
       if (index === -1) return;
       const item = ticket.items[index];
+
+      // Prerequisite guard: check if a dependent service relies on this item
+      if (item.serviceId) {
+        const dependent = ticket.items.find(
+          (i) => i.prerequisiteForServiceId === item.serviceId && i.id !== itemId
+        );
+        if (dependent) {
+          setPrereqRemoval({
+            prerequisiteItemId: itemId,
+            prerequisiteName: item.itemName,
+            dependentItemId: dependent.id,
+            dependentName: dependent.itemName,
+          });
+          return;
+        }
+      }
 
       // Also capture child addons (for parent items) so undo restores them too
       const children = ticket.items
@@ -265,8 +321,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       return;
     }
     // If ticket has sale/combo priced items, require discount_override permission
-    if (hasSpecialPricingWithoutOverride) {
-      toast.error('Override permission required — ticket has special pricing');
+    if (hasSpecialPricingWithoutOverride && !discountOverrideGranted) {
+      setShowDiscountOverridePin(true);
       return;
     }
     dispatch({
@@ -372,6 +428,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                             childItems={children}
                             addonSuggestions={item.serviceId ? (suggestionsMap.get(item.serviceId) ?? []) : []}
                             ticketServiceIds={ticketServiceIds}
+                            onRemoveItem={handleRemoveItem}
                             onAddonClick={(addonServiceId) => {
                               const svc = services.find((s) => s.id === addonServiceId);
                               if (svc) {
@@ -410,8 +467,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                 ? (
                   <button
                     onClick={() => {
-                      if (hasSpecialPricingWithoutOverride) {
-                        toast.error('Override permission required — ticket has special pricing');
+                      if (hasSpecialPricingWithoutOverride && !discountOverrideGranted) {
+                        setShowDiscountOverridePin(true);
                         return;
                       }
                       setShowDiscountForm(true);
@@ -533,8 +590,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                 ticket.coupon && (
                   <button
                     onClick={() => {
-                      if (hasSpecialPricingWithoutOverride) {
-                        toast.error('Override permission required — ticket has special pricing');
+                      if (hasSpecialPricingWithoutOverride && !discountOverrideGranted) {
+                        setShowDiscountOverridePin(true);
                         return;
                       }
                       setShowDiscountForm(true);
@@ -694,6 +751,33 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
             </div>
           </div>
         </div>
+      )}
+
+      {/* Prerequisite Removal Guard Dialog */}
+      {prereqRemoval && (
+        <PrerequisiteRemovalDialog
+          prerequisiteName={prereqRemoval.prerequisiteName}
+          dependentName={prereqRemoval.dependentName}
+          onRemoveBoth={() => {
+            dispatch({ type: 'REMOVE_ITEM', itemId: prereqRemoval.dependentItemId });
+            dispatch({ type: 'REMOVE_ITEM', itemId: prereqRemoval.prerequisiteItemId });
+            setPrereqRemoval(null);
+          }}
+          onCancel={() => setPrereqRemoval(null)}
+        />
+      )}
+
+      {/* Discount Override Manager PIN */}
+      {showDiscountOverridePin && (
+        <ManagerPinDialog
+          permissionKey="pos.discount_override"
+          onSuccess={() => {
+            setDiscountOverrideGranted(true);
+            setShowDiscountOverridePin(false);
+            setShowDiscountForm(true);
+          }}
+          onCancel={() => setShowDiscountOverridePin(false)}
+        />
       )}
     </div>
   );

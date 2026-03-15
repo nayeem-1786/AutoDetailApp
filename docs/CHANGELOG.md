@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Prerequisites — history notes, all dialog options, deletion guard, manager PIN override — 2026-03-14
+
+- **History satisfaction notes** — when a prerequisite is met via customer transaction history, the line item shows a blue sub-text like "Prereq met: Single-Stage Polish (3/1/26)". Persisted to `transaction_items.prerequisite_note` column and shown on all 4 receipt paths.
+- **All prerequisite options** — warning dialog now shows ALL qualifying prerequisite services with individual "Add to Ticket" buttons (previously showed only the first match).
+- **Deletion guard** — removing a prerequisite service from a ticket/quote when a dependent service exists shows "Remove Both?" confirmation dialog. Applied to both desktop remove button and swipe-to-delete.
+- **Manager PIN override** — replaced disabled permission-gated override button with active "Manager Override" that opens a generic `ManagerPinDialog`. Verifies a manager's PIN + permission via new `POST /api/pos/auth/verify-override` endpoint.
+- **Generic ManagerPinDialog** — reusable component accepting `{ permissionKey, onSuccess, onCancel }`. Also wired into the discount override flow in both ticket-panel and quote-ticket-panel (replaces toast.error with PIN prompt).
+- **New migration** — `20260314000005_add_transaction_items_prerequisite_note.sql`
+
+---
+
 ## feat: Service prerequisites — admin config + POS enforcement — 2026-03-14
 
 - **POS prerequisite enforcement** — when adding a service with prerequisites to a ticket or quote, the system checks current ticket items and customer+vehicle transaction history. If unmet, shows warning dialog with 3 options: add the prerequisite service, override (requires `pos.override_prerequisites` permission), or cancel.

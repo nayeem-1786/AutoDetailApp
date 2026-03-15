@@ -31,6 +31,12 @@ interface UsePrerequisiteCheckOptions {
   ticketServiceIds: string[];
 }
 
+export interface PrerequisiteCheckResult {
+  canAdd: boolean;
+  /** When satisfied by history, the note to display on the ticket item */
+  prerequisiteNote?: string;
+}
+
 /**
  * Hook for checking service prerequisites before adding to ticket/quote.
  * Returns a check function and the warning state for the dialog.
@@ -42,16 +48,17 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
   optionsRef.current = options;
 
   /**
-   * Check prerequisites for a service. Returns true if the service can be added
-   * immediately (no prerequisites or all satisfied). Returns false if prerequisites
-   * are unmet (warning dialog will be shown).
+   * Check prerequisites for a service. Returns { canAdd, prerequisiteNote }.
+   * canAdd=true means the service can be added immediately.
+   * canAdd=false means prerequisites are unmet (warning dialog will be shown).
+   * prerequisiteNote is set when the prereq was satisfied by customer history.
    */
   const checkPrerequisites = useCallback(async (
     service: CatalogService,
     pricing: ServicePricing,
     vehicleSizeClass: VehicleSizeClass | null,
     perUnitQty?: number,
-  ): Promise<boolean> => {
+  ): Promise<PrerequisiteCheckResult> => {
     const { customerId, vehicleId, ticketServiceIds } = optionsRef.current;
 
     setChecking(true);
@@ -68,14 +75,26 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
       });
 
       if (!res.ok) {
-        // On API error, allow the add (fail open)
-        return true;
+        return { canAdd: true };
       }
 
       const data = await res.json();
 
       if (!data.has_prerequisites || data.satisfied) {
-        return true;
+        // Build prerequisite note from history-satisfied prerequisites
+        let prerequisiteNote: string | undefined;
+        if (data.has_prerequisites && data.satisfied) {
+          const historyMatch = (data.prerequisites as PrerequisiteInfo[]).find(
+            (p) => p.met_by?.source === 'history'
+          );
+          if (historyMatch?.met_by) {
+            const dateStr = historyMatch.met_by.date
+              ? new Date(historyMatch.met_by.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+              : '';
+            prerequisiteNote = `Prereq met: ${historyMatch.met_by.service_name || historyMatch.service_name}${dateStr ? ` (${dateStr})` : ''}`;
+          }
+        }
+        return { canAdd: true, prerequisiteNote };
       }
 
       // Show warning dialog
@@ -86,10 +105,9 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
         perUnitQty,
         prerequisites: data.prerequisites,
       });
-      return false;
+      return { canAdd: false };
     } catch {
-      // Fail open on network errors
-      return true;
+      return { canAdd: true };
     } finally {
       setChecking(false);
     }

@@ -12,6 +12,7 @@ interface ReceiptItem {
   item_type?: string | null;
   standard_price?: number | null;
   pricing_type?: string | null;
+  prerequisite_note?: string | null;
 }
 
 interface ReceiptPayment {
@@ -388,6 +389,14 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
         text: `  ${label}: Reg $${item.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!`,
       });
     }
+
+    // Prerequisite note sub-text
+    if (item.prerequisite_note) {
+      lines.push({
+        type: 'text',
+        text: `  ${item.prerequisite_note}`,
+      });
+    }
   }
 
   lines.push({ type: 'divider' });
@@ -640,6 +649,13 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
         const label = item.pricing_type === 'combo' ? 'Combo' : 'Sale';
         rows += `<tr>
           <td colspan="3" style="padding:0 0 4px 12px;font-size:11px;color:#16a34a;">${label}: Reg $${item.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!</td>
+        </tr>`;
+      }
+
+      // Prerequisite note sub-text
+      if (item.prerequisite_note) {
+        rows += `<tr>
+          <td colspan="3" style="padding:0 0 4px 12px;font-size:11px;color:#3b82f6;">${esc(item.prerequisite_note)}</td>
         </tr>`;
       }
 

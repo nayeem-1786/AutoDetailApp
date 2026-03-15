@@ -336,6 +336,7 @@ src/app/api/migration/vehicles/route.ts
 src/app/api/pos/appointments/[id]/notify/route.ts
 src/app/api/pos/auth/logout/route.ts
 src/app/api/pos/auth/pin-login/route.ts
+src/app/api/pos/auth/verify-override/route.ts
 src/app/api/pos/card-customer/route.ts
 src/app/api/pos/coupons/validate/route.ts
 src/app/api/pos/customers/[id]/type/route.ts
@@ -1116,7 +1117,8 @@ catalog-panel.tsx           keypad-tab.tsx              register-tab.tsx
 category-tabs.tsx           loyalty-panel.tsx           search-bar.tsx
 category-tile.tsx           offline-indicator.tsx       service-detail-dialog.tsx
 checkout/                   offline-queue-badge.tsx     service-pricing-picker.tsx
-coupon-input.tsx            pin-screen.tsx              prerequisite-warning-dialog.tsx
+coupon-input.tsx            manager-pin-dialog.tsx      prerequisite-removal-dialog.tsx
+                            pin-screen.tsx              prerequisite-warning-dialog.tsx
                                                         swipeable-cart-item.tsx
 customer-create-dialog.tsx  pin-pad.tsx                 ticket-actions.tsx
 customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
@@ -1316,6 +1318,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260314000002_update_manual_discounts_description.sql
 20260314000003_add_transaction_items_is_addon.sql
 20260314000004_add_pos_override_prerequisites_permission.sql
+20260314000005_add_transaction_items_prerequisite_note.sql
 ```
 
 ---

@@ -9,9 +9,11 @@ import { useQuote } from '../../context/quote-context';
 
 interface QuoteItemRowProps {
   item: TicketItem;
+  /** When provided, called instead of direct dispatch for REMOVE_ITEM (for prerequisite guard) */
+  onRemoveItem?: (itemId: string) => void;
 }
 
-export function QuoteItemRow({ item }: QuoteItemRowProps) {
+export function QuoteItemRow({ item, onRemoveItem }: QuoteItemRowProps) {
   const { dispatch } = useQuote();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -37,12 +39,17 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
     setEditing(true);
   }
 
+  const removeItem = (itemId: string) => {
+    if (onRemoveItem) onRemoveItem(itemId);
+    else dispatch({ type: 'REMOVE_ITEM', itemId });
+  };
+
   function commitEdit() {
     const qty = parseInt(editValue, 10);
     if (!isNaN(qty) && qty > 0) {
       dispatch({ type: 'UPDATE_ITEM_QUANTITY', itemId: item.id, quantity: qty });
     } else if (editValue === '0' || editValue === '') {
-      dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+      removeItem(item.id);
     }
     setEditing(false);
   }
@@ -129,7 +136,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
                 onClick={() =>
                   item.perUnitQty! > 1
                     ? dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: item.id, perUnitQty: item.perUnitQty! - 1 })
-                    : dispatch({ type: 'REMOVE_ITEM', itemId: item.id })
+                    : removeItem(item.id)
                 }
                 className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               >
@@ -231,7 +238,7 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
 
           {/* Remove */}
           <button
-            onClick={() => dispatch({ type: 'REMOVE_ITEM', itemId: item.id })}
+            onClick={() => removeItem(item.id)}
             className="flex h-11 w-11 items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400"
           >
             <X className="h-4 w-4" />
@@ -243,6 +250,13 @@ export function QuoteItemRow({ item }: QuoteItemRowProps) {
       {item.notes && !noteOpen && (
         <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500 italic">
           {item.notes}
+        </p>
+      )}
+
+      {/* Prerequisite note sub-text */}
+      {item.prerequisiteNote && (
+        <p className="mt-0.5 truncate text-[11px] text-blue-500 dark:text-blue-400">
+          {item.prerequisiteNote}
         </p>
       )}
 

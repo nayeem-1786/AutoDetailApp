@@ -193,11 +193,16 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     vsc: VehicleSizeClass | null,
     perUnitQty?: number,
     skipPrereqCheck?: boolean,
+    extraFields?: { prerequisiteNote?: string; prerequisiteForServiceId?: string },
   ): Promise<boolean> => {
+    let prerequisiteNote = extraFields?.prerequisiteNote;
+    const prerequisiteForServiceId = extraFields?.prerequisiteForServiceId;
+
     // Skip prerequisites for addons (parentItemId cases don't come through here)
     if (!skipPrereqCheck) {
-      const canAdd = await checkPrerequisites(svc, p, vsc, perUnitQty);
-      if (!canAdd) return false;
+      const result = await checkPrerequisites(svc, p, vsc, perUnitQty);
+      if (!result.canAdd) return false;
+      if (result.prerequisiteNote) prerequisiteNote = result.prerequisiteNote;
     }
 
     if (onAddService) {
@@ -225,18 +230,19 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         }
         return true;
       }
-      dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty });
+      dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote, prerequisiteForServiceId });
     }
     return true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onAddService, dispatch, ticket.items, checkPrerequisites]);
 
   /** Handle prerequisite warning: override → add the original service */
-  const handlePrereqOverride = useCallback(() => {
+  const handlePrereqOverride = useCallback((managerName?: string) => {
     if (!prereqWarning) return;
     const { service, pricing, vehicleSizeClass, perUnitQty } = prereqWarning;
     clearPrereqWarning();
-    addServiceChecked(service, pricing, vehicleSizeClass, perUnitQty, true).then((added) => {
+    const note = managerName ? `Prereq overridden by ${managerName}` : undefined;
+    addServiceChecked(service, pricing, vehicleSizeClass, perUnitQty, true, { prerequisiteNote: note }).then((added) => {
       if (added && !onAddService) toast.success(`Added ${service.name}`);
     });
   }, [prereqWarning, clearPrereqWarning, addServiceChecked, onAddService]);
@@ -254,14 +260,15 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       return;
     }
 
-    // Add the prerequisite service first (skip its own prereq check)
+    // Add the prerequisite service first (skip its own prereq check), tagged with the dependent service's ID
     const prereqPricing = prereqService.pricing ?? [];
+    const prereqExtra = { prerequisiteForServiceId: originalService.id };
     if (prereqPricing.length > 0) {
       const tier = prereqPricing[0];
       if (onAddService) {
         onAddService(prereqService, tier, vehicleSizeClass);
       } else if (dispatch) {
-        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: tier, vehicleSizeClass });
+        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: tier, vehicleSizeClass, ...prereqExtra });
       }
       if (!onAddService) toast.success(`Added ${prereqService.name}`);
     } else if (prereqService.flat_price != null) {
@@ -273,7 +280,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       if (onAddService) {
         onAddService(prereqService, syntheticPricing, vehicleSizeClass);
       } else if (dispatch) {
-        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass });
+        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass, ...prereqExtra });
       }
       if (!onAddService) toast.success(`Added ${prereqService.name}`);
     } else {

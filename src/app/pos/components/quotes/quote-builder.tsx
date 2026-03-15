@@ -212,8 +212,11 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
 
     const pricing = service.pricing ?? [];
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
-      const canAdd = await checkPrerequisites(service, pricing[0], vehicleSizeClass);
-      if (canAdd) handleAddService(service, pricing[0], vehicleSizeClass);
+      const result = await checkPrerequisites(service, pricing[0], vehicleSizeClass);
+      if (result.canAdd) {
+        dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass, prerequisiteNote: result.prerequisiteNote });
+        toast.success(`Added ${service.name}`);
+      }
       return;
     }
     if (pricing.length === 0 && service.flat_price != null) {
@@ -231,8 +234,11 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
         vehicle_size_suv_van_price: null,
         created_at: '',
       };
-      const canAdd = await checkPrerequisites(service, syntheticPricing, vehicleSizeClass);
-      if (canAdd) handleAddService(service, syntheticPricing, vehicleSizeClass);
+      const result = await checkPrerequisites(service, syntheticPricing, vehicleSizeClass);
+      if (result.canAdd) {
+        dispatch({ type: 'ADD_SERVICE', service, pricing: syntheticPricing, vehicleSizeClass, prerequisiteNote: result.prerequisiteNote });
+        toast.success(`Added ${service.name}`);
+      }
       return;
     }
     setPickerService(service);
@@ -242,15 +248,19 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     if (!pickerService) return;
     const svc = pickerService;
     setPickerService(null);
-    const canAdd = await checkPrerequisites(svc, pricing, vsc, perUnitQty);
-    if (canAdd) handleAddService(svc, pricing, vsc, perUnitQty);
+    const result = await checkPrerequisites(svc, pricing, vsc, perUnitQty);
+    if (result.canAdd) {
+      handleAddService(svc, pricing, vsc, perUnitQty);
+    }
   }
 
-  function handlePrereqOverride() {
+  function handlePrereqOverride(managerName?: string) {
     if (!prereqWarning) return;
     const { service, pricing, vehicleSizeClass: vsc, perUnitQty } = prereqWarning;
     clearPrereqWarning();
-    handleAddService(service, pricing, vsc, perUnitQty);
+    const note = managerName ? `Prereq overridden by ${managerName}` : undefined;
+    dispatch({ type: 'ADD_SERVICE', service, pricing, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote: note });
+    toast.success(`Added ${service.name}`);
   }
 
   function handleAddPrerequisite(prereqServiceName: string) {
@@ -264,17 +274,20 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
       return;
     }
 
-    // Add prerequisite
+    // Add prerequisite, tagged with dependent service ID
+    const prereqExtra = { prerequisiteForServiceId: originalService.id };
     const prereqPricing = prereqService.pricing ?? [];
     if (prereqPricing.length > 0) {
-      handleAddService(prereqService, prereqPricing[0], vehicleSizeClass);
+      dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: prereqPricing[0], vehicleSizeClass, ...prereqExtra });
+      toast.success(`Added ${prereqService.name}`);
     } else if (prereqService.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
         price: prereqService.flat_price, sale_price: null, display_order: 0, is_vehicle_size_aware: false,
         vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, created_at: '',
       };
-      handleAddService(prereqService, syntheticPricing, vehicleSizeClass);
+      dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass, ...prereqExtra });
+      toast.success(`Added ${prereqService.name}`);
     } else {
       toast.error(`Cannot auto-add ${prereqService.name} — no pricing available`);
       return;

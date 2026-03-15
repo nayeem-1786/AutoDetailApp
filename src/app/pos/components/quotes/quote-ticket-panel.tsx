@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -25,6 +25,8 @@ import { CustomerCreateDialog } from '../customer-create-dialog';
 import { VehicleSelector } from '../vehicle-selector';
 import { VehicleCreateDialog } from '../vehicle-create-dialog';
 import { QuoteSendDialog } from './quote-send-dialog';
+import { PrerequisiteRemovalDialog } from '../prerequisite-removal-dialog';
+import { ManagerPinDialog } from '../manager-pin-dialog';
 import type { Customer, Vehicle } from '@/lib/supabase/types';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
@@ -52,7 +54,41 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   const [discountLabel, setDiscountLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [discountOverrideGranted, setDiscountOverrideGranted] = useState(false);
+  const [showDiscountOverridePin, setShowDiscountOverridePin] = useState(false);
   const [pendingVehicleChange, setPendingVehicleChange] = useState<Vehicle | null>(null);
+
+  // Prerequisite removal guard state
+  const [prereqRemoval, setPrereqRemoval] = useState<{
+    prerequisiteItemId: string;
+    prerequisiteName: string;
+    dependentItemId: string;
+    dependentName: string;
+  } | null>(null);
+
+  const handleRemoveItem = useCallback((itemId: string) => {
+    const item = quote.items.find((i) => i.id === itemId);
+    if (!item || !item.serviceId) {
+      dispatch({ type: 'REMOVE_ITEM', itemId });
+      return;
+    }
+
+    // Check if any other item on the quote was added as a dependent that relies on this item
+    const dependent = quote.items.find(
+      (i) => i.prerequisiteForServiceId === item.serviceId && i.id !== itemId
+    );
+    if (dependent) {
+      setPrereqRemoval({
+        prerequisiteItemId: itemId,
+        prerequisiteName: item.itemName,
+        dependentItemId: dependent.id,
+        dependentName: dependent.itemName,
+      });
+      return;
+    }
+
+    dispatch({ type: 'REMOVE_ITEM', itemId });
+  }, [quote.items, dispatch]);
 
   function handleSelectCustomer(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
@@ -127,8 +163,8 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       toast.error('Percentage discount cannot exceed 100%');
       return;
     }
-    if (hasSpecialPricingWithoutOverride) {
-      toast.error('Override permission required — ticket has special pricing');
+    if (hasSpecialPricingWithoutOverride && !discountOverrideGranted) {
+      setShowDiscountOverridePin(true);
       return;
     }
     dispatch({
@@ -501,7 +537,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         ) : (
           <div className="py-2">
             {quote.items.map((item) => (
-              <QuoteItemRow key={item.id} item={item} />
+              <QuoteItemRow key={item.id} item={item} onRemoveItem={handleRemoveItem} />
             ))}
           </div>
         )}
@@ -610,8 +646,8 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
               ) : (
                 <button
                   onClick={() => {
-                    if (hasSpecialPricingWithoutOverride) {
-                      toast.error('Override permission required — ticket has special pricing');
+                    if (hasSpecialPricingWithoutOverride && !discountOverrideGranted) {
+                      setShowDiscountOverridePin(true);
                       return;
                     }
                     setShowDiscountForm(true);
@@ -764,6 +800,33 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           customerEmail={quote.customer?.email ?? null}
           customerPhone={quote.customer?.phone ?? null}
           onSent={handleSendComplete}
+        />
+      )}
+
+      {/* Prerequisite Removal Confirmation */}
+      {prereqRemoval && (
+        <PrerequisiteRemovalDialog
+          prerequisiteName={prereqRemoval.prerequisiteName}
+          dependentName={prereqRemoval.dependentName}
+          onRemoveBoth={() => {
+            dispatch({ type: 'REMOVE_ITEM', itemId: prereqRemoval.dependentItemId });
+            dispatch({ type: 'REMOVE_ITEM', itemId: prereqRemoval.prerequisiteItemId });
+            setPrereqRemoval(null);
+          }}
+          onCancel={() => setPrereqRemoval(null)}
+        />
+      )}
+
+      {/* Discount Override Manager PIN */}
+      {showDiscountOverridePin && (
+        <ManagerPinDialog
+          permissionKey="pos.discount_override"
+          onSuccess={() => {
+            setDiscountOverrideGranted(true);
+            setShowDiscountOverridePin(false);
+            setShowDiscountForm(true);
+          }}
+          onCancel={() => setShowDiscountOverridePin(false)}
         />
       )}
 

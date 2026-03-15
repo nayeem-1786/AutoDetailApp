@@ -296,6 +296,7 @@
 | standard_price | DECIMAL(10,2) | DEFAULT NULL | Catalog price before sale/combo discount |
 | pricing_type | TEXT | DEFAULT 'standard' | standard, sale, or combo |
 | is_addon | BOOLEAN | DEFAULT false | Whether item is an add-on to another service |
+| prerequisite_note | TEXT | DEFAULT NULL | Prereq context: "Prereq met: ..." or "Prereq overridden by ..." |
 | created_at | TIMESTAMPTZ | | |
 
 ### payments

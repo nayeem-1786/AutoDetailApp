@@ -16,9 +16,11 @@ interface TicketItemRowProps {
   addonSuggestions?: AddonSuggestionEntry[];
   ticketServiceIds?: Set<string>;
   onAddonClick?: (addonServiceId: string) => void;
+  /** When provided, called instead of direct dispatch for REMOVE_ITEM (for prerequisite guard) */
+  onRemoveItem?: (itemId: string) => void;
 }
 
-export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketServiceIds, onAddonClick }: TicketItemRowProps) {
+export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketServiceIds, onAddonClick, onRemoveItem }: TicketItemRowProps) {
   const { dispatch } = useTicket();
   const { services } = useCatalog();
   const [editing, setEditing] = useState(false);
@@ -53,12 +55,17 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
     setEditing(true);
   }
 
+  const removeItem = (itemId: string) => {
+    if (onRemoveItem) onRemoveItem(itemId);
+    else dispatch({ type: 'REMOVE_ITEM', itemId });
+  };
+
   function commitEdit() {
     const qty = parseInt(editValue, 10);
     if (!isNaN(qty) && qty > 0) {
       dispatch({ type: 'UPDATE_ITEM_QUANTITY', itemId: item.id, quantity: qty });
     } else if (editValue === '0' || editValue === '') {
-      dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+      removeItem(item.id);
     }
     setEditing(false);
   }
@@ -157,7 +164,7 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
                 onClick={() =>
                   item.perUnitQty! > 1
                     ? dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: item.id, perUnitQty: item.perUnitQty! - 1 })
-                    : dispatch({ type: 'REMOVE_ITEM', itemId: item.id })
+                    : removeItem(item.id)
                 }
                 className="flex h-11 w-11 items-center justify-center rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               >
@@ -273,7 +280,7 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
           <button
             onClick={(e) => {
               e.stopPropagation();
-              dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+              removeItem(item.id);
             }}
             className="hidden pointer-fine:flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
             aria-label="Remove item"
@@ -283,6 +290,13 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
 
         </div>
       </div>
+
+      {/* Prerequisite note sub-text */}
+      {item.prerequisiteNote && (
+        <p className="mt-0.5 truncate text-[11px] text-blue-500 dark:text-blue-400">
+          {item.prerequisiteNote}
+        </p>
+      )}
 
       {/* Note text (when exists and note input is closed) */}
       {item.notes && !noteOpen && (

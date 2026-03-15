@@ -31,6 +31,7 @@ interface TransactionWithRelations {
     item_type: string | null;
     standard_price: number | null;
     pricing_type: string | null;
+    prerequisite_note: string | null;
   }[];
   payments: {
     id: string;
@@ -171,6 +172,9 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                       <div className="text-xs text-green-500 mt-0.5">
                         {item.pricing_type === 'combo' ? 'Combo' : 'Sale'}: Reg {formatCurrency(item.standard_price)} | Saved {formatCurrency(item.standard_price - item.unit_price)}!
                       </div>
+                    )}
+                    {item.prerequisite_note && (
+                      <div className="text-xs text-blue-500 mt-0.5">{item.prerequisite_note}</div>
                     )}
                   </td>
                   <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>

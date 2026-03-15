@@ -103,6 +103,8 @@ export function quoteReducer(
           pricingType: 'standard',
           comboSourcePrimaryId: null,
           saleEffectivePrice: null,
+          prerequisiteNote: null,
+          prerequisiteForServiceId: null,
         };
         items = [...state.items, newItem];
       }
@@ -110,7 +112,7 @@ export function quoteReducer(
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId } = action;
+      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId } = action;
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
 
       // Resolve pricing with sale awareness
@@ -161,6 +163,8 @@ export function quoteReducer(
         pricingType,
         comboSourcePrimaryId: comboSourceId,
         saleEffectivePrice: saleEffective,
+        prerequisiteNote: prerequisiteNote ?? null,
+        prerequisiteForServiceId: prerequisiteForServiceId ?? null,
       };
 
       // If this is a child addon, insert immediately after the parent's last child
@@ -209,6 +213,8 @@ export function quoteReducer(
         pricingType: 'standard',
         comboSourcePrimaryId: null,
         saleEffectivePrice: null,
+        prerequisiteNote: null,
+        prerequisiteForServiceId: null,
       };
       return recalculateTotals({
         ...state,

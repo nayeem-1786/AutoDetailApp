@@ -1,17 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import { AlertTriangle, ShieldAlert, Plus } from 'lucide-react';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { usePosPermission } from '../context/pos-permission-context';
+import { ManagerPinDialog } from './manager-pin-dialog';
 import { formatDate } from '@/lib/utils/format';
 import type { PrerequisiteWarning } from '../hooks/use-prerequisite-check';
 
 interface PrerequisiteWarningDialogProps {
   warning: PrerequisiteWarning;
   onClose: () => void;
-  /** Override: add the service without prerequisites */
-  onOverride: () => void;
+  /** Override: add the service without prerequisites. managerName is set when overridden via PIN. */
+  onOverride: (managerName?: string) => void;
   /** Add a prerequisite service to the ticket, then add the original service */
   onAddPrerequisite: (prerequisiteServiceName: string) => void;
 }
@@ -22,9 +23,8 @@ export function PrerequisiteWarningDialog({
   onOverride,
   onAddPrerequisite,
 }: PrerequisiteWarningDialogProps) {
-  const { granted: canOverride, loading: permLoading } = usePosPermission('pos.override_prerequisites');
+  const [showManagerPin, setShowManagerPin] = useState(false);
   const unmetPrereqs = warning.prerequisites.filter((p) => !p.met_by);
-  const hasRequired = unmetPrereqs.some((p) => p.enforcement !== 'recommended');
   const isRecommendedOnly = unmetPrereqs.every((p) => p.enforcement === 'recommended');
 
   // Build the list of prerequisite service names for display
@@ -53,7 +53,7 @@ export function PrerequisiteWarningDialog({
           ) : (
             <p>
               <strong className="text-gray-900 dark:text-gray-100">{warning.service.name}</strong>
-              {hasRequired ? ' requires ' : ' is recommended to have '}
+              {!isRecommendedOnly ? ' requires ' : ' is recommended to have '}
               <strong className="text-gray-900 dark:text-gray-100">
                 {prereqNames.join(' or ')}
               </strong>
@@ -71,47 +71,59 @@ export function PrerequisiteWarningDialog({
           ))}
         </div>
 
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+        {/* Add prerequisite options — show ALL unmet prerequisites */}
+        {unmetPrereqs.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              Add a prerequisite:
+            </p>
+            {unmetPrereqs.map((prereq, idx) => (
+              <Button
+                key={idx}
+                variant="outline"
+                onClick={() => onAddPrerequisite(prereq.service_name)}
+                className="w-full justify-start gap-1.5"
+              >
+                <Plus className="h-4 w-4 shrink-0" />
+                Add {prereq.service_name}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
 
-          {/* Add prerequisite to ticket — only show first unmet prerequisite */}
-          {unmetPrereqs.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => onAddPrerequisite(unmetPrereqs[0].service_name)}
-              className="gap-1.5"
-            >
-              <Plus className="h-4 w-4" />
-              Add {unmetPrereqs[0].service_name}
-            </Button>
-          )}
-
           {/* Override button */}
           {isRecommendedOnly ? (
-            <Button onClick={onOverride}>
+            <Button onClick={() => onOverride()}>
               Add Anyway
             </Button>
           ) : (
             <Button
-              onClick={onOverride}
-              disabled={permLoading || !canOverride}
-              title={!canOverride && !permLoading ? 'You do not have permission to override prerequisites' : undefined}
+              onClick={() => setShowManagerPin(true)}
               className="gap-1.5"
             >
               <ShieldAlert className="h-4 w-4" />
-              Override
+              Manager Override
             </Button>
           )}
         </div>
-
-        {hasRequired && !canOverride && !permLoading && (
-          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 text-right">
-            Override requires manager permission
-          </p>
-        )}
       </div>
+
+      {/* Manager PIN verification dialog */}
+      {showManagerPin && (
+        <ManagerPinDialog
+          permissionKey="pos.override_prerequisites"
+          onSuccess={(employeeName) => {
+            setShowManagerPin(false);
+            onOverride(employeeName);
+          }}
+          onCancel={() => setShowManagerPin(false)}
+        />
+      )}
     </Dialog>
   );
 }

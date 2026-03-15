@@ -123,6 +123,7 @@ export function SplitPayment() {
             standard_price: i.standardPrice,
             pricing_type: i.pricingType,
             is_addon: !!i.parentItemId,
+            prerequisite_note: i.prerequisiteNote || null,
           })),
           payments: [
             {
