@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Sale pricing support for flat/per_unit pricing models — 2026-03-17
+
+Sale pricing previously only worked for tiered services (vehicle_size, scope, specialty). This adds full sale pricing support for flat and per_unit pricing models across the entire stack.
+
+- **DB migration** — Added `sale_price DECIMAL(10,2)` column to `services` table with non-negative CHECK constraint. Used by flat/per_unit models only; tiered models continue using `service_pricing.sale_price`.
+- **TypeScript types** — Added `sale_price` to `Service` interface.
+- **Admin pricing tab** — Flat/per_unit services now show sale price input, discount controls (percentage/fixed/direct), date pickers, and sale preview. Validation rejects sale_price >= base price. "Clear Sale" button works for all models.
+- **POS synthetic tiers** — Updated all 11 synthetic tier creation sites across 7 files to populate `sale_price` from `service.sale_price`. Per-unit sites multiply by quantity.
+- **POS reducer bypass removed** — Removed per-unit hardcoded bypass in ticket-reducer and quote-reducer so per_unit services now flow through `resolveServicePriceWithSale()` like all other models.
+- **POS catalog card** — Flat and per_unit services now show strikethrough + sale price + "Sale" badge when on sale.
+- **Promotions endpoints** — GET now includes `flat_price`, `per_unit_price`, `sale_price` in select. Batch apply writes `services.sale_price` for flat/per_unit. Clear nulls `services.sale_price`.
+- **Booking flow** — `computePrice()` and `getServicePriceDisplay()` now return sale prices for flat/per_unit. Flat rate and per-unit display cards show strikethrough + sale badge.
+- **Public service pages** — `FlatPricing` and `PerUnitPricing` components now show sale display with strikethrough.
+- **Supabase select audit** — Updated `src/app/api/pos/services/route.ts` explicit column list to include `sale_price`, `sale_starts_at`, `sale_ends_at`, `per_unit_price`, `per_unit_label`, `per_unit_max`, `classification`, and `sale_price` in service_pricing join.
+- **Receipt/coupon** — No changes needed; both work automatically via `pricing_type: 'sale'` set by the updated reducer.
+
+---
+
 ## fix: Exclude refunded transactions from prerequisite history + fix deletion guard — 2026-03-15
 
 - **Bug A — Prerequisite history now excludes partial refunds**: Changed check-prerequisites query from `.in('transactions.status', ['completed', 'partial_refund'])` to `.eq('transactions.status', 'completed')`. Partial refunds can't confirm which items were refunded, so they shouldn't satisfy prerequisites.

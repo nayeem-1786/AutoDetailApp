@@ -34,17 +34,22 @@ export async function POST(request: NextRequest) {
   for (const item of body.items) {
     try {
       if (item.type === 'service') {
-        // Update sale dates on service
+        // Update sale dates (and flat/per_unit sale_price if provided) on service
+        const svcUpdate: Record<string, unknown> = {
+          sale_starts_at: body.sale_starts_at,
+          sale_ends_at: body.sale_ends_at,
+        };
+        // For flat/per_unit models: sale_price lives on the services table
+        if (item.sale_price !== undefined) {
+          svcUpdate.sale_price = item.sale_price;
+        }
         const { error: svcError } = await admin
           .from('services')
-          .update({
-            sale_starts_at: body.sale_starts_at,
-            sale_ends_at: body.sale_ends_at,
-          })
+          .update(svcUpdate)
           .eq('id', item.id);
         if (svcError) throw svcError;
 
-        // Update sale_price on each pricing tier
+        // Update sale_price on each pricing tier (for tiered models)
         if (item.sale_prices) {
           for (const [tierName, salePrice] of Object.entries(item.sale_prices)) {
             const { error: tierError } = await admin

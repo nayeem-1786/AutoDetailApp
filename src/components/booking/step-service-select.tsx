@@ -898,17 +898,26 @@ function PricingSelector({
   saleStatus: SaleStatusInfo;
 }) {
   switch (service.pricing_model) {
-    case 'flat':
+    case 'flat': {
+      const flatSaleStatus = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
+      const flatOnSale = flatSaleStatus.isOnSale && service.sale_price != null && service.flat_price != null && service.sale_price < service.flat_price;
       return (
         <div className="rounded-lg border border-site-border p-4">
           <p className="text-sm text-site-text-secondary">Flat Rate</p>
-          <p className="text-2xl font-bold text-site-text">
-            {service.flat_price != null
-              ? formatCurrency(service.flat_price)
-              : '--'}
-          </p>
+          {flatOnSale ? (
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-site-text-muted line-through">{formatCurrency(service.flat_price!)}</p>
+              <p className="text-2xl font-bold text-accent-brand">{formatCurrency(service.sale_price!)}</p>
+              <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
+            </div>
+          ) : (
+            <p className="text-2xl font-bold text-site-text">
+              {service.flat_price != null ? formatCurrency(service.flat_price) : '--'}
+            </p>
+          )}
         </div>
       );
+    }
 
     case 'vehicle_size':
       return (
@@ -1062,12 +1071,22 @@ function PricingSelector({
         </div>
       );
 
-    case 'per_unit':
+    case 'per_unit': {
+      const puSaleStatus = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
+      const puOnSale = puSaleStatus.isOnSale && service.sale_price != null && service.per_unit_price != null && service.sale_price < service.per_unit_price;
       return (
         <div className="rounded-lg border border-site-border p-4">
           <p className="text-sm text-site-text-secondary">
-            {formatCurrency(service.per_unit_price ?? 0)} per{' '}
-            {service.per_unit_label || 'unit'}
+            {puOnSale ? (
+              <>
+                <span className="line-through text-site-text-muted">{formatCurrency(service.per_unit_price!)}</span>{' '}
+                <span className="font-semibold text-accent-brand">{formatCurrency(service.sale_price!)}</span>{' '}
+                <span className="rounded bg-red-100 px-1 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>{' '}
+              </>
+            ) : (
+              formatCurrency(service.per_unit_price ?? 0)
+            )}
+            {' '}per {service.per_unit_label || 'unit'}
           </p>
           <div className="mt-3 flex items-center gap-3">
             <button
@@ -1095,11 +1114,19 @@ function PricingSelector({
               <Plus className="h-4 w-4" />
             </button>
           </div>
-          <p className="mt-2 text-xl font-bold text-site-text">
-            {formatCurrency((service.per_unit_price ?? 0) * perUnitQty)}
-          </p>
+          {puOnSale ? (
+            <div className="mt-2 flex items-center gap-2">
+              <p className="text-sm text-site-text-muted line-through">{formatCurrency((service.per_unit_price ?? 0) * perUnitQty)}</p>
+              <p className="text-xl font-bold text-accent-brand">{formatCurrency(service.sale_price! * perUnitQty)}</p>
+            </div>
+          ) : (
+            <p className="mt-2 text-xl font-bold text-site-text">
+              {formatCurrency((service.per_unit_price ?? 0) * perUnitQty)}
+            </p>
+          )}
         </div>
       );
+    }
 
     default:
       return null;
@@ -1181,6 +1208,9 @@ function computePrice(
 ): number {
   switch (service.pricing_model) {
     case 'flat':
+      if (isOnSale && service.sale_price != null && service.sale_price < (service.flat_price ?? 0)) {
+        return service.sale_price;
+      }
       return service.flat_price ?? 0;
 
     case 'vehicle_size':
@@ -1196,8 +1226,13 @@ function computePrice(
       }
       return tier.price;
 
-    case 'per_unit':
-      return (service.per_unit_price ?? 0) * perUnitQty;
+    case 'per_unit': {
+      const baseUnit = service.per_unit_price ?? 0;
+      if (isOnSale && service.sale_price != null && service.sale_price < baseUnit) {
+        return service.sale_price * perUnitQty;
+      }
+      return baseUnit * perUnitQty;
+    }
 
     default:
       return 0;
@@ -1257,6 +1292,9 @@ function getServicePriceDisplay(service: BookableService): {
   switch (service.pricing_model) {
     case 'flat': {
       if (service.flat_price == null) return { priceLabel: null, originalPrice: null, isOnSale: false };
+      if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.flat_price) {
+        return { priceLabel: formatCurrency(service.sale_price), originalPrice: formatCurrency(service.flat_price), isOnSale: true };
+      }
       return { priceLabel: formatCurrency(service.flat_price), originalPrice: null, isOnSale: false };
     }
 
@@ -1297,9 +1335,11 @@ function getServicePriceDisplay(service: BookableService): {
     }
 
     case 'per_unit':
-      return service.per_unit_price != null
-        ? { priceLabel: `${formatCurrency(service.per_unit_price)} / ${service.per_unit_label || 'unit'}`, originalPrice: null, isOnSale: false }
-        : { priceLabel: null, originalPrice: null, isOnSale: false };
+      if (service.per_unit_price == null) return { priceLabel: null, originalPrice: null, isOnSale: false };
+      if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.per_unit_price) {
+        return { priceLabel: `${formatCurrency(service.sale_price)} / ${service.per_unit_label || 'unit'}`, originalPrice: `${formatCurrency(service.per_unit_price)} / ${service.per_unit_label || 'unit'}`, isOnSale: true };
+      }
+      return { priceLabel: `${formatCurrency(service.per_unit_price)} / ${service.per_unit_label || 'unit'}`, originalPrice: null, isOnSale: false };
 
     case 'custom':
       return service.custom_starting_price != null

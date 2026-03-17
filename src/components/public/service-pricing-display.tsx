@@ -224,16 +224,28 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
 }
 
 function PerUnitPricing({ service }: { service: Service }) {
+  const { isOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
+  const onSale = isOnSale && service.sale_price != null && service.per_unit_price != null && service.sale_price < service.per_unit_price;
+
   return (
     <div className="space-y-2">
-      <p className="font-display text-2xl font-bold text-accent-brand">
-        {service.per_unit_price !== null
-          ? formatCurrency(service.per_unit_price)
-          : '--'}{' '}
-        <span className="text-base font-normal text-site-text-muted">
-          per {service.per_unit_label ?? 'unit'}
-        </span>
-      </p>
+      {onSale ? (
+        <div className="flex items-center gap-2">
+          <p className="text-base text-site-text-muted line-through">{formatCurrency(service.per_unit_price!)}</p>
+          <p className="font-display text-2xl font-bold text-accent-brand">
+            {formatCurrency(service.sale_price!)}{' '}
+            <span className="text-base font-normal text-site-text-muted">per {service.per_unit_label ?? 'unit'}</span>
+          </p>
+          <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
+        </div>
+      ) : (
+        <p className="font-display text-2xl font-bold text-accent-brand">
+          {service.per_unit_price !== null ? formatCurrency(service.per_unit_price) : '--'}{' '}
+          <span className="text-base font-normal text-site-text-muted">
+            per {service.per_unit_label ?? 'unit'}
+          </span>
+        </p>
+      )}
       {service.per_unit_max !== null && (
         <p className="text-sm text-site-text-muted">
           Maximum {service.per_unit_max} {service.per_unit_label ?? 'units'}
@@ -310,13 +322,22 @@ function SpecialtyPricing({ service }: { service: Service }) {
 }
 
 function FlatPricing({ service }: { service: Service }) {
+  const { isOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
+  const onSale = isOnSale && service.sale_price != null && service.flat_price != null && service.sale_price < service.flat_price;
+
   return (
     <div>
-      <p className="font-display text-3xl font-bold text-accent-brand">
-        {service.flat_price !== null
-          ? formatCurrency(service.flat_price)
-          : '--'}
-      </p>
+      {onSale ? (
+        <div className="flex items-center gap-3">
+          <p className="text-lg text-site-text-muted line-through">{formatCurrency(service.flat_price!)}</p>
+          <p className="font-display text-3xl font-bold text-accent-brand">{formatCurrency(service.sale_price!)}</p>
+          <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
+        </div>
+      ) : (
+        <p className="font-display text-3xl font-bold text-accent-brand">
+          {service.flat_price !== null ? formatCurrency(service.flat_price) : '--'}
+        </p>
+      )}
     </div>
   );
 }

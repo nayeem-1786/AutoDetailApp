@@ -125,6 +125,7 @@ export default function ServiceDetailPage() {
 
   // Sale pricing state
   const [salePrices, setSalePrices] = useState<Record<string, number | ''>>({});
+  const [flatSalePrice, setFlatSalePrice] = useState<number | ''>('');
   const [saleStartsAt, setSaleStartsAt] = useState('');
   const [saleEndsAt, setSaleEndsAt] = useState('');
   const [savingSale, setSavingSale] = useState(false);
@@ -260,6 +261,8 @@ export default function ServiceDetailPage() {
       sp[r.tier_name] = r.sale_price ?? '';
     });
     setSalePrices(sp);
+    // Populate flat/per_unit sale price from service-level column
+    setFlatSalePrice(svc.sale_price ?? '');
     // Convert ISO timestamps to local date strings for date inputs
     setSaleStartsAt(svc.sale_starts_at ? new Date(svc.sale_starts_at).toISOString().split('T')[0] : '');
     setSaleEndsAt(svc.sale_ends_at ? new Date(svc.sale_ends_at).toISOString().split('T')[0] : '');
@@ -336,6 +339,19 @@ export default function ServiceDetailPage() {
     if (saleDiscountType === 'direct') return;
     if (typeof saleDiscountValue !== 'number' || saleDiscountValue <= 0) return;
 
+    // Flat/per_unit: single base price
+    if (service && (service.pricing_model === 'flat' || service.pricing_model === 'per_unit')) {
+      const basePrice = service.pricing_model === 'flat'
+        ? (typeof pricingValue.data === 'object' && 'flat_price' in pricingValue.data ? (pricingValue.data as { flat_price: number | '' }).flat_price : 0)
+        : (typeof pricingValue.data === 'object' && 'per_unit_price' in pricingValue.data ? (pricingValue.data as { per_unit_price: number | '' }).per_unit_price : 0);
+      const std = typeof basePrice === 'number' ? basePrice : 0;
+      if (std <= 0) { setFlatSalePrice(''); return; }
+      setFlatSalePrice(saleDiscountType === 'percentage'
+        ? Math.round(std * (1 - saleDiscountValue / 100) * 100) / 100
+        : Math.max(0.01, Math.round((std - saleDiscountValue) * 100) / 100));
+      return;
+    }
+
     const newSP: Record<string, number | ''> = {};
 
     if (pricingValue.model === 'vehicle_size') {
@@ -356,7 +372,7 @@ export default function ServiceDetailPage() {
     }
 
     setSalePrices(newSP);
-  }, [saleDiscountType, saleDiscountValue, pricingValue, pricing]);
+  }, [saleDiscountType, saleDiscountValue, pricingValue, pricing, service]);
 
   function toggleVehicleType(type: VehicleType) {
     const current = vehicleCompatibility;
@@ -510,6 +526,19 @@ export default function ServiceDetailPage() {
       const model = service.pricing_model;
 
       // Validate sale prices before saving
+      if ((model === 'flat' || model === 'per_unit') && typeof flatSalePrice === 'number') {
+        const basePrice = model === 'flat' ? service.flat_price : service.per_unit_price;
+        if (basePrice != null && flatSalePrice >= basePrice) {
+          toast.error(`Sale price must be less than standard price (${formatCurrency(basePrice)})`);
+          setSavingPricing(false);
+          return;
+        }
+        if (flatSalePrice <= 0) {
+          toast.error('Sale price must be greater than $0');
+          setSavingPricing(false);
+          return;
+        }
+      }
       for (const row of pricing) {
         const sp = salePrices[row.tier_name];
         if (sp !== '' && sp !== undefined && typeof sp === 'number') {
@@ -538,6 +567,11 @@ export default function ServiceDetailPage() {
         serviceUpdate.per_unit_price = typeof pricingValue.data.per_unit_price === 'number' ? pricingValue.data.per_unit_price : null;
         serviceUpdate.per_unit_max = typeof pricingValue.data.per_unit_max === 'number' ? pricingValue.data.per_unit_max : null;
         serviceUpdate.per_unit_label = pricingValue.data.per_unit_label || null;
+      }
+
+      // Save flat/per_unit sale_price on service level
+      if (model === 'flat' || model === 'per_unit') {
+        serviceUpdate.sale_price = typeof flatSalePrice === 'number' ? flatSalePrice : null;
       }
 
       // Always save sale dates
@@ -866,7 +900,7 @@ export default function ServiceDetailPage() {
   async function clearAllSalePrices() {
     setSavingSale(true);
     try {
-      // Clear sale_price on all pricing rows
+      // Clear sale_price on all pricing rows (tiered models)
       for (const row of pricing) {
         const { error } = await supabase
           .from('service_pricing')
@@ -875,10 +909,10 @@ export default function ServiceDetailPage() {
         if (error) throw error;
       }
 
-      // Clear sale dates on service
+      // Clear sale dates and flat/per_unit sale_price on service
       const { error: svcError } = await supabase
         .from('services')
-        .update({ sale_starts_at: null, sale_ends_at: null })
+        .update({ sale_price: null, sale_starts_at: null, sale_ends_at: null })
         .eq('id', serviceId);
       if (svcError) throw svcError;
 
@@ -1275,13 +1309,57 @@ export default function ServiceDetailPage() {
                       </div>
                     </div>
                   )}
+                  {/* Inline sale pricing for flat/per_unit (single price, no tiers) */}
+                  {pricing.length === 0 && (service.pricing_model === 'flat' || service.pricing_model === 'per_unit') && service.classification !== 'addon_only' && (() => {
+                    const basePrice = service.pricing_model === 'flat' ? service.flat_price : service.per_unit_price;
+                    const hasError = typeof flatSalePrice === 'number' && basePrice != null && flatSalePrice >= basePrice;
+                    return (
+                      <div className="border-t border-gray-200 pt-6 space-y-4">
+                        <p className="mb-1 text-sm font-semibold text-gray-700">Sale Price</p>
+                        <SaleDiscountControls
+                          discountType={saleDiscountType}
+                          setDiscountType={setSaleDiscountType}
+                          discountValue={saleDiscountValue}
+                          setDiscountValue={setSaleDiscountValue}
+                        />
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 mb-1">Standard</p>
+                            <p className="text-sm text-gray-600">{basePrice != null ? formatCurrency(basePrice) : '—'}{service.pricing_model === 'per_unit' ? ` / ${service.per_unit_label || 'unit'}` : ''}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 mb-1">Sale Price</p>
+                            {saleDiscountType !== 'direct' ? (
+                              <p className="text-sm font-medium text-gray-700">
+                                {typeof flatSalePrice === 'number' ? formatCurrency(flatSalePrice) : <span className="text-gray-400">—</span>}
+                              </p>
+                            ) : (
+                              <div className="relative max-w-[160px]">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="No sale"
+                                  className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                                  value={flatSalePrice}
+                                  onChange={(e) => setFlatSalePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                />
+                                {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(basePrice!)}</p>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
 
-              {/* Sale Period — shown when pricing rows exist */}
-              {pricing.length > 0 && (
+              {/* Sale Period — shown when pricing rows exist or flat/per_unit */}
+              {(pricing.length > 0 || ((service.pricing_model === 'flat' || service.pricing_model === 'per_unit') && service.classification !== 'addon_only')) && (
                 <div className={service.pricing_model !== 'vehicle_size' ? 'border-t border-gray-200 pt-6' : ''}>
-                  <p className="mb-2 text-sm font-medium text-gray-700">Sale Period (applies to all tiers)</p>
+                  <p className="mb-2 text-sm font-medium text-gray-700">Sale Period{pricing.length > 0 ? ' (applies to all tiers)' : ''}</p>
                   <div className="flex items-center gap-3">
                     <Input
                       type="date"
@@ -1302,46 +1380,77 @@ export default function ServiceDetailPage() {
               )}
 
               {/* Sale Preview */}
-              {pricing.length > 0 && (() => {
-                const sortedTiers = [...pricing].sort((a, b) => a.display_order - b.display_order);
-                const hasSale = sortedTiers.some((t) => salePrices[t.tier_name] !== '' && salePrices[t.tier_name] !== undefined);
-                const hasDbSale = hasAnySalePrice(pricing);
-                const endingSoon = isEndingSoon(getSaleStatus(service).saleEndsAt);
-                if (!hasSale) return null;
-                return (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                    <p className="mb-2 text-sm font-semibold text-gray-700">
-                      Sale Preview
-                      {hasDbSale && getSaleStatus(service).isOnSale && endingSoon && (
-                        <span className="ml-2 text-amber-600">&#9200; Ending soon!</span>
-                      )}
-                    </p>
-                    <div className="space-y-1 text-sm">
-                      {sortedTiers.map((tier) => {
-                        const sp = salePrices[tier.tier_name];
-                        if (sp === '' || sp === undefined || typeof sp !== 'number') return null;
-                        const info = getTierSaleInfo(tier.price, sp, true);
-                        if (!info || !info.isDiscounted) return null;
-                        return (
-                          <div key={tier.id} className="flex items-center gap-2 text-gray-600">
-                            <span className="font-medium min-w-[140px]">{tier.tier_label || tier.tier_name}:</span>
-                            <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
-                            <span className="text-gray-400">&rarr;</span>
-                            <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
-                            <span className="text-xs text-gray-400">
-                              (-{info.discountPercent}%, save {formatCurrency(info.savings)})
-                            </span>
-                          </div>
-                        );
-                      })}
+              {(() => {
+                // Tiered models preview
+                if (pricing.length > 0) {
+                  const sortedTiers = [...pricing].sort((a, b) => a.display_order - b.display_order);
+                  const hasSale = sortedTiers.some((t) => salePrices[t.tier_name] !== '' && salePrices[t.tier_name] !== undefined);
+                  const hasDbSale = hasAnySalePrice(pricing);
+                  const endingSoon = isEndingSoon(getSaleStatus(service).saleEndsAt);
+                  if (!hasSale) return null;
+                  return (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <p className="mb-2 text-sm font-semibold text-gray-700">
+                        Sale Preview
+                        {hasDbSale && getSaleStatus(service).isOnSale && endingSoon && (
+                          <span className="ml-2 text-amber-600">&#9200; Ending soon!</span>
+                        )}
+                      </p>
+                      <div className="space-y-1 text-sm">
+                        {sortedTiers.map((tier) => {
+                          const sp = salePrices[tier.tier_name];
+                          if (sp === '' || sp === undefined || typeof sp !== 'number') return null;
+                          const info = getTierSaleInfo(tier.price, sp, true);
+                          if (!info || !info.isDiscounted) return null;
+                          return (
+                            <div key={tier.id} className="flex items-center gap-2 text-gray-600">
+                              <span className="font-medium min-w-[140px]">{tier.tier_label || tier.tier_name}:</span>
+                              <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+                              <span className="text-gray-400">&rarr;</span>
+                              <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+                              <span className="text-xs text-gray-400">
+                                (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
+                  );
+                }
+                // Flat/per_unit preview
+                if ((service.pricing_model === 'flat' || service.pricing_model === 'per_unit') && service.classification !== 'addon_only' && typeof flatSalePrice === 'number') {
+                  const basePrice = service.pricing_model === 'flat' ? service.flat_price : service.per_unit_price;
+                  const info = getTierSaleInfo(basePrice, flatSalePrice, true);
+                  if (!info || !info.isDiscounted) return null;
+                  const endingSoon = isEndingSoon(getSaleStatus(service).saleEndsAt);
+                  const label = service.pricing_model === 'flat' ? 'Flat' : `Per ${service.per_unit_label || 'unit'}`;
+                  return (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <p className="mb-2 text-sm font-semibold text-gray-700">
+                        Sale Preview
+                        {service.sale_price != null && getSaleStatus(service).isOnSale && endingSoon && (
+                          <span className="ml-2 text-amber-600">&#9200; Ending soon!</span>
+                        )}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span className="font-medium min-w-[140px]">{label}:</span>
+                        <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+                        <span className="text-gray-400">&rarr;</span>
+                        <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+                        <span className="text-xs text-gray-400">
+                          (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
               })()}
 
               {/* Action buttons */}
               <div className="flex items-center justify-between">
-                {hasAnySalePrice(pricing) && (
+                {(hasAnySalePrice(pricing) || service.sale_price != null) && (
                   <Button variant="outline" size="sm" onClick={() => setShowClearSaleDialog(true)} disabled={savingSale}>
                     <X className="h-4 w-4" />
                     Clear All Sale Prices

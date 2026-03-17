@@ -119,9 +119,7 @@ export function quoteReducer(
       const saleWindow = (service.sale_starts_at || service.sale_ends_at)
         ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
         : null;
-      const resolved = isPerUnit
-        ? { standardPrice: service.per_unit_price! * perUnitQty, effectivePrice: service.per_unit_price! * perUnitQty, isOnSale: false, saleSavings: 0 }
-        : resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
+      const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
 
       // Determine effective price: lowest of sale vs combo wins
       let effectivePrice = resolved.effectivePrice;

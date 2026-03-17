@@ -228,7 +228,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
         tier_name: 'default',
         tier_label: null,
         price: service.flat_price,
-        sale_price: null,
+        sale_price: service.sale_price ?? null,
         display_order: 0,
         is_vehicle_size_aware: false,
         vehicle_size_sedan_price: null,
@@ -285,7 +285,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     } else if (prereqService.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
-        price: prereqService.flat_price, sale_price: null, display_order: 0, is_vehicle_size_aware: false,
+        price: prereqService.flat_price, sale_price: prereqService.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
         vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, created_at: '',
       };
       dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass, ...prereqExtra });

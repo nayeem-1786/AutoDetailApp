@@ -20,10 +20,17 @@ export async function GET(request: NextRequest) {
         id,
         name,
         flat_price,
+        per_unit_price,
+        per_unit_label,
+        per_unit_max,
         pricing_model,
+        classification,
         base_duration_minutes,
         vehicle_compatibility,
-        pricing:service_pricing(tier_name, price, display_order)
+        sale_price,
+        sale_starts_at,
+        sale_ends_at,
+        pricing:service_pricing(tier_name, price, sale_price, display_order)
       `)
       .eq('is_active', true)
       .order('display_order')

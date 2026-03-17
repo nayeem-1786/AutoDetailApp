@@ -23,10 +23,10 @@ export async function POST(request: NextRequest) {
 
   for (const item of body.items) {
     if (item.type === 'service') {
-      // Clear sale dates on service
+      // Clear sale dates and flat/per_unit sale_price on service
       await admin
         .from('services')
-        .update({ sale_starts_at: null, sale_ends_at: null })
+        .update({ sale_price: null, sale_starts_at: null, sale_ends_at: null })
         .eq('id', item.id);
 
       // Clear sale_price on all pricing rows

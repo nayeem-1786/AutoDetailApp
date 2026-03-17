@@ -274,7 +274,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     } else if (prereqService.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
-        price: prereqService.flat_price, sale_price: null, display_order: 0, is_vehicle_size_aware: false,
+        price: prereqService.flat_price, sale_price: prereqService.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
         vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, created_at: '',
       };
       if (onAddService) {
@@ -343,7 +343,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         tier_name: 'default',
         tier_label: null,
         price: service.flat_price,
-        sale_price: null,
+        sale_price: service.sale_price ?? null,
         display_order: 0,
         is_vehicle_size_aware: false,
         vehicle_size_sedan_price: null,
@@ -422,7 +422,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     if (pricing.length === 0 && service.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: service.id, tier_name: 'default', tier_label: null,
-        price: service.flat_price, sale_price: null, display_order: 0, is_vehicle_size_aware: false,
+        price: service.flat_price, sale_price: service.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
         vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, created_at: '',
       };
       quickAdd(service, syntheticPricing, vehicleSizeClass);

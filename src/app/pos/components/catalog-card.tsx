@@ -83,6 +83,10 @@ function ServicePriceDisplay({
   // Per-unit pricing: "$150/panel"
   if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
     const label = service.per_unit_label || 'unit';
+    const { isOnSale: perUnitOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
+    if (perUnitOnSale && service.sale_price != null && service.sale_price < service.per_unit_price) {
+      return <SalePriceStack standardLabel={`$${service.per_unit_price.toFixed(2)}/${label}`} saleLabel={`$${service.sale_price.toFixed(2)}/${label}`} />;
+    }
     return (
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
         ${service.per_unit_price.toFixed(2)}/{label}
@@ -91,6 +95,10 @@ function ServicePriceDisplay({
   }
 
   if (service.flat_price != null) {
+    const { isOnSale: flatOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
+    if (flatOnSale && service.sale_price != null && service.sale_price < service.flat_price) {
+      return <SalePriceStack standardLabel={`$${service.flat_price.toFixed(2)}`} saleLabel={`$${service.sale_price.toFixed(2)}`} />;
+    }
     return (
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
         ${service.flat_price.toFixed(2)}

@@ -234,6 +234,7 @@ export interface Service {
   show_on_website: boolean;
   is_featured: boolean;
   display_order: number;
+  sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
   created_at: string;

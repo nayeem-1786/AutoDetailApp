@@ -1319,6 +1319,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260314000003_add_transaction_items_is_addon.sql
 20260314000004_add_pos_override_prerequisites_permission.sql
 20260314000005_add_transaction_items_prerequisite_note.sql
+20260316000001_feature_flags_anon_select_policy.sql
+20260317000001_add_services_sale_price.sql
 ```
 
 ---

@@ -143,6 +143,7 @@
 | special_requirements | TEXT | | E.g. "Aviation-approved products only" |
 | image_url | TEXT | | Supabase storage URL |
 | image_alt | TEXT | | Alt text for image |
+| sale_price | DECIMAL(10,2) | DEFAULT NULL, CHECK >= 0 | For flat/per_unit models only. Tiered models use `service_pricing.sale_price`. Added via `20260317000001` |
 | sale_starts_at | TIMESTAMPTZ | DEFAULT NULL | Shared sale date range for all tiers. Added via `20260219000009` |
 | sale_ends_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
 | is_active | BOOLEAN | NOT NULL, DEFAULT true | |
@@ -152,7 +153,7 @@
 
 **Indexes:** category_id, pricing_model, classification, is_active
 
-**Sale pricing note:** `sale_starts_at` / `sale_ends_at` on `services` define the sale window for ALL tiers. The actual sale prices per tier are stored on `service_pricing.sale_price`. Flat-priced services (pricing_model = 'flat') have NO sale_price mechanism — they have no `service_pricing` rows and no sale_price column on `services` itself. To discount flat-priced add-ons, use `service_addon_suggestions.combo_price` instead.
+**Sale pricing note:** `sale_starts_at` / `sale_ends_at` on `services` define the sale window. For tiered models (vehicle_size, scope, specialty), actual sale prices are stored per tier on `service_pricing.sale_price`. For flat/per_unit models, the sale price is stored on `services.sale_price`. To discount add-ons, use `service_addon_suggestions.combo_price`.
 
 ### service_pricing
 | Column | Type | Constraints | Notes |
