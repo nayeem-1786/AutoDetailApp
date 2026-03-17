@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { pstEndOfDayLiteral } from '@/lib/utils/pst-date';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,8 +45,7 @@ export async function GET(request: NextRequest) {
     if (dateFrom) query = query.gte('created_at', dateFrom);
     if (dateTo) {
       // dateTo is a date string like "2026-02-22" — include the full day
-      const endOfDay = `${dateTo}T23:59:59.999-08:00`;
-      query = query.lte('created_at', endOfDay);
+      query = query.lte('created_at', pstEndOfDayLiteral(dateTo));
     }
     if (search) {
       query = query.or(

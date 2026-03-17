@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { pstEndOfDayLiteral } from '@/lib/utils/pst-date';
 
 const PST_TZ = 'America/Los_Angeles';
 
@@ -63,8 +64,8 @@ export async function GET(request: NextRequest) {
     if (source) query = query.eq('source', source);
     if (dateFrom) query = query.gte('created_at', dateFrom);
     if (dateTo) {
-      const endOfDay = `${dateTo}T23:59:59.999-08:00`;
-      query = query.lte('created_at', endOfDay);
+      query = query.lte('created_at', pstEndOfDayLiteral(dateTo));
+
     }
     if (search) {
       query = query.or(

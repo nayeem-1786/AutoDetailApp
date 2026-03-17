@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { pstStartOfDayLiteral } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 
 /**
@@ -105,8 +106,9 @@ export async function POST(request: NextRequest) {
       if (apt.scheduled_end_time) {
         // scheduled_end_time is a TIME like "14:30:00", scheduled_date is a DATE
         const dateTimeStr = `${apt.scheduled_date}T${apt.scheduled_end_time}`;
-        // Parse in PST context
-        const dt = new Date(dateTimeStr + '-08:00'); // PST offset approximation
+        // Parse in PST/PDT context — extract correct offset for this date
+        const offsetStr = pstStartOfDayLiteral(apt.scheduled_date).slice(-6); // e.g. "-08:00" or "-07:00"
+        const dt = new Date(dateTimeStr + offsetStr);
         if (!isNaN(dt.getTime())) {
           estimatedPickup = dt.toISOString();
         }

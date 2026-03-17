@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { pstStartOfDayLiteral, pstEndOfDayLiteral } from '@/lib/utils/pst-date';
 
 /**
  * GET /api/pos/staff/available — List bookable staff with busy status and today's job counts.
@@ -37,8 +38,8 @@ export async function GET(request: NextRequest) {
     // Use PST timezone for "today"
     const now = new Date();
     const pstDate = now.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-    const todayStart = `${pstDate}T00:00:00-08:00`;
-    const todayEnd = `${pstDate}T23:59:59-08:00`;
+    const todayStart = pstStartOfDayLiteral(pstDate);
+    const todayEnd = pstEndOfDayLiteral(pstDate);
 
     const { data: activeJobs } = await supabase
       .from('jobs')

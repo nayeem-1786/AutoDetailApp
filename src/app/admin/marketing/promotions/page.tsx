@@ -21,6 +21,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
 import { formatCurrency } from '@/lib/utils/format';
+import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import {
   isEndingSoon,
 } from '@/lib/utils/sale-pricing';
@@ -529,8 +530,8 @@ function QuickSaleDialog({
     if (selectedItems.length === 0 || typeof discountValue !== 'number' || discountValue <= 0) return;
     setApplying(true);
 
-    const startTs = saleStartsAt ? new Date(saleStartsAt + 'T00:00:00-08:00').toISOString() : null;
-    const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
+    const startTs = dateToPstStartOfDay(saleStartsAt);
+    const endTs = dateToPstEndOfDay(saleEndsAt);
 
     const batchItems = selectedItems.map((item) => {
       if (item.type === 'service') {

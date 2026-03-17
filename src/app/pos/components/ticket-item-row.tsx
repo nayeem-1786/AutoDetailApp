@@ -105,9 +105,14 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
     }
   }
 
-  // Per-unit display: "2 panels x $150.00"
+  // Per-unit display: "2 panels × $150.00" or "2 panels × $120.00" (sale)
+  const perUnitSalePPU = item.perUnitQty && item.perUnitPrice != null && item.pricingType === 'sale' && item.saleEffectivePrice != null
+    ? item.saleEffectivePrice / item.perUnitQty
+    : null;
   const perUnitText = item.perUnitQty && item.perUnitPrice != null
-    ? `${item.perUnitQty} ${item.perUnitLabel || 'unit'}${item.perUnitQty > 1 ? 's' : ''} \u00D7 $${item.perUnitPrice.toFixed(2)}`
+    ? perUnitSalePPU != null
+      ? `${item.perUnitQty} ${item.perUnitLabel || 'unit'}${item.perUnitQty > 1 ? 's' : ''} \u00D7 $${perUnitSalePPU.toFixed(2)}`
+      : `${item.perUnitQty} ${item.perUnitLabel || 'unit'}${item.perUnitQty > 1 ? 's' : ''} \u00D7 $${item.perUnitPrice.toFixed(2)}`
     : null;
 
   const subParts = [sizeLabel, tierLabel, perUnitText].filter(Boolean);

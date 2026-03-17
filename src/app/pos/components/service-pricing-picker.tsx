@@ -242,7 +242,13 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
   const perUnitLabel = service.per_unit_label || 'unit';
   const [quantity, setQuantity] = useState(1);
 
+  // Sale awareness
+  const { isOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
+  const perUnitOnSale = isOnSale && service.sale_price != null && service.sale_price < perUnitPrice;
+  const effectiveUnitPrice = perUnitOnSale ? service.sale_price! : perUnitPrice;
+
   const total = quantity * perUnitPrice;
+  const saleTotal = perUnitOnSale ? quantity * service.sale_price! : null;
 
   // Create a synthetic ServicePricing for the dispatch
   const syntheticPricing: ServicePricing = {
@@ -269,13 +275,27 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
     <Dialog open={open} onOpenChange={onClose}>
       <DialogClose onClose={onClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
-        <DialogTitle>{service.name}</DialogTitle>
+        <DialogTitle>
+          {service.name}
+          {perUnitOnSale && (
+            <span className="ml-2 inline-flex rounded bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400 align-middle">
+              Sale
+            </span>
+          )}
+        </DialogTitle>
       </DialogHeader>
       <DialogContent>
         {/* Unit price info */}
         <div className="mb-4 rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            <span className="font-semibold text-gray-900 dark:text-gray-100">${perUnitPrice.toFixed(2)}</span>
+            {perUnitOnSale ? (
+              <>
+                <span className="text-gray-400 dark:text-gray-500 line-through mr-1">${perUnitPrice.toFixed(2)}</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">${service.sale_price!.toFixed(2)}</span>
+              </>
+            ) : (
+              <span className="font-semibold text-gray-900 dark:text-gray-100">${perUnitPrice.toFixed(2)}</span>
+            )}
             {' '}per {perUnitLabel}
           </p>
           {perUnitMax && (
@@ -326,13 +346,28 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
         </div>
 
         {/* Total display */}
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20 px-4 py-3">
+        <div className={cn(
+          'mb-4 flex items-center justify-between rounded-lg border px-4 py-3',
+          perUnitOnSale
+            ? 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-900/20'
+            : 'border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20'
+        )}>
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {quantity} {perUnitLabel}{quantity > 1 ? 's' : ''} &times; ${perUnitPrice.toFixed(2)}
+            {quantity} {perUnitLabel}{quantity > 1 ? 's' : ''} &times; ${effectiveUnitPrice.toFixed(2)}
           </span>
-          <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-            ${total.toFixed(2)}
-          </span>
+          <div className="text-right">
+            {perUnitOnSale && (
+              <span className="block text-xs text-gray-400 dark:text-gray-500 line-through">
+                ${total.toFixed(2)}
+              </span>
+            )}
+            <span className={cn(
+              'text-lg font-bold',
+              perUnitOnSale ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+            )}>
+              ${(saleTotal ?? total).toFixed(2)}
+            </span>
+          </div>
         </div>
 
         {/* Action buttons */}
@@ -348,7 +383,11 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
               'min-h-[48px]'
             )}
           >
-            Add to Ticket &mdash; ${total.toFixed(2)}
+            Add to Ticket &mdash;{' '}
+            {perUnitOnSale && (
+              <span className="line-through opacity-60 mr-1">${total.toFixed(2)}</span>
+            )}
+            ${(saleTotal ?? total).toFixed(2)}
           </button>
         </div>
       </DialogContent>

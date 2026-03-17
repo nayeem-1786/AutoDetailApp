@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Per-unit sale display in modal/picker/ticket + sale date timezone shift — 2026-03-17
+
+### Bug 1: Per-unit sale price not displayed in modal/picker/ticket
+- **Root cause**: When per_unit display sections were written in ServiceDetailDialog, PerUnitPicker, and TicketItemRow, sale pricing didn't exist for per_unit services. The reducer/synthetic-tier logic was correct — purely a display bug.
+- **ServiceDetailDialog**: Unit price info box, total display, and "Add to Ticket" button now show strikethrough + sale price when sale is active.
+- **PerUnitPicker** (service-pricing-picker.tsx): Same — unit price, total, and button now sale-aware. Title shows "Sale" badge.
+- **TicketItemRow**: Sub-text now shows sale per-unit price (e.g. "2 panels × $120.00") instead of always showing base price.
+
+### Bug 2: Sale end date shifts forward by one day after save
+- **Root cause (read-side)**: `new Date(value).toISOString().split('T')[0]` extracts the UTC date. For PST timestamps stored as late-night values (T23:59:59-08:00 → T07:59:59Z next day), the UTC date is one day ahead.
+- **Fix**: Replaced with `toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })` in services page (1 location), products page (2 locations).
+
+### Bug 2b: Hardcoded -08:00 offset breaks during DST
+- **Root cause (save-side)**: All sale date saves and range queries used `-08:00` (PST) even during PDT (March–November, when offset is `-07:00`).
+- **Fix**: Created `src/lib/utils/pst-date.ts` with `dateToPstStartOfDay()`, `dateToPstEndOfDay()`, `pstStartOfDayLiteral()`, `pstEndOfDayLiteral()`. Uses `Intl.DateTimeFormat` to dynamically detect PST vs PDT offset.
+- **Applied to**: services page, products page, promotions page, audit-log route, audit-log export route, POS jobs/populate route, POS staff/available route.
+
+---
+
 ## fix: Per-unit service sale price lost on quantity change — 2026-03-17
 
 - **Root cause**: `UPDATE_PER_UNIT_QTY` and inline per-unit increment both recalculated price using `perUnitPrice` (always the base price, e.g. $150), ignoring the sale. Initial add set the correct sale total via `resolveServicePriceWithSale()`, but any quantity change overwrote it with base × qty.

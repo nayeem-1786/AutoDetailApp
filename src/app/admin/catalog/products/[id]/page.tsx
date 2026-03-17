@@ -11,6 +11,7 @@ import { productCreateSchema, type ProductCreateInput } from '@/lib/utils/valida
 import { WATER_SKU } from '@/lib/utils/constants';
 import type { Product, ProductCategory, ProductImage, Vendor } from '@/lib/supabase/types';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -180,8 +181,8 @@ export default function ProductDetailPage() {
 
       // Populate sale pricing
       setSalePrice(p.sale_price ?? '');
-      setSaleStartsAt(p.sale_starts_at ? new Date(p.sale_starts_at).toISOString().split('T')[0] : '');
-      setSaleEndsAt(p.sale_ends_at ? new Date(p.sale_ends_at).toISOString().split('T')[0] : '');
+      setSaleStartsAt(p.sale_starts_at ? new Date(p.sale_starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
+      setSaleEndsAt(p.sale_ends_at ? new Date(p.sale_ends_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
       setSaleDiscountType('direct');
       setSaleDiscountValue('');
 
@@ -431,8 +432,8 @@ export default function ProductDetailPage() {
         }
       }
 
-      const startTs = saleStartsAt ? new Date(saleStartsAt + 'T00:00:00-08:00').toISOString() : null;
-      const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
+      const startTs = dateToPstStartOfDay(saleStartsAt);
+      const endTs = dateToPstEndOfDay(saleEndsAt);
       const sp = (salePrice !== '' && typeof salePrice === 'number') ? salePrice : null;
 
       const { error } = await supabase
@@ -456,8 +457,8 @@ export default function ProductDetailPage() {
       if (updated) {
         setProduct(updated as ProductWithRelations);
         setSalePrice(updated.sale_price ?? '');
-        setSaleStartsAt(updated.sale_starts_at ? new Date(updated.sale_starts_at).toISOString().split('T')[0] : '');
-        setSaleEndsAt(updated.sale_ends_at ? new Date(updated.sale_ends_at).toISOString().split('T')[0] : '');
+        setSaleStartsAt(updated.sale_starts_at ? new Date(updated.sale_starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
+        setSaleEndsAt(updated.sale_ends_at ? new Date(updated.sale_ends_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
       }
     } catch (err) {
       console.error('Failed to update sale pricing:', err);

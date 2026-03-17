@@ -23,6 +23,7 @@ import {
   VEHICLE_TYPE_LABELS,
 } from '@/lib/utils/constants';
 import { formatCurrency } from '@/lib/utils/format';
+import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -263,9 +264,9 @@ export default function ServiceDetailPage() {
     setSalePrices(sp);
     // Populate flat/per_unit sale price from service-level column
     setFlatSalePrice(svc.sale_price ?? '');
-    // Convert ISO timestamps to local date strings for date inputs
-    setSaleStartsAt(svc.sale_starts_at ? new Date(svc.sale_starts_at).toISOString().split('T')[0] : '');
-    setSaleEndsAt(svc.sale_ends_at ? new Date(svc.sale_ends_at).toISOString().split('T')[0] : '');
+    // Convert timestamps to PST date strings for date inputs
+    setSaleStartsAt(svc.sale_starts_at ? new Date(svc.sale_starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
+    setSaleEndsAt(svc.sale_ends_at ? new Date(svc.sale_ends_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
     setSaleDiscountType('direct');
     setSaleDiscountValue('');
 
@@ -574,9 +575,9 @@ export default function ServiceDetailPage() {
         serviceUpdate.sale_price = typeof flatSalePrice === 'number' ? flatSalePrice : null;
       }
 
-      // Always save sale dates
-      const startTs = saleStartsAt ? new Date(saleStartsAt + 'T00:00:00-08:00').toISOString() : null;
-      const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
+      // Always save sale dates (PST/PDT-aware)
+      const startTs = dateToPstStartOfDay(saleStartsAt);
+      const endTs = dateToPstEndOfDay(saleEndsAt);
       serviceUpdate.sale_starts_at = startTs;
       serviceUpdate.sale_ends_at = endTs;
 

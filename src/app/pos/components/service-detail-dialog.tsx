@@ -216,12 +216,18 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     onClose();
   }
 
+  // Per-unit sale status
+  const perUnitOnSale = isPerUnit && isOnSale && service.sale_price != null && service.sale_price < service.per_unit_price!;
+  const perUnitEffectivePrice = perUnitOnSale ? service.sale_price! : service.per_unit_price!;
+
   // Resolve display price for the Add button
   let resolvedPrice: number | null;
   let resolvedStandardPrice: number | null = null;
   let isSalePrice = false;
   if (isPerUnit) {
-    resolvedPrice = perUnitQty * service.per_unit_price!;
+    resolvedPrice = perUnitQty * perUnitEffectivePrice;
+    resolvedStandardPrice = perUnitQty * service.per_unit_price!;
+    isSalePrice = perUnitOnSale;
   } else if (selectedTier) {
     resolvedPrice = getDisplayPrice(selectedTier);
     resolvedStandardPrice = resolveServicePrice(selectedTier, vehicleSizeClass);
@@ -235,7 +241,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   const showComboPrice = !isPerUnit && comboPrice != null && resolvedPrice != null && comboPrice < resolvedPrice;
   const displayPrice = showComboPrice ? comboPrice : resolvedPrice;
   // Show standard strikethrough on button when sale or combo is active
-  const showButtonStrikethrough = !showComboPrice && isSalePrice && resolvedStandardPrice != null && resolvedStandardPrice !== displayPrice;
+  const showButtonStrikethrough = !showComboPrice && isSalePrice && resolvedStandardPrice != null && resolvedStandardPrice !== (displayPrice ?? resolvedPrice);
 
   const perUnitMax = service.per_unit_max ?? 10;
   const perUnitLabel = service.per_unit_label || 'unit';
@@ -267,10 +273,27 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
               {/* Unit price info */}
               <div className="mb-4 rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">
-                    ${service.per_unit_price!.toFixed(2)}
-                  </span>
-                  {' '}per {perUnitLabel}
+                  {perUnitOnSale ? (
+                    <>
+                      <span className="text-gray-400 dark:text-gray-500 line-through mr-1">
+                        ${service.per_unit_price!.toFixed(2)}
+                      </span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        ${service.sale_price!.toFixed(2)}
+                      </span>
+                      {' '}per {perUnitLabel}
+                      <span className="ml-1.5 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
+                        Sale
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        ${service.per_unit_price!.toFixed(2)}
+                      </span>
+                      {' '}per {perUnitLabel}
+                    </>
+                  )}
                 </p>
                 {perUnitMax && (
                   <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
@@ -318,13 +341,28 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
               </div>
 
               {/* Total display */}
-              <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20 px-4 py-3">
+              <div className={cn(
+                'mt-4 flex items-center justify-between rounded-lg border px-4 py-3',
+                perUnitOnSale
+                  ? 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-900/20'
+                  : 'border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20'
+              )}>
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {perUnitQty} {perUnitLabel}{perUnitQty > 1 ? 's' : ''} &times; ${service.per_unit_price!.toFixed(2)}
+                  {perUnitQty} {perUnitLabel}{perUnitQty > 1 ? 's' : ''} &times; ${perUnitEffectivePrice.toFixed(2)}
                 </span>
-                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  ${resolvedPrice!.toFixed(2)}
-                </span>
+                <div className="text-right">
+                  {perUnitOnSale && (
+                    <span className="block text-xs text-gray-400 dark:text-gray-500 line-through">
+                      ${(perUnitQty * service.per_unit_price!).toFixed(2)}
+                    </span>
+                  )}
+                  <span className={cn(
+                    'text-lg font-bold',
+                    perUnitOnSale ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+                  )}>
+                    ${resolvedPrice!.toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
           )}
