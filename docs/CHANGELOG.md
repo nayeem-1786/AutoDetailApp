@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Per-unit service sale price lost on quantity change — 2026-03-17
+
+- **Root cause**: `UPDATE_PER_UNIT_QTY` and inline per-unit increment both recalculated price using `perUnitPrice` (always the base price, e.g. $150), ignoring the sale. Initial add set the correct sale total via `resolveServicePriceWithSale()`, but any quantity change overwrote it with base × qty.
+- **Fix**: Both paths now derive the per-unit sale price from `saleEffectivePrice / perUnitQty` when `pricingType === 'sale'`, and scale both `unitPrice` and `standardPrice` proportionally on qty change. Applied to ticket-reducer (`UPDATE_PER_UNIT_QTY` + inline increment) and quote-reducer (`UPDATE_PER_UNIT_QTY`).
+
+---
+
 ## fix: Quick Sale batch apply for flat/per_unit services — 2026-03-17
 
 - **Root cause**: Quick Sale dialog treated ALL services as tiered — iterated over `item.tiers` (empty array for flat/per_unit), produced `sale_prices: {}`, never sent `sale_price` to the batch endpoint.

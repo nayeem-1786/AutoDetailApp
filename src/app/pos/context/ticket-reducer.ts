@@ -131,13 +131,20 @@ export function ticketReducer(
           }
           // Increment per-unit quantity inline
           const newQty = existing.perUnitQty! + 1;
-          const unitPrice = existing.perUnitPrice! * newQty;
+          const newStdPrice = existing.perUnitPrice! * newQty;
+          const salePPU = existing.pricingType === 'sale' && existing.saleEffectivePrice != null && existing.perUnitQty
+            ? existing.saleEffectivePrice / existing.perUnitQty
+            : null;
+          const unitPrice = salePPU != null ? salePPU * newQty : newStdPrice;
+          const newSaleEff = salePPU != null ? salePPU * newQty : null;
           const items = state.items.map((item) =>
             item.id === existing.id
               ? {
                   ...item,
                   perUnitQty: newQty,
                   unitPrice,
+                  standardPrice: newStdPrice,
+                  saleEffectivePrice: newSaleEff,
                   totalPrice: unitPrice * item.quantity,
                   taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
                 }
@@ -291,11 +298,19 @@ export function ticketReducer(
       }
       const items = state.items.map((item) => {
         if (item.id !== itemId || !item.perUnitPrice) return item;
-        const unitPrice = item.perUnitPrice * perUnitQty;
+        const newStandardPrice = item.perUnitPrice * perUnitQty;
+        // Use sale per-unit price when on sale
+        const salePricePerUnit = item.pricingType === 'sale' && item.saleEffectivePrice != null && item.perUnitQty
+          ? item.saleEffectivePrice / item.perUnitQty
+          : null;
+        const unitPrice = salePricePerUnit != null ? salePricePerUnit * perUnitQty : newStandardPrice;
+        const newSaleEffective = salePricePerUnit != null ? salePricePerUnit * perUnitQty : null;
         return {
           ...item,
           perUnitQty,
           unitPrice,
+          standardPrice: newStandardPrice,
+          saleEffectivePrice: newSaleEffective,
           totalPrice: unitPrice * item.quantity,
           taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
         };

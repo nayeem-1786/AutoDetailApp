@@ -250,11 +250,19 @@ export function quoteReducer(
       }
       const items = state.items.map((item) => {
         if (item.id !== itemId || !item.perUnitPrice) return item;
-        const unitPrice = item.perUnitPrice * perUnitQty;
+        const newStandardPrice = item.perUnitPrice * perUnitQty;
+        // Use sale per-unit price when on sale
+        const salePricePerUnit = item.pricingType === 'sale' && item.saleEffectivePrice != null && item.perUnitQty
+          ? item.saleEffectivePrice / item.perUnitQty
+          : null;
+        const unitPrice = salePricePerUnit != null ? salePricePerUnit * perUnitQty : newStandardPrice;
+        const newSaleEffective = salePricePerUnit != null ? salePricePerUnit * perUnitQty : null;
         return {
           ...item,
           perUnitQty,
           unitPrice,
+          standardPrice: newStandardPrice,
+          saleEffectivePrice: newSaleEffective,
           totalPrice: unitPrice * item.quantity,
           taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
         };
