@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Quick Sale batch apply for flat/per_unit services — 2026-03-17
+
+- **Root cause**: Quick Sale dialog treated ALL services as tiered — iterated over `item.tiers` (empty array for flat/per_unit), produced `sale_prices: {}`, never sent `sale_price` to the batch endpoint.
+- **Frontend fixes**: `QuickSaleItem` now carries `pricing_model`, `flat_price`, `per_unit_price`. `handleApply()` branches on pricing model — flat/per_unit sends `sale_price` (single value), tiered sends `sale_prices` (tier map). Preview shows correct base price for flat/per_unit. Tier checkboxes hidden when only flat/per_unit services selected.
+- **List display fix**: `PromotionRow.renderTierCell()` now shows flat/per_unit standard + sale price in first column instead of all em-dashes.
+- **`PromotionItem` type**: Added `flat_price`, `per_unit_price` fields (already returned by GET endpoint).
+
+---
+
 ## fix: Crash when switching to Scope/Specialty on new service page — 2026-03-17
 
 - `selectedPricingModel` (react-hook-form `watch`) updates synchronously but `pricingValue` state updates asynchronously via `useEffect`, causing a one-render-cycle mismatch. Scope and Specialty sub-forms call `.map()` on object-shaped data and crash.

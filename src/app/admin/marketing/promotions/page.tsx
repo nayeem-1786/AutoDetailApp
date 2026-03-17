@@ -56,6 +56,8 @@ interface PromotionItem {
   sale_ends_at: string | null;
   // Service fields
   pricing_model?: string;
+  flat_price?: number | null;
+  per_unit_price?: number | null;
   service_pricing?: ServicePricingRow[];
   // Product fields
   retail_price?: number;
@@ -372,6 +374,14 @@ function PromotionRow({
       }
       return <span className="text-gray-300">—</span>;
     }
+    // Flat/per_unit services: show price in first column only
+    if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
+      if (tierName === 'sedan') {
+        const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
+        return renderPrice(basePrice, item.sale_price ?? null);
+      }
+      return <span className="text-gray-300">—</span>;
+    }
     const tier = tiers.find((t) => t.tier_name === tierName);
     if (!tier) return <span className="text-gray-300">—</span>;
     return renderPrice(tier.price, tier.sale_price);
@@ -419,6 +429,9 @@ interface QuickSaleItem {
   type: 'service' | 'product';
   id: string;
   name: string;
+  pricing_model?: string;
+  flat_price?: number | null;
+  per_unit_price?: number | null;
   tiers?: ServicePricingRow[];
   retail_price?: number;
 }
@@ -489,6 +502,9 @@ function QuickSaleDialog({
         type: item.item_type,
         id: item.id,
         name: item.name,
+        pricing_model: item.pricing_model,
+        flat_price: item.flat_price,
+        per_unit_price: item.per_unit_price,
         tiers: item.service_pricing as ServicePricingRow[] | undefined,
         retail_price: item.retail_price,
       },
@@ -517,9 +533,16 @@ function QuickSaleDialog({
     const endTs = saleEndsAt ? new Date(saleEndsAt + 'T23:59:59-08:00').toISOString() : null;
 
     const batchItems = selectedItems.map((item) => {
-      if (item.type === 'service' && item.tiers) {
+      if (item.type === 'service') {
+        const isFlatPerUnit = item.pricing_model === 'flat' || item.pricing_model === 'per_unit';
+        if (isFlatPerUnit) {
+          // Flat/per_unit: sale_price on the services table
+          const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
+          return { type: 'service' as const, id: item.id, sale_price: calculateSalePrice(basePrice) };
+        }
+        // Tiered: sale_prices per tier on service_pricing table
         const salePrices: Record<string, number> = {};
-        for (const tier of item.tiers) {
+        for (const tier of (item.tiers || [])) {
           const shouldApply =
             (tier.tier_name === 'sedan' && applySedan) ||
             (tier.tier_name === 'truck_suv_2row' && applyTruck) ||
@@ -621,6 +644,12 @@ function QuickSaleDialog({
                   {item.type === 'product' && (
                     <span className="text-xs text-gray-500">{formatCurrency(item.retail_price ?? 0)}</span>
                   )}
+                  {item.type === 'service' && item.pricing_model === 'flat' && item.flat_price != null && (
+                    <span className="text-xs text-gray-500">{formatCurrency(item.flat_price)}</span>
+                  )}
+                  {item.type === 'service' && item.pricing_model === 'per_unit' && item.per_unit_price != null && (
+                    <span className="text-xs text-gray-500">{formatCurrency(item.per_unit_price)}/unit</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -663,8 +692,8 @@ function QuickSaleDialog({
           </FormField>
         </div>
 
-        {/* Tier checkboxes */}
-        {selectedItems.some((i) => i.type === 'service') && (
+        {/* Tier checkboxes — only for tiered services (not flat/per_unit) */}
+        {selectedItems.some((i) => i.type === 'service' && i.pricing_model !== 'flat' && i.pricing_model !== 'per_unit' && i.pricing_model !== 'custom') && (
           <FormField label="Apply to tiers (services only)">
             <div className="flex gap-4">
               <label className="flex items-center gap-2 text-sm">
@@ -700,7 +729,18 @@ function QuickSaleDialog({
             {selectedItems.map((item) => (
               <div key={item.id} className="text-sm">
                 <p className="font-medium text-gray-700">{item.name}:</p>
-                {item.type === 'service' && item.tiers ? (
+                {item.type === 'service' && (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') ? (() => {
+                  const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
+                  const sp = calculateSalePrice(basePrice);
+                  const valid = sp > 0 && sp < basePrice;
+                  return (
+                    <p className={`ml-4 ${valid ? 'text-gray-600' : 'text-red-500'}`}>
+                      {formatCurrency(basePrice)} → {formatCurrency(sp)}
+                      {item.pricing_model === 'per_unit' && ' /unit'}
+                      {!valid && ' (invalid)'}
+                    </p>
+                  );
+                })() : item.type === 'service' && item.tiers && item.tiers.length > 0 ? (
                   <div className="ml-4 space-y-0.5">
                     {item.tiers
                       .sort((a, b) => a.display_order - b.display_order)
