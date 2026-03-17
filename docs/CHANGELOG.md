@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Crash when switching to Scope/Specialty on new service page — 2026-03-17
+
+- `selectedPricingModel` (react-hook-form `watch`) updates synchronously but `pricingValue` state updates asynchronously via `useEffect`, causing a one-render-cycle mismatch. Scope and Specialty sub-forms call `.map()` on object-shaped data and crash.
+- Fix: guard at the `ServicePricingForm` call site — fall back to `getDefaultPricingValue()` when `pricingValue.model` doesn't match the selected model.
+
+---
+
 ## feat: Sale pricing support for flat/per_unit pricing models — 2026-03-17
 
 Sale pricing previously only worked for tiered services (vehicle_size, scope, specialty). This adds full sale pricing support for flat and per_unit pricing models across the entire stack.

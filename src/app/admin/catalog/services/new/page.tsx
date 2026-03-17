@@ -516,7 +516,7 @@ export default function NewServicePage() {
               <CardContent>
                 <ServicePricingForm
                   pricingModel={selectedPricingModel}
-                  value={pricingValue}
+                  value={pricingValue.model === selectedPricingModel ? pricingValue : getDefaultPricingValue(selectedPricingModel)}
                   onChange={setPricingValue}
                 />
               </CardContent>
