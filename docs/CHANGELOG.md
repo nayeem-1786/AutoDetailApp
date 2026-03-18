@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Loyalty points earned on full subtotal instead of actual amount paid — 2026-03-18
+
+- **Root cause**: Earning calculation at `transactions/route.ts:256` only subtracted `loyalty_discount`, ignoring coupon and manual discounts. `discount_amount` (already includes all three) was available but unused.
+- **Fix 1** (`src/app/api/pos/transactions/route.ts`): Replaced `earnableAfterLoyalty = earnableSpend - loyalty_discount` with `earnableAfterAllDiscounts = earnableSpend - discount_amount`. Points now earned only on actual money collected.
+- **Fix 2** (`src/app/pos/components/loyalty-panel.tsx`): Earn preview now shows `subtotal - discountAmount` instead of raw `subtotal`, so cashier sees accurate points before completing transaction.
+- **Fix 3** (`src/app/api/pos/loyalty/earn/route.ts`): Marked as legacy — nothing calls this endpoint. Primary earning path is in `transactions/route.ts`.
+
+---
+
 ## refactor: Remove search bar from Promotions page — 2026-03-18
 
 - Removed search input, `search` state, and debounce timer from `page.tsx`

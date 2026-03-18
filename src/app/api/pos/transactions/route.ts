@@ -252,9 +252,10 @@ export async function POST(request: NextRequest) {
         0
       );
 
-      // Subtract loyalty discount — earn points only on what the customer actually paid
-      const earnableAfterLoyalty = Math.max(0, earnableSpend - (data.loyalty_discount || 0));
-      const pointsEarned = Math.floor(earnableAfterLoyalty * LOYALTY.EARN_RATE);
+      // Earn points only on what the customer actually paid
+      // discount_amount includes ALL discounts (coupon + loyalty + manual)
+      const earnableAfterAllDiscounts = Math.max(0, earnableSpend - (data.discount_amount || 0));
+      const pointsEarned = Math.floor(earnableAfterAllDiscounts * LOYALTY.EARN_RATE);
 
       if (pointsEarned > 0) {
         currentBalance += pointsEarned;

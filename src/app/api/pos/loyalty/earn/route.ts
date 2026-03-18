@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
 
     const waterProductId = waterProduct?.id;
 
+    // Legacy endpoint — primary earning path is in /api/pos/transactions/route.ts
     // Calculate eligible spend (exclude water SKU)
     const eligibleSpend = (items ?? [])
       .filter((i) => i.product_id !== waterProductId)

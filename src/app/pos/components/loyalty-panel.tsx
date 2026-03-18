@@ -23,8 +23,8 @@ export function LoyaltyPanel() {
   // Max redemption: lesser of balance value or ticket total
   const maxRedemption = Math.min(fullDollarValue, ticket.total + ticket.loyaltyDiscount);
 
-  // Preview earned points
-  const earnPreview = Math.floor(ticket.subtotal * LOYALTY.EARN_RATE);
+  // Preview earned points (after all discounts: coupon + loyalty + manual)
+  const earnPreview = Math.floor(Math.max(0, ticket.subtotal - (ticket.discountAmount || 0)) * LOYALTY.EARN_RATE);
 
   // Reset loyalty redeem if customer changes
   useEffect(() => {
