@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Public category page not showing sale pricing on service cards — 2026-03-17
+
+- **Root cause**: `getStartingPrice()` in `service-card.tsx` had sale awareness for tiered models (vehicle_size, scope, specialty) via `hasAnySalePrice(tiers)`, but `flat` and `per_unit` cases always returned `isOnSale: false` — they never checked `service.sale_price`.
+- **Fix**: Added `saleStatus.isOnSale && service.sale_price < base_price` checks to both `flat` and `per_unit` cases. Shows strikethrough original + sale price + "Sale" badge on image overlay.
+- **Affected pages**: `/services/[category]` grid and "You May Also Like" section on `/services/[category]/[service]`.
+
+---
+
 ## fix: Booking coupons stacking on sale-priced services — 2026-03-17
 
 - **Root cause**: Booking coupon endpoint (`/api/book/validate-coupon`) had zero sale awareness — calculated discounts on all items regardless of sale status. POS correctly blocked this via `pricing_type` checks.

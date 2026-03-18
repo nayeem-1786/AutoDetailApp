@@ -67,12 +67,27 @@ function getStartingPrice(service: Service): PriceDisplay {
     }
     case 'per_unit': {
       if (service.per_unit_price !== null) {
-        return { text: `${formatCurrency(service.per_unit_price)}/${service.per_unit_label ?? 'unit'}`, isOnSale: false };
+        const label = service.per_unit_label ?? 'unit';
+        if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.per_unit_price) {
+          return {
+            text: `${formatCurrency(service.sale_price)}/${label}`,
+            wasText: `${formatCurrency(service.per_unit_price)}/${label}`,
+            isOnSale: true,
+          };
+        }
+        return { text: `${formatCurrency(service.per_unit_price)}/${label}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
     case 'flat': {
       if (service.flat_price !== null) {
+        if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.flat_price) {
+          return {
+            text: formatCurrency(service.sale_price),
+            wasText: formatCurrency(service.flat_price),
+            isOnSale: true,
+          };
+        }
         return { text: formatCurrency(service.flat_price), isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
