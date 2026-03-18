@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       const conditions = evaluateCouponConditions(coupon, items, subtotal, customer);
 
       // Calculate potential discount
-      const discountAmount = calculateCouponDiscount(rewards, items, subtotal);
+      const discountAmount = calculateCouponDiscount(rewards, items, subtotal).total_discount;
 
       // Build reward labels for description (always computed)
       const description = rewards.map((r) => {

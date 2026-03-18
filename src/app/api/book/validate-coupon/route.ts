@@ -1,55 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
+import { getSaleStatus } from '@/lib/utils/sale-pricing';
+import {
+  calculateCouponDiscount,
+  type CartItem,
+  type CouponRewardRow,
+} from '@/lib/utils/coupon-helpers';
 
 interface ServiceItem {
   service_id: string;
   name: string;
   price: number;
-}
-
-interface CouponReward {
-  id: string;
-  applies_to: 'order' | 'product' | 'service';
-  discount_type: 'percentage' | 'flat' | 'free';
-  discount_value: number;
-  max_discount: number | null;
-  target_product_id: string | null;
-  target_service_id: string | null;
-  target_product_category_id: string | null;
-  target_service_category_id: string | null;
-}
-
-interface RewardResult {
-  applies_to: string;
-  discount_type: string;
-  target_name: string;
-  discount_amount: number;
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-function calculateRewardDiscount(
-  reward: CouponReward,
-  applicablePrice: number
-): number {
-  switch (reward.discount_type) {
-    case 'percentage': {
-      let disc = round2(applicablePrice * (reward.discount_value / 100));
-      if (reward.max_discount != null) {
-        disc = Math.min(disc, reward.max_discount);
-      }
-      return disc;
-    }
-    case 'flat':
-      return Math.min(reward.discount_value, applicablePrice);
-    case 'free':
-      return applicablePrice;
-    default:
-      return 0;
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -223,9 +185,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 8. Check conditions
-    const conditions: boolean[] = [];
     const serviceItems = services || [];
     const serviceIds = serviceItems.map((s) => s.service_id);
+
+    // Fetch service details for category matching + sale detection
+    const { data: serviceDetails } = serviceIds.length > 0
+      ? await supabase
+          .from('services')
+          .select('id, category_id, pricing_model, flat_price, per_unit_price, sale_price, sale_starts_at, sale_ends_at, service_pricing(tier_name, price, sale_price)')
+          .in('id', serviceIds)
+      : { data: [] as any[] };
+
+    const conditions: boolean[] = [];
 
     // Check min_purchase
     if (coupon.min_purchase != null) {
@@ -252,14 +223,8 @@ export async function POST(request: NextRequest) {
       coupon.requires_service_category_ids &&
       coupon.requires_service_category_ids.length > 0
     ) {
-      // Get categories for the selected services
-      const { data: servicesWithCategories } = await supabase
-        .from('services')
-        .select('id, category_id')
-        .in('id', serviceIds);
-
       const customerServiceCategoryIds =
-        servicesWithCategories
+        serviceDetails
           ?.map((s: { category_id: string | null }) => s.category_id)
           .filter(Boolean) || [];
 
@@ -348,86 +313,71 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 9. Calculate discounts from coupon_rewards
-    const rewards: CouponReward[] = coupon.coupon_rewards || [];
-    const rewardResults: RewardResult[] = [];
-    const unmatchedTargetServices: string[] = [];
+    // 9. Map booking services into CartItem[] with sale detection
+    const cartItems: CartItem[] = serviceItems.map((item) => {
+      const svc = serviceDetails?.find((s: { id: string }) => s.id === item.service_id);
+      let pricingType: string = 'standard';
 
-    for (const reward of rewards) {
-      let discountAmount = 0;
-      let targetName = 'Order';
+      if (svc) {
+        const { isOnSale } = getSaleStatus({
+          sale_starts_at: svc.sale_starts_at,
+          sale_ends_at: svc.sale_ends_at,
+        });
 
-      if (reward.applies_to === 'order') {
-        targetName = 'Order';
-        discountAmount = calculateRewardDiscount(reward, subtotal);
-      } else if (reward.applies_to === 'service') {
-        // For booking, we match services from the booking
-        if (reward.target_service_id) {
-          const matchingService = serviceItems.find(
-            (s) => s.service_id === reward.target_service_id
-          );
-          if (matchingService) {
-            targetName = matchingService.name;
-            discountAmount = calculateRewardDiscount(reward, matchingService.price);
-          } else {
-            // Track that this reward's target service isn't in the cart
-            unmatchedTargetServices.push(reward.target_service_id);
+        if (isOnSale) {
+          switch (svc.pricing_model) {
+            case 'flat':
+              if (svc.sale_price != null && svc.flat_price != null && svc.sale_price < svc.flat_price) {
+                pricingType = 'sale';
+              }
+              break;
+            case 'per_unit':
+              if (svc.sale_price != null && svc.per_unit_price != null && svc.sale_price < svc.per_unit_price) {
+                pricingType = 'sale';
+              }
+              break;
+            default: {
+              // Tiered (vehicle_size, scope, specialty): check if submitted price matches a tier's sale_price
+              const tiers: { tier_name: string; price: number; sale_price: number | null }[] = svc.service_pricing || [];
+              const matchesTierSale = tiers.some(
+                (t) => t.sale_price != null && t.sale_price < t.price && item.price === t.sale_price
+              );
+              if (matchesTierSale) {
+                pricingType = 'sale';
+              }
+              break;
+            }
           }
-        } else if (reward.target_service_category_id) {
-          // Check if any selected service is in the target category
-          const { data: servicesInCategory } = await supabase
-            .from('services')
-            .select('id, name')
-            .eq('category_id', reward.target_service_category_id)
-            .in('id', serviceIds);
-
-          if (servicesInCategory && servicesInCategory.length > 0) {
-            // Apply discount to matching services
-            const matchingPrices = serviceItems.filter((s) =>
-              servicesInCategory.some(
-                (svc: { id: string }) => svc.id === s.service_id
-              )
-            );
-            const totalMatchingPrice = matchingPrices.reduce(
-              (sum, s) => sum + s.price,
-              0
-            );
-            targetName =
-              matchingPrices.length === 1
-                ? matchingPrices[0].name
-                : 'Matching Services';
-            discountAmount = calculateRewardDiscount(reward, totalMatchingPrice);
-          } else {
-            // No services from target category in cart
-            unmatchedTargetServices.push(reward.target_service_category_id);
-          }
-        } else {
-          // Applies to all services
-          targetName = 'Services';
-          const totalServicePrice = serviceItems.reduce(
-            (sum, s) => sum + s.price,
-            0
-          );
-          discountAmount = calculateRewardDiscount(reward, totalServicePrice);
         }
       }
 
-      discountAmount = round2(discountAmount);
+      return {
+        item_type: 'service' as const,
+        service_id: item.service_id,
+        category_id: svc?.category_id ?? undefined,
+        unit_price: item.price,
+        quantity: 1,
+        item_name: item.name,
+        pricing_type: pricingType,
+      };
+    });
 
-      if (discountAmount > 0) {
-        rewardResults.push({
-          applies_to: reward.applies_to,
-          discount_type: reward.discount_type,
-          target_name: targetName,
-          discount_amount: discountAmount,
-        });
-      }
+    // 10. No-stacking: reject if ALL items are on sale
+    const allOnSale = cartItems.length > 0 && cartItems.every((i) => i.pricing_type === 'sale');
+    if (allOnSale) {
+      return NextResponse.json(
+        { error: 'Coupon cannot be applied — all items already have sale pricing' },
+        { status: 400 }
+      );
     }
 
-    // If ALL rewards targeted specific services/categories and NONE matched,
+    // 11. Calculate discounts using shared utility
+    const rewards: CouponRewardRow[] = coupon.coupon_rewards || [];
+    const result = calculateCouponDiscount(rewards, cartItems, subtotal);
+
+    // If ALL rewards targeted specific services and NONE matched eligible items,
     // the coupon doesn't apply to the selected services
-    if (rewards.length > 0 && rewardResults.length === 0) {
-      // Get names of services the coupon targets
+    if (rewards.length > 0 && result.rewards.length === 0 && result.excluded_count === 0) {
       const targetServiceIds = rewards
         .filter((r) => r.target_service_id)
         .map((r) => r.target_service_id);
@@ -479,31 +429,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Sum up total discount, never exceed subtotal
-    let totalDiscount = round2(
-      rewardResults.reduce((sum, r) => sum + r.discount_amount, 0)
-    );
-    totalDiscount = Math.min(totalDiscount, subtotal);
-    totalDiscount = round2(totalDiscount);
-
-    // Build description string
-    const description = rewardResults
-      .map((r) => {
-        if (r.discount_type === 'free') {
-          return `Free ${r.target_name}`;
-        }
-        return `${r.target_name} $${r.discount_amount.toFixed(2)} off`;
-      })
-      .join(' + ') || 'Coupon applied';
-
     return NextResponse.json({
       data: {
         id: coupon.id,
         code: coupon.code,
         name: coupon.name || null,
-        rewards: rewardResults,
-        total_discount: totalDiscount,
-        description,
+        rewards: result.rewards,
+        total_discount: result.total_discount,
+        description: result.description,
+        excluded_count: result.excluded_count,
       },
     });
   } catch (err) {

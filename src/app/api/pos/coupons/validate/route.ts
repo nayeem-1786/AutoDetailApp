@@ -1,74 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
-
-interface CartItem {
-  item_type: 'product' | 'service';
-  product_id?: string;
-  service_id?: string;
-  category_id?: string;
-  unit_price: number;
-  quantity: number;
-  item_name: string;
-  standard_price?: number;
-  pricing_type?: string;
-}
-
-interface CouponReward {
-  id: string;
-  applies_to: 'order' | 'product' | 'service';
-  discount_type: 'percentage' | 'flat' | 'free';
-  discount_value: number;
-  max_discount: number | null;
-  target_product_id: string | null;
-  target_service_id: string | null;
-  target_product_category_id: string | null;
-  target_service_category_id: string | null;
-}
-
-interface RewardResult {
-  applies_to: string;
-  discount_type: string;
-  target_name: string;
-  discount_amount: number;
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-function calculateRewardDiscount(
-  reward: CouponReward,
-  applicablePrice: number
-): number {
-  switch (reward.discount_type) {
-    case 'percentage': {
-      let disc = round2(applicablePrice * (reward.discount_value / 100));
-      if (reward.max_discount != null) {
-        disc = Math.min(disc, reward.max_discount);
-      }
-      return disc;
-    }
-    case 'flat':
-      return Math.min(reward.discount_value, applicablePrice);
-    case 'free':
-      return applicablePrice;
-    default:
-      return 0;
-  }
-}
-
-function buildRewardDescription(result: RewardResult): string {
-  const { discount_type, target_name, discount_amount } = result;
-  if (discount_type === 'free') {
-    return `Free ${target_name}`;
-  }
-  if (discount_type === 'percentage') {
-    // We don't store the raw percentage on the result, so describe by amount
-    return `${target_name} $${discount_amount.toFixed(2)} off`;
-  }
-  return `${target_name} $${discount_amount.toFixed(2)} off`;
-}
+import {
+  calculateCouponDiscount,
+  type CartItem,
+  type CouponRewardRow,
+} from '@/lib/utils/coupon-helpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -467,116 +404,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 8. No-stacking: filter out items already on sale/combo pricing
-    const excludedCount = cartItems.filter(
-      (i) => i.pricing_type === 'sale' || i.pricing_type === 'combo'
-    ).length;
-    const eligibleItems = cartItems.filter(
-      (i) => !i.pricing_type || i.pricing_type === 'standard'
-    );
-
-    // If ALL items are specially priced, reject the coupon
-    if (cartItems.length > 0 && eligibleItems.length === 0) {
-      return NextResponse.json(
-        { error: 'Coupon cannot be applied — all items already have special pricing' },
-        { status: 400 }
+    // 8. No-stacking check: if ALL items are sale/combo, reject
+    if (cartItems.length > 0) {
+      const eligibleItems = cartItems.filter(
+        (i) => !i.pricing_type || i.pricing_type === 'standard'
       );
-    }
-
-    // Calculate eligible subtotal (standard-priced items only)
-    const eligibleSubtotal = eligibleItems.reduce(
-      (sum, item) => sum + item.unit_price * item.quantity,
-      0
-    );
-
-    // 9. Calculate discounts from coupon_rewards (using eligible items only)
-    const rewards: CouponReward[] = coupon.coupon_rewards || [];
-    const rewardResults: RewardResult[] = [];
-
-    for (const reward of rewards) {
-      let discountAmount = 0;
-      let targetName = 'Order';
-
-      if (reward.applies_to === 'order') {
-        targetName = 'Order';
-        discountAmount = calculateRewardDiscount(reward, eligibleSubtotal);
-      } else if (reward.applies_to === 'product') {
-        const matchingItems = getMatchingItems(
-          eligibleItems,
-          'product',
-          reward.target_product_id,
-          reward.target_product_category_id
+      if (eligibleItems.length === 0) {
+        return NextResponse.json(
+          { error: 'Coupon cannot be applied — all items already have special pricing' },
+          { status: 400 }
         );
-
-        if (matchingItems.length > 0) {
-          targetName = reward.target_product_id
-            ? matchingItems[0].item_name
-            : reward.target_product_category_id
-              ? 'Products'
-              : 'All Products';
-
-          const totalItemPrice = matchingItems.reduce(
-            (sum, item) => sum + item.unit_price * item.quantity,
-            0
-          );
-          discountAmount = calculateRewardDiscount(reward, totalItemPrice);
-        }
-      } else if (reward.applies_to === 'service') {
-        const matchingItems = getMatchingItems(
-          eligibleItems,
-          'service',
-          reward.target_service_id,
-          reward.target_service_category_id
-        );
-
-        if (matchingItems.length > 0) {
-          targetName = reward.target_service_id
-            ? matchingItems[0].item_name
-            : reward.target_service_category_id
-              ? 'Services'
-              : 'All Services';
-
-          const totalItemPrice = matchingItems.reduce(
-            (sum, item) => sum + item.unit_price * item.quantity,
-            0
-          );
-          discountAmount = calculateRewardDiscount(reward, totalItemPrice);
-        }
-      }
-
-      discountAmount = round2(discountAmount);
-
-      if (discountAmount > 0) {
-        rewardResults.push({
-          applies_to: reward.applies_to,
-          discount_type: reward.discount_type,
-          target_name: targetName,
-          discount_amount: discountAmount,
-        });
       }
     }
 
-    // Sum up total discount, never exceed subtotal
-    let totalDiscount = round2(
-      rewardResults.reduce((sum, r) => sum + r.discount_amount, 0)
-    );
-    totalDiscount = Math.min(totalDiscount, subtotal);
-    totalDiscount = round2(totalDiscount);
-
-    // Build description string
-    const description = rewardResults
-      .map((r) => buildRewardDescription(r))
-      .join(' + ') || 'Coupon applied';
+    // 9. Calculate discounts using shared utility (handles sale/combo exclusion)
+    const rewards: CouponRewardRow[] = coupon.coupon_rewards || [];
+    const result = calculateCouponDiscount(rewards, cartItems, subtotal);
 
     return NextResponse.json({
       data: {
         id: coupon.id,
         code: coupon.code,
         name: coupon.name || null,
-        rewards: rewardResults,
-        total_discount: totalDiscount,
-        description,
-        excluded_count: excludedCount,
+        rewards: result.rewards,
+        total_discount: result.total_discount,
+        description: result.description,
+        excluded_count: result.excluded_count,
         ...(customerTypeWarning ? { warning: customerTypeWarning } : {}),
       },
     });
@@ -587,28 +440,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function getMatchingItems(
-  items: CartItem[],
-  itemType: 'product' | 'service',
-  targetId: string | null,
-  targetCategoryId: string | null
-): CartItem[] {
-  return items.filter((item) => {
-    if (item.item_type !== itemType) return false;
-
-    if (targetId) {
-      return itemType === 'product'
-        ? item.product_id === targetId
-        : item.service_id === targetId;
-    }
-
-    if (targetCategoryId) {
-      return item.category_id === targetCategoryId;
-    }
-
-    // No specific target — match all items of this type
-    return true;
-  });
 }

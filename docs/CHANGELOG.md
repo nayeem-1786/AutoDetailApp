@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Booking coupons stacking on sale-priced services — 2026-03-17
+
+- **Root cause**: Booking coupon endpoint (`/api/book/validate-coupon`) had zero sale awareness — calculated discounts on all items regardless of sale status. POS correctly blocked this via `pricing_type` checks.
+- **Consolidation**: Coupon discount calculation now lives in a single shared utility (`src/lib/utils/coupon-helpers.ts`). Both POS and booking endpoints use `calculateCouponDiscount()` which returns `{ rewards, total_discount, excluded_count, description }`. No more duplicated inline discount logic.
+- **Booking sale detection**: Server-side — fetches service details including `sale_price`, `sale_starts_at`, `sale_ends_at`, `pricing_model`, and `service_pricing` tiers. Uses `getSaleStatus()` to determine if each item is on sale. For flat/per_unit, checks `sale_price < base`. For tiered, checks if submitted price matches a tier's `sale_price`.
+- **Booking rejection**: If ALL items are on sale, coupon is rejected with "all items already have sale pricing". If mixed, sale items are excluded from discount calculation.
+- **Client display**: Booking coupon section now shows "X sale item(s) excluded" when some items are excluded.
+- **POS unchanged**: Response shape and behavior identical — still uses `pricing_type` from cart items, same `excluded_count` in response.
+- **Other callers**: Updated `checkout/create-payment-intent` and `pos/promotions/available` to handle the new `CouponDiscountResult` return type (`.total_discount` instead of raw number).
+
+---
+
 ## fix: Sale pricing ignored on ticket/quote when dates left empty — 2026-03-17
 
 - **Root cause**: 7 locations constructed `saleWindow` using `(service.sale_starts_at || service.sale_ends_at)` as a guard. When both dates are null (admin says "Leave dates empty for no time limit"), `null || null` is falsy, so `saleWindow = null`. `resolveServicePriceWithSale()` sees `!saleWindow` and bails with `isOnSale: false` — never calling `getSaleStatus()`, which correctly treats null dates as "always active."

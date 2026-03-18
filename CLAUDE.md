@@ -95,6 +95,7 @@ The full database schema is documented in `docs/dev/DB_SCHEMA.md`. This file con
 - **POS has TWO timeout systems**: Idle timeout (Admin > Settings, transparent overlay, PIN re-entry, session alive) vs JWT token expiry (12hr hardcoded, full redirect to login, session dead). Both are needed.
 - **Stripe Terminal in PWA**: Requires pfSense DNS exception — `private-domain: "stripe-terminal-local-reader.net"` in Unbound custom options. Without this, iPad Safari PWA can't resolve Stripe's local reader DNS (desktop browsers bypass via DoH).
 - **Vehicle categories**: 5 categories — automobile, motorcycle, rv, boat, aircraft. Constants in `src/lib/utils/vehicle-categories.ts`. Specialty vehicle pricing tiers map to `service_pricing.tier_name` via `vehicles.specialty_tier`. Automobiles use `vehicle_type` for pricing resolution instead.
+- **Coupon discount rules**: ALL coupon business logic (sale/combo no-stacking, discount calculation, eligible-item filtering) lives in `src/lib/utils/coupon-helpers.ts`. Both POS (`/api/pos/coupons/validate`) and booking (`/api/book/validate-coupon`) endpoints use `calculateCouponDiscount()`. Add new coupon rules to the shared utility, NOT to individual endpoints.
 
 ## Current Phase
 

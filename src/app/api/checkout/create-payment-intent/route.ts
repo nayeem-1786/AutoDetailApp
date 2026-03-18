@@ -206,12 +206,12 @@ export async function POST(request: NextRequest) {
           }));
 
           const subtotalDollars = subtotalCents / 100;
-          const discountDollars = calculateCouponDiscount(
+          const discountResult = calculateCouponDiscount(
             (coupon as unknown as CouponRow).coupon_rewards,
             couponItems,
             subtotalDollars
           );
-          discountCents = Math.round(discountDollars * 100);
+          discountCents = Math.round(discountResult.total_discount * 100);
           couponId = coupon.id;
           resolvedCouponCode = coupon.code;
         }

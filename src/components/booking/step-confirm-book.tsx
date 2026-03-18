@@ -46,6 +46,7 @@ interface AppliedCoupon {
   code: string;
   discount: number;
   description: string;
+  excluded_count?: number;
 }
 
 export interface StepConfirmBookProps {
@@ -249,6 +250,7 @@ export function StepConfirmBook({
         code: result.data.code,
         discount: result.data.total_discount,
         description: result.data.description,
+        excluded_count: result.data.excluded_count ?? 0,
       });
       setCouponInput('');
     } catch {
@@ -525,6 +527,11 @@ export function StepConfirmBook({
                     {appliedCoupon ? (
                       <span className="text-sm font-semibold text-success">
                         Saving {formatCurrency(appliedCoupon.discount)} with {appliedCoupon.code}
+                        {appliedCoupon.excluded_count != null && appliedCoupon.excluded_count > 0 && (
+                          <span className="ml-1 text-xs font-normal text-site-text-muted">
+                            ({appliedCoupon.excluded_count} sale item{appliedCoupon.excluded_count > 1 ? 's' : ''} excluded)
+                          </span>
+                        )}
                       </span>
                     ) : (
                       <span className="text-sm font-semibold text-site-text-secondary">

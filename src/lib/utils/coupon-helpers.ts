@@ -1,4 +1,5 @@
-// Shared coupon evaluation helpers used by validate route and promotions API
+// ALL coupon business rules live here. Both POS and booking endpoints use
+// this. Add new rules HERE, not in individual endpoints.
 
 import type { CustomerType } from '@/lib/supabase/types';
 
@@ -228,12 +229,36 @@ function getMatchingItems(
   });
 }
 
+export interface RewardResult {
+  applies_to: string;
+  discount_type: string;
+  target_name: string;
+  discount_amount: number;
+}
+
+export interface CouponDiscountResult {
+  rewards: RewardResult[];
+  total_discount: number;
+  excluded_count: number;
+  description: string;
+}
+
+/**
+ * Calculate coupon discount with sale/combo no-stacking enforcement.
+ *
+ * Items with pricing_type 'sale' or 'combo' are excluded from the discount.
+ * If ALL items are excluded, returns total_discount: 0 and excluded_count equal
+ * to the total item count — the caller should reject the coupon.
+ */
 export function calculateCouponDiscount(
   rewards: CouponRewardRow[],
   items: CartItem[],
   subtotal: number
-): number {
+): CouponDiscountResult {
   // No-stacking: filter out items with sale/combo pricing
+  const excludedCount = items.filter(
+    (i) => i.pricing_type === 'sale' || i.pricing_type === 'combo'
+  ).length;
   const eligibleItems = items.filter(
     (i) => !i.pricing_type || i.pricing_type === 'standard'
   );
@@ -242,30 +267,58 @@ export function calculateCouponDiscount(
     0
   );
 
-  let totalDiscount = 0;
+  const rewardResults: RewardResult[] = [];
 
   for (const reward of rewards) {
     let discountAmount = 0;
+    let targetName = 'Order';
 
     if (reward.applies_to === 'order') {
       discountAmount = calculateRewardDiscount(reward, eligibleSubtotal);
     } else if (reward.applies_to === 'product') {
       const matching = getMatchingItems(eligibleItems, 'product', reward.target_product_id, reward.target_product_category_id);
       if (matching.length > 0) {
-        const totalItemPrice = matching.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+        targetName = reward.target_product_id
+          ? matching[0].item_name
+          : reward.target_product_category_id ? 'Products' : 'All Products';
+        const totalItemPrice = matching.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
         discountAmount = calculateRewardDiscount(reward, totalItemPrice);
       }
     } else if (reward.applies_to === 'service') {
       const matching = getMatchingItems(eligibleItems, 'service', reward.target_service_id, reward.target_service_category_id);
       if (matching.length > 0) {
-        const totalItemPrice = matching.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+        targetName = reward.target_service_id
+          ? matching[0].item_name
+          : reward.target_service_category_id ? 'Services' : 'All Services';
+        const totalItemPrice = matching.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
         discountAmount = calculateRewardDiscount(reward, totalItemPrice);
       }
     }
 
-    totalDiscount += round2(discountAmount);
+    discountAmount = round2(discountAmount);
+
+    if (discountAmount > 0) {
+      rewardResults.push({
+        applies_to: reward.applies_to,
+        discount_type: reward.discount_type,
+        target_name: targetName,
+        discount_amount: discountAmount,
+      });
+    }
   }
 
+  let totalDiscount = round2(
+    rewardResults.reduce((sum, r) => sum + r.discount_amount, 0)
+  );
   totalDiscount = Math.min(totalDiscount, subtotal);
-  return round2(totalDiscount);
+  totalDiscount = round2(totalDiscount);
+
+  const description = rewardResults
+    .map((r) => {
+      if (r.discount_type === 'free') return `Free ${r.target_name}`;
+      return `${r.target_name} $${r.discount_amount.toFixed(2)} off`;
+    })
+    .join(' + ') || 'Coupon applied';
+
+  return { rewards: rewardResults, total_discount: totalDiscount, excluded_count: excludedCount, description };
 }
