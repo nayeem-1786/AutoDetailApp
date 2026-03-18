@@ -28,6 +28,8 @@ interface ReceiptRefund {
   amount: number;
   status: string;
   reason: string | null;
+  points_clawed_back: number;
+  points_restored: number;
   created_at: string;
   refund_items: ReceiptRefundItem[];
 }
@@ -562,6 +564,20 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
         left: 'Refund Amount',
         right: `-$${refund.amount.toFixed(2)}`,
       });
+      if (refund.points_clawed_back > 0) {
+        lines.push({
+          type: 'columns',
+          left: 'Points Reversed',
+          right: `-${refund.points_clawed_back}`,
+        });
+      }
+      if (refund.points_restored > 0) {
+        lines.push({
+          type: 'columns',
+          left: 'Points Restored',
+          right: `+${refund.points_restored}`,
+        });
+      }
     }
   }
 
@@ -1047,6 +1063,8 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     <div style="font-size:12px;color:#666;margin-top:2px;">${formatRefundDate(refund.created_at)}</div>
     ${refund.reason ? `<div style="font-size:12px;color:#666;">Reason: ${esc(refund.reason)}</div>` : ''}
     <div style="font-size:14px;font-weight:bold;color:#dc2626;margin-top:4px;">-$${refund.amount.toFixed(2)}</div>
+    ${refund.points_clawed_back > 0 ? `<div style="font-size:12px;color:#dc2626;margin-top:2px;">Points Reversed: -${refund.points_clawed_back}</div>` : ''}
+    ${refund.points_restored > 0 ? `<div style="font-size:12px;color:#16a34a;margin-top:2px;">Points Restored: +${refund.points_restored}</div>` : ''}
   </div>`).join('');
   })()}
 

@@ -179,6 +179,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Adjust loyalty points if applicable
+    let clawbackPoints = 0;
+    let restoredPoints = 0;
+
     if (transaction.customer_id && (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0)) {
       // Get current customer balance
       const { data: customer } = await supabase
@@ -194,7 +197,7 @@ export async function POST(request: NextRequest) {
 
         // 5a. Restore redeemed points
         if (transaction.loyalty_points_redeemed > 0) {
-          const restoredPoints = isFullRefund
+          restoredPoints = isFullRefund
             ? transaction.loyalty_points_redeemed
             : Math.floor(transaction.loyalty_points_redeemed * (totalRefundAmount / transaction.total_amount));
 
@@ -215,7 +218,7 @@ export async function POST(request: NextRequest) {
 
         // 5b. Claw back earned points
         if (transaction.loyalty_points_earned > 0) {
-          const clawbackPoints = isFullRefund
+          clawbackPoints = isFullRefund
             ? transaction.loyalty_points_earned
             : Math.floor(transaction.loyalty_points_earned * (totalRefundAmount / transaction.total_amount));
 
@@ -240,6 +243,17 @@ export async function POST(request: NextRequest) {
           .update({ loyalty_points_balance: Math.max(0, runningBalance) })
           .eq('id', transaction.customer_id);
       }
+    }
+
+    // Store loyalty adjustments on the refund record
+    if (clawbackPoints > 0 || restoredPoints > 0) {
+      await supabase
+        .from('refunds')
+        .update({
+          points_clawed_back: clawbackPoints,
+          points_restored: restoredPoints,
+        })
+        .eq('id', refund.id);
     }
 
     // 6. Update transaction status

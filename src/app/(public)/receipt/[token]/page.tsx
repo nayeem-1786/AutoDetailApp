@@ -46,6 +46,8 @@ interface TransactionWithRelations {
     amount: number;
     status: string;
     reason: string | null;
+    points_clawed_back: number;
+    points_restored: number;
     created_at: string;
     refund_items: {
       id: string;
@@ -309,6 +311,12 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               <p className="text-sm font-bold text-red-600 mt-1">
                 -{formatCurrency(refund.amount)}
               </p>
+              {refund.points_clawed_back > 0 && (
+                <p className="text-xs text-red-500 mt-1">Points Reversed: -{refund.points_clawed_back}</p>
+              )}
+              {refund.points_restored > 0 && (
+                <p className="text-xs text-green-500 mt-1">Points Restored: +{refund.points_restored}</p>
+              )}
             </div>
           ))}
         </div>

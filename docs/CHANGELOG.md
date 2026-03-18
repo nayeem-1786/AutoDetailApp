@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Loyalty points clawback/restoration on refund receipts — 2026-03-18
+
+- **Migration**: Added `points_clawed_back` (INTEGER DEFAULT 0) and `points_restored` (INTEGER DEFAULT 0) columns to `refunds` table.
+- **Refund route** (`/api/pos/refunds/route.ts`): Hoisted `clawbackPoints`/`restoredPoints` to outer scope, stores values on refund record after loyalty ledger writes.
+- **Types**: Updated `Refund` interface (`types.ts`), `ReceiptRefund` (`receipt-template.ts`), and `TransactionWithRelations.refunds` (`receipt/[token]/page.tsx`).
+- **Thermal receipt**: Shows "Points Reversed: -X" and "Points Restored: +X" in refund summary when > 0.
+- **HTML receipt**: Same with red text for reversed, green for restored.
+- **Public receipt page**: Same in refund summary card JSX.
+- Existing refunds default to 0/0 — no loyalty lines shown (correct behavior).
+
+---
+
 ## feat: Refund-aware receipts across all rendering paths — 2026-03-18
 
 - **Data layer** (`receipt-data.ts`): Added `refunds(*, refund_items(*))` to `fetchReceiptData()` query and pass-through mapping.

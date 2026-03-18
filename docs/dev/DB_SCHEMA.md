@@ -316,6 +316,8 @@
 | transaction_id | UUID | NOT NULL, FK → transactions(id) ON DELETE RESTRICT | |
 | status | refund_status (enum) | NOT NULL, DEFAULT 'pending' | |
 | amount | DECIMAL(10,2) | NOT NULL | |
+| points_clawed_back | INTEGER | DEFAULT 0 | Earned points reversed |
+| points_restored | INTEGER | DEFAULT 0 | Redeemed points given back |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 

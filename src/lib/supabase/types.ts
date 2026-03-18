@@ -419,6 +419,8 @@ export interface Refund {
   reason: string | null;
   stripe_refund_id: string | null;
   processed_by: string | null;
+  points_clawed_back: number;
+  points_restored: number;
   created_at: string;
   updated_at: string;
 }
