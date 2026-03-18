@@ -165,6 +165,7 @@ src/app/api/admin/marketing/analytics/coupons/route.ts
 src/app/api/admin/marketing/analytics/route.ts
 src/app/api/admin/marketing/promotions/batch/route.ts
 src/app/api/admin/marketing/promotions/clear/route.ts
+src/app/api/admin/marketing/promotions/history/route.ts
 src/app/api/admin/marketing/promotions/route.ts
 ```
 
@@ -916,6 +917,7 @@ src/lib/utils/render-annotations.ts
 src/lib/utils/revalidate.ts
 src/lib/utils/role-defaults.ts
 src/lib/utils/pst-date.ts
+src/lib/utils/sale-history.ts
 src/lib/utils/sale-pricing.ts
 src/lib/utils/shipping-types.ts
 src/lib/utils/short-link.ts
@@ -1322,6 +1324,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260314000005_add_transaction_items_prerequisite_note.sql
 20260316000001_feature_flags_anon_select_policy.sql
 20260317000001_add_services_sale_price.sql
+20260317000002_sale_history.sql
 ```
 
 ---

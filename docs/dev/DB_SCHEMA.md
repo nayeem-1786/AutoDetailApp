@@ -956,6 +956,31 @@
 **Indexes:** `idx_page_block_unique` UNIQUE(page_path, block_id), `idx_page_block_path` (page_path, sort_order).
 **RLS:** Public read, authenticated full access.
 
+### sale_history
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| service_id | UUID | FK → services(id) ON DELETE CASCADE | One of service_id or product_id must be set |
+| product_id | UUID | FK → products(id) ON DELETE CASCADE | |
+| sale_name | TEXT | | Optional label, e.g. "Spring Special" |
+| pricing_snapshot | JSONB | NOT NULL | Snapshot of prices at time of sale (format varies by pricing model) |
+| pricing_model | TEXT | | vehicle_size, scope, specialty, flat, per_unit, or null for products |
+| sale_starts_at | TIMESTAMPTZ | | |
+| sale_ends_at | TIMESTAMPTZ | | |
+| ended_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | When the sale was ended/archived |
+| ended_reason | TEXT | NOT NULL, DEFAULT 'manual' | manual, overwritten, expired_cleared |
+| ended_by | UUID | FK → employees(id) | Who ended the sale |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**CHECK:** `chk_sale_history_item` — exactly one of service_id or product_id must be set.
+**Indexes:** `idx_sale_history_service` (service_id WHERE NOT NULL), `idx_sale_history_product` (product_id WHERE NOT NULL), `idx_sale_history_ended_at` (ended_at DESC).
+
+**pricing_snapshot formats:**
+- Flat: `{ base_price, sale_price }`
+- Per_unit: `{ base_price, sale_price, per_unit_label }`
+- Tiered (vehicle_size/scope/specialty): `[{ tier_name, tier_label, base_price, sale_price }]`
+- Products: `{ retail_price, sale_price }`
+
 ### announcement_tickers
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|

@@ -288,6 +288,24 @@ export interface ServicePrerequisite {
   prerequisite_service?: Service;
 }
 
+export interface SaleHistoryRecord {
+  id: string;
+  service_id: string | null;
+  product_id: string | null;
+  sale_name: string | null;
+  pricing_snapshot: any; // JSONB — typed per pricing model at usage
+  pricing_model: string | null;
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
+  ended_at: string;
+  ended_reason: 'manual' | 'overwritten' | 'expired_cleared';
+  ended_by: string | null;
+  created_at: string;
+  // Joined fields
+  service_name?: string;
+  product_name?: string;
+}
+
 export interface MobileZone {
   id: string;
   name: string;

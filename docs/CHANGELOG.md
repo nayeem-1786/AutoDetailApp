@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Sale history backend — archive table, auto-archive on clear/overwrite, history API — 2026-03-18
+
+- **New table**: `sale_history` — archives sale data before it's cleared or overwritten. Stores pricing snapshot (JSONB), pricing model, sale window dates, ended_at, ended_reason (manual/overwritten/expired_cleared), ended_by (FK → employees).
+- **Archive helper**: `src/lib/utils/sale-history.ts` — `archiveSaleData()` fetches current sale data, builds pricing snapshot per pricing model (flat, per_unit, tiered, product), inserts into `sale_history`. Single point of archival used by both endpoints.
+- **Clear endpoint**: Now archives before nulling. `ended_reason: 'manual'`. Non-blocking — archive failure doesn't prevent clear.
+- **Batch endpoint**: Now archives existing sale before overwriting. `ended_reason: 'overwritten'`. Same non-blocking pattern.
+- **History GET endpoint**: `GET /api/admin/marketing/promotions/history` — returns past sales with FK-joined service/product names, pagination (limit/offset), optional service_id/product_id filter.
+- **Auth fix**: Both clear and batch endpoints now select `id, role` from employees (was `role` only) to populate `ended_by`.
+
+---
+
 ## fix: Public category page not showing sale pricing on service cards — 2026-03-17
 
 - **Root cause**: `getStartingPrice()` in `service-card.tsx` had sale awareness for tiered models (vehicle_size, scope, specialty) via `hasAnySalePrice(tiers)`, but `flat` and `per_unit` cases always returned `isOnSale: false` — they never checked `service.sale_price`.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { archiveSaleData } from '@/lib/utils/sale-history';
 
 interface BatchItem {
   type: 'service' | 'product';
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data: employee } = await supabase
-    .from('employees').select('role').eq('auth_user_id', user.id).single();
+    .from('employees').select('id, role').eq('auth_user_id', user.id).single();
   if (!employee || !['super_admin', 'admin'].includes(employee.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
@@ -33,6 +34,19 @@ export async function POST(request: NextRequest) {
 
   for (const item of body.items) {
     try {
+      // Archive existing sale before overwriting (non-blocking)
+      try {
+        await archiveSaleData({
+          supabase: admin,
+          serviceId: item.type === 'service' ? item.id : undefined,
+          productId: item.type === 'product' ? item.id : undefined,
+          endedReason: 'overwritten',
+          endedBy: employee.id,
+        });
+      } catch (err) {
+        console.error('[Promotions] Failed to archive sale history:', err);
+      }
+
       if (item.type === 'service') {
         // Update sale dates (and flat/per_unit sale_price if provided) on service
         const svcUpdate: Record<string, unknown> = {
