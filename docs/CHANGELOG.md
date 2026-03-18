@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Delete individual sale history records — 2026-03-18
+
+- **Backend**: Added `DELETE` handler to `/api/admin/marketing/promotions/history`. Accepts `{ id }` in body, deletes single `sale_history` record, returns 404 if not found. Same admin auth pattern as GET.
+- **Frontend**: Red trash icon button on each Sale History row (after Duplicate button). Confirmation dialog via `ConfirmDialog` component — "Delete this history record? This cannot be undone." On confirm: removes row from local state (no refetch) + success toast. On error: error toast.
+
+---
+
 ## feat: Sale history display + duplicate action on promotions page — 2026-03-18
 
 - **Pre-work**: Extracted QuickSaleDialog from page.tsx into `_components/quick-sale-dialog.tsx` (~300 lines). Page.tsx reduced from 789 to ~310 lines.

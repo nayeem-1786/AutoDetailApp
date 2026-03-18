@@ -51,3 +51,33 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ data: records, total: count ?? 0 });
 }
+
+export async function DELETE(request: NextRequest) {
+  // Auth check
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { data: employee } = await supabase
+    .from('employees').select('role').eq('auth_user_id', user.id).single();
+  if (!employee || !['super_admin', 'admin'].includes(employee.role))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const body = await request.json();
+  const { id } = body as { id: string };
+  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('sale_history')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true });
+}

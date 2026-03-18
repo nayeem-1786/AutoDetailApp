@@ -7,7 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
-import { ChevronDown, ChevronRight, Copy } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { SaleHistoryRecord } from '@/lib/supabase/types';
 
 // ─── Snapshot Price Display ────────────────────────────────
@@ -106,6 +108,8 @@ export function SaleHistorySection({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SaleHistoryRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchHistory = useCallback(async (offset: number) => {
     setLoading(true);
@@ -140,6 +144,27 @@ export function SaleHistorySection({
 
   function handleLoadMore() {
     fetchHistory(records.length);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/admin/marketing/promotions/history', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id }),
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      setRecords((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      setTotal((prev) => prev - 1);
+      toast.success('History record deleted');
+    } catch {
+      toast.error('Failed to delete history record');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   }
 
   const hasMore = records.length < total;
@@ -212,6 +237,15 @@ export function SaleHistorySection({
                           >
                             <Copy className="h-3.5 w-3.5" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setDeleteTarget(record)}
+                            title="Delete history record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -229,6 +263,16 @@ export function SaleHistorySection({
           )}
         </CardContent>
       )}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete History Record"
+        description="Delete this history record? This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleting}
+        onConfirm={handleDeleteConfirm}
+      />
     </Card>
   );
 }
