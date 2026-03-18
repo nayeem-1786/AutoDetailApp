@@ -682,7 +682,7 @@ function QuickSaleDialog({
               <Input
                 type="number"
                 min="0"
-                step={discountType === 'percentage' ? '1' : '0.01'}
+                step="1"
                 placeholder="0"
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value === '' ? '' : parseFloat(e.target.value))}
