@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
@@ -12,7 +11,6 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import {
-  Search,
   Plus,
   ChevronDown,
   ChevronRight,
@@ -86,7 +84,6 @@ export default function PromotionsPage() {
   const [items, setItems] = useState<PromotionItem[]>([]);
   const [counts, setCounts] = useState<Counts>({ active: 0, scheduled: 0, expired: 0, no_sale: 0 });
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'service' | 'product'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'scheduled' | 'expired' | 'no_sale'>('all');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['active', 'scheduled', 'expired']));
@@ -103,7 +100,6 @@ export default function PromotionsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (search) params.set('search', search);
       if (typeFilter !== 'all') params.set('type', typeFilter);
       if (statusFilter !== 'all') params.set('status', statusFilter);
 
@@ -117,11 +113,10 @@ export default function PromotionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, typeFilter, statusFilter]);
+  }, [typeFilter, statusFilter]);
 
   useEffect(() => {
-    const timer = setTimeout(fetchData, 300);
-    return () => clearTimeout(timer);
+    fetchData();
   }, [fetchData]);
 
   const grouped = useMemo(() => {
@@ -289,19 +284,9 @@ export default function PromotionsPage() {
         }
       />
 
-      {/* Search & Filters */}
+      {/* Filters */}
       <Card>
         <CardContent className="pt-5 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search services and products by name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-gray-500 font-medium">Type:</span>

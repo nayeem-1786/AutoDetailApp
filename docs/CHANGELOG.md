@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Remove search bar from Promotions page — 2026-03-18
+
+- Removed search input, `search` state, and debounce timer from `page.tsx`
+- Removed `Search` (lucide) and `Input` imports now unused by the page
+- Removed `search` query parameter from `fetchData` API call
+- Fetch now fires immediately on filter change (no 300ms debounce needed without search)
+- Type filter pills and status filter pills unchanged
+- Quick Sale dialog retains its own independent search
+
+---
+
 ## feat: Delete individual sale history records — 2026-03-18
 
 - **Backend**: Added `DELETE` handler to `/api/admin/marketing/promotions/history`. Accepts `{ id }` in body, deletes single `sale_history` record, returns 404 if not found. Same admin auth pattern as GET.
