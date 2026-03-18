@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (type === 'all' || type === 'service') {
     let query = admin
       .from('services')
-      .select('id, name, slug, pricing_model, flat_price, per_unit_price, sale_price, sale_starts_at, sale_ends_at, is_active, service_pricing(id, tier_name, tier_label, price, sale_price, display_order)')
+      .select('id, name, slug, pricing_model, flat_price, per_unit_price, per_unit_label, sale_price, sale_starts_at, sale_ends_at, is_active, service_pricing(id, tier_name, tier_label, price, sale_price, display_order)')
       .eq('is_active', true)
       .order('name');
 

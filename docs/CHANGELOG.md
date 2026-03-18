@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Promotions inline edit, adaptive column layout, conflict detection — 2026-03-18
+
+- **Adaptive Sale Price column**: Replaced 3 hardcoded tier columns (Sedan/Truck/SUV) with a single adaptive column that renders correctly per pricing model — vehicle_size (stacked tiers), scope/specialty (labeled tiers), flat (single line), per_unit (with per_unit_label like "/panel"), and products.
+- **Sale Period column**: Replaced "Ends" column with full date range display using PST-aware formatting ("Mar 17 – Apr 30", "From Mar 17", "Until Apr 30", "No limit").
+- **Inline editing**: Click pencil to edit any row's sale price and dates directly in the table. Supports all pricing models. Discount type toggle (Direct Price / % Off / $ Off) with auto-calculation. Validation prevents sale_price >= base_price. Only one row editable at a time with discard-confirm dialog for unsaved changes.
+- **Conflict detection**: Quick Sale dialog now shows inline warning badges when adding items with existing active or scheduled sales, displaying current sale prices so admins know what they're overwriting.
+- **Component extraction**: Extracted `PromotionRow` (~400 lines) into `_components/promotion-row.tsx` to keep page.tsx manageable.
+- **GET endpoint**: Added `per_unit_label` to services select for adaptive column display.
+- **New utility**: `formatPstShortDate()` in `pst-date.ts` for PST-aware short date formatting.
+
+---
+
 ## feat: Sale history backend — archive table, auto-archive on clear/overwrite, history API — 2026-03-18
 
 - **New table**: `sale_history` — archives sale data before it's cleared or overwritten. Stores pricing snapshot (JSONB), pricing model, sale window dates, ended_at, ended_reason (manual/overwritten/expired_cleared), ended_by (FK → employees).

@@ -80,3 +80,15 @@ export function pstStartOfDayLiteral(dateStr: string): string {
   const offset = getPstOffset(new Date(dateStr + 'T12:00:00'));
   return `${dateStr}T00:00:00${offset}`;
 }
+
+/**
+ * Format an ISO timestamp as a short PST/PDT date for display.
+ * Example: "Mar 17", "Apr 30", "Dec 25"
+ */
+export function formatPstShortDate(isoString: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: LA_TZ,
+  }).format(new Date(isoString));
+}

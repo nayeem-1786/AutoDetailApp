@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -23,47 +22,23 @@ import { FormField } from '@/components/ui/form-field';
 import { formatCurrency } from '@/lib/utils/format';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import {
-  isEndingSoon,
-} from '@/lib/utils/sale-pricing';
-import {
   Search,
   Plus,
-  Pencil,
   X,
   ChevronDown,
   ChevronRight,
   Wrench,
   ShoppingBag,
+  AlertTriangle,
 } from 'lucide-react';
+import {
+  PromotionRow,
+  isDirty,
+  initEditState,
+} from './_components/promotion-row';
+import type { PromotionItem, ServicePricingRow } from './_components/promotion-row';
 
 // ─── Types ──────────────────────────────────────────────────
-
-interface ServicePricingRow {
-  id: string;
-  tier_name: string;
-  tier_label: string | null;
-  price: number;
-  sale_price: number | null;
-  display_order: number;
-}
-
-interface PromotionItem {
-  id: string;
-  name: string;
-  slug: string;
-  item_type: 'service' | 'product';
-  sale_status: 'active' | 'scheduled' | 'expired' | 'no_sale';
-  sale_starts_at: string | null;
-  sale_ends_at: string | null;
-  // Service fields
-  pricing_model?: string;
-  flat_price?: number | null;
-  per_unit_price?: number | null;
-  service_pricing?: ServicePricingRow[];
-  // Product fields
-  retail_price?: number;
-  sale_price?: number | null;
-}
 
 interface Counts {
   active: number;
@@ -75,7 +50,6 @@ interface Counts {
 // ─── Main Page ──────────────────────────────────────────────
 
 export default function PromotionsPage() {
-  const router = useRouter();
   const [items, setItems] = useState<PromotionItem[]>([]);
   const [counts, setCounts] = useState<Counts>({ active: 0, scheduled: 0, expired: 0, no_sale: 0 });
   const [loading, setLoading] = useState(true);
@@ -86,6 +60,16 @@ export default function PromotionsPage() {
   const [quickSaleOpen, setQuickSaleOpen] = useState(false);
   const [clearConfirmItem, setClearConfirmItem] = useState<PromotionItem | null>(null);
   const [clearing, setClearing] = useState(false);
+
+  // Inline edit state — only one row editable at a time
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [discardConfirmTarget, setDiscardConfirmTarget] = useState<string | null>(null);
+
+  // Find the currently editing item for dirty checks
+  const editingItem = useMemo(
+    () => (editingRowId ? items.find((i) => `${i.item_type}-${i.id}` === editingRowId) : null),
+    [editingRowId, items]
+  );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -146,12 +130,37 @@ export default function PromotionsPage() {
       if (!res.ok) throw new Error('Failed');
       toast.success(`Sale ended for ${item.name}`);
       setClearConfirmItem(null);
+      setEditingRowId(null);
       fetchData();
     } catch {
       toast.error('Failed to clear sale');
     } finally {
       setClearing(false);
     }
+  }
+
+  function handleStartEdit(rowKey: string) {
+    // If another row is being edited, check dirty state
+    if (editingRowId && editingRowId !== rowKey && editingItem) {
+      // We need to check if the editing row has unsaved changes
+      // The PromotionRow manages its own edit state, so we use a simple
+      // confirm dialog approach — target the new row, ask to discard
+      setDiscardConfirmTarget(rowKey);
+      return;
+    }
+    setEditingRowId(rowKey);
+  }
+
+  function handleConfirmDiscard() {
+    if (discardConfirmTarget) {
+      setEditingRowId(discardConfirmTarget);
+      setDiscardConfirmTarget(null);
+    }
+  }
+
+  function handleSaved() {
+    setEditingRowId(null);
+    fetchData();
   }
 
   const STATUS_SECTIONS: { key: string; label: string; emoji: string }[] = [
@@ -284,28 +293,26 @@ export default function PromotionsPage() {
                           <tr className="border-b border-gray-200">
                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Type</th>
                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Name</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Sedan</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Truck/SUV</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">SUV/Van</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Ends</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Sale Price</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Sale Period</th>
                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {sectionItems.map((item) => (
-                            <PromotionRow
-                              key={`${item.item_type}-${item.id}`}
-                              item={item}
-                              onEdit={() => {
-                                if (item.item_type === 'service') {
-                                  router.push(`/admin/catalog/services/${item.id}`);
-                                } else {
-                                  router.push(`/admin/catalog/products/${item.id}`);
-                                }
-                              }}
-                              onEndSale={() => setClearConfirmItem(item)}
-                            />
-                          ))}
+                          {sectionItems.map((item) => {
+                            const rowKey = `${item.item_type}-${item.id}`;
+                            return (
+                              <PromotionRow
+                                key={rowKey}
+                                item={item}
+                                isEditing={editingRowId === rowKey}
+                                onStartEdit={() => handleStartEdit(rowKey)}
+                                onCancelEdit={() => setEditingRowId(null)}
+                                onEndSale={() => setClearConfirmItem(item)}
+                                onSaved={handleSaved}
+                              />
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -316,6 +323,17 @@ export default function PromotionsPage() {
           })}
         </div>
       )}
+
+      {/* Discard unsaved changes confirm */}
+      <ConfirmDialog
+        open={!!discardConfirmTarget}
+        onOpenChange={(open) => !open && setDiscardConfirmTarget(null)}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes on the current row. Discard them and edit the new row?"
+        confirmLabel="Discard"
+        variant="destructive"
+        onConfirm={handleConfirmDiscard}
+      />
 
       {/* End Sale Confirm */}
       <ConfirmDialog
@@ -339,91 +357,6 @@ export default function PromotionsPage() {
   );
 }
 
-// ─── Promotion Row ──────────────────────────────────────────
-
-function PromotionRow({
-  item,
-  onEdit,
-  onEndSale,
-}: {
-  item: PromotionItem;
-  onEdit: () => void;
-  onEndSale: () => void;
-}) {
-  const Icon = item.item_type === 'service' ? Wrench : ShoppingBag;
-  const tiers = item.service_pricing
-    ? [...item.service_pricing].sort((a, b) => a.display_order - b.display_order)
-    : [];
-
-  function renderPrice(standard: number, sale: number | null) {
-    if (sale === null || item.sale_status === 'no_sale') {
-      return <span className="text-gray-600">{formatCurrency(standard)}</span>;
-    }
-    return (
-      <span>
-        <span className="text-gray-400 line-through text-xs">{formatCurrency(standard)}</span>
-        <span className="ml-1 font-medium text-green-600">{formatCurrency(sale)}</span>
-      </span>
-    );
-  }
-
-  function renderTierCell(tierName: string) {
-    if (item.item_type === 'product') {
-      // Products span across tier columns — only show in first
-      if (tierName === 'sedan') {
-        return renderPrice(item.retail_price!, item.sale_price ?? null);
-      }
-      return <span className="text-gray-300">—</span>;
-    }
-    // Flat/per_unit services: show price in first column only
-    if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
-      if (tierName === 'sedan') {
-        const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
-        return renderPrice(basePrice, item.sale_price ?? null);
-      }
-      return <span className="text-gray-300">—</span>;
-    }
-    const tier = tiers.find((t) => t.tier_name === tierName);
-    if (!tier) return <span className="text-gray-300">—</span>;
-    return renderPrice(tier.price, tier.sale_price);
-  }
-
-  const endDate = item.sale_ends_at ? new Date(item.sale_ends_at) : null;
-  const endingSoon = isEndingSoon(endDate);
-
-  return (
-    <tr className="border-b border-gray-100 hover:bg-gray-50">
-      <td className="px-3 py-2">
-        <Icon className="h-4 w-4 text-gray-400" />
-      </td>
-      <td className="px-3 py-2 font-medium text-gray-900">{item.name}</td>
-      <td className="px-3 py-2">{renderTierCell('sedan')}</td>
-      <td className="px-3 py-2">{renderTierCell('truck_suv_2row')}</td>
-      <td className="px-3 py-2">{renderTierCell('suv_3row_van')}</td>
-      <td className="px-3 py-2 text-xs text-gray-500">
-        {endDate && (
-          <span className={endingSoon ? 'text-amber-600 font-medium' : ''}>
-            {endingSoon && '⏰ '}
-            {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-      </td>
-      <td className="px-3 py-2 text-right">
-        <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={onEdit} title="Edit">
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          {item.sale_status !== 'no_sale' && (
-            <Button variant="ghost" size="sm" onClick={onEndSale} title="End Sale">
-              <X className="h-3.5 w-3.5 text-red-500" />
-            </Button>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 // ─── Quick Sale Dialog ──────────────────────────────────────
 
 interface QuickSaleItem {
@@ -433,8 +366,15 @@ interface QuickSaleItem {
   pricing_model?: string;
   flat_price?: number | null;
   per_unit_price?: number | null;
+  per_unit_label?: string | null;
   tiers?: ServicePricingRow[];
   retail_price?: number;
+  // Conflict detection fields
+  sale_status: 'active' | 'scheduled' | 'expired' | 'no_sale';
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
+  current_sale_price?: number | null;
+  current_tier_sale_prices?: { tier_label: string | null; tier_name: string; sale_price: number | null }[];
 }
 
 function QuickSaleDialog({
@@ -497,6 +437,9 @@ function QuickSaleDialog({
 
   function addItem(item: PromotionItem) {
     if (selectedItems.some((s) => s.id === item.id && s.type === item.item_type)) return;
+    const tiers = item.service_pricing
+      ? [...item.service_pricing].sort((a, b) => a.display_order - b.display_order)
+      : undefined;
     setSelectedItems((prev) => [
       ...prev,
       {
@@ -506,8 +449,19 @@ function QuickSaleDialog({
         pricing_model: item.pricing_model,
         flat_price: item.flat_price,
         per_unit_price: item.per_unit_price,
-        tiers: item.service_pricing as ServicePricingRow[] | undefined,
+        per_unit_label: item.per_unit_label,
+        tiers,
         retail_price: item.retail_price,
+        // Conflict detection
+        sale_status: item.sale_status,
+        sale_starts_at: item.sale_starts_at,
+        sale_ends_at: item.sale_ends_at,
+        current_sale_price: item.sale_price,
+        current_tier_sale_prices: tiers?.map((t) => ({
+          tier_label: t.tier_label,
+          tier_name: t.tier_name,
+          sale_price: t.sale_price,
+        })),
       },
     ]);
     setSearchQuery('');
@@ -537,11 +491,9 @@ function QuickSaleDialog({
       if (item.type === 'service') {
         const isFlatPerUnit = item.pricing_model === 'flat' || item.pricing_model === 'per_unit';
         if (isFlatPerUnit) {
-          // Flat/per_unit: sale_price on the services table
           const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
           return { type: 'service' as const, id: item.id, sale_price: calculateSalePrice(basePrice) };
         }
-        // Tiered: sale_prices per tier on service_pricing table
         const salePrices: Record<string, number> = {};
         for (const tier of (item.tiers || [])) {
           const shouldApply =
@@ -583,6 +535,44 @@ function QuickSaleDialog({
     }
   }
 
+  function renderConflictWarning(item: QuickSaleItem) {
+    const hasConflict = item.sale_status === 'active' || item.sale_status === 'scheduled';
+    if (!hasConflict) return null;
+
+    const statusLabel = item.sale_status === 'active' ? 'active sale' : 'scheduled sale';
+
+    // Gather current sale prices for display
+    const currentPrices: string[] = [];
+    if (item.type === 'product' && item.current_sale_price != null) {
+      currentPrices.push(formatCurrency(item.current_sale_price));
+    } else if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
+      if (item.current_sale_price != null) {
+        const suffix = item.pricing_model === 'per_unit' ? `/${item.per_unit_label || 'unit'}` : '';
+        currentPrices.push(formatCurrency(item.current_sale_price) + suffix);
+      }
+    } else if (item.current_tier_sale_prices) {
+      for (const t of item.current_tier_sale_prices) {
+        if (t.sale_price != null) {
+          currentPrices.push(`${t.tier_label || t.tier_name}: ${formatCurrency(t.sale_price)}`);
+        }
+      }
+    }
+
+    return (
+      <div className="mt-1">
+        <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
+          <AlertTriangle className="h-3 w-3" />
+          Has {statusLabel}
+        </span>
+        {currentPrices.length > 0 && (
+          <p className="mt-0.5 text-[10px] text-amber-600">
+            Current: {currentPrices.join(', ')}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogClose onClose={() => onOpenChange(false)} />
@@ -617,7 +607,15 @@ function QuickSaleDialog({
                     ) : (
                       <ShoppingBag className="h-3.5 w-3.5 text-gray-400" />
                     )}
-                    <span>{r.name}</span>
+                    <span className="flex-1">
+                      {r.name}
+                      {(r.sale_status === 'active' || r.sale_status === 'scheduled') && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-amber-600">
+                          <AlertTriangle className="h-2.5 w-2.5" />
+                          {r.sale_status === 'active' ? 'Active sale' : 'Scheduled'}
+                        </span>
+                      )}
+                    </span>
                     <Badge variant="secondary" className="ml-auto text-[10px]">
                       {r.item_type}
                     </Badge>
@@ -635,22 +633,25 @@ function QuickSaleDialog({
               {selectedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm"
+                  className="rounded-md border border-gray-200 px-3 py-2 text-sm"
                 >
-                  <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-500">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="flex-1 font-medium">{item.name}</span>
-                  <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
-                  {item.type === 'product' && (
-                    <span className="text-xs text-gray-500">{formatCurrency(item.retail_price ?? 0)}</span>
-                  )}
-                  {item.type === 'service' && item.pricing_model === 'flat' && item.flat_price != null && (
-                    <span className="text-xs text-gray-500">{formatCurrency(item.flat_price)}</span>
-                  )}
-                  {item.type === 'service' && item.pricing_model === 'per_unit' && item.per_unit_price != null && (
-                    <span className="text-xs text-gray-500">{formatCurrency(item.per_unit_price)}/unit</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-500">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="flex-1 font-medium">{item.name}</span>
+                    <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
+                    {item.type === 'product' && (
+                      <span className="text-xs text-gray-500">{formatCurrency(item.retail_price ?? 0)}</span>
+                    )}
+                    {item.type === 'service' && item.pricing_model === 'flat' && item.flat_price != null && (
+                      <span className="text-xs text-gray-500">{formatCurrency(item.flat_price)}</span>
+                    )}
+                    {item.type === 'service' && item.pricing_model === 'per_unit' && item.per_unit_price != null && (
+                      <span className="text-xs text-gray-500">{formatCurrency(item.per_unit_price)}/{item.per_unit_label || 'unit'}</span>
+                    )}
+                  </div>
+                  {renderConflictWarning(item)}
                 </div>
               ))}
             </div>
@@ -737,7 +738,7 @@ function QuickSaleDialog({
                   return (
                     <p className={`ml-4 ${valid ? 'text-gray-600' : 'text-red-500'}`}>
                       {formatCurrency(basePrice)} → {formatCurrency(sp)}
-                      {item.pricing_model === 'per_unit' && ' /unit'}
+                      {item.pricing_model === 'per_unit' && ` /${item.per_unit_label || 'unit'}`}
                       {!valid && ' (invalid)'}
                     </p>
                   );
