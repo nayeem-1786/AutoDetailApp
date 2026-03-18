@@ -543,6 +543,8 @@ src/app/admin/marketing/coupons/new/page.tsx
 src/app/admin/marketing/coupons/page.tsx
 src/app/admin/marketing/promotions/page.tsx
 src/app/admin/marketing/promotions/_components/promotion-row.tsx
+src/app/admin/marketing/promotions/_components/quick-sale-dialog.tsx
+src/app/admin/marketing/promotions/_components/sale-history-section.tsx
 src/app/admin/marketing/email-templates/page.tsx
 src/app/admin/marketing/email-templates/[id]/page.tsx
 src/app/admin/marketing/email-templates/_components/template-list.tsx

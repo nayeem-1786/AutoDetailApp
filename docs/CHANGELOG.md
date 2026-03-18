@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Sale history display + duplicate action on promotions page — 2026-03-18
+
+- **Pre-work**: Extracted QuickSaleDialog from page.tsx into `_components/quick-sale-dialog.tsx` (~300 lines). Page.tsx reduced from 789 to ~310 lines.
+- **Sale History Section** (`_components/sale-history-section.tsx`): Lazy-loaded collapsible card below the existing status sections. Fetches from `/api/admin/marketing/promotions/history` on expand. Shows item name, snapshot prices, sale period, ended date, reason badge. Pagination with "Load More" (20 per page).
+- **SnapshotPriceDisplay**: New component parsing `pricing_snapshot` JSONB — handles tiered (array), flat, per_unit, and product shapes. Matches the visual style of AdaptivePriceDisplay (strikethrough base + green sale).
+- **Duplicate from History**: Copy button on each history row. Looks up the current item in the loaded items array, checks for pricing model mismatches (warning toast), pre-fills QuickSaleDialog with snapshot prices in "Direct price" mode, dates empty for admin to set.
+- **Duplicate from Active/Expired rows**: Copy button on PromotionRow for items with active, scheduled, or expired sales. Same pre-fill flow using current sale prices.
+- **QuickSaleDialog pre-fill mode**: New `prefill` prop with `{ item, source }`. Reset effect applies prefill AFTER clearing state. Shows blue info banner "Duplicating from: [name] (ended [date])". Discount section hidden in direct mode. "Switch to percentage/fixed" link to exit direct mode.
+- **Direct discount type**: New third discount type `'direct'` — uses pre-filled exact prices instead of calculating from percentage/fixed. Apply button enabled when items selected (no discount value needed). Batch payload uses `prefilled_sale_price` or `prefilled_tier_sale_prices` from QuickSaleItem.
+
+---
+
 ## fix: Quick Sale search result buttons not responding to clicks — 2026-03-18
 
 - **Root cause**: Search result `<button>` elements lacked `type="button"`, defaulting to `type="submit"`. While no `<form>` ancestor exists, the missing attribute caused inconsistent click handling across browsers.

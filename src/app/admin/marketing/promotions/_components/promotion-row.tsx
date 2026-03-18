@@ -9,7 +9,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import { timestampToPstDate } from '@/lib/utils/pst-date';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
-import { Pencil, X, Check, Wrench, ShoppingBag } from 'lucide-react';
+import { Pencil, X, Check, Copy, Wrench, ShoppingBag } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -388,6 +388,7 @@ export function PromotionRow({
   onCancelEdit,
   onEndSale,
   onSaved,
+  onDuplicate,
 }: {
   item: PromotionItem;
   isEditing: boolean;
@@ -395,6 +396,7 @@ export function PromotionRow({
   onCancelEdit: () => void;
   onEndSale: () => void;
   onSaved: () => void;
+  onDuplicate?: () => void;
 }) {
   const Icon = item.item_type === 'service' ? Wrench : ShoppingBag;
   const [editState, setEditState] = useState<EditState>(() => initEditState(item));
@@ -536,6 +538,11 @@ export function PromotionRow({
             <Button variant="ghost" size="sm" onClick={handleStartEdit} title="Edit">
               <Pencil className="h-3.5 w-3.5" />
             </Button>
+            {item.sale_status !== 'no_sale' && onDuplicate && (
+              <Button variant="ghost" size="sm" onClick={onDuplicate} title="Duplicate sale with new dates">
+                <Copy className="h-3.5 w-3.5 text-blue-500" />
+              </Button>
+            )}
             {item.sale_status !== 'no_sale' && (
               <Button variant="ghost" size="sm" onClick={onEndSale} title="End Sale">
                 <X className="h-3.5 w-3.5 text-red-500" />

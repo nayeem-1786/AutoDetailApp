@@ -9,34 +9,22 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  Dialog,
-  DialogHeader,
-  DialogTitle,
-  DialogContent,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { FormField } from '@/components/ui/form-field';
 import { formatCurrency } from '@/lib/utils/format';
-import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
+import { formatPstShortDate } from '@/lib/utils/pst-date';
 import {
   Search,
   Plus,
-  X,
   ChevronDown,
   ChevronRight,
-  Wrench,
-  ShoppingBag,
-  AlertTriangle,
 } from 'lucide-react';
 import {
   PromotionRow,
-  isDirty,
-  initEditState,
 } from './_components/promotion-row';
-import type { PromotionItem, ServicePricingRow } from './_components/promotion-row';
+import type { PromotionItem } from './_components/promotion-row';
+import { QuickSaleDialog } from './_components/quick-sale-dialog';
+import type { QuickSaleItem, QuickSalePrefill } from './_components/quick-sale-dialog';
+import { SaleHistorySection } from './_components/sale-history-section';
+import type { SaleHistoryRecord } from '@/lib/supabase/types';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -45,6 +33,51 @@ interface Counts {
   scheduled: number;
   expired: number;
   no_sale: number;
+}
+
+// ─── Helpers ────────────────────────────────────────────────
+
+/** Build a QuickSaleItem from a PromotionItem with current sale prices as prefill */
+function buildPrefillFromPromotion(item: PromotionItem): QuickSaleItem {
+  const tiers = item.service_pricing
+    ? [...item.service_pricing].sort((a, b) => a.display_order - b.display_order)
+    : undefined;
+
+  const base: QuickSaleItem = {
+    type: item.item_type,
+    id: item.id,
+    name: item.name,
+    pricing_model: item.pricing_model,
+    flat_price: item.flat_price,
+    per_unit_price: item.per_unit_price,
+    per_unit_label: item.per_unit_label,
+    tiers,
+    retail_price: item.retail_price,
+    sale_status: item.sale_status,
+    sale_starts_at: item.sale_starts_at,
+    sale_ends_at: item.sale_ends_at,
+    current_sale_price: item.sale_price,
+    current_tier_sale_prices: tiers?.map((t) => ({
+      tier_label: t.tier_label,
+      tier_name: t.tier_name,
+      sale_price: t.sale_price,
+    })),
+  };
+
+  // Pre-fill sale prices for direct mode
+  if (item.item_type === 'product') {
+    base.prefilled_sale_price = item.sale_price ?? null;
+  } else if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
+    base.prefilled_sale_price = item.sale_price ?? null;
+  } else if (tiers) {
+    const tierPrices: Record<string, number> = {};
+    for (const t of tiers) {
+      if (t.sale_price != null) tierPrices[t.tier_name] = t.sale_price;
+    }
+    if (Object.keys(tierPrices).length > 0) base.prefilled_tier_sale_prices = tierPrices;
+  }
+
+  return base;
 }
 
 // ─── Main Page ──────────────────────────────────────────────
@@ -58,18 +91,13 @@ export default function PromotionsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'scheduled' | 'expired' | 'no_sale'>('all');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['active', 'scheduled', 'expired']));
   const [quickSaleOpen, setQuickSaleOpen] = useState(false);
+  const [quickSalePrefill, setQuickSalePrefill] = useState<QuickSalePrefill | null>(null);
   const [clearConfirmItem, setClearConfirmItem] = useState<PromotionItem | null>(null);
   const [clearing, setClearing] = useState(false);
 
-  // Inline edit state — only one row editable at a time
+  // Inline edit state
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [discardConfirmTarget, setDiscardConfirmTarget] = useState<string | null>(null);
-
-  // Find the currently editing item for dirty checks
-  const editingItem = useMemo(
-    () => (editingRowId ? items.find((i) => `${i.item_type}-${i.id}` === editingRowId) : null),
-    [editingRowId, items]
-  );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,7 +124,6 @@ export default function PromotionsPage() {
     return () => clearTimeout(timer);
   }, [fetchData]);
 
-  // Group items by sale_status
   const grouped = useMemo(() => {
     const groups: Record<string, PromotionItem[]> = {
       active: [],
@@ -140,11 +167,7 @@ export default function PromotionsPage() {
   }
 
   function handleStartEdit(rowKey: string) {
-    // If another row is being edited, check dirty state
-    if (editingRowId && editingRowId !== rowKey && editingItem) {
-      // We need to check if the editing row has unsaved changes
-      // The PromotionRow manages its own edit state, so we use a simple
-      // confirm dialog approach — target the new row, ask to discard
+    if (editingRowId && editingRowId !== rowKey) {
       setDiscardConfirmTarget(rowKey);
       return;
     }
@@ -163,6 +186,89 @@ export default function PromotionsPage() {
     fetchData();
   }
 
+  // ─── Duplicate Handlers ──────────────────────────────────
+
+  function handleDuplicateFromRow(item: PromotionItem) {
+    const prefillItem = buildPrefillFromPromotion(item);
+    setQuickSalePrefill({
+      item: prefillItem,
+      source: `${item.name} (current)`,
+    });
+    setQuickSaleOpen(true);
+  }
+
+  function handleDuplicateFromHistory(record: SaleHistoryRecord) {
+    // Find the item in the loaded items array by service_id or product_id
+    const matchingItem = items.find((i) =>
+      (record.service_id && i.item_type === 'service' && i.id === record.service_id) ||
+      (record.product_id && i.item_type === 'product' && i.id === record.product_id)
+    );
+
+    if (!matchingItem) {
+      toast.error('This item no longer exists or is inactive');
+      return;
+    }
+
+    // Check for pricing model mismatch
+    if (record.pricing_model !== null && matchingItem.pricing_model !== record.pricing_model) {
+      toast.warning('Pricing model has changed since this sale — prices may need adjustment');
+    }
+
+    // Build the QuickSaleItem from current item data
+    const tiers = matchingItem.service_pricing
+      ? [...matchingItem.service_pricing].sort((a, b) => a.display_order - b.display_order)
+      : undefined;
+
+    const prefillItem: QuickSaleItem = {
+      type: matchingItem.item_type,
+      id: matchingItem.id,
+      name: matchingItem.name,
+      pricing_model: matchingItem.pricing_model,
+      flat_price: matchingItem.flat_price,
+      per_unit_price: matchingItem.per_unit_price,
+      per_unit_label: matchingItem.per_unit_label,
+      tiers,
+      retail_price: matchingItem.retail_price,
+      sale_status: matchingItem.sale_status,
+      sale_starts_at: matchingItem.sale_starts_at,
+      sale_ends_at: matchingItem.sale_ends_at,
+      current_sale_price: matchingItem.sale_price,
+      current_tier_sale_prices: tiers?.map((t) => ({
+        tier_label: t.tier_label,
+        tier_name: t.tier_name,
+        sale_price: t.sale_price,
+      })),
+    };
+
+    // Apply sale prices from the history snapshot
+    const snap = record.pricing_snapshot;
+    if (record.pricing_model === 'flat' || record.pricing_model === 'per_unit') {
+      prefillItem.prefilled_sale_price = snap?.sale_price ?? null;
+    } else if (record.pricing_model === null) {
+      // Product
+      prefillItem.prefilled_sale_price = snap?.sale_price ?? null;
+    } else if (Array.isArray(snap)) {
+      // Tiered
+      const tierPrices: Record<string, number> = {};
+      for (const t of snap) {
+        if (t.sale_price != null) tierPrices[t.tier_name] = t.sale_price;
+      }
+      if (Object.keys(tierPrices).length > 0) prefillItem.prefilled_tier_sale_prices = tierPrices;
+    }
+
+    const endedLabel = formatPstShortDate(record.ended_at);
+    setQuickSalePrefill({
+      item: prefillItem,
+      source: `${record.service_name || record.product_name || 'Item'} (ended ${endedLabel})`,
+    });
+    setQuickSaleOpen(true);
+  }
+
+  function handleQuickSaleOpenChange(open: boolean) {
+    setQuickSaleOpen(open);
+    if (!open) setQuickSalePrefill(null);
+  }
+
   const STATUS_SECTIONS: { key: string; label: string; emoji: string }[] = [
     { key: 'active', label: 'Active Sales', emoji: '🟢' },
     { key: 'scheduled', label: 'Scheduled', emoji: '🟡' },
@@ -176,7 +282,7 @@ export default function PromotionsPage() {
         title="Promotions"
         description="Manage sale pricing across services and products"
         action={
-          <Button onClick={() => setQuickSaleOpen(true)}>
+          <Button onClick={() => { setQuickSalePrefill(null); setQuickSaleOpen(true); }}>
             <Plus className="h-4 w-4" />
             Quick Sale
           </Button>
@@ -202,6 +308,7 @@ export default function PromotionsPage() {
               {(['all', 'service', 'product'] as const).map((t) => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => setTypeFilter(t)}
                   className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                     typeFilter === t
@@ -218,6 +325,7 @@ export default function PromotionsPage() {
               {(['all', 'active', 'scheduled', 'expired', 'no_sale'] as const).map((s) => (
                 <button
                   key={s}
+                  type="button"
                   onClick={() => setStatusFilter(s)}
                   className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                     statusFilter === s
@@ -263,7 +371,6 @@ export default function PromotionsPage() {
           {STATUS_SECTIONS.map(({ key, label, emoji }) => {
             const sectionItems = grouped[key] || [];
             if (sectionItems.length === 0) return null;
-            // Hide "No Sale" section by default unless that filter is active
             if (key === 'no_sale' && statusFilter !== 'no_sale') return null;
 
             const isExpanded = expandedSections.has(key);
@@ -271,6 +378,7 @@ export default function PromotionsPage() {
             return (
               <Card key={key}>
                 <button
+                  type="button"
                   onClick={() => toggleSection(key)}
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
                 >
@@ -310,6 +418,7 @@ export default function PromotionsPage() {
                                 onCancelEdit={() => setEditingRowId(null)}
                                 onEndSale={() => setClearConfirmItem(item)}
                                 onSaved={handleSaved}
+                                onDuplicate={() => handleDuplicateFromRow(item)}
                               />
                             );
                           })}
@@ -323,6 +432,9 @@ export default function PromotionsPage() {
           })}
         </div>
       )}
+
+      {/* Sale History */}
+      <SaleHistorySection onDuplicate={handleDuplicateFromHistory} />
 
       {/* Discard unsaved changes confirm */}
       <ConfirmDialog
@@ -350,440 +462,10 @@ export default function PromotionsPage() {
       {/* Quick Sale Dialog */}
       <QuickSaleDialog
         open={quickSaleOpen}
-        onOpenChange={setQuickSaleOpen}
+        onOpenChange={handleQuickSaleOpenChange}
         onApplied={fetchData}
+        prefill={quickSalePrefill}
       />
     </div>
-  );
-}
-
-// ─── Quick Sale Dialog ──────────────────────────────────────
-
-interface QuickSaleItem {
-  type: 'service' | 'product';
-  id: string;
-  name: string;
-  pricing_model?: string;
-  flat_price?: number | null;
-  per_unit_price?: number | null;
-  per_unit_label?: string | null;
-  tiers?: ServicePricingRow[];
-  retail_price?: number;
-  // Conflict detection fields
-  sale_status: 'active' | 'scheduled' | 'expired' | 'no_sale';
-  sale_starts_at: string | null;
-  sale_ends_at: string | null;
-  current_sale_price?: number | null;
-  current_tier_sale_prices?: { tier_label: string | null; tier_name: string; sale_price: number | null }[];
-}
-
-function QuickSaleDialog({
-  open,
-  onOpenChange,
-  onApplied,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onApplied: () => void;
-}) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<PromotionItem[]>([]);
-  const [selectedItems, setSelectedItems] = useState<QuickSaleItem[]>([]);
-  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
-  const [discountValue, setDiscountValue] = useState<number | ''>('');
-  const [applySedan, setApplySedan] = useState(true);
-  const [applyTruck, setApplyTruck] = useState(true);
-  const [applySuv, setApplySuv] = useState(true);
-  const [saleStartsAt, setSaleStartsAt] = useState('');
-  const [saleEndsAt, setSaleEndsAt] = useState('');
-  const [applying, setApplying] = useState(false);
-  const [searching, setSearching] = useState(false);
-
-  // Reset on open
-  useEffect(() => {
-    if (open) {
-      setSearchQuery('');
-      setSearchResults([]);
-      setSelectedItems([]);
-      setDiscountValue('');
-      setDiscountType('percentage');
-      setApplySedan(true);
-      setApplyTruck(true);
-      setApplySuv(true);
-      setSaleStartsAt('');
-      setSaleEndsAt('');
-    }
-  }, [open]);
-
-  // Search items
-  useEffect(() => {
-    if (!searchQuery || searchQuery.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const res = await fetch(`/api/admin/marketing/promotions?search=${encodeURIComponent(searchQuery)}`, { cache: 'no-store' });
-        if (res.ok) {
-          const json = await res.json();
-          setSearchResults(json.data || []);
-        }
-      } catch { /* silent */ }
-      setSearching(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  function addItem(item: PromotionItem) {
-    if (selectedItems.some((s) => s.id === item.id && s.type === item.item_type)) return;
-    const tiers = item.service_pricing
-      ? [...item.service_pricing].sort((a, b) => a.display_order - b.display_order)
-      : undefined;
-    setSelectedItems((prev) => [
-      ...prev,
-      {
-        type: item.item_type,
-        id: item.id,
-        name: item.name,
-        pricing_model: item.pricing_model,
-        flat_price: item.flat_price,
-        per_unit_price: item.per_unit_price,
-        per_unit_label: item.per_unit_label,
-        tiers,
-        retail_price: item.retail_price,
-        // Conflict detection
-        sale_status: item.sale_status,
-        sale_starts_at: item.sale_starts_at,
-        sale_ends_at: item.sale_ends_at,
-        current_sale_price: item.sale_price,
-        current_tier_sale_prices: tiers?.map((t) => ({
-          tier_label: t.tier_label,
-          tier_name: t.tier_name,
-          sale_price: t.sale_price,
-        })),
-      },
-    ]);
-    setSearchQuery('');
-    setSearchResults([]);
-  }
-
-  function removeItem(id: string) {
-    setSelectedItems((prev) => prev.filter((i) => i.id !== id));
-  }
-
-  function calculateSalePrice(standard: number): number {
-    if (typeof discountValue !== 'number' || discountValue <= 0) return standard;
-    if (discountType === 'percentage') {
-      return Math.round((standard * (1 - discountValue / 100)) * 100) / 100;
-    }
-    return Math.max(0, standard - discountValue);
-  }
-
-  async function handleApply() {
-    if (selectedItems.length === 0 || typeof discountValue !== 'number' || discountValue <= 0) return;
-    setApplying(true);
-
-    const startTs = dateToPstStartOfDay(saleStartsAt);
-    const endTs = dateToPstEndOfDay(saleEndsAt);
-
-    const batchItems = selectedItems.map((item) => {
-      if (item.type === 'service') {
-        const isFlatPerUnit = item.pricing_model === 'flat' || item.pricing_model === 'per_unit';
-        if (isFlatPerUnit) {
-          const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
-          return { type: 'service' as const, id: item.id, sale_price: calculateSalePrice(basePrice) };
-        }
-        const salePrices: Record<string, number> = {};
-        for (const tier of (item.tiers || [])) {
-          const shouldApply =
-            (tier.tier_name === 'sedan' && applySedan) ||
-            (tier.tier_name === 'truck_suv_2row' && applyTruck) ||
-            (tier.tier_name === 'suv_3row_van' && applySuv);
-          if (shouldApply) {
-            salePrices[tier.tier_name] = calculateSalePrice(tier.price);
-          }
-        }
-        return { type: 'service' as const, id: item.id, sale_prices: salePrices };
-      }
-      return {
-        type: 'product' as const,
-        id: item.id,
-        sale_price: calculateSalePrice(item.retail_price ?? 0),
-      };
-    });
-
-    try {
-      const res = await fetch('/api/admin/marketing/promotions/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: batchItems,
-          sale_starts_at: startTs,
-          sale_ends_at: endTs,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const json = await res.json();
-      toast.success(`Sale applied to ${json.updated} items`);
-      onOpenChange(false);
-      onApplied();
-    } catch {
-      toast.error('Failed to apply sale');
-    } finally {
-      setApplying(false);
-    }
-  }
-
-  function renderConflictWarning(item: QuickSaleItem) {
-    const hasConflict = item.sale_status === 'active' || item.sale_status === 'scheduled';
-    if (!hasConflict) return null;
-
-    const statusLabel = item.sale_status === 'active' ? 'active sale' : 'scheduled sale';
-
-    // Gather current sale prices for display
-    const currentPrices: string[] = [];
-    if (item.type === 'product' && item.current_sale_price != null) {
-      currentPrices.push(formatCurrency(item.current_sale_price));
-    } else if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
-      if (item.current_sale_price != null) {
-        const suffix = item.pricing_model === 'per_unit' ? `/${item.per_unit_label || 'unit'}` : '';
-        currentPrices.push(formatCurrency(item.current_sale_price) + suffix);
-      }
-    } else if (item.current_tier_sale_prices) {
-      for (const t of item.current_tier_sale_prices) {
-        if (t.sale_price != null) {
-          currentPrices.push(`${t.tier_label || t.tier_name}: ${formatCurrency(t.sale_price)}`);
-        }
-      }
-    }
-
-    return (
-      <div className="mt-1">
-        <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
-          <AlertTriangle className="h-3 w-3" />
-          Has {statusLabel}
-        </span>
-        {currentPrices.length > 0 && (
-          <p className="mt-0.5 text-[10px] text-amber-600">
-            Current: {currentPrices.join(', ')}
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogClose onClose={() => onOpenChange(false)} />
-      <DialogHeader>
-        <DialogTitle>Quick Sale</DialogTitle>
-      </DialogHeader>
-      <DialogContent className="space-y-4 max-h-[70vh] overflow-y-auto">
-        {/* Search to add items */}
-        <FormField label="Select items">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search to add items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          {searching && <p className="mt-1 text-xs text-gray-400">Searching...</p>}
-          {searchResults.length > 0 && (
-            <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-gray-200">
-              {searchResults
-                .filter((r) => !selectedItems.some((s) => s.id === r.id && s.type === r.item_type))
-                .map((r) => (
-                  <button
-                    type="button"
-                    key={`${r.item_type}-${r.id}`}
-                    onClick={() => addItem(r)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50"
-                  >
-                    {r.item_type === 'service' ? (
-                      <Wrench className="h-3.5 w-3.5 text-gray-400" />
-                    ) : (
-                      <ShoppingBag className="h-3.5 w-3.5 text-gray-400" />
-                    )}
-                    <span className="flex-1">
-                      {r.name}
-                      {(r.sale_status === 'active' || r.sale_status === 'scheduled') && (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-amber-600">
-                          <AlertTriangle className="h-2.5 w-2.5" />
-                          {r.sale_status === 'active' ? 'Active sale' : 'Scheduled'}
-                        </span>
-                      )}
-                    </span>
-                    <Badge variant="secondary" className="ml-auto text-[10px]">
-                      {r.item_type}
-                    </Badge>
-                  </button>
-                ))}
-            </div>
-          )}
-        </FormField>
-
-        {/* Selected items */}
-        {selectedItems.length > 0 && (
-          <div>
-            <p className="mb-2 text-xs font-medium text-gray-500">Selected ({selectedItems.length}):</p>
-            <div className="space-y-1">
-              {selectedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-md border border-gray-200 px-3 py-2 text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-500">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="flex-1 font-medium">{item.name}</span>
-                    <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
-                    {item.type === 'product' && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.retail_price ?? 0)}</span>
-                    )}
-                    {item.type === 'service' && item.pricing_model === 'flat' && item.flat_price != null && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.flat_price)}</span>
-                    )}
-                    {item.type === 'service' && item.pricing_model === 'per_unit' && item.per_unit_price != null && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.per_unit_price)}/{item.per_unit_label || 'unit'}</span>
-                    )}
-                  </div>
-                  {renderConflictWarning(item)}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Discount */}
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Discount type">
-            <div className="flex gap-2">
-              {(['percentage', 'fixed'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setDiscountType(t)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    discountType === t
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {t === 'percentage' ? 'Percentage off' : 'Fixed amount off'}
-                </button>
-              ))}
-            </div>
-          </FormField>
-          <FormField label="Discount">
-            <div className="relative">
-              <Input
-                type="number"
-                min="0"
-                step="1"
-                placeholder="0"
-                value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value === '' ? '' : parseFloat(e.target.value))}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                {discountType === 'percentage' ? '%' : '$'}
-              </span>
-            </div>
-          </FormField>
-        </div>
-
-        {/* Tier checkboxes — only for tiered services (not flat/per_unit) */}
-        {selectedItems.some((i) => i.type === 'service' && i.pricing_model !== 'flat' && i.pricing_model !== 'per_unit' && i.pricing_model !== 'custom') && (
-          <FormField label="Apply to tiers (services only)">
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={applySedan} onChange={() => setApplySedan(!applySedan)} />
-                Sedan
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={applyTruck} onChange={() => setApplyTruck(!applyTruck)} />
-                Truck/SUV
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={applySuv} onChange={() => setApplySuv(!applySuv)} />
-                SUV/Van
-              </label>
-            </div>
-          </FormField>
-        )}
-
-        {/* Sale period */}
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Start Date">
-            <Input type="date" value={saleStartsAt} onChange={(e) => setSaleStartsAt(e.target.value)} />
-          </FormField>
-          <FormField label="End Date">
-            <Input type="date" value={saleEndsAt} onChange={(e) => setSaleEndsAt(e.target.value)} />
-          </FormField>
-        </div>
-
-        {/* Preview */}
-        {selectedItems.length > 0 && typeof discountValue === 'number' && discountValue > 0 && (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-500">Preview</p>
-            {selectedItems.map((item) => (
-              <div key={item.id} className="text-sm">
-                <p className="font-medium text-gray-700">{item.name}:</p>
-                {item.type === 'service' && (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') ? (() => {
-                  const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
-                  const sp = calculateSalePrice(basePrice);
-                  const valid = sp > 0 && sp < basePrice;
-                  return (
-                    <p className={`ml-4 ${valid ? 'text-gray-600' : 'text-red-500'}`}>
-                      {formatCurrency(basePrice)} → {formatCurrency(sp)}
-                      {item.pricing_model === 'per_unit' && ` /${item.per_unit_label || 'unit'}`}
-                      {!valid && ' (invalid)'}
-                    </p>
-                  );
-                })() : item.type === 'service' && item.tiers && item.tiers.length > 0 ? (
-                  <div className="ml-4 space-y-0.5">
-                    {item.tiers
-                      .sort((a, b) => a.display_order - b.display_order)
-                      .map((tier) => {
-                        const shouldApply =
-                          (tier.tier_name === 'sedan' && applySedan) ||
-                          (tier.tier_name === 'truck_suv_2row' && applyTruck) ||
-                          (tier.tier_name === 'suv_3row_van' && applySuv);
-                        if (!shouldApply) return null;
-                        const sp = calculateSalePrice(tier.price);
-                        const valid = sp > 0 && sp < tier.price;
-                        return (
-                          <p key={tier.tier_name} className={valid ? 'text-gray-600' : 'text-red-500'}>
-                            {tier.tier_label || tier.tier_name}: {formatCurrency(tier.price)} → {formatCurrency(sp)}
-                            {!valid && ' (invalid)'}
-                          </p>
-                        );
-                      })}
-                  </div>
-                ) : (
-                  <p className="ml-4 text-gray-600">
-                    {formatCurrency(item.retail_price ?? 0)} → {formatCurrency(calculateSalePrice(item.retail_price ?? 0))}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </DialogContent>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleApply}
-          disabled={applying || selectedItems.length === 0 || typeof discountValue !== 'number' || discountValue <= 0}
-        >
-          {applying ? 'Applying...' : `Apply Sale to ${selectedItems.length} Item${selectedItems.length !== 1 ? 's' : ''}`}
-        </Button>
-      </DialogFooter>
-    </Dialog>
   );
 }
