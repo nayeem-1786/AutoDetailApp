@@ -738,7 +738,7 @@ export default function CustomerProfilePage() {
     },
     {
       accessorKey: 'action',
-      header: () => <div className="text-center">Action</div>,
+      header: () => <div className="w-full text-center">Action</div>,
       size: 100,
       cell: ({ row }) => {
         const action = row.original.action;
@@ -760,7 +760,7 @@ export default function CustomerProfilePage() {
     },
     {
       accessorKey: 'points_change',
-      header: () => <div className="text-center">Points</div>,
+      header: () => <div className="w-full text-center">Points</div>,
       size: 80,
       cell: ({ row }) => {
         const change = row.original.points_change;
@@ -775,7 +775,7 @@ export default function CustomerProfilePage() {
     },
     {
       accessorKey: 'points_balance',
-      header: () => <div className="text-center">Balance</div>,
+      header: () => <div className="w-full text-center">Balance</div>,
       size: 80,
       cell: ({ row }) => (
         <div className="text-center">

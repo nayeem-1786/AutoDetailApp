@@ -7,6 +7,7 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 ## fix: Loyalty tab column alignment and description wrapping — 2026-03-18
 
 - Centered Action (100px), Points (80px), and Balance (80px) columns — both headers and cells.
+- Fixed header/cell alignment mismatch by adding `w-full` to header divs so `text-center` works inside the DataTable flex wrapper.
 - Date column set to 120px. Description column takes remaining space, no longer wraps unnecessarily.
 
 ---
