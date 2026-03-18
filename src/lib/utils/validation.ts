@@ -491,6 +491,7 @@ const refundItemSchema = z.object({
 export const refundCreateSchema = z.object({
   transaction_id: z.string().uuid(),
   items: z.array(refundItemSchema).min(1, 'Select at least one item to refund'),
+  tip_refund: z.coerce.number().min(0).default(0),
   reason: requiredString,
 });
 

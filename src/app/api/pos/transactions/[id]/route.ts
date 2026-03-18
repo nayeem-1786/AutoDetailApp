@@ -49,7 +49,8 @@ export async function GET(
         vehicle:vehicles(id, vehicle_type, year, make, model, color, size_class),
         employee:employees(id, first_name, last_name),
         items:transaction_items(*),
-        payments(*)
+        payments(*),
+        refunds(*, refund_items(*))
       `)
       .eq('id', id)
       .single();

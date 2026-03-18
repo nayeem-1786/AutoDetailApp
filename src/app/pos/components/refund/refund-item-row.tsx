@@ -9,6 +9,7 @@ interface RefundItemRowProps {
   selected: boolean;
   refundQty: number;
   restock: boolean;
+  perUnitRefundable: number;
   onToggle: () => void;
   onQtyChange: (qty: number) => void;
   onRestockChange: (restock: boolean) => void;
@@ -27,14 +28,15 @@ export function RefundItemRow({
   selected,
   refundQty,
   restock,
+  perUnitRefundable,
   onToggle,
   onQtyChange,
   onRestockChange,
 }: RefundItemRowProps) {
   const disabled = maxRefundableQty <= 0;
   const displayAmount = selected
-    ? (item.unit_price * refundQty).toFixed(2)
-    : item.unit_price.toFixed(2);
+    ? (perUnitRefundable * refundQty).toFixed(2)
+    : perUnitRefundable.toFixed(2);
 
   function decrement() {
     if (refundQty > 1) {

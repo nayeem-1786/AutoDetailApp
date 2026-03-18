@@ -11,6 +11,7 @@ interface RefundSummaryProps {
     amount: number;
     restock: boolean;
   }>;
+  tipRefund?: number;
   reason: string;
   processing: boolean;
   onConfirm: () => void;
@@ -18,11 +19,13 @@ interface RefundSummaryProps {
 
 export function RefundSummary({
   items,
+  tipRefund = 0,
   reason,
   processing,
   onConfirm,
 }: RefundSummaryProps) {
-  const totalAmount = items.reduce((sum, entry) => sum + entry.amount, 0);
+  const itemsTotal = items.reduce((sum, entry) => sum + entry.amount, 0);
+  const totalAmount = Math.round((itemsTotal + tipRefund) * 100) / 100;
 
   return (
     <div className="space-y-4">
@@ -51,6 +54,16 @@ export function RefundSummary({
           </div>
         ))}
       </div>
+
+      {/* Tip line */}
+      {tipRefund > 0 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-700 dark:text-gray-300">Tip refund</span>
+          <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
+            ${tipRefund.toFixed(2)}
+          </span>
+        </div>
+      )}
 
       {/* Divider */}
       <div className="border-t border-gray-200 dark:border-gray-700" />

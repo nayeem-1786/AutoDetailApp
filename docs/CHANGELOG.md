@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Refund calculates from full item prices instead of actual amount paid — 2026-03-18
+
+Critical financial bug — $300 subtotal with $297 coupon = $3 paid, but refund dialog showed $300. Six cascading fixes:
+
+- **Fix 0** (`/api/pos/transactions/[id]/route.ts`): Added `refunds(*, refund_items(*))` to transaction GET select — was missing entirely, so already-refunded quantity tracking never worked.
+- **Fix 1** (`refund-dialog.tsx`): Replaced `item.unit_price * qty` with proportional discount distribution. Formula: `(item_subtotal + item_tax) - (discount_amount × item_share)`. Full refunds include tip; partial refunds do not.
+- **Fix 2** (`refund-item-row.tsx`): Added `perUnitRefundable` prop so item selection step shows the same discounted amounts as the confirmation summary.
+- **Fix 3** (`/api/pos/refunds/route.ts`): Added server-side refund cap — queries existing `processed` refunds, computes `maxRefundable = total_amount + tip_amount - alreadyRefunded`, rejects over-refunds.
+- **Fix 4** (`/api/pos/refunds/route.ts`): Stripe refund capped at `cardPayment.amount` for split payments (card+cash). Only card portion sent to Stripe.
+- **Fix 5** (`/api/pos/refunds/route.ts`): Reordered operations — Stripe refund now called BEFORE inserting refund/refund_items records. If Stripe fails, no orphaned records are created.
+- **Fix 6** (`refund-summary.tsx`): Added `tipRefund` prop with tip line item display on full refunds. Updated validation schema with `tip_refund` field.
+
+---
+
 ## fix: Loyalty points earned on full subtotal instead of actual amount paid — 2026-03-18
 
 - **Root cause**: Earning calculation at `transactions/route.ts:256` only subtracted `loyalty_discount`, ignoring coupon and manual discounts. `discount_amount` (already includes all three) was available but unused.

@@ -53,8 +53,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate total refund amount
-    const totalRefundAmount = data.items.reduce((sum, item) => sum + item.amount, 0);
+    // Calculate total refund amount (items + tip)
+    const itemsRefundAmount = data.items.reduce((sum, item) => sum + item.amount, 0);
+    const tipRefund = data.tip_refund ?? 0;
+    const totalRefundAmount = Math.round((itemsRefundAmount + tipRefund) * 100) / 100;
 
     if (totalRefundAmount <= 0) {
       return NextResponse.json(
@@ -63,7 +65,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Insert refund record
+    // Server-side cap: refund must not exceed actual amount paid minus already refunded
+    const { data: existingRefunds } = await supabase
+      .from('refunds')
+      .select('amount')
+      .eq('transaction_id', data.transaction_id)
+      .eq('status', 'processed');
+    const alreadyRefunded = (existingRefunds || []).reduce(
+      (sum: number, r: { amount: number }) => sum + r.amount,
+      0
+    );
+    const maxRefundable = (transaction.total_amount + (transaction.tip_amount || 0)) - alreadyRefunded;
+    if (totalRefundAmount > maxRefundable + 0.01) {
+      return NextResponse.json(
+        { error: `Refund amount ($${totalRefundAmount.toFixed(2)}) exceeds maximum refundable ($${maxRefundable.toFixed(2)})` },
+        { status: 400 }
+      );
+    }
+
+    // 1. If payment was card, issue Stripe refund FIRST (before inserting records)
+    const cardPayment = transaction.payments?.find(
+      (p: { method: string }) => p.method === 'card'
+    );
+    let stripeRefundId: string | null = null;
+
+    if (cardPayment?.stripe_payment_intent_id) {
+      // Cap Stripe refund at card payment amount (rest was cash/check)
+      const stripeRefundAmount = Math.min(totalRefundAmount, cardPayment.amount || 0);
+      if (stripeRefundAmount > 0) {
+        try {
+          const stripeRefund = await stripe.refunds.create({
+            payment_intent: cardPayment.stripe_payment_intent_id,
+            amount: Math.round(stripeRefundAmount * 100),
+          });
+          stripeRefundId = stripeRefund.id;
+        } catch (stripeErr) {
+          console.error('Stripe refund error:', stripeErr);
+          return NextResponse.json(
+            { error: 'Stripe refund failed. No records created.' },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
+    // 2. Insert refund record (only after Stripe succeeds or payment is cash/check)
     const { data: refund, error: refundError } = await supabase
       .from('refunds')
       .insert({
@@ -72,6 +118,7 @@ export async function POST(request: NextRequest) {
         amount: totalRefundAmount,
         reason: data.reason,
         processed_by: posEmployee.employee_id,
+        stripe_refund_id: stripeRefundId,
       })
       .select('*')
       .single();
@@ -79,12 +126,12 @@ export async function POST(request: NextRequest) {
     if (refundError || !refund) {
       console.error('Refund insert error:', refundError);
       return NextResponse.json(
-        { error: 'Failed to create refund' },
+        { error: 'Failed to create refund record' },
         { status: 500 }
       );
     }
 
-    // 2. Insert refund items
+    // 3. Insert refund items
     const refundItemRows = data.items.map((item) => ({
       refund_id: refund.id,
       transaction_item_id: item.transaction_item_id,
@@ -99,40 +146,6 @@ export async function POST(request: NextRequest) {
 
     if (refundItemsError) {
       console.error('Refund items insert error:', refundItemsError);
-    }
-
-    // 3. If payment was card, issue Stripe refund
-    const cardPayment = transaction.payments?.find(
-      (p: { method: string }) => p.method === 'card'
-    );
-
-    if (cardPayment?.stripe_payment_intent_id) {
-      try {
-        const stripeRefund = await stripe.refunds.create({
-          payment_intent: cardPayment.stripe_payment_intent_id,
-          amount: Math.round(totalRefundAmount * 100),
-        });
-
-        // Update refund with stripe_refund_id
-        await supabase
-          .from('refunds')
-          .update({ stripe_refund_id: stripeRefund.id })
-          .eq('id', refund.id);
-
-        refund.stripe_refund_id = stripeRefund.id;
-      } catch (stripeErr) {
-        console.error('Stripe refund error:', stripeErr);
-        // Update refund status to failed if Stripe fails
-        await supabase
-          .from('refunds')
-          .update({ status: 'failed' })
-          .eq('id', refund.id);
-
-        return NextResponse.json(
-          { error: 'Stripe refund failed. Refund marked as failed.' },
-          { status: 500 }
-        );
-      }
     }
 
     // 4. Restock products where applicable
@@ -176,7 +189,8 @@ export async function POST(request: NextRequest) {
 
       if (customer) {
         let runningBalance = customer.loyalty_points_balance;
-        const isFullRefund = totalRefundAmount >= transaction.total_amount;
+        const txFullAmount = transaction.total_amount + (transaction.tip_amount || 0);
+        const isFullRefund = totalRefundAmount >= txFullAmount;
 
         // 5a. Restore redeemed points
         if (transaction.loyalty_points_redeemed > 0) {
@@ -229,7 +243,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Update transaction status
-    const newStatus = totalRefundAmount >= transaction.total_amount
+    const txFullAmount = transaction.total_amount + (transaction.tip_amount || 0);
+    const newStatus = totalRefundAmount >= txFullAmount
       ? 'refunded'
       : 'partial_refund';
 

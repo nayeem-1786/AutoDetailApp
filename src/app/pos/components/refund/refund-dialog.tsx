@@ -116,6 +116,31 @@ export function RefundDialog({
     });
   }, []);
 
+  // Calculate per-unit refundable amount for each item (proportional discount + tax)
+  const perUnitRefundableMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const txSubtotal = transaction.subtotal || 0;
+    const txDiscount = transaction.discount_amount || 0;
+
+    for (const item of transaction.items) {
+      const itemSubtotal = item.unit_price * item.quantity;
+      const itemTax = item.tax_amount || 0;
+      const itemTotalWithTax = itemSubtotal + itemTax;
+
+      // Proportional share of the transaction-level discount
+      const itemShare = txSubtotal > 0 ? itemSubtotal / txSubtotal : 0;
+      const itemDiscount = txDiscount * itemShare;
+
+      const refundableTotal = Math.max(0, itemTotalWithTax - itemDiscount);
+      const perUnit = item.quantity > 0
+        ? Math.round(refundableTotal / item.quantity * 100) / 100
+        : 0;
+      map.set(item.id, perUnit);
+    }
+
+    return map;
+  }, [transaction.items, transaction.subtotal, transaction.discount_amount]);
+
   // Build summary items for the confirm step
   const summaryItems = useMemo(() => {
     const result: Array<{
@@ -128,17 +153,31 @@ export function RefundDialog({
     for (const [itemId, state] of selectedItems) {
       const item = transaction.items.find((i) => i.id === itemId);
       if (item) {
+        const perUnit = perUnitRefundableMap.get(item.id) ?? 0;
         result.push({
           item,
           quantity: state.qty,
-          amount: item.unit_price * state.qty,
+          amount: Math.round(perUnit * state.qty * 100) / 100,
           restock: state.restock,
         });
       }
     }
 
     return result;
-  }, [selectedItems, transaction.items]);
+  }, [selectedItems, transaction.items, perUnitRefundableMap]);
+
+  // Check if all refundable items are fully selected (full refund → include tip)
+  const isFullRefund = useMemo(() => {
+    for (const item of transaction.items) {
+      const maxQty = maxRefundableQtyMap.get(item.id) ?? 0;
+      if (maxQty <= 0) continue; // already fully refunded, skip
+      const selection = selectedItems.get(item.id);
+      if (!selection || selection.qty < maxQty) return false;
+    }
+    return selectedItems.size > 0;
+  }, [transaction.items, selectedItems, maxRefundableQtyMap]);
+
+  const tipRefund = isFullRefund ? (transaction.tip_amount || 0) : 0;
 
   const canProceed = selectedItems.size > 0 && reason.trim().length > 0;
 
@@ -155,6 +194,7 @@ export function RefundDialog({
           amount: entry.amount,
           restock: entry.restock,
         })),
+        tip_refund: tipRefund,
         reason: reason.trim(),
       };
 
@@ -220,6 +260,7 @@ export function RefundDialog({
                       selected={!!selection}
                       refundQty={selection?.qty ?? 1}
                       restock={selection?.restock ?? false}
+                      perUnitRefundable={perUnitRefundableMap.get(item.id) ?? 0}
                       onToggle={() => toggleItem(item.id)}
                       onQtyChange={(qty) => updateQty(item.id, qty)}
                       onRestockChange={(rs) => updateRestock(item.id, rs)}
@@ -275,6 +316,7 @@ export function RefundDialog({
 
             <RefundSummary
               items={summaryItems}
+              tipRefund={tipRefund}
               reason={reason}
               processing={processing}
               onConfirm={handleConfirm}
