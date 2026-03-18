@@ -8,6 +8,7 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { getSaleStatus } from '@/lib/utils/sale-pricing';
 
 export async function POST(request: NextRequest) {
   try {
@@ -476,14 +477,25 @@ function computeExpectedPrice(
   service: {
     pricing_model: string;
     flat_price: number | null;
+    sale_price: number | null;
+    sale_starts_at: string | null;
+    sale_ends_at: string | null;
     per_unit_price: number | null;
-    service_pricing: { tier_name: string; price: number; is_vehicle_size_aware: boolean; vehicle_size_sedan_price: number | null; vehicle_size_truck_suv_price: number | null; vehicle_size_suv_van_price: number | null }[];
+    service_pricing: { tier_name: string; price: number; sale_price: number | null; is_vehicle_size_aware: boolean; vehicle_size_sedan_price: number | null; vehicle_size_truck_suv_price: number | null; vehicle_size_suv_van_price: number | null }[];
   },
   tierName: string | null | undefined,
   sizeClass: string | null | undefined
 ): number | null {
+  const { isOnSale } = getSaleStatus({
+    sale_starts_at: service.sale_starts_at,
+    sale_ends_at: service.sale_ends_at,
+  });
+
   switch (service.pricing_model) {
     case 'flat':
+      if (isOnSale && service.sale_price != null && service.flat_price != null && service.sale_price < service.flat_price) {
+        return service.sale_price;
+      }
       return service.flat_price;
 
     case 'vehicle_size':
@@ -496,6 +508,9 @@ function computeExpectedPrice(
         if (sizeClass === 'sedan') return tier.vehicle_size_sedan_price;
         if (sizeClass === 'truck_suv_2row') return tier.vehicle_size_truck_suv_price;
         if (sizeClass === 'suv_3row_van') return tier.vehicle_size_suv_van_price;
+      }
+      if (isOnSale && tier.sale_price != null && tier.sale_price < tier.price) {
+        return tier.sale_price;
       }
       return tier.price;
     }

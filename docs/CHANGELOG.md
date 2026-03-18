@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Booking "Price mismatch" for sale-priced services — 2026-03-17
+
+- **Root cause**: `computeExpectedPrice()` in `/api/book/route.ts` had zero sale awareness — returned `flat_price` for flat services and `tier.price` for tiered, ignoring `sale_price` entirely. Client correctly sent the sale price, server expected base price, mismatch triggered for ALL sale-priced bookings (flat, scope, specialty, vehicle_size non-VSA tiers).
+- **Fix**: Added `getSaleStatus()` check to `computeExpectedPrice()`. Returns `sale_price` when sale is active and lower than base price, mirroring client-side `computePrice()` logic in `step-service-select.tsx`. Added `sale_price`, `sale_starts_at`, `sale_ends_at` to service type and `sale_price` to tier type.
+- **Not affected**: Per-unit services (already returned `null`, skipping validation), vehicle-size-aware tiers with known vehicle (client also skips sale for that path).
+
+---
+
 ## fix: Per-unit sale display in modal/picker/ticket + sale date timezone shift — 2026-03-17
 
 ### Bug 1: Per-unit sale price not displayed in modal/picker/ticket
