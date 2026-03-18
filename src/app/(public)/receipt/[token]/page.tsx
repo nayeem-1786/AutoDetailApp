@@ -41,6 +41,19 @@ interface TransactionWithRelations {
     card_brand: string | null;
     card_last_four: string | null;
   }[];
+  refunds: {
+    id: string;
+    amount: number;
+    status: string;
+    reason: string | null;
+    created_at: string;
+    refund_items: {
+      id: string;
+      transaction_item_id: string;
+      quantity: number;
+      amount: number;
+    }[];
+  }[];
 }
 
 interface PageProps {
@@ -58,7 +71,8 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
       employee:employees(first_name, last_name),
       vehicle:vehicles(year, make, model, color),
       items:transaction_items(*),
-      payments(*)
+      payments(*),
+      refunds(*, refund_items(*))
     `)
     .eq('access_token', token)
     .single();
@@ -101,6 +115,26 @@ export default async function PublicReceiptPage({ params }: PageProps) {
   }
 
   const receiptId = tx.receipt_number || `SD-${tx.id.slice(0, 6).toUpperCase()}`;
+
+  // Build refund data
+  const processedRefunds = (tx.refunds ?? []).filter((r) => r.status === 'processed');
+  const refundedMap = new Map<string, { qty: number; amount: number }>();
+  for (const refund of processedRefunds) {
+    for (const ri of refund.refund_items) {
+      const existing = refundedMap.get(ri.transaction_item_id) ?? { qty: 0, amount: 0 };
+      existing.qty += ri.quantity;
+      existing.amount += ri.amount;
+      refundedMap.set(ri.transaction_item_id, existing);
+    }
+  }
+  const allFullyRefunded = processedRefunds.length > 0 && tx.items.every((item) => {
+    const r = refundedMap.get(item.id);
+    return r && r.qty >= item.quantity;
+  });
+  const refundStatus: 'none' | 'partial' | 'full' = processedRefunds.length === 0
+    ? 'none'
+    : allFullyRefunded ? 'full' : 'partial';
+
   const vehicleStr = tx.vehicle
     ? [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model].filter(Boolean).join(' ')
     : null;
@@ -126,6 +160,11 @@ export default async function PublicReceiptPage({ params }: PageProps) {
             <h2 className="text-lg font-semibold text-site-text">
               Receipt {receiptId}
             </h2>
+            {refundStatus !== 'none' && (
+              <span className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-bold text-white ${refundStatus === 'full' ? 'bg-red-600' : 'bg-amber-500'}`}>
+                {refundStatus === 'full' ? 'REFUNDED' : 'PARTIALLY REFUNDED'}
+              </span>
+            )}
             <p className="mt-1 text-sm text-site-text-muted">
               Date: {formatDate(tx.transaction_date)}
             </p>
@@ -164,28 +203,37 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {tx.items.map((item) => (
-                <tr key={item.id} className="border-b border-site-border">
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-site-text">{item.item_name}</div>
-                    {item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price && (
-                      <div className="text-xs text-green-500 mt-0.5">
-                        {item.pricing_type === 'combo' ? 'Combo' : 'Sale'}: Reg {formatCurrency(item.standard_price)} | Saved {formatCurrency(item.standard_price - item.unit_price)}!
-                      </div>
-                    )}
-                    {item.prerequisite_note && (
-                      <div className="text-xs text-blue-500 mt-0.5">{item.prerequisite_note}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>
-                  <td className="px-4 py-4 text-right text-site-text-muted">
-                    {formatCurrency(item.unit_price)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-medium text-site-text">
-                    {formatCurrency(item.total_price)}
-                  </td>
-                </tr>
-              ))}
+              {tx.items.map((item) => {
+                const itemRefund = refundedMap.get(item.id);
+                const isFullyRefunded = itemRefund && itemRefund.qty >= item.quantity;
+                return (
+                  <tr key={item.id} className="border-b border-site-border">
+                    <td className="px-6 py-4">
+                      <div className={`font-medium ${isFullyRefunded ? 'line-through text-site-text-muted' : 'text-site-text'}`}>{item.item_name}</div>
+                      {item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price && (
+                        <div className="text-xs text-green-500 mt-0.5">
+                          {item.pricing_type === 'combo' ? 'Combo' : 'Sale'}: Reg {formatCurrency(item.standard_price)} | Saved {formatCurrency(item.standard_price - item.unit_price)}!
+                        </div>
+                      )}
+                      {item.prerequisite_note && (
+                        <div className="text-xs text-blue-500 mt-0.5">{item.prerequisite_note}</div>
+                      )}
+                      {itemRefund && (
+                        <div className="text-xs text-red-500 mt-0.5">
+                          REFUNDED ({itemRefund.qty}) -{formatCurrency(itemRefund.amount)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>
+                    <td className="px-4 py-4 text-right text-site-text-muted">
+                      {formatCurrency(item.unit_price)}
+                    </td>
+                    <td className="px-6 py-4 text-right font-medium text-site-text">
+                      {formatCurrency(item.total_price)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -245,6 +293,26 @@ export default async function PublicReceiptPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {/* Refund Summary */}
+      {processedRefunds.length > 0 && (
+        <div className="mb-6 space-y-3">
+          {processedRefunds.map((refund) => (
+            <div key={refund.id} className="rounded-lg border border-red-200 bg-red-50 px-6 py-4 shadow-sm" style={{ borderLeft: '3px solid #dc2626' }}>
+              <p className="text-sm font-bold text-red-600">Refund</p>
+              <p className="text-xs text-site-text-muted mt-1">
+                {formatDate(refund.created_at)}
+              </p>
+              {refund.reason && (
+                <p className="text-xs text-site-text-muted">Reason: {refund.reason}</p>
+              )}
+              <p className="text-sm font-bold text-red-600 mt-1">
+                -{formatCurrency(refund.amount)}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Payment Methods */}
       {tx.payments.length > 0 && (

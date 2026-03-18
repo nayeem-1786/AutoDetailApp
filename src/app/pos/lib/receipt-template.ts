@@ -4,6 +4,7 @@ import { LOYALTY } from '@/lib/utils/constants';
 import QRCode from 'qrcode';
 
 interface ReceiptItem {
+  id: string;
   item_name: string;
   quantity: number;
   unit_price: number;
@@ -13,6 +14,22 @@ interface ReceiptItem {
   standard_price?: number | null;
   pricing_type?: string | null;
   prerequisite_note?: string | null;
+}
+
+interface ReceiptRefundItem {
+  id: string;
+  transaction_item_id: string;
+  quantity: number;
+  amount: number;
+}
+
+interface ReceiptRefund {
+  id: string;
+  amount: number;
+  status: string;
+  reason: string | null;
+  created_at: string;
+  refund_items: ReceiptRefundItem[];
 }
 
 interface ReceiptPayment {
@@ -47,6 +64,7 @@ export interface ReceiptTransaction {
   items: ReceiptItem[];
   payments: ReceiptPayment[];
   loyalty_points_earned?: number;
+  refunds?: ReceiptRefund[];
 }
 
 export interface ReceiptLine {
@@ -276,6 +294,42 @@ function pushZoneLines(
  * Generate a structured receipt from transaction data.
  * This can be used by Star WebPRNT or formatted as plain text.
  */
+// ─── Refund Helpers ─────────────────────────────────────────────────────────
+
+function buildRefundedMap(refunds: ReceiptRefund[] | undefined): Map<string, { qty: number; amount: number }> {
+  const map = new Map<string, { qty: number; amount: number }>();
+  for (const refund of refunds ?? []) {
+    if (refund.status !== 'processed') continue;
+    for (const ri of refund.refund_items) {
+      const existing = map.get(ri.transaction_item_id) ?? { qty: 0, amount: 0 };
+      existing.qty += ri.quantity;
+      existing.amount += ri.amount;
+      map.set(ri.transaction_item_id, existing);
+    }
+  }
+  return map;
+}
+
+function getRefundStatus(refunds: ReceiptRefund[] | undefined, items: ReceiptItem[]): 'none' | 'partial' | 'full' {
+  const processed = (refunds ?? []).filter((r) => r.status === 'processed');
+  if (processed.length === 0) return 'none';
+  const refundedMap = buildRefundedMap(refunds);
+  const allFullyRefunded = items.every((item) => {
+    const r = refundedMap.get(item.id);
+    return r && r.qty >= item.quantity;
+  });
+  return allFullyRefunded ? 'full' : 'partial';
+}
+
+function formatRefundDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedReceiptConfig, context?: ReceiptContext): ReceiptLine[] {
   const c = config ?? FALLBACK_CONFIG;
   const lines: ReceiptLine[] = [];
@@ -311,6 +365,10 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     lines.push({ type: 'divider' });
   }
 
+  // Refund status + refunded map
+  const refundStatus = getRefundStatus(tx.refunds, tx.items);
+  const refundedMap = buildRefundedMap(tx.refunds);
+
   // Receipt number & date with time
   lines.push({
     type: 'columns',
@@ -319,6 +377,14 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
     }),
   });
+
+  if (refundStatus !== 'none') {
+    lines.push({
+      type: 'text',
+      text: refundStatus === 'full' ? '** REFUNDED **' : '** PARTIALLY REFUNDED **',
+      alignment: 'center',
+    });
+  }
 
   // Customer name + type, phone
   if (tx.customer) {
@@ -397,6 +463,15 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
         text: `  ${item.prerequisite_note}`,
       });
     }
+
+    // Refund indicator for this item
+    const refunded = refundedMap.get(item.id);
+    if (refunded) {
+      lines.push({
+        type: 'text',
+        text: `  >> REFUNDED (${refunded.qty}) -$${refunded.amount.toFixed(2)}`,
+      });
+    }
   }
 
   lines.push({ type: 'divider' });
@@ -466,6 +541,28 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       left: label,
       right: `$${p.amount.toFixed(2)}`,
     });
+  }
+
+  // Refund summary sections
+  const processedRefunds = (tx.refunds ?? []).filter((r) => r.status === 'processed');
+  if (processedRefunds.length > 0) {
+    lines.push({ type: 'divider' });
+    for (const refund of processedRefunds) {
+      lines.push({ type: 'text', text: '--- Refund ---', alignment: 'center' });
+      lines.push({
+        type: 'columns',
+        left: 'Refund Date',
+        right: formatRefundDate(refund.created_at),
+      });
+      if (refund.reason) {
+        lines.push({ type: 'text', text: `Reason: ${refund.reason}` });
+      }
+      lines.push({
+        type: 'columns',
+        left: 'Refund Amount',
+        right: `-$${refund.amount.toFixed(2)}`,
+      });
+    }
   }
 
   // Points earned line
@@ -619,6 +716,10 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     minute: '2-digit',
   });
 
+  // Refund data
+  const htmlRefundStatus = getRefundStatus(tx.refunds, tx.items);
+  const htmlRefundedMap = buildRefundedMap(tx.refunds);
+
   // Build vehicle description for customer info section
   const vehicleDesc = buildVehicleDesc(tx.vehicle);
 
@@ -656,6 +757,29 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       if (item.prerequisite_note) {
         rows += `<tr>
           <td colspan="3" style="padding:0 0 4px 12px;font-size:11px;color:#3b82f6;">${esc(item.prerequisite_note)}</td>
+        </tr>`;
+      }
+
+      // Refund indicator
+      const itemRefund = htmlRefundedMap.get(item.id);
+      if (itemRefund) {
+        const isFullItem = itemRefund.qty >= item.quantity;
+        const nameStyle = isFullItem ? 'text-decoration:line-through;color:#999;' : '';
+        // Re-style the item name with strikethrough for fully refunded items
+        if (isFullItem && item.quantity > 1) {
+          // Replace the first row's item name with strikethrough
+          rows = rows.replace(
+            `>${esc(item.item_name)}<`,
+            ` style="${nameStyle}">${esc(item.item_name)}<`
+          );
+        } else if (isFullItem) {
+          rows = rows.replace(
+            `font-size:14px;">${esc(item.item_name)}<`,
+            `font-size:14px;${nameStyle}">${esc(item.item_name)}<`
+          );
+        }
+        rows += `<tr>
+          <td colspan="3" style="padding:0 0 4px 12px;font-size:11px;color:#dc2626;">REFUNDED (${itemRefund.qty}) -$${itemRefund.amount.toFixed(2)}</td>
         </tr>`;
       }
 
@@ -878,6 +1002,12 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     </tr>` : ''}
   </table>
 
+  ${htmlRefundStatus !== 'none' ? `<div style="text-align:center;margin:8px 0;padding:6px 12px;display:inline-block;width:100%;box-sizing:border-box;">
+    <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:${htmlRefundStatus === 'full' ? '#dc2626' : '#d97706'};">
+      ${htmlRefundStatus === 'full' ? 'REFUNDED' : 'PARTIALLY REFUNDED'}
+    </span>
+  </div>` : ''}
+
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
 
   <!-- Items -->
@@ -906,6 +1036,19 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   <table style="width:100%;border-collapse:collapse;">
     ${paymentRows}
   </table>
+
+  ${(() => {
+    const htmlProcessedRefunds = (tx.refunds ?? []).filter((r) => r.status === 'processed');
+    if (htmlProcessedRefunds.length === 0) return '';
+    return htmlProcessedRefunds.map((refund) => `
+  <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
+  <div style="border-left:3px solid #dc2626;padding-left:10px;margin:8px 0;">
+    <div style="font-size:13px;font-weight:bold;color:#dc2626;">Refund</div>
+    <div style="font-size:12px;color:#666;margin-top:2px;">${formatRefundDate(refund.created_at)}</div>
+    ${refund.reason ? `<div style="font-size:12px;color:#666;">Reason: ${esc(refund.reason)}</div>` : ''}
+    <div style="font-size:14px;font-weight:bold;color:#dc2626;margin-top:4px;">-$${refund.amount.toFixed(2)}</div>
+  </div>`).join('');
+  })()}
 
   ${(() => {
     if (tx.customer && (tx.loyalty_points_earned ?? 0) > 0) {

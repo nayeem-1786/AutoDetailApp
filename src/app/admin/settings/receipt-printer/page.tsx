@@ -458,9 +458,9 @@ export default function ReceiptPrinterPage() {
     employee: { first_name: 'Joselyn', last_name: 'Reyes' },
     vehicle: { year: 2027, make: 'Honda', model: 'Accord', color: 'Silver' },
     items: [
-      { item_name: 'Full Detail — Sedan', quantity: 1, unit_price: 129.99, total_price: 129.99, tax_amount: 0, item_type: 'service' },
-      { item_name: 'Air Freshener', quantity: 2, unit_price: 9.99, total_price: 19.99, tax_amount: 2.05, item_type: 'product' },
-    ] as { item_name: string; quantity: number; unit_price: number; total_price: number; tax_amount: number; item_type?: string }[],
+      { id: 'sample-1', item_name: 'Full Detail — Sedan', quantity: 1, unit_price: 129.99, total_price: 129.99, tax_amount: 0, item_type: 'service' },
+      { id: 'sample-2', item_name: 'Air Freshener', quantity: 2, unit_price: 9.99, total_price: 19.99, tax_amount: 2.05, item_type: 'product' },
+    ] as { id: string; item_name: string; quantity: number; unit_price: number; total_price: number; tax_amount: number; item_type?: string }[],
     payments: [
       { method: 'card', amount: 177.68, tip_amount: 20.00, card_brand: 'Visa', card_last_four: '4242' },
     ] as { method: string; amount: number; tip_amount: number; card_brand?: string | null; card_last_four?: string | null }[],

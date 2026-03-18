@@ -36,7 +36,8 @@ export async function fetchReceiptData(
       employee:employees(first_name, last_name),
       vehicle:vehicles(vehicle_type, year, make, model, color),
       items:transaction_items(*),
-      payments(*)
+      payments(*),
+      refunds(*, refund_items(*))
     `)
     .eq('id', transactionId)
     .single();
@@ -108,6 +109,7 @@ export async function fetchReceiptData(
     vehicle: raw.vehicle,
     items: raw.items ?? [],
     payments: raw.payments ?? [],
+    refunds: raw.refunds ?? [],
   };
 
   return { tx, config: merged, context, images, print_server_url };

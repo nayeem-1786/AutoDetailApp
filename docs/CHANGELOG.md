@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Refund-aware receipts across all rendering paths — 2026-03-18
+
+- **Data layer** (`receipt-data.ts`): Added `refunds(*, refund_items(*))` to `fetchReceiptData()` query and pass-through mapping.
+- **Interfaces** (`receipt-template.ts`): Added `id` to `ReceiptItem`, new `ReceiptRefund`/`ReceiptRefundItem` interfaces, `refunds` field on `ReceiptTransaction`.
+- **Helpers** (`receipt-template.ts`): `buildRefundedMap()` aggregates per-item refund quantities/amounts, `getRefundStatus()` returns `none`/`partial`/`full`, `formatRefundDate()` uses PST.
+- **Thermal/ESC-POS** (`generateReceiptLines`): "REFUNDED" / "PARTIALLY REFUNDED" stamp after receipt number. Per-item `>> REFUNDED (qty) -$amount` indicator. Refund summary sections after payments with date, reason, amount.
+- **HTML** (`generateReceiptHtml`): Red/amber badge in header. Per-item strikethrough for fully refunded items + red refund line. Refund summary blocks with red left border after payments.
+- **Public receipt page** (`receipt/[token]/page.tsx`): Independent query updated with `refunds(*, refund_items(*))`. Refund badge, per-item strikethrough + red indicator, refund summary cards with red-left border.
+- **Receipt printer settings**: Added `id` to sample transaction items for type compatibility.
+- Non-refunded receipts render exactly as before (no refunds = no changes).
+
+---
+
 ## fix: Refund calculates from full item prices instead of actual amount paid — 2026-03-18
 
 Critical financial bug — $300 subtotal with $297 coupon = $3 paid, but refund dialog showed $300. Six cascading fixes:
