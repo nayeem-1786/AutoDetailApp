@@ -401,7 +401,6 @@ function QuickSaleDialog({
 
   // Reset on open
   useEffect(() => {
-    console.log('[QuickSale] reset effect fired, open:', open);
     if (open) {
       setSearchQuery('');
       setSearchResults([]);
@@ -437,7 +436,6 @@ function QuickSaleDialog({
   }, [searchQuery]);
 
   function addItem(item: PromotionItem) {
-    console.log('[QuickSale] addItem called:', item.name, item.item_type, 'sale_status:', item.sale_status);
     if (selectedItems.some((s) => s.id === item.id && s.type === item.item_type)) return;
     const tiers = item.service_pricing
       ? [...item.service_pricing].sort((a, b) => a.display_order - b.display_order)
@@ -466,13 +464,11 @@ function QuickSaleDialog({
         })),
       },
     ]);
-    console.log('[QuickSale] selectedItems after add:', selectedItems.length + 1);
     setSearchQuery('');
     setSearchResults([]);
   }
 
   function removeItem(id: string) {
-    console.log('[QuickSale] removeItem called:', id);
     setSelectedItems((prev) => prev.filter((i) => i.id !== id));
   }
 
@@ -577,8 +573,6 @@ function QuickSaleDialog({
     );
   }
 
-  console.log('[QuickSale] render — selectedItems:', selectedItems.length, selectedItems.map(i => i.name));
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogClose onClose={() => onOpenChange(false)} />
@@ -604,6 +598,7 @@ function QuickSaleDialog({
                 .filter((r) => !selectedItems.some((s) => s.id === r.id && s.type === r.item_type))
                 .map((r) => (
                   <button
+                    type="button"
                     key={`${r.item_type}-${r.id}`}
                     onClick={() => addItem(r)}
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50"

@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Quick Sale search result buttons not responding to clicks — 2026-03-18
+
+- **Root cause**: Search result `<button>` elements lacked `type="button"`, defaulting to `type="submit"`. While no `<form>` ancestor exists, the missing attribute caused inconsistent click handling across browsers.
+- **Fix**: Added `type="button"` to search result buttons in Quick Sale dialog.
+- **Cleanup**: Removed 5 temporary debug console.logs from previous debugging session.
+
+---
+
 ## feat: Promotions inline edit, adaptive column layout, conflict detection — 2026-03-18
 
 - **Adaptive Sale Price column**: Replaced 3 hardcoded tier columns (Sedan/Truck/SUV) with a single adaptive column that renders correctly per pricing model — vehicle_size (stacked tiers), scope/specialty (labeled tiers), flat (single line), per_unit (with per_unit_label like "/panel"), and products.
