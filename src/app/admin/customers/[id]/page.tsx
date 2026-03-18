@@ -731,13 +731,15 @@ export default function CustomerProfilePage() {
     {
       id: 'date',
       header: 'Date',
+      size: 120,
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">{formatDate(row.original.created_at)}</span>
       ),
     },
     {
       accessorKey: 'action',
-      header: 'Action',
+      header: () => <div className="text-center">Action</div>,
+      size: 100,
       cell: ({ row }) => {
         const action = row.original.action;
         const variants: Record<string, 'success' | 'destructive' | 'warning' | 'info' | 'default'> = {
@@ -748,29 +750,37 @@ export default function CustomerProfilePage() {
           welcome_bonus: 'success',
         };
         return (
-          <Badge variant={variants[action] || 'default'}>
-            {action.charAt(0).toUpperCase() + action.slice(1).replace('_', ' ')}
-          </Badge>
+          <div className="text-center">
+            <Badge variant={variants[action] || 'default'}>
+              {action.charAt(0).toUpperCase() + action.slice(1).replace('_', ' ')}
+            </Badge>
+          </div>
         );
       },
     },
     {
       accessorKey: 'points_change',
-      header: 'Points',
+      header: () => <div className="text-center">Points</div>,
+      size: 80,
       cell: ({ row }) => {
         const change = row.original.points_change;
         return (
-          <span className={`text-sm font-medium ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {change > 0 ? '+' : ''}{formatPoints(change)}
-          </span>
+          <div className="text-center">
+            <span className={`text-sm font-medium ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {change > 0 ? '+' : ''}{formatPoints(change)}
+            </span>
+          </div>
         );
       },
     },
     {
       accessorKey: 'points_balance',
-      header: 'Balance',
+      header: () => <div className="text-center">Balance</div>,
+      size: 80,
       cell: ({ row }) => (
-        <span className="text-sm text-gray-900">{formatPoints(row.original.points_balance)}</span>
+        <div className="text-center">
+          <span className="text-sm text-gray-900">{formatPoints(row.original.points_balance)}</span>
+        </div>
       ),
     },
     {

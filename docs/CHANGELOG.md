@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Loyalty tab column alignment and description wrapping — 2026-03-18
+
+- Centered Action (100px), Points (80px), and Balance (80px) columns — both headers and cells.
+- Date column set to 120px. Description column takes remaining space, no longer wraps unnecessarily.
+
+---
+
 ## feat: Loyalty points clawback/restoration on refund receipts — 2026-03-18
 
 - **Migration**: Added `points_clawed_back` (INTEGER DEFAULT 0) and `points_restored` (INTEGER DEFAULT 0) columns to `refunds` table.
