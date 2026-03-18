@@ -115,10 +115,8 @@ export function quoteReducer(
       const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId } = action;
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
 
-      // Resolve pricing with sale awareness
-      const saleWindow = (service.sale_starts_at || service.sale_ends_at)
-        ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
-        : null;
+      // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
+      const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
       const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
 
       // Determine effective price: lowest of sale vs combo wins
@@ -328,11 +326,10 @@ export function quoteReducer(
         const pricingTier = service?.pricing?.find(
           (p) => p.tier_name === item.tierName
         );
-        if (!pricingTier) return item;
+        if (!pricingTier || !service) return item;
 
-        const saleWindow = service && (service.sale_starts_at || service.sale_ends_at)
-          ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
-          : null;
+        // Always pass window — null dates = no time limit
+        const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
         const resolved = resolveServicePriceWithSale(pricingTier, sizeClass, saleWindow);
 
         let effectivePrice = resolved.effectivePrice;

@@ -159,10 +159,8 @@ export function ticketReducer(
 
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
 
-      // Resolve pricing with sale awareness
-      const saleWindow = (service.sale_starts_at || service.sale_ends_at)
-        ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
-        : null;
+      // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
+      const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
       const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
 
       // Determine effective price: lowest of sale vs combo wins
@@ -389,12 +387,10 @@ export function ticketReducer(
         const pricingTier = service?.pricing?.find(
           (p) => p.tier_name === item.tierName
         );
-        if (!pricingTier) return item;
+        if (!pricingTier || !service) return item;
 
-        // Resolve with sale awareness
-        const saleWindow = service && (service.sale_starts_at || service.sale_ends_at)
-          ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
-          : null;
+        // Resolve with sale awareness (always pass window — null dates = no time limit)
+        const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
         const resolved = resolveServicePriceWithSale(pricingTier, sizeClass, saleWindow);
 
         // Re-evaluate combo vs sale (lowest wins)

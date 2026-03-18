@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Sale pricing ignored on ticket/quote when dates left empty — 2026-03-17
+
+- **Root cause**: 7 locations constructed `saleWindow` using `(service.sale_starts_at || service.sale_ends_at)` as a guard. When both dates are null (admin says "Leave dates empty for no time limit"), `null || null` is falsy, so `saleWindow = null`. `resolveServicePriceWithSale()` sees `!saleWindow` and bails with `isOnSale: false` — never calling `getSaleStatus()`, which correctly treats null dates as "always active."
+- **Symptom**: Catalog card shows sale badge (uses `getSaleStatus()` directly), but ticket/quote uses base price (goes through the broken `saleWindow` guard).
+- **Fix**: Always pass `{ sale_starts_at, sale_ends_at }` as `saleWindow` — let `getSaleStatus()` + `!pricing.sale_price` handle the logic. Applied to all 7 locations: ticket-reducer (ADD_SERVICE, RECALCULATE_VEHICLE_PRICES), quote-reducer (same), service-detail-dialog (getDisplayPrice), catalog-browser (getToastPrice), register-tab (getToastPrice).
+
+---
+
 ## fix: Booking "Price mismatch" for sale-priced services — 2026-03-17
 
 - **Root cause**: `computeExpectedPrice()` in `/api/book/route.ts` had zero sale awareness — returned `flat_price` for flat services and `tier.price` for tiered, ignoring `sale_price` entirely. Client correctly sent the sale price, server expected base price, mismatch triggered for ALL sale-priced bookings (flat, scope, specialty, vehicle_size non-VSA tiers).

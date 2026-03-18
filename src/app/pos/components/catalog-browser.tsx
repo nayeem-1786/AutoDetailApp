@@ -23,9 +23,8 @@ const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']
 
 /** Resolve sale-aware price for toast messages */
 function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {
-  const saleWindow = (service.sale_starts_at || service.sale_ends_at)
-    ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
-    : null;
+  // Always pass window — null dates = no time limit
+  const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
   return resolveServicePriceWithSale(tier, vsc, saleWindow).effectivePrice;
 }
 

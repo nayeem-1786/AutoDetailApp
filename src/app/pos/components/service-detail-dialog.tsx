@@ -106,9 +106,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   });
 
   function getDisplayPrice(tier: ServicePricing): number {
-    const saleWindow = (service.sale_starts_at || service.sale_ends_at)
-      ? { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at }
-      : null;
+    // Always pass window — null dates = no time limit
+    const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
     return resolveServicePriceWithSale(tier, vehicleSizeClass, saleWindow).effectivePrice;
   }
 
