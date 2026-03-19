@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
           .from('customers')
           .select('id')
           .is('qbo_id', null)
+          .is('deleted_at', null)
           .limit(500);
         const ids = (customers ?? []).map((c) => c.id);
         result = await syncCustomerBatch(ids);

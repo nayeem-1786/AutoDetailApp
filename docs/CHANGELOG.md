@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Customer soft delete complete coverage (Session 12B) — 2026-03-18
+
+**Query filters added (`.is('deleted_at', null)`):**
+- Drip engine (`drip-engine.ts`): send-time customer check (auto-stops enrollment if archived), 3 auto-enrollment queries (no_visit, new_customer, contactability)
+- Audience builder (`audience.ts`): filter added inside `applyFilters()` — all 4 call sites automatically covered
+- Voice agent: customer lookup, appointment queries (GET + POST find-or-create), quote find-or-create
+- Customer portal auth: check-exists (phone + email), link-account (phone + email), link-by-phone
+- QBO batch sync: unsynced customer selection
+
+**Archived customer restore flow:**
+- Admin + POS creation endpoints: second-tier archived check returns `409` with `archived_match` payload when phone matches an archived record. Respects `force_create` flag to skip check.
+- Restore endpoint: now zeros loyalty points balance + inserts ledger entry (`action: 'adjusted'`) preserving history on reactivation.
+- Admin new customer page: handles `409` archived match with restore dialog (ConfirmDialog).
+- POS customer create dialog: same archived match handling with restore dialog.
+
+**Intentionally unfiltered (verified via grep):** Transaction queries, receipt rendering, refund endpoints, lifecycle engine cron (historical joins), conversation summaries, Stripe/Mailgun webhooks, QuickBooks individual sync, campaign/drip analytics.
+
+---
+
 ## feat: Customer soft delete — foundation + high-traffic paths (Session 12A) — 2026-03-18
 
 **Migration:** Added `deleted_at TIMESTAMPTZ DEFAULT NULL` to `customers` table with partial indexes (`idx_customers_active`, `idx_customers_active_phone`).

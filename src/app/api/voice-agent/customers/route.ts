@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         'id, first_name, last_name, phone, email, loyalty_points_balance'
       )
       .eq('phone', e164Phone)
+      .is('deleted_at', null)
       .limit(1)
       .single();
 

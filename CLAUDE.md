@@ -33,6 +33,7 @@ After commit, push, and cache clear, print: `⚠️ Session complete. Run: npm r
 15. **iOS format-detection**: Root layout includes `format-detection: telephone=no` meta tag. Never render phone numbers as plain text in customer-facing components — always wrap in `<a href="tel:...">` to prevent iOS Safari from auto-linking and causing hydration mismatches.
 16. **iOS input zoom prevention**: All text inputs in customer-facing forms must use `text-base sm:text-sm` to prevent iOS auto-zoom on focus (iOS zooms inputs with font-size < 16px).
 17. **Schema reference**: Read `docs/dev/DB_SCHEMA.md` when session touches pricing, services, or booking.
+18. **Customer soft delete**: Customers table uses soft delete (`deleted_at` column). All forward-looking queries (search, selection, eligibility, enrollment, creation uniqueness) MUST filter `.is('deleted_at', null)`. Historical joins (transactions, receipts, refunds, analytics, lifecycle engine) are intentionally unfiltered. One phone = one customer record; archived match surfaced on creation with restore as default path.
 
 ## Project Structure
 

@@ -13,9 +13,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { posFetch } from '../lib/pos-fetch';
-import { formatPhoneInput } from '@/lib/utils/format';
+import { formatPhoneInput, formatDate } from '@/lib/utils/format';
 import type { Customer, CustomerType } from '@/lib/supabase/types';
+
+interface ArchivedMatch {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  deleted_at: string;
+}
 
 interface CustomerCreateDialogProps {
   open: boolean;
@@ -50,6 +60,10 @@ export function CustomerCreateDialog({
   // Duplicate check state
   const [phoneDup, setPhoneDup] = useState<DuplicateError | null>(null);
   const [emailDup, setEmailDup] = useState<DuplicateError | null>(null);
+
+  // Archived match state
+  const [archivedMatch, setArchivedMatch] = useState<ArchivedMatch | null>(null);
+  const [restoringArchived, setRestoringArchived] = useState(false);
   const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -146,6 +160,10 @@ export function CustomerCreateDialog({
       const json = await res.json();
 
       if (!res.ok) {
+        if (res.status === 409 && json.archived_match) {
+          setArchivedMatch(json.archived_match);
+          return;
+        }
         toast.error(json.error || 'Failed to create customer');
         return;
       }
@@ -185,6 +203,7 @@ export function CustomerCreateDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogClose onClose={handleClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
       <DialogHeader>
@@ -298,5 +317,52 @@ export function CustomerCreateDialog({
         </DialogFooter>
       </form>
     </Dialog>
+
+    {/* Archived Customer Match Dialog */}
+    <ConfirmDialog
+      open={!!archivedMatch}
+      onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}
+      title="Archived Customer Found"
+      description={
+        archivedMatch ? (
+          <div className="space-y-3">
+            <p>
+              <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Restoring will reactivate their account with full history. Loyalty points will be reset to zero.
+            </p>
+          </div>
+        ) : ''
+      }
+      confirmLabel={restoringArchived ? 'Restoring...' : 'Restore Customer'}
+      loading={restoringArchived}
+      onConfirm={async () => {
+        if (!archivedMatch) return;
+        setRestoringArchived(true);
+        try {
+          const res = await posFetch(`/api/admin/customers/${archivedMatch.id}/restore`, { method: 'POST' });
+          if (!res.ok) throw new Error('Failed to restore');
+          // Fetch restored customer data and pass to parent
+          const custRes = await posFetch(`/api/pos/customers/search?q=${encodeURIComponent(archivedMatch.phone || '')}`);
+          const custJson = await custRes.json();
+          const restored = custJson.data?.[0];
+          if (restored) {
+            toast.success(`Restored ${restored.first_name} ${restored.last_name}`);
+            onCreated(restored as Customer);
+            handleClose();
+          } else {
+            toast.success('Customer restored');
+            handleClose();
+          }
+        } catch {
+          toast.error('Failed to restore customer');
+        } finally {
+          setRestoringArchived(false);
+          setArchivedMatch(null);
+        }
+      }}
+    />
+    </>
   );
 }

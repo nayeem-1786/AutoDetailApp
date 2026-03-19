@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       sms_consent,
       email_consent,
       customer_type,
+      force_create,
     } = body;
 
     if (!first_name || !last_name) {
@@ -83,6 +84,30 @@ export async function POST(request: NextRequest) {
           { error: `A customer with this email already exists: ${existingByEmail.first_name} ${existingByEmail.last_name}` },
           { status: 409 }
         );
+      }
+    }
+
+    // Second-tier: check for archived customer with same phone
+    if (normalizedPhone && !force_create) {
+      const { data: archivedMatch } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name, phone, email, deleted_at')
+        .eq('phone', normalizedPhone)
+        .not('deleted_at', 'is', null)
+        .maybeSingle();
+
+      if (archivedMatch) {
+        return NextResponse.json({
+          archived_match: {
+            id: archivedMatch.id,
+            first_name: archivedMatch.first_name,
+            last_name: archivedMatch.last_name,
+            phone: archivedMatch.phone,
+            email: archivedMatch.email,
+            deleted_at: archivedMatch.deleted_at,
+          },
+          message: 'An archived customer with this phone number exists.',
+        }, { status: 409 });
       }
     }
 

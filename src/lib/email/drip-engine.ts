@@ -252,16 +252,22 @@ export async function executeStep(
     isFeatureEnabled(FEATURE_FLAGS.EMAIL_MARKETING),
   ]);
 
-  // Load customer
+  // Load customer (exclude archived)
   const { data: customer } = await db
     .from('customers')
     .select('first_name, last_name, phone, email, sms_consent, email_consent, loyalty_points_balance, visit_count, last_visit_date, lifetime_spend')
     .eq('id', enrollment.customer_id)
+    .is('deleted_at', null)
     .single();
 
   if (!customer) {
-    console.error(`[Drip] Customer ${enrollment.customer_id} not found`);
-    await logSend(db, enrollment.id, step.id, step.step_order, 'email', 'failed', null, null, 'Customer not found');
+    // Customer not found or archived — stop enrollment
+    console.error(`[Drip] Customer ${enrollment.customer_id} not found or archived`);
+    await db
+      .from('drip_enrollments')
+      .update({ status: 'stopped', stopped_reason: 'customer_archived', stopped_at: new Date().toISOString() })
+      .eq('id', enrollment.id);
+    await logSend(db, enrollment.id, step.id, step.step_order, 'email', 'failed', null, null, 'Customer not found or archived');
     return { sent: false, emailSent: false, smsSent: false };
   }
 
@@ -708,7 +714,8 @@ export async function runAutoEnrollments(
           .from('customers')
           .select('id')
           .lt('last_visit_date', cutoffDate)
-          .not('last_visit_date', 'is', null);
+          .not('last_visit_date', 'is', null)
+          .is('deleted_at', null);
 
         customerIds = (customers || []).map((c) => c.id);
       } else if (condition === 'after_service') {
@@ -739,7 +746,8 @@ export async function runAutoEnrollments(
         const { data: customers } = await db
           .from('customers')
           .select('id')
-          .gte('created_at', cutoff);
+          .gte('created_at', cutoff)
+          .is('deleted_at', null);
 
         customerIds = (customers || []).map((c) => c.id);
       }
@@ -761,7 +769,8 @@ export async function runAutoEnrollments(
         const { data: contactable } = await db
           .from('customers')
           .select('id, phone, email, sms_consent, email_consent')
-          .in('id', toEnroll);
+          .in('id', toEnroll)
+          .is('deleted_at', null);
 
         for (const cust of contactable || []) {
           const hasPhone = cust.phone && cust.sms_consent;

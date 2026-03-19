@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
         .select('id, first_name, last_name, email')
         .eq('phone', e164Phone)
         .is('auth_user_id', null)
+        .is('deleted_at', null)
         .limit(1)
         .single();
 
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
       .select('id, first_name, last_name, phone')
       .eq('email', email)
       .is('auth_user_id', null)
+      .is('deleted_at', null)
       .limit(1)
       .single();
 

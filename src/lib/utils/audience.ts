@@ -28,6 +28,9 @@ function applyFilters(
   query: ReturnType<ReturnType<SupabaseClient['from']>['select']>,
   filters: AudienceFilters
 ) {
+  // Exclude archived customers from all audience queries
+  query = query.is('deleted_at', null);
+
   // Filter: days_since_visit
   if (filters.days_since_visit_min != null) {
     const date = new Date();

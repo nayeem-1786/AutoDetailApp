@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
         .from('customers')
         .select('id, auth_user_id')
         .eq('phone', e164)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (!customer) {
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
         .from('customers')
         .select('id, auth_user_id')
         .ilike('email', normalizedEmail)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (!customer) {

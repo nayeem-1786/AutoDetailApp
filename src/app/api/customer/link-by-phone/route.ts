@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         .from('customers')
         .select('id, auth_user_id, phone')
         .eq('phone', phoneFormat)
+        .is('deleted_at', null)
         .order('created_at', { ascending: true })
         .limit(1);
 

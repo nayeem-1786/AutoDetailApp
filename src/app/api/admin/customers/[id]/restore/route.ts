@@ -33,15 +33,36 @@ export async function POST(
       return NextResponse.json({ error: 'Customer not found or not archived' }, { status: 404 });
     }
 
-    // Clear deleted_at
+    // Clear deleted_at and reset loyalty points balance
     const { error: restoreError } = await supabase
       .from('customers')
-      .update({ deleted_at: null })
+      .update({ deleted_at: null, loyalty_points_balance: 0 })
       .eq('id', id);
 
     if (restoreError) {
       console.error('Failed to restore customer:', restoreError);
       return NextResponse.json({ error: 'Failed to restore customer' }, { status: 500 });
+    }
+
+    // Zero loyalty points via ledger entry (preserves history)
+    const { data: lastLedger } = await supabase
+      .from('loyalty_ledger')
+      .select('points_balance')
+      .eq('customer_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastLedger && lastLedger.points_balance > 0) {
+      await supabase
+        .from('loyalty_ledger')
+        .insert({
+          customer_id: id,
+          action: 'adjusted',
+          points_change: -lastLedger.points_balance,
+          points_balance: 0,
+          description: `Points reset on account reactivation (previous balance: ${lastLedger.points_balance})`,
+        });
     }
 
     // Re-link portal access if it was disconnected during archive

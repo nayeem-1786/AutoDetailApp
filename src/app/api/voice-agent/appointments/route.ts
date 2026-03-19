@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
       .from('customers')
       .select('id')
       .eq('phone', e164Phone)
+      .is('deleted_at', null)
       .limit(1)
       .single();
 
@@ -226,6 +227,7 @@ export async function POST(request: NextRequest) {
       .from('customers')
       .select('id')
       .eq('phone', e164Phone)
+      .is('deleted_at', null)
       .limit(1)
       .single();
 
