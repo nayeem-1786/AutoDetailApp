@@ -1,7 +1,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
 > Auto-generated from `supabase/migrations/*.sql`
-> Last updated: Mar 3, 2026
+> Last updated: Mar 19, 2026
 
 ---
 
@@ -28,6 +28,8 @@
 | id | UUID | PK, default gen_random_uuid() | |
 | auth_user_id | UUID | UNIQUE, FK → auth.users(id) ON DELETE SET NULL | Portal login |
 | deactivated_auth_user_id | UUID | | Stores auth ID when portal access disabled |
+| square_customer_id | TEXT | UNIQUE | Square POS customer ID |
+| square_reference_id | TEXT | | Square reference ID |
 | first_name | TEXT | NOT NULL | |
 | last_name | TEXT | NOT NULL | |
 | phone | TEXT | | Primary phone (auth identity) |
@@ -40,17 +42,44 @@
 | city | TEXT | | |
 | state | TEXT | | |
 | zip | TEXT | | |
+| notes | TEXT | | Free-text admin notes |
+| tags | JSONB | NOT NULL, DEFAULT '[]' | Array of tag strings (e.g. "VIP", "fleet") |
 | sms_consent | BOOLEAN | NOT NULL, DEFAULT false | |
 | email_consent | BOOLEAN | NOT NULL, DEFAULT false | |
 | notify_promotions | BOOLEAN | NOT NULL, DEFAULT true | |
 | notify_loyalty | BOOLEAN | NOT NULL, DEFAULT true | |
+| first_visit_date | DATE | | Set on first completed transaction |
+| last_visit_date | DATE | | Updated on each completed transaction |
+| visit_count | INTEGER | NOT NULL, DEFAULT 0 | Incremented on each completed transaction |
+| lifetime_spend | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Running total of transaction amounts |
+| loyalty_points_balance | INTEGER | NOT NULL, DEFAULT 0 | Current loyalty points (denormalized from loyalty_ledger) |
 | qbo_id | TEXT | | QuickBooks Online ID |
 | qbo_synced_at | TIMESTAMPTZ | | |
 | deleted_at | TIMESTAMPTZ | DEFAULT NULL | Soft delete. NULL = active. Set = archived |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | "Customer Since" date |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
-**Indexes:** `idx_customers_active` (partial: WHERE deleted_at IS NULL), `idx_customers_active_phone` (partial: phone WHERE deleted_at IS NULL AND phone IS NOT NULL)
+**CHECK constraints:** `valid_phone CHECK (phone ~ '^\+1\d{10}$' OR phone IS NULL)` — enforces E.164 format, `customers_customer_type_check CHECK (customer_type IN ('enthusiast', 'professional'))`
+
+**Indexes:**
+```
+idx_customers_active — btree (id) WHERE deleted_at IS NULL
+idx_customers_active_phone — btree (phone) WHERE deleted_at IS NULL AND phone IS NOT NULL
+idx_customers_phone_unique — UNIQUE btree (phone) WHERE deleted_at IS NULL AND phone IS NOT NULL AND phone <> ''
+idx_customers_email_unique — UNIQUE btree (lower(email)) WHERE deleted_at IS NULL AND email IS NOT NULL AND email <> ''
+idx_customers_email — btree (email)
+idx_customers_phone — btree (phone)
+idx_customers_name — btree (last_name, first_name)
+idx_customers_last_visit — btree (last_visit_date DESC)
+idx_customers_lifetime_spend — btree (lifetime_spend DESC)
+idx_customers_loyalty — btree (loyalty_points_balance DESC)
+idx_customers_qbo_id — btree (qbo_id) WHERE qbo_id IS NOT NULL
+idx_customers_search — GIN to_tsvector('english', coalesce(first_name,'') || ' ' || coalesce(last_name,'') || ' ' || coalesce(phone,'') || ' ' || coalesce(email,''))
+idx_customers_square_id — btree (square_customer_id)
+idx_customers_auth_user_id — btree (auth_user_id)
+customers_auth_user_id_key — UNIQUE btree (auth_user_id)
+customers_square_customer_id_key — UNIQUE btree (square_customer_id)
+```
 
 ### vehicles
 | Column | Type | Constraints | Notes |
@@ -306,32 +335,60 @@
 ### payments
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| id | UUID | PK | |
+| id | UUID | PK, default gen_random_uuid() | |
 | transaction_id | UUID | NOT NULL, FK → transactions(id) ON DELETE CASCADE | |
 | method | payment_method (enum) | NOT NULL | |
 | amount | DECIMAL(10,2) | NOT NULL | |
-| created_at | TIMESTAMPTZ | | |
+| tip_amount | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Tip portion of this payment |
+| tip_net | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Tip after processing fee deduction |
+| stripe_payment_intent_id | TEXT | | Stripe PaymentIntent ID |
+| stripe_charge_id | TEXT | | Stripe Charge ID |
+| card_brand | TEXT | | e.g. 'visa', 'mastercard' |
+| card_last_four | TEXT | | Last 4 digits of card |
+| card_fingerprint | TEXT | | Stripe card fingerprint for matching saved cards |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:**
+```
+idx_payments_transaction — btree (transaction_id)
+idx_payments_stripe — btree (stripe_payment_intent_id)
+```
 
 ### refunds
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| id | UUID | PK | |
+| id | UUID | PK, default gen_random_uuid() | |
 | transaction_id | UUID | NOT NULL, FK → transactions(id) ON DELETE RESTRICT | |
 | status | refund_status (enum) | NOT NULL, DEFAULT 'pending' | |
 | amount | DECIMAL(10,2) | NOT NULL | |
+| reason | TEXT | | Refund reason text |
+| stripe_refund_id | TEXT | | Stripe Refund ID |
+| processed_by | UUID | FK → employees(id) ON DELETE SET NULL | Employee who processed the refund |
 | points_clawed_back | INTEGER | DEFAULT 0 | Earned points reversed |
 | points_restored | INTEGER | DEFAULT 0 | Redeemed points given back |
-| created_at | TIMESTAMPTZ | | |
-| updated_at | TIMESTAMPTZ | | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:**
+```
+idx_refunds_transaction — btree (transaction_id)
+```
 
 ### refund_items
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| id | UUID | PK | |
-| transaction_item_id | UUID | NOT NULL, FK → transaction_items(id) | |
+| id | UUID | PK, default gen_random_uuid() | |
+| refund_id | UUID | NOT NULL, FK → refunds(id) ON DELETE CASCADE | |
+| transaction_item_id | UUID | NOT NULL, FK → transaction_items(id) ON DELETE RESTRICT | |
 | quantity | INTEGER | NOT NULL, DEFAULT 1 | |
 | amount | DECIMAL(10,2) | NOT NULL | |
-| created_at | TIMESTAMPTZ | | |
+| restock | BOOLEAN | NOT NULL, DEFAULT false | Whether to return item to inventory |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:**
+```
+idx_refund_items_refund — btree (refund_id)
+```
 
 ---
 

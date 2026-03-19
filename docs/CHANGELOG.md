@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: DB_SCHEMA.md full audit — fill verified gaps from database introspection — 2026-03-19
+
+- **Customers table**: Added 10 missing columns (square_customer_id, square_reference_id, notes, tags, first_visit_date, last_visit_date, visit_count, lifetime_spend, loyalty_points_balance, deleted_at). Added `valid_phone` CHECK constraint. Added 16 indexes (phone/email unique partials, search GIN, sort indexes, QBO, Square, auth).
+- **Payments table**: Added 7 missing columns (tip_amount, tip_net, stripe_payment_intent_id, stripe_charge_id, card_brand, card_last_four, card_fingerprint). Added 2 indexes.
+- **Refunds table**: Added 3 missing columns (reason, stripe_refund_id, processed_by with FK). Added index.
+- **Refund items table**: Added 2 missing columns (refund_id with FK CASCADE, restock). Added index.
+- **Migration**: Created `20260319000001_partial_unique_phone_email.sql` to capture manually applied partial unique constraints (added `deleted_at IS NULL` condition for soft delete compatibility). Mark as already applied with `npx supabase migration repair`.
+
+---
+
 ## refactor: Remove "Create New Anyway" — restore-only flow for archived phone matches — 2026-03-18
 
 - **Admin** (`admin/customers/new/page.tsx`): Removed "Create New Anyway" button, force-create confirmation dialog, `forceCreateConfirmOpen`/`forcingCreate`/`lastFormDataRef` state. Dialog now has 2 buttons: Restore Customer + Cancel.
