@@ -16,7 +16,6 @@ import { Switch } from '@/components/ui/switch';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogHeader, DialogTitle, DialogContent } from '@/components/ui/dialog';
 import { ArrowLeft } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
@@ -73,9 +72,6 @@ export default function NewCustomerPage() {
   // Archived match state
   const [archivedMatch, setArchivedMatch] = useState<ArchivedMatch | null>(null);
   const [restoringArchived, setRestoringArchived] = useState(false);
-  const [forceCreateConfirmOpen, setForceCreateConfirmOpen] = useState(false);
-  const [forcingCreate, setForcingCreate] = useState(false);
-  const lastFormDataRef = useRef<Record<string, unknown> | null>(null);
   const [emailFormatError, setEmailFormatError] = useState('');
   const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -290,8 +286,6 @@ export default function NewCustomerPage() {
         email_consent: data.email_consent,
         customer_type: customerType,
       };
-      lastFormDataRef.current = payload;
-
       const res = await adminFetch('/api/admin/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -563,7 +557,7 @@ export default function NewCustomerPage() {
       </form>
 
       {/* Archived Customer Match Dialog */}
-      <Dialog open={!!archivedMatch && !forceCreateConfirmOpen} onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}>
+      <Dialog open={!!archivedMatch} onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}>
         <DialogHeader>
           <DialogTitle>Archived Customer Found</DialogTitle>
         </DialogHeader>
@@ -598,13 +592,6 @@ export default function NewCustomerPage() {
                   {restoringArchived ? 'Restoring...' : 'Restore Customer'}
                 </Button>
                 <Button
-                  variant="outline"
-                  disabled={restoringArchived}
-                  onClick={() => setForceCreateConfirmOpen(true)}
-                >
-                  Create New Anyway
-                </Button>
-                <Button
                   variant="ghost"
                   disabled={restoringArchived}
                   onClick={() => setArchivedMatch(null)}
@@ -616,38 +603,6 @@ export default function NewCustomerPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Force Create Confirmation (Admin — simple confirm, no PIN needed) */}
-      <ConfirmDialog
-        open={forceCreateConfirmOpen}
-        onOpenChange={(open) => { if (!open) setForceCreateConfirmOpen(false); }}
-        title="Create Duplicate Record?"
-        description="This will create a new customer record while an archived record with the same phone exists. The archived record's history will not be linked."
-        confirmLabel={forcingCreate ? 'Creating...' : 'Yes, Create New'}
-        variant="destructive"
-        loading={forcingCreate}
-        onConfirm={async () => {
-          if (!lastFormDataRef.current) return;
-          setForcingCreate(true);
-          try {
-            const res = await adminFetch('/api/admin/customers', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...lastFormDataRef.current, force_create: true }),
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.error || 'Failed to create');
-            toast.success('Customer created successfully');
-            router.push(`/admin/customers/${json.data.id}`);
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to create customer');
-          } finally {
-            setForcingCreate(false);
-            setForceCreateConfirmOpen(false);
-            setArchivedMatch(null);
-          }
-        }}
-      />
     </div>
   );
 }

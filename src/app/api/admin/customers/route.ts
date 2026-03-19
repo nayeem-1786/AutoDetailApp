@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
       sms_consent,
       email_consent,
       customer_type,
-      force_create,
     } = body;
 
     if (!first_name || !last_name) {
@@ -88,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Second-tier: check for archived customer with same phone
-    if (normalizedPhone && !force_create) {
+    if (normalizedPhone) {
       const { data: archivedMatch } = await supabase
         .from('customers')
         .select('id, first_name, last_name, phone, email, deleted_at')

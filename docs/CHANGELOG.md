@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Remove "Create New Anyway" — restore-only flow for archived phone matches — 2026-03-18
+
+- **Admin** (`admin/customers/new/page.tsx`): Removed "Create New Anyway" button, force-create confirmation dialog, `forceCreateConfirmOpen`/`forcingCreate`/`lastFormDataRef` state. Dialog now has 2 buttons: Restore Customer + Cancel.
+- **POS** (`pos/components/customer-create-dialog.tsx`): Removed "Create New Anyway" button, ManagerPinDialog integration, `showManagerPin`/`forcingCreate` state. Dialog now has 2 buttons: Restore Customer + Cancel.
+- **Admin backend** (`/api/admin/customers/route.ts`): Removed `force_create` from body destructuring. Archived check now always runs unconditionally.
+- **POS backend** (`/api/pos/customers/route.ts`): Same — removed `force_create`, archived check always runs.
+- Business rule enforced: one phone = one customer record. Restore is the only path.
+
+---
+
 ## fix: Add "Create New Anyway" with manager pin to archived match dialogs — 2026-03-18
 
 - **Admin** (`admin/customers/new/page.tsx`): Replaced ConfirmDialog with raw Dialog — 3 buttons: Restore Customer (primary), Create New Anyway (outline → simple confirmation dialog), Cancel. Force-creates via `force_create: true` flag.

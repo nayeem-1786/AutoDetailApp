@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     const body = await request.json();
-    const { first_name, last_name, phone, email, customer_type, force_create } = body;
+    const { first_name, last_name, phone, email, customer_type } = body;
 
     if (!first_name || !last_name || !phone) {
       return NextResponse.json(
@@ -48,27 +48,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Second-tier: check for archived customer with same phone
-    if (!force_create) {
-      const { data: archivedMatch } = await supabase
-        .from('customers')
-        .select('id, first_name, last_name, phone, email, deleted_at')
-        .eq('phone', normalizedPhone)
-        .not('deleted_at', 'is', null)
-        .maybeSingle();
+    const { data: archivedMatch } = await supabase
+      .from('customers')
+      .select('id, first_name, last_name, phone, email, deleted_at')
+      .eq('phone', normalizedPhone)
+      .not('deleted_at', 'is', null)
+      .maybeSingle();
 
-      if (archivedMatch) {
-        return NextResponse.json({
-          archived_match: {
-            id: archivedMatch.id,
-            first_name: archivedMatch.first_name,
-            last_name: archivedMatch.last_name,
-            phone: archivedMatch.phone,
-            email: archivedMatch.email,
-            deleted_at: archivedMatch.deleted_at,
-          },
-          message: 'An archived customer with this phone number exists.',
-        }, { status: 409 });
-      }
+    if (archivedMatch) {
+      return NextResponse.json({
+        archived_match: {
+          id: archivedMatch.id,
+          first_name: archivedMatch.first_name,
+          last_name: archivedMatch.last_name,
+          phone: archivedMatch.phone,
+          email: archivedMatch.email,
+          deleted_at: archivedMatch.deleted_at,
+        },
+        message: 'An archived customer with this phone number exists.',
+      }, { status: 409 });
     }
 
     // Validate customer_type if provided

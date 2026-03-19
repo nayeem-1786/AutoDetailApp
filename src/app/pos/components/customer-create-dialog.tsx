@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
-import { ManagerPinDialog } from './manager-pin-dialog';
 import { formatPhoneInput, formatDate } from '@/lib/utils/format';
 import type { Customer, CustomerType } from '@/lib/supabase/types';
 
@@ -64,8 +63,6 @@ export function CustomerCreateDialog({
   // Archived match state
   const [archivedMatch, setArchivedMatch] = useState<ArchivedMatch | null>(null);
   const [restoringArchived, setRestoringArchived] = useState(false);
-  const [showManagerPin, setShowManagerPin] = useState(false);
-  const [forcingCreate, setForcingCreate] = useState(false);
   const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -321,7 +318,7 @@ export function CustomerCreateDialog({
     </Dialog>
 
     {/* Archived Customer Match Dialog */}
-    <Dialog open={!!archivedMatch && !showManagerPin} onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}>
+    <Dialog open={!!archivedMatch} onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}>
       <DialogHeader>
         <DialogTitle>Archived Customer Found</DialogTitle>
       </DialogHeader>
@@ -367,14 +364,6 @@ export function CustomerCreateDialog({
                 {restoringArchived ? 'Restoring...' : 'Restore Customer'}
               </Button>
               <Button
-                variant="outline"
-                className="min-h-[44px]"
-                disabled={restoringArchived}
-                onClick={() => setShowManagerPin(true)}
-              >
-                Create New Anyway
-              </Button>
-              <Button
                 variant="ghost"
                 className="min-h-[44px]"
                 disabled={restoringArchived}
@@ -387,42 +376,6 @@ export function CustomerCreateDialog({
         )}
       </DialogContent>
     </Dialog>
-
-    {/* Manager Pin for Force Create */}
-    {showManagerPin && (
-      <ManagerPinDialog
-        permissionKey="customers.delete"
-        onSuccess={async () => {
-          setShowManagerPin(false);
-          setForcingCreate(true);
-          try {
-            const res = await posFetch('/api/pos/customers', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                first_name: firstName.trim(),
-                last_name: lastName.trim(),
-                phone,
-                email: email.trim() || undefined,
-                customer_type: customerType,
-                force_create: true,
-              }),
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.error || 'Failed to create');
-            toast.success(`Created ${firstName} ${lastName}`);
-            onCreated(json.data as Customer);
-            handleClose();
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to create customer');
-          } finally {
-            setForcingCreate(false);
-            setArchivedMatch(null);
-          }
-        }}
-        onCancel={() => setShowManagerPin(false)}
-      />
-    )}
     </>
   );
 }
