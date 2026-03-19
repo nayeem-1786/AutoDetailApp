@@ -185,7 +185,8 @@ function DataTable<TData>({
                       <div
                         className={cn(
                           'flex items-center gap-1',
-                          header.column.getCanSort() && 'cursor-pointer select-none'
+                          header.column.getCanSort() && 'cursor-pointer select-none',
+                          (header.column.columnDef.meta as { headerClassName?: string })?.headerClassName
                         )}
                         onClick={header.column.getToggleSortingHandler()}
                       >

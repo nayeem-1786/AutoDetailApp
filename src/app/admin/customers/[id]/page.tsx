@@ -731,15 +731,16 @@ export default function CustomerProfilePage() {
     {
       id: 'date',
       header: 'Date',
-      size: 120,
+      size: 80,
       cell: ({ row }) => (
         <span className="text-sm text-gray-600">{formatDate(row.original.created_at)}</span>
       ),
     },
     {
       accessorKey: 'action',
-      header: () => <div className="w-full text-center">Action</div>,
-      size: 100,
+      header: 'Action',
+      size: 80,
+      meta: { headerClassName: 'justify-center' },
       cell: ({ row }) => {
         const action = row.original.action;
         const variants: Record<string, 'success' | 'destructive' | 'warning' | 'info' | 'default'> = {
@@ -760,8 +761,9 @@ export default function CustomerProfilePage() {
     },
     {
       accessorKey: 'points_change',
-      header: () => <div className="w-full text-center">Points</div>,
+      header: 'Points',
       size: 80,
+      meta: { headerClassName: 'justify-center' },
       cell: ({ row }) => {
         const change = row.original.points_change;
         return (
@@ -775,8 +777,9 @@ export default function CustomerProfilePage() {
     },
     {
       accessorKey: 'points_balance',
-      header: () => <div className="w-full text-center">Balance</div>,
+      header: 'Balance',
       size: 80,
+      meta: { headerClassName: 'justify-center' },
       cell: ({ row }) => (
         <div className="text-center">
           <span className="text-sm text-gray-900">{formatPoints(row.original.points_balance)}</span>
