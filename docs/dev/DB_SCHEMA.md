@@ -46,8 +46,11 @@
 | notify_loyalty | BOOLEAN | NOT NULL, DEFAULT true | |
 | qbo_id | TEXT | | QuickBooks Online ID |
 | qbo_synced_at | TIMESTAMPTZ | | |
+| deleted_at | TIMESTAMPTZ | DEFAULT NULL | Soft delete. NULL = active. Set = archived |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | "Customer Since" date |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:** `idx_customers_active` (partial: WHERE deleted_at IS NULL), `idx_customers_active_phone` (partial: phone WHERE deleted_at IS NULL AND phone IS NOT NULL)
 
 ### vehicles
 | Column | Type | Constraints | Notes |
@@ -1385,7 +1388,7 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 | enrolled_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | next_send_at | TIMESTAMPTZ | | Calculated from cumulative delays |
 | status | TEXT | NOT NULL, CHECK IN ('active','completed','stopped','paused') | |
-| stopped_reason | TEXT | | `purchased`, `booked`, `replied`, `manual`, `unsubscribed` |
+| stopped_reason | TEXT | | `purchased`, `booked`, `replied`, `manual`, `unsubscribed`, `customer_archived` |
 | stopped_at | TIMESTAMPTZ | | |
 | nurture_transferred | BOOLEAN | NOT NULL, DEFAULT false | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |

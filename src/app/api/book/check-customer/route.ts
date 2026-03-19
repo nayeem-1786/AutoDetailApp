@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
           .from('customers')
           .select('id, visit_count')
           .eq('phone', e164Phone)
+          .is('deleted_at', null)
           .single();
         customer = byPhone;
       }
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
         .from('customers')
         .select('id, visit_count')
         .eq('email', email.toLowerCase().trim())
+        .is('deleted_at', null)
         .single();
       customer = byEmail;
     }

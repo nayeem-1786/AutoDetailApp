@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
           let query = admin
             .from('customers')
             .select('id, first_name, last_name')
-            .eq('phone', normalized);
+            .eq('phone', normalized)
+            .is('deleted_at', null);
           if (excludeId) query = query.neq('id', excludeId);
           const { data: match } = await query.maybeSingle();
 
@@ -52,7 +53,8 @@ export async function GET(request: NextRequest) {
         let query = admin
           .from('customers')
           .select('id, first_name, last_name')
-          .ilike('email', normalizedEmail);
+          .ilike('email', normalizedEmail)
+          .is('deleted_at', null);
         if (excludeId) query = query.neq('id', excludeId);
         const { data: match } = await query.maybeSingle();
 

@@ -85,6 +85,7 @@ export interface Customer {
   visit_count: number;
   lifetime_spend: number;
   loyalty_points_balance: number;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }

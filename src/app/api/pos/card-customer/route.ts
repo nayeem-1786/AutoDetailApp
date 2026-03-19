@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
       .from('customers')
       .select('id, first_name, last_name, email, phone, visit_count, lifetime_spend, loyalty_points_balance')
       .eq('id', matchedCustomerId)
+      .is('deleted_at', null)
       .single();
 
     if (cust) {

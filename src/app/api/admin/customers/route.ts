@@ -53,11 +53,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 });
     }
 
-    // Check phone uniqueness
+    // Check phone uniqueness (only among active customers)
     const { data: existingByPhone } = await supabase
       .from('customers')
       .select('id, first_name, last_name')
       .eq('phone', normalizedPhone)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (existingByPhone) {
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
         .from('customers')
         .select('id, first_name, last_name')
         .ilike('email', normalizedEmail)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (existingByEmail) {

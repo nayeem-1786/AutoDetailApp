@@ -27,6 +27,7 @@ src/app/api/admin/current-ip/route.ts
 src/app/api/admin/customers/[id]/photos/route.ts
 src/app/api/admin/customers/[id]/portal-access/route.ts
 src/app/api/admin/customers/[id]/reset-password/route.ts
+src/app/api/admin/customers/[id]/restore/route.ts
 src/app/api/admin/customers/[id]/route.ts
 src/app/api/admin/customers/check-duplicate/route.ts
 src/app/api/admin/customers/route.ts

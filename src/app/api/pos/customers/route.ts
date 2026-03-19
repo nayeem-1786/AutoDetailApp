@@ -32,11 +32,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for existing customer with same phone
+    // Check for existing customer with same phone (only active customers)
     const { data: existing } = await supabase
       .from('customers')
       .select('id, first_name, last_name')
       .eq('phone', normalizedPhone)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (existing) {

@@ -128,9 +128,11 @@ export default function CustomerProfilePage() {
   const [reactivatingPortal, setReactivatingPortal] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
-  // Delete customer state
+  // Archive/restore customer state
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0); // 0=closed, 1=first confirm, 2=final confirm
   const [deletingCustomer, setDeletingCustomer] = useState(false);
+  const [restoringCustomer, setRestoringCustomer] = useState(false);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
 
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
@@ -701,8 +703,8 @@ export default function CustomerProfilePage() {
     }
   }
 
-  // --- Delete Customer ---
-  async function handleDeleteCustomer() {
+  // --- Archive Customer ---
+  async function handleArchiveCustomer() {
     if (!customer) return;
     setDeletingCustomer(true);
     try {
@@ -712,17 +714,48 @@ export default function CustomerProfilePage() {
       const json = await res.json();
 
       if (!res.ok) {
-        throw new Error(json.error || 'Failed to delete customer');
+        throw new Error(json.error || 'Failed to archive customer');
       }
 
-      toast.success('Customer deleted successfully');
+      toast.success('Customer archived successfully');
       router.push('/admin/customers');
     } catch (err) {
-      console.error('Delete customer error:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to delete customer');
+      console.error('Archive customer error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to archive customer');
       setDeleteStep(0);
     } finally {
       setDeletingCustomer(false);
+    }
+  }
+
+  // --- Restore Customer ---
+  async function handleRestoreCustomer() {
+    if (!customer) return;
+    setRestoringCustomer(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customer.id}/restore`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to restore customer');
+      }
+
+      toast.success('Customer restored successfully');
+      // Reload customer data to reflect updated state
+      const { data: updated } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', customer.id)
+        .single();
+      if (updated) setCustomer(updated);
+      setRestoreConfirmOpen(false);
+    } catch (err) {
+      console.error('Restore customer error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to restore customer');
+    } finally {
+      setRestoringCustomer(false);
     }
   }
 
@@ -901,6 +934,9 @@ export default function CustomerProfilePage() {
                 setCustomer((prev) => prev ? { ...prev, customer_type: newType } : prev);
               }}
             />
+            {customer.deleted_at && (
+              <Badge variant="destructive">Archived</Badge>
+            )}
           </span>
         }
         description={
@@ -1298,7 +1334,7 @@ export default function CustomerProfilePage() {
             </Card>
 
             <div className="flex justify-between">
-              {canDeleteCustomer && (
+              {canDeleteCustomer && !customer?.deleted_at && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -1306,7 +1342,17 @@ export default function CustomerProfilePage() {
                   onClick={() => setDeleteStep(1)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Customer
+                  Archive Customer
+                </Button>
+              )}
+              {canDeleteCustomer && customer?.deleted_at && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => setRestoreConfirmOpen(true)}
+                >
+                  Restore Customer
                 </Button>
               )}
               {!canDeleteCustomer && <div />}
@@ -1915,23 +1961,22 @@ export default function CustomerProfilePage() {
         </TabsContent>
       </Tabs>
 
-      {/* Delete Customer - First Confirmation */}
+      {/* Archive Customer - First Confirmation */}
       <ConfirmDialog
         open={deleteStep === 1}
         onOpenChange={(open) => { if (!open) setDeleteStep(0); }}
-        title="Delete Customer"
+        title="Archive Customer"
         description={
           <div className="space-y-3">
-            <p>Are you sure you want to delete <strong>{customer?.first_name} {customer?.last_name}</strong>?</p>
+            <p>Are you sure you want to archive <strong>{customer?.first_name} {customer?.last_name}</strong>?</p>
             <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-              <p className="font-medium">This will permanently delete:</p>
+              <p className="font-medium">This will:</p>
               <ul className="mt-1 list-disc pl-5">
-                <li>Customer profile and contact information</li>
-                <li>All {vehicles.length} vehicle record(s)</li>
-                <li>Loyalty points balance ({formatPoints(customer?.loyalty_points_balance || 0)} pts)</li>
-                <li>Portal access (if any)</li>
+                <li>Hide the customer from search and selection</li>
+                <li>Disconnect portal access (if any)</li>
+                <li>Stop active marketing sequences</li>
               </ul>
-              <p className="mt-2">Transaction history will be preserved but unlinked from this customer.</p>
+              <p className="mt-2">All records (transactions, appointments, vehicles, loyalty) are preserved. You can restore this customer later.</p>
             </div>
           </div>
         }
@@ -1940,23 +1985,36 @@ export default function CustomerProfilePage() {
         onConfirm={() => setDeleteStep(2)}
       />
 
-      {/* Delete Customer - Final Confirmation */}
+      {/* Archive Customer - Final Confirmation */}
       <ConfirmDialog
         open={deleteStep === 2}
         onOpenChange={(open) => { if (!open) setDeleteStep(0); }}
-        title="Final Confirmation"
+        title="Confirm Archive"
         description={
           <div className="space-y-3">
-            <p className="text-red-600 font-medium">This action cannot be undone.</p>
-            <p>Type the customer&apos;s first name to confirm deletion:</p>
+            <p>Type the customer&apos;s first name to confirm:</p>
             <p className="text-center font-mono text-lg font-bold text-gray-900">{customer?.first_name}</p>
           </div>
         }
-        confirmLabel={deletingCustomer ? 'Deleting...' : 'Permanently Delete'}
+        confirmLabel={deletingCustomer ? 'Archiving...' : 'Archive Customer'}
         variant="destructive"
         loading={deletingCustomer}
         requireConfirmText={customer?.first_name || ''}
-        onConfirm={handleDeleteCustomer}
+        onConfirm={handleArchiveCustomer}
+      />
+
+      {/* Restore Customer Confirmation */}
+      <ConfirmDialog
+        open={restoreConfirmOpen}
+        onOpenChange={(open) => { if (!open) setRestoreConfirmOpen(false); }}
+        title="Restore Customer"
+        description={
+          <p>This will restore <strong>{customer?.first_name} {customer?.last_name}</strong> as an active customer. If they had portal access, it will be reconnected.</p>
+        }
+        confirmLabel={restoringCustomer ? 'Restoring...' : 'Restore'}
+        variant="default"
+        loading={restoringCustomer}
+        onConfirm={handleRestoreCustomer}
       />
     </div>
   );

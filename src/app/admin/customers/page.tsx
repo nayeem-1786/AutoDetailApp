@@ -23,6 +23,7 @@ type SortOption = 'name' | 'last_visit' | 'spend';
 type CustomerTypeFilter = 'all' | 'enthusiast' | 'professional' | 'unset';
 type VisitStatusFilter = 'all' | 'new' | 'returning' | 'loyal' | 'inactive';
 type ActivityFilter = 'all' | 'open_quotes' | 'pending_appointments';
+type ArchivedFilter = boolean;
 
 function BulkTagDialog({
   open,
@@ -286,6 +287,7 @@ export default function CustomersPage() {
   const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilter>('all');
   const [visitStatusFilter, setVisitStatusFilter] = useState<VisitStatusFilter>('all');
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
+  const [showArchived, setShowArchived] = useState<ArchivedFilter>(false);
   const [openQuoteCustomerIds, setOpenQuoteCustomerIds] = useState<Set<string>>(new Set());
   const [pendingApptCustomerIds, setPendingApptCustomerIds] = useState<Set<string>>(new Set());
 
@@ -357,8 +359,12 @@ export default function CustomersPage() {
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+      let custQuery = supabase.from('customers').select('*').order('first_name').limit(5000);
+      if (!showArchived) {
+        custQuery = custQuery.is('deleted_at', null);
+      }
       const [custRes, quotesRes, apptsRes] = await Promise.all([
-        supabase.from('customers').select('*').order('first_name').limit(5000),
+        custQuery,
         // Open quotes: anything not yet accepted, converted, or expired
         supabase
           .from('quotes')
@@ -397,7 +403,7 @@ export default function CustomersPage() {
     }
     load();
     fetchStats();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showArchived]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -529,12 +535,17 @@ export default function CustomersPage() {
       size: 180,
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
       cell: ({ row }) => (
-        <button
-          className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
-          onClick={() => router.push(`/admin/customers/${row.original.id}`)}
-        >
-          {row.original.first_name} {row.original.last_name}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className={`text-left font-medium hover:underline ${row.original.deleted_at ? 'text-gray-400' : 'text-blue-600 hover:text-blue-800'}`}
+            onClick={() => router.push(`/admin/customers/${row.original.id}`)}
+          >
+            {row.original.first_name} {row.original.last_name}
+          </button>
+          {row.original.deleted_at && (
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Archived</Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -689,6 +700,15 @@ export default function CustomersPage() {
           <option value="last_visit">Sort by Last Visit</option>
           <option value="spend">Sort by Spend</option>
         </Select>
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer ml-auto">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+          />
+          Show archived
+        </label>
       </div>
 
       {/* Quick filters + tag filter */}

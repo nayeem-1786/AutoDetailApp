@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       .from('customers')
       .select('first_name')
       .eq('phone', e164)
+      .is('deleted_at', null)
       .single();
 
     if (!customer) {

@@ -189,7 +189,7 @@ export async function PATCH(
   }
 }
 
-// DELETE - Delete a customer and associated records
+// DELETE - Archive a customer (soft delete)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -206,88 +206,53 @@ export async function DELETE(
     const { id } = await params;
     const supabase = createAdminClient();
 
-    // Verify customer exists
+    // Verify customer exists and is not already archived
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select('id, first_name, last_name')
+      .select('id, first_name, last_name, auth_user_id')
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (customerError || !customer) {
-      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Customer not found or already archived' }, { status: 404 });
     }
 
-    // Delete associated records
-
-    // 1. Delete vehicles
-    const { error: vehiclesError } = await supabase
-      .from('vehicles')
-      .delete()
-      .eq('customer_id', id);
-
-    if (vehiclesError) {
-      console.error('Failed to delete vehicles:', vehiclesError);
-    }
-
-    // 2. Delete loyalty ledger entries
-    const { error: ledgerError } = await supabase
-      .from('loyalty_ledger')
-      .delete()
-      .eq('customer_id', id);
-
-    if (ledgerError) {
-      console.error('Failed to delete loyalty ledger:', ledgerError);
-    }
-
-    // 3. Unlink transactions (preserve for accounting)
-    const { error: txError } = await supabase
-      .from('transactions')
-      .update({ customer_id: null })
-      .eq('customer_id', id);
-
-    if (txError) {
-      console.error('Failed to unlink transactions:', txError);
-    }
-
-    // 4. Delete marketing consent log entries
-    const { error: consentError } = await supabase
-      .from('marketing_consent_log')
-      .delete()
-      .eq('customer_id', id);
-
-    if (consentError) {
-      console.error('Failed to delete consent log:', consentError);
-    }
-
-    // 5. Delete appointments
-    const { error: appointmentsError } = await supabase
-      .from('appointments')
-      .delete()
-      .eq('customer_id', id);
-
-    if (appointmentsError) {
-      console.error('Failed to delete appointments:', appointmentsError);
-    }
-
-    // 6. Delete quotes
-    const { error: quotesError } = await supabase
-      .from('quotes')
-      .delete()
-      .eq('customer_id', id);
-
-    if (quotesError) {
-      console.error('Failed to delete quotes:', quotesError);
-    }
-
-    // Finally delete the customer
-    const { error: deleteError } = await supabase
+    // Soft delete — set deleted_at timestamp
+    const { error: archiveError } = await supabase
       .from('customers')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (deleteError) {
-      console.error('Failed to delete customer:', deleteError);
-      return NextResponse.json({ error: 'Failed to delete customer' }, { status: 500 });
+    if (archiveError) {
+      console.error('Failed to archive customer:', archiveError);
+      return NextResponse.json({ error: 'Failed to archive customer' }, { status: 500 });
+    }
+
+    // Disconnect portal access (non-blocking)
+    if (customer.auth_user_id) {
+      try {
+        await supabase
+          .from('customers')
+          .update({
+            deactivated_auth_user_id: customer.auth_user_id,
+            auth_user_id: null,
+          })
+          .eq('id', id);
+      } catch (e) {
+        console.error('Failed to disconnect portal on archive:', e);
+      }
+    }
+
+    // Stop active drip enrollments (non-blocking)
+    try {
+      await supabase
+        .from('drip_enrollments')
+        .update({ status: 'stopped', stopped_reason: 'customer_archived', stopped_at: new Date().toISOString() })
+        .eq('customer_id', id)
+        .eq('status', 'active');
+    } catch (e) {
+      console.error('Failed to stop drip enrollments on archive:', e);
     }
 
     logAudit({
@@ -297,17 +262,14 @@ export async function DELETE(
       action: 'delete',
       entityType: 'customer',
       entityId: id,
-      entityLabel: `${customer.first_name} ${customer.last_name}`.trim(),
+      entityLabel: `Archived: ${customer.first_name} ${customer.last_name}`.trim(),
       ipAddress: getRequestIp(request),
       source: 'admin',
     });
 
-    return NextResponse.json({
-      success: true,
-      deleted: `${customer.first_name} ${customer.last_name}`
-    });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Delete customer error:', err);
+    console.error('Archive customer error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

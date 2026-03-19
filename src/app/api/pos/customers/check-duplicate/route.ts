@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
             .from('customers')
             .select('id, first_name, last_name')
             .eq('phone', normalized)
+            .is('deleted_at', null)
             .maybeSingle();
 
           if (match) {
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
           .from('customers')
           .select('id, first_name, last_name')
           .ilike('email', normalizedEmail)
+          .is('deleted_at', null)
           .maybeSingle();
 
         if (match) {

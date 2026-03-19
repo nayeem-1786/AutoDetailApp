@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
       .from('customers')
       .select('id, first_name, last_name, email')
       .eq('phone', e164Phone)
+      .is('deleted_at', null)
       .limit(1)
       .single();
 
@@ -125,6 +126,7 @@ export async function POST(request: NextRequest) {
         .select('id, phone')
         .eq('email', data.customer.email)
         .is('phone', null)
+        .is('deleted_at', null)
         .limit(1)
         .single();
 

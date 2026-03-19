@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     let dbQuery = admin
       .from('customers')
       .select('id, first_name, last_name, phone')
+      .is('deleted_at', null)
       .order('last_name')
       .limit(10);
 

@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Customer soft delete — foundation + high-traffic paths (Session 12A) — 2026-03-18
+
+**Migration:** Added `deleted_at TIMESTAMPTZ DEFAULT NULL` to `customers` table with partial indexes (`idx_customers_active`, `idx_customers_active_phone`).
+
+**Archive endpoint** (`/api/admin/customers/[id]` DELETE): Replaced hard delete (which failed on 19+ FK constraints) with soft delete. Sets `deleted_at`, disconnects portal access (`auth_user_id` → `deactivated_auth_user_id`), stops active drip enrollments (`stopped_reason: 'customer_archived'`).
+
+**Restore endpoint** (`/api/admin/customers/[id]/restore` POST): Clears `deleted_at`, re-links portal access from `deactivated_auth_user_id`. Uses `customers.delete` permission.
+
+**Auth guards:** `customer-helpers.ts` and `customer-auth-provider.tsx` now filter `deleted_at IS NULL` — archived customers silently treated as "not found."
+
+**Admin UI:**
+- Customer list: "Show archived" toggle, archived badge (red) on rows, greyed-out names
+- Customer detail: "Archived" badge in header, "Archive Customer" button (replaces Delete), "Restore Customer" button on archived records
+- Confirmation dialogs updated: "Archive" copy, preserves-records messaging, restore confirmation
+
+**Filters added (`.is('deleted_at', null)`):**
+- Admin: customer search, stats, check-duplicate (phone + email), creation POST (phone + email uniqueness)
+- POS: customer search, check-duplicate (phone + email), creation POST (phone uniqueness), card-customer lookup
+- Booking: check-phone, check-customer (phone + email), find-or-create (phone + email fallback)
+
+**NOT filtered (historical data preserved):** Transaction queries, receipt rendering, refund endpoints, Stripe/Mailgun webhooks, QuickBooks sync.
+
+---
+
 ## fix: Loyalty tab column alignment and description wrapping — 2026-03-18
 
 - All fixed columns set to 80px (Date, Action, Points, Balance). Description fills remaining space.

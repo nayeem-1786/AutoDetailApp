@@ -18,6 +18,7 @@ export async function getCustomerFromSession(
     .from('customers')
     .select('*')
     .eq('auth_user_id', user.id)
+    .is('deleted_at', null)
     .single();
 
   return (customer as Customer) ?? null;

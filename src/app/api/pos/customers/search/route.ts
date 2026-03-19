@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('customers')
       .select('id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags, customer_type')
+      .is('deleted_at', null)
       .order('last_name')
       .limit(10);
 

@@ -24,6 +24,7 @@ export async function GET() {
     const { data: customers, error } = await adminClient
       .from('customers')
       .select('id, email, phone, visit_count, lifetime_spend, last_visit_date, created_at, customer_type')
+      .is('deleted_at', null)
       .limit(10000);
 
     if (error) {

@@ -41,6 +41,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         .from('customers')
         .select('*')
         .eq('auth_user_id', userId)
+        .is('deleted_at', null)
         .single();
 
       if (cust) {
