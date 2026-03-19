@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Add "Create New Anyway" with manager pin to archived match dialogs — 2026-03-18
+
+- **Admin** (`admin/customers/new/page.tsx`): Replaced ConfirmDialog with raw Dialog — 3 buttons: Restore Customer (primary), Create New Anyway (outline → simple confirmation dialog), Cancel. Force-creates via `force_create: true` flag.
+- **POS** (`pos/components/customer-create-dialog.tsx`): Same 3-button layout. "Create New Anyway" opens `ManagerPinDialog` with `customers.delete` permission. Successful pin → force-creates. All buttons min-height 44px for iPad touch targets.
+- No backend changes — `force_create` flag already implemented on both endpoints.
+
+---
+
 ## feat: Customer soft delete complete coverage (Session 12B) — 2026-03-18
 
 **Query filters added (`.is('deleted_at', null)`):**

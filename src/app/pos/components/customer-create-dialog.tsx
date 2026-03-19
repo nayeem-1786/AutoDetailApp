@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { posFetch } from '../lib/pos-fetch';
+import { ManagerPinDialog } from './manager-pin-dialog';
 import { formatPhoneInput, formatDate } from '@/lib/utils/format';
 import type { Customer, CustomerType } from '@/lib/supabase/types';
 
@@ -64,6 +64,8 @@ export function CustomerCreateDialog({
   // Archived match state
   const [archivedMatch, setArchivedMatch] = useState<ArchivedMatch | null>(null);
   const [restoringArchived, setRestoringArchived] = useState(false);
+  const [showManagerPin, setShowManagerPin] = useState(false);
+  const [forcingCreate, setForcingCreate] = useState(false);
   const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -319,50 +321,108 @@ export function CustomerCreateDialog({
     </Dialog>
 
     {/* Archived Customer Match Dialog */}
-    <ConfirmDialog
-      open={!!archivedMatch}
-      onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}
-      title="Archived Customer Found"
-      description={
-        archivedMatch ? (
-          <div className="space-y-3">
-            <p>
-              <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Restoring will reactivate their account with full history. Loyalty points will be reset to zero.
-            </p>
+    <Dialog open={!!archivedMatch && !showManagerPin} onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}>
+      <DialogHeader>
+        <DialogTitle>Archived Customer Found</DialogTitle>
+      </DialogHeader>
+      <DialogContent>
+        {archivedMatch && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Restoring will reactivate their account with full history. Loyalty points will be reset to zero.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                className="min-h-[44px]"
+                disabled={restoringArchived}
+                onClick={async () => {
+                  setRestoringArchived(true);
+                  try {
+                    const res = await posFetch(`/api/admin/customers/${archivedMatch.id}/restore`, { method: 'POST' });
+                    if (!res.ok) throw new Error('Failed to restore');
+                    const custRes = await posFetch(`/api/pos/customers/search?q=${encodeURIComponent(archivedMatch.phone || '')}`);
+                    const custJson = await custRes.json();
+                    const restored = custJson.data?.[0];
+                    if (restored) {
+                      toast.success(`Restored ${restored.first_name} ${restored.last_name}`);
+                      onCreated(restored as Customer);
+                      handleClose();
+                    } else {
+                      toast.success('Customer restored');
+                      handleClose();
+                    }
+                  } catch {
+                    toast.error('Failed to restore customer');
+                  } finally {
+                    setRestoringArchived(false);
+                    setArchivedMatch(null);
+                  }
+                }}
+              >
+                {restoringArchived ? 'Restoring...' : 'Restore Customer'}
+              </Button>
+              <Button
+                variant="outline"
+                className="min-h-[44px]"
+                disabled={restoringArchived}
+                onClick={() => setShowManagerPin(true)}
+              >
+                Create New Anyway
+              </Button>
+              <Button
+                variant="ghost"
+                className="min-h-[44px]"
+                disabled={restoringArchived}
+                onClick={() => setArchivedMatch(null)}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-        ) : ''
-      }
-      confirmLabel={restoringArchived ? 'Restoring...' : 'Restore Customer'}
-      loading={restoringArchived}
-      onConfirm={async () => {
-        if (!archivedMatch) return;
-        setRestoringArchived(true);
-        try {
-          const res = await posFetch(`/api/admin/customers/${archivedMatch.id}/restore`, { method: 'POST' });
-          if (!res.ok) throw new Error('Failed to restore');
-          // Fetch restored customer data and pass to parent
-          const custRes = await posFetch(`/api/pos/customers/search?q=${encodeURIComponent(archivedMatch.phone || '')}`);
-          const custJson = await custRes.json();
-          const restored = custJson.data?.[0];
-          if (restored) {
-            toast.success(`Restored ${restored.first_name} ${restored.last_name}`);
-            onCreated(restored as Customer);
+        )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Manager Pin for Force Create */}
+    {showManagerPin && (
+      <ManagerPinDialog
+        permissionKey="customers.delete"
+        onSuccess={async () => {
+          setShowManagerPin(false);
+          setForcingCreate(true);
+          try {
+            const res = await posFetch('/api/pos/customers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                phone,
+                email: email.trim() || undefined,
+                customer_type: customerType,
+                force_create: true,
+              }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to create');
+            toast.success(`Created ${firstName} ${lastName}`);
+            onCreated(json.data as Customer);
             handleClose();
-          } else {
-            toast.success('Customer restored');
-            handleClose();
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to create customer');
+          } finally {
+            setForcingCreate(false);
+            setArchivedMatch(null);
           }
-        } catch {
-          toast.error('Failed to restore customer');
-        } finally {
-          setRestoringArchived(false);
-          setArchivedMatch(null);
-        }
-      }}
-    />
+        }}
+        onCancel={() => setShowManagerPin(false)}
+      />
+    )}
     </>
   );
 }

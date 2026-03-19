@@ -17,6 +17,7 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogContent } from '@/components/ui/dialog';
 import { ArrowLeft } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
 import type { CustomerType } from '@/lib/supabase/types';
@@ -72,6 +73,9 @@ export default function NewCustomerPage() {
   // Archived match state
   const [archivedMatch, setArchivedMatch] = useState<ArchivedMatch | null>(null);
   const [restoringArchived, setRestoringArchived] = useState(false);
+  const [forceCreateConfirmOpen, setForceCreateConfirmOpen] = useState(false);
+  const [forcingCreate, setForcingCreate] = useState(false);
+  const lastFormDataRef = useRef<Record<string, unknown> | null>(null);
   const [emailFormatError, setEmailFormatError] = useState('');
   const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -269,26 +273,29 @@ export default function NewCustomerPage() {
     try {
       const birthday = buildBirthdayDate();
 
+      const payload = {
+        first_name: data.first_name,
+        last_name: data.last_name,
+        phone: data.phone || null,
+        email: data.email || null,
+        birthday,
+        address_line_1: data.address_line_1 || null,
+        address_line_2: data.address_line_2 || null,
+        city: data.city || null,
+        state: data.state || null,
+        zip: data.zip || null,
+        notes: data.notes || null,
+        tags: data.tags || [],
+        sms_consent: data.sms_consent,
+        email_consent: data.email_consent,
+        customer_type: customerType,
+      };
+      lastFormDataRef.current = payload;
+
       const res = await adminFetch('/api/admin/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          first_name: data.first_name,
-          last_name: data.last_name,
-          phone: data.phone || null,
-          email: data.email || null,
-          birthday,
-          address_line_1: data.address_line_1 || null,
-          address_line_2: data.address_line_2 || null,
-          city: data.city || null,
-          state: data.state || null,
-          zip: data.zip || null,
-          notes: data.notes || null,
-          tags: data.tags || [],
-          sms_consent: data.sms_consent,
-          email_consent: data.email_consent,
-          customer_type: customerType,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -556,36 +563,88 @@ export default function NewCustomerPage() {
       </form>
 
       {/* Archived Customer Match Dialog */}
-      <ConfirmDialog
-        open={!!archivedMatch}
-        onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}
-        title="Archived Customer Found"
-        description={
-          archivedMatch ? (
-            <div className="space-y-3">
-              <p>
-                <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
-              </p>
-              <p className="text-sm text-gray-600">
-                Restoring will reactivate their account with full history. Loyalty points will be reset to zero.
-              </p>
+      <Dialog open={!!archivedMatch && !forceCreateConfirmOpen} onOpenChange={(open) => { if (!open) setArchivedMatch(null); }}>
+        <DialogHeader>
+          <DialogTitle>Archived Customer Found</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          {archivedMatch && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p>
+                  <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Restoring will reactivate their account with full history. Loyalty points will be reset to zero.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <Button
+                  disabled={restoringArchived}
+                  onClick={async () => {
+                    setRestoringArchived(true);
+                    try {
+                      const res = await adminFetch(`/api/admin/customers/${archivedMatch.id}/restore`, { method: 'POST' });
+                      if (!res.ok) throw new Error('Failed to restore');
+                      toast.success('Customer restored successfully');
+                      router.push(`/admin/customers/${archivedMatch.id}`);
+                    } catch {
+                      toast.error('Failed to restore customer');
+                    } finally {
+                      setRestoringArchived(false);
+                    }
+                  }}
+                >
+                  {restoringArchived ? 'Restoring...' : 'Restore Customer'}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={restoringArchived}
+                  onClick={() => setForceCreateConfirmOpen(true)}
+                >
+                  Create New Anyway
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={restoringArchived}
+                  onClick={() => setArchivedMatch(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
-          ) : ''
-        }
-        confirmLabel={restoringArchived ? 'Restoring...' : 'Restore Customer'}
-        loading={restoringArchived}
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Force Create Confirmation (Admin — simple confirm, no PIN needed) */}
+      <ConfirmDialog
+        open={forceCreateConfirmOpen}
+        onOpenChange={(open) => { if (!open) setForceCreateConfirmOpen(false); }}
+        title="Create Duplicate Record?"
+        description="This will create a new customer record while an archived record with the same phone exists. The archived record's history will not be linked."
+        confirmLabel={forcingCreate ? 'Creating...' : 'Yes, Create New'}
+        variant="destructive"
+        loading={forcingCreate}
         onConfirm={async () => {
-          if (!archivedMatch) return;
-          setRestoringArchived(true);
+          if (!lastFormDataRef.current) return;
+          setForcingCreate(true);
           try {
-            const res = await adminFetch(`/api/admin/customers/${archivedMatch.id}/restore`, { method: 'POST' });
-            if (!res.ok) throw new Error('Failed to restore');
-            toast.success('Customer restored successfully');
-            router.push(`/admin/customers/${archivedMatch.id}`);
-          } catch {
-            toast.error('Failed to restore customer');
+            const res = await adminFetch('/api/admin/customers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...lastFormDataRef.current, force_create: true }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to create');
+            toast.success('Customer created successfully');
+            router.push(`/admin/customers/${json.data.id}`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to create customer');
           } finally {
-            setRestoringArchived(false);
+            setForcingCreate(false);
+            setForceCreateConfirmOpen(false);
+            setArchivedMatch(null);
           }
         }}
       />
