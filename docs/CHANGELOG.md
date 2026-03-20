@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Scope tier duplicate detection matches serviceId + tierName, excludes vehicle_size — 2026-03-20
+
+- **Root cause**: All 3 duplicate detection locations (catalog-browser, service-detail-dialog, ticket-reducer) matched on `serviceId` only. Different tiers of the same scope service (e.g., Hot Shampoo "Per Seat Row" vs "Floor Mats Only") were treated as duplicates.
+- **Fix**: Added `useTierMatching` guard — only `scope` and `specialty` pricing models include `tierName` in the duplicate comparison. `vehicle_size`, `flat`, `per_unit`, and `custom` models preserve serviceId-only matching (current behavior). Tier name compared using `tier_label || tier_name` to match the reducer's storage format.
+- **Result**: A ticket can now have multiple tiers of the same scope service as separate line items (e.g., Per Seat Row × 2 + Floor Mats Only × 1 + Complete Interior × 1). Same-tier re-adds still increment quantity or block at max.
+
+---
+
 ## fix: Scope tier duplicate detection allows qty increment, correct toast labels — 2026-03-20
 
 - **Bug 1** (`service-detail-dialog.tsx:129`): Changed `isPerUnit && perUnitQty` gate to `isExistingPerUnit && perUnitQty`. The old gate checked `service.pricing_model === 'per_unit'` which is false for scope services, blocking qty increment and showing false "already at maximum" toast.

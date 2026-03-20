@@ -208,8 +208,10 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       onAddService(svc, p, vsc, perUnitQty);
     } else if (dispatch) {
       // Duplicate check for POS ticket path
+      const useTierMatching = svc.pricing_model === 'scope' || svc.pricing_model === 'specialty';
+      const tierName = p ? (p.tier_label || p.tier_name) : null;
       const existingItem = ticket.items.find(
-        (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId
+        (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId && (!useTierMatching || !tierName || i.tierName === tierName)
       );
       if (existingItem) {
         const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;

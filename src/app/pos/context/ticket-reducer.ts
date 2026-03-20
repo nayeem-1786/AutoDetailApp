@@ -112,12 +112,15 @@ export function ticketReducer(
     case 'ADD_SERVICE': {
       const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId } = action;
 
-      // Duplicate guard: check if this service (same serviceId, same parent context) already exists
+      // Duplicate guard: check if this service (same serviceId, same tier, same parent context) already exists
+      const useTierMatching = service.pricing_model === 'scope' || service.pricing_model === 'specialty';
+      const pricingTierName = pricing ? (pricing.tier_label || pricing.tier_name) : null;
       const existing = state.items.find(
         (i) =>
           i.itemType === 'service' &&
           i.serviceId === service.id &&
-          i.parentItemId === (parentItemId ?? null)
+          i.parentItemId === (parentItemId ?? null) &&
+          (!useTierMatching || !pricingTierName || i.tierName === pricingTierName)
       );
 
       if (existing) {

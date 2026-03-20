@@ -119,8 +119,10 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   async function handleAdd() {
     // Duplicate check for POS ticket path (not callback mode)
     if (!onAdd && dispatch) {
+      const useTierMatching = service.pricing_model === 'scope' || service.pricing_model === 'specialty';
+      const selectedTierName = selectedTier ? (selectedTier.tier_label || selectedTier.tier_name) : null;
       const existingItem = ticket.items.find(
-        (i) => i.itemType === 'service' && i.serviceId === service.id && i.parentItemId === (parentItemId ?? null)
+        (i) => i.itemType === 'service' && i.serviceId === service.id && i.parentItemId === (parentItemId ?? null) && (!useTierMatching || !selectedTierName || i.tierName === selectedTierName)
       );
       if (existingItem) {
         const isExistingPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
