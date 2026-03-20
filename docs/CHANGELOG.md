@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Stray "0" on public receipt when loyalty_discount is zero — 2026-03-20
+
+- **Root cause**: `receipt/[token]/page.tsx:276` used `{tx.loyalty_discount && tx.loyalty_discount > 0 && (...)}`. When `loyalty_discount` is `0` (not null), React renders the number `0` as visible text — the stray "0" below Subtotal.
+- **Fix**: Changed to `{tx.loyalty_discount > 0 && (...)}`. `null > 0` and `0 > 0` are both `false`, so the line is correctly hidden. Thermal/HTML receipt templates don't have this bug (server-side `if` statements don't render falsy values).
+
+---
+
 ## fix: Scope tier duplicate detection matches serviceId + tierName, excludes vehicle_size — 2026-03-20
 
 - **Root cause**: All 3 duplicate detection locations (catalog-browser, service-detail-dialog, ticket-reducer) matched on `serviceId` only. Different tiers of the same scope service (e.g., Hot Shampoo "Per Seat Row" vs "Floor Mats Only") were treated as duplicates.

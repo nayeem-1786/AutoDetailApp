@@ -273,7 +273,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 </div>
               ) : null;
             })()}
-            {tx.loyalty_discount && tx.loyalty_discount > 0 && (
+            {tx.loyalty_discount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-site-text-muted">
                   Loyalty{tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : ''}
