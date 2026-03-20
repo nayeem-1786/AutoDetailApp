@@ -48,7 +48,6 @@ export function ServicePricingPicker({
 
   function handleSelect(tier: ServicePricing, sizeOverride?: VehicleSizeClass) {
     const vsc = sizeOverride ?? vehicleSizeClass;
-    console.log('[picker] tier selected', { tierName: tier.tier_name, maxQty: tier.max_qty, qtyLabel: tier.qty_label });
     // If this tier supports multi-qty, show qty picker instead of immediate add
     if (tier.max_qty && tier.max_qty > 1) {
       setTierQtyPick({ tier, vsc });

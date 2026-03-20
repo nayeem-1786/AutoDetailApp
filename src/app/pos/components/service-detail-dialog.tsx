@@ -92,12 +92,17 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     }
   }, [service.id, autoMatchIdx]);
 
-  // Reset per-unit quantity when service changes
+  // Reset per-unit quantity when service or selected tier changes
   useEffect(() => {
     setPerUnitQty(1);
-  }, [service.id]);
+  }, [service.id, selectedTierIdx]);
 
   const selectedTier = tiers[selectedTierIdx] ?? null;
+
+  // Detect scope tier with multi-qty support
+  const isScopeTierMultiQty = !isPerUnit && selectedTier != null && selectedTier.max_qty != null && selectedTier.max_qty > 1;
+  const scopeMaxQty = isScopeTierMultiQty ? selectedTier!.max_qty! : 1;
+  const scopeQtyLabel = isScopeTierMultiQty ? (selectedTier!.qty_label || selectedTier!.tier_label || 'unit') : 'unit';
 
   // Sale status for this service
   const { isOnSale } = getSaleStatus({
@@ -190,13 +195,14 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
       toast.error('No pricing available');
       return;
     }
+    const scopeTierQty = isScopeTierMultiQty ? perUnitQty : undefined;
     if (onAdd) {
-      onAdd(service, selectedTier, vehicleSizeClass);
+      onAdd(service, selectedTier, vehicleSizeClass, scopeTierQty);
     } else if (dispatch) {
       // Prerequisite check for non-addon services
       let prerequisiteNote: string | undefined;
       if (!parentItemId && onPrerequisiteCheck) {
-        const result = await onPrerequisiteCheck(service, selectedTier, vehicleSizeClass);
+        const result = await onPrerequisiteCheck(service, selectedTier, vehicleSizeClass, scopeTierQty);
         if (!result.canAdd) { onClose(); return; }
         prerequisiteNote = result.prerequisiteNote;
       }
@@ -205,6 +211,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         service,
         pricing: selectedTier,
         vehicleSizeClass,
+        perUnitQty: scopeTierQty,
         parentItemId,
         comboPrice,
         comboPrimaryServiceId,
@@ -228,9 +235,12 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     resolvedStandardPrice = perUnitQty * service.per_unit_price!;
     isSalePrice = perUnitOnSale;
   } else if (selectedTier) {
-    resolvedPrice = getDisplayPrice(selectedTier);
-    resolvedStandardPrice = resolveServicePrice(selectedTier, vehicleSizeClass);
-    const saleInfo = getTierSaleInfo(resolvedStandardPrice, selectedTier.sale_price, isOnSale);
+    const tierEffective = getDisplayPrice(selectedTier);
+    const tierStandard = resolveServicePrice(selectedTier, vehicleSizeClass);
+    const qtyMul = isScopeTierMultiQty ? perUnitQty : 1;
+    resolvedPrice = tierEffective * qtyMul;
+    resolvedStandardPrice = tierStandard * qtyMul;
+    const saleInfo = getTierSaleInfo(tierStandard, selectedTier.sale_price, isOnSale);
     isSalePrice = saleInfo?.isDiscounted ?? false;
   } else {
     resolvedPrice = null;
@@ -456,6 +466,70 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                     : 'Auto-selected based on vehicle size'}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Scope tier quantity picker — when selected tier has max_qty > 1 */}
+          {isScopeTierMultiQty && (
+            <div className="mt-5">
+              <div className="mb-4 rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">
+                    ${getDisplayPrice(selectedTier!).toFixed(2)}
+                  </span>
+                  {' '}per {scopeQtyLabel}
+                </p>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  Maximum: {scopeMaxQty} {scopeQtyLabel}{scopeMaxQty > 1 ? 's' : ''}
+                </p>
+              </div>
+
+              <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                How many {scopeQtyLabel}{perUnitQty !== 1 ? 's' : ''}?
+              </p>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => setPerUnitQty((q) => Math.max(1, q - 1))}
+                  disabled={perUnitQty <= 1}
+                  className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                    perUnitQty <= 1
+                      ? 'border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-500 cursor-not-allowed'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-95'
+                  )}
+                >
+                  <Minus className="h-5 w-5" />
+                </button>
+
+                <div className="flex h-14 w-20 items-center justify-center rounded-xl bg-white dark:bg-gray-900 border-2 border-blue-200 dark:border-blue-800">
+                  <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                    {perUnitQty}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setPerUnitQty((q) => Math.min(scopeMaxQty, q + 1))}
+                  disabled={perUnitQty >= scopeMaxQty}
+                  className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                    perUnitQty >= scopeMaxQty
+                      ? 'border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-500 cursor-not-allowed'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-95'
+                  )}
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Running total */}
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20 px-4 py-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {perUnitQty} {scopeQtyLabel}{perUnitQty > 1 ? 's' : ''} &times; ${getDisplayPrice(selectedTier!).toFixed(2)}
+                </span>
+                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  ${(perUnitQty * getDisplayPrice(selectedTier!)).toFixed(2)}
+                </span>
+              </div>
             </div>
           )}
 

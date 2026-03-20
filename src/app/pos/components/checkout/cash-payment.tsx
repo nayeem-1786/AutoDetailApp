@@ -27,10 +27,8 @@ export function CashPayment() {
   const change = Math.max(0, tenderedNum - amountDue);
   const isValid = tenderedNum >= amountDue;
   const enterSubmit = useEnterSubmit(handleProcessCash, isValid && !processing);
-  console.log('[cash-payment] render', { isValid, processing, tendered, tenderedNum, amountDue });
 
   async function handleProcessCash() {
-    console.log('[cash-payment] handleProcessCash called', { isValid, tenderedNum, amountDue });
     if (!isValid) return;
 
     setProcessing(true);

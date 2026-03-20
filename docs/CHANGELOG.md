@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Detail dialog qty stepper for scope tiers with max_qty — 2026-03-20
+
+- **Root cause**: When users browse by category and tap a service, the ServiceDetailDialog opens (not the pricing picker). The dialog's qty stepper and `perUnitQty` state only activated for `isPerUnit` services. Scope tiers with `max_qty > 1` (like Hot Shampoo "Per Seat Row") dispatched ADD_SERVICE without `perUnitQty`, so the reducer's `isScopeTierWithQty` guard never fired and all perUnit* fields stayed null — no stepper buttons on the ticket.
+- **Fix**: Added `isScopeTierMultiQty` detection in the detail dialog. When the selected scope tier has `max_qty > 1`, shows the qty stepper UI (reusing existing `perUnitQty` state), updates the "Add to Ticket" button total, and passes `perUnitQty` in the ADD_SERVICE dispatch. The reducer's existing `isScopeTierWithQty` logic then populates perUnit* fields automatically.
+- **Cleanup**: Removed 5 debug console.logs from previous sessions (use-enter-submit, cash-payment, service-pricing-picker, ticket-reducer ×2).
+
+---
+
 ## fix: POS services API missing service_pricing columns — 2026-03-20
 
 - **Root cause**: `/api/pos/services/route.ts` used an explicit column list for the `service_pricing` join — only `tier_name`, `price`, `sale_price`, `display_order`. Missing: `tier_label`, `is_vehicle_size_aware`, vehicle size prices, `max_qty`, `qty_label`.
