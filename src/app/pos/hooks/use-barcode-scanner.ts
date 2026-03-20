@@ -62,6 +62,7 @@ export function useBarcodeScanner({
         const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();
         const activeEl = document.activeElement;
         const isBarcodeScanTarget = activeEl?.hasAttribute('data-barcode-target');
+        console.log('[barcode-scanner] Enter', { bufferLen: barcode.length, isBarcodeScanTarget, activeTag: activeEl?.tagName, willSwallow: barcode.length >= minLength && isBarcodeScanTarget });
         if (barcode.length >= minLength && isBarcodeScanTarget) {
           e.preventDefault();
           e.stopPropagation();

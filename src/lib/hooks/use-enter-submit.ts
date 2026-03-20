@@ -8,6 +8,7 @@ import { useCallback } from 'react';
  */
 export function useEnterSubmit(onSubmit: () => void, enabled = true) {
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    console.log('[useEnterSubmit]', { key: e.key, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing, enabled, activeTag: document.activeElement?.tagName });
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && enabled) {
       e.preventDefault();
       onSubmit();
