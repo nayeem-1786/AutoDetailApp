@@ -633,6 +633,12 @@ export function StepConfirmBook({
                           placeholder="e.g., SAVE20"
                           value={couponInput}
                           onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.nativeEvent.isComposing && !couponLoading && couponInput.trim()) {
+                              e.preventDefault();
+                              handleApplyCoupon(couponInput);
+                            }
+                          }}
                           className="flex-1 font-mono border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-accent-ui"
                         />
                         <Button

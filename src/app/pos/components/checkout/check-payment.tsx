@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -15,6 +16,7 @@ export function CheckPayment() {
   const amountDue = ticket.total;
   const [checkNumber, setCheckNumber] = useState('');
   const [processing, setProcessing] = useState(false);
+  const enterSubmit = useEnterSubmit(handleProcessCheck, !processing);
 
   async function handleProcessCheck() {
     setProcessing(true);
@@ -118,6 +120,7 @@ export function CheckPayment() {
           value={checkNumber}
           onChange={(e) => setCheckNumber(e.target.value)}
           autoFocus
+          {...enterSubmit}
           className="h-14 w-48 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-amber-400 dark:focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-200 dark:focus:ring-amber-800"
           placeholder="#"
         />

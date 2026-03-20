@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -41,6 +42,7 @@ function ConfirmDialog({
   }, [open]);
 
   const isConfirmDisabled = loading || Boolean(requireConfirmText && confirmInput !== requireConfirmText);
+  const enterSubmit = useEnterSubmit(onConfirm, !isConfirmDisabled);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -56,6 +58,7 @@ function ConfirmDialog({
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               autoComplete="off"
+              {...enterSubmit}
             />
           </div>
         )}

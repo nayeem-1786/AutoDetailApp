@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Enter-key-as-submit — shared hook + POS checkout + searches + confirm dialog + booking coupon — 2026-03-19
+
+- **New hook** (`src/lib/hooks/use-enter-submit.ts`): Shared `useEnterSubmit(onSubmit, enabled)` hook. Handles Shift+Enter exclusion, IME composing state, and disabled/loading guards.
+- **POS checkout** (4 files): Enter submits on tip custom amount, cash tender, check number, and split payment amount. All respect button disabled states (isValid, processing, isValidSplit, splitStep).
+- **POS search** (3 files): Enter flushes debounce on search-bar (also fixes barcode scanner UX), customer-lookup (immediate search), and transaction-list (400ms debounce bypass).
+- **POS custom items** (2 files): Enter on register-tab and keypad-tab note inputs triggers "Add to Ticket" (guarded by `cents > 0`).
+- **Confirm dialog** (`src/components/ui/confirm-dialog.tsx`): Enter triggers confirm when `requireConfirmText` matches. Global fix for all typed-confirmation dialogs.
+- **Booking coupon** (`src/components/booking/step-confirm-book.tsx`): Enter applies coupon code (guarded by loading state and non-empty input).
+
+---
+
 ## docs: DB_SCHEMA.md full audit — fill verified gaps from database introspection — 2026-03-19
 
 - **Customers table**: Added 10 missing columns (square_customer_id, square_reference_id, notes, tags, first_visit_date, last_visit_date, visit_count, lifetime_spend, loyalty_points_balance, deleted_at). Added `valid_phone` CHECK constraint. Added 16 indexes (phone/email unique partials, search GIN, sort indexes, QBO, Square, auth).

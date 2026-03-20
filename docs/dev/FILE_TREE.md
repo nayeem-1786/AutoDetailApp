@@ -797,6 +797,7 @@ src/lib/hooks/feature-flag-provider.tsx     — Feature flag context provider
 src/lib/hooks/use-async-action.ts
 src/lib/hooks/use-business-info.ts
 src/lib/hooks/use-drag-drop-reorder.ts
+src/lib/hooks/use-enter-submit.ts
 src/lib/hooks/use-feature-flag.ts
 src/lib/hooks/use-form-validation.ts
 src/lib/hooks/use-online-status.ts

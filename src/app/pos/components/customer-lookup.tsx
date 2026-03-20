@@ -5,6 +5,7 @@ import { Search, UserPlus, UserX, Loader2 } from 'lucide-react';
 import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { CustomerTypeBadge } from './customer-type-badge';
 import type { Customer } from '@/lib/supabase/types';
 
@@ -65,6 +66,11 @@ export function CustomerLookup({
     }
   }, []);
 
+  const enterSubmit = useEnterSubmit(() => {
+    clearTimeout(debounceRef.current);
+    searchCustomers(searchInput.trim());
+  }, searchInput.trim().length >= 2);
+
   function handleInputChange(value: string) {
     // If it looks like a phone number, format it
     const digits = value.replace(/\D/g, '');
@@ -99,6 +105,7 @@ export function CustomerLookup({
           pattern="[0-9]*"
           value={searchInput}
           onChange={(e) => handleInputChange(e.target.value)}
+          {...enterSubmit}
           placeholder="Search by name or phone..."
           autoFocus
           className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-400 dark:focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700"

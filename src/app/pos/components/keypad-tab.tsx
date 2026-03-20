@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { MessageSquarePlus, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useTicket } from '../context/ticket-context';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { PinPad } from './pin-pad';
 
 export function KeypadTab() {
@@ -15,6 +16,7 @@ export function KeypadTab() {
 
   const dollars = cents / 100;
   const display = dollars.toFixed(2);
+  const enterSubmitNote = useEnterSubmit(handleAddToTicket, cents > 0);
 
   function handleDigit(d: string) {
     if (d === '.') return; // Ignore decimal — cents-based input
@@ -67,6 +69,7 @@ export function KeypadTab() {
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              {...enterSubmitNote}
               placeholder="Item description..."
               className="flex-1 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none"
               maxLength={100}

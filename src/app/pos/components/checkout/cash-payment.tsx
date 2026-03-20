@@ -6,6 +6,7 @@ import { Loader2, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 import { useOnlineStatus } from '@/lib/hooks/use-online-status';
@@ -25,6 +26,7 @@ export function CashPayment() {
   const tenderedNum = parseFloat(tendered) || 0;
   const change = Math.max(0, tenderedNum - amountDue);
   const isValid = tenderedNum >= amountDue;
+  const enterSubmit = useEnterSubmit(handleProcessCash, isValid && !processing);
 
   async function handleProcessCash() {
     if (!isValid) return;
@@ -223,6 +225,7 @@ export function CashPayment() {
             const v = e.target.value.replace(/[^0-9.]/g, '');
             setTendered(v);
           }}
+          {...enterSubmit}
           className="h-14 w-40 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-green-400 dark:focus:border-green-600 focus:outline-none focus:ring-2 focus:ring-green-200 dark:focus:ring-green-800"
           placeholder="0.00"
         />

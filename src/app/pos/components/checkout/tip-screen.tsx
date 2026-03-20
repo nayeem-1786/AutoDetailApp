@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { TIP_PRESETS } from '@/lib/utils/constants';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -14,6 +15,7 @@ export function TipScreen() {
     null
   );
   const [customAmount, setCustomAmount] = useState('');
+  const enterSubmit = useEnterSubmit(handleContinue, selected !== null);
 
   const subtotal = ticket.subtotal;
 
@@ -99,6 +101,7 @@ export function TipScreen() {
               const v = e.target.value.replace(/[^0-9.]/g, '');
               setCustomAmount(v);
             }}
+            {...enterSubmit}
             className="h-12 w-32 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-xl text-gray-900 dark:text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
             placeholder="0.00"
           />

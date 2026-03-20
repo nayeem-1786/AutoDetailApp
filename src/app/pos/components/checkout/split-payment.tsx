@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
 import { cn } from '@/lib/utils/cn';
 import { TIP_PRESETS } from '@/lib/utils/constants';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -35,6 +36,7 @@ export function SplitPayment() {
     primaryNum < grandTotal &&
     cashAmount >= 0 &&
     cardAmount > 0;
+  const enterSubmit = useEnterSubmit(handleProcessSplit, isValidSplit && splitStep === 'enter-amounts');
 
   // Quick-split presets
   function handleSplitHalf() {
@@ -277,6 +279,7 @@ export function SplitPayment() {
                   setPrimaryAmount(v);
                 }}
                 autoFocus
+                {...enterSubmit}
                 className="h-14 w-40 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
                 placeholder="0.00"
               />

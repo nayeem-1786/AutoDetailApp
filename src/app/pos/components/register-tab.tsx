@@ -8,6 +8,7 @@ import { useFavorites } from '../hooks/use-favorites';
 import { useCatalog } from '../hooks/use-catalog';
 import { useTicket } from '../context/ticket-context';
 import { usePosTheme } from '../context/pos-theme-context';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { PinPad } from './pin-pad';
 import { resolveServicePriceWithSale } from '../utils/pricing';
@@ -45,6 +46,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   const vehicleSpecialtyTier = ticket.vehicle?.specialty_tier ?? null;
   const dollars = cents / 100;
   const display = dollars.toFixed(2);
+  const enterSubmitNote = useEnterSubmit(handleAddToTicket, cents > 0);
 
   // ─── Favorites handlers ────────────────────────────────────
 
@@ -267,6 +269,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              {...enterSubmitNote}
               placeholder="Description..."
               className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none"
               maxLength={100}

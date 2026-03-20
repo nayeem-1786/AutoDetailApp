@@ -213,6 +213,14 @@ export function TransactionList({ onSelect }: TransactionListProps) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                clearTimeout(debounceRef.current);
+                setPage(0);
+                fetchTransactions(query, 0, dateFrom, dateTo);
+              }
+            }}
             placeholder="Receipt # or phone..."
             className="pl-9"
           />
