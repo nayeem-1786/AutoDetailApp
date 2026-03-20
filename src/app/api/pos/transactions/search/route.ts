@@ -24,37 +24,30 @@ export async function GET(request: NextRequest) {
         { count: 'exact' }
       );
 
-    // Search by receipt number or customer phone
+    // Search by receipt number (partial) and/or customer phone
     if (q) {
-      const isNumericOnly = /^\d+$/.test(q);
+      const digits = q.replace(/\D/g, '');
 
-      if (isNumericOnly) {
-        // Receipt number search
-        query = query.eq('receipt_number', q);
+      // If input looks like a phone number (7+ digits), search customers by phone
+      let customerIds: string[] = [];
+      if (digits.length >= 7) {
+        const { data: matchingCustomers } = await supabase
+          .from('customers')
+          .select('id')
+          .like('phone', `%${digits}%`)
+          .limit(100);
+
+        customerIds = (matchingCustomers ?? []).map((c) => c.id);
+      }
+
+      // Combine receipt partial match + customer match
+      // .or() is safe here — both columns are on the transactions table (not a related table)
+      if (customerIds.length > 0) {
+        query = query.or(
+          `receipt_number.ilike.%${q}%,customer_id.in.(${customerIds.join(',')})`
+        );
       } else {
-        // Phone search - find customers matching the phone, then filter transactions
-        const digits = q.replace(/\D/g, '');
-        if (digits.length > 0) {
-          const { data: matchingCustomers } = await supabase
-            .from('customers')
-            .select('id')
-            .like('phone', `%${digits}%`)
-            .limit(100);
-
-          const customerIds = (matchingCustomers ?? []).map((c) => c.id);
-
-          if (customerIds.length === 0) {
-            // No matching customers, return empty results
-            return NextResponse.json({
-              data: [],
-              count: 0,
-              limit,
-              offset,
-            });
-          }
-
-          query = query.in('customer_id', customerIds);
-        }
+        query = query.ilike('receipt_number', `%${q}%`);
       }
     }
 

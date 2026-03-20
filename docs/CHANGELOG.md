@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: POS transaction search handles phone variations and partial receipt numbers — 2026-03-19
+
+- **Root cause**: `api/pos/transactions/search/route.ts` had flawed branching — all-digit input (e.g. `4243637450`) only tried exact receipt match, never phone search. Receipt used `.eq()` (exact) so `6201` couldn't find `SD-006201`. Non-numeric input like `SD-006201` only tried phone search, never receipt.
+- **Fix**: Replaced `isNumericOnly` branching with multi-strategy search. Always tries receipt partial match (`ilike` with `%` wildcards). If 7+ digits detected, also searches customers by phone then combines via `.or()` on the transactions table. Follows same pattern as admin transaction search.
+- **No regressions**: Date filters, pagination, and `{ count: 'exact' }` preserved. Admin search unchanged (already correct).
+
+---
+
 ## fix: Barcode scanner no longer swallows Enter on checkout inputs — 2026-03-19
 
 - **Root cause**: `use-barcode-scanner.ts` capture-phase keydown listener called `preventDefault()` + `stopPropagation()` on Enter when its keystroke buffer had 4+ chars. Fast typing in cash/split/tip inputs (e.g. "90.00" at <50ms gaps) accumulated in the buffer, causing Enter to be eaten before reaching the input's `onKeyDown` handler.
