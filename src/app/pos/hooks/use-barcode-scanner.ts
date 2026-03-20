@@ -60,7 +60,9 @@ export function useBarcodeScanner({
 
       if (e.key === 'Enter') {
         const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();
-        if (barcode.length >= minLength) {
+        const activeEl = document.activeElement;
+        const isBarcodeScanTarget = activeEl?.hasAttribute('data-barcode-target');
+        if (barcode.length >= minLength && isBarcodeScanTarget) {
           e.preventDefault();
           e.stopPropagation();
           onScanRef.current(barcode);

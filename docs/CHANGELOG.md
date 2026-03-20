@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Barcode scanner no longer swallows Enter on checkout inputs — 2026-03-19
+
+- **Root cause**: `use-barcode-scanner.ts` capture-phase keydown listener called `preventDefault()` + `stopPropagation()` on Enter when its keystroke buffer had 4+ chars. Fast typing in cash/split/tip inputs (e.g. "90.00" at <50ms gaps) accumulated in the buffer, causing Enter to be eaten before reaching the input's `onKeyDown` handler.
+- **Fix**: Added `data-barcode-target` guard — barcode scanner only intercepts Enter when the focused element has the `data-barcode-target` attribute (only the POS search bar). Checkout inputs, which lack the attribute, now always pass Enter through to `useEnterSubmit`.
+- **No regressions**: Buffer still resets on Enter regardless. Barcode scanning on search bar unchanged. Manual Enter on search bar still flushes debounce.
+
+---
+
 ## feat: Enter-key-as-submit — shared hook + POS checkout + searches + confirm dialog + booking coupon — 2026-03-19
 
 - **New hook** (`src/lib/hooks/use-enter-submit.ts`): Shared `useEnterSubmit(onSubmit, enabled)` hook. Handles Shift+Enter exclusion, IME composing state, and disabled/loading guards.
