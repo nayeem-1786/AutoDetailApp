@@ -158,6 +158,7 @@ export function ticketReducer(
       }
 
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
+      const isScopeTierWithQty = !isPerUnit && !!perUnitQty && !!pricing?.max_qty && pricing.max_qty > 1;
 
       // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
       const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
@@ -169,7 +170,7 @@ export function ticketReducer(
       let comboSourceId: string | null = null;
       const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
 
-      if (!isPerUnit && comboPrice != null && comboPrice < resolved.standardPrice) {
+      if (!isPerUnit && !isScopeTierWithQty && comboPrice != null && comboPrice < resolved.standardPrice) {
         if (comboPrice <= effectivePrice) {
           // Combo price wins (or ties — prefer combo for display)
           effectivePrice = comboPrice;
@@ -179,7 +180,9 @@ export function ticketReducer(
         // else sale price is lower, keep sale
       }
 
-      const unitPrice = effectivePrice;
+      // When scope tier has qty, multiply prices by quantity
+      const qtyMultiplier = isScopeTierWithQty ? perUnitQty! : 1;
+      const unitPrice = effectivePrice * qtyMultiplier;
       const totalPrice = unitPrice;
       const newItem: TicketItem = {
         id: generateId(),
@@ -196,15 +199,23 @@ export function ticketReducer(
         tierName: pricing.tier_label || pricing.tier_name,
         vehicleSizeClass,
         notes: null,
-        perUnitQty: isPerUnit ? perUnitQty : null,
-        perUnitLabel: isPerUnit ? (service.per_unit_label ?? null) : null,
-        perUnitPrice: isPerUnit ? service.per_unit_price! : null,
-        perUnitMax: isPerUnit ? (service.per_unit_max ?? null) : null,
+        perUnitQty: isPerUnit ? perUnitQty
+          : isScopeTierWithQty ? perUnitQty
+          : null,
+        perUnitLabel: isPerUnit ? (service.per_unit_label ?? null)
+          : isScopeTierWithQty ? (pricing.qty_label ?? pricing.tier_label ?? null)
+          : null,
+        perUnitPrice: isPerUnit ? service.per_unit_price!
+          : isScopeTierWithQty ? resolved.standardPrice
+          : null,
+        perUnitMax: isPerUnit ? (service.per_unit_max ?? null)
+          : isScopeTierWithQty ? pricing.max_qty
+          : null,
         parentItemId: parentItemId ?? null,
-        standardPrice: resolved.standardPrice,
+        standardPrice: resolved.standardPrice * qtyMultiplier,
         pricingType,
         comboSourcePrimaryId: comboSourceId,
-        saleEffectivePrice: saleEffective,
+        saleEffectivePrice: saleEffective != null ? saleEffective * qtyMultiplier : null,
         prerequisiteNote: prerequisiteNote ?? null,
         prerequisiteForServiceId: prerequisiteForServiceId ?? null,
       };

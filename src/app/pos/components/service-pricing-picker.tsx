@@ -36,6 +36,7 @@ export function ServicePricingPicker({
 }: ServicePricingPickerProps) {
   const pricing = service.pricing ?? [];
   const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
+  const [tierQtyPick, setTierQtyPick] = useState<{ tier: ServicePricing; vsc: VehicleSizeClass | null } | null>(null);
 
   const VEHICLE_SIZES: VehicleSizeClass[] = ['sedan', 'truck_suv_2row', 'suv_3row_van'];
 
@@ -46,7 +47,13 @@ export function ServicePricingPicker({
   });
 
   function handleSelect(tier: ServicePricing, sizeOverride?: VehicleSizeClass) {
-    onSelect(tier, sizeOverride ?? vehicleSizeClass);
+    const vsc = sizeOverride ?? vehicleSizeClass;
+    // If this tier supports multi-qty, show qty picker instead of immediate add
+    if (tier.max_qty && tier.max_qty > 1) {
+      setTierQtyPick({ tier, vsc });
+      return;
+    }
+    onSelect(tier, vsc);
     onClose();
   }
 
@@ -59,6 +66,26 @@ export function ServicePricingPicker({
         service={service}
         onSelect={onSelect}
         vehicleSizeClass={vehicleSizeClass}
+      />
+    );
+  }
+
+  // Tier quantity picker — shown after selecting a tier with max_qty > 1
+  if (tierQtyPick) {
+    return (
+      <TierQtyPicker
+        open={open}
+        onClose={() => { setTierQtyPick(null); onClose(); }}
+        onBack={() => setTierQtyPick(null)}
+        service={service}
+        tier={tierQtyPick.tier}
+        vehicleSizeClass={tierQtyPick.vsc}
+        isOnSale={isOnSale}
+        onSelect={(qty) => {
+          onSelect(tierQtyPick.tier, tierQtyPick.vsc, qty);
+          setTierQtyPick(null);
+          onClose();
+        }}
       />
     );
   }
@@ -385,6 +412,156 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
           >
             Add to Ticket &mdash;{' '}
             {perUnitOnSale && (
+              <span className="line-through opacity-60 mr-1">${total.toFixed(2)}</span>
+            )}
+            ${(saleTotal ?? total).toFixed(2)}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Tier Quantity Picker (scope tiers with max_qty > 1) ─────
+
+interface TierQtyPickerProps {
+  open: boolean;
+  onClose: () => void;
+  onBack: () => void;
+  service: CatalogService;
+  tier: ServicePricing;
+  vehicleSizeClass: VehicleSizeClass | null;
+  isOnSale: boolean;
+  onSelect: (qty: number) => void;
+}
+
+function TierQtyPicker({ open, onClose, onBack, service, tier, vehicleSizeClass, isOnSale, onSelect }: TierQtyPickerProps) {
+  const maxQty = tier.max_qty ?? 10;
+  const label = tier.qty_label || tier.tier_label || 'unit';
+  const [quantity, setQuantity] = useState(1);
+
+  const standardPrice = resolveServicePrice(tier, vehicleSizeClass);
+  const tierOnSale = isOnSale && tier.sale_price != null && tier.sale_price < standardPrice;
+  const effectiveUnitPrice = tierOnSale ? tier.sale_price! : standardPrice;
+
+  const total = quantity * standardPrice;
+  const saleTotal = tierOnSale ? quantity * tier.sale_price! : null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogClose onClose={onClose} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
+      <DialogHeader>
+        <DialogTitle>
+          {service.name}
+          {tierOnSale && (
+            <span className="ml-2 inline-flex rounded bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400 align-middle">
+              Sale
+            </span>
+          )}
+        </DialogTitle>
+      </DialogHeader>
+      <DialogContent>
+        {/* Tier + unit price info */}
+        <div className="mb-4 rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+            {tier.tier_label || tier.tier_name}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {tierOnSale ? (
+              <>
+                <span className="text-gray-400 dark:text-gray-500 line-through mr-1">${standardPrice.toFixed(2)}</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">${tier.sale_price!.toFixed(2)}</span>
+              </>
+            ) : (
+              <span className="font-semibold text-gray-900 dark:text-gray-100">${standardPrice.toFixed(2)}</span>
+            )}
+            {' '}per {label}
+          </p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            Maximum: {maxQty} {label}{maxQty > 1 ? 's' : ''}
+          </p>
+        </div>
+
+        {/* Quantity selector */}
+        <div className="mb-4">
+          <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+            How many {label}{quantity !== 1 ? 's' : ''}?
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                quantity <= 1
+                  ? 'border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-500 cursor-not-allowed'
+                  : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-95'
+              )}
+            >
+              <Minus className="h-5 w-5" />
+            </button>
+
+            <div className="flex h-14 w-20 items-center justify-center rounded-xl bg-white dark:bg-gray-900 border-2 border-blue-200 dark:border-blue-800">
+              <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                {quantity}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
+              disabled={quantity >= maxQty}
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-xl border-2 transition-all',
+                quantity >= maxQty
+                  ? 'border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-500 cursor-not-allowed'
+                  : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-95'
+              )}
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Total display */}
+        <div className={cn(
+          'mb-4 flex items-center justify-between rounded-lg border px-4 py-3',
+          tierOnSale
+            ? 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-900/20'
+            : 'border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/20'
+        )}>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {quantity} {label}{quantity > 1 ? 's' : ''} &times; ${effectiveUnitPrice.toFixed(2)}
+          </span>
+          <div className="text-right">
+            {tierOnSale && (
+              <span className="block text-xs text-gray-400 dark:text-gray-500 line-through">
+                ${total.toFixed(2)}
+              </span>
+            )}
+            <span className={cn(
+              'text-lg font-bold',
+              tierOnSale ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+            )}>
+              ${(saleTotal ?? total).toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            Back
+          </Button>
+          <button
+            onClick={() => onSelect(quantity)}
+            className={cn(
+              'flex-1 rounded-lg py-3 text-sm font-semibold text-white transition-all',
+              'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 active:scale-[0.99]',
+              'min-h-[48px]'
+            )}
+          >
+            Add to Ticket &mdash;{' '}
+            {tierOnSale && (
               <span className="line-through opacity-60 mr-1">${total.toFixed(2)}</span>
             )}
             ${(saleTotal ?? total).toFixed(2)}

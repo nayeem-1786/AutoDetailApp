@@ -26,6 +26,8 @@ export interface ScopeTier {
   vehicle_size_sedan_price: number | '';
   vehicle_size_truck_suv_price: number | '';
   vehicle_size_suv_van_price: number | '';
+  max_qty: number | '';
+  qty_label: string;
 }
 
 export interface PerUnitPricing {
@@ -153,7 +155,7 @@ function ScopeForm({ value, onChange }: {
   const addTier = useCallback(() => {
     onChange({
       model: 'scope',
-      data: [...tiers, { tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '' }],
+      data: [...tiers, { tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', max_qty: '', qty_label: '' }],
     });
   }, [tiers, onChange]);
 
@@ -211,6 +213,27 @@ function ScopeForm({ value, onChange }: {
               </div>
             </FormField>
           )}
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Max Quantity" description="Leave empty for single qty. Set to 2+ to allow multiples in POS.">
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="1"
+                value={tier.max_qty}
+                onChange={(e) => updateTier(index, { max_qty: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
+              />
+            </FormField>
+            {typeof tier.max_qty === 'number' && tier.max_qty > 1 && (
+              <FormField label="Qty Label" description="Short unit name (e.g. 'row', 'panel'). Leave empty to use display label.">
+                <Input
+                  placeholder="e.g., row"
+                  value={tier.qty_label}
+                  onChange={(e) => updateTier(index, { qty_label: e.target.value })}
+                />
+              </FormField>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Switch
               checked={tier.is_vehicle_size_aware}

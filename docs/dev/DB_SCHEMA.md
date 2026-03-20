@@ -201,6 +201,8 @@ customers_square_customer_id_key — UNIQUE btree (square_customer_id)
 | vehicle_size_sedan_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
 | vehicle_size_truck_suv_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
 | vehicle_size_suv_van_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
+| max_qty | INTEGER | DEFAULT NULL | Max quantity per tier. NULL/1 = single qty. 2+ = qty stepper in POS |
+| qty_label | TEXT | DEFAULT NULL | Short unit label for qty display (e.g. 'row', 'panel'). Falls back to tier_label |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
 **UNIQUE:** (service_id, tier_name)

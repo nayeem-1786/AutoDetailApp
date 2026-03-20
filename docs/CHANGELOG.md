@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Hot Shampoo multi-qty — scope tier quantity via perUnit infrastructure reuse — 2026-03-20
+
+- **Migration** (`20260320000001`): Added `max_qty INTEGER` and `qty_label TEXT` to `service_pricing`. Hot Shampoo "Per Seat Row" set to `max_qty: 3, qty_label: 'row'`.
+- **Types**: Added `max_qty` + `qty_label` to `ServicePricing` interface and `ScopeTier` form interface.
+- **Admin** (`service-pricing-form.tsx`, `services/[id]/page.tsx`): Max Quantity + Qty Label inputs on scope tier editor cards. Qty Label only visible when max_qty > 1. Load and save both fields.
+- **POS Pricing Picker** (`service-pricing-picker.tsx`): New `TierQtyPicker` component — when a scope tier has `max_qty > 1`, shows quantity stepper (same UX as PerUnitPicker) before adding to ticket. Tiers without max_qty add immediately as before.
+- **POS Ticket Reducer** (`ticket-reducer.ts`): Added `isScopeTierWithQty` guard alongside `isPerUnit`. When true, populates `perUnitQty`/`perUnitMax`/`perUnitLabel`/`perUnitPrice` from tier data so the full per-unit infrastructure (stepper, display, duplicate detection, receipts) works automatically with zero changes to ticket-item-row or receipt templates.
+- **Booking flow**: Deferred to separate session — POS is priority for Hot Shampoo.
+
+---
+
 ## fix: POS ticket item row — per-unit and tier sub-text no longer truncated by stepper — 2026-03-20
 
 - **Root cause**: Sub-text (e.g. "2 panels × $150.00") shared a single flex row with the stepper buttons, price, and trash icon. The right side was `shrink-0` (~300px), leaving near-zero space for the sub-text on iPad, causing `truncate` to clip it to "2 pan..."

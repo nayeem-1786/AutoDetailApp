@@ -259,6 +259,8 @@ export interface ServicePricing {
   vehicle_size_sedan_price: number | null;
   vehicle_size_truck_suv_price: number | null;
   vehicle_size_suv_van_price: number | null;
+  max_qty: number | null;
+  qty_label: string | null;
   created_at: string;
 }
 

@@ -298,8 +298,10 @@ export default function ServiceDetailPage() {
           vehicle_size_sedan_price: r.vehicle_size_sedan_price ?? '',
           vehicle_size_truck_suv_price: r.vehicle_size_truck_suv_price ?? '',
           vehicle_size_suv_van_price: r.vehicle_size_suv_van_price ?? '',
+          max_qty: r.max_qty ?? '',
+          qty_label: r.qty_label || '',
         }));
-        setPricingValue({ model: 'scope', data: scopeTiers.length > 0 ? scopeTiers : [{ tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '' }] });
+        setPricingValue({ model: 'scope', data: scopeTiers.length > 0 ? scopeTiers : [{ tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', max_qty: '', qty_label: '' }] });
         break;
       }
       case 'per_unit':
@@ -636,6 +638,8 @@ export default function ServiceDetailPage() {
                 vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
                 vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
                 sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
+                max_qty: typeof t.max_qty === 'number' && t.max_qty > 1 ? t.max_qty : null,
+                qty_label: t.qty_label?.trim() || null,
               })
               .eq('id', t.id as string);
             if (updateError) throw updateError;
@@ -656,6 +660,8 @@ export default function ServiceDetailPage() {
                 vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
                 vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
                 sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
+                max_qty: typeof t.max_qty === 'number' && t.max_qty > 1 ? t.max_qty : null,
+                qty_label: t.qty_label?.trim() || null,
               };
             });
             const { error: insertError } = await supabase.from('service_pricing').insert(insertRows);
