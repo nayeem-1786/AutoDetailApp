@@ -137,13 +137,15 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
         )}
       </div>
 
-      {/* Line 2: Sub-text + note icon | qty + price + remove */}
+      {/* Sub-text line — own row when per-unit so it never gets truncated by stepper */}
+      {subText && (
+        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subText}</p>
+      )}
+
+      {/* Controls row: note icon | qty + price + remove */}
       <div className="mt-1 flex items-center gap-2">
-        {/* Left: sub-text + note icon */}
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          {subText && (
-            <span className="truncate text-xs text-gray-500 dark:text-gray-400">{subText}</span>
-          )}
+        {/* Left: note icon */}
+        <div className="flex min-w-0 flex-1 items-center">
           <button
             onClick={() => {
               setNoteValue(item.notes ?? '');

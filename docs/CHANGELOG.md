@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: POS ticket item row — per-unit and tier sub-text no longer truncated by stepper — 2026-03-20
+
+- **Root cause**: Sub-text (e.g. "2 panels × $150.00") shared a single flex row with the stepper buttons, price, and trash icon. The right side was `shrink-0` (~300px), leaving near-zero space for the sub-text on iPad, causing `truncate` to clip it to "2 pan..."
+- **Fix**: Moved sub-text to its own `<p>` line above the controls row. Per-unit descriptions, scope tier labels (e.g. "Per Seat Row"), and vehicle size labels are now fully visible at all viewport widths.
+- **No regressions**: Non-per-unit items (regular services, products) render identically — the sub-text `<p>` only appears when `subText` is non-empty. Note icon, stepper buttons (44px touch targets), price, trash, badges, prerequisite notes, and addon suggestions all unaffected.
+
+---
+
 ## feat: Enter-key-as-submit Session 2 — admin forms, inline edits, SearchInput — 2026-03-19
 
 ### SearchInput (`src/components/ui/search-input.tsx`)
