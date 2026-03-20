@@ -159,6 +159,7 @@ export function ticketReducer(
 
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
       const isScopeTierWithQty = !isPerUnit && !!perUnitQty && !!pricing?.max_qty && pricing.max_qty > 1;
+      console.log('[reducer] ADD_SERVICE', { pricingModel: service.pricing_model, isPerUnit, isScopeTierWithQty, perUnitQty, pricingMaxQty: pricing?.max_qty });
 
       // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
       const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
@@ -219,6 +220,7 @@ export function ticketReducer(
         prerequisiteNote: prerequisiteNote ?? null,
         prerequisiteForServiceId: prerequisiteForServiceId ?? null,
       };
+      console.log('[reducer] item created', { perUnitQty: newItem.perUnitQty, perUnitMax: newItem.perUnitMax, perUnitLabel: newItem.perUnitLabel, perUnitPrice: newItem.perUnitPrice });
 
       // If this is a child addon, insert immediately after the parent's last child
       if (parentItemId) {
