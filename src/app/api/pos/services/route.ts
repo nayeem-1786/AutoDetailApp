@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         sale_price,
         sale_starts_at,
         sale_ends_at,
-        pricing:service_pricing(tier_name, price, sale_price, display_order)
+        pricing:service_pricing(*)
       `)
       .eq('is_active', true)
       .order('display_order')

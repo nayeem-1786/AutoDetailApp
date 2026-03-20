@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: POS services API missing service_pricing columns — 2026-03-20
+
+- **Root cause**: `/api/pos/services/route.ts` used an explicit column list for the `service_pricing` join — only `tier_name`, `price`, `sale_price`, `display_order`. Missing: `tier_label`, `is_vehicle_size_aware`, vehicle size prices, `max_qty`, `qty_label`.
+- **Fix**: Changed to `service_pricing(*)` wildcard to match the catalog hook pattern and avoid this class of bug when new columns are added.
+- **Also fixes**: Pre-existing bug where `tier_label` was missing from the jobs module service fetch, causing slug-format names like "per_row" instead of "Per Seat Row".
+
+---
+
 ## feat: Hot Shampoo multi-qty — scope tier quantity via perUnit infrastructure reuse — 2026-03-20
 
 - **Migration** (`20260320000001`): Added `max_qty INTEGER` and `qty_label TEXT` to `service_pricing`. Hot Shampoo "Per Seat Row" set to `max_qty: 3, qty_label: 'row'`.
