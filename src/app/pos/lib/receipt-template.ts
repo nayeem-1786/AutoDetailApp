@@ -14,6 +14,7 @@ interface ReceiptItem {
   standard_price?: number | null;
   pricing_type?: string | null;
   prerequisite_note?: string | null;
+  tier_name?: string | null;
 }
 
 interface ReceiptRefundItem {
@@ -433,8 +434,11 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   for (const item of tx.items) {
     const price = `$${item.total_price.toFixed(2)}`;
     const txCol = item.tax_amount > 0 ? ' TX' : '   ';
+    const displayName = item.tier_name && item.tier_name !== 'default'
+      ? `${item.item_name} - ${item.tier_name}`
+      : item.item_name;
     if (item.quantity > 1) {
-      lines.push({ type: 'columns', left: item.item_name, right: '' });
+      lines.push({ type: 'columns', left: displayName, right: '' });
       lines.push({
         type: 'columns',
         left: `  ${item.quantity} x $${item.unit_price.toFixed(2)} each`,
@@ -443,7 +447,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     } else {
       lines.push({
         type: 'columns',
-        left: item.item_name,
+        left: displayName,
         right: `${price}${txCol}`,
       });
     }
@@ -742,10 +746,13 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   const itemRows = tx.items
     .map((item) => {
       const txCell = item.tax_amount > 0 ? 'TX' : '';
+      const htmlDisplayName = item.tier_name && item.tier_name !== 'default'
+        ? `${esc(item.item_name)} - ${esc(item.tier_name)}`
+        : esc(item.item_name);
       let rows = '';
       if (item.quantity > 1) {
         rows += `<tr>
-          <td colspan="3" style="padding:4px 0 0;font-size:14px;">${esc(item.item_name)}</td>
+          <td colspan="3" style="padding:4px 0 0;font-size:14px;">${htmlDisplayName}</td>
         </tr>
         <tr>
           <td style="padding:0 0 4px 12px;font-size:13px;color:#444;">${item.quantity} x $${item.unit_price.toFixed(2)} each</td>
@@ -754,7 +761,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
         </tr>`;
       } else {
         rows += `<tr>
-        <td style="padding:4px 0;font-size:14px;">${esc(item.item_name)}</td>
+        <td style="padding:4px 0;font-size:14px;">${htmlDisplayName}</td>
         <td style="padding:4px 0;font-size:14px;text-align:right;white-space:nowrap;">$${item.total_price.toFixed(2)}</td>
         <td style="padding:4px 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;">${txCell}</td>
       </tr>`;

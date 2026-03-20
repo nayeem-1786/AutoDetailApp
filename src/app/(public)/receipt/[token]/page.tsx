@@ -211,7 +211,12 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 return (
                   <tr key={item.id} className="border-b border-site-border">
                     <td className="px-6 py-4">
-                      <div className={`font-medium ${isFullyRefunded ? 'line-through text-site-text-muted' : 'text-site-text'}`}>{item.item_name}</div>
+                      <div className={`font-medium ${isFullyRefunded ? 'line-through text-site-text-muted' : 'text-site-text'}`}>
+                        {item.item_name}
+                        {item.tier_name && item.tier_name !== 'default' && (
+                          <span className="text-site-text-muted font-normal"> — {item.tier_name}</span>
+                        )}
+                      </div>
                       {item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price && (
                         <div className="text-xs text-green-500 mt-0.5">
                           {item.pricing_type === 'combo' ? 'Combo' : 'Sale'}: Reg {formatCurrency(item.standard_price)} | Saved {formatCurrency(item.standard_price - item.unit_price)}!

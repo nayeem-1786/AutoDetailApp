@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Receipt per-unit/scope quantity and tier name display — 2026-03-20
+
+- **Fix A — Transaction item mapping**: All 5 checkout payment components (cash ×2, card, check, split) now store `quantity: perUnitQty` and `unit_price: unitPrice / perUnitQty` when an item has `perUnitQty > 1`. Previously `quantity` was always 1 with the total baked into `unit_price`, so receipt qty > 1 formatting never triggered. Also adjusts `standard_price` per-unit for correct savings display.
+- **Fix B — Tier name on receipts**: Added `tier_name` to `ReceiptItem` interface. All 3 receipt paths now display tier name:
+  - Thermal: "Hot Shampoo Extraction - Per Seat Row" + "2 x $125.00 each → $250.00"
+  - HTML: Same format in table rows
+  - Public page: "Hot Shampoo Extraction — Per Seat Row" with em dash separator
+  - Tier name "default" is excluded from display.
+
+---
+
 ## fix: Detail dialog qty stepper for scope tiers with max_qty — 2026-03-20
 
 - **Root cause**: When users browse by category and tap a service, the ServiceDetailDialog opens (not the pricing picker). The dialog's qty stepper and `perUnitQty` state only activated for `isPerUnit` services. Scope tiers with `max_qty > 1` (like Hot Shampoo "Per Seat Row") dispatched ADD_SERVICE without `perUnitQty`, so the reducer's `isScopeTierWithQty` guard never fired and all perUnit* fields stayed null — no stepper buttons on the ticket.
