@@ -216,12 +216,12 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         if (isPerUnit) {
           const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
           if (existingItem.perUnitQty! >= max) {
-            const label = svc.per_unit_label || 'unit';
+            const label = existingItem.perUnitLabel || svc.per_unit_label || 'unit';
             toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
           } else {
             const newQty = perUnitQty ?? (existingItem.perUnitQty! + 1);
             dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: newQty });
-            const label = svc.per_unit_label || 'unit';
+            const label = existingItem.perUnitLabel || svc.per_unit_label || 'unit';
             toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
           }
         } else {

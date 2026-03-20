@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Scope tier duplicate detection allows qty increment, correct toast labels — 2026-03-20
+
+- **Bug 1** (`service-detail-dialog.tsx:129`): Changed `isPerUnit && perUnitQty` gate to `isExistingPerUnit && perUnitQty`. The old gate checked `service.pricing_model === 'per_unit'` which is false for scope services, blocking qty increment and showing false "already at maximum" toast.
+- **Bug 2** (`catalog-browser.tsx:219,224`): Toast label now reads `existingItem.perUnitLabel || svc.per_unit_label || 'unit'` instead of `svc.per_unit_label || 'unit'`. Scope tier items have `perUnitLabel` set from the tier's `qty_label` (e.g., "row"), so toasts now say "3 rows" not "3 units".
+- **Bug 3** (`service-detail-dialog.tsx:133,137,141`): Same label fix as Bug 2 — all 3 toast messages now use `existingItem.perUnitLabel` fallback chain.
+
+---
+
 ## fix: Receipt per-unit/scope quantity and tier name display — 2026-03-20
 
 - **Fix A — Transaction item mapping**: All 5 checkout payment components (cash ×2, card, check, split) now store `quantity: perUnitQty` and `unit_price: unitPrice / perUnitQty` when an item has `perUnitQty > 1`. Previously `quantity` was always 1 with the total baked into `unit_price`, so receipt qty > 1 formatting never triggered. Also adjusts `standard_price` per-unit for correct savings display.
