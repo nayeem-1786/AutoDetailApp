@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useAsyncAction } from '@/lib/hooks/use-async-action';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import type { WebsiteNavItem, WebsitePage, NavPlacement } from '@/lib/supabase/types';
 
 const PLACEMENTS: { value: NavPlacement; label: string }[] = [
@@ -499,10 +500,17 @@ export default function NavigationPage() {
       {/* Add Link Dialog */}
       {showAddDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+          <form
+            className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAdd();
+            }}
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Add Navigation Link</h3>
               <button
+                type="button"
                 onClick={() => {
                   setShowAddDialog(false);
                   resetAddForm();
@@ -642,6 +650,7 @@ export default function NavigationPage() {
 
             <div className="flex justify-end gap-3 pt-2">
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => {
                   setShowAddDialog(false);
@@ -651,9 +660,9 @@ export default function NavigationPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleAdd} disabled={isSubmitting}>Add Link</Button>
+              <Button type="submit" disabled={isSubmitting}>Add Link</Button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </div>
@@ -713,6 +722,17 @@ function NavItemRow({
   isIndentTarget,
   disabled,
 }: NavItemRowProps) {
+  const { onKeyDown: editKeyDown } = useEnterSubmit(onSaveEdit, !disabled);
+
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancelEdit();
+      return;
+    }
+    editKeyDown(e);
+  }, [editKeyDown, onCancelEdit]);
+
   return (
     <div
       className={`flex items-center gap-3 px-4 py-3 transition-colors ${
@@ -736,6 +756,7 @@ function NavItemRow({
               type="text"
               value={editLabel}
               onChange={(e) => onEditLabel(e.target.value)}
+              onKeyDown={handleEditKeyDown}
               className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
               autoFocus
             />
@@ -743,6 +764,7 @@ function NavItemRow({
               type="text"
               value={editUrl}
               onChange={(e) => onEditUrl(e.target.value)}
+              onKeyDown={handleEditKeyDown}
               className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
             />
             <button type="button" onClick={onSaveEdit} className="text-green-600 hover:text-green-700">

@@ -471,6 +471,14 @@ export default function TeamMembersAdminPage() {
                           updateMemberLocal(member.id, { name: e.target.value })
                         }
                         onBlur={(e) => validateField(member.id, 'name', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                            e.preventDefault();
+                            handleSaveMember(member);
+                          } else if (e.key === 'Escape') {
+                            setExpandedId(null);
+                          }
+                        }}
                         placeholder="Full name"
                         className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                       />
@@ -487,6 +495,14 @@ export default function TeamMembersAdminPage() {
                           updateMemberLocal(member.id, { role: e.target.value })
                         }
                         onBlur={(e) => validateField(member.id, 'role', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                            e.preventDefault();
+                            handleSaveMember(member);
+                          } else if (e.key === 'Escape') {
+                            setExpandedId(null);
+                          }
+                        }}
                         placeholder="e.g. Lead Detailer"
                         className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                       />

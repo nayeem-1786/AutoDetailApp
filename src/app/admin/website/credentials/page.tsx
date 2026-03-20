@@ -429,6 +429,14 @@ export default function CredentialsAdminPage() {
                         updateCredentialLocal(cred.id, { title: e.target.value })
                       }
                       onBlur={(e) => validateField(cred.id, 'title', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                          e.preventDefault();
+                          (e.target as HTMLInputElement).blur();
+                        } else if (e.key === 'Escape') {
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
                       placeholder="e.g. Ceramic Pro Certified Installer"
                       className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                     />

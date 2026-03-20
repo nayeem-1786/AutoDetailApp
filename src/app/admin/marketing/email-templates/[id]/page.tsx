@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
@@ -54,6 +55,9 @@ export default function TemplateEditorPage() {
   const [resetting, setResetting] = useState(false);
 
   const variables: VariableDefinition[] = getVariablesForCategory(category);
+
+  const enterSubmitProps = useEnterSubmit(handleSave, !saving && !loading);
+  const enterTestSendProps = useEnterSubmit(handleTestSend, !testSending && !!testEmail);
 
   const isDirty = template
     ? JSON.stringify({ subject, previewText, layoutId, blocks, name }) !== initial
@@ -254,6 +258,7 @@ export default function TemplateEditorPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={template.is_system}
+                {...enterSubmitProps}
               />
             </FormField>
             <FormField label="Layout" htmlFor="tmpl-layout">
@@ -277,6 +282,7 @@ export default function TemplateEditorPage() {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Email subject with {variables}"
+                {...enterSubmitProps}
               />
             </div>
             <FormField label="Preview Text" htmlFor="tmpl-preview" description="90-char inbox snippet">
@@ -286,6 +292,7 @@ export default function TemplateEditorPage() {
                 onChange={(e) => setPreviewText(e.target.value)}
                 placeholder="Brief preview text shown in inbox..."
                 maxLength={90}
+                {...enterSubmitProps}
               />
               <p className="mt-1 text-xs text-gray-400">{previewText.length}/90</p>
             </FormField>
@@ -359,6 +366,7 @@ export default function TemplateEditorPage() {
               value={testEmail}
               onChange={(e) => setTestEmail(e.target.value)}
               placeholder="your@email.com"
+              {...enterTestSendProps}
             />
           </FormField>
           {isDirty && (

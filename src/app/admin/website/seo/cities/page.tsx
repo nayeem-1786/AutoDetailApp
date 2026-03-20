@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -251,6 +252,8 @@ export default function CitiesAdminPage() {
       setSaving(false);
     }
   };
+
+  const enterSubmit = useEnterSubmit(handleSave, !saving);
 
   // -----------------------------------------------------------------------
   // Toggle active
@@ -791,6 +794,7 @@ export default function CitiesAdminPage() {
                     onChange={(e) => handleNameChange(e.target.value)}
                     placeholder="e.g. Torrance"
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    {...enterSubmit}
                   />
                 </div>
                 <div>
@@ -806,6 +810,7 @@ export default function CitiesAdminPage() {
                     placeholder="CA"
                     maxLength={2}
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    {...enterSubmit}
                   />
                 </div>
               </div>
@@ -825,6 +830,7 @@ export default function CitiesAdminPage() {
                         setForm((prev) => ({ ...prev, slug: toSlug(e.target.value) }))
                       }
                       className="block w-full border-0 bg-transparent px-0 py-2 text-sm dark:text-gray-200 focus:ring-0"
+                      {...enterSubmit}
                     />
                   </div>
                 </div>
@@ -844,6 +850,7 @@ export default function CitiesAdminPage() {
                     }
                     placeholder="e.g. 3.5"
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    {...enterSubmit}
                   />
                 </div>
               </div>
@@ -925,6 +932,7 @@ export default function CitiesAdminPage() {
                                 }
                                 placeholder="Service name (e.g. Ceramic Coating)"
                                 className="flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm dark:border-gray-500 dark:bg-gray-600 dark:text-gray-200"
+                                {...enterSubmit}
                               />
                               <button
                                 type="button"
@@ -983,6 +991,7 @@ export default function CitiesAdminPage() {
                   }
                   placeholder="e.g. Del Amo Fashion Center, Torrance Beach, Madrona Marsh, Wilson Park"
                   className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  {...enterSubmit}
                 />
                 <p className="mt-1 text-xs text-gray-400">
                   Comma-separated landmarks
@@ -1002,6 +1011,7 @@ export default function CitiesAdminPage() {
                   }
                   placeholder="Auto-generated if blank: Mobile Auto Detailing in {City}, {State}"
                   className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  {...enterSubmit}
                 />
               </div>
 
@@ -1043,6 +1053,7 @@ export default function CitiesAdminPage() {
                       }
                       placeholder="e.g. auto detailing torrance, car wash torrance"
                       className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      {...enterSubmit}
                     />
                     <p className="mt-1 text-xs text-gray-400">
                       Comma-separated keywords — AI will target these in generated content
@@ -1064,6 +1075,7 @@ export default function CitiesAdminPage() {
                       }
                       placeholder="Auto-generated if blank"
                       className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      {...enterSubmit}
                     />
                     <p className="mt-1 text-xs text-gray-400">
                       {form.meta_title.length}/60 characters

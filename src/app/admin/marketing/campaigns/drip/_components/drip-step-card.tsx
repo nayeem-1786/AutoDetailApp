@@ -17,6 +17,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ALL_GROUPS, VARIABLE_GROUPS } from '@/lib/utils/template';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -46,6 +47,8 @@ interface DripStepCardProps {
   emailTemplates: Array<{ id: string; name: string; subject: string }>;
   coupons: Array<{ id: string; code: string; name: string | null }>;
   sequences: Array<{ id: string; name: string }>;
+  onSave: () => void;
+  saving: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -95,10 +98,13 @@ export function DripStepCard({
   emailTemplates,
   coupons,
   sequences,
+  onSave,
+  saving,
 }: DripStepCardProps) {
   const [showExitConditions, setShowExitConditions] = useState(
     !!step.exit_condition
   );
+  const enterSubmitProps = useEnterSubmit(onSave, !saving);
 
   function update(partial: Partial<StepFormData>) {
     onChange({ ...step, ...partial });
@@ -212,6 +218,7 @@ export function DripStepCard({
               onChange={(e) =>
                 update({ delay_days: Math.max(0, parseInt(e.target.value) || 0) })
               }
+              {...enterSubmitProps}
             />
           </FormField>
           <FormField label="Delay (hours)" htmlFor={`step-${step.id}-hours`}>
@@ -226,6 +233,7 @@ export function DripStepCard({
                   delay_hours: Math.min(23, Math.max(0, parseInt(e.target.value) || 0)),
                 })
               }
+              {...enterSubmitProps}
             />
           </FormField>
         </div>
@@ -276,6 +284,7 @@ export function DripStepCard({
                 value={step.subject_override}
                 onChange={(e) => update({ subject_override: e.target.value })}
                 placeholder="Optional subject line override"
+                {...enterSubmitProps}
               />
             </FormField>
           </>
@@ -442,6 +451,7 @@ export function DripStepCard({
                     value={step.exit_tag}
                     onChange={(e) => update({ exit_tag: e.target.value })}
                     placeholder="e.g. engaged, vip"
+                    {...enterSubmitProps}
                   />
                 </FormField>
               )}

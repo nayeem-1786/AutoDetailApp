@@ -339,7 +339,7 @@ export default function AdCreativeEditorPage() {
   const previewScale = Math.min(1, maxPreviewWidth / previewW);
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={(e) => { e.preventDefault(); save(); }} className="space-y-6">
       <ConfirmDialog {...dialogProps} />
       <PageHeader
         title={isNew ? 'Create Ad' : 'Edit Ad'}
@@ -347,6 +347,7 @@ export default function AdCreativeEditorPage() {
         action={
           <div className="flex items-center gap-3">
             <Button
+              type="button"
               variant="outline"
               onClick={() => router.push('/admin/website/ads')}
             >
@@ -355,6 +356,7 @@ export default function AdCreativeEditorPage() {
             </Button>
             {!isNew && (
               <Button
+                type="button"
                 variant="outline"
                 onClick={handleDelete}
                 disabled={deleting}
@@ -368,7 +370,7 @@ export default function AdCreativeEditorPage() {
                 Delete
               </Button>
             )}
-            <Button onClick={save} disabled={saving}>
+            <Button type="submit" disabled={saving}>
               {saving ? (
                 <>
                   <Spinner size="sm" /> Saving...
@@ -814,6 +816,6 @@ export default function AdCreativeEditorPage() {
           </div>
         </div>
       </div>
-    </div>
+    </form>
   );
 }

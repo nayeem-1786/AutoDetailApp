@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { ArrowLeft, Save } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 import {
@@ -131,6 +132,8 @@ export default function TickerEditorPage() {
     }
   };
 
+  const enterSubmit = useEnterSubmit(save, !saving);
+
   if (loading || !ticker) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -225,6 +228,7 @@ export default function TickerEditorPage() {
               onChange={(e) => update('link_url', e.target.value || null)}
               className="mt-1"
               placeholder="https://..."
+              {...enterSubmit}
             />
           </div>
           <div>
@@ -236,6 +240,7 @@ export default function TickerEditorPage() {
               onChange={(e) => update('link_text', e.target.value || null)}
               className="mt-1"
               placeholder="Learn more"
+              {...enterSubmit}
             />
           </div>
         </div>
@@ -364,6 +369,7 @@ export default function TickerEditorPage() {
                 value={ticker.bg_color}
                 onChange={(e) => update('bg_color', e.target.value)}
                 className="flex-1 font-mono text-xs"
+                {...enterSubmit}
               />
             </div>
           </div>
@@ -382,6 +388,7 @@ export default function TickerEditorPage() {
                 value={ticker.text_color}
                 onChange={(e) => update('text_color', e.target.value)}
                 className="flex-1 font-mono text-xs"
+                {...enterSubmit}
               />
             </div>
           </div>
@@ -413,6 +420,7 @@ export default function TickerEditorPage() {
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               className="mt-1"
+              {...enterSubmit}
             />
           </div>
           <div>
@@ -424,6 +432,7 @@ export default function TickerEditorPage() {
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               className="mt-1"
+              {...enterSubmit}
             />
           </div>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { useAsyncAction } from '@/lib/hooks/use-async-action';
@@ -918,6 +919,8 @@ function BrandColumnEditor({
     toast.success('Brand settings saved');
   };
 
+  const enterSubmitBrand = useEnterSubmit(save, !saving && !disabled);
+
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
@@ -963,6 +966,7 @@ function BrandColumnEditor({
           className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50 disabled:bg-gray-100"
           min={40}
           max={400}
+          {...enterSubmitBrand}
         />
         <p className="mt-1 text-xs text-gray-500">Height scales automatically.</p>
       </div>
@@ -1224,6 +1228,14 @@ function LinksEditor({
                 type="text"
                 value={editLabel}
                 onChange={(e) => setEditLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    saveEditLink();
+                  } else if (e.key === 'Escape') {
+                    setEditingLinkId(null);
+                  }
+                }}
                 className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
                 placeholder="Label"
                 autoFocus
@@ -1232,6 +1244,14 @@ function LinksEditor({
                 type="text"
                 value={editUrl}
                 onChange={(e) => setEditUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    saveEditLink();
+                  } else if (e.key === 'Escape') {
+                    setEditingLinkId(null);
+                  }
+                }}
                 className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
                 placeholder="URL"
               />
@@ -1496,6 +1516,8 @@ function ServiceAreasPanel({
     setSaving(false);
   };
 
+  const enterSubmitAreas = useEnterSubmit(save, !saving && isDirty && !disabled);
+
   return (
     <div className="space-y-4">
       <div>
@@ -1508,6 +1530,7 @@ function ServiceAreasPanel({
           onChange={(e) => setPrefixText(e.target.value)}
           className="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
           placeholder="e.g. Mobile Detailing in (leave blank for none)"
+          {...enterSubmitAreas}
         />
         <p className="mt-1 text-xs text-gray-500">
           This text appears before the list of cities. Leave blank to show only city links.
@@ -1696,6 +1719,7 @@ function BottomBarPanel({
   };
 
   const year = new Date().getFullYear();
+  const enterSubmitCopyright = useEnterSubmit(saveCopyright, copyrightDirty && !savingCopyright && !isSubmitting);
 
   return (
     <div className="space-y-6">
@@ -1715,6 +1739,7 @@ function BottomBarPanel({
             onChange={(e) => setCustomCopyright(e.target.value)}
             className="w-full max-w-lg rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
             placeholder="Leave empty to use auto-generated text"
+            {...enterSubmitCopyright}
           />
         </div>
         {copyrightDirty && (

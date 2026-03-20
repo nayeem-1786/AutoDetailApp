@@ -13,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X, CheckCircle2, XCircle, Loader2, Receipt } from 'lucide-react';
 import { generateReceiptHtml, generateReceiptLines, receiptToEscPos } from '@/app/pos/lib/receipt-template';
 import type { ReceiptImages, ReceiptContext } from '@/app/pos/lib/receipt-template';
@@ -158,6 +159,9 @@ export default function ReceiptPrinterPage() {
   const [reviewContext, setReviewContext] = useState<ReceiptContext>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zoneTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+
+  const enterSubmitConnection = useEnterSubmit(() => handleSave(), !saving);
+  const enterSubmitHeader = useEnterSubmit(() => handleSave(), !saving);
 
   useEffect(() => {
     async function loadSettings() {
@@ -547,6 +551,7 @@ export default function ReceiptPrinterPage() {
               placeholder="http://192.168.1.174:8080"
               value={config.print_server_url}
               onChange={(e) => updateConfig('print_server_url', e.target.value)}
+              {...enterSubmitConnection}
             />
           </FormField>
 
@@ -566,6 +571,7 @@ export default function ReceiptPrinterPage() {
               placeholder="192.168.1.100"
               value={config.printer_ip}
               onChange={(e) => updateConfig('printer_ip', e.target.value)}
+              {...enterSubmitConnection}
             />
           </FormField>
         </CardContent>
@@ -594,6 +600,7 @@ export default function ReceiptPrinterPage() {
                   placeholder={defaults.business_name || 'Business Profile value'}
                   value={config.override_name}
                   onChange={(e) => updateConfig('override_name', e.target.value)}
+                  {...enterSubmitHeader}
                 />
               </FormField>
 
@@ -603,6 +610,7 @@ export default function ReceiptPrinterPage() {
                   placeholder={defaults.business_phone || 'Business Profile value'}
                   value={config.override_phone}
                   onChange={(e) => updateConfig('override_phone', e.target.value)}
+                  {...enterSubmitHeader}
                 />
               </FormField>
 
@@ -612,6 +620,7 @@ export default function ReceiptPrinterPage() {
                   placeholder={defaults.business_address || 'Business Profile value'}
                   value={config.override_address}
                   onChange={(e) => updateConfig('override_address', e.target.value)}
+                  {...enterSubmitHeader}
                 />
               </FormField>
 
@@ -622,6 +631,7 @@ export default function ReceiptPrinterPage() {
                   placeholder={defaults.business_email || 'Business Profile value'}
                   value={config.override_email}
                   onChange={(e) => updateConfig('override_email', e.target.value)}
+                  {...enterSubmitHeader}
                 />
               </FormField>
 
@@ -631,6 +641,7 @@ export default function ReceiptPrinterPage() {
                   placeholder={defaults.business_website || 'Business Profile value'}
                   value={config.override_website}
                   onChange={(e) => updateConfig('override_website', e.target.value)}
+                  {...enterSubmitHeader}
                 />
               </FormField>
             </div>

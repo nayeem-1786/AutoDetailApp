@@ -26,6 +26,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, ArrowRight, Users, Send, Plus, Eye, ChevronLeft, ChevronRight, Clock, FlaskConical, FileText } from 'lucide-react';
 import { SITE_URL, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import type { EmailBlock } from '@/lib/email/types';
@@ -676,6 +677,21 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
   const canNext = stepIndex < STEPS.length - 1;
   const canPrev = stepIndex > 0;
 
+  // Enter-key-as-submit for Input fields (not Textareas)
+  const enterSubmitHandler = useCallback(() => {
+    if (canNext) {
+      navigateToStep(STEPS[stepIndex + 1].key);
+    } else if (step === 'review') {
+      if (scheduledAt) {
+        handleSchedule();
+      } else {
+        handleSendNow();
+      }
+    }
+  }, [canNext, stepIndex, step, scheduledAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const enterSubmit = useEnterSubmit(enterSubmitHandler, !saving && !sending);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -726,6 +742,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Spring Special"
+                  {...enterSubmit}
                 />
               </FormField>
               <FormField label="Channel" required htmlFor="channel">
@@ -813,6 +830,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                   value={daysSinceVisitMin}
                   onChange={(e) => setDaysSinceVisitMin(e.target.value)}
                   placeholder="e.g. 30"
+                  {...enterSubmit}
                 />
               </FormField>
               <FormField label="Days Since Last Visit (max)" htmlFor="days_max">
@@ -823,6 +841,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                   value={daysSinceVisitMax}
                   onChange={(e) => setDaysSinceVisitMax(e.target.value)}
                   placeholder="e.g. 90"
+                  {...enterSubmit}
                 />
               </FormField>
               <FormField label="Minimum Lifetime Spend" htmlFor="min_spend">
@@ -834,6 +853,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                   value={minSpend}
                   onChange={(e) => setMinSpend(e.target.value)}
                   placeholder="e.g. 100"
+                  {...enterSubmit}
                 />
               </FormField>
             </div>
@@ -933,6 +953,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                         value={emailSubject}
                         onChange={(e) => setEmailSubject(e.target.value)}
                         placeholder="Special offer just for you, {first_name}!"
+                        {...enterSubmit}
                       />
                     </FormField>
                     {variableChips(setEmailSubject, 'email_subject')}
@@ -946,6 +967,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                         onChange={(e) => setEmailPreviewText(e.target.value)}
                         placeholder="Optional preview text for inbox..."
                         maxLength={90}
+                        {...enterSubmit}
                       />
                     </FormField>
                   </div>
@@ -1072,6 +1094,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                                 value={variantBEmailSubject}
                                 onChange={(e) => setVariantBEmailSubject(e.target.value)}
                                 placeholder="A special surprise for you, {first_name}!"
+                                {...enterSubmit}
                               />
                             </FormField>
                             {variableChips(setVariantBEmailSubject, 'variant_b_email_subject')}
@@ -1386,6 +1409,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                     type="datetime-local"
                     value={scheduledAt}
                     onChange={(e) => setScheduledAt(e.target.value)}
+                    {...enterSubmit}
                   />
                 </FormField>
               </div>

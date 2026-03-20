@@ -281,10 +281,14 @@ function EditPriceInputs({
   item,
   state,
   onChange,
+  onSave,
+  onCancel,
 }: {
   item: PromotionItem;
   state: EditState;
   onChange: (updates: Partial<EditState>) => void;
+  onSave: () => void;
+  onCancel: () => void;
 }) {
   const tiers = item.service_pricing
     ? [...item.service_pricing].sort((a, b) => a.display_order - b.display_order)
@@ -328,6 +332,14 @@ function EditPriceInputs({
               onChange={(e) =>
                 onChange({ inputValue: e.target.value === '' ? '' : parseFloat(e.target.value) })
               }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  onSave();
+                } else if (e.key === 'Escape') {
+                  onCancel();
+                }
+              }}
               className="h-8 text-xs"
             />
           </div>
@@ -365,6 +377,14 @@ function EditPriceInputs({
                   },
                 })
               }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  onSave();
+                } else if (e.key === 'Escape') {
+                  onCancel();
+                }
+              }}
               className="h-8 text-xs"
             />
             {state.discountType !== 'direct' && computed !== null && (
@@ -586,7 +606,7 @@ export function PromotionRow({
           </div>
 
           {/* Price inputs */}
-          <EditPriceInputs item={item} state={editState} onChange={updateState} />
+          <EditPriceInputs item={item} state={editState} onChange={updateState} onSave={handleSave} onCancel={onCancelEdit} />
 
           {/* Validation errors */}
           {errors.length > 0 && (
@@ -606,6 +626,14 @@ export function PromotionRow({
               type="date"
               value={editState.saleStartsAt}
               onChange={(e) => updateState({ saleStartsAt: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleSave();
+                } else if (e.key === 'Escape') {
+                  onCancelEdit();
+                }
+              }}
               className="h-8 text-xs"
             />
           </div>
@@ -615,6 +643,14 @@ export function PromotionRow({
               type="date"
               value={editState.saleEndsAt}
               onChange={(e) => updateState({ saleEndsAt: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleSave();
+                } else if (e.key === 'Escape') {
+                  onCancelEdit();
+                }
+              }}
               className="h-8 text-xs"
             />
           </div>

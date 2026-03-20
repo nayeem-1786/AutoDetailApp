@@ -213,6 +213,11 @@ export default function QuotesPage() {
             <SearchInput
               value={search}
               onChange={setSearch}
+              onEnter={() => {
+                clearTimeout(debounceRef.current);
+                setPage(0);
+                fetchQuotes(search, statusFilter, dateFrom, dateTo, 0);
+              }}
               placeholder="Search quote # or customer..."
               className="w-full sm:w-80"
             />

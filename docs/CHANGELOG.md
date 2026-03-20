@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Enter-key-as-submit Session 2 — admin forms, inline edits, SearchInput — 2026-03-19
+
+### SearchInput (`src/components/ui/search-input.tsx`)
+- Added optional `onEnter` callback prop with IME composing guard
+- Wired to 3 server-debounced callers (Enter flushes debounce):
+  - `admin/jobs/page.tsx` (300ms), `admin/quotes/page.tsx` (300ms), `admin/settings/audit-log/page.tsx` (500ms)
+
+### Pages with textareas — `useEnterSubmit` on `<Input>` fields only
+- `settings/shipping/page.tsx` — 19 inputs, textarea untouched
+- `settings/receipt-printer/page.tsx` — 7 inputs (2 sections), textareas untouched
+- `orders/[id]/page.tsx` — 3 fulfillment inputs, notes/refund textareas untouched
+- `inventory/purchase-orders/new/page.tsx` — 2 inputs, textarea untouched
+- `marketing/coupons/new/page.tsx` — 9 inputs across wizard steps
+- `marketing/campaigns/_components/campaign-wizard.tsx` — 8 inputs, textareas untouched
+- `marketing/campaigns/drip/_components/drip-builder.tsx` — 4 inputs, textarea untouched
+- `marketing/campaigns/drip/_components/drip-step-card.tsx` — 4 inputs, textarea untouched (props passed via drip-steps-editor)
+- `marketing/email-templates/[id]/page.tsx` — 4 inputs (main + test send dialog)
+- `marketing/email-templates/_components/brand-settings.tsx` — 12 inputs (including ColorField sub-component)
+- `website/homepage/page.tsx` — 8 inputs (4 per-section hooks), textareas untouched
+- `website/seo/page.tsx` — 6 inputs in PageEditor, textareas untouched
+- `website/seo/cities/page.tsx` — 9 inputs, textareas untouched
+- `website/tickers/[id]/page.tsx` — 6 inputs, textarea untouched
+- `website/footer/page.tsx` — 3 inputs (brand/areas/copyright sections), inline edits untouched
+
+### Pages without textareas — `<form>` wrapping
+- `website/hero/[id]/page.tsx` — form wrapped, Save=submit, Back=button
+- `website/ads/creatives/[id]/page.tsx` — form wrapped, Save=submit, Back/Delete=button
+- `website/themes/[id]/page.tsx` — form wrapped, Save=submit, Back/Preview/Export/Import=button
+- `website/navigation/page.tsx` — Add Link dialog form-wrapped; inline edits get useEnterSubmit+Escape
+- `marketing/email-templates/layouts/[id]/page.tsx` — form wrapped, Save=submit
+
+### Inline edits — Enter saves, Escape cancels
+- `marketing/promotions/_components/promotion-row.tsx` — sale prices + date inputs
+- `website/footer/page.tsx` — link label/URL edits (column title already worked)
+- `website/credentials/page.tsx` — credential title (Enter blurs to trigger existing onBlur save)
+- `website/team/page.tsx` — name + role inputs (excerpt textarea skipped)
+
+### Quick Sale Dialog
+- `marketing/promotions/_components/quick-sale-dialog.tsx` — discount value input (date inputs skipped)
+
+---
+
 ## fix: POS transaction search handles phone variations and partial receipt numbers — 2026-03-19
 
 - **Root cause**: `api/pos/transactions/search/route.ts` had flawed branching — all-digit input (e.g. `4243637450`) only tried exact receipt match, never phone search. Receipt used `.eq()` (exact) so `6201` couldn't find `SD-006201`. Non-numeric input like `SD-006201` only tried phone search, never receipt.

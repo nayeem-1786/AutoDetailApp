@@ -97,17 +97,17 @@ export default function HeroSlideEditorPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={(e) => { e.preventDefault(); save(); }} className="space-y-6">
       <PageHeader
         title="Edit Slide"
         description={slide.title || 'Untitled'}
         action={
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => router.push('/admin/website/hero')}>
+            <Button type="button" variant="outline" onClick={() => router.push('/admin/website/hero')}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
-            <Button onClick={save} disabled={saving}>
+            <Button type="submit" disabled={saving}>
               {saving ? <><Spinner size="sm" /> Saving...</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
             </Button>
           </div>
@@ -326,7 +326,7 @@ export default function HeroSlideEditorPage() {
 
       {/* Color Overrides */}
       <ColorOverridesSection slide={slide} update={update} />
-    </div>
+    </form>
   );
 }
 

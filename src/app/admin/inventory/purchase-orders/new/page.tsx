@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import type { Vendor, Product } from '@/lib/supabase/types';
 import { formatCurrency } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
@@ -40,6 +41,7 @@ export default function NewPurchaseOrderPage() {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<POLineItem[]>([]);
   const [productSearch, setProductSearch] = useState('');
+  const enterSubmit = useEnterSubmit(() => submitForm('ordered'), !saving);
 
   useEffect(() => {
     async function load() {
@@ -277,6 +279,7 @@ export default function NewPurchaseOrderPage() {
                           value={item.quantity_ordered}
                           onChange={(e) => updateItem(idx, 'quantity_ordered', parseInt(e.target.value) || 1)}
                           className="w-20"
+                          {...enterSubmit}
                         />
                       </td>
                       <td className="py-2">
@@ -287,6 +290,7 @@ export default function NewPurchaseOrderPage() {
                           value={item.unit_cost}
                           onChange={(e) => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)}
                           className="w-24"
+                          {...enterSubmit}
                         />
                       </td>
                       <td className="py-2 text-right font-medium">

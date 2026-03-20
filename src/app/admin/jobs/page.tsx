@@ -236,6 +236,11 @@ export default function AdminJobsPage() {
         <SearchInput
           value={search}
           onChange={setSearch}
+          onEnter={() => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            setDebouncedSearch(search);
+            setPage(1);
+          }}
           placeholder="Search customer..."
           className="w-64"
         />

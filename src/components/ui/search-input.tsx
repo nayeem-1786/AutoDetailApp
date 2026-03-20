@@ -8,9 +8,10 @@ interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
   value: string;
   onChange: (value: string) => void;
   onClear?: () => void;
+  onEnter?: () => void;
 }
 
-function SearchInput({ value, onChange, onClear, className, placeholder = 'Search...', ...props }: SearchInputProps) {
+function SearchInput({ value, onChange, onClear, onEnter, className, placeholder = 'Search...', ...props }: SearchInputProps) {
   return (
     <div className={cn('relative', className)}>
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ui-text-dim" />
@@ -18,6 +19,12 @@ function SearchInput({ value, onChange, onClear, className, placeholder = 'Searc
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onEnter ? (e) => {
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            onEnter();
+          }
+        } : undefined}
         placeholder={placeholder}
         className="h-9 w-full rounded-md border border-ui-input-border bg-ui-input-bg pl-9 pr-8 text-sm text-ui-text shadow-sm placeholder:text-ui-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring focus-visible:ring-offset-1"
         {...props}

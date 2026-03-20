@@ -249,25 +249,25 @@ export default function ThemeEditorPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={(e) => { e.preventDefault(); save(); }} className="space-y-6">
       <PageHeader
         title="Edit Theme"
         description={theme.name}
         action={
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => router.push('/admin/website/themes')}>
+            <Button type="button" variant="outline" onClick={() => router.push('/admin/website/themes')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Button>
-            <Button variant="outline" onClick={handlePreview}>
+            <Button type="button" variant="outline" onClick={handlePreview}>
               <Eye className="mr-2 h-4 w-4" /> Preview
             </Button>
-            <Button variant="outline" onClick={handleExport}>
+            <Button type="button" variant="outline" onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" /> Export
             </Button>
-            <Button variant="outline" onClick={handleImport}>
+            <Button type="button" variant="outline" onClick={handleImport}>
               <Upload className="mr-2 h-4 w-4" /> Import
             </Button>
-            <Button onClick={save} disabled={saving}>
+            <Button type="submit" disabled={saving}>
               {saving ? <><Spinner size="sm" /> Saving...</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
             </Button>
           </div>
@@ -624,6 +624,6 @@ export default function ThemeEditorPage() {
           label="Hero Background Image (optional)"
         />
       </div>
-    </div>
+    </form>
   );
 }

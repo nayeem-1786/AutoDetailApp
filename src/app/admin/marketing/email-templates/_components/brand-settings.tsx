@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ export function BrandSettings() {
   const [saving, setSaving] = useState(false);
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(initial);
+  const enterSubmitProps = useEnterSubmit(handleSave, !saving && !loading);
 
   useEffect(() => {
     loadBrandKit();
@@ -133,24 +135,28 @@ export function BrandSettings() {
               description="Header background and primary buttons"
               value={settings.primary_color}
               onChange={(v) => updateField('primary_color', v)}
+              enterSubmitProps={enterSubmitProps}
             />
             <ColorField
               label="Accent Color"
               description="Secondary buttons and link highlights"
               value={settings.accent_color}
               onChange={(v) => updateField('accent_color', v)}
+              enterSubmitProps={enterSubmitProps}
             />
             <ColorField
               label="Text Color"
               description="Body text color"
               value={settings.text_color}
               onChange={(v) => updateField('text_color', v)}
+              enterSubmitProps={enterSubmitProps}
             />
             <ColorField
               label="Background Color"
               description="Outer email background"
               value={settings.bg_color}
               onChange={(v) => updateField('bg_color', v)}
+              enterSubmitProps={enterSubmitProps}
             />
           </div>
         </CardContent>
@@ -189,6 +195,7 @@ export function BrandSettings() {
               value={settings.logo_url}
               onChange={(e) => updateField('logo_url', e.target.value)}
               placeholder={receiptLogoUrl || 'https://...'}
+              {...enterSubmitProps}
             />
           </FormField>
           <FormField label="Logo Width (px)" htmlFor="logo-width">
@@ -200,6 +207,7 @@ export function BrandSettings() {
               step={10}
               value={settings.logo_width}
               onChange={(e) => updateField('logo_width', parseInt(e.target.value, 10) || 200)}
+              {...enterSubmitProps}
             />
           </FormField>
           {effectiveLogoUrl && (
@@ -229,6 +237,7 @@ export function BrandSettings() {
                 value={settings.social_google}
                 onChange={(e) => updateField('social_google', e.target.value)}
                 placeholder="https://g.page/..."
+                {...enterSubmitProps}
               />
             </FormField>
             <FormField label="Yelp Page URL" htmlFor="social-yelp">
@@ -238,6 +247,7 @@ export function BrandSettings() {
                 value={settings.social_yelp}
                 onChange={(e) => updateField('social_yelp', e.target.value)}
                 placeholder="https://yelp.com/biz/..."
+                {...enterSubmitProps}
               />
             </FormField>
             <FormField label="Instagram URL" htmlFor="social-instagram">
@@ -247,6 +257,7 @@ export function BrandSettings() {
                 value={settings.social_instagram}
                 onChange={(e) => updateField('social_instagram', e.target.value)}
                 placeholder="https://instagram.com/..."
+                {...enterSubmitProps}
               />
             </FormField>
             <FormField label="Facebook URL" htmlFor="social-facebook">
@@ -256,6 +267,7 @@ export function BrandSettings() {
                 value={settings.social_facebook}
                 onChange={(e) => updateField('social_facebook', e.target.value)}
                 placeholder="https://facebook.com/..."
+                {...enterSubmitProps}
               />
             </FormField>
           </div>
@@ -274,6 +286,7 @@ export function BrandSettings() {
               value={settings.footer_text}
               onChange={(e) => updateField('footer_text', e.target.value)}
               placeholder="e.g., Proudly serving the South Bay since 2020"
+              {...enterSubmitProps}
             />
           </FormField>
         </CardContent>
@@ -294,11 +307,13 @@ function ColorField({
   description,
   value,
   onChange,
+  enterSubmitProps,
 }: {
   label: string;
   description: string;
   value: string;
   onChange: (value: string) => void;
+  enterSubmitProps?: { onKeyDown: (e: React.KeyboardEvent) => void };
 }) {
   const id = label.toLowerCase().replace(/\s+/g, '-');
   return (
@@ -317,6 +332,7 @@ function ColorField({
           onChange={(e) => onChange(e.target.value)}
           placeholder="#000000"
           className="flex-1 font-mono"
+          {...enterSubmitProps}
         />
       </div>
     </FormField>

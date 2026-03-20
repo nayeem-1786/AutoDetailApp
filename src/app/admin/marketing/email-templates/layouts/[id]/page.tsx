@@ -155,13 +155,13 @@ export default function LayoutEditorPage() {
         title={`Edit Layout: ${layout.name}`}
         description={layout.description || undefined}
         action={
-          <Button variant="outline" onClick={() => router.push('/admin/marketing/email-templates/layouts')}>
+          <Button type="button" variant="outline" onClick={() => router.push('/admin/marketing/email-templates/layouts')}>
             Back to Layouts
           </Button>
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="grid gap-6 lg:grid-cols-2">
         {/* Left: Settings */}
         <div className="space-y-6">
           {/* Color Overrides */}
@@ -192,6 +192,7 @@ export default function LayoutEditorPage() {
                   />
                   {layout.color_overrides[key] && (
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => updateColorOverride(key, '')}
@@ -271,10 +272,10 @@ export default function LayoutEditorPage() {
 
           {/* Save */}
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={loadPreview} disabled={previewLoading}>
+            <Button type="button" variant="outline" onClick={loadPreview} disabled={previewLoading}>
               {previewLoading ? 'Loading...' : 'Refresh Preview'}
             </Button>
-            <Button onClick={handleSave} disabled={saving || !isDirty}>
+            <Button type="submit" disabled={saving || !isDirty}>
               {saving ? <><Spinner size="sm" className="mr-2" /> Saving...</> : 'Save Changes'}
             </Button>
           </div>
@@ -306,7 +307,7 @@ export default function LayoutEditorPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

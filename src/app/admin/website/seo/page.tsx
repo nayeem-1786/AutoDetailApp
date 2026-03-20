@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { SITE_URL } from '@/lib/utils/constants';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import type { PageSeo } from '@/lib/supabase/types';
 import {
   Search,
@@ -425,6 +426,8 @@ function PageEditor({
     }
   };
 
+  const enterSubmit = useEnterSubmit(handleSave, !saving);
+
   return (
     <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-5 space-y-5">
       {/* Live Score + AI Optimize */}
@@ -498,6 +501,7 @@ function PageEditor({
           onChange={(e) => setForm((prev) => ({ ...prev, seo_title: e.target.value }))}
           placeholder="Enter an SEO title (50-60 characters ideal)"
           className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          {...enterSubmit}
         />
       </div>
 
@@ -540,6 +544,7 @@ function PageEditor({
           }
           placeholder="Enter a focus keyword"
           className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          {...enterSubmit}
         />
         {fk && (
           <div className="mt-2 flex flex-wrap gap-3">
@@ -563,6 +568,7 @@ function PageEditor({
           }
           placeholder="keyword1, keyword2, keyword3"
           className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          {...enterSubmit}
         />
       </div>
 
@@ -581,6 +587,7 @@ function PageEditor({
             }
             placeholder={`${SITE_URL}/...`}
             className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            {...enterSubmit}
           />
         </div>
 
@@ -623,6 +630,7 @@ function PageEditor({
               }
               placeholder={form.seo_title || 'Same as SEO title'}
               className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              {...enterSubmit}
             />
           </div>
           <div>
@@ -651,6 +659,7 @@ function PageEditor({
               }
               placeholder="https://..."
               className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              {...enterSubmit}
             />
           </div>
         </div>

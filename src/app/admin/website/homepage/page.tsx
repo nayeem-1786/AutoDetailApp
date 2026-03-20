@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import {
   Save, Plus, Trash2, GripVertical, ChevronUp, ChevronDown,
   Truck, Shield, Leaf, Star, Phone, Mail, MapPin, Clock, Globe,
@@ -195,6 +196,12 @@ export default function HomepageSettingsPage() {
     });
   };
 
+  // Enter-key-as-submit: one hook per section, all pointing to the single save handler
+  const enterSubmitCta = useEnterSubmit(save, !saving);
+  const enterSubmitSection = useEnterSubmit(save, !saving);
+  const enterSubmitDiff = useEnterSubmit(save, !saving);
+  const enterSubmitReviews = useEnterSubmit(save, !saving);
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -232,6 +239,7 @@ export default function HomepageSettingsPage() {
             onChange={(e) => setSettings((prev) => ({ ...prev, ctaTitle: e.target.value }))}
             className="mt-1 text-sm"
             placeholder="Ready to Transform Your Vehicle?"
+            {...enterSubmitCta}
           />
         </div>
         <div>
@@ -255,6 +263,7 @@ export default function HomepageSettingsPage() {
             onChange={(e) => setSettings((prev) => ({ ...prev, ctaButtonText: e.target.value }))}
             className="mt-1 text-sm"
             placeholder="Book Your Detail"
+            {...enterSubmitCta}
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -321,6 +330,7 @@ export default function HomepageSettingsPage() {
               onChange={(e) => setSettings((prev) => ({ ...prev, teamHeading: e.target.value }))}
               className="mt-1"
               placeholder="Meet the Team"
+              {...enterSubmitSection}
             />
           </div>
           <div>
@@ -332,6 +342,7 @@ export default function HomepageSettingsPage() {
               onChange={(e) => setSettings((prev) => ({ ...prev, credentialsHeading: e.target.value }))}
               className="mt-1"
               placeholder="Credentials & Awards"
+              {...enterSubmitSection}
             />
           </div>
         </div>
@@ -408,6 +419,7 @@ export default function HomepageSettingsPage() {
                       onChange={(e) => updateDiff(idx, 'title', e.target.value)}
                       placeholder="e.g. Mobile Service"
                       className="text-sm"
+                      {...enterSubmitDiff}
                     />
                   </div>
                   <div>
@@ -417,6 +429,7 @@ export default function HomepageSettingsPage() {
                       onChange={(e) => updateDiff(idx, 'description', e.target.value)}
                       placeholder="Short description..."
                       className="text-sm"
+                      {...enterSubmitDiff}
                     />
                   </div>
                 </div>
@@ -465,6 +478,7 @@ export default function HomepageSettingsPage() {
             onChange={(e) => setSettings((prev) => ({ ...prev, googlePlaceId: e.target.value }))}
             placeholder="e.g. ChIJ..."
             className="font-mono text-sm"
+            {...enterSubmitReviews}
           />
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -151,6 +152,7 @@ export default function ShippingSettingsPage() {
   const [addressMessages, setAddressMessages] = useState<string[]>([]);
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(initial);
+  const enterSubmit = useEnterSubmit(handleSave, !saving);
 
   const updateField = useCallback(<K extends keyof ShippingFormData>(key: K, value: ShippingFormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -456,6 +458,7 @@ export default function ShippingSettingsPage() {
                 onChange={(e) => updateField('shippo_api_key_test', e.target.value)}
                 placeholder="shippo_test_..."
                 className="pr-10"
+                {...enterSubmit}
               />
               <button
                 type="button"
@@ -481,6 +484,7 @@ export default function ShippingSettingsPage() {
                 onChange={(e) => updateField('shippo_api_key_live', e.target.value)}
                 placeholder="shippo_live_..."
                 className="pr-10"
+                {...enterSubmit}
               />
               <button
                 type="button"
@@ -553,6 +557,7 @@ export default function ShippingSettingsPage() {
                 value={form.ship_from_name}
                 onChange={(e) => updateField('ship_from_name', e.target.value)}
                 placeholder="Business Name"
+                {...enterSubmit}
               />
             </FormField>
 
@@ -562,6 +567,7 @@ export default function ShippingSettingsPage() {
                 value={form.ship_from_company}
                 onChange={(e) => updateField('ship_from_company', e.target.value)}
                 placeholder="Company (optional)"
+                {...enterSubmit}
               />
             </FormField>
           </div>
@@ -572,6 +578,7 @@ export default function ShippingSettingsPage() {
               value={form.ship_from_street1}
               onChange={(e) => updateField('ship_from_street1', e.target.value)}
               placeholder="123 Main St"
+              {...enterSubmit}
             />
           </FormField>
 
@@ -581,6 +588,7 @@ export default function ShippingSettingsPage() {
               value={form.ship_from_street2}
               onChange={(e) => updateField('ship_from_street2', e.target.value)}
               placeholder="Suite, Unit, etc. (optional)"
+              {...enterSubmit}
             />
           </FormField>
 
@@ -591,6 +599,7 @@ export default function ShippingSettingsPage() {
                 value={form.ship_from_city}
                 onChange={(e) => updateField('ship_from_city', e.target.value)}
                 placeholder="City"
+                {...enterSubmit}
               />
             </FormField>
 
@@ -612,6 +621,7 @@ export default function ShippingSettingsPage() {
                 value={form.ship_from_zip}
                 onChange={(e) => updateField('ship_from_zip', e.target.value)}
                 placeholder="90717"
+                {...enterSubmit}
               />
             </FormField>
 
@@ -621,6 +631,7 @@ export default function ShippingSettingsPage() {
                 value={form.ship_from_country}
                 onChange={(e) => updateField('ship_from_country', e.target.value)}
                 disabled
+                {...enterSubmit}
               />
             </FormField>
           </div>
@@ -632,6 +643,7 @@ export default function ShippingSettingsPage() {
                 value={form.ship_from_phone}
                 onChange={(e) => updateField('ship_from_phone', e.target.value)}
                 placeholder="(310) 555-1234"
+                {...enterSubmit}
               />
             </FormField>
 
@@ -642,6 +654,7 @@ export default function ShippingSettingsPage() {
                 value={form.ship_from_email}
                 onChange={(e) => updateField('ship_from_email', e.target.value)}
                 placeholder="shipping@example.com"
+                {...enterSubmit}
               />
             </FormField>
           </div>
@@ -702,6 +715,7 @@ export default function ShippingSettingsPage() {
                 min="0"
                 value={form.default_parcel_length}
                 onChange={(e) => updateField('default_parcel_length', e.target.value)}
+                {...enterSubmit}
               />
             </FormField>
 
@@ -713,6 +727,7 @@ export default function ShippingSettingsPage() {
                 min="0"
                 value={form.default_parcel_width}
                 onChange={(e) => updateField('default_parcel_width', e.target.value)}
+                {...enterSubmit}
               />
             </FormField>
 
@@ -724,6 +739,7 @@ export default function ShippingSettingsPage() {
                 min="0"
                 value={form.default_parcel_height}
                 onChange={(e) => updateField('default_parcel_height', e.target.value)}
+                {...enterSubmit}
               />
             </FormField>
 
@@ -748,6 +764,7 @@ export default function ShippingSettingsPage() {
                 min="0"
                 value={form.default_parcel_weight}
                 onChange={(e) => updateField('default_parcel_weight', e.target.value)}
+                {...enterSubmit}
               />
             </FormField>
 
@@ -924,6 +941,7 @@ export default function ShippingSettingsPage() {
                     value={form.free_shipping_threshold}
                     onChange={(e) => updateField('free_shipping_threshold', e.target.value)}
                     className="pl-7"
+                    {...enterSubmit}
                   />
                 </div>
               </FormField>
@@ -956,6 +974,7 @@ export default function ShippingSettingsPage() {
                     value={form.flat_rate_amount}
                     onChange={(e) => updateField('flat_rate_amount', e.target.value)}
                     className="pl-7"
+                    {...enterSubmit}
                   />
                 </div>
               </FormField>
@@ -997,6 +1016,7 @@ export default function ShippingSettingsPage() {
                     value={form.handling_fee_amount}
                     onChange={(e) => updateField('handling_fee_amount', e.target.value)}
                     className={form.handling_fee_type === 'flat' ? 'pl-7' : ''}
+                    {...enterSubmit}
                   />
                   {form.handling_fee_type === 'percent' && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
@@ -1079,6 +1099,7 @@ export default function ShippingSettingsPage() {
                   value={form.local_pickup_address}
                   onChange={(e) => updateField('local_pickup_address', e.target.value)}
                   placeholder="123 Main St, Lomita, CA 90717"
+                  {...enterSubmit}
                 />
               </FormField>
 

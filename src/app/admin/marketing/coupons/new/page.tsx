@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Plus, X, Info, AlertTriangle } from 'lucide-react';
 import type { CouponReward } from '@/lib/supabase/types';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -832,6 +833,11 @@ export default function NewCouponPage() {
   const canNext = stepIndex < STEPS.length - 1;
   const canPrev = stepIndex > 0;
 
+  const enterSubmit = useEnterSubmit(
+    () => { canNext ? goNext() : handleCreate(); },
+    !creating,
+  );
+
   async function goNext() {
     if (!canNext) return;
 
@@ -1219,6 +1225,7 @@ export default function NewCouponPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Spring Booster Bundle"
+                  {...enterSubmit}
                 />
               </FormField>
 
@@ -1249,6 +1256,7 @@ export default function NewCouponPage() {
                         }}
                         placeholder="e.g. SPRING25"
                         className={`font-mono uppercase ${codeError ? 'border-red-500' : ''}`}
+                        {...enterSubmit}
                       />
                     </FormField>
                   </div>
@@ -1793,6 +1801,7 @@ export default function NewCouponPage() {
                       value={minPurchase}
                       onChange={(e) => setMinPurchase(e.target.value)}
                       placeholder="No minimum"
+                      {...enterSubmit}
                     />
                   </FormField>
 
@@ -1810,6 +1819,7 @@ export default function NewCouponPage() {
                       value={maxCustomerVisits}
                       onChange={(e) => setMaxCustomerVisits(e.target.value)}
                       placeholder="No limit"
+                      {...enterSubmit}
                     />
                   </FormField>
                 </div>
@@ -2024,6 +2034,7 @@ export default function NewCouponPage() {
                               ? 'e.g. 20'
                               : 'e.g. 10.00'
                           }
+                          {...enterSubmit}
                         />
                       </FormField>
                     )}
@@ -2045,6 +2056,7 @@ export default function NewCouponPage() {
                             updateReward(reward.id, 'maxDiscount', e.target.value)
                           }
                           placeholder="No cap"
+                          {...enterSubmit}
                         />
                       </FormField>
                     )}
@@ -2084,6 +2096,7 @@ export default function NewCouponPage() {
                   type="datetime-local"
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
+                  {...enterSubmit}
                 />
               </FormField>
 
@@ -2113,6 +2126,7 @@ export default function NewCouponPage() {
                   value={maxUses}
                   onChange={(e) => setMaxUses(e.target.value)}
                   placeholder="Unlimited"
+                  {...enterSubmit}
                 />
               </FormField>
             </div>

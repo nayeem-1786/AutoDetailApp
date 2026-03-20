@@ -12,6 +12,8 @@ interface DripStepsEditorProps {
   emailTemplates: Array<{ id: string; name: string; subject: string }>;
   coupons: Array<{ id: string; code: string; name: string | null }>;
   sequences: Array<{ id: string; name: string }>;
+  onSave: () => void;
+  saving: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────
@@ -22,6 +24,8 @@ export function DripStepsEditor({
   emailTemplates,
   coupons,
   sequences,
+  onSave,
+  saving,
 }: DripStepsEditorProps) {
   function handleStepChange(index: number, updated: StepFormData) {
     const next = [...steps];
@@ -74,6 +78,8 @@ export function DripStepsEditor({
             emailTemplates={emailTemplates}
             coupons={coupons}
             sequences={sequences}
+            onSave={onSave}
+            saving={saving}
           />
         </div>
       ))}

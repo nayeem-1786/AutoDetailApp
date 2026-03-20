@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { formatCurrency } from '@/lib/utils/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -85,6 +86,8 @@ export default function AdminOrderDetailPage() {
 
   // Notes
   const [internalNotes, setInternalNotes] = useState('');
+
+  const enterSubmitFulfillment = useEnterSubmit(handleSaveFulfillment, !saving);
 
   // Refund dialog
   const [showRefund, setShowRefund] = useState(false);
@@ -368,6 +371,7 @@ export default function AdminOrderDetailPage() {
                       value={shippingCarrier}
                       onChange={(e) => setShippingCarrier(e.target.value)}
                       placeholder="e.g. USPS, UPS, FedEx"
+                      {...enterSubmitFulfillment}
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
                     />
                   </div>
@@ -378,6 +382,7 @@ export default function AdminOrderDetailPage() {
                       value={trackingNumber}
                       onChange={(e) => setTrackingNumber(e.target.value)}
                       placeholder="Tracking number"
+                      {...enterSubmitFulfillment}
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
                     />
                   </div>
@@ -388,6 +393,7 @@ export default function AdminOrderDetailPage() {
                       value={trackingUrl}
                       onChange={(e) => setTrackingUrl(e.target.value)}
                       placeholder="https://..."
+                      {...enterSubmitFulfillment}
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
                     />
                   </div>

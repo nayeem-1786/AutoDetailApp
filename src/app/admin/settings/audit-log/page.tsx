@@ -218,6 +218,7 @@ export default function AuditLogPage() {
         <SearchInput
           value={search}
           onChange={setSearch}
+          onEnter={() => setDebouncedSearch(search)}
           placeholder="Search by name, email..."
           className="w-full sm:w-64"
         />

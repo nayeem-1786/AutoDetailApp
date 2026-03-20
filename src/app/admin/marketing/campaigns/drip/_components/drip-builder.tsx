@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { createClient } from '@/lib/supabase/client';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { DripStepsEditor } from './drip-steps-editor';
 import type { StepFormData } from './drip-step-card';
 
@@ -276,6 +277,8 @@ export function DripBuilder({ initialData }: DripBuilderProps) {
     setTriggerValue((prev) => ({ ...prev, [key]: value }));
   }
 
+  const enterSubmitProps = useEnterSubmit(handleSave, !saving);
+
   // ── Loading state ──────────────────────────────────────────────
   if (loading) {
     return (
@@ -318,6 +321,7 @@ export function DripBuilder({ initialData }: DripBuilderProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Win-Back Lapsed Customers"
+              {...enterSubmitProps}
             />
           </FormField>
           <FormField label="Description" htmlFor="seq-desc">
@@ -374,6 +378,7 @@ export function DripBuilder({ initialData }: DripBuilderProps) {
                   )
                 }
                 placeholder="e.g. 60"
+                {...enterSubmitProps}
               />
             </FormField>
           )}
@@ -415,6 +420,7 @@ export function DripBuilder({ initialData }: DripBuilderProps) {
                   )
                 }
                 placeholder="7"
+                {...enterSubmitProps}
               />
             </FormField>
           )}
@@ -437,6 +443,7 @@ export function DripBuilder({ initialData }: DripBuilderProps) {
                 value={(triggerValue.tag as string) || ''}
                 onChange={(e) => updateTriggerValue('tag', e.target.value)}
                 placeholder="e.g. vip, ceramic-interested"
+                {...enterSubmitProps}
               />
             </FormField>
           )}
@@ -455,6 +462,8 @@ export function DripBuilder({ initialData }: DripBuilderProps) {
             emailTemplates={emailTemplates}
             coupons={coupons}
             sequences={sequences}
+            onSave={handleSave}
+            saving={saving}
           />
         </CardContent>
       </Card>

@@ -16,6 +16,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { formatCurrency } from '@/lib/utils/format';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { dateToPstStartOfDay, dateToPstEndOfDay, formatPstShortDate } from '@/lib/utils/pst-date';
 import { Search, X, Wrench, ShoppingBag, AlertTriangle, Info } from 'lucide-react';
 import type { PromotionItem, ServicePricingRow } from './promotion-row';
@@ -274,6 +275,8 @@ export function QuickSaleDialog({
     discountType === 'direct' || (typeof discountValue === 'number' && discountValue > 0)
   );
 
+  const enterSubmitDiscount = useEnterSubmit(handleApply, !applying && canApply);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogClose onClose={() => onOpenChange(false)} />
@@ -415,6 +418,7 @@ export function QuickSaleDialog({
                     placeholder="0"
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    {...enterSubmitDiscount}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
                     {discountType === 'percentage' ? '%' : '$'}
