@@ -173,7 +173,7 @@ export function EmailBlockEditor({ blocks, onChange, variables }: EmailBlockEdit
       </div>
 
       {/* Right: Properties Panel */}
-      <div className="w-[504px] shrink-0 overflow-y-auto border-l border-gray-200 bg-gray-50">
+      <div className="w-[432px] shrink-0 overflow-y-auto border-l border-gray-200 bg-gray-50">
         {selectedBlock ? (
           <BlockProperties
             block={selectedBlock}

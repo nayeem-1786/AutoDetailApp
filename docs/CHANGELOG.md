@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Email template preview — slide-over panel with auto-refresh — 2026-03-21
+
+- **Slide-over preview**: Preview button now opens a 672px slide-over panel from the right instead of an inline card below the editor. Eliminates nested scrolling issues — the slide-over scrolls naturally while the editor stays in place.
+- **Auto-height iframe**: The preview iframe auto-sizes to fit the email content height (reads `contentDocument.body.scrollHeight` on load). No more fixed 800px iframe with internal scroll.
+- **Auto-refresh**: Preview automatically re-renders 1.5 seconds after any change to blocks, layout, or subject while the slide-over is open. Removed the manual Refresh button.
+- **Right panel width**: Properties panel set to 432px (`w-[432px]`).
+
+---
+
 ## fix: Business info in emails resolved from DB, not hardcoded — 2026-03-21
 
 - **sendTemplatedEmail auto-resolve**: Business variables (`business_name`, `business_phone`, `business_email`, `business_address`, `business_website`) are now auto-injected from `getBusinessInfo()` when not provided by the caller. No email sender needs to pass business info explicitly — it's always resolved from the DB (Settings > Business Profile).

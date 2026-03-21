@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
@@ -16,6 +16,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { EmailBlockEditor } from '../_components/email-block-editor';
 import { EmailPreview } from '../_components/email-preview';
+import { SlideOver } from '@/components/ui/slide-over';
 import { VariableInserter } from '../_components/variable-inserter';
 import { getVariablesForCategory } from '@/lib/email/variables';
 import type { EmailTemplate, EmailLayout, EmailBlock, EmailTemplateCategory } from '@/lib/email/types';
@@ -57,6 +58,18 @@ export default function TemplateEditorPage() {
   const [resetting, setResetting] = useState(false);
 
   const variables: VariableDefinition[] = getVariablesForCategory(category);
+
+  // Auto-refresh preview when blocks/layout/subject change while preview is open
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!showPreview) return;
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(() => {
+      loadPreview();
+    }, 1500);
+    return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPreview, blocks, layoutId, subject]);
 
   const enterSubmitProps = useEnterSubmit(handleSave, !saving && !loading);
   const enterTestSendProps = useEnterSubmit(handleTestSend, !testSending && !!testEmail);
@@ -351,11 +364,11 @@ export default function TemplateEditorPage() {
           <Button
             variant="outline"
             onClick={() => {
-              setShowPreview(!showPreview);
-              if (!showPreview) loadPreview();
+              setShowPreview(true);
+              loadPreview();
             }}
           >
-            {showPreview ? 'Hide Preview' : 'Preview'}
+            Preview
           </Button>
           <Button variant="outline" onClick={() => setTestSendOpen(true)}>
             Send Test
@@ -366,20 +379,15 @@ export default function TemplateEditorPage() {
         </Button>
       </div>
 
-      {/* Preview Panel */}
-      {showPreview && (
-        <Card>
-          <CardContent className="p-0">
-            <div className="h-[700px]">
-              <EmailPreview
-                html={previewHtml}
-                loading={previewLoading}
-                onRefresh={loadPreview}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Preview Slide-Over */}
+      <SlideOver
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        title="Email Preview"
+        width="2xl"
+      >
+        <EmailPreview html={previewHtml} loading={previewLoading} />
+      </SlideOver>
 
       {/* Test Send Dialog */}
       <Dialog open={testSendOpen} onOpenChange={setTestSendOpen}>
