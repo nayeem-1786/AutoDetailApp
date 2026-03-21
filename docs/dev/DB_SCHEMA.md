@@ -410,6 +410,7 @@ idx_refund_items_refund — btree (refund_id)
 | discount_amount | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | |
 | total_amount | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | |
 | job_notes | TEXT | | |
+| reminder_sent_at | TIMESTAMPTZ | DEFAULT NULL | Prevents duplicate booking reminders |
 | payment_type | TEXT | CHECK ('deposit','pay_on_site','full') | |
 | deposit_amount | DECIMAL(10,2) | | |
 | created_at | TIMESTAMPTZ | | |
@@ -1373,7 +1374,7 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK, default gen_random_uuid() | |
-| template_key | TEXT | UNIQUE | NULL for custom; `booking_confirmation`, `review_request`, etc. for system |
+| template_key | TEXT | UNIQUE | NULL for custom; `booking_confirmation`, `booking_reminder`, `booking_cancellation`, `review_request`, etc. for system |
 | category | TEXT | NOT NULL, CHECK IN ('transactional','review','marketing','notification') | |
 | name | TEXT | NOT NULL | Human-readable: "Booking Confirmation" |
 | subject | TEXT | NOT NULL | Subject line with {variables} |

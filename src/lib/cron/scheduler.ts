@@ -114,6 +114,7 @@ export function setupCronJobs() {
     { name: 'cleanup-orders', expr: '0 */6 * * *', fn: () => runJob('cleanup-orders', '/api/cron/cleanup-orders') },
     { name: 'cleanup-idempotency', expr: '0 11 * * *', fn: () => runJob('cleanup-idempotency', '/api/cron/cleanup-idempotency') },
     { name: 'cleanup-audit-log', expr: '30 11 * * *', fn: () => runJob('cleanup-audit-log', '/api/cron/cleanup-audit-log') },
+    { name: 'booking-reminders', expr: '0 16 * * *', fn: () => runJob('booking-reminders', '/api/cron/booking-reminders') },
   ];
 
   // Stagger task starts 2s apart to avoid aligned schedule bursts
@@ -134,4 +135,5 @@ export function setupCronJobs() {
   console.log('  - cleanup-orders: every 6 hours');
   console.log('  - cleanup-idempotency: daily at 3:00 AM PST');
   console.log('  - cleanup-audit-log: daily at 3:30 AM PST');
+  console.log('  - booking-reminders: daily at 8:00 AM PST');
 }

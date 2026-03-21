@@ -345,6 +345,7 @@ export interface Appointment {
   total_amount: number;
   cancellation_fee: number | null;
   cancellation_reason: string | null;
+  reminder_sent_at: string | null;
   job_notes: string | null;
   internal_notes: string | null;
   created_at: string;

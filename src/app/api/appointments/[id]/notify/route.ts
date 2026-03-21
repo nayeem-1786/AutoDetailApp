@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sendEmail } from '@/lib/utils/email';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
@@ -88,6 +89,49 @@ export async function POST(
       if (!customer.email) {
         errors.push('Customer has no email address');
       } else {
+        // Pre-render services table for template variable
+        const serviceRowsHtml = services
+          .map((s) => `<tr>
+            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${s.tier_name ? ` <span style="color: #6b7280;">(${s.tier_name})</span>` : ''}</td>
+            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(s.price_at_booking)}</td>
+          </tr>`)
+          .join('');
+
+        const servicesTableHtml = services.length > 0
+          ? `<table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background-color: #f3f4f6;">
+                  <th style="padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Service</th>
+                  <th style="padding: 10px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Price</th>
+                </tr>
+              </thead>
+              <tbody>${serviceRowsHtml}</tbody>
+            </table>`
+          : '';
+
+        // Template-first path
+        const templated = await sendTemplatedEmail(customer.email, 'appointment_confirmed', {
+          first_name: customer.first_name,
+          last_name: customer.last_name,
+          customer_name: `${customer.first_name} ${customer.last_name}`,
+          appointment_date: dateStr,
+          appointment_time: displayTime,
+          appointment_total: formatCurrency(appointment.total_amount),
+          vehicle_info: vehicleStr,
+          services_list: serviceNames,
+          items_table: servicesTableHtml,
+          business_name: business.name,
+          business_phone: business.phone,
+          business_email: business.email || '',
+          business_address: business.address,
+          business_website: business.website || '',
+        });
+
+        if (templated.usedTemplate) {
+          if (templated.success) sentVia.push('email');
+          else errors.push(templated.error || 'Template email failed');
+        } else {
+        // Hardcoded HTML fallback — kept for uncustomized system template
         const serviceLines = services
           .map((s) => `  ${s.service?.name || 'Service'}${s.tier_name ? ` (${s.tier_name})` : ''} — ${formatCurrency(s.price_at_booking)}`)
           .join('\n');
@@ -207,6 +251,7 @@ Thank you for choosing ${business.name}!`;
         } else {
           errors.push(result.error);
         }
+        } // end hardcoded fallback else
       }
     }
 

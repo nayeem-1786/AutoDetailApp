@@ -75,6 +75,7 @@ export type Database = {
           mobile_surcharge: number | null
           mobile_zone_id: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
+          reminder_sent_at: string | null
           scheduled_date: string
           scheduled_end_time: string
           scheduled_start_time: string
@@ -104,6 +105,7 @@ export type Database = {
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          reminder_sent_at?: string | null
           scheduled_date: string
           scheduled_end_time: string
           scheduled_start_time: string
@@ -133,6 +135,7 @@ export type Database = {
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          reminder_sent_at?: string | null
           scheduled_date?: string
           scheduled_end_time?: string
           scheduled_start_time?: string

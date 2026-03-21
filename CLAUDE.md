@@ -193,6 +193,7 @@ All core build phases complete. App is in active daily use with ongoing refineme
 | Stock alerts | Daily 8 AM PST | `/api/cron/stock-alerts` |
 | QBO auto-sync | Every 30 min | `/api/cron/qbo-sync` |
 | Order cleanup | Every 6 hours | `/api/cron/cleanup-orders` |
+| Booking reminders | Daily 8 AM PST | `/api/cron/booking-reminders` |
 | Audit log cleanup | Daily 3:30 AM PST | `/api/cron/cleanup-audit-log` |
 
 ## Production Env Vars (Required)

@@ -7,6 +7,7 @@ import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { sendCancellationEmail } from '@/lib/email/send-cancellation-email';
 
 const TERMINAL_STATUSES = ['completed', 'cancelled'];
 
@@ -82,6 +83,11 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    // Send cancellation email (non-blocking)
+    sendCancellationEmail(id, data.cancellation_reason).catch(err =>
+      console.error('Cancellation email failed (non-blocking):', err)
+    );
 
     // Fire cancellation webhook
     fireWebhook('appointment_cancelled', {

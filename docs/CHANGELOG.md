@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Transactional email templates — booking confirmation, reminder, cancellation — 2026-03-20
+
+- **Public booking confirmation** (`api/appointments/[id]/notify/route.ts`): Added template-first path matching the POS pattern. Attempts `sendTemplatedEmail('appointment_confirmed', ...)` before falling back to hardcoded HTML. Until admin customizes the template, the existing hardcoded email continues to send.
+- **Booking reminder** (new cron `api/cron/booking-reminders/route.ts`): Sends reminder emails for tomorrow's appointments (pending/confirmed) at 8 AM PST daily. Uses `booking_reminder` template (seeded with `is_customized = true` — works immediately). Added `reminder_sent_at` column to `appointments` table for dedup.
+- **Booking cancellation** (new helper `lib/email/send-cancellation-email.ts`): Sends cancellation email via `booking_cancellation` template when appointments are cancelled from admin or customer portal. Non-blocking — errors are logged but don't fail the cancel operation.
+- **Migration**: Seeds `booking_reminder` and `booking_cancellation` templates with block content, assigns trigger keys, adds `reminder_sent_at` column.
+- **Cron registration**: Added `booking-reminders` to `scheduler.ts` (daily at `0 16 * * *` = 8 AM PST).
+
+---
+
 ## fix: Stray "0" on public receipt when loyalty_discount is zero — 2026-03-20
 
 - **Root cause**: `receipt/[token]/page.tsx:276` used `{tx.loyalty_discount && tx.loyalty_discount > 0 && (...)}`. When `loyalty_discount` is `0` (not null), React renders the number `0` as visible text — the stray "0" below Subtotal.

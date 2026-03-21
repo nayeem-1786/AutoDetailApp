@@ -271,6 +271,7 @@ src/app/api/cron/cleanup-orders/route.ts
 src/app/api/cron/google-reviews/route.ts
 src/app/api/cron/lifecycle-engine/route.ts
 src/app/api/cron/qbo-sync/route.ts
+src/app/api/cron/booking-reminders/route.ts
 src/app/api/cron/quote-reminders/route.ts
 src/app/api/cron/stock-alerts/route.ts
 src/app/api/cron/theme-activation/route.ts
@@ -840,6 +841,7 @@ src/lib/email/block-renderers.ts
 src/lib/email/layout-renderer.ts
 src/lib/email/photo-resolver.ts
 src/lib/email/template-resolver.ts
+src/lib/email/send-cancellation-email.ts
 src/lib/email/send-templated-email.ts
 src/lib/email/variables.ts
 src/lib/email/drip-engine.ts

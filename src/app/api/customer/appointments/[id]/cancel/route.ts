@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { fireWebhook } from '@/lib/utils/webhook';
+import { sendCancellationEmail } from '@/lib/email/send-cancellation-email';
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
 
@@ -84,6 +85,11 @@ export async function POST(
       console.error('Cancel appointment error:', updateErr.message);
       return NextResponse.json({ error: 'Failed to cancel appointment' }, { status: 500 });
     }
+
+    // Send cancellation email (non-blocking)
+    sendCancellationEmail(id, 'Cancelled by customer').catch(err =>
+      console.error('Cancellation email failed (non-blocking):', err)
+    );
 
     // Fire cancellation webhook
     fireWebhook('appointment_cancelled', {
