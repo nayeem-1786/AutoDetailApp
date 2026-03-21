@@ -39,6 +39,8 @@ export default function TemplateEditorPage() {
   const [blocks, setBlocks] = useState<EmailBlock[]>([]);
   const [category, setCategory] = useState<EmailTemplateCategory>('transactional');
   const [name, setName] = useState('');
+  const [couponId, setCouponId] = useState<string | null>(null);
+  const [coupons, setCoupons] = useState<{ id: string; code: string; label: string }[]>([]);
 
   // Preview state
   const [previewHtml, setPreviewHtml] = useState('');
@@ -60,7 +62,7 @@ export default function TemplateEditorPage() {
   const enterTestSendProps = useEnterSubmit(handleTestSend, !testSending && !!testEmail);
 
   const isDirty = template
-    ? JSON.stringify({ subject, previewText, layoutId, blocks, name }) !== initial
+    ? JSON.stringify({ subject, previewText, layoutId, blocks, name, couponId }) !== initial
     : false;
 
   useEffect(() => {
@@ -70,13 +72,27 @@ export default function TemplateEditorPage() {
 
   async function loadData() {
     try {
-      const [templateRes, layoutsRes] = await Promise.all([
+      const [templateRes, layoutsRes, couponsRes] = await Promise.all([
         adminFetch(`/api/admin/email-templates/${id}`, { cache: 'no-store' }),
         adminFetch('/api/admin/email-templates/layouts', { cache: 'no-store' }),
+        adminFetch('/api/marketing/coupons?status=active&limit=200', { cache: 'no-store' }),
       ]);
 
       const templateJson = await templateRes.json();
       const layoutsJson = await layoutsRes.json();
+      const couponsJson = await couponsRes.json();
+
+      // Build coupon options with discount summary
+      const couponList = (couponsJson.data || []).map((c: { id: string; code: string; coupon_rewards?: { discount_type: string; discount_value: number }[] }) => {
+        const rewardLabel = (c.coupon_rewards || []).map((r: { discount_type: string; discount_value: number }) => {
+          if (r.discount_type === 'percentage') return `${r.discount_value}% off`;
+          if (r.discount_type === 'flat') return `$${r.discount_value} off`;
+          if (r.discount_type === 'free') return 'Free';
+          return '';
+        }).filter(Boolean).join(' + ') || 'Special offer';
+        return { id: c.id, code: c.code, label: `${c.code} — ${rewardLabel}` };
+      });
+      setCoupons(couponList);
 
       const data = templateJson.data as EmailTemplate;
       setTemplate(data);
@@ -86,6 +102,7 @@ export default function TemplateEditorPage() {
       setBlocks(data.body_blocks || []);
       setCategory(data.category);
       setName(data.name);
+      setCouponId(data.coupon_id || null);
       setLayouts(layoutsJson.data || []);
 
       setInitial(JSON.stringify({
@@ -94,6 +111,7 @@ export default function TemplateEditorPage() {
         layoutId: data.layout_id,
         blocks: data.body_blocks || [],
         name: data.name,
+        couponId: data.coupon_id || null,
       }));
     } catch {
       toast.error('Failed to load template');
@@ -137,6 +155,7 @@ export default function TemplateEditorPage() {
           preview_text: previewText,
           layout_id: layoutId,
           body_blocks: blocks,
+          coupon_id: couponId,
         }),
       });
       const json = await res.json();
@@ -145,7 +164,7 @@ export default function TemplateEditorPage() {
         return;
       }
       setTemplate(json.data);
-      setInitial(JSON.stringify({ subject, previewText, layoutId, blocks, name }));
+      setInitial(JSON.stringify({ subject, previewText, layoutId, blocks, name, couponId }));
       toast.success('Template saved');
     } catch {
       toast.error('Failed to save template');
@@ -295,6 +314,18 @@ export default function TemplateEditorPage() {
                 {...enterSubmitProps}
               />
               <p className="mt-1 text-xs text-gray-400">{previewText.length}/90</p>
+            </FormField>
+            <FormField label="Attach Coupon" htmlFor="tmpl-coupon" description="Auto-resolves {coupon_code} variable">
+              <Select
+                id="tmpl-coupon"
+                value={couponId || ''}
+                onChange={(e) => setCouponId(e.target.value || null)}
+              >
+                <option value="">None</option>
+                {coupons.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </Select>
             </FormField>
           </div>
         </CardContent>

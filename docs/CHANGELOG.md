@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Template coupon picker + welcome email triggers — 2026-03-21
+
+- **Template coupon picker**: Added `coupon_id` column to `email_templates`. Any template can now have a default coupon attached via the editor UI dropdown. When the email sends, `{coupon_code}` resolves automatically from the template's coupon (unless the caller provides one — trigger-level coupons take priority).
+- **Coupon resolution in sendTemplatedEmail**: After template resolves, if `coupon_id` is set and no `coupon_code` was passed by the caller, fetches the coupon code from DB and injects it. Inactive coupons resolve to empty string.
+- **Editor UI**: "Attach Coupon" dropdown added to template settings card. Shows active coupons with code + discount summary. Template list shows green tag badge when a coupon is attached.
+- **Welcome email template**: Seeded `welcome_email` template (transactional, `is_customized = true`) with heading, welcome text, coupon block, Book Now button. Admin attaches a coupon via the picker after deployment.
+- **Welcome email triggers** (`send-welcome-email.ts`):
+  - Customer self-signup via portal (`link-account` CREATE branch)
+  - First-time booking (`book/route.ts` when `isNewCustomer = true`)
+  - Admin creates customer (`admin/customers/route.ts` POST)
+  - Admin reactivates archived customer (`admin/customers/[id]/restore/route.ts`)
+  - POS customer creation does NOT trigger (separate HMAC code path)
+
+---
+
 ## feat: Review request email template — 2026-03-20
 
 - **Migration**: Seeds `review_request` template (category: `review`, `is_customized = true`) with heading, body text, Google Review button, and follow-up text. Trigger key `review_request` assigned for lifecycle engine use.

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Select } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Tag } from 'lucide-react';
 import type { EmailTemplate, EmailTemplateCategory } from '@/lib/email/types';
 
 const CATEGORIES: { value: string; label: string }[] = [
@@ -147,6 +148,7 @@ function TemplateCard({
   onDelete?: () => void;
 }) {
   const layoutName = (template as unknown as { email_layouts?: { name: string } }).email_layouts?.name;
+  const couponCode = (template as unknown as { coupons?: { code: string } | null }).coupons?.code;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md">
@@ -171,6 +173,12 @@ function TemplateCard({
         <span>v{template.version}</span>
         {template.segment_tag && <span>Segment: {template.segment_tag}</span>}
         {template.is_customized && <span className="text-amber-500">Customized</span>}
+        {couponCode && (
+          <span className="inline-flex items-center gap-1 text-emerald-600">
+            <Tag className="h-3 w-3" />
+            {couponCode}
+          </span>
+        )}
       </div>
 
       {/* Actions */}

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     let query = admin
       .from('email_templates')
-      .select('*, email_layouts(id, name, slug)', { count: 'exact' })
+      .select('*, email_layouts(id, name, slug), coupons(id, code)', { count: 'exact' })
       .order('category')
       .order('name');
 

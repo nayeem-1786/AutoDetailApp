@@ -1374,7 +1374,7 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK, default gen_random_uuid() | |
-| template_key | TEXT | UNIQUE | NULL for custom; `booking_confirmation`, `booking_reminder`, `booking_cancellation`, `review_request`, etc. for system |
+| template_key | TEXT | UNIQUE | NULL for custom; `booking_confirmation`, `booking_reminder`, `booking_cancellation`, `review_request`, `welcome_email`, etc. for system |
 | category | TEXT | NOT NULL, CHECK IN ('transactional','review','marketing','notification') | |
 | name | TEXT | NOT NULL | Human-readable: "Booking Confirmation" |
 | subject | TEXT | NOT NULL | Subject line with {variables} |
@@ -1389,6 +1389,7 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 | version | INTEGER | NOT NULL, DEFAULT 1 | Incremented on each save |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Trigger: `update_updated_at()` |
+| coupon_id | UUID | DEFAULT NULL, FK → coupons(id) ON DELETE SET NULL | Optional default coupon — resolves {coupon_code} when sent |
 | updated_by | UUID | FK → auth.users(id) ON DELETE SET NULL | |
 
 ### email_template_assignments

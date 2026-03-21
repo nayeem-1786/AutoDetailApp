@@ -38,7 +38,7 @@ export async function resolveEmailTemplate(
       email_templates (
         id, template_key, category, name, subject, preview_text,
         layout_id, body_blocks, body_html, variables, segment_tag,
-        is_system, is_customized, version, created_at, updated_at, updated_by
+        is_system, is_customized, version, created_at, updated_at, updated_by, coupon_id
       )
     `)
     .eq('trigger_key', triggerKey)

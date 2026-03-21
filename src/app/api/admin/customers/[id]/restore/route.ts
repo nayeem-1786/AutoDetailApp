@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 
 export async function POST(
   request: NextRequest,
@@ -24,7 +25,7 @@ export async function POST(
     // Verify customer exists and IS archived
     const { data: customer, error: fetchError } = await supabase
       .from('customers')
-      .select('id, first_name, last_name, deleted_at, deactivated_auth_user_id')
+      .select('id, first_name, last_name, email, deleted_at, deactivated_auth_user_id')
       .eq('id', id)
       .not('deleted_at', 'is', null)
       .single();
@@ -78,6 +79,15 @@ export async function POST(
       } catch (e) {
         console.error('Failed to restore portal access:', e);
       }
+    }
+
+    // Send welcome email for reactivated customer (non-blocking)
+    if (customer.email) {
+      sendWelcomeEmail({
+        email: customer.email,
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+      }).catch(err => console.error('Welcome email failed (non-blocking):', err));
     }
 
     logAudit({

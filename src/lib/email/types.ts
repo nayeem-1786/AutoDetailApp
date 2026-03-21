@@ -171,6 +171,7 @@ export interface EmailTemplate {
   created_at: string;
   updated_at: string;
   updated_by: string | null;
+  coupon_id: string | null;
   // Joined
   layout?: EmailLayout;
 }

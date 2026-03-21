@@ -2,6 +2,7 @@
 // Resolves template → renders → sends via Mailgun
 
 import { sendEmail } from '@/lib/utils/email';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchBrandKit, renderEmail } from './layout-renderer';
 import { resolveEmailTemplate, fetchDefaultLayout } from './template-resolver';
 import type { CustomerAttributes, EmailBlock, RenderOptions, RenderedEmail } from './types';
@@ -58,6 +59,20 @@ export async function sendTemplatedEmail(
     // or is a non-system template
     if (template.is_system && !template.is_customized) {
       return { success: false, usedTemplate: false };
+    }
+
+    // 1b. Resolve template-level coupon if caller didn't provide one
+    if (template.coupon_id && !variables.coupon_code) {
+      const adminClient = createAdminClient();
+      const { data: coupon } = await adminClient
+        .from('coupons')
+        .select('code, status')
+        .eq('id', template.coupon_id)
+        .single();
+
+      if (coupon && coupon.status === 'active') {
+        variables.coupon_code = coupon.code;
+      }
     }
 
     // 2. Fetch brand kit

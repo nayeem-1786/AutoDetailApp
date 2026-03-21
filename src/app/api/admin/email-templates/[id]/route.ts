@@ -58,7 +58,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const update: Record<string, unknown> = {};
     const allowedFields = [
       'name', 'subject', 'preview_text', 'layout_id',
-      'body_blocks', 'body_html', 'variables', 'segment_tag',
+      'body_blocks', 'body_html', 'variables', 'segment_tag', 'coupon_id',
     ];
 
     for (const field of allowedFields) {

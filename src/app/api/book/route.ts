@@ -9,6 +9,7 @@ import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-deta
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
+import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -173,6 +174,15 @@ export async function POST(request: NextRequest) {
         }
         customerId = newCustomer.id;
         isNewCustomer = true;
+
+        // Send welcome email for new customers (non-blocking)
+        if (data.customer?.email) {
+          sendWelcomeEmail({
+            email: data.customer.email,
+            first_name: data.customer.first_name,
+            last_name: data.customer.last_name,
+          }).catch(err => console.error('Welcome email failed (non-blocking):', err));
+        }
 
         // Log SMS consent for new customer if opted in
         if (smsConsent) {

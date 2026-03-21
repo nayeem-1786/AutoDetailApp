@@ -843,6 +843,7 @@ src/lib/email/photo-resolver.ts
 src/lib/email/template-resolver.ts
 src/lib/email/send-cancellation-email.ts
 src/lib/email/send-templated-email.ts
+src/lib/email/send-welcome-email.ts
 src/lib/email/variables.ts
 src/lib/email/drip-engine.ts
 ```

@@ -4,6 +4,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { normalizePhone } from '@/lib/utils/format';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -133,12 +134,21 @@ export async function POST(request: NextRequest) {
         email_consent: email_consent ?? false,
         customer_type: resolvedType,
       })
-      .select('id, first_name, last_name, phone')
+      .select('id, first_name, last_name, phone, email')
       .single();
 
     if (error) {
       console.error('Admin customer create error:', error);
       return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
+    }
+
+    // Send welcome email (non-blocking)
+    if (customer.email) {
+      sendWelcomeEmail({
+        email: customer.email,
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+      }).catch(err => console.error('Welcome email failed (non-blocking):', err));
     }
 
     // Log marketing consent if given

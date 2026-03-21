@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 
 function noStoreJson(data: unknown, init?: ResponseInit) {
   return noStoreJson(data, {
@@ -158,6 +159,11 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail({ email, first_name, last_name }).catch(err =>
+      console.error('Welcome email failed (non-blocking):', err)
+    );
 
     logAudit({
       userId: user.id,
