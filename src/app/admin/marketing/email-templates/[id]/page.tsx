@@ -424,20 +424,20 @@ export default function TemplateEditorPage() {
 
       {/* Reset Confirmation Dialog */}
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogHeader>
+          <DialogTitle>Reset to Default</DialogTitle>
+        </DialogHeader>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset to Default</DialogTitle>
-          </DialogHeader>
           <p className="text-sm text-gray-500">
             This will revert all customizations to this system template. Your edits will be lost. This cannot be undone.
           </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleReset} disabled={resetting}>
-              {resetting ? <><Spinner size="sm" className="mr-2" /> Resetting...</> : 'Reset Template'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
+          <Button variant="destructive" onClick={handleReset} disabled={resetting}>
+            {resetting ? <><Spinner size="sm" className="mr-2" /> Resetting...</> : 'Reset Template'}
+          </Button>
+        </DialogFooter>
       </Dialog>
     </div>
   );
