@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Review request email template — 2026-03-20
+
+- **Migration**: Seeds `review_request` template (category: `review`, `is_customized = true`) with heading, body text, Google Review button, and follow-up text. Trigger key `review_request` assigned for lifecycle engine use.
+- **Variables**: `first_name`, `customer_name`, `service_name`, `google_review_link`, `yelp_review_link`, `business_name`, `business_phone`, `business_email`, `booking_url`, `loyalty_points`, `visit_count`.
+
+---
+
 ## feat: Transactional email templates — booking confirmation, reminder, cancellation — 2026-03-20
 
 - **Public booking confirmation** (`api/appointments/[id]/notify/route.ts`): Added template-first path matching the POS pattern. Attempts `sendTemplatedEmail('appointment_confirmed', ...)` before falling back to hardcoded HTML. Until admin customizes the template, the existing hardcoded email continues to send.
