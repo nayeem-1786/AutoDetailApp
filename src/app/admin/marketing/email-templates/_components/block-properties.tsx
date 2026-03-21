@@ -8,7 +8,6 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { VariableInserter } from './variable-inserter';
 import { PhotoGalleryPicker } from './photo-gallery-picker';
-import { TwoColumnProperties } from './two-column-properties';
 import type {
   EmailBlock,
   EmailBlockType,
@@ -21,7 +20,6 @@ import type {
   DividerBlockData,
   SpacerBlockData,
   SocialLinksBlockData,
-  TwoColumnBlockData,
   PhotoPair,
 } from '@/lib/email/types';
 import type { VariableDefinition } from '@/lib/email/variables';
@@ -71,11 +69,9 @@ export function BlockProperties({ block, variables, onChange }: BlockPropertiesP
         <SocialLinksProperties data={block.data as SocialLinksBlockData} onChange={(d) => update(d)} />
       )}
       {block.type === 'two_column' && (
-        <TwoColumnProperties
-          data={block.data as TwoColumnBlockData}
-          variables={variables}
-          onChange={(d) => update(d)}
-        />
+        <p className="text-xs text-gray-500">
+          Use the column zones below to add and arrange blocks. Click a nested block to edit its properties here.
+        </p>
       )}
     </div>
   );

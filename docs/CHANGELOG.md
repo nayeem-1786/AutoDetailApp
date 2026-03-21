@@ -4,9 +4,11 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## feat: Two-column block editor UI — 2026-03-21
+## refactor: Two-column block — inline canvas editing — 2026-03-21
 
-- **Nested block editing**: Two Column blocks now have a full editor in the properties panel. Select a Two Column block to see Left/Right column tabs, a mini block list with reorder/delete controls, an "Add block" dropdown, and inline property editing for nested blocks.
+- **Inline column zones**: Two Column blocks now expand in the center canvas to show two side-by-side column zones (Left/Right). Each zone displays nested blocks with move up/down/delete controls and an "Add block" dropdown. This replaces the previous right-panel approach, keeping layout management in the canvas and property editing in the right panel.
+- **Nested block selection**: Clicking a nested block inside a column selects it globally — its property editor appears in the right panel just like any top-level block.
+- **Removed** `two-column-properties.tsx` — no longer needed since editing is inline in the canvas.
 - **Prevents nesting**: The add-block dropdown filters out Two Column from available types, preventing unsupported nested two-column layouts.
 - **Duplicate safety**: Duplicating a Two Column block now regenerates IDs for all nested blocks to prevent key collisions.
 - **Canvas preview**: Two Column blocks in the canvas now show "Left: N | Right: N blocks" instead of generic "2-column layout".

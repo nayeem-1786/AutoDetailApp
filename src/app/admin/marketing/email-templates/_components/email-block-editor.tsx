@@ -48,7 +48,21 @@ interface EmailBlockEditorProps {
 export function EmailBlockEditor({ blocks, onChange, variables }: EmailBlockEditorProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selectedBlock = selectedId ? blocks.find((b) => b.id === selectedId) || null : null;
+  // Find selected block — check top-level first, then inside two_column blocks
+  const selectedBlock = (() => {
+    if (!selectedId) return null;
+    const topLevel = blocks.find((b) => b.id === selectedId);
+    if (topLevel) return topLevel;
+    // Search inside two_column blocks for nested selection
+    for (const block of blocks) {
+      if (block.type === 'two_column') {
+        const tcData = block.data as { left: EmailBlock[]; right: EmailBlock[] };
+        const nested = tcData.left.find(b => b.id === selectedId) || tcData.right.find(b => b.id === selectedId);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  })();
 
   const handleAdd = useCallback(
     (type: EmailBlockType) => {
@@ -113,7 +127,27 @@ export function EmailBlockEditor({ blocks, onChange, variables }: EmailBlockEdit
 
   const handleBlockChange = useCallback(
     (updatedBlock: EmailBlock) => {
-      onChange(blocks.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+      // Check if it's a top-level block
+      if (blocks.some(b => b.id === updatedBlock.id)) {
+        onChange(blocks.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+        return;
+      }
+      // Check if it's a nested block inside a two_column
+      onChange(blocks.map((b) => {
+        if (b.type !== 'two_column') return b;
+        const tcData = b.data as { left: EmailBlock[]; right: EmailBlock[] };
+        const inLeft = tcData.left.some(nb => nb.id === updatedBlock.id);
+        const inRight = tcData.right.some(nb => nb.id === updatedBlock.id);
+        if (!inLeft && !inRight) return b;
+        return {
+          ...b,
+          data: {
+            ...tcData,
+            left: inLeft ? tcData.left.map(nb => nb.id === updatedBlock.id ? updatedBlock : nb) : tcData.left,
+            right: inRight ? tcData.right.map(nb => nb.id === updatedBlock.id ? updatedBlock : nb) : tcData.right,
+          },
+        } as EmailBlock;
+      }));
     },
     [blocks, onChange]
   );
@@ -134,11 +168,12 @@ export function EmailBlockEditor({ blocks, onChange, variables }: EmailBlockEdit
           onReorder={handleReorder}
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
+          onBlockChange={handleBlockChange}
         />
       </div>
 
       {/* Right: Properties Panel */}
-      <div className="w-[576px] shrink-0 overflow-y-auto border-l border-gray-200 bg-gray-50">
+      <div className="w-[504px] shrink-0 overflow-y-auto border-l border-gray-200 bg-gray-50">
         {selectedBlock ? (
           <BlockProperties
             block={selectedBlock}
