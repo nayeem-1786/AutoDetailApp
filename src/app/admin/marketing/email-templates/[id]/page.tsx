@@ -64,9 +64,10 @@ export default function TemplateEditorPage() {
   useEffect(() => {
     if (!showPreview) return;
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    const delay = previewHtml ? 1500 : 100;
     previewTimerRef.current = setTimeout(() => {
       loadPreview();
-    }, 1500);
+    }, delay);
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showPreview, blocks, layoutId, subject]);
@@ -363,10 +364,7 @@ export default function TemplateEditorPage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => {
-              setShowPreview(true);
-              loadPreview();
-            }}
+            onClick={() => setShowPreview(true)}
           >
             Preview
           </Button>
