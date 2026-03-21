@@ -296,7 +296,8 @@ export interface SaleHistoryRecord {
   service_id: string | null;
   product_id: string | null;
   sale_name: string | null;
-  pricing_snapshot: any; // JSONB — typed per pricing model at usage
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pricing_snapshot: any; // JSONB — shape varies by pricing_model, cast at usage site
   pricing_model: string | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;

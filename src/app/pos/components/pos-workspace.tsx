@@ -128,6 +128,8 @@ export function PosWorkspace() {
         vehicle_size_sedan_price: null,
         vehicle_size_truck_suv_price: null,
         vehicle_size_suv_van_price: null,
+        max_qty: null,
+        qty_label: null,
         created_at: '',
       };
       dispatch({

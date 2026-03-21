@@ -32,6 +32,7 @@ interface TransactionWithRelations {
     standard_price: number | null;
     pricing_type: string | null;
     prerequisite_note: string | null;
+    tier_name: string | null;
   }[];
   payments: {
     id: string;
@@ -273,13 +274,13 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 </div>
               ) : null;
             })()}
-            {tx.loyalty_discount > 0 && (
+            {tx.loyalty_discount != null && tx.loyalty_discount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-site-text-muted">
                   Loyalty{tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : ''}
                 </span>
                 <span className="font-medium text-amber-400">
-                  -{formatCurrency(tx.loyalty_discount)}
+                  -{formatCurrency(tx.loyalty_discount!)}
                 </span>
               </div>
             )}

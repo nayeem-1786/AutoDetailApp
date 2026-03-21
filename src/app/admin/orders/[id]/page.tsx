@@ -87,8 +87,6 @@ export default function AdminOrderDetailPage() {
   // Notes
   const [internalNotes, setInternalNotes] = useState('');
 
-  const enterSubmitFulfillment = useEnterSubmit(handleSaveFulfillment, !saving);
-
   // Refund dialog
   const [showRefund, setShowRefund] = useState(false);
   const [refundType, setRefundType] = useState<'full' | 'partial'>('full');
@@ -137,6 +135,8 @@ export default function AdminOrderDetailPage() {
     }
     setSaving(false);
   };
+
+  const enterSubmitFulfillment = useEnterSubmit(handleSaveFulfillment, !saving);
 
   const handleSaveNotes = async () => {
     if (!order) return;

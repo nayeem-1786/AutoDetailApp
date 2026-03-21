@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
           .from('services')
           .select('id, category_id, pricing_model, flat_price, per_unit_price, sale_price, sale_starts_at, sale_ends_at, service_pricing(tier_name, price, sale_price)')
           .in('id', serviceIds)
-      : { data: [] as any[] };
+      : { data: [] as { id: string; category_id: string | null; pricing_model: string; flat_price: number | null; per_unit_price: number | null; sale_price: number | null; sale_starts_at: string | null; sale_ends_at: string | null; service_pricing: { tier_name: string; price: number; sale_price: number | null }[] }[] };
 
     const conditions: boolean[] = [];
 

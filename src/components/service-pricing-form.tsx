@@ -65,7 +65,7 @@ export function getDefaultPricingValue(model: PricingModel): PricingValue {
     case 'vehicle_size':
       return { model: 'vehicle_size', data: { sedan: '', truck_suv_2row: '', suv_3row_van: '' } };
     case 'scope':
-      return { model: 'scope', data: [{ tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '' }] };
+      return { model: 'scope', data: [{ tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', max_qty: '', qty_label: '' }] };
     case 'per_unit':
       return { model: 'per_unit', data: { per_unit_price: '', per_unit_max: '', per_unit_label: '' } };
     case 'specialty':
