@@ -21,7 +21,7 @@ interface BlockTypeConfig {
   icon: React.ReactNode;
 }
 
-const BLOCK_TYPES: BlockTypeConfig[] = [
+export const BLOCK_TYPES: BlockTypeConfig[] = [
   { type: 'heading', label: 'Heading', description: 'H1, H2, or H3 title', icon: <Heading className="h-4 w-4" /> },
   { type: 'text', label: 'Text', description: 'Rich text paragraph', icon: <Type className="h-4 w-4" /> },
   { type: 'button', label: 'Button', description: 'Call-to-action button', icon: <MousePointerClick className="h-4 w-4" /> },

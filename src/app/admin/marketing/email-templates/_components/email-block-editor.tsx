@@ -8,7 +8,7 @@ import type { EmailBlock, EmailBlockType } from '@/lib/email/types';
 import type { VariableDefinition } from '@/lib/email/variables';
 
 /** Default data for each block type */
-function defaultBlockData(type: EmailBlockType): Record<string, unknown> {
+export function defaultBlockData(type: EmailBlockType): Record<string, unknown> {
   switch (type) {
     case 'text':
       return { content: '', align: 'left' };
@@ -35,7 +35,7 @@ function defaultBlockData(type: EmailBlockType): Record<string, unknown> {
   }
 }
 
-function generateId(): string {
+export function generateId(): string {
   return `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
@@ -97,6 +97,12 @@ export function EmailBlockEditor({ blocks, onChange, variables }: EmailBlockEdit
         id: generateId(),
         data: JSON.parse(JSON.stringify(original.data)),
       };
+      // Regenerate nested block IDs for two_column to avoid duplicates
+      if (duplicate.type === 'two_column') {
+        const tcData = duplicate.data as { left: EmailBlock[]; right: EmailBlock[] };
+        tcData.left = tcData.left.map(b => ({ ...b, id: generateId() }));
+        tcData.right = tcData.right.map(b => ({ ...b, id: generateId() }));
+      }
       const updated = [...blocks];
       updated.splice(idx + 1, 0, duplicate);
       onChange(updated);

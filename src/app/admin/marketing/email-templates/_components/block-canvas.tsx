@@ -192,9 +192,12 @@ function BlockPreviewText({ block }: { block: EmailBlock }) {
     case 'social_links':
       preview = data.use_brand_kit ? 'From Brand Kit' : 'Custom links';
       break;
-    case 'two_column':
-      preview = '2-column layout';
+    case 'two_column': {
+      const tcLeft = (data.left as unknown[] | undefined) || [];
+      const tcRight = (data.right as unknown[] | undefined) || [];
+      preview = `Left: ${tcLeft.length} | Right: ${tcRight.length} blocks`;
       break;
+    }
   }
 
   if (!preview) return null;

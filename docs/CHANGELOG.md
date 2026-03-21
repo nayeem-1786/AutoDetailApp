@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Two-column block editor UI — 2026-03-21
+
+- **Nested block editing**: Two Column blocks now have a full editor in the properties panel. Select a Two Column block to see Left/Right column tabs, a mini block list with reorder/delete controls, an "Add block" dropdown, and inline property editing for nested blocks.
+- **Prevents nesting**: The add-block dropdown filters out Two Column from available types, preventing unsupported nested two-column layouts.
+- **Duplicate safety**: Duplicating a Two Column block now regenerates IDs for all nested blocks to prevent key collisions.
+- **Canvas preview**: Two Column blocks in the canvas now show "Left: N | Right: N blocks" instead of generic "2-column layout".
+- **Exports**: `generateId`, `defaultBlockData`, `BLOCK_TYPES`, and all per-type property editors are now exported for reuse.
+
+---
+
 ## feat: Template coupon picker + welcome email triggers — 2026-03-21
 
 - **Template coupon picker**: Added `coupon_id` column to `email_templates`. Any template can now have a default coupon attached via the editor UI dropdown. When the email sends, `{coupon_code}` resolves automatically from the template's coupon (unless the caller provides one — trigger-level coupons take priority).

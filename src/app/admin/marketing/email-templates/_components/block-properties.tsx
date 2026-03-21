@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { VariableInserter } from './variable-inserter';
 import { PhotoGalleryPicker } from './photo-gallery-picker';
+import { TwoColumnProperties } from './two-column-properties';
 import type {
   EmailBlock,
   EmailBlockType,
@@ -20,6 +21,7 @@ import type {
   DividerBlockData,
   SpacerBlockData,
   SocialLinksBlockData,
+  TwoColumnBlockData,
   PhotoPair,
 } from '@/lib/email/types';
 import type { VariableDefinition } from '@/lib/email/variables';
@@ -69,9 +71,11 @@ export function BlockProperties({ block, variables, onChange }: BlockPropertiesP
         <SocialLinksProperties data={block.data as SocialLinksBlockData} onChange={(d) => update(d)} />
       )}
       {block.type === 'two_column' && (
-        <div className="text-xs text-gray-500">
-          Edit the left and right columns by selecting blocks within them. Two-column blocks contain nested blocks.
-        </div>
+        <TwoColumnProperties
+          data={block.data as TwoColumnBlockData}
+          variables={variables}
+          onChange={(d) => update(d)}
+        />
       )}
     </div>
   );
@@ -79,7 +83,7 @@ export function BlockProperties({ block, variables, onChange }: BlockPropertiesP
 
 // ─── Per-type property editors ───────────────────────────────
 
-function TextProperties({
+export function TextProperties({
   data,
   variables,
   onChange,
@@ -116,7 +120,7 @@ function TextProperties({
   );
 }
 
-function HeadingProperties({
+export function HeadingProperties({
   data,
   onChange,
 }: {
@@ -149,7 +153,7 @@ function HeadingProperties({
   );
 }
 
-function ButtonProperties({
+export function ButtonProperties({
   data,
   variables,
   onChange,
@@ -192,7 +196,7 @@ function ButtonProperties({
   );
 }
 
-function ImageProperties({
+export function ImageProperties({
   data,
   onChange,
 }: {
@@ -242,7 +246,7 @@ function ImageProperties({
   );
 }
 
-function PhotoGalleryProperties({
+export function PhotoGalleryProperties({
   data,
   onChange,
 }: {
@@ -314,7 +318,7 @@ function PhotoGalleryProperties({
   );
 }
 
-function CouponProperties({
+export function CouponProperties({
   data,
   variables,
   onChange,
@@ -370,7 +374,7 @@ function CouponProperties({
   );
 }
 
-function DividerProperties({
+export function DividerProperties({
   data,
   onChange,
 }: {
@@ -410,7 +414,7 @@ function DividerProperties({
   );
 }
 
-function SpacerProperties({
+export function SpacerProperties({
   data,
   onChange,
 }: {
@@ -433,7 +437,7 @@ function SpacerProperties({
   );
 }
 
-function SocialLinksProperties({
+export function SocialLinksProperties({
   data,
   onChange,
 }: {
@@ -464,7 +468,7 @@ function SocialLinksProperties({
 
 // ─── Shared helpers ──────────────────────────────────────────
 
-function AlignSelect({
+export function AlignSelect({
   value,
   onChange,
 }: {
