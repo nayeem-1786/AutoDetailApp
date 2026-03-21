@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { formatCurrency } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import {
   Plus,

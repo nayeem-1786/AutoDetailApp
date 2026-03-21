@@ -234,7 +234,6 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote, prerequisiteForServiceId });
     }
     return true;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onAddService, dispatch, ticket.items, checkPrerequisites]);
 
   /** Handle prerequisite warning: override → add the original service */

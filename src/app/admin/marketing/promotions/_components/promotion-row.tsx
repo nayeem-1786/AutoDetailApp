@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import { timestampToPstDate } from '@/lib/utils/pst-date';
@@ -482,7 +481,6 @@ export function PromotionRow({
   };
 
   const errors = useMemo(() => getValidationErrors(item, editState), [item, editState]);
-  const dirty = useMemo(() => isDirty(item, editState), [item, editState]);
 
   const handleSave = async () => {
     if (errors.length > 0) return;

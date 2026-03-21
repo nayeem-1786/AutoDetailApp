@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { formatCurrency } from '@/lib/utils/format';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
-import { dateToPstStartOfDay, dateToPstEndOfDay, formatPstShortDate } from '@/lib/utils/pst-date';
+import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { Search, X, Wrench, ShoppingBag, AlertTriangle, Info } from 'lucide-react';
 import type { PromotionItem, ServicePricingRow } from './promotion-row';
 

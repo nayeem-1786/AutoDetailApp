@@ -834,7 +834,7 @@ export default function NewCouponPage() {
   const canPrev = stepIndex > 0;
 
   const enterSubmit = useEnterSubmit(
-    () => { canNext ? goNext() : handleCreate(); },
+    () => { if (canNext) goNext(); else handleCreate(); },
     !creating,
   );
 

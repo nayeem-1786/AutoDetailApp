@@ -12,7 +12,6 @@ import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { PinPad } from './pin-pad';
 import { resolveServicePriceWithSale } from '../utils/pricing';
-import { getSaleStatus } from '@/lib/utils/sale-pricing';
 import { getTileColors, TYPE_ICONS } from '@/lib/pos/tile-colors';
 import type { FavoriteItem, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';

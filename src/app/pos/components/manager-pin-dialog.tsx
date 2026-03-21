@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ShieldAlert, Loader2 } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PinPad } from './pin-pad';
