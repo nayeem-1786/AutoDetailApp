@@ -3,6 +3,7 @@
 
 import { sendEmail } from '@/lib/utils/email';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getBusinessInfo } from '@/lib/data/business';
 import { fetchBrandKit, renderEmail } from './layout-renderer';
 import { resolveEmailTemplate, fetchDefaultLayout } from './template-resolver';
 import type { CustomerAttributes, EmailBlock, RenderOptions, RenderedEmail } from './types';
@@ -61,7 +62,15 @@ export async function sendTemplatedEmail(
       return { success: false, usedTemplate: false };
     }
 
-    // 1b. Resolve template-level coupon if caller didn't provide one
+    // 1b. Auto-resolve business variables from DB when not provided by caller
+    const biz = await getBusinessInfo();
+    variables.business_name ??= biz.name;
+    variables.business_phone ??= biz.phone;
+    variables.business_email ??= biz.email || '';
+    variables.business_address ??= biz.address;
+    variables.business_website ??= biz.website || '';
+
+    // 1c. Resolve template-level coupon if caller didn't provide one
     if (template.coupon_id && !variables.coupon_code) {
       const adminClient = createAdminClient();
       const { data: coupon } = await adminClient

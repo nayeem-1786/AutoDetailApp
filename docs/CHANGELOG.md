@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Business info in emails resolved from DB, not hardcoded — 2026-03-21
+
+- **sendTemplatedEmail auto-resolve**: Business variables (`business_name`, `business_phone`, `business_email`, `business_address`, `business_website`) are now auto-injected from `getBusinessInfo()` when not provided by the caller. No email sender needs to pass business info explicitly — it's always resolved from the DB (Settings > Business Profile).
+- **Test send**: Overrides sample variables with real business data from DB instead of hardcoded samples.
+- **Preview**: Same treatment — real business data from DB replaces hardcoded samples.
+- **Sample values**: `variables.ts` business samples changed from hardcoded strings to `[From Settings]` to prevent confusion — these only appear in the Variable Inserter UI labels and are overridden by real data in all rendering paths.
+
+---
+
 ## refactor: Two-column block — inline canvas editing — 2026-03-21
 
 - **Inline column zones**: Two Column blocks now expand in the center canvas to show two side-by-side column zones (Left/Right). Each zone displays nested blocks with move up/down/delete controls and an "Add block" dropdown. This replaces the previous right-panel approach, keeping layout management in the canvas and property editing in the right panel.

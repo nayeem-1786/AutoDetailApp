@@ -19,11 +19,11 @@ const CUSTOMER_VARS: VariableDefinition[] = [
 ];
 
 const BUSINESS_VARS: VariableDefinition[] = [
-  { key: 'business_name', description: 'Business name', sample: 'Smart Detail Auto Spa' },
-  { key: 'business_phone', description: 'Business phone', sample: '(310) 999-0000' },
-  { key: 'business_address', description: 'Business address', sample: '2021 Lomita Blvd, Lomita, CA 90717' },
-  { key: 'business_email', description: 'Business email', sample: 'info@smartdetails.com' },
-  { key: 'business_website', description: 'Business website', sample: 'https://smartdetails.com' },
+  { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+  { key: 'business_phone', description: 'Business phone', sample: '[From Settings]' },
+  { key: 'business_address', description: 'Business address', sample: '[From Settings]' },
+  { key: 'business_email', description: 'Business email', sample: '[From Settings]' },
+  { key: 'business_website', description: 'Business website', sample: '[From Settings]' },
 ];
 
 const LINK_VARS: VariableDefinition[] = [

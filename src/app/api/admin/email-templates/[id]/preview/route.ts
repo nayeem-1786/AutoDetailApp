@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { fetchBrandKit, renderEmail } from '@/lib/email/layout-renderer';
 import { getSampleVariables } from '@/lib/email/variables';
+import { getBusinessInfo } from '@/lib/data/business';
 import type { EmailBlock, EmailLayout } from '@/lib/email/types';
 
 type Params = { params: Promise<{ id: string }> };
@@ -55,10 +56,20 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Layout not found' }, { status: 404 });
     }
 
-    // Render with sample variables
+    // Render with sample variables + real business data from DB
     const brandKit = await fetchBrandKit();
+    const biz = await getBusinessInfo();
     const sampleVars = getSampleVariables();
-    const variables = { ...sampleVars, _subject: subject, ...body.variables };
+    const variables = {
+      ...sampleVars,
+      business_name: biz.name,
+      business_phone: biz.phone,
+      business_email: biz.email || '',
+      business_address: biz.address,
+      business_website: biz.website || '',
+      _subject: subject,
+      ...body.variables,
+    };
 
     const rendered = await renderEmail(
       blocks,
