@@ -391,10 +391,10 @@ export default function TemplateEditorPage() {
 
       {/* Test Send Dialog */}
       <Dialog open={testSendOpen} onOpenChange={setTestSendOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Test Email</DialogTitle>
-          </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Send Test Email</DialogTitle>
+        </DialogHeader>
+        <DialogContent className="space-y-4">
           <p className="text-sm text-gray-500">
             Sends this template with sample variable values. Subject will be prefixed with [TEST].
           </p>
@@ -413,13 +413,13 @@ export default function TemplateEditorPage() {
               You have unsaved changes. The template will be saved before sending.
             </p>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTestSendOpen(false)}>Cancel</Button>
-            <Button onClick={handleTestSend} disabled={testSending || !testEmail}>
-              {testSending ? <><Spinner size="sm" className="mr-2" /> Sending...</> : 'Send Test'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setTestSendOpen(false)}>Cancel</Button>
+          <Button onClick={handleTestSend} disabled={testSending || !testEmail}>
+            {testSending ? <><Spinner size="sm" className="mr-2" /> Sending...</> : 'Send Test'}
+          </Button>
+        </DialogFooter>
       </Dialog>
 
       {/* Reset Confirmation Dialog */}
