@@ -186,7 +186,7 @@ Each tab saves independently. Click the relevant **Save** button after making ch
 
 - **Deactivating** — Toggle the Active switch to off on the Details tab. A confirmation dialog appears. The service becomes invisible in POS and booking but its data is preserved.
 - **Deleting** — Click the **Delete** button (requires `services.delete` permission). This also performs a soft delete (sets `is_active = false`) and redirects to the service list.
-- **Reactivating** — On the services list, inactive services show a **Reactivate** button. Click it to restore the service to active status.
+- **Reactivating** — On the services list, inactive services show an **Activate** button. Click it to restore the service to active status.
 
 ---
 
@@ -284,7 +284,7 @@ For services that require inspection before final pricing (e.g., flood damage re
 
 ### Sale Pricing
 
-Services that use the `service_pricing` table (vehicle_size, scope, and specialty models) support sale pricing. On the service edit page **Pricing** tab:
+All pricing models except custom quote support sale pricing. Tiered models (vehicle_size, scope, specialty) store sale prices in `service_pricing.sale_price`. Flat and per_unit models store sale prices in `services.sale_price`. On the service edit page **Pricing** tab:
 
 1. **Sale prices per tier** — Enter a reduced price for each tier. The sale price must be less than the standard price and greater than $0.
 2. **Discount helpers** — Instead of entering each sale price manually, use the discount controls:
@@ -313,7 +313,7 @@ A **Sale Preview** panel shows the before/after prices with savings calculations
 
 To remove all sale prices, click **Clear All Sale Prices** and confirm.
 
-> Flat-priced services do not have a sale pricing mechanism. To offer a discount on a flat-priced add-on, use the combo price on the add-on suggestion (see section 6.5).
+> Custom quote services do not have a sale pricing mechanism since their price is determined per-job.
 
 ---
 
@@ -407,6 +407,18 @@ Navigate to the service edit page and select the **Prerequisites** tab. The tab 
 | `required_same_ticket` | Required (Same Ticket) | The prerequisite service must be on the same ticket. Blocks adding the service without it. |
 | `required_history` | Required (History) | The prerequisite must exist in the vehicle's service history within the configured number of days. |
 | `recommended` | Recommended | Shows a warning message but allows proceeding. Used when the prerequisite may have been done elsewhere. |
+
+### Multiple Prerequisites (OR Logic)
+
+When a service has multiple prerequisites configured, **any one** being satisfied is sufficient. For example, if a ceramic coating requires either "Paint Correction (Single-Stage)" or "Paint Correction (3-Stage)", having either one on the ticket or in history satisfies the requirement.
+
+### POS Enforcement
+
+When the prerequisite is not met in the POS, a warning dialog appears with three options:
+
+1. **Add prerequisite to ticket** — Adds the missing service
+2. **Override** — Proceeds without the prerequisite (requires `pos.override_prerequisites` permission)
+3. **Cancel** — Aborts adding the service
 
 #### Example: Ceramic Coatings
 

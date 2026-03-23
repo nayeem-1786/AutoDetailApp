@@ -10,12 +10,12 @@ All Website management pages are accessed from **Admin** →**Website** in the l
 
 ## 7.1 Website Overview
 
-Navigate to **Admin** →**Website** to see the overview dashboard. This page displays 15 section cards organized into groups, each linking to its management page:
+Navigate to **Admin** →**Website** to see the overview dashboard. This page displays 15 section cards in a flat grid, each linking to its management page. The sidebar organizes these into four groups:
 
 | Group | Sections |
 |-------|----------|
-| **Content** | Homepage, Pages, Team Members, Credentials, Global Blocks |
-| **Data** | City Pages, SEO |
+| **Content** | Homepage, Pages, Global Blocks |
+| **Data** | Team Members, Credentials, City Pages, SEO |
 | **Layout** | Hero, Navigation, Footer, Tickers, Ads, Catalog Display |
 | **Appearance** | Theme & Styles, Seasonal Themes |
 
@@ -40,7 +40,7 @@ The page list displays all custom pages in a table with these columns:
 | **In Nav** | Toggle switch — shows or hides the page in site navigation. Disabled when the page is unpublished. Auto-clears when a page is unpublished. |
 | **Updated** | Last modification timestamp |
 
-Click **New Page** to create a new page. This automatically creates a draft page titled "Untitled Page" with a timestamp-based slug and redirects to the page editor.
+Click **Create Page** to create a new page. This automatically creates a draft page titled "Untitled Page" with a timestamp-based slug and redirects to the page editor.
 
 ### Page Editor
 
@@ -97,7 +97,7 @@ The SEO section within the page editor provides per-page search engine optimizat
 | **Meta Description** | Description shown in search results | 150-160 characters |
 | **OG Image** | Social sharing image (upload) | 1200x630px |
 
-Character count indicators appear next to the title and description fields: green when within the ideal range, amber when below, and red when over the limit.
+Character count indicators appear next to the title and description fields: green when within 85% of the maximum, amber when approaching the limit (85-100%), and red when over the maximum.
 
 Click **AI Generate** to have AI populate the meta title and description based on the page content.
 
@@ -150,7 +150,7 @@ Some buttons are only available in certain contexts. Buttons marked "CMS only" a
 |--------|-------------|
 | **Button** | Inserts a styled button element. Prompts for button text and URL. |
 | **Divider** | Inserts a horizontal rule (`<hr>`) for visual separation. |
-| **Spacer** | Dropdown with four size options: Small (16px), Medium (32px), Large (48px), Extra Large (64px). Inserts a blank div of the selected height. |
+| **Spacer** | Dropdown with four size options: Small (16px), Medium (32px), Large (48px), XL (64px). Inserts a blank div of the selected height. |
 | **Table** | Inserts an HTML table structure with header row and body rows. |
 | **Columns** | *(CMS only)* Inserts a responsive multi-column layout container. |
 
@@ -188,7 +188,7 @@ Navigate to **Admin** →**Website** →**Hero** to manage the hero section that
 
 ### Carousel Configuration
 
-At the top of the page, the carousel settings control how slides are displayed:
+A **Config** toggle button in the page header reveals the carousel settings that control how slides are displayed:
 
 | Setting | Options | Description |
 |---------|---------|-------------|
@@ -206,7 +206,7 @@ Below the carousel settings, all slides are listed with:
 - **Up/Down** arrows to reorder slides
 - A **Delete** button
 
-Click a slide to open the slide editor, or click **New Slide** to create one.
+Click a slide to open the slide editor, or click **Add Slide** to create one.
 
 ### Slide Editor
 
@@ -382,14 +382,15 @@ Click **Add Column** and fill in:
 | **Column Title** | The heading displayed above the column content |
 | **Content Type** | The type of content the column will contain |
 
-**Content Type Options:**
+**Content Type Options (when adding):**
 
 | Type | Description |
 |------|-------------|
 | **Links** | A list of clickable links. Links are managed through the navigation system. |
 | **HTML** | Free-form HTML content. Uses the HTML editor toolbar for formatting. |
 | **Business Info** | Automatically displays business contact information pulled from Business Settings. |
-| **Brand** | Logo, tagline, and contact toggles. Only one brand column can exist. Configuration includes logo width, tagline text, and toggles for showing phone, email, address, and review badges. |
+
+> **Brand** columns (logo, tagline, contact toggles) cannot be created from the Add Column dialog — they can only exist if pre-seeded in the database. If a brand column exists, it appears in the footer with amber badge and supports logo width, tagline text, and toggles for phone, email, address, and review badges. Only one brand column can exist.
 
 #### Column Controls
 
@@ -599,7 +600,7 @@ Button styling is configured for two button types:
 | **Background** | Button background color |
 | **Text** | Button text color |
 | **Hover Background** | Background color on hover |
-| **Border Radius** | Corner rounding (e.g., `0.375rem`, `9999px` for pill shape) |
+| **Border Radius** | Corner rounding dropdown: Sharp (0), Slight (4px), Rounded (8px), More (12px), Large (16px), Pill (9999px) |
 
 **CTA Button:**
 
@@ -992,7 +993,7 @@ Displays ad performance data with:
 
 | Control | Options |
 |---------|---------|
-| **Period Selector** | Last 7 days, Last 30 days, Last 90 days, All time |
+| **Period Selector** | 7d, 30d, 90d, All Time |
 
 **Stat Cards:**
 
@@ -1108,7 +1109,7 @@ Differentiators can be added, removed, and reordered by dragging.
 
 | Field | Description |
 |-------|-------------|
-| **Google Place ID** | The Google Maps Place ID for the business. This enables the Google Reviews widget on the homepage, which automatically pulls and displays recent reviews. |
+| **Google Place ID** | The Google Maps Place ID for the business. Used for fetching review data. The homepage shows a "See all reviews on Google" link using this ID, not an embedded review widget. |
 
 ---
 
