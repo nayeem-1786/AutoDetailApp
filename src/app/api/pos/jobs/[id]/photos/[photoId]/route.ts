@@ -19,7 +19,22 @@ export async function PATCH(
     }
 
     const supabase = createAdminClient();
+
+    // Permission check: editing photo metadata requires photos.upload
+    const canEdit = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'photos.upload');
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Forbidden', message: 'Missing permission: photos.upload' }, { status: 403 });
+    }
+
     const body = await request.json();
+
+    // Featured toggle additionally requires photos.approve_marketing
+    if ('is_featured' in body) {
+      const canApprove = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'photos.approve_marketing');
+      if (!canApprove) {
+        return NextResponse.json({ error: 'Forbidden', message: 'Missing permission: photos.approve_marketing' }, { status: 403 });
+      }
+    }
 
     const allowedFields = ['annotation_data', 'notes', 'is_internal', 'is_featured'];
     const updates: Record<string, unknown> = {};
