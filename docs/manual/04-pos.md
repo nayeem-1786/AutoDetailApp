@@ -42,12 +42,14 @@ The POS will now launch in fullscreen mode without Safari's address bar. The vie
 ### PIN Login
 
 1. Open the POS (on the home screen icon or at `/pos`)
-2. The PIN screen appears with 4 dot indicators
+2. The PIN screen appears with the business logo, an "Enter PIN" heading, and 4 dot indicators
 3. Enter your **4-digit PIN** on the keypad
 4. The PIN auto-submits after the 4th digit — no "Submit" button needed
 5. On success, the workspace loads with your name and role in the header
 
 If the PIN is wrong, the dots shake and clear. Re-enter the correct PIN.
+
+If the screen was locked (idle timeout), it shows "Last session: [name]" above the PIN entry so you know who was previously logged in. You can re-enter as the same person or a different staff member.
 
 > PINs are set by an admin in **Admin > Staff > [name] > Profile tab > POS PIN Code**. A staff member without a PIN cannot access the POS. PIN presence = POS access.
 
@@ -64,7 +66,7 @@ From left to right:
 | Element | What It Shows |
 |---------|--------------|
 | **Scanner icon** | Barcode scanner integration indicator |
-| **Card reader status** | Green Wifi icon = connected, red WifiOff = disconnected, spinning loader = connecting. Tap to reconnect. Shows the reader name or "No Reader". |
+| **Card reader status** | Green Wifi icon = connected, gray WifiOff = disconnected, blue spinning loader = connecting. Tap to reconnect. Shows the reader name or "No Reader". |
 | **Business name + "POS"** | Centered brand label |
 | **Offline queue badge** | Amber pill with count of pending offline transactions (hidden when 0) |
 | **Role badge** | Small pill showing your role (e.g., "Cashier", "Admin") |
@@ -92,7 +94,7 @@ The right side always shows the current ticket:
 
 ### Bottom Navigation (Fixed Bottom)
 
-Five tabs across the bottom of the screen:
+Four navigation tabs plus a More popover across the bottom of the screen:
 
 | Tab | Icon | Destination |
 |-----|------|-------------|
@@ -133,7 +135,7 @@ The Register tab is the default view when you open the POS. It has two columns: 
 
 ### Favorites Grid
 
-Up to 15 quick-action tiles arranged in a 3x5 grid. Each tile is color-coded and has an icon. Favorites are configured in **Admin > Settings > POS Favorites**. Tile types include:
+Up to 15 quick-action tiles arranged in a 3-column grid (up to 5 rows). Each tile is color-coded and has an icon. Favorites are configured in **Admin > Settings > POS Favorites**. Tile types include:
 
 | Type | What It Does |
 |------|-------------|
@@ -190,7 +192,7 @@ Products show stock status on their cards. "Out of stock" appears in red when qu
 The right column of the Register tab (or the standalone Keypad tab) provides a numeric keypad:
 
 1. Enter an amount using the digit buttons (stored in cents internally)
-2. Optionally tap **+ Note** to add a description (max 100 characters)
+2. Optionally type a description in the always-visible description field below the amount (max 100 characters)
 3. Tap **Add to Ticket** to add the custom amount as a line item
 
 The dollar display adapts its font size to the number of digits entered. Maximum amount is $99,999.99.
@@ -258,11 +260,13 @@ From the customer lookup dialog, tap **New Customer**:
 
 1. Fill in **First Name**, **Last Name**, and **Mobile** (required)
 2. Optionally add an **Email**
-3. Select **Customer Type** — Enthusiast (blue) or Professional (purple)
+3. Select **Customer Type** (required) — Enthusiast (blue) or Professional (purple)
 4. The form runs a **duplicate check** as you type the phone number (after 10 digits) or email. If a match is found, a red warning appears and the Create button is disabled.
 5. Tap **Create** to save
 
 The newly created customer is automatically selected for the ticket.
+
+**Archived customer match** — If the phone number matches a previously soft-deleted (archived) customer, a restore dialog appears. The default action is to restore the existing record rather than create a duplicate. This ensures one phone number = one customer record.
 
 ### Customer Type Prompt
 
@@ -293,7 +297,7 @@ Tap **Add Vehicle** from the vehicle selector:
 
 1. Select a **Category** — Automobile (default), Motorcycle, RV, Boat, or Aircraft
 2. **For automobiles:**
-   - Year (dropdown 2015–2026, or "Other" for manual entry)
+   - Year (dropdown from current year + 2 down to 1980, or "Other" for manual entry)
    - Make (searchable combobox)
    - Model
    - Color
@@ -312,7 +316,7 @@ Once a customer and vehicle are set, the ticket header shows:
 - Customer name, phone, and type badge
 - Vehicle label (year make model) with size or category in parentheses
 - **X** button to clear the customer and vehicle
-- Tap the vehicle row to change vehicles or the customer row to change customers
+- Tap the vehicle row to change vehicles (or edit the current vehicle) or the customer row to change customers
 
 ---
 
@@ -320,14 +324,9 @@ Once a customer and vehicle are set, the ticket header shows:
 
 Tap **Checkout** at the bottom of the ticket panel. If a customer is selected but no vehicle is attached, an error toast appears and the vehicle selector opens. If the customer has no type set, the type prompt appears first.
 
-### Tip Screen
+### Loyalty-Covered Transactions
 
-Before payment method selection, an optional tip screen may appear (depending on configuration) showing:
-
-- The current total
-- Preset tip percentage buttons
-- A custom tip amount option
-- "No Tip" to skip
+If loyalty point redemption covers the entire ticket total ($0.00 remaining), a **Complete with Loyalty** button appears instead of the normal checkout flow. Tapping it creates a transaction with payment method `loyalty` and no card/cash processing needed.
 
 ### Payment Method Selection
 
@@ -358,7 +357,9 @@ When offline, only Cash is enabled. Card, Check, and Split show as disabled.
 4. On success, the transaction saves with the card brand, last 4 digits, and any on-reader tip
 5. On failure, an error message appears with a retry option
 
-> If the customer adds a tip on the card reader, the system captures it automatically by comparing the authorized amount to the original total.
+### On-Reader Tipping
+
+Tips are collected directly on the Stripe Terminal card reader, not in the POS UI. When a card payment is initiated, the reader presents tip preset options (15%, 20%, 25%) to the customer. If the customer selects a tip, the authorized amount includes it. The POS captures the tip by comparing the authorized amount to the original total. This applies to both standalone card payments and the card portion of split payments.
 
 ### Check Payment
 
@@ -394,7 +395,7 @@ After checkout completes, four receipt delivery options appear:
 
 | Option | Icon | What It Does |
 |--------|------|-------------|
-| **Print** | Copier | Opens a new browser window with the HTML receipt and triggers the print dialog |
+| **Print** | Printer | Opens a new browser window with the HTML receipt and triggers the print dialog |
 | **Email** | Mail | Sends the receipt to the customer's email (or prompts for one) |
 | **SMS** | MessageSquare | Texts a formatted receipt to the customer's phone (or prompts for one) |
 | **Receipt** | Printer | Sends ESC/POS data to the configured Star network receipt printer |
@@ -413,7 +414,7 @@ Tap **Hold** at the bottom of the ticket panel to pause the current ticket. The 
 
 ### Viewing Held Tickets
 
-Open held tickets from the bottom nav (or press Esc when the panel is open). The panel shows:
+Open held tickets by tapping the pause icon in the ticket panel header. The panel shows:
 
 - **Ticket cards** with customer name, item count, total, and time held (e.g., "5m ago", "1h 20m ago")
 - **Resume** button (blue) on each card
@@ -434,7 +435,8 @@ When the loyalty program feature flag is enabled and a customer is selected, an 
 
 - **Points balance** (e.g., "250 pts")
 - **Dollar equivalent** shown in parentheses (e.g., "worth $2.50") if the balance meets the redemption minimum
-- **Redeem button** — Tap to apply loyalty points as a discount. Tap again to cancel. The button changes to show the discount amount (e.g., "Redeeming -$2.50").
+- **Redeem button** — Tap to apply loyalty points as a discount. Tap again to cancel. When active, the button changes to "Clear -$X.XX".
+- **Partial redemption** — After tapping Redeem, an input field appears where you can enter a custom dollar amount to redeem less than the full balance. The field shows "max $X.XX" and clamps to the maximum available.
 - **Earn preview** — Shows how many points this purchase will earn (e.g., "Will earn ~25 pts from this purchase"), visible when not redeeming
 
 Points are calculated at 1 point per $1 of eligible spend (water products excluded). Redemption value is $0.05 per point. Minimum redemption is 100 points.
@@ -665,6 +667,7 @@ Tap a receipt number to view the full transaction:
 
 | Status | Meaning |
 |--------|---------|
+| **Open** | Transaction initiated but not yet finalized (e.g., pending card confirmation) |
 | **Completed** | Normal successful transaction |
 | **Partial Refund** | Some items have been refunded |
 | **Refunded** | Fully refunded |
@@ -738,10 +741,10 @@ Below the day summary:
 
 1. **Count Your Drawer** — Enter the cash in the drawer by denomination (same form as opening)
 2. **Reconciliation** — The system calculates:
-   - Opening Float + Cash Sales + Cash Tips - Cash Refunds = **Expected Cash**
+   - Opening Float + Cash Sales + Cash Tips = **Expected Cash**
    - Your counted cash vs. expected = **Variance** (green if zero, red otherwise)
 3. **Close Out Form:**
-   - **Next Day Float** — Cash to leave for tomorrow's opening (pre-filled from last session)
+   - **Next Day Float** — Cash to leave for tomorrow's opening (pre-filled from the previous session's opening float)
    - **Deposit Amount** — Auto-calculated as Counted Cash minus Next Day Float
    - **Notes** — Optional end-of-day notes
 4. Tap **Close Register** (red button, requires `pos.end_of_day` permission)
@@ -813,7 +816,7 @@ POS sessions expire after **12 hours** regardless of activity. When the token ex
 
 ### HMAC API Authentication
 
-All POS API requests include an `X-POS-Session` header with a custom HMAC-SHA256 token. The token contains the employee's ID, role, and name, signed with the Supabase service role key. This token is verified on every API call. The system uses timing-safe comparison to prevent timing attacks.
+All POS API requests include an `X-POS-Session` header with a custom HMAC-SHA256 token. The token payload contains the employee's ID, auth user ID, role, first name, last name, email, and expiration timestamp, signed with the Supabase service role key. This token is verified on every API call using timing-safe comparison to prevent timing attacks.
 
 ### Permission-Based Access
 
@@ -821,6 +824,7 @@ Each POS action is gated by a specific permission key. If a staff member's role 
 
 | Permission | What It Controls |
 |------------|-----------------|
+| `pos.open_close_register` | Opening and closing the cash register |
 | `pos.create_tickets` | Creating new tickets |
 | `pos.add_items` | Adding items to a ticket |
 | `pos.apply_coupons` | Applying coupon codes |
@@ -863,8 +867,8 @@ Changes take effect within 10 seconds (settings are cached in-memory). If the da
 | Icon | Meaning |
 |------|---------|
 | Green Wifi + reader name | Connected and ready |
-| Red WifiOff + "No Reader" | Not connected — tap to reconnect |
-| Spinning loader | Attempting to connect |
+| Gray WifiOff + "No Reader" | Not connected — tap to reconnect |
+| Blue spinning loader | Attempting to connect |
 
 ### Troubleshooting
 
