@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## chore: add standalone output for Hostinger VPS deploy — 2026-03-22
+
+- Added `output: 'standalone'` to `next.config.ts` for self-hosted deployment via PM2.
+
+---
+
 ## fix: IP whitelist enforcement on POS API routes — 2026-03-22
 
 - **Security gap**: Middleware IP whitelist only covered `/pos/*` page routes. All `/api/pos/*` routes were excluded from the middleware matcher, allowing a stolen POS token to bypass IP restriction via direct API calls.

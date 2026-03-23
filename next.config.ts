@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Standalone output for self-hosted deployment (PM2 on Hostinger VPS)
+  output: 'standalone',
+
   // Prevent Turbopack from bundling heavy server-only packages
   serverExternalPackages: ['pdfkit', 'sharp'],
 
