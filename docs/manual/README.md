@@ -23,6 +23,10 @@ Complete operational guide for the Smart Details Auto Spa management platform.
 11. [Settings & Configuration](./11-settings.md) — Business info, toggles, staff, permissions
 12. [Developer Guide](./12-developer-guide.md) — Architecture, env vars, cron, deployment
 
+### Supplementary
+
+- [Website System Reference](./website/README.md) — Architecture, content sources, public page inventory, CMS-to-public mapping
+
 ---
 
-*Last updated: 2026-03-01*
+*Last updated: 2026-03-22*
