@@ -327,7 +327,7 @@ The full cart page at `/cart` shows:
 
 The checkout page at `/checkout` guides customers through a three-step process. Form data is saved to session storage, so customers can refresh the page or navigate back without losing their information.
 
-### Step 1: Information
+### Step 1: Contact & Fulfillment Method
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -335,13 +335,14 @@ The checkout page at `/checkout` guides customers through a three-step process. 
 | **First Name** | Yes | Customer name |
 | **Last Name** | Yes | Customer name |
 | **Phone** | No | Contact number |
-| **Customer Notes** | No | Special instructions for the order |
 
-If the customer is logged in, these fields are auto-populated from their profile.
+The customer also selects a **fulfillment method** (Local Pickup or Shipping) in this step.
 
-### Step 2: Fulfillment
+If the customer is logged in, contact fields are auto-populated from their profile.
 
-The customer chooses between two fulfillment methods:
+### Step 2: Fulfillment Details
+
+Depending on the fulfillment method selected:
 
 **Local Pickup:**
 - No additional fields required
@@ -363,11 +364,13 @@ After entering the address:
 2. Available shipping rates are fetched from Shippo based on the address, package dimensions, and cart items
 3. The customer selects a shipping option
 
-Shipping rate options may include carrier name, service level, estimated delivery time, carrier logo (configurable), and price. Free shipping may appear if the order meets the configured threshold.
+Shipping rate options may include carrier name, service level, estimated delivery time, carrier logo (configurable), and price. Free shipping may appear if the order meets the configured threshold. Rates auto-fetch when the address is valid (500ms debounce). If rate fetching fails, an error message with a **Retry** button appears.
 
-### Step 3: Payment
+An **Order Notes** field is available in this step for special instructions.
 
-The payment step uses Stripe's embedded payment element, which handles card entry, validation, and 3D Secure authentication.
+### Step 3: Review & Payment
+
+A **review section** summarizes the contact information and fulfillment details with **Edit** buttons to go back and modify. Below the review, Stripe's embedded payment element handles card entry, validation, and 3D Secure authentication.
 
 The page displays trust badges ("256-bit SSL Encrypted", "PCI DSS Compliant") and a "Powered by Stripe" logo.
 
@@ -381,7 +384,7 @@ On successful payment:
 2. An order number is assigned (sequential, starting at WO-10001)
 3. Product stock is decremented for each item
 4. The customer is redirected to the confirmation page
-5. A confirmation email is sent (not implemented as a separate email — the order record serves as confirmation)
+5. A confirmation email is sent to the customer via `sendOrderConfirmationEmail()`
 
 ### Guest Checkout
 
@@ -434,6 +437,7 @@ Results are paginated at 20 per page.
 | Status | Meaning | Badge |
 |--------|---------|-------|
 | **Pending** | Payment not yet completed (abandoned checkout) | Yellow |
+| **Cancelled** | Payment cancelled (by cleanup cron or Stripe) | Gray |
 | **Paid** | Payment received via Stripe | Green |
 | **Failed** | Payment attempt failed | Red |
 | **Refunded** | Full refund processed | Gray |
@@ -729,6 +733,23 @@ When a customer applies a coupon code during online checkout (on the cart page o
 6. Cart conditions are met (required items, minimum purchase, visit count)
 
 If validation passes, the discount is calculated and shown in the order summary. The discount is reflected in the Stripe payment intent amount.
+
+---
+
+## 8.9 Abandoned Order Cleanup
+
+A cron job runs **every 6 hours** to clean up abandoned checkout sessions:
+
+1. Finds orders with `payment_status = 'pending'` older than **24 hours**
+2. Processes up to **100 orders** per run
+3. Cancels the associated Stripe PaymentIntents (best-effort — tolerates already-cancelled or succeeded intents)
+4. Sets the order's `payment_status` to `cancelled`
+
+Stock is **not** restored during cleanup because stock is only decremented on successful payment (via the Stripe webhook). Pending orders never had stock deducted.
+
+### Coupon No-Stacking Rule
+
+Items with `sale` or `combo` pricing are automatically excluded from coupon discounts. This prevents double-discounting when a sale price or combo price is already applied. The logic lives in `calculateCouponDiscount()` in `src/lib/utils/coupon-helpers.ts`.
 
 ---
 

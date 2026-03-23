@@ -22,7 +22,7 @@ All completed POS transactions can optionally sync to QuickBooks Online for book
 |------|-----------|-------------|
 | POS transactions | Yes — fires in the background after each completed transaction | Yes — "Sync Transactions" button |
 | Customers | Configurable — auto-sync can be enabled in QBO settings | Yes — "Sync Customers" button |
-| Catalog items (services + products) | No | Yes — "Sync Catalog" button |
+| Catalog items (services + products) | Configurable — auto-sync can be enabled in QBO settings | Yes — "Sync Catalog" button |
 
 When QBO integration is disabled or disconnected, the POS works normally with zero impact. New transactions receive no sync status, and no API calls are made to Intuit.
 
@@ -30,7 +30,7 @@ When QBO integration is disabled or disconnected, the POS works normally with ze
 
 ## 10.2 QuickBooks Online Integration
 
-Navigate to **Admin > Settings > Integrations > QuickBooks Online** to manage the QBO connection. The page has three tabs: **Settings**, **Sync**, and **Reports**.
+Navigate to **Admin > Settings > Integrations > QuickBooks Online** to manage the QBO connection. The page has two tabs: **Settings** and **Reports**. The Settings tab contains connection settings, account mapping, sync toggles, manual sync actions, and the sync log.
 
 ### 10.2.1 Initial Setup — Connecting QBO
 
@@ -45,9 +45,9 @@ Navigate to **Admin > Settings > Integrations > QuickBooks Online** to manage th
 1. Go to **Admin > Settings > QuickBooks Online**
 2. In the **Connection** card, select the environment — **Sandbox** (for testing) or **Production** (for live accounting)
 3. Click **Connect to QuickBooks**
-4. A popup window opens showing the Intuit OAuth consent screen
+4. A full-page redirect opens the Intuit OAuth consent screen
 5. Sign in to your QuickBooks account and authorize the connection
-6. The popup closes and the page refreshes to show "Connected" status with the company name
+6. After authorization, you are redirected back to the QBO settings page showing "Connected" status with the company name
 
 The connection status card shows:
 - Connection status (Connected / Not Connected)
@@ -72,30 +72,34 @@ If these accounts are not mapped, transaction syncs will fail. The system valida
 
 Also on the **Settings** tab:
 
-- **Auto-Sync Customers** — Toggle on/off. When enabled, new customers created in the app are automatically pushed to QBO in the background.
-- **Auto-Sync Transactions** — Toggle on/off. When enabled, completed POS transactions fire a background sync to QBO immediately after checkout. This is the primary sync mechanism.
+- **Auto-Sync Transactions** — Toggle on/off. When enabled, completed POS transactions are synced to QBO.
+- **Real-Time Sync** — Toggle on/off. When enabled, transactions sync immediately on POS completion instead of waiting for the next batch run.
+- **Auto-Sync Customers** — Toggle on/off. When enabled, new customers created in the app are automatically pushed to QBO.
+- **Auto-Sync Catalog** — Toggle on/off. When enabled, services and products are synced on each auto-sync run.
+- **Background Sync Interval** — Dropdown to set the cron frequency: Disabled, 15 minutes, 30 minutes, or 60 minutes.
 
-Both toggles are saved independently and take effect immediately.
+All toggles are saved independently and take effect immediately.
 
 ### 10.2.4 Auto-Sync (Cron)
 
 A cron job runs every 30 minutes (`/api/cron/qbo-sync`) that:
 
 1. Checks if QBO integration is enabled (`qbo_enabled` feature flag + valid tokens)
-2. Finds all transactions with `qbo_sync_status = 'pending'` or `NULL` (completed transactions that haven't been synced)
-3. Syncs each transaction to QBO as a Sales Receipt
-4. Logs every sync attempt to the `qbo_sync_log` table
+2. Syncs transactions with `qbo_sync_status = NULL` or `'failed'` (up to 50 per run)
+3. Syncs unsynced customers (up to 50 per run)
+4. Syncs catalog changes (if auto-sync catalog is enabled)
+5. Retries failed transactions older than 1 hour (up to 10 per run, with backoff)
+6. Logs every sync attempt to the `qbo_sync_log` table
 
-This catches any transactions that failed real-time sync or were created while QBO was temporarily unavailable. The cron processes transactions in chronological order with a small delay between each to respect QBO rate limits.
+This catches any transactions that failed real-time sync or were created while QBO was temporarily unavailable. The cron respects the configurable interval setting and can be disabled entirely.
 
 ### 10.2.5 Manual Sync
 
-On the **Sync** tab, four sync actions are available:
+On the **Settings** tab, three sync actions are available:
 
 | Button | What It Does |
 |--------|-------------|
 | **Sync All** | Syncs unsynced transactions, customers, and catalog items in one batch |
-| **Sync Customers** | Pushes all customers without a `qbo_id` to QBO |
 | **Sync Transactions** | Pushes all unsynced completed transactions to QBO |
 | **Sync Catalog** | Pushes all active services and products without a `qbo_id` to QBO |
 
@@ -116,8 +120,7 @@ If there are any failed syncs, a **Retry Failed** button appears (red outline). 
 - Mapped to QBO Sales Receipt entities
 - Each line item (service or product) becomes a line on the Sales Receipt
 - Coupon discounts become a Discount Line
-- Tax is included as a tax line
-- Payment method is recorded (card, cash, split)
+- Payment method is recorded in the Sales Receipt's private notes field
 - $0 transactions are automatically skipped (`qbo_sync_status = 'skipped'`)
 - Transaction dates use the `America/Los_Angeles` timezone
 
@@ -175,7 +178,7 @@ Existing sync history and account mappings are preserved. If you reconnect later
 The **Reports** tab provides a dashboard view of sync health and revenue data. It includes a period selector (7 days, 30 days, 90 days, All Time).
 
 **Sync Health Cards (row 1):**
-- **Sync Rate** — Percentage of completed transactions that are synced (color-coded: green > 90%, yellow > 70%, red below)
+- **Sync Rate** — Percentage of completed transactions that are synced (color-coded: green >= 95%, yellow >= 80%, red below 80%)
 - **Synced Transactions** — Count of synced out of total
 - **Failed** — Count of failed syncs (red if > 0)
 - **Last Sync** — Relative time since last sync, with auto-sync timestamp below
@@ -211,44 +214,39 @@ Navigate to **Admin > Transactions** in the sidebar to view all POS transactions
 The transaction list page shows a searchable, filterable table of all completed transactions.
 
 **Stats Row:**
-Four metric cards at the top of the page:
-
-| Card | What It Shows |
-|------|--------------|
-| **Total Revenue** | Sum of all transaction amounts in the filtered period |
-| **Transaction Count** | Number of transactions in the filtered period |
-| **Average Transaction** | Total revenue divided by transaction count |
-| **Top Payment Method** | Most common payment method used |
+Revenue and payment breakdown cards appear at the top (permission-gated by `reports.revenue` and `reports.financial_detail`). Stats include revenue, transaction count, average ticket, tips, new customers, and win-backs. A separate payment breakdown section shows totals by payment method.
 
 **Filters and Search:**
-- **Date range picker** — Filter transactions to a specific date range
-- **Search** — Search by receipt number, customer name, or transaction ID
-- **Payment method filter** — Filter by card, cash, or split payment
-- **QBO sync status** — Filter by synced, failed, pending, or not synced
+- **Date presets** — Today, Yesterday, This Week, This Month, This Year, All
+- **Search** — Search by receipt number or customer name
+- **Status dropdown** — Filter by completed, voided, refunded, partial_refund, or open
 
 **Table Columns:**
 - **Date** — Transaction date and time (PST)
-- **Receipt #** — POS receipt number (e.g., "POS #1234")
-- **Customer** — Customer name (clickable link to customer detail) or "Walk-in" for anonymous transactions
-- **Items** — Count of line items
-- **Amount** — Total transaction amount
-- **Payment** — Payment method badge (Card, Cash, Split)
-- **QBO Status** — Sync status badge if QBO integration is enabled
+- **Receipt #** — POS receipt number (clickable — opens receipt dialog)
+- **Customer** — Customer name or "Walk-in" for anonymous transactions
+- **Services** — Service names from the transaction
+- **Employee** — Staff member who processed the transaction
+- **Method** — Payment method badge (Card, Cash, Split, etc.)
+- **Status** — Transaction status badge
+- **Total** — Transaction total amount
 
-Clicking a row navigates to the transaction detail view.
+Clicking a receipt number opens a **receipt dialog** modal with full receipt preview, not a separate page.
 
-### 10.3.2 Transaction Types
+### 10.3.2 Transaction Statuses
 
-| Type | Description |
-|------|------------|
-| `sale` | Standard POS sale — services, products, or both |
-| `refund` | Partial or full refund of a previous transaction |
+| Status | Description |
+|--------|------------|
+| `completed` | Normal successful transaction |
+| `open` | Transaction initiated but not finalized |
+| `voided` | Transaction voided (entire amount reversed) |
+| `refunded` | Fully refunded |
+| `partial_refund` | Some items have been refunded |
 
 ### 10.3.3 How Transactions Relate to Other Entities
 
-- **Jobs** — A transaction is linked to a job via the `job_id` foreign key. When a POS ticket is checked out, a job record is created and the transaction is linked to it.
-- **Appointments** — When a job is created from a booked appointment, the appointment's `appointment_id` is carried through to the job, creating an indirect link: Appointment → Job → Transaction.
-- **Quotes** — When a quote is converted to a job via the POS, the job's `quote_id` links back to the originating quote. The transaction then links to the job.
+- **Appointments** — Transactions link to customers. When a customer has an appointment that was checked out via POS, the transaction is associated through the shared customer record.
+- **Quotes** — When a quote is converted to an appointment via the POS, the `converted_appointment_id` on the quote links to the new appointment. The quote's items become appointment services.
 - **Orders** — Online store orders have their own payment flow through Stripe Checkout, separate from POS transactions. They appear in Admin > Orders, not in Transactions.
 
 ---
@@ -268,7 +266,7 @@ Four metric cards:
 |------|--------------|
 | **Total Quotes** | Total number of quotes (excluding soft-deleted) |
 | **Pending** | Quotes in draft, sent, or viewed status |
-| **Booking Rate** | Percentage of quotes that converted to jobs (`converted / total`) |
+| **Booking Rate** | Percentage of quotes that converted to appointments (`converted / total`) |
 | **Booked Revenue** | Sum of `total_amount` for all converted quotes |
 
 **Status Filters:**
@@ -368,7 +366,7 @@ Once a quote is accepted (or even while in draft/sent/viewed status), it can be 
    - Pricing from the quote
    - Auto-assigned detailer (or manually selected)
 3. The quote status changes to "converted" with a link to the new appointment
-4. A server-side duplicate check prevents the same quote from being converted twice (via the `quote_id` foreign key on the jobs table)
+4. A server-side duplicate check prevents the same quote from being converted twice (checks if `quote.status === 'converted'`)
 
 The conversion flow:
 - Quote items with a `service_id` become appointment services
@@ -384,7 +382,7 @@ A cron job runs hourly at the :30 minute mark (`/api/cron/quote-reminders`) that
 2. Sends reminder SMS/email to the customer
 3. Marks expired quotes as "expired" when they pass their `valid_until` date
 
-The quote validity period is configurable in **Admin > Settings > Business Profile > Booking & Quotes > Quote Validity (Days)**. The default is 14 days.
+The quote validity period is configurable in **Admin > Settings > Business Profile > Booking & Quotes > Quote Validity (Days)**. The default is 10 days.
 
 ### 10.4.7 Quote Communications Log
 

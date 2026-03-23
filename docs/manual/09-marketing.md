@@ -18,8 +18,11 @@ Navigate to **Admin** → **Marketing** to reach the marketing hub. The hub show
 | **Automations** | Automated lifecycle sequences triggered by customer activity |
 | **Coupons** | Discount codes (see [Chapter 8, Section 8.8](./08-online-store.md#88-coupons--discounts)) |
 | **Promotions** | Sale pricing across services and products |
+| **Email Templates** | Reusable email templates and brand settings for campaign emails |
 | **Analytics** | Cross-campaign performance metrics |
 | **Compliance** | SMS/email consent audit log |
+
+> The marketing hub shows quick-link cards for Coupons, Automations, Campaigns, and Compliance. Other sections are accessible from the sidebar.
 
 ### Feature Flags
 
@@ -46,7 +49,18 @@ Disabling a flag prevents that channel from sending. Campaigns using a disabled 
 
 ## 9.2 Campaigns
 
-Navigate to **Admin** → **Marketing** → **Campaigns** to create and manage campaigns.
+Navigate to **Admin** → **Marketing** → **Campaigns** to create and manage campaigns. The campaigns page has two tabs: **One-Time** (standard campaigns) and **Drip** (multi-step automated sequences).
+
+### Drip Sequences
+
+Drip sequences are multi-step automated marketing flows. Each sequence has:
+- **Trigger conditions**: No Visit, After Service, New Customer, Manual Enrollment, Tag Added
+- **Stop conditions**: On purchase, on booking, on reply
+- **Steps**: Each step has a configurable delay (days/hours), channel (email/SMS/both), templates, optional coupon, and exit conditions
+- **Nurture chaining**: Link to a follow-up sequence after completion
+- **Enrollments**: View and manage enrolled customers with pause/resume/stop controls
+
+The lifecycle engine cron handles drip execution alongside standard automations (auto-enrollment, stop condition checking, and step execution).
 
 ### Campaign List
 
@@ -75,7 +89,6 @@ Navigate to **Admin** → **Marketing** → **Campaigns** to create and manage c
 | **Scheduled** | Set to send at a future time | Blue |
 | **Sending** | Currently being sent | Yellow |
 | **Sent** | Delivery complete | Green |
-| **Paused** | Temporarily paused | — |
 | **Cancelled** | Campaign was cancelled | Red |
 
 ### Creating a Campaign
@@ -389,7 +402,9 @@ When enabled, the AI assistant automatically replies to inbound SMS messages. Th
 | **Unknown numbers** | AI responds (configurable) | AI always responds |
 | **Known customers** | AI responds (configurable) | AI always responds |
 
-The AI keeps messages under 160 characters, asks only 1–2 questions per message, and uses a casual, friendly tone. It never makes up pricing — it only quotes prices from the service catalog.
+The AI is instructed to keep messages short (under 160 characters ideal), asks only 1-2 questions per message, and uses a casual, friendly tone. It never makes up pricing — it only quotes prices from the service catalog. Longer messages are automatically split into multiple texts. A rate limit of **10 AI replies per conversation per hour** prevents runaway conversations.
+
+The AI can also generate quotes automatically via structured `[GENERATE_QUOTE]` blocks in responses, and handle job add-on authorization approvals/declines via SMS conversation.
 
 ### Messaging Settings
 
@@ -471,7 +486,7 @@ SMS consent is collected at these touchpoints:
 
 ### Consent Tracking
 
-Every consent change is recorded in the `sms_consent_log` with:
+Every consent change is recorded in both the `sms_consent_log` and `marketing_consent_log` tables with:
 
 - Customer ID
 - Action (opt in or opt out)
