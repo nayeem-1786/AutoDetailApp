@@ -89,6 +89,8 @@ Select multiple customers using the checkboxes, then use these bulk actions (req
 | **Review Duplicates** | `customers.merge` | Opens the duplicate detection page |
 | **Add Customer** | `customers.create` | Opens the new customer form |
 
+A **Show archived** checkbox toggle is also available to include soft-deleted customers in the list.
+
 ---
 
 ## 5.3 Creating a Customer
@@ -138,6 +140,10 @@ The form performs real-time duplicate checking as you type:
 
 The **Create Customer** button is disabled when duplicate warnings or validation errors are present.
 
+### Archived Customer Match
+
+If the phone number matches a previously archived (soft-deleted) customer, the system returns a 409 conflict and shows a **restore dialog** instead of creating a duplicate. The dialog offers to restore the archived customer record, maintaining the one-phone-one-customer principle.
+
 ### What Happens on Submit
 
 1. Phone is normalized to standard format
@@ -168,26 +174,22 @@ The Info tab is the editable customer profile, organized identically to the crea
 
 **Notes & Tags Card** — Same as create form.
 
-**Portal Access Card** — Manages the customer's portal login:
+**Portal Access Card** — Manages the customer's portal login. Shows **Active** or **Deactivated** toggle-style buttons:
 
-| Action | When Available | What It Does |
-|--------|---------------|-------------|
-| **Send Password Reset** | Customer has an email address | Sends a password reset email so the customer can set up or change their portal login |
-| **Deactivate Portal Access** | Customer has an active portal account (`auth_user_id` is set) | Disables the customer's ability to log into the portal. Two-step confirmation required. |
-| **Reactivate Portal Access** | Customer's portal was previously deactivated | Restores portal login ability |
+- **Send Password Reset** — Available when the customer has an email and an active portal account (`auth_user_id` is set). Sends a reset link.
+- **Active / Deactivated toggle** — Switch between active and deactivated portal access. Deactivating requires a two-step confirmation.
 
-**Delete Customer Card** — Permanently deletes the customer and all associated records. Requires `customers.delete` permission. Uses a two-step confirmation dialog.
+**Archive Customer Card** — Soft-deletes (archives) the customer. Requires `customers.delete` permission. Uses a two-step confirmation dialog.
 
-When a customer is deleted, the following happens:
+When a customer is archived:
 
-1. Vehicles are deleted
-2. Loyalty ledger entries are deleted
-3. Transactions are unlinked (preserved for accounting, `customer_id` set to null)
-4. Marketing consent logs are deleted
-5. Appointments are deleted
-6. Quotes are deleted
-7. The customer record is deleted
-8. An audit log entry is created
+1. The `deleted_at` timestamp is set on the customer record
+2. All associated records (vehicles, transactions, appointments, quotes, loyalty) are **preserved** — nothing is deleted
+3. The customer no longer appears in forward-looking queries (search, selection, eligibility)
+4. An audit log entry is created
+5. The customer can be **restored** later via a "Restore Customer" button that appears on archived records
+
+> This is a **soft delete**, not a permanent deletion. The `deleted_at` column is used throughout the codebase to filter archived customers from active queries while preserving historical data.
 
 **Save Changes** button at the bottom saves all edits on the Info tab.
 
@@ -246,6 +248,15 @@ Displays a chronological record of all services the customer has received, organ
 - Services performed
 - Before/after photo pairs (where available)
 - Job status
+
+### Sequences Tab
+
+Shows the customer's drip sequence enrollments (automated multi-step marketing flows). From this tab you can:
+
+- View all sequences the customer is enrolled in with their current status
+- **Enroll** the customer in a new drip sequence
+- **Pause/Resume** an active sequence enrollment
+- **Stop** a sequence enrollment entirely
 
 ---
 
@@ -411,9 +422,11 @@ Every customer is classified into one of two types (or left uncategorized):
 
 | Type | Badge Color | Description |
 |------|-------------|------------|
-| **Enthusiast** | Green / Blue | Individual car owners who care about their vehicle's appearance |
-| **Professional** | Blue / Purple | Business customers — fleet managers, dealerships, body shops |
+| **Enthusiast** | Green (in list), Blue (in forms/POS) | Individual car owners who care about their vehicle's appearance |
+| **Professional** | Blue (in list), Purple (in forms/POS) | Business customers — fleet managers, dealerships, body shops |
 | **Unknown** | Gray | Not yet categorized |
+
+> Badge colors vary by context: the customer list uses green/blue/gray, while the create form, detail page, and POS use blue/purple/gray.
 
 ### Why Customer Type Matters
 
@@ -486,13 +499,7 @@ Staff can manually override these toggles at any time.
 
 ### Consent Logging
 
-All consent changes are logged in the `marketing_consent_log` and `sms_consent_log` tables for compliance. Logs record:
-
-- Customer ID
-- Channel (SMS or email)
-- Action (opt_in or opt_out)
-- Source (manual, admin_manual, customer self-service, keyword response)
-- Timestamp
+All consent changes are logged in the `marketing_consent_log` and `sms_consent_log` tables for compliance. The SMS consent log records phone, keyword, source, previous value, and new value. Sources include: `inbound_sms`, `admin_manual`, `unsubscribe_page`, `booking_form`, `customer_portal`, `system`.
 
 > Customers can also manage their own consent from the portal profile page (`/account/profile`). Turning off a consent toggle from the portal shows a confirmation dialog before applying.
 
@@ -505,7 +512,7 @@ All consent changes are logged in the `marketing_consent_log` and `sms_consent_l
 | `customers.view` | View customer list and profiles |
 | `customers.create` | Create new customer records |
 | `customers.edit` | Edit customer details, manage tags (including bulk tag operations) |
-| `customers.delete` | Delete customer records (two-step confirmation) |
+| `customers.delete` | Archive (soft-delete) customer records (two-step confirmation) |
 | `customers.view_history` | View a customer's transaction and service history |
 | `customers.view_loyalty` | View loyalty point balance |
 | `customers.adjust_loyalty` | Manually add or subtract loyalty points |

@@ -198,7 +198,7 @@ The overview tab is organized into a main content area and a sidebar:
 
 | Card | What It Shows |
 |------|--------------|
-| **Totals** | Subtotal, add-on total, discount, tax, and grand total |
+| **Totals** | Services subtotal, add-on subtotal (if any), and grand total |
 | **Quick Stats** | Photo count, work duration, number of services, number of add-ons |
 | **Intake Notes** | Notes recorded during vehicle intake |
 
@@ -301,18 +301,18 @@ Every photo is tagged with a **zone** indicating which part of the vehicle it do
 | `exterior_passenger_side` | Passenger Side |
 | `exterior_hood` | Hood |
 | `exterior_roof` | Roof |
-| `exterior_trunk` | Trunk |
-| `exterior_wheels` | Wheels |
+| `exterior_trunk` | Trunk/Tailgate |
+| `exterior_wheels` | Wheels & Tires |
 
 #### Interior Zones (7)
 
 | Zone | Label |
 |------|-------|
 | `interior_dashboard` | Dashboard |
-| `interior_console` | Console |
+| `interior_console` | Center Console |
 | `interior_seats_front` | Front Seats |
 | `interior_seats_rear` | Rear Seats |
-| `interior_carpet` | Carpet |
+| `interior_carpet` | Carpet/Floor |
 | `interior_door_panels` | Door Panels |
 | `interior_trunk_cargo` | Trunk / Cargo |
 
@@ -384,11 +384,18 @@ When a detailer discovers additional work needed during a job (e.g., a stain req
 
 Add-on proposals include an issue type to help the customer understand the context:
 
-- Stain or spot requiring treatment
-- Scratch or swirl that could be addressed
-- Odor requiring special treatment
-- Damage found during inspection
-- Other / general recommendation
+| Issue Type | Description |
+|------------|-------------|
+| `scratches` | Scratches found on the vehicle |
+| `water_spots` | Water spots on paint or glass |
+| `paint_damage` | Paint chips, peeling, or other damage |
+| `pet_hair_stains` | Pet hair or stains from animals |
+| `interior_stains` | Interior stains on seats, carpet, or headliner |
+| `odor` | Odor requiring special treatment |
+| `headlight_haze` | Headlight oxidation or hazing |
+| `wheel_damage` | Wheel curb rash or damage |
+| `tar_sap_overspray` | Tar, sap, or paint overspray |
+| `other` | General recommendation |
 
 > The authorization page is designed to be customer-friendly — it uses conversational language rather than technical terminology, and clearly shows what the customer is approving.
 
