@@ -5,9 +5,9 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 type Params = { params: Promise<{ id: string }> };
 
 // POST /api/admin/email-templates/[id]/reset — Reset system template to defaults
-export async function POST(_request: NextRequest, { params }: Params) {
+export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;

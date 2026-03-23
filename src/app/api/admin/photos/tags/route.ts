@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -6,7 +6,7 @@ import { pstEndOfDayLiteral } from '@/lib/utils/pst-date';
 
 export async function GET(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

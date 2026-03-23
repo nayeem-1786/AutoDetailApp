@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
 // GET /api/admin/vehicle-categories — All categories (including inactive), ordered by display_order
-export async function GET() {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

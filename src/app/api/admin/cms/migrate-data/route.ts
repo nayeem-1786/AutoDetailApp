@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
@@ -31,8 +31,8 @@ function wrapInParagraphs(text: string): string {
     .join('\n');
 }
 
-export async function POST() {
-  const employee = await getEmployeeFromSession();
+export async function POST(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

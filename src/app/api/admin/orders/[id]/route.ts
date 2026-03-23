@@ -6,11 +6,11 @@ import { sendFulfillmentEmail } from '@/lib/utils/order-emails';
 import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const denied = await requirePermission(employee.id, 'orders.view');
@@ -85,7 +85,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const denied = await requirePermission(employee.id, 'orders.manage');

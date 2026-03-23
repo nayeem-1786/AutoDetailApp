@@ -5,7 +5,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 // GET /api/admin/email-templates/assignments — List segment routing assignments
 export async function GET(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/email-templates/assignments — Create or update an assignment
 export async function POST(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 // PATCH /api/admin/email-templates/assignments — Update an assignment by id
 export async function PATCH(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
@@ -106,7 +106,7 @@ export async function PATCH(request: NextRequest) {
 // DELETE /api/admin/email-templates/assignments — Delete an assignment by id
 export async function DELETE(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);

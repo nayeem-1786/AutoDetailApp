@@ -17,7 +17,7 @@ const MIN_SPAN = 2;
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -190,7 +190,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -8,7 +8,7 @@ import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 
 export async function POST(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

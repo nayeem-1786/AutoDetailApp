@@ -9,11 +9,11 @@ const VALID_TRIGGERS = ['no_visit_days', 'after_service', 'new_customer', 'manua
 
 // GET /api/admin/drip-sequences/[id] — Single sequence with steps
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: Params
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -60,7 +60,7 @@ export async function PATCH(
   { params }: Params
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -221,11 +221,11 @@ export async function PATCH(
 
 // DELETE /api/admin/drip-sequences/[id] — Delete a sequence (if no active enrollments)
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: Params
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

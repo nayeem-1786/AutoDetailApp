@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
@@ -32,8 +32,8 @@ interface CreativeStats {
   ctr: number;
 }
 
-export async function GET(request: Request) {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

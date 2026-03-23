@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
@@ -9,8 +9,8 @@ import { revalidateTag } from '@/lib/utils/revalidate';
 // Body: { items: [{ id: string, sort_order: number }] }
 // ---------------------------------------------------------------------------
 
-export async function PATCH(request: Request) {
-  const employee = await getEmployeeFromSession();
+export async function PATCH(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

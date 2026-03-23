@@ -23,8 +23,8 @@ const HOMEPAGE_KEYS = [
   'services_page_description',
 ] as const;
 
-export async function GET() {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -52,7 +52,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

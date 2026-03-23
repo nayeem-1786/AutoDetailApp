@@ -10,11 +10,11 @@ const VALID_EXIT_ACTIONS = ['stop', 'move', 'tag'] as const;
 
 // GET /api/admin/drip-sequences/[id]/steps — List steps for a sequence
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: Params
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -60,7 +60,7 @@ export async function POST(
   { params }: Params
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

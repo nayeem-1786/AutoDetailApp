@@ -12,7 +12,7 @@ type Params = { params: Promise<{ id: string }> };
 // POST /api/admin/email-templates/[id]/test-send — Send test email
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;

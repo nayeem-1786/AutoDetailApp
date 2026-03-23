@@ -9,7 +9,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 // ---------------------------------------------------------------------------
 
 export async function PATCH(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

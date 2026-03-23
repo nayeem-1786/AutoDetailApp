@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: app subdomain architecture — host-based routing and IP restriction — 2026-03-23
+
+Production uses two domains pointing to the same Next.js app:
+- `smartdetailsautospa.com` — public site, booking, customer portal
+- `app.smartdetailsautospa.com` — admin + POS (IP restricted)
+
+### Middleware host-based routing (`src/middleware.ts`)
+- **Main domain:** `/admin`, `/pos`, `/login` → 302 redirect to `app.` subdomain
+- **App domain:** IP whitelist enforced on ALL paths (not just `/pos`). Non-staff paths redirected to main domain. Root `/` → `/admin`.
+- **Staging:** Single-domain mode, `/pos`-only IP restriction preserved
+- **Dev/ngrok:** No subdomain routing (gated by `NEXT_PUBLIC_MAIN_DOMAIN` env var)
+
+### Admin API IP restriction (`src/lib/auth/get-employee.ts`)
+- `getEmployeeFromSession()` now accepts optional `request: NextRequest` parameter
+- When provided, checks IP whitelist via `isIpAllowed()` before session validation
+- All 110 admin API route files (187 call sites) updated to pass `request`
+- Backwards compatible — existing calls without `request` still work
+
+### Other changes
+- **New utility:** `src/lib/security/host-routing.ts` — `getHostType()`, `STAFF_PATHS`, `APP_ALLOWED_PATHS`
+- **Staff email links:** Password reset uses `NEXT_PUBLIC_STAFF_URL` (points to `app.` domain)
+- **next.config.ts:** Belt-and-suspenders `redirects()` for main + www domains
+- **Env vars:** `NEXT_PUBLIC_MAIN_DOMAIN` (gates subdomain routing), `NEXT_PUBLIC_STAFF_URL` (staff email links)
+
+### Manual config needed for production
+- Supabase: add `app.smartdetailsautospa.com` redirect URLs
+- QuickBooks: update OAuth redirect URI to `app.` domain
+- POS PWA: reinstall from `app.smartdetailsautospa.com/pos`
+- Nginx: ensure both domains proxy to port 5003 with `X-Forwarded-For` / `X-Real-IP` headers
+
+---
+
 ## chore: add standalone output for Hostinger VPS deploy — 2026-03-22
 
 - Added `output: 'standalone'` to `next.config.ts` for self-hosted deployment via PM2.

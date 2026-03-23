@@ -12,8 +12,8 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -38,7 +38,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -75,8 +75,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json({ data });
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
-  const employee = await getEmployeeFromSession();
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -3,15 +3,15 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 
-export async function GET(req: NextRequest) {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const denied = await requirePermission(employee.id, 'admin.photos.view');
   if (denied) return denied;
 
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get('page') || '1', 10);
   const limit = parseInt(searchParams.get('limit') || '20', 10);
   const offset = (page - 1) * limit;

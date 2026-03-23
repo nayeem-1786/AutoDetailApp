@@ -12,8 +12,8 @@ import { checkIdempotency, saveIdempotency } from '@/lib/utils/idempotency';
 // DELETE /api/admin/footer/bottom-links — Delete a bottom link
 // ---------------------------------------------------------------------------
 
-export async function GET() {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -35,7 +35,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -139,7 +139,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

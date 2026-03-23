@@ -1,5 +1,5 @@
 # Smart Details Auto Spa — Launch Roadmap
-*Last updated: March 10, 2026*
+*Last updated: March 24, 2026*
 
 ---
 
@@ -7,792 +7,538 @@
 
 ```
 Codebase:     MBP localhost, branch main, pushed to GitHub origin/main
-              Session 9-A complete — auth fixes, TS cleanup, admin employee check
-App status:   Phases 1–12 complete. Active daily use on localhost dev server.
-VPS:          Hostinger, running TorranceNotary.com, sales.lomitamail.com, 121Media.com
-              Smart Details NOT yet deployed on VPS
-Subdomains:   None created yet for Smart Details
-GitHub:       main branch (current), feature/vehicle-silhouettes (pending resolution)
-Database:     Supabase project zwvahzymzardmxixyfim — single project, production data
+              All features code-complete (Sessions 9-12+ plus role audit, email templates, manual)
+Staging:      staging.smartdetailsautospa.com — running on Hostinger VPS, port 5003
+              Single-domain test environment. Admin login confirmed working.
+App domain:   app.smartdetailsautospa.com — DNS + Apache proxy configured, returning 200
+              Middleware code changes pending (CC plan approved, ready to execute)
+VPS:          Hostinger, /home/media/repositories/smart-details/
+              PM2 via start.sh wrapper (sources .env.local), Apache/cPanel proxy
+Database:     Supabase project zwvahzymzardmxixyfim — single project
 ```
 
 ---
 
-## Roadmap Overview
+## Production Architecture (Two Domains, One App)
+
+Both domains point to the SAME Next.js app instance on port 5003. A new `host-routing.ts` utility detects the domain via Host header. The `NEXT_PUBLIC_MAIN_DOMAIN` env var gates all subdomain logic — when unset (local dev, ngrok, staging), no host-based routing fires.
 
 ```
-Phase 1 — Finish remaining app features (Sessions 9-B through 9-H)
-Phase 2 — Git cleanup and branch strategy
-Phase 3 — VPS staging environment setup
-Phase 4 — app.smartdetailsautospa.com setup (admin + POS, live immediately)
-Phase 5 — Session isolation (cookie separation or subdomain enforcement)
-Phase 6 — Full QA on staging
-Phase 7 — SEO audit and 301 redirect map
-Phase 8 — Production go-live
-Phase 9 — Post-launch monitoring
+smartdetailsautospa.com (PUBLIC — open to all)
+├── /                    → Homepage
+├── /book                → Booking wizard
+├── /services/*          → Service pages
+├── /products/*          → Product pages + shop
+├── /cart, /checkout     → Product checkout
+├── /gallery             → Photo gallery
+├── /account/*           → Customer portal (auth required, NO IP restriction)
+├── /areas/*             → City/area SEO pages
+├── /receipt/[token]     → Public receipt page
+├── /quote/[token]       → Public quote view
+├── /admin/*             → 302 REDIRECT to app.smartdetailsautospa.com/admin/*
+├── /pos/*               → 302 REDIRECT to app.smartdetailsautospa.com/pos/*
+├── /login               → 302 REDIRECT to app.smartdetailsautospa.com/login
+└── /api/public/*        → Public APIs (open)
+    /api/book/*          → Booking APIs (open)
+    /api/customer/*      → Customer APIs (auth required)
+    /api/webhooks/*      → Webhook receivers (open)
+
+app.smartdetailsautospa.com (STAFF — entire domain IP restricted)
+├── /                    → Redirect to /admin
+├── /admin/*             → Admin panel (IP restricted + session auth)
+├── /pos/*               → POS system (IP restricted + HMAC auth)
+├── /login               → Staff login (IP restricted)
+├── /auth/callback       → Auth callback
+├── (any public path)    → Redirect to smartdetailsautospa.com
+└── /api/admin/*         → Admin APIs (IP restricted via getEmployeeFromSession)
+    /api/pos/*           → POS APIs (IP restricted via authenticatePosRequest)
+
+staging.smartdetailsautospa.com (TESTING — single-domain mode)
+├── Everything works as one domain (no redirects)
+├── /pos/* only          → IP restricted (preserves current behavior)
+└── NEXT_PUBLIC_MAIN_DOMAIN is unset → host routing disabled
+```
+
+**Cookie separation:** Different subdomains = different cookie jars. Staff sessions on `app.` never collide with customer sessions on the main domain. Permanently fixes the OTP spinner issue.
+
+**IP restriction:** The ENTIRE `app.` domain is gated by the IP whitelist (Admin → Settings → POS Security). Admin APIs are also IP-checked via `getEmployeeFromSession(request)`. POS APIs via `authenticatePosRequest(request)`.
+
+**Redirects use 302 initially.** Switch to 301 after architecture is confirmed stable in production (prevents aggressive browser caching during setup).
+
+---
+
+## Roadmap
+
+```
+Phase 1 — ✅ COMPLETE — All app features finished
+Phase 2 — Git cleanup
+Phase 3 — ✅ COMPLETE — Staging deployed (single-domain test)
+Phase 4 — ✅ PARTIAL — app. proxy configured, middleware code pending
+Phase 5 — External service configuration
+Phase 6 — SEO audit and redirect map
+Phase 7 — Data prep + production go-live
+Phase 8 — Post-launch monitoring
 ```
 
 ---
 
-## Phase 1 — Remaining App Features
+## Phase 1 — ✅ COMPLETE
 
-All items below are open from the Session 9 handoff doc. Complete in order.
-Each is a separate Claude Code session.
+All features finished across Sessions 9-12+:
 
-### Task B — POS Print Button → window.print() / AirPrint
-**Priority:** High
-Revert POS Print button from the current print server path back to `window.print()` for
-native AirPrint support on iPads. The AltaLink C8070 now has native AirPrint enabled and
-Avahi reflects mDNS cross-subnet. Print path: iPad → AirPrint → AltaLink C8070.
-Konica still uses raw TCP 9100 via print server — that path is unchanged.
-
-### Task C — SMS Receipt Redesign
-**Priority:** High
-Redesign SMS receipt to fit under 160 characters. Format: summary line + link to full
-receipt in customer portal. Avoids multi-part SMS charges and improves deliverability.
-All SMS through `sendSms()` in `src/lib/utils/sms.ts`.
-
-### Task D — Coupon Stacking Audit
-**Priority:** High
-Audit and enforce no-stacking rules: coupons cannot stack with add-ons, combos,
-closeout pricing, or active promotions. Document the exact matrix of what can and
-cannot combine. Fix any POS paths where stacking is currently possible.
-Reference `docs/COUPONS.md` before starting.
-
-### Task E — Loyalty Points as Payment Line Item
-**Priority:** Medium
-Add loyalty points redemption as a payment line item in the POS checkout flow.
-Points appear as a credit line reducing the balance due. Check DB_SCHEMA.md for
-existing loyalty fields before adding any new columns.
-
-### Task F — Add-on Savings Sub-text + DB Migration
-**Priority:** Medium
-Display savings sub-text on add-ons showing the discount vs standalone price.
-Requires DB migration: add `is_addon` (boolean) and `original_price` (numeric) to
-`transaction_items` table. Check DB_SCHEMA.md first — reuse existing fields if possible.
-Migration must be backwards-compatible with existing transaction records.
-
-### Task G — Barcode Scanner Handler in POS
-**Priority:** Medium
-Add keyboard wedge barcode scanner input handler to POS. Scanners emulate rapid
-keyboard input ending in Enter. Handler must: detect scan vs manual typing by input
-speed, look up product/coupon/customer by barcode, not interfere with normal
-keyboard navigation in POS forms.
-
-### Task H — Logo Base64 in receipt-template.ts
-**Priority:** Low
-Embed the business logo as a base64 string at line 617 of `receipt-template.ts`
-so receipts render the logo without a network dependency. Reference
-`docs/hardware/STAR_PRINTER_LOGO.md` for ESC/POS constraints.
+| Feature | Status |
+|---------|--------|
+| POS Print (AirPrint) | ✅ |
+| SMS Receipt Redesign | ✅ |
+| Coupon Stacking Audit | ✅ |
+| Loyalty Points Payment | ✅ |
+| Add-on Savings Sub-text | ✅ |
+| Barcode Scanner | ✅ |
+| Logo Base64 in Receipts | ✅ |
+| Customer Soft Delete | ✅ |
+| Hot Shampoo Multi-Qty | ✅ |
+| Enter-Key-as-Submit (42 files) | ✅ |
+| Prerequisites System + Manager PIN | ✅ |
+| Role Audit (90/97 permissions enforced) | ✅ |
+| Email Templates + Brand Kit + Drip Sequences | ✅ |
+| Welcome Email + Template Coupon Picker | ✅ |
+| Transactional Emails (confirm/remind/cancel) | ✅ |
+| Two-Column Block Editor | ✅ |
+| Business Info Single Source of Truth | ✅ |
+| IP Whitelist on POS API Routes | ✅ |
+| App Manual (12 chapters verified against codebase) | ✅ |
 
 ---
 
-## Phase 2 — Git Cleanup and Branch Strategy
+## Phase 2 — Git Cleanup
 
-### Branch Resolution
-
-**feature/vehicle-silhouettes:**
-The silhouette feature (vehicle type icons in zone picker for intake/completed jobs)
-is confirmed working in the current codebase. The branch contains one code commit
-(`a59b9e0`) that is already reflected in the working app. The branch also contains
-older versions of docs that have since been superseded on main.
-
-Actions:
 ```bash
-# Verify the feature commit is already in main
-git log main --oneline | head -20
-# If a59b9e0 is NOT in main, cherry-pick it:
-git cherry-pick a59b9e0
-git push origin main
+# Verify feature/vehicle-silhouettes is merged
+git log main --oneline | grep silhouette
 
-# Delete the branch (local and remote)
+# If merged, delete the branch
 git branch -d feature/vehicle-silhouettes
 git push origin --delete feature/vehicle-silhouettes
 ```
 
-### Create Staging Branch
-```bash
-git checkout -b staging
-git push -u origin staging
-```
-
-Staging branch is created from the current state of main — all Phase 1 work complete,
-all auth fixes in place. This becomes the branch deployed to the VPS staging environment.
-
-### Branch Strategy Going Forward
-
-```
-main      ← production only. Never commit directly.
-            Receives merges from staging after testing.
-            Deployed to: smartdetailsautospa.com
-
-staging   ← active development and pre-production testing.
-            All new work commits here.
-            Deployed to: staging.smartdetailsautospa.com
-```
-
-**Workflow for every change after launch:**
-```
-Code on MBP (localhost)
-  → commit to staging branch
-    → push to GitHub
-      → pull on VPS staging environment
-        → test on staging.smartdetailsautospa.com
-          → merge staging → main on GitHub
-            → pull on VPS production
-              → production updated
-```
-
-**Protect main branch on GitHub:**
-GitHub → Settings → Branches → Add rule → Branch name: `main`
-→ Check: Require a pull request before merging
-→ Check: Require approvals: 1 (you reviewing your own PR is fine)
-This prevents accidental direct pushes to production.
+Branch strategy: single `main` branch for now. Post-launch, consider `staging` branch for pre-production testing of risky changes.
 
 ---
 
-## Phase 3 — VPS Staging Environment Setup
+## Phase 3 — ✅ COMPLETE — Staging Deployed
 
-### Prerequisites
-- SSH access to Hostinger VPS confirmed
-- Existing sites (TorranceNotary, LomitaMail, 121Media) already running
-- Traefik already configured with dynamic configs in `~/infra/traefik/dynamic/`
-- GitHub repo accessible from VPS (SSH key or deploy token)
+Completed March 23, 2026. Single-domain test environment at `staging.smartdetailsautospa.com`.
 
-### DNS Records to Create
-Add these A records at your DNS registrar. All point to the same VPS IP.
-
+### Server details
 ```
-Type  Name             Value         TTL
-A     staging          [VPS IP]      3600
-A     app              [VPS IP]      3600
+Directory:    /home/media/repositories/smart-details/
+Port:         5003
+PM2:          start.sh wrapper (sources .env.local, exec node server.js)
+Apache proxy: /etc/apache2/conf.d/userdata/ssl/2_4/davidsegundo/staging.smartdetailsautospa.com/proxy.conf
 ```
 
-That is two new DNS records. `staging.smartdetailsautospa.com` and
-`app.smartdetailsautospa.com`. No others needed.
-
-Verify propagation before proceeding to Traefik config:
-```bash
-dig staging.smartdetailsautospa.com
-dig app.smartdetailsautospa.com
-```
-
-### VPS Directory Structure
-```
-/var/www/
-├── smartdetails-staging/     ← staging branch, port 3001
-├── smartdetails-production/  ← main branch, port 3000 (set up at go-live)
-└── [existing sites...]
-```
-
-### Clone and Configure Staging
-```bash
-ssh into VPS
-cd /var/www
-git clone git@github.com:[username]/AutoDetailApp.git smartdetails-staging
-cd smartdetails-staging
-git checkout staging
-cp .env.example .env  # or create .env manually
-npm ci
-npm run build
-```
-
-### Environment Variables for Staging
-Create `/var/www/smartdetails-staging/.env`:
-```env
-NEXT_PUBLIC_SITE_URL=https://staging.smartdetailsautospa.com
-NEXT_PUBLIC_APP_URL=https://app.smartdetailsautospa.com
-NODE_ENV=production
-# All other vars identical to local .env (Supabase, Stripe, Twilio, Mailgun, Square)
-# Single Supabase project — staging reads/writes real data
-# Do not run bulk operations or destructive queries from staging
-```
-
-### PM2 Process for Staging
-```bash
-pm2 start npm --name "sd-staging" -- start -- -p 3001
-pm2 save
-pm2 startup  # if not already configured
-```
-
-### Traefik Config for Staging
-New file: `~/infra/traefik/dynamic/smartdetails-staging.yml`
-
-```yaml
-http:
-  routers:
-    smartdetails-staging:
-      rule: "Host(`staging.smartdetailsautospa.com`)"
-      entryPoints:
-        - websecure
-      tls:
-        certResolver: letsencrypt
-      service: smartdetails-staging-service
-
-  services:
-    smartdetails-staging-service:
-      loadBalancer:
-        servers:
-          - url: "http://localhost:3001"
-```
-
-No IP restriction on staging — you need to access it from any device for testing.
-Staging has no real customers and no public SEO presence.
-
-### Verify Staging
-```
-[ ] https://staging.smartdetailsautospa.com loads the app
-[ ] SSL cert issued (check Traefik dashboard)
-[ ] Customer portal reachable
-[ ] Admin panel reachable at staging.smartdetailsautospa.com/admin
-[ ] POS reachable at staging.smartdetailsautospa.com/pos
-[ ] OTP login works on staging
-[ ] No console errors on load
-```
+### Key setup details discovered during deploy
+- Next.js standalone `server.js` does NOT auto-load `.env.local` — the `start.sh` wrapper sources it explicitly
+- `ecosystem.config.js` JavaScript parser mangles long keys (added leading spaces) — abandoned in favor of `start.sh`
+- `NEXT_PUBLIC_*` vars are baked at build time — must be correct BEFORE `npm run build`
+- Apache proxy requires `RequestHeader set X-Forwarded-For` and `X-Real-IP` for IP whitelist to work
+- cPanel user for Smart Details subdomains: `davidsegundo`
 
 ---
 
 ## Phase 4 — app.smartdetailsautospa.com Setup
 
-`app.` is the permanent home for admin and POS. It goes live immediately because it is
-IP restricted from day one — no customer can reach it, no SEO implications.
-
-### What app. Hosts
+### Step 1: Apache proxy — ✅ COMPLETE
 ```
-app.smartdetailsautospa.com/admin    ← Admin panel
-app.smartdetailsautospa.com/pos      ← POS system
-app.smartdetailsautospa.com/login    ← Staff login
-app.smartdetailsautospa.com/auth/callback  ← Auth callback for staff
+/etc/apache2/conf.d/userdata/ssl/2_4/davidsegundo/app.smartdetailsautospa.com/proxy.conf
+```
+Configured March 23. Proxy to port 5003 with X-Forwarded-For, X-Real-IP, X-Forwarded-Proto headers. Returning 200.
+
+### Step 2: Middleware code changes — PENDING
+
+CC has audited and produced the final merged plan. Ready to execute.
+
+**Implementation summary (6 steps, ~110 files):**
+
+| Step | File(s) | Change |
+|------|---------|--------|
+| 1 | `src/lib/security/host-routing.ts` | NEW — `getHostType()` utility with `NEXT_PUBLIC_MAIN_DOMAIN` env var gate |
+| 2 | `src/middleware.ts` | Rewrite: host-based routing replaces old `/pos`-only IP check |
+| 3 | `src/lib/auth/get-employee.ts` + ~110 admin API routes | Optional `request` param on `getEmployeeFromSession()` + IP check |
+| 4 | `src/app/api/admin/staff/[id]/reset-password/route.ts` | Use `NEXT_PUBLIC_STAFF_URL` for staff email links |
+| 5 | `next.config.ts` | Add `redirects()` with host conditions (belt-and-suspenders) |
+| 6 | `.env.local` updates | Add `NEXT_PUBLIC_MAIN_DOMAIN` and `NEXT_PUBLIC_STAFF_URL` |
+
+**Admin API route update breakdown (187 call sites, 110 files):**
+
+| Pattern | Count | Method |
+|---------|-------|--------|
+| `request` param available | ~73 files | Direct find-replace |
+| `_request` param (underscore) | 12 files | Rename `_request` → `request`, then replace |
+| No `request` param (e.g. `GET()`) | 25 files | Add `request: NextRequest` to signature, then replace |
+
+**Edge cases handled:**
+
+| Edge Case | Resolution |
+|-----------|------------|
+| ngrok/tunnel dev | `NEXT_PUBLIC_MAIN_DOMAIN` unset → `getHostType()` returns `'dev'` → no redirects |
+| `www.` visitors | Config redirects handle `www.` explicitly with duplicate rules |
+| Bookmarked admin URLs | 302 redirect to `app.` domain (seamless) |
+| Customer on app. domain | IP blocked or redirected to main domain |
+| Cron self-calls | `localhost:5003`, matcher excludes `/api/*` — no middleware hit |
+| Staff reset email | Uses `NEXT_PUBLIC_STAFF_URL` → `app.` domain |
+| Staff "Forgot Password" in browser | `window.location.origin` already `app.` → correct |
+| Staging | Single-domain, only `/pos` IP-restricted, no redirects |
+| `/receipt/*`, `/quote/*` on app. | Not in allowed paths → redirected to main domain |
+
+### Step 3: Environment Variables — ADD to server .env.local
+
+```
+NEXT_PUBLIC_MAIN_DOMAIN=smartdetailsautospa.com
+NEXT_PUBLIC_STAFF_URL=https://app.smartdetailsautospa.com
 ```
 
-### VPS Directory for app.
+Local dev .env.local — ADD:
+```
+NEXT_PUBLIC_STAFF_URL=http://localhost:3000
+```
+(`NEXT_PUBLIC_MAIN_DOMAIN` intentionally unset in dev — disables all subdomain routing)
+
+Staging .env.local: `NEXT_PUBLIC_MAIN_DOMAIN` intentionally unset (single-domain mode).
+
+### Step 4: External Dashboard Configuration (manual)
+
+```
+[ ] Supabase Auth → add redirect URLs:
+    - https://app.smartdetailsautospa.com/auth/callback
+    - https://app.smartdetailsautospa.com/login
+    - https://smartdetailsautospa.com/auth/callback (if not already there)
+[ ] QuickBooks OAuth → update redirect URI in Intuit Developer Portal:
+    - https://app.smartdetailsautospa.com/api/admin/integrations/qbo/callback
+[ ] POS PWA → uninstall old PWA, reinstall from app.smartdetailsautospa.com/pos
+```
+
+### Step 5: Rebuild and deploy
+
 ```bash
-cd /var/www
-git clone git@github.com:[username]/AutoDetailApp.git smartdetails-app
-cd smartdetails-app
-git checkout staging  # same codebase as staging initially
-cp .env.example .env
-```
-
-Environment variables for app.:
-```env
-NEXT_PUBLIC_SITE_URL=https://app.smartdetailsautospa.com
-NEXT_PUBLIC_APP_URL=https://app.smartdetailsautospa.com
-NODE_ENV=production
-# All other vars same as staging
-```
-
-```bash
-npm ci
+cd /home/media/repositories/smart-details
+git pull origin main
+# Add new env vars to .env.local first
+rm -rf .next
 npm run build
-pm2 start npm --name "sd-app" -- start -- -p 3002
-pm2 save
+cp -r .next/static .next/standalone/.next/static
+cp -r public .next/standalone/public
+cp .env.local .next/standalone/.env.local
+pm2 restart smart-details
 ```
 
-### Traefik Config for app. with IP Restriction
-New file: `~/infra/traefik/dynamic/smartdetails-app.yml`
+### Step 6: Verify
 
-```yaml
-http:
-  routers:
-    smartdetails-app:
-      rule: "Host(`app.smartdetailsautospa.com`)"
-      entryPoints:
-        - websecure
-      tls:
-        certResolver: letsencrypt
-      middlewares:
-        - smartdetails-ip-allowlist
-      service: smartdetails-app-service
-
-  middlewares:
-    smartdetails-ip-allowlist:
-      ipAllowList:
-        sourceRange:
-          - "127.0.0.1/32"
-          - "[STORE-PUBLIC-IP]/32"
-          - "[OWNER-HOME-IP]/32"
-          # Add additional permanent IPs here
-          # Mirror your core IPs from POS Settings whitelist
-
-  services:
-    smartdetails-app-service:
-      loadBalancer:
-        servers:
-          - url: "http://localhost:3002"
 ```
+# Local dev (must still work):
+[ ] localhost:3000/admin → loads normally (no redirect)
+[ ] localhost:3000/pos → loads normally
+[ ] localhost:3000/ → homepage
 
-**Two-layer IP enforcement:**
-- Layer 1: Traefik rejects non-whitelisted IPs before request reaches Next.js
-- Layer 2: Existing in-app middleware whitelist (POS Settings) remains active as fallback
+# Main domain:
+[ ] smartdetailsautospa.com/ → homepage
+[ ] smartdetailsautospa.com/book → booking
+[ ] smartdetailsautospa.com/account → customer portal
+[ ] smartdetailsautospa.com/admin → 302 to app.smartdetailsautospa.com/admin
+[ ] smartdetailsautospa.com/pos → 302 to app.smartdetailsautospa.com/pos
+[ ] smartdetailsautospa.com/login → 302 to app.smartdetailsautospa.com/login
+[ ] www.smartdetailsautospa.com/admin → same redirect
 
-**Login page exception:** `app.smartdetailsautospa.com/login` should remain reachable
-so staff attempting access from an unwhitelisted IP see a proper redirect rather than
-a raw 403. Handle this in Traefik by either excluding `/login` from the IP rule or
-accepting that staff must be on an approved network to log in at all (recommended —
-if they can't access the app, they don't need the login page either).
+# App domain:
+[ ] app.smartdetailsautospa.com/ → 302 to /admin
+[ ] app.smartdetailsautospa.com/admin → admin (IP restricted)
+[ ] app.smartdetailsautospa.com/pos → POS (IP restricted)
+[ ] app.smartdetailsautospa.com/services → redirect to main domain
+[ ] app.smartdetailsautospa.com/receipt/[token] → redirect to main domain
+[ ] app.smartdetailsautospa.com from blocked IP → 403
 
-### Update Supabase Redirect URLs
-In Supabase Dashboard → Authentication → URL Configuration → Redirect URLs, add:
-```
-https://app.smartdetailsautospa.com
-https://app.smartdetailsautospa.com/login
-https://app.smartdetailsautospa.com/auth/callback
-https://staging.smartdetailsautospa.com
-https://staging.smartdetailsautospa.com/auth/callback
-```
+# Staging:
+[ ] staging.smartdetailsautospa.com/admin → loads (no redirect)
+[ ] staging.smartdetailsautospa.com/pos → IP restricted
 
-Existing `https://smartdetailsautospa.com` entries stay unchanged.
+# API security:
+[ ] /api/pos/* from blocked IP → 401 (authenticatePosRequest)
+[ ] /api/admin/* from blocked IP → 401 (getEmployeeFromSession)
 
-### Update Old URL Redirects
-In `next.config.js`, add redirects so existing bookmarks to `/admin` and `/pos`
-on the main domain forward to `app.`:
-
-```js
-async redirects() {
-  return [
-    {
-      source: '/admin/:path*',
-      destination: 'https://app.smartdetailsautospa.com/admin/:path*',
-      permanent: true,
-    },
-    {
-      source: '/pos/:path*',
-      destination: 'https://app.smartdetailsautospa.com/pos/:path*',
-      permanent: true,
-    },
-    {
-      source: '/login/:path*',
-      destination: 'https://app.smartdetailsautospa.com/login/:path*',
-      permanent: true,
-    },
-  ];
-},
-```
-
-This goes in the staging branch and deploys with the app.
-
-### Verify app.
-```
-[ ] https://app.smartdetailsautospa.com/admin loads admin login
-[ ] https://app.smartdetailsautospa.com/pos loads POS login
-[ ] SSL cert issued
-[ ] Admin login and session works
-[ ] POS PIN login works
-[ ] From non-whitelisted IP: 403 returned
-[ ] From whitelisted IP: full access
-[ ] Staff password reset email links resolve to app. subdomain
+# Cookie separation:
+[ ] Staff login on app. → cookie on app.smartdetailsautospa.com
+[ ] Customer login on main → cookie on smartdetailsautospa.com
+[ ] Both active simultaneously → no collision
 ```
 
 ---
 
-## Phase 5 — Session Isolation
+## Phase 5 — External Service Configuration
 
-### The Problem
-Admin, Customer Portal, and Booking all share one Supabase cookie:
-`sb-zwvahzymzardmxixyfim-auth-token*`
-
-One active session per browser. Logging into admin overwrites customer session.
-Logging out of admin logs out customer portal simultaneously.
-
-### The Solution: Subdomain-Based Cookie Separation
-Moving admin and POS to `app.smartdetailsautospa.com` (Phase 4) resolves this
-automatically at the browser level. Browsers scope cookies by domain:
-
+### Smoke Test
 ```
-smartdetailsautospa.com     cookie: sb-*-auth-token  → customer session
-app.smartdetailsautospa.com cookie: sb-*-auth-token  → staff session
-```
-
-Same cookie name. Different domain. Completely separate cookie jars.
-No code changes to auth logic required.
-
-### App Code Changes Required
-
-**1. Middleware cleanup (`src/middleware.ts`):**
-Remove `/admin` and `/pos` from the route matcher on the main domain since these
-routes will exclusively live on `app.`. Update the IP whitelist check to cover
-`/admin/*` routes in addition to `/pos/*` (defense-in-depth for the app. domain).
-
-**2. Staff password reset emails:**
-Any email template linking back to admin must use `app.smartdetailsautospa.com`
-as the base URL, not `smartdetailsautospa.com`. Audit all transactional email
-templates that contain admin-facing links.
-
-**3. Environment variable audit:**
-Search the codebase for any hardcoded `smartdetailsautospa.com` references in
-admin-facing code. Replace with `process.env.NEXT_PUBLIC_APP_URL`.
-Customer-facing references use `process.env.NEXT_PUBLIC_SITE_URL`.
-
-**4. Remove signOut() on mount hacks (after confirming subdomain separation works):**
-The `signOut()` on mount added in Session 9-A was a workaround for the shared
-cookie problem. Once admin lives on `app.` and customer portal on the main domain,
-these two sessions can never collide. The signOut on mount is no longer needed.
-Remove it from `signin/page.tsx`, `signup/page.tsx`, and `login/page.tsx` only
-after verifying session isolation works correctly on staging.
-
-### Verify Session Isolation
-```
-[ ] Log into admin at app.smartdetailsautospa.com/login
-[ ] In same browser, open staging.smartdetailsautospa.com/signin — customer OTP works
-[ ] Both tabs remain logged in simultaneously
-[ ] Log out of admin — customer portal stays logged in
-[ ] Log out of customer — admin stays logged in
-[ ] Customer portal loads vehicles, transactions, loyalty, appointments correctly
-[ ] Booking flow with inline auth works while admin is logged in on app. subdomain
-[ ] OTP works in normal browser (no private/incognito needed)
+[ ] Homepage, services, products, gallery load correctly
+[ ] Booking wizard — all 3 steps complete
+[ ] Customer signup + login (incognito) + welcome email received
+[ ] Customer portal — profile, vehicles, appointments, transactions
+[ ] Product cart + checkout reaches payment
+[ ] Admin dashboard — stats load
+[ ] Admin CRUD — customers, appointments, services, products, marketing, settings
+[ ] POS login via PIN
+[ ] POS ticket — add service, add product, coupon, loyalty, checkout
+[ ] POS receipts — thermal (at store), email, SMS, public page
+[ ] POS quotes — create, send, convert
+[ ] POS jobs — intake, progress, complete, photos
+[ ] POS refund — process, receipt updates
+[ ] Cron jobs — PM2 logs clean (no errors)
 ```
 
----
-
-## Phase 6 — Full QA on Staging
-
-Run the complete smoke test suite on `staging.smartdetailsautospa.com` before
-touching production. Test on real devices (iPad for POS, mobile for customer portal).
-
-### POS
+### External Services
 ```
-[ ] Staff PIN login
-[ ] New job creation — all vehicle types
-[ ] Service selection with combos and add-ons
-[ ] Coupon application — no stacking with add-ons/combos (Task D fix verified)
-[ ] Loyalty points as payment line item (Task E fix verified)
-[ ] Barcode scanner input (Task G fix verified)
-[ ] Payment processing — Stripe card present
-[ ] Receipt printing — Star TSP100III (logo, cut)
-[ ] Receipt printing — Konica via raw TCP 9100
-[ ] AirPrint receipt — iPad → AltaLink C8070 (Task B fix verified)
-[ ] SMS receipt sent under 160 chars (Task C fix verified)
-[ ] Cash drawer trigger
-[ ] POS session expiry at 12 hours — clean redirect to PIN screen
-[ ] IP whitelist enforcement — access blocked from non-whitelisted IP
+[ ] Stripe webhook → https://smartdetailsautospa.com/api/webhooks/stripe
+    Events: payment_intent.succeeded, payment_intent.failed
+    Copy STRIPE_WEBHOOK_SECRET to .env.local on server
+[ ] Twilio webhook → https://smartdetailsautospa.com/api/webhooks/twilio/inbound
+[ ] Mailgun webhooks → https://smartdetailsautospa.com/api/webhooks/mailgun (all events)
+[ ] Supabase Auth → add production + app. domains to allowed redirect URLs
+[ ] QuickBooks → update OAuth redirect to app. domain
+[ ] Test SMS send — from admin messaging
+[ ] Test email send — from email template editor
+[ ] Test Stripe payment — booking or POS checkout
 ```
 
-### Admin Panel
-```
-[ ] Admin login and session persistence
-[ ] Dashboard loads — job stats, revenue, activity
-[ ] Job management — create, edit, complete, void
-[ ] Customer management — search, view history, edit
-[ ] Service catalog — add, edit, pricing, add-ons
-[ ] Coupon management — create, set rules, expiry
-[ ] Loyalty program settings
-[ ] POS Settings — IP whitelist add/remove/toggle
-[ ] Receipt printer settings
-[ ] Staff management — add, permissions, PIN reset
-[ ] SMS settings — Twilio number, templates
-[ ] Reports and exports
-[ ] Admin password reset flow — email link resolves to app. subdomain
-```
+### Deploy Script
 
-### Customer Portal
-```
-[ ] OTP login — phone and email — normal browser (no private/incognito)
-[ ] Sign up — new customer registration
-[ ] Account dashboard loads
-[ ] Vehicle list — add, edit, delete
-[ ] Transaction history — correct data, correct customer
-[ ] Loyalty points balance and history
-[ ] Appointments — upcoming and past
-[ ] Profile edit — name, phone, email
-[ ] Password reset flow
-[ ] Session persistence — return after days away
-[ ] Session expiry — clean redirect to signin
-[ ] Mobile layout on real device
-```
-
-### Booking Flow
-```
-[ ] Full 3-step booking wizard
-[ ] Inline auth during booking — new customer OTP
-[ ] Inline auth during booking — returning customer OTP
-[ ] Booking while admin logged in on app. subdomain — no session conflict
-[ ] Booking confirmation email
-[ ] Post-booking redirect to account
-[ ] Combo pricing display
-[ ] Add-on selection
-```
-
-### Cross-Surface
-```
-[ ] Admin and customer portal in same browser simultaneously — independent sessions
-[ ] POS and admin in same browser simultaneously — no conflict (POS uses localStorage)
-[ ] Clear all site data, re-login to all three — all work independently
-```
-
-### Cron Jobs
-```
-[ ] All internal cron jobs fire correctly (no n8n, no Vercel Cron — internal only)
-[ ] Scheduled tasks run in America/Los_Angeles timezone
-[ ] No cron errors in PM2 logs after 24 hours
-```
-
----
-
-## Phase 7 — SEO Audit and 301 Redirect Map
-
-This phase must be completed before the production DNS switch. Doing it after causes
-Google to index 404s or wrong URLs, losing any ranking the current site has.
-
-### Step 1 — Export Current Indexed URLs
-From Google Search Console → Coverage → Valid → Export all indexed URLs.
-Also run Screaming Frog (or equivalent) on the current live `smartdetailsautospa.com`
-to crawl all accessible URLs regardless of index status.
-
-### Step 2 — Audit the Built-in SEO Section
-The app has a complete SEO section built out. Before go-live, audit:
-- Every public-facing route in the app has a corresponding `metadata` export
-  (title, description, canonical URL, Open Graph)
-- Service pages use structured data (LocalBusiness, Service schema)
-- 38-city schema implementation is intact (from TorranceNotary SEO audit pattern)
-- `sitemap.xml` is generated and accurate
-- `robots.txt` is correct — allows customer-facing routes, disallows `/admin`, `/pos`
-
-### Step 3 — Map Old URLs to New URLs
-Compare every currently-indexed URL against every route in the new app.
-For each URL that has changed path, write a 301 redirect rule.
-
-Common cases to check:
-```
-/services          → verify route exists and slug matches
-/services/[slug]   → verify all service slugs are identical
-/about             → verify route exists
-/contact           → verify route exists
-/book              → verify route exists
-/blog/[slug]       → if blog routes changed, map each one
-```
-
-### Step 4 — Implement Redirects in next.config.js
-All 301s go in the `redirects()` array in `next.config.js`. They are permanent
-(301 not 302) and must be in place at the moment the new app goes live.
-
-```js
-async redirects() {
-  return [
-    // Staff tool redirects (from Phase 4)
-    { source: '/admin/:path*', destination: 'https://app.smartdetailsautospa.com/admin/:path*', permanent: true },
-    { source: '/pos/:path*', destination: 'https://app.smartdetailsautospa.com/pos/:path*', permanent: true },
-    { source: '/login/:path*', destination: 'https://app.smartdetailsautospa.com/login/:path*', permanent: true },
-
-    // Content URL changes (fill in based on audit)
-    // { source: '/old-path', destination: '/new-path', permanent: true },
-  ];
-},
-```
-
-### Step 5 — Verify Sitemap and Canonical URLs
-After deploying to staging, fetch `staging.smartdetailsautospa.com/sitemap.xml`.
-All URLs in the sitemap must use `smartdetailsautospa.com` as the canonical domain
-(not `staging.`). Confirm `NEXT_PUBLIC_SITE_URL` drives the sitemap generation.
-
----
-
-## Phase 8 — Production Go-Live
-
-All phases above must be complete and verified before starting this phase.
-
-### Pre-Launch Checklist
-```
-[ ] All Phase 1 tasks (B–H) complete and tested on staging
-[ ] app.smartdetailsautospa.com live and verified
-[ ] Session isolation verified on staging
-[ ] Full QA (Phase 6) passed — zero blocking issues
-[ ] SEO audit complete — all 301 redirects written and tested on staging
-[ ] Sitemap accurate, canonical URLs correct
-[ ] All environment variables confirmed for production .env
-[ ] Staff notified of new admin/POS URLs (app.smartdetailsautospa.com)
-[ ] Supabase redirect URLs include production domain entries
-[ ] PM2 and Traefik configs ready for production
-[ ] DNS TTL lowered to 300s (5 min) on smartdetailsautospa.com at least 24 hours before go-live
-    (allows fast rollback if needed)
-```
-
-### Production Deploy Sequence
-
-**Step 1 — Final merge**
+Create `/usr/local/bin/deploy-smartdetails`:
 ```bash
-# On MBP, after all staging testing passes:
-git checkout main
-git merge staging
-git push origin main
-```
-
-**Step 2 — Set up production environment on VPS**
-```bash
-cd /var/www
-git clone git@github.com:[username]/AutoDetailApp.git smartdetails-production
-cd smartdetails-production
-git checkout main
-```
-
-Create `/var/www/smartdetails-production/.env`:
-```env
-NEXT_PUBLIC_SITE_URL=https://smartdetailsautospa.com
-NEXT_PUBLIC_APP_URL=https://app.smartdetailsautospa.com
-NODE_ENV=production
-# All production credentials — Supabase, Stripe live keys, Twilio, Mailgun, Square
-# Verify: Stripe LIVE keys, not test keys
-# Verify: Twilio production number
-# Verify: Mailgun production domain
-```
-
-```bash
-npm ci
+#!/bin/bash
+set -e
+echo "=== Deploying Smart Details ==="
+cd /home/media/repositories/smart-details
+git config --global --add safe.directory /home/media/repositories/smart-details
+git pull origin main
+npm install --silent
+rm -rf .next
 npm run build
-pm2 start npm --name "sd-production" -- start -- -p 3000
-pm2 save
+cp -r .next/static .next/standalone/.next/static
+cp -r public .next/standalone/public
+cp .env.local .next/standalone/.env.local
+pm2 restart smart-details
+echo "=== Deploy complete ==="
+pm2 status smart-details
 ```
-
-**Step 3 — Traefik config for production**
-New file: `~/infra/traefik/dynamic/smartdetails-production.yml`
-
-```yaml
-http:
-  routers:
-    smartdetails-production:
-      rule: "Host(`smartdetailsautospa.com`) || Host(`www.smartdetailsautospa.com`)"
-      entryPoints:
-        - websecure
-      tls:
-        certResolver: letsencrypt
-      service: smartdetails-production-service
-
-  services:
-    smartdetails-production-service:
-      loadBalancer:
-        servers:
-          - url: "http://localhost:3000"
-```
-
-**Step 4 — DNS switch**
-Update `smartdetailsautospa.com` A record to point to VPS IP.
-(If already pointing to VPS from a previous deploy, this step may already be done.)
-
-**Step 5 — Verify SSL and routing**
-Traefik ACME will issue cert automatically. Monitor Traefik logs.
 ```bash
-pm2 logs sd-production --lines 50
+chmod +x /usr/local/bin/deploy-smartdetails
 ```
 
-**Step 6 — Run DB migrations if any**
-```bash
-cd /var/www/smartdetails-production
-# Run any pending Supabase migrations
-# Verify migrations don't break existing data
+---
+
+## Phase 6 — SEO Audit and Redirect Map
+
 ```
+[ ] Crawl current smartdetailsautospa.com — document all existing URLs
+[ ] Map old URLs to new URLs
+[ ] Write 301 redirects in next.config.ts
+[ ] Test redirects on staging
+[ ] Lower DNS TTL to 300s at least 24 hours before go-live
+[ ] Verify sitemap uses production domain as canonical
+[ ] Verify OpenGraph images work
+```
+
+---
+
+## Phase 7 — Data Prep + Production Go-Live
+
+### Data Purge (BEFORE go-live)
+```
+[ ] Delete ALL test transactions
+[ ] Delete ALL test customers
+[ ] Delete ALL test appointments
+[ ] Delete ALL test orders
+[ ] Delete ALL test quotes
+[ ] Delete ALL test jobs
+[ ] Clear lifecycle_executions, drip_enrollments, campaign_recipients, sms_delivery_log
+[ ] Verify real business data preserved (business_settings, services, products, categories, pricing, email templates, roles, permissions)
+```
+
+### Square Data Import
+```
+[ ] Decide cutover date (last day on Square → first day on Smart Details)
+[ ] Export Square transaction history (cutover date through last Square day)
+[ ] Export Square customer list
+[ ] Use Admin → Migration tool to import customers, transactions, vehicles, products, loyalty
+[ ] Spot-check imported data — customer records, transaction totals, loyalty balances
+```
+
+### Production Environment Switch
+
+**Step 1 — Update .env.local on server:**
+```
+NEXT_PUBLIC_APP_URL=https://smartdetailsautospa.com
+TWILIO_WEBHOOK_URL=https://smartdetailsautospa.com/api/webhooks/twilio/inbound
+NEXT_PUBLIC_MAIN_DOMAIN=smartdetailsautospa.com
+NEXT_PUBLIC_STAFF_URL=https://app.smartdetailsautospa.com
+```
+
+**Step 2 — Rebuild** (NEXT_PUBLIC_ vars baked at build time):
+```bash
+deploy-smartdetails
+```
+
+**Step 3 — Apache proxy for production domain:**
+Same pattern as staging/app, under `davidsegundo` cPanel user, pointing to port 5003.
+
+**Step 4 — DNS switch:**
+Update `smartdetailsautospa.com` A record to VPS IP.
+
+**Step 5 — SSL:** Verify AutoSSL covers production domain.
+
+**Step 6 — Update all webhook URLs** to production domain (Stripe, Twilio, Mailgun).
+
+**Step 7 — POS Security:** Add store's public IP to whitelist in Admin → Settings → POS Security.
 
 ### Production Smoke Test
 ```
-[ ] https://smartdetailsautospa.com loads — correct new app, not old site
-[ ] https://www.smartdetailsautospa.com redirects to non-www
-[ ] https://app.smartdetailsautospa.com/admin — admin login works
-[ ] https://app.smartdetailsautospa.com/pos — POS loads
-[ ] Customer OTP login — real phone number receives real SMS
-[ ] Booking flow — completes successfully, confirmation email received
-[ ] Stripe payment — test with real card on production (refund immediately)
-[ ] Customer portal — real customer account loads correct data
-[ ] Receipt printing — physical receipt prints correctly
-[ ] Old URL redirects — /admin → app.smartdetailsautospa.com/admin
-[ ] SSL valid on all three domains (smartdetails, staging, app)
-[ ] PM2 logs — no errors after 10 minutes of activity
-[ ] Google Search Console — submit new sitemap URL
+[ ] smartdetailsautospa.com loads — new app
+[ ] www redirect works
+[ ] smartdetailsautospa.com/admin → 302 to app.smartdetailsautospa.com/admin
+[ ] app.smartdetailsautospa.com/admin → admin login works
+[ ] app.smartdetailsautospa.com/pos → POS login works
+[ ] Customer OTP — real phone receives SMS
+[ ] Booking completes, confirmation email received
+[ ] Stripe payment works (test + refund)
+[ ] Receipt printing at store
+[ ] Cron jobs running cleanly
+[ ] SSL valid on all domains
+[ ] Non-whitelisted IP → 403 on app. domain
+[ ] Admin + customer portal open simultaneously — no session collision
 ```
 
 ---
 
-## Phase 9 — Post-Launch Monitoring
+## Phase 8 — Post-Launch Monitoring
 
 ### First 24 Hours
 ```
-[ ] Monitor PM2 logs on production every 2 hours: pm2 logs sd-production
-[ ] Check Supabase dashboard — query volume, error rates
-[ ] Confirm cron jobs ran at expected times (check logs)
-[ ] No spike in SMS errors (Twilio dashboard)
-[ ] No payment failures (Stripe dashboard)
-[ ] Test customer OTP from a real customer device on cellular (not WiFi)
+[ ] PM2 logs every 2 hours: pm2 logs smart-details
+[ ] Supabase dashboard — query volume, errors
+[ ] Cron jobs firing correctly
+[ ] Twilio dashboard — no SMS errors
+[ ] Stripe dashboard — no payment failures
+[ ] Mailgun dashboard — no delivery issues
+[ ] Test customer OTP from real device on cellular
 ```
 
 ### First Week
 ```
-[ ] Google Search Console — check for 404 crawl errors
-[ ] Verify all redirected URLs returning 301 (not 404)
-[ ] Resubmit sitemap in Search Console
-[ ] Monitor Core Web Vitals in Search Console
-[ ] Check PM2 memory usage — restart if climbing: pm2 restart sd-production
-[ ] Staff feedback on new admin/POS URLs
-```
-
-### Ongoing Deployment Process (After Launch)
-```
-Bug or feature identified
-  → Code fix on MBP (localhost)
-    → Commit to staging branch
-      → Push to GitHub
-        → SSH to VPS: cd /var/www/smartdetails-staging && git pull && npm ci && npm run build && pm2 restart sd-staging
-          → Test on staging.smartdetailsautospa.com
-            → If good: merge staging → main on GitHub
-              → SSH to VPS: cd /var/www/smartdetails-production && git pull && npm ci && npm run build && pm2 restart sd-production
-                → Verify on smartdetailsautospa.com
-```
-
-For `app.` updates (admin/POS changes):
-```
-  → SSH to VPS: cd /var/www/smartdetails-app && git pull origin staging && npm ci && npm run build && pm2 restart sd-app
+[ ] Google Search Console — 404 crawl errors
+[ ] Resubmit sitemap
+[ ] Core Web Vitals
+[ ] PM2 memory usage — restart if climbing
+[ ] Staff feedback on admin/POS
+[ ] Booking reminders firing at 8 AM PST
+[ ] Lifecycle engine running every 10 minutes
+[ ] Switch 302 redirects to 301 if architecture is stable
 ```
 
 ---
 
-## Reference: DNS Records Summary
+## Development Workflow (Post-Launch)
 
+### Routine Bug Fixes
 ```
-Type  Name               Value        Purpose
-A     [root]             [VPS IP]     Production customer portal (existing or add)
-A     www                [VPS IP]     www redirect (existing or add)
-A     staging            [VPS IP]     Staging environment (NEW)
-A     app                [VPS IP]     Admin + POS, IP restricted (NEW)
-```
-
-## Reference: VPS PM2 Processes
-
-```
-Name              Port   Branch    Domain                              IP Restricted
-sd-app            3002   staging   app.smartdetailsautospa.com         YES (Traefik)
-sd-staging        3001   staging   staging.smartdetailsautospa.com     NO
-sd-production     3000   main      smartdetailsautospa.com             NO
+1. Code fix on MBP at localhost:3000
+   (NEXT_PUBLIC_MAIN_DOMAIN unset → no subdomain routing, everything works locally)
+2. Test locally — verify the fix
+3. git add -A && git commit && git push
+4. SSH to server: deploy-smartdetails
+5. Changes live on production within minutes
 ```
 
-## Reference: Environment Variables Per Environment
+No ngrok needed for routine development. You see changes on localhost first, then deploy.
 
+### Risky Changes (new features, DB migrations, refactors)
 ```
-Variable                    staging.                    app.                        production
-NEXT_PUBLIC_SITE_URL        staging.domain.com          app.domain.com              domain.com
-NEXT_PUBLIC_APP_URL         app.domain.com              app.domain.com              app.domain.com
-NODE_ENV                    production                  production                  production
-Supabase keys               same project                same project                same project
-Stripe keys                 TEST keys                   TEST keys                   LIVE keys
+1. Code on MBP, test locally
+2. git push
+3. SSH to server: deploy-smartdetails
+4. Test on staging.smartdetailsautospa.com first
+   (staging has NEXT_PUBLIC_MAIN_DOMAIN unset → single-domain, all features accessible)
+5. If good → changes are already on production (same app instance, same port)
+   OR: if separate instances needed later, set up staging on a different port
 ```
+
+### Webhook Testing
+Ngrok is still useful for testing inbound webhooks locally (Twilio replies, Stripe events, Mailgun notifications). For most work, test webhooks on the live server instead.
 
 ---
 
-## Open Items / Decisions Not Yet Made
+## Reference
 
-1. **CLAUDE.md update after Phase 5** — Once admin lives on `app.` and session isolation
-   is confirmed, update CLAUDE.md to reflect the new domain structure and remove the
-   signOut-on-mount rule added in Session 9-A.
+### Server Paths
+```
+App code:         /home/media/repositories/smart-details/
+Env file:         /home/media/repositories/smart-details/.env.local
+Env backup:       /home/media/repositories/smart-details/.env.local.BAK
+Start script:     /home/media/repositories/smart-details/start.sh
+Deploy script:    /usr/local/bin/deploy-smartdetails (to be created)
+Staging proxy:    /etc/apache2/conf.d/userdata/ssl/2_4/davidsegundo/staging.smartdetailsautospa.com/proxy.conf
+App proxy:        /etc/apache2/conf.d/userdata/ssl/2_4/davidsegundo/app.smartdetailsautospa.com/proxy.conf
+Production proxy: /etc/apache2/conf.d/userdata/ssl/2_4/davidsegundo/smartdetailsautospa.com/proxy.conf (at go-live)
+PM2 logs:         ~/.pm2/logs/smart-details-*.log
+```
 
-2. **Staging Supabase project** — Currently staging uses the same Supabase project as
-   production. If data isolation becomes a concern (e.g. running bulk test data), create
-   a separate Supabase project for staging and replicate schema + RLS policies.
-   Defer until a specific need arises.
+### PM2 Port Map
+```
+Port  App              Domain(s)
+5000  121media         121media.com
+5001  sales-tracker    sales.lomitamail.com
+5002  passport-photos  photos.lomitamail.com
+5003  smart-details    staging. / app. / smartdetailsautospa.com
+```
 
-3. **app.staging.smartdetailsautospa.com** — Not needed now. Add later only if a
-   specific admin/POS change requires testing in a real-URL environment before deploying
-   to `app.`. For all current work, testing admin on MBP localhost is sufficient.
+### Domains
+```
+Domain                                  Purpose              IP Restricted    Port
+staging.smartdetailsautospa.com         Testing (keep)       /pos only        5003
+app.smartdetailsautospa.com             Admin + POS          YES (all paths)  5003
+smartdetailsautospa.com                 Public site          No               5003
+```
 
-4. **Phase 13 (Full QA)** and **Phase 16 (Launch Prep / data purge)** from the original
-   app build plan — not yet started. These should be folded into Phase 6 and Phase 8
-   of this roadmap respectively.
+All three domains → same app instance on port 5003. `host-routing.ts` handles separation.
 
-5. **Data purge before launch** — Phase 16 of the original plan includes clearing test
-   transactions, dummy customers, and placeholder service entries created during
-   development. This must happen before go-live. Add as a checklist item in Phase 8.
+### Environment Variables by Environment
+```
+Variable                      Local Dev              Staging                Production
+NEXT_PUBLIC_APP_URL           localhost:3000         staging.sdas.com       smartdetailsautospa.com
+NEXT_PUBLIC_MAIN_DOMAIN       (unset)                (unset)                smartdetailsautospa.com
+NEXT_PUBLIC_STAFF_URL         localhost:3000         (unset or localhost)   app.smartdetailsautospa.com
+CRON_BASE_URL                 localhost:3000         localhost:5003         localhost:5003
+PORT                          (default 3000)         5003                   5003
+HOSTNAME                      (default)              0.0.0.0                0.0.0.0
+```
+
+### Decisions Made
+
+| Decision | Choice | Reasoning |
+|----------|--------|-----------|
+| `app.` subdomain for staff | YES | Cookie separation, IP restriction, clean URLs |
+| IP restrict entire `app.` domain | YES | All staff paths + admin APIs gated by whitelist |
+| `NEXT_PUBLIC_MAIN_DOMAIN` env var gate | YES | Prevents broken redirects on ngrok/localhost/unknown hosts |
+| Admin API IP restriction | YES | `getEmployeeFromSession(request)` — optional param, backwards compatible |
+| 302 redirects initially | YES | Prevents cached 301s during setup; switch to 301 after stable |
+| Keep staging subdomain | YES | Safety net for risky changes; costs nothing |
+| Separate staging instance | NO | Same app, different domain, same port |
+| Booking multi-service | SHELVED | 5-6 sessions, marginal gain, POS handles walk-ins |
+| Apache (not Traefik) | YES | Server uses cPanel/Apache for Next.js apps |
+| Standalone build | YES | Smaller footprint, `start.sh` for env loading |
+| `ecosystem.config.js` | ABANDONED | JavaScript parser mangled Supabase keys; `start.sh` is reliable |
+
+### Open Items
+
+1. **Square cutover date** — decide last day on Square → first day on Smart Details
+2. **SEO redirect map** — depends on current site URL structure
+3. **CRON_SECRET** — generate: `openssl rand -hex 32` (placeholder still in server .env.local)
+4. **STRIPE_WEBHOOK_SECRET** — create webhook endpoint in Stripe Dashboard, copy signing secret
+5. **Next.js security update** — upgrade from 15.3.3 after go-live (CVE-2025-66478)
+6. **301 upgrade** — switch 302 redirects to 301 after one week of stable production

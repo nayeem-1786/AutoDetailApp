@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
@@ -7,9 +7,9 @@ type Params = { params: Promise<{ id: string }> };
 
 // ─── GET: Funnel + conversion analytics for a drip sequence ─────────
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -8,7 +8,7 @@ const VALID_TRIGGERS = ['no_visit_days', 'after_service', 'new_customer', 'manua
 // GET /api/admin/drip-sequences — List all sequences with enrollment counts
 export async function GET(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/drip-sequences — Create a new sequence with optional steps
 export async function POST(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -5,9 +5,9 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 type Params = { params: Promise<{ id: string }> };
 
 // GET /api/admin/email-templates/[id] — Get single template
-export async function GET(_request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
@@ -36,7 +36,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 // PATCH /api/admin/email-templates/[id] — Update template
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
@@ -97,9 +97,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 // DELETE /api/admin/email-templates/[id] — Delete template (non-system only)
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;

@@ -9,8 +9,8 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 // POST /api/admin/cms/global-blocks — Create a new global block
 // ---------------------------------------------------------------------------
 
-export async function GET() {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -69,7 +69,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

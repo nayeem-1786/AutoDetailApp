@@ -4,10 +4,10 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function GET(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

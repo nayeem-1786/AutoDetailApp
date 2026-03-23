@@ -9,8 +9,8 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 // POST /api/admin/cms/pages  — Create a new page
 // ---------------------------------------------------------------------------
 
-export async function GET() {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -71,7 +71,7 @@ function toSlug(title: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

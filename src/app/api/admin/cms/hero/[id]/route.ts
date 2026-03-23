@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
@@ -12,10 +12,10 @@ import { revalidateTag } from '@/lib/utils/revalidate';
 // ---------------------------------------------------------------------------
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -36,10 +36,10 @@ export async function GET(
 }
 
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -104,10 +104,10 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

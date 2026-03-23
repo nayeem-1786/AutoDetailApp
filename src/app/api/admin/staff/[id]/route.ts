@@ -9,7 +9,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const caller = await getEmployeeFromSession();
+    const caller = await getEmployeeFromSession(request);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

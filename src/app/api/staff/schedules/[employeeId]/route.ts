@@ -9,7 +9,7 @@ export async function PUT(
   { params }: { params: Promise<{ employeeId: string }> }
 ) {
   try {
-    const authEmployee = await getEmployeeFromSession();
+    const authEmployee = await getEmployeeFromSession(request);
     if (!authEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

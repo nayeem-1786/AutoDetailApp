@@ -9,8 +9,8 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 
 type RouteContext = { params: Promise<{ id: string; revisionId: string }> };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest, context: RouteContext) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

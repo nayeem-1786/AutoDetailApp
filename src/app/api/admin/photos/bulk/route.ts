@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function PATCH(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -14,6 +14,26 @@ const nextConfig: NextConfig = {
     BUILD_ID: Date.now().toString(),
   },
 
+  // Belt-and-suspenders redirects: staff paths → app. subdomain
+  // Fires before middleware. Only matches production domain (has condition).
+  // Using 302 initially — switch to permanent: true after confirmed stable.
+  async redirects() {
+    return [
+      { source: '/admin/:path*', has: [{ type: 'host', value: 'smartdetailsautospa.com' }],
+        destination: 'https://app.smartdetailsautospa.com/admin/:path*', permanent: false },
+      { source: '/admin/:path*', has: [{ type: 'host', value: 'www.smartdetailsautospa.com' }],
+        destination: 'https://app.smartdetailsautospa.com/admin/:path*', permanent: false },
+      { source: '/pos/:path*', has: [{ type: 'host', value: 'smartdetailsautospa.com' }],
+        destination: 'https://app.smartdetailsautospa.com/pos/:path*', permanent: false },
+      { source: '/pos/:path*', has: [{ type: 'host', value: 'www.smartdetailsautospa.com' }],
+        destination: 'https://app.smartdetailsautospa.com/pos/:path*', permanent: false },
+      { source: '/login/:path*', has: [{ type: 'host', value: 'smartdetailsautospa.com' }],
+        destination: 'https://app.smartdetailsautospa.com/login/:path*', permanent: false },
+      { source: '/login/:path*', has: [{ type: 'host', value: 'www.smartdetailsautospa.com' }],
+        destination: 'https://app.smartdetailsautospa.com/login/:path*', permanent: false },
+    ];
+  },
+
   images: {
     remotePatterns: [
       {

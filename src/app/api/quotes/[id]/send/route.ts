@@ -10,7 +10,7 @@ export async function POST(
 ) {
   try {
     // Auth check — admin only
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -22,7 +22,7 @@ function titleCaseMake(name: string): string {
 // Optional ?category= filter (omit to return all categories)
 // Optional ?active=true to filter only active makes
 export async function GET(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin/vehicle-makes — Add a new make
 export async function POST(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
 
 // PATCH /api/admin/vehicle-makes — Update a make
 export async function PATCH(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -166,7 +166,7 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE /api/admin/vehicle-makes — Remove a make
 export async function DELETE(request: NextRequest) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

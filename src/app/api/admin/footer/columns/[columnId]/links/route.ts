@@ -13,10 +13,10 @@ import { checkIdempotency, saveIdempotency } from '@/lib/utils/idempotency';
 // ---------------------------------------------------------------------------
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ columnId: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -44,7 +44,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ columnId: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -110,7 +110,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ columnId: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -160,7 +160,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ columnId: string }> }
 ) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

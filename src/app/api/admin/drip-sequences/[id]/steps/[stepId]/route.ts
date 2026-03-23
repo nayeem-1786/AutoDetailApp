@@ -14,7 +14,7 @@ export async function PATCH(
   { params }: Params
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -156,11 +156,11 @@ export async function PATCH(
 
 // DELETE /api/admin/drip-sequences/[id]/steps/[stepId] — Delete a step and renumber
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: Params
 ) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

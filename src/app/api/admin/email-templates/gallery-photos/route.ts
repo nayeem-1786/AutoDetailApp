@@ -5,7 +5,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 // GET /api/admin/email-templates/gallery-photos — Browse featured photos for manual gallery pick
 export async function GET(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);

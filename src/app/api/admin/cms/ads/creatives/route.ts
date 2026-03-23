@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
@@ -9,8 +9,8 @@ import { revalidateTag } from '@/lib/utils/revalidate';
 // POST /api/admin/cms/ads/creatives — Create a new ad creative
 // ---------------------------------------------------------------------------
 
-export async function GET() {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -28,8 +28,8 @@ export async function GET() {
   return NextResponse.json({ data });
 }
 
-export async function POST(request: Request) {
-  const employee = await getEmployeeFromSession();
+export async function POST(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

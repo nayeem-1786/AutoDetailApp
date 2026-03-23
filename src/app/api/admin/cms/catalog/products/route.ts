@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
@@ -9,8 +9,8 @@ import { revalidateTag } from '@/lib/utils/revalidate';
 // PATCH /api/admin/cms/catalog/products — Batch update visibility/featured/order
 // ---------------------------------------------------------------------------
 
-export async function GET() {
-  const employee = await getEmployeeFromSession();
+export async function GET(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -29,8 +29,8 @@ export async function GET() {
   return NextResponse.json({ data });
 }
 
-export async function PATCH(request: Request) {
-  const employee = await getEmployeeFromSession();
+export async function PATCH(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -12,7 +12,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const employee = await getEmployeeFromSession();
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -58,8 +58,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   return NextResponse.json({ data });
 }
 
-export async function DELETE(_request: NextRequest, context: RouteContext) {
-  const employee = await getEmployeeFromSession();
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const employee = await getEmployeeFromSession(request);
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -5,9 +5,9 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 type Params = { params: Promise<{ id: string }> };
 
 // GET /api/admin/email-templates/layouts/[id] — Get single layout
-export async function GET(_request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
@@ -37,7 +37,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 // Note: Layouts cannot be deleted (system layouts). Only colors and configs are editable.
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;

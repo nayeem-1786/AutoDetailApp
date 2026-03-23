@@ -7,7 +7,7 @@ import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
   try {
-    const caller = await getEmployeeFromSession();
+    const caller = await getEmployeeFromSession(request);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

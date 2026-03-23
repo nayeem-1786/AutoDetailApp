@@ -19,9 +19,9 @@ const BRAND_KIT_KEYS = [
 ];
 
 // GET /api/admin/email-templates/brand-kit — Get all Brand Kit settings
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const admin = createAdminClient();
@@ -68,7 +68,7 @@ export async function GET() {
 // PATCH /api/admin/email-templates/brand-kit — Update Brand Kit settings
 export async function PATCH(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();

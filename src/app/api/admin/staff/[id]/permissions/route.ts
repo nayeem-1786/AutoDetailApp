@@ -9,11 +9,11 @@ import { requirePermission } from '@/lib/auth/require-permission';
  * Returns role defaults + employee overrides for the given employee.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const caller = await getEmployeeFromSession();
+    const caller = await getEmployeeFromSession(request);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -98,7 +98,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const caller = await getEmployeeFromSession();
+    const caller = await getEmployeeFromSession(request);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

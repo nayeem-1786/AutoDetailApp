@@ -1,20 +1,70 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 import { getIpWhitelistConfig, getClientIp } from '@/lib/security/ip-whitelist';
+import { getHostType, STAFF_PATHS, APP_ALLOWED_PATHS } from '@/lib/security/host-routing';
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/unsubscribe', '/services', '/products', '/sitemap.xml', '/robots.txt', '/pos', '/auth/callback', '/s/'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get('host') || '';
+  const hostType = getHostType(host);
 
-  // IP restriction for POS routes (controlled by toggle in Settings > POS Security)
-  if (pathname.startsWith('/pos')) {
+  // =========================================================================
+  // MAIN DOMAIN: redirect staff paths to app. subdomain
+  // =========================================================================
+  if (hostType === 'main') {
+    if (STAFF_PATHS.some((p) => pathname.startsWith(p))) {
+      const mainDomain = process.env.NEXT_PUBLIC_MAIN_DOMAIN!;
+      const appUrl = new URL(request.url);
+      appUrl.hostname = `app.${mainDomain}`;
+      appUrl.port = '';
+      return NextResponse.redirect(appUrl, 302);
+    }
+    // Fall through to existing auth logic below
+  }
+
+  // =========================================================================
+  // APP DOMAIN: IP restrict everything, allow only staff paths
+  // =========================================================================
+  if (hostType === 'app') {
+    // IP whitelist applies to ALL paths on app. domain
     const { ips, enabled } = await getIpWhitelistConfig();
     if (enabled && ips.length > 0) {
       const clientIp = getClientIp(request.headers);
-      // null means local/dev connection (::1, 127.0.0.1, or no proxy headers)
-      // Only enforce IP restriction when we have a real public IP to check
+      if (clientIp && !ips.includes(clientIp)) {
+        return new NextResponse(
+          'Access denied: Your IP address (' + clientIp + ') is not authorized.',
+          { status: 403 }
+        );
+      }
+    }
+
+    // Root path → redirect to /admin
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/admin', request.url), 302);
+    }
+
+    // Non-staff path → redirect to main domain
+    if (!APP_ALLOWED_PATHS.some((p) => pathname.startsWith(p))) {
+      const mainDomain = process.env.NEXT_PUBLIC_MAIN_DOMAIN!;
+      const mainUrl = new URL(request.url);
+      mainUrl.hostname = mainDomain;
+      mainUrl.port = '';
+      return NextResponse.redirect(mainUrl, 302);
+    }
+
+    // Fall through to existing auth logic below
+  }
+
+  // =========================================================================
+  // STAGING: preserve /pos-only IP restriction (no redirects)
+  // =========================================================================
+  if (hostType === 'staging' && pathname.startsWith('/pos')) {
+    const { ips, enabled } = await getIpWhitelistConfig();
+    if (enabled && ips.length > 0) {
+      const clientIp = getClientIp(request.headers);
       if (clientIp && !ips.includes(clientIp)) {
         return new NextResponse(
           'Access denied: Your IP address (' + clientIp + ') is not authorized to access the POS system.',
@@ -23,6 +73,14 @@ export async function middleware(request: NextRequest) {
       }
     }
   }
+
+  // =========================================================================
+  // DEV (localhost / ngrok / unknown): no changes — fall through to auth logic
+  // =========================================================================
+
+  // =========================================================================
+  // EXISTING AUTH FLOW (unchanged)
+  // =========================================================================
 
   // Public routes: skip auth entirely for anonymous visitors (no Supabase cookie).
   // Logged-in users still get their session refreshed.

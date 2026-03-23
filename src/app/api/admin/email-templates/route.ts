@@ -5,7 +5,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 // GET /api/admin/email-templates — List templates with optional filters
 export async function GET(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/email-templates — Create a new template
 export async function POST(request: NextRequest) {
   try {
-    const employee = await getEmployeeFromSession();
+    const employee = await getEmployeeFromSession(request);
     if (!employee) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
