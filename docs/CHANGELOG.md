@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: print job queue — thermal printing + cash drawer via Supabase queue — 2026-03-23
+
+The app runs on a remote VPS that cannot reach the store's LAN print server. HTTPS→HTTP mixed content also blocks browser-direct calls. Solution: print job queue with an OptiPlex polling agent.
+
+- **Architecture:** VPS inserts print jobs into `print_jobs` table → OptiPlex agent polls every 2s → sends ESC/POS binary to local printer
+- **Modified:** `print-server/route.ts` and `cash-drawer/route.ts` — replaced server-side `fetch(print_server_url)` with DB insert into `print_jobs`
+- **New:** `print-jobs/[id]/route.ts` — job status endpoint for POS UI polling
+- **New:** `docs/hardware/print-agent/polling-agent.js` — standalone Node.js polling agent for OptiPlex
+- **New:** `supabase/migrations/20260323000001_create_print_jobs.sql` — print_jobs table with pending index
+- **No changes** to receipt template, ESC/POS generation, email, SMS, or HTML print paths
+
+---
+
 ## feat: app subdomain architecture — host-based routing and IP restriction — 2026-03-23
 
 Production uses two domains pointing to the same Next.js app:

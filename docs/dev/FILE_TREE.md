@@ -379,6 +379,7 @@ src/app/api/pos/receipts/email/route.ts
 src/app/api/pos/receipts/html/route.ts
 src/app/api/pos/receipts/print/route.ts
 src/app/api/pos/receipts/print-copier/route.ts
+src/app/api/pos/receipts/print-jobs/[id]/route.ts
 src/app/api/pos/receipts/print-server/route.ts
 src/app/api/pos/receipts/sms/route.ts
 src/app/api/pos/refunds/route.ts
@@ -1340,6 +1341,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260317000001_add_services_sale_price.sql
 20260317000002_sale_history.sql
 20260322000001_add_missing_permission_definitions.sql
+20260323000001_create_print_jobs.sql
 ```
 
 ---

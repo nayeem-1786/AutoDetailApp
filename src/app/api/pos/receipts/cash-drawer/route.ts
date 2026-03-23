@@ -4,10 +4,10 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { escPosOpenDrawer } from '@/app/pos/lib/receipt-template';
-import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 
 export async function POST(request: NextRequest) {
   try {
+    let employeeId: string | null = null;
     // Accept POS token auth OR admin Supabase session auth
     const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       }
       // Admin session auth — skip permission check (admin dashboard users)
     } else {
+      employeeId = posEmployee.employee_id;
       // POS token auth — check pos.open_close_register permission
       const supabaseForPermCheck = createAdminClient();
       const granted = await checkPosPermission(supabaseForPermCheck, posEmployee.role, posEmployee.employee_id, 'pos.open_close_register');
@@ -25,48 +26,32 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
+
     const supabase = createAdminClient();
+    const drawerData = escPosOpenDrawer();
+    const payload = Buffer.from(drawerData).toString('base64');
 
-    const { print_server_url } = await fetchReceiptConfig(supabase);
+    // Insert cash drawer kick into print_jobs queue.
+    // The OptiPlex polling agent picks up pending jobs and sends to the local printer.
+    const { data: job, error: insertError } = await supabase
+      .from('print_jobs')
+      .insert({
+        type: 'cash_drawer',
+        payload,
+        created_by: employeeId,
+      })
+      .select('id')
+      .single();
 
-    if (!print_server_url) {
-      console.error('print_server_url is null — receipt_config may not have been saved with this field yet');
+    if (insertError) {
+      console.error('Failed to create cash drawer job:', insertError);
       return NextResponse.json(
-        { error: 'Print server not configured' },
-        { status: 400 }
+        { error: 'Failed to queue cash drawer command' },
+        { status: 500 }
       );
     }
 
-    const drawerData = escPosOpenDrawer();
-
-    // Send cash drawer kick command with 3-second timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    try {
-      const res = await fetch(`${print_server_url}/cash-drawer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: Buffer.from(drawerData),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: 'Cash drawer command failed' },
-          { status: 502 }
-        );
-      }
-    } catch (fetchErr) {
-      clearTimeout(timeout);
-      const msg = fetchErr instanceof Error && fetchErr.name === 'AbortError'
-        ? 'Print server timeout (3s)'
-        : 'Print server unreachable';
-      return NextResponse.json({ error: msg }, { status: 502 });
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, job_id: job.id });
   } catch (err) {
     console.error('Cash drawer error:', err);
     return NextResponse.json(

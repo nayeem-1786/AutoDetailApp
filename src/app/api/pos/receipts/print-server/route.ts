@@ -7,6 +7,7 @@ import { fetchReceiptData } from '@/lib/data/receipt-data';
 
 export async function POST(request: NextRequest) {
   try {
+    let employeeId: string | null = null;
     const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
       const supabaseSession = await createClient();
@@ -14,6 +15,8 @@ export async function POST(request: NextRequest) {
       if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
+    } else {
+      employeeId = posEmployee.employee_id;
     }
 
     const body = await request.json();
@@ -27,48 +30,35 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const { tx, config, context, print_server_url } = await fetchReceiptData(supabase, transaction_id);
-
-    if (!print_server_url) {
-      console.error('print_server_url is null — receipt_config may not have been saved with this field yet');
-      return NextResponse.json(
-        { error: 'Print server not configured. Set Print Server URL in Settings > Receipt Printer.' },
-        { status: 400 }
-      );
-    }
+    const { tx, config, context } = await fetchReceiptData(supabase, transaction_id);
 
     const receiptLines = generateReceiptLines(tx, config, context);
     const escPosData = receiptToEscPos(receiptLines, 48);
 
-    // Send binary data to local print server with 3-second timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    // Encode ESC/POS binary as base64 and insert into print_jobs queue.
+    // The OptiPlex polling agent picks up pending jobs and sends to the local printer.
+    const payload = Buffer.from(escPosData).toString('base64');
 
-    try {
-      const printRes = await fetch(`${print_server_url}/print`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: escPosData as Uint8Array<ArrayBuffer>,
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+    const { data: job, error: insertError } = await supabase
+      .from('print_jobs')
+      .insert({
+        type: 'thermal_receipt',
+        payload,
+        transaction_id,
+        created_by: employeeId,
+      })
+      .select('id')
+      .single();
 
-      if (!printRes.ok) {
-        const errText = await printRes.text().catch(() => 'Unknown error');
-        return NextResponse.json(
-          { error: `Print server error: ${errText}` },
-          { status: 502 }
-        );
-      }
-    } catch (fetchErr) {
-      clearTimeout(timeout);
-      const msg = fetchErr instanceof Error && fetchErr.name === 'AbortError'
-        ? 'Print server timeout (3s)'
-        : 'Print server unreachable';
-      return NextResponse.json({ error: msg }, { status: 502 });
+    if (insertError) {
+      console.error('Failed to create print job:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to queue print job' },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, job_id: job.id });
   } catch (err) {
     console.error('Receipt print-server error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
