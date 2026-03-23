@@ -383,7 +383,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   const auth = await authenticatePosRequest(request);
-  if (!auth.success) return NextResponse.json({ error: auth.error }, { status: 401 });
+  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const admin = createAdminClient();
   // ... query logic
@@ -480,7 +480,9 @@ Every `bg-white` in POS components must have a corresponding `dark:bg-gray-900` 
 
 ### Soft-Delete
 
-Quotes use `deleted_at` column. **All** quote queries must include `.is('deleted_at', null)` except:
+**Customers** use `deleted_at` column for soft deletion (archival). All forward-looking queries (search, selection, eligibility, enrollment, creation uniqueness) **must** filter `.is('deleted_at', null)`. Historical joins (transactions, receipts, refunds, analytics, lifecycle engine) are intentionally unfiltered. One phone = one customer record; archived matches are surfaced on creation with restore as the default path.
+
+**Quotes** also use `deleted_at` column. **All** quote queries must include `.is('deleted_at', null)` except:
 - `quote-number.ts` (needs all quotes to prevent number reuse)
 - Public quote page (shows a friendly "deleted" message)
 
@@ -512,7 +514,7 @@ Before writing any new component, search `src/components/` for existing reusable
 
 ### Cache Revalidation
 
-Use the wrapper from `src/lib/utils/revalidate.ts` instead of Next.js's `revalidateTag` directly — it provides the required cache-life profile argument for Next.js 15.x compatibility:
+Use the wrapper from `src/lib/utils/revalidate.ts` instead of Next.js's `revalidateTag` directly — it provides a consistent import path and abstraction layer:
 
 ```typescript
 import { revalidateTag } from '@/lib/utils/revalidate';
@@ -547,6 +549,7 @@ Guards:
 | Google reviews | Daily 6:00 AM PST | `/api/cron/google-reviews` | Refresh Google review data |
 | Order cleanup | Every 6 hours | `/api/cron/cleanup-orders` | Cancel abandoned orders > 24h + cancel Stripe PIs |
 | Idempotency cleanup | Daily 3:00 AM PST | `/api/cron/cleanup-idempotency` | Delete idempotency keys > 24h old |
+| Booking reminders | Daily 8:00 AM PST | `/api/cron/booking-reminders` | Sends SMS/email reminders for upcoming appointments |
 | Audit log cleanup | Daily 3:30 AM PST | `/api/cron/cleanup-audit-log` | Retention policy (90 days) |
 
 Additionally, **pg_cron** runs one database-level job:
@@ -579,9 +582,9 @@ Additionally, **pg_cron** runs one database-level job:
 ### Supabase — Database, Auth, Storage
 
 - **Database**: PostgreSQL with 70+ tables and RLS policies
-- **Auth**: Email/password for admin, phone OTP for customers, magic link for POS PIN auth
+- **Auth**: Email/password for admin, phone OTP for customers, custom HMAC-SHA256 JWT for POS PIN auth
 - **Storage**: Product images (`product-images/`), service images (`service-images/`), job photos (`job-photos/`), CMS uploads
-- **Three clients**: browser (`client.ts`), server (`server.ts`), admin (`admin.ts`) — see [Section 12.5](#125-authentication--authorization)
+- **Four clients**: browser (`client.ts`), server (`server.ts`), admin (`admin.ts`), anon (`anon.ts` — for static generation/build-time fetching without cookies) — see [Section 12.5](#125-authentication--authorization)
 
 ### Twilio — SMS
 

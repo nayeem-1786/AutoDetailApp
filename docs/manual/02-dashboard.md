@@ -69,7 +69,7 @@ Four cards showing today's appointment data. These are calculated from direct Su
 
 ## 2.4 Quotes & Customers Row
 
-This row appears only for users with the `reports.view` permission. It contains four clickable cards:
+This row appears only for users with the `reports.view` permission. It contains four cards (three are clickable — New This Month is not a link):
 
 ### Open Quotes
 
@@ -163,7 +163,7 @@ A detailed list of today's confirmed and in-progress appointments (not pending, 
 | Field | Description |
 |-------|-------------|
 | **Time range** | Scheduled start time – end time (formatted as 12-hour, e.g., "9:00 AM - 11:30 AM") |
-| **Status badge** | Color-coded badge (Confirmed = blue, In Progress = amber) |
+| **Status badge** | Color-coded badge (Confirmed = blue, In Progress = blue). Note: the Week at a Glance dots use amber for in-progress, but the schedule badges use blue. |
 | **Customer name** | First and last name |
 | **Services** | Comma-separated list of booked services |
 | **Vehicle** | Year, make, model (if a vehicle is attached to the appointment) |

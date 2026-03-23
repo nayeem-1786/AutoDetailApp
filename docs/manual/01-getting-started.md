@@ -246,8 +246,9 @@ Permissions are resolved in this order:
 | Inventory | All | All | View stock, receive | None |
 | Marketing | All | All | None | None |
 | Quotes | All | All | Create, send, convert | None |
-| Photos | All | All | Upload, view | Upload, view |
-| Reports | All | Revenue, own tips | Own tips only | Own tips only |
+| Photos | All | Upload, view, delete, approve (no admin manage) | Upload, view | Upload, view |
+| Reports | All | View, revenue, own tips | Own tips only | Own tips only |
+| Orders | All | View, manage | View only | None |
 | Settings | All | Business hours only | None | None |
 | CMS | All | All | None | None |
 
