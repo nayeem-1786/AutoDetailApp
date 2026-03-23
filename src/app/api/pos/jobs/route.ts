@@ -12,7 +12,7 @@ import { logAudit, getRequestIp } from '@/lib/services/audit';
  */
 export async function GET(request: NextRequest) {
   try {
-    const posEmployee = authenticatePosRequest(request);
+    const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const posEmployee = authenticatePosRequest(request);
+    const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

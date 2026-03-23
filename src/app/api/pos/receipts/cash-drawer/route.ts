@@ -9,7 +9,7 @@ import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 export async function POST(request: NextRequest) {
   try {
     // Accept POS token auth OR admin Supabase session auth
-    const posEmployee = authenticatePosRequest(request);
+    const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
       const supabaseSession = await createClient();
       const { data: { user } } = await supabaseSession.auth.getUser();

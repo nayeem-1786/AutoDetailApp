@@ -11,7 +11,7 @@ import { logAudit, getRequestIp } from '@/lib/services/audit';
  * Returns the employee_id if authenticated, null otherwise.
  */
 async function authenticate(request: NextRequest): Promise<string | null> {
-  const posEmployee = authenticatePosRequest(request);
+  const posEmployee = await authenticatePosRequest(request);
   if (posEmployee) return posEmployee.employee_id;
 
   const supabaseSession = await createClient();
@@ -96,7 +96,7 @@ export async function PATCH(
     if (!employeeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const posEmployee = authenticatePosRequest(request);
+    const posEmployee = await authenticatePosRequest(request);
     const supabase = createAdminClient();
 
     const body = await request.json();

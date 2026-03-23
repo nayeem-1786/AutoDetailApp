@@ -7,7 +7,7 @@ import { fetchReceiptData } from '@/lib/data/receipt-data';
 
 export async function POST(request: NextRequest) {
   try {
-    const posEmployee = authenticatePosRequest(request);
+    const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
       const supabaseSession = await createClient();
       const { data: { user } } = await supabaseSession.auth.getUser();

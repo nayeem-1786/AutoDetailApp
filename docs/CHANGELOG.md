@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: IP whitelist enforcement on POS API routes — 2026-03-22
+
+- **Security gap**: Middleware IP whitelist only covered `/pos/*` page routes. All `/api/pos/*` routes were excluded from the middleware matcher, allowing a stolen POS token to bypass IP restriction via direct API calls.
+- **Fix**: Extracted IP whitelist logic (`getIpWhitelistConfig`, `getClientIp`, `isIpAllowed`) from `middleware.ts` into shared utility `src/lib/security/ip-whitelist.ts`. Added `isIpAllowed()` check inside `authenticatePosRequest()` — the single auth function every POS API route calls. Now both page routes (via middleware) and API routes (via auth function) enforce the same IP whitelist.
+- **Breaking change**: `authenticatePosRequest()` is now `async` (returns `Promise<PosEmployee | null>`). All 56 POS API route files updated to `await` the call.
+- **Behavior preserved**: fail-open on DB failure (falls back to env var), skip check when toggle disabled, local/dev IPs always allowed.
+
+---
+
 ## fix: Roles & permissions — full enforcement audit (Sessions 0–8) — 2026-03-22
 
 Wired up 83 of 97 defined permissions across the entire app (7 skipped for unbuilt features, 3 skipped for missing UI, 4 already fully enforced).

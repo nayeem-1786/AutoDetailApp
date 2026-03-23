@@ -812,6 +812,11 @@ src/lib/migration/phone-utils.ts
 src/lib/migration/types.ts
 ```
 
+### Security
+```
+src/lib/security/ip-whitelist.ts
+```
+
 ### POS
 ```
 src/lib/pos/api-auth.ts

@@ -9,7 +9,7 @@ import { pstStartOfDayLiteral, pstEndOfDayLiteral } from '@/lib/utils/pst-date';
  */
 export async function GET(request: NextRequest) {
   try {
-    const posEmployee = authenticatePosRequest(request);
+    const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

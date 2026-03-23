@@ -14,7 +14,7 @@ import { checkPosPermission } from '@/lib/pos/check-permission';
  */
 export async function POST(request: NextRequest) {
   // Require an active POS session (the requesting employee)
-  const posEmployee = authenticatePosRequest(request);
+  const posEmployee = await authenticatePosRequest(request);
   if (!posEmployee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

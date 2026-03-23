@@ -3,7 +3,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
-  const auth = authenticatePosRequest(request);
+  const auth = await authenticatePosRequest(request);
   if (!auth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

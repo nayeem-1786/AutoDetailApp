@@ -19,7 +19,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const posEmployee = authenticatePosRequest(request);
+    const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

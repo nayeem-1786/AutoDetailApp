@@ -3,7 +3,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function POST(request: NextRequest) {
-  const posEmployee = authenticatePosRequest(request);
+  const posEmployee = await authenticatePosRequest(request);
 
   // Even if token is expired/invalid, still try to log what we can
   const body = await request.json().catch(() => ({}));
