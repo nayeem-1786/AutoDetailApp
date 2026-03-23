@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { sendSms } from '@/lib/utils/sms';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -19,13 +20,16 @@ export async function GET(
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('role')
+    .select('id, role')
     .eq('auth_user_id', user.id)
     .single();
 
   if (!employee || !['super_admin', 'admin', 'cashier', 'detailer'].includes(employee.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const denied = await requirePermission(employee.id, 'marketing.two_way_sms');
+  if (denied) return denied;
 
   const admin = createAdminClient();
 
@@ -74,6 +78,9 @@ export async function POST(
   if (!employee || !['super_admin', 'admin', 'cashier', 'detailer'].includes(employee.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const denied = await requirePermission(employee.id, 'marketing.two_way_sms');
+  if (denied) return denied;
 
   // Gate: two_way_sms must be enabled to send staff replies
   const twoWaySmsEnabled = await isFeatureEnabled(FEATURE_FLAGS.TWO_WAY_SMS);

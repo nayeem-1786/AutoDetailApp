@@ -7,6 +7,7 @@ import { TicketPercent, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import { useTicket } from '../context/ticket-context';
+import { usePosPermission } from '../context/pos-permission-context';
 
 interface CouponInputProps {
   renderCollapsedInline?: React.ReactNode;
@@ -14,6 +15,7 @@ interface CouponInputProps {
 
 export function CouponInput({ renderCollapsedInline }: CouponInputProps) {
   const { ticket, dispatch } = useTicket();
+  const { granted: canApplyCoupons } = usePosPermission('pos.apply_coupons');
   const [code, setCode] = useState('');
   const [validating, setValidating] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -108,6 +110,9 @@ export function CouponInput({ renderCollapsedInline }: CouponInputProps) {
       </div>
     );
   }
+
+  // Hide coupon input entirely if permission denied (applied coupons still shown above)
+  if (!canApplyCoupons) return null;
 
   // Show collapsed link (matches "Add Discount" style)
   if (!expanded) {

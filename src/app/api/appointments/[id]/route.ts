@@ -46,6 +46,13 @@ export async function PATCH(
       if (denied) return denied;
     }
 
+    // Permission check: notes changes require appointments.add_notes
+    const isNotesChange = data.job_notes !== undefined || data.internal_notes !== undefined;
+    if (isNotesChange) {
+      const denied = await requirePermission(employee.id, 'appointments.add_notes');
+      if (denied) return denied;
+    }
+
     const supabase = createAdminClient();
 
     // Fetch current appointment

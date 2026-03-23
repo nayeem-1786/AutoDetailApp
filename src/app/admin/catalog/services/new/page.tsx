@@ -26,8 +26,9 @@ import {
   type SpecialtyTier,
 } from '@/components/service-pricing-form';
 import { toast } from 'sonner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 const PRICING_MODEL_DESCRIPTIONS: Record<PricingModel, string> = {
   vehicle_size: 'Different price for sedan, truck/SUV, and SUV 3-row/van',
@@ -43,6 +44,7 @@ const ALL_VEHICLE_TYPES: VehicleType[] = ['standard', 'motorcycle', 'rv', 'boat'
 export default function NewServicePage() {
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canEditServices, loading: loadingPerm } = usePermission('services.edit');
 
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -251,10 +253,20 @@ export default function NewServicePage() {
     }
   }
 
-  if (loadingCategories) {
+  if (loadingPerm || loadingCategories) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canEditServices) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-gray-300 mb-4" />
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You do not have permission to create services.</p>
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
 
@@ -20,6 +21,11 @@ export async function GET(
     }
 
     const supabase = createAdminClient();
+    const canView = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'photos.view');
+    if (!canView) {
+      return NextResponse.json({ error: 'Forbidden', message: 'Missing permission: photos.view' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const phase = searchParams.get('phase');
     const zone = searchParams.get('zone');
@@ -64,6 +70,10 @@ export async function POST(
     }
 
     const supabase = createAdminClient();
+    const canUpload = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'photos.upload');
+    if (!canUpload) {
+      return NextResponse.json({ error: 'Forbidden', message: 'Missing permission: photos.upload' }, { status: 403 });
+    }
 
     // Verify job exists
     const { data: job, error: jobError } = await supabase

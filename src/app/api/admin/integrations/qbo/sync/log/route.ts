@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getSyncLog, clearSyncLog } from '@/lib/qbo/sync-log';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +11,19 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id, role')
+      .eq('auth_user_id', user.id)
+      .single();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Permission check: reports.quickbooks_status
+    const denied = await requirePermission(employee.id, 'reports.quickbooks_status');
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
@@ -47,6 +61,19 @@ export async function DELETE() {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id, role')
+      .eq('auth_user_id', user.id)
+      .single();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Permission check: reports.quickbooks_status
+    const denied = await requirePermission(employee.id, 'reports.quickbooks_status');
+    if (denied) return denied;
 
     await clearSyncLog();
     return NextResponse.json({ success: true });

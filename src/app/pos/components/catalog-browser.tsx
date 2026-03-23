@@ -9,6 +9,7 @@ import { usePrerequisiteCheck } from '../hooks/use-prerequisite-check';
 import { PrerequisiteWarningDialog } from './prerequisite-warning-dialog';
 import type { CatalogProduct, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+import { usePosPermission } from '../context/pos-permission-context';
 import { CategoryTile } from './category-tile';
 import { ProductGrid, ServiceGrid } from './catalog-grid';
 import { ProductDetail } from './product-detail';
@@ -50,8 +51,16 @@ interface CatalogBrowserProps {
 export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride, vehicleSpecialtyTierOverride, addedServiceIds }: CatalogBrowserProps) {
   const { products, services } = useCatalog();
   const { ticket, dispatch: ticketDispatch } = useTicket();
+  const { granted: canCreateTickets } = usePosPermission('pos.create_tickets');
+  const { granted: canAddItems } = usePosPermission('pos.add_items');
   const hasCallbacks = !!onAddProduct || !!onAddService;
   const dispatch = hasCallbacks ? undefined : ticketDispatch;
+
+  // Items cannot be added if:
+  // 1. pos.add_items is denied (always blocked), OR
+  // 2. pos.create_tickets is denied AND ticket is empty (can't start a new ticket)
+  const ticketIsEmpty = ticket.items.length === 0;
+  const addDisabled = !canAddItems || (!canCreateTickets && ticketIsEmpty);
   const [browseState, setBrowseState] = useState<BrowseState>({ view: 'categories' });
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
   const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
@@ -295,6 +304,10 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   }, [prereqWarning, clearPrereqWarning, services, onAddService, dispatch, vehicleSizeClass, addServiceChecked]);
 
   function handleTapProduct(product: CatalogProduct) {
+    if (addDisabled) {
+      toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
+      return;
+    }
     if (onAddProduct) {
       onAddProduct(product);
       return;
@@ -303,6 +316,10 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   }
 
   function handleTapService(service: CatalogService) {
+    if (addDisabled) {
+      toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
+      return;
+    }
     if (!isServiceCompatible(service)) {
       setCompatWarning({ service, mode: 'detail' });
       return;
@@ -311,6 +328,10 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   }
 
   function handleTapServiceDirect(service: CatalogService) {
+    if (addDisabled) {
+      toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
+      return;
+    }
     if (!isServiceCompatible(service)) {
       setCompatWarning({ service, mode: 'direct' });
       return;

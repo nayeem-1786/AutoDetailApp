@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { campaignCreateSchema } from '@/lib/utils/validation';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(request: NextRequest) {
@@ -14,12 +15,15 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     const { data: employee } = await admin
       .from('employees')
-      .select('role')
+      .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -66,6 +70,9 @@ export async function POST(request: NextRequest) {
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const body = await request.json();
     const parsed = campaignCreateSchema.safeParse(body);

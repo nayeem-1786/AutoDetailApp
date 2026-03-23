@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 function toLocalDateString(date: Date): string {
   const y = date.getFullYear();
@@ -19,12 +20,18 @@ export async function GET() {
     }
     const { data: employee } = await authClient
       .from('employees')
-      .select('role')
+      .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Permission check: viewing full stats requires appointments.view_calendar
+    // (today-only stats are still accessible with appointments.view_today,
+    //  but the stats endpoint serves aggregated data for the full calendar view)
+    const denied = await requirePermission(employee.id, 'appointments.view_calendar');
+    if (denied) return denied;
 
     const supabase = createAdminClient();
 

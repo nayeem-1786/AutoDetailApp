@@ -11,9 +11,10 @@ interface RevenueStatsProps {
   newCustomers: number;
   winBacks: number;
   loading: boolean;
+  showTips?: boolean;
 }
 
-const cards = [
+const allCards = [
   { key: 'revenue', label: 'Revenue', border: 'border-l-green-500', isCurrency: true },
   { key: 'transactions', label: 'Transactions', border: 'border-l-blue-500', isCurrency: false },
   { key: 'avgTicket', label: 'Avg Ticket', border: 'border-l-gray-400', isCurrency: true },
@@ -29,7 +30,9 @@ export function RevenueStats({
   newCustomers,
   winBacks,
   loading,
+  showTips = true,
 }: RevenueStatsProps) {
+  const cards = showTips ? allCards : allCards.filter(c => c.key !== 'tips');
   function getValue(key: string): string {
     switch (key) {
       case 'revenue':
@@ -48,7 +51,7 @@ export function RevenueStats({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className={`grid grid-cols-2 sm:grid-cols-3 ${cards.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
       {cards.map((card) => (
         <div
           key={card.key}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 type Params = { params: Promise<{ id: string; stepId: string }> };
 
@@ -17,6 +18,9 @@ export async function PATCH(
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const { id, stepId } = await params;
     const admin = createAdminClient();
@@ -160,6 +164,9 @@ export async function DELETE(
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const { id, stepId } = await params;
     const admin = createAdminClient();

@@ -36,6 +36,13 @@ export async function POST(
     }
 
     const data = parsed.data;
+
+    // Permission check: setting a cancellation fee requires appointments.waive_fee
+    if (data.cancellation_fee !== undefined && data.cancellation_fee !== null) {
+      const feeDenied = await requirePermission(employee.id, 'appointments.waive_fee');
+      if (feeDenied) return feeDenied;
+    }
+
     const supabase = createAdminClient();
 
     // Fetch current appointment

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { employeeWeeklyScheduleSchema } from '@/lib/utils/validation';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ employeeId: string }> }
 ) {
   try {
+    const authEmployee = await getEmployeeFromSession();
+    if (!authEmployee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const denied = await requirePermission(authEmployee.id, 'appointments.manage_schedule');
+    if (denied) return denied;
+
     const { employeeId } = await params;
     const body = await request.json();
 

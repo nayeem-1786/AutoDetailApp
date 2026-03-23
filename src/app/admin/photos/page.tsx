@@ -132,6 +132,7 @@ export default function AdminPhotosPage() {
   const { enabled: photoDocEnabled } = useFeatureFlag(FEATURE_FLAGS.PHOTO_DOCUMENTATION);
   const { granted: canView } = usePermission('admin.photos.view');
   const { granted: canManage } = usePermission('admin.photos.manage');
+  const { granted: canApproveMarketing } = usePermission('photos.approve_marketing');
 
   const [photos, setPhotos] = useState<PhotoResponse[]>([]);
   const [total, setTotal] = useState(0);
@@ -758,6 +759,7 @@ export default function AdminPhotosPage() {
                 onToggleSelect={() => toggleSelect(photo.id)}
                 onClick={() => setSelectedIndex(i)}
                 canManage={canManage}
+                canApproveMarketing={canApproveMarketing}
                 onToggleFeatured={() => updatePhoto(photo.id, { is_featured: !photo.is_featured })}
               />
             ))}
@@ -782,12 +784,16 @@ export default function AdminPhotosPage() {
               {selectedIds.size} selected
             </span>
             <div className="h-5 w-px bg-gray-200" />
-            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ is_featured: true })}>
-              <Star className="mr-1 h-3.5 w-3.5" /> Feature
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ is_featured: false })}>
-              <StarOff className="mr-1 h-3.5 w-3.5" /> Unfeature
-            </Button>
+            {canApproveMarketing && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => bulkUpdate({ is_featured: true })}>
+                  <Star className="mr-1 h-3.5 w-3.5" /> Feature
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => bulkUpdate({ is_featured: false })}>
+                  <StarOff className="mr-1 h-3.5 w-3.5" /> Unfeature
+                </Button>
+              </>
+            )}
             <Button size="sm" variant="outline" onClick={() => bulkUpdate({ is_internal: true })}>
               <EyeOff className="mr-1 h-3.5 w-3.5" /> Mark Internal
             </Button>
@@ -871,6 +877,7 @@ export default function AdminPhotosPage() {
           index={selectedIndex}
           total={photos.length}
           canManage={canManage}
+          canApproveMarketing={canApproveMarketing}
           availableTags={availableTags}
           onClose={() => setSelectedIndex(null)}
           onNavigate={setSelectedIndex}
@@ -890,6 +897,7 @@ function PhotoCard({
   onToggleSelect,
   onClick,
   canManage,
+  canApproveMarketing,
   onToggleFeatured,
 }: {
   photo: PhotoResponse;
@@ -898,6 +906,7 @@ function PhotoCard({
   onToggleSelect: () => void;
   onClick: () => void;
   canManage: boolean;
+  canApproveMarketing: boolean;
   onToggleFeatured: () => void;
 }) {
   const customerName = photo.customer
@@ -981,7 +990,7 @@ function PhotoCard({
         </button>
 
         {/* Featured star — outside image, overlapping bottom-right */}
-        {canManage && !selectMode && (
+        {canManage && canApproveMarketing && !selectMode && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -1052,6 +1061,7 @@ function PhotoDetailModal({
   index,
   total,
   canManage,
+  canApproveMarketing,
   availableTags,
   onClose,
   onNavigate,
@@ -1061,6 +1071,7 @@ function PhotoDetailModal({
   index: number;
   total: number;
   canManage: boolean;
+  canApproveMarketing: boolean;
   availableTags: string[];
   onClose: () => void;
   onNavigate: (i: number) => void;
@@ -1336,36 +1347,38 @@ function PhotoDetailModal({
         {/* Actions */}
         {canManage && (
           <div className="border-t border-gray-800 p-4 space-y-2">
-            {/* Featured toggle */}
-            <button
-              onClick={handleFeatureToggle}
-              disabled={!canFeature && !photo.is_featured && !isProgressPhase ? false : undefined}
-              className={cn(
-                'flex w-full items-center justify-between rounded-md px-3 py-2 text-xs font-medium transition-colors',
-                photo.is_featured
-                  ? 'bg-yellow-500/20 text-yellow-300'
-                  : !canFeature || isProgressPhase
-                  ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              )}
-            >
-              <span className="flex items-center gap-1.5">
-                {photo.is_featured ? <Star className="h-3.5 w-3.5 fill-current" /> : <Star className="h-3.5 w-3.5" />}
-                Featured on website
-              </span>
-              {(!canFeature && !photo.is_featured) || isProgressPhase ? (
-                <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-gray-700">
-                  {isProgressPhase ? 'N/A' : 'No pair'}
+            {/* Featured toggle — requires photos.approve_marketing permission */}
+            {canApproveMarketing && (
+              <button
+                onClick={handleFeatureToggle}
+                disabled={!canFeature && !photo.is_featured && !isProgressPhase ? false : undefined}
+                className={cn(
+                  'flex w-full items-center justify-between rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                  photo.is_featured
+                    ? 'bg-yellow-500/20 text-yellow-300'
+                    : !canFeature || isProgressPhase
+                    ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                )}
+              >
+                <span className="flex items-center gap-1.5">
+                  {photo.is_featured ? <Star className="h-3.5 w-3.5 fill-current" /> : <Star className="h-3.5 w-3.5" />}
+                  Featured on website
                 </span>
-              ) : (
-                <span className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[10px]',
-                  photo.is_featured ? 'bg-yellow-500/30' : 'bg-gray-700'
-                )}>
-                  {photo.is_featured ? 'ON' : 'OFF'}
-                </span>
-              )}
-            </button>
+                {(!canFeature && !photo.is_featured) || isProgressPhase ? (
+                  <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-gray-700">
+                    {isProgressPhase ? 'N/A' : 'No pair'}
+                  </span>
+                ) : (
+                  <span className={cn(
+                    'rounded-full px-1.5 py-0.5 text-[10px]',
+                    photo.is_featured ? 'bg-yellow-500/30' : 'bg-gray-700'
+                  )}>
+                    {photo.is_featured ? 'ON' : 'OFF'}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Internal toggle */}
             <button

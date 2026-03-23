@@ -5,6 +5,7 @@ import { syncUnsynced } from '@/lib/qbo/sync-transaction';
 import { syncCustomerBatch } from '@/lib/qbo/sync-customer';
 import { syncAllCatalog } from '@/lib/qbo/sync-catalog';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,19 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id, role')
+      .eq('auth_user_id', user.id)
+      .single();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Permission check: reports.quickbooks_status
+    const denied = await requirePermission(employee.id, 'reports.quickbooks_status');
+    if (denied) return denied;
 
     const connected = await isQboConnected();
     if (!connected) {

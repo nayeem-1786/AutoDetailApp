@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Check, Pencil, Sparkles, X } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface CouponStats {
   usage_count: number;
@@ -28,6 +29,7 @@ export default function CouponDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const supabase = createClient();
+  const { granted: canManageCoupons, loading: permLoading } = usePermission('marketing.coupons');
 
   const [coupon, setCoupon] = useState<Coupon | null>(null);
   const [stats, setStats] = useState<CouponStats | null>(null);
@@ -339,10 +341,22 @@ export default function CouponDetailPage() {
     }
   }
 
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageCoupons) {
+    return (
+      <div>
+        <PageHeader title="Coupon Details" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage coupons.</p>
+        </div>
       </div>
     );
   }

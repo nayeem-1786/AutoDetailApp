@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { Spinner } from '@/components/ui/spinner';
@@ -98,6 +99,7 @@ function getDateRange(preset: string): { from: string; to: string } | null {
 }
 
 export default function AuditLogPage() {
+  const { granted: canViewAuditLog, loading: permLoading } = usePermission('settings.audit_log');
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -193,6 +195,29 @@ export default function AuditLogPage() {
     } finally {
       setExporting(false);
     }
+  }
+
+  if (permLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Audit Log" description="Loading..." />
+        <div className="flex items-center justify-center py-12">
+          <Spinner size="lg" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!canViewAuditLog) {
+    return (
+      <div>
+        <PageHeader title="Audit Log" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to view the audit log.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

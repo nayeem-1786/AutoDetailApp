@@ -13,13 +13,15 @@ import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { Spinner } from '@/components/ui/spinner';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
 
 const PAGE_SIZE = 50;
 
 export default function StockHistoryPage() {
   const router = useRouter();
+  const { granted: canViewStock, loading: loadingPerm } = usePermission('inventory.view_stock');
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -162,10 +164,20 @@ export default function StockHistoryPage() {
     },
   ];
 
-  if (loading && adjustments.length === 0) {
+  if (loadingPerm || (loading && adjustments.length === 0)) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canViewStock) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-gray-300 mb-4" />
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You do not have permission to view stock history.</p>
       </div>
     );
   }

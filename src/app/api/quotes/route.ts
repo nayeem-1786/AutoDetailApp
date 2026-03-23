@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { createQuoteSchema } from '@/lib/utils/validation';
 import { listQuotes, createQuote } from '@/lib/quotes/quote-service';
 
@@ -25,6 +27,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const employee = await getEmployeeFromSession();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const denied = await requirePermission(employee.id, 'quotes.create');
+    if (denied) return denied;
+
     const body = await request.json();
     const parsed = createQuoteSchema.safeParse(body);
 

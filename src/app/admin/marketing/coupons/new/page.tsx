@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Plus, X, Info, AlertTriangle } from 'lucide-react';
 import type { CouponReward } from '@/lib/supabase/types';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -286,6 +288,7 @@ export default function NewCouponPage() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const supabase = createClient();
+  const { granted: canManageCoupons, loading: permLoading } = usePermission('marketing.coupons');
 
   // Step state
   const [step, setStep] = useState<Step>('basics');
@@ -1156,10 +1159,22 @@ export default function NewCouponPage() {
   // Render
   // -------------------------------------------------------------------------
 
-  if (!draftLoaded) {
+  if (!draftLoaded || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageCoupons) {
+    return (
+      <div>
+        <PageHeader title={editId ? 'Edit Coupon' : 'Create Coupon'} />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage coupons.</p>
+        </div>
       </div>
     );
   }

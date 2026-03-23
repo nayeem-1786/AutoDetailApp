@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import { escPosOpenDrawer } from '@/app/pos/lib/receipt-template';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 
@@ -14,6 +15,14 @@ export async function POST(request: NextRequest) {
       const { data: { user } } = await supabaseSession.auth.getUser();
       if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      // Admin session auth — skip permission check (admin dashboard users)
+    } else {
+      // POS token auth — check pos.open_close_register permission
+      const supabaseForPermCheck = createAdminClient();
+      const granted = await checkPosPermission(supabaseForPermCheck, posEmployee.role, posEmployee.employee_id, 'pos.open_close_register');
+      if (!granted) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
     const supabase = createAdminClient();

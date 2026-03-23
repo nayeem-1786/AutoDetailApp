@@ -21,6 +21,12 @@ export async function PATCH(
 
     const supabase = createAdminClient();
 
+    // If toggling featured status, require photos.approve_marketing permission
+    if (typeof body.is_featured === 'boolean') {
+      const marketingDenied = await requirePermission(employee.id, 'photos.approve_marketing');
+      if (marketingDenied) return marketingDenied;
+    }
+
     const updates: Record<string, unknown> = {};
     if (typeof body.is_featured === 'boolean') updates.is_featured = body.is_featured;
     if (typeof body.is_internal === 'boolean') updates.is_internal = body.is_internal;

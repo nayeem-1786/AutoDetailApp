@@ -5,6 +5,7 @@ import { Search, Plus, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { formatRelativeDate } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
+import { usePosPermission } from '../../context/pos-permission-context';
 import { STATUS_BADGE_CONFIG, formatCurrency } from './quote-helpers';
 import type { QuoteStatus } from '../../types';
 
@@ -54,6 +55,7 @@ interface QuoteListProps {
 }
 
 export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
+  const { granted: canCreateQuote } = usePosPermission('quotes.create');
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -109,13 +111,15 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quotes</h1>
-        <button
-          onClick={onNewQuote}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
-        >
-          <Plus className="h-4 w-4" />
-          New Quote
-        </button>
+        {canCreateQuote && (
+          <button
+            onClick={onNewQuote}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+          >
+            <Plus className="h-4 w-4" />
+            New Quote
+          </button>
+        )}
       </div>
 
       {/* Search + Filters */}
@@ -163,12 +167,14 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
         ) : quotes.length === 0 ? (
           <div className="flex h-40 flex-col items-center justify-center gap-2">
             <p className="text-sm text-gray-400 dark:text-gray-500">No quotes found</p>
-            <button
-              onClick={onNewQuote}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-            >
-              Create your first quote
-            </button>
+            {canCreateQuote && (
+              <button
+                onClick={onNewQuote}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+              >
+                Create your first quote
+              </button>
+            )}
           </div>
         ) : (
           <>

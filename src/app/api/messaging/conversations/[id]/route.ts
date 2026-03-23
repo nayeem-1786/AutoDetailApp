@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 const STATUS_ACTION_LABELS: Record<string, string> = {
   closed: 'closed',
@@ -22,13 +23,16 @@ export async function PATCH(
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('role, first_name, last_name')
+    .select('id, role, first_name, last_name')
     .eq('auth_user_id', user.id)
     .single();
 
   if (!employee || !['super_admin', 'admin', 'cashier', 'detailer'].includes(employee.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const denied = await requirePermission(employee.id, 'marketing.two_way_sms');
+  if (denied) return denied;
 
   const body = await request.json();
   const admin = createAdminClient();

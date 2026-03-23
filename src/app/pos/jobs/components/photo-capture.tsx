@@ -5,6 +5,7 @@ import { Camera, RotateCcw, Save, Pencil, Eye, EyeOff, StickyNote } from 'lucide
 import { cn } from '@/lib/utils/cn';
 import { PhotoAnnotation, AnnotationOverlay } from './photo-annotation';
 import { posFetch } from '../../lib/pos-fetch';
+import { usePosPermission } from '../../context/pos-permission-context';
 import { getZoneLabel } from '@/lib/utils/job-zones';
 import type { Annotation } from '@/lib/utils/job-zones';
 import type { JobPhoto, JobPhotoPhase } from '@/lib/supabase/types';
@@ -18,6 +19,7 @@ interface PhotoCaptureProps {
 }
 
 export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCaptureProps) {
+  const { granted: canUpload } = usePosPermission('photos.upload');
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -81,6 +83,22 @@ export function PhotoCapture({ jobId, zone, phase, onSaved, onCancel }: PhotoCap
     } finally {
       setSaving(false);
     }
+  }
+
+  // Permission check
+  if (!canUpload) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-gray-50 dark:bg-gray-800 p-4">
+        <Camera className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-500" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">You do not have permission to upload photos.</p>
+        <button
+          onClick={onCancel}
+          className="mt-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+        >
+          Go Back
+        </button>
+      </div>
+    );
   }
 
   // Annotation editor view

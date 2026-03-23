@@ -14,11 +14,14 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ArrowLeft, Send, PackageCheck, XCircle, Trash2 } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 export default function PurchaseOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const poId = params.id as string;
+  const { granted: canManagePO } = usePermission('inventory.manage_po');
+  const { granted: canReceive } = usePermission('inventory.receive');
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -191,7 +194,7 @@ export default function PurchaseOrderDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {po.status === 'draft' && (
+          {po.status === 'draft' && canManagePO && (
             <>
               <Button
                 size="sm"
@@ -213,26 +216,30 @@ export default function PurchaseOrderDetailPage() {
           )}
           {po.status === 'ordered' && (
             <>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setReceiving(true);
-                  fillAllRemaining();
-                }}
-                disabled={acting || receiving}
-              >
-                <PackageCheck className="h-4 w-4" />
-                Receive Items
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setCancelOpen(true)}
-                disabled={acting}
-              >
-                <XCircle className="h-4 w-4" />
-                Cancel
-              </Button>
+              {canReceive && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setReceiving(true);
+                    fillAllRemaining();
+                  }}
+                  disabled={acting || receiving}
+                >
+                  <PackageCheck className="h-4 w-4" />
+                  Receive Items
+                </Button>
+              )}
+              {canManagePO && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCancelOpen(true)}
+                  disabled={acting}
+                >
+                  <XCircle className="h-4 w-4" />
+                  Cancel
+                </Button>
+              )}
             </>
           )}
         </div>

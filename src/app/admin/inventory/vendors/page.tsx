@@ -28,8 +28,9 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type VendorWithCount = Vendor & {
@@ -39,6 +40,7 @@ type VendorWithCount = Vendor & {
 export default function VendorsPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canManageVendors, loading: loadingPerm } = usePermission('inventory.manage_vendors');
 
   const [vendors, setVendors] = useState<VendorWithCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -298,10 +300,20 @@ export default function VendorsPage() {
     },
   ];
 
-  if (loading) {
+  if (loadingPerm || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageVendors) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-gray-300 mb-4" />
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You do not have permission to manage vendors.</p>
       </div>
     );
   }

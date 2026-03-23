@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 interface ReceiveItem {
   item_id: string;
@@ -29,6 +30,9 @@ export async function POST(
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'inventory.receive');
+    if (denied) return denied;
 
     // Fetch PO with items
     const { data: po } = await admin

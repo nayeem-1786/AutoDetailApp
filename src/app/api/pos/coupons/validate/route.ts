@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import {
   calculateCouponDiscount,
   type CartItem,
@@ -14,6 +15,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const supabase = createAdminClient();
+
+    // Permission check: pos.apply_coupons
+    const couponPermGranted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.apply_coupons');
+    if (!couponPermGranted) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const body = await request.json();
     const {

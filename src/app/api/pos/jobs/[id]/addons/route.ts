@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
@@ -66,6 +67,13 @@ export async function POST(
     }
 
     const supabase = createAdminClient();
+
+    // Permission check: pos.jobs.flag_issue
+    const flagIssueGranted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.jobs.flag_issue');
+    if (!flagIssueGranted) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
 
     // Verify job exists and is in_progress

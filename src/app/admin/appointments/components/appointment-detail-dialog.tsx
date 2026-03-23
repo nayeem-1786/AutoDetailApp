@@ -40,6 +40,7 @@ interface AppointmentDetailDialogProps {
   onCancel: (appointment: AppointmentWithRelations) => void;
   canReschedule: boolean;
   canCancel: boolean;
+  canAddNotes?: boolean;
 }
 
 export function AppointmentDetailDialog({
@@ -51,6 +52,7 @@ export function AppointmentDetailDialog({
   onCancel,
   canReschedule,
   canCancel,
+  canAddNotes = true,
 }: AppointmentDetailDialogProps) {
   const [saving, setSaving] = useState(false);
 
@@ -254,7 +256,8 @@ export function AppointmentDetailDialog({
               id="detail-job-notes"
               {...register('job_notes')}
               rows={2}
-              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
+              disabled={!canAddNotes}
+              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50"
             />
           </FormField>
 
@@ -263,7 +266,8 @@ export function AppointmentDetailDialog({
               id="detail-internal-notes"
               {...register('internal_notes')}
               rows={2}
-              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
+              disabled={!canAddNotes}
+              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50"
             />
           </FormField>
         </form>

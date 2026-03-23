@@ -15,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const denied = await requirePermission(employee.id, 'cms.pages.manage');
+  const denied = await requirePermission(employee.id, 'cms.about.manage');
   if (denied) return denied;
 
   const admin = createAdminClient();
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const denied = await requirePermission(employee.id, 'cms.pages.manage');
+  const denied = await requirePermission(employee.id, 'cms.about.manage');
   if (denied) return denied;
 
   const body = await request.json();

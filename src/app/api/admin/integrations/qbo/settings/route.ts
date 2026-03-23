@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 const ALLOWED_KEYS = [
   'qbo_environment',
@@ -29,17 +30,21 @@ async function authCheck() {
 
   const { data: employee } = await authClient
     .from('employees')
-    .select('role')
+    .select('id, role')
     .eq('auth_user_id', user.id)
     .single();
 
-  return employee ? user : null;
+  return employee ? { user, employee } : null;
 }
 
 export async function GET() {
   try {
-    const user = await authCheck();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authCheck();
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Permission check: reports.quickbooks_status
+    const denied = await requirePermission(auth.employee.id, 'reports.quickbooks_status');
+    if (denied) return denied;
 
     const supabase = createAdminClient();
     const { data: rows } = await supabase
@@ -66,8 +71,12 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await authCheck();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authCheck();
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Permission check: reports.quickbooks_status
+    const denied = await requirePermission(auth.employee.id, 'reports.quickbooks_status');
+    if (denied) return denied;
 
     const body = await request.json();
     const supabase = createAdminClient();

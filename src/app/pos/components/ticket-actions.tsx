@@ -7,6 +7,7 @@ import { PauseCircle, Loader2, Star } from 'lucide-react';
 import { useTicket } from '../context/ticket-context';
 import { useCheckout } from '../context/checkout-context';
 import { useHeldTickets } from '../context/held-tickets-context';
+import { usePosPermission } from '../context/pos-permission-context';
 import { CustomerTypePrompt } from './customer-type-prompt';
 import { posFetch } from '../lib/pos-fetch';
 
@@ -18,6 +19,7 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
   const { ticket, dispatch } = useTicket();
   const { openCheckout, setComplete } = useCheckout();
   const { holdTicket } = useHeldTickets();
+  const { granted: canCreateTickets } = usePosPermission('pos.create_tickets');
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [showTypePrompt, setShowTypePrompt] = useState(false);
   const [processingLoyalty, setProcessingLoyalty] = useState(false);
@@ -128,8 +130,9 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
         <Button
           variant="outline"
           className="flex-1"
-          disabled={!hasItems}
+          disabled={!hasItems || !canCreateTickets}
           onClick={handleClearClick}
+          title={!canCreateTickets ? 'You do not have permission to create new tickets' : undefined}
         >
           Clear
         </Button>

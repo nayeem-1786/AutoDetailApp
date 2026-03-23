@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin, getPeriodDates } from '@/lib/utils/analytics-helpers';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { getAttributedRevenue } from '@/lib/utils/attribution';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await authenticateAdmin();
     if ('error' in auth) return auth.error;
-    const { adminClient } = auth;
+    const { employeeId, adminClient } = auth;
+
+    const denied = await requirePermission(employeeId, 'marketing.analytics');
+    if (denied) return denied;
 
     const period = request.nextUrl.searchParams.get('period') || '30d';
     const { start, end } = getPeriodDates(period);

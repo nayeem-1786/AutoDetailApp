@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useFavorites } from '../hooks/use-favorites';
 import { useCatalog } from '../hooks/use-catalog';
 import { useTicket } from '../context/ticket-context';
+import { usePosPermission } from '../context/pos-permission-context';
 import { usePosTheme } from '../context/pos-theme-context';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { ServicePricingPicker } from './service-pricing-picker';
@@ -33,7 +34,15 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   const { favorites, loading: favLoading } = useFavorites();
   const { products, services } = useCatalog();
   const { ticket, dispatch } = useTicket();
+  const { granted: canCreateTickets } = usePosPermission('pos.create_tickets');
+  const { granted: canAddItems } = usePosPermission('pos.add_items');
   const { resolvedTheme } = usePosTheme();
+
+  // Items cannot be added if:
+  // 1. pos.add_items is denied (always blocked), OR
+  // 2. pos.create_tickets is denied AND ticket is empty (can't start a new ticket)
+  const ticketIsEmpty = ticket.items.length === 0;
+  const addDisabled = !canAddItems || (!canCreateTickets && ticketIsEmpty);
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
 
   // Keypad state
@@ -50,6 +59,12 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   // ─── Favorites handlers ────────────────────────────────────
 
   function handleTapFavorite(fav: FavoriteItem) {
+    // Allow non-item favorites (customer_lookup) through, but block item-adding ones
+    const isItemFavorite = fav.type === 'product' || fav.type === 'service' || fav.type === 'custom_amount' || fav.type === 'surcharge';
+    if (isItemFavorite && addDisabled) {
+      toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
+      return;
+    }
     switch (fav.type) {
       case 'product': {
         const product = products.find((p) => p.id === fav.referenceId);
@@ -188,6 +203,10 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   }
 
   function handleAddToTicket() {
+    if (addDisabled) {
+      toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
+      return;
+    }
     if (cents === 0) {
       toast.error('Enter an amount');
       return;

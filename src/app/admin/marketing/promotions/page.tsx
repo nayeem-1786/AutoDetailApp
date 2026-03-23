@@ -22,6 +22,7 @@ import { QuickSaleDialog } from './_components/quick-sale-dialog';
 import type { QuickSaleItem, QuickSalePrefill } from './_components/quick-sale-dialog';
 import { SaleHistorySection } from './_components/sale-history-section';
 import type { SaleHistoryRecord } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ function buildPrefillFromPromotion(item: PromotionItem): QuickSaleItem {
 // ─── Main Page ──────────────────────────────────────────────
 
 export default function PromotionsPage() {
+  const { granted: canManageCoupons, loading: permLoading } = usePermission('marketing.coupons');
   const [items, setItems] = useState<PromotionItem[]>([]);
   const [counts, setCounts] = useState<Counts>({ active: 0, scheduled: 0, expired: 0, no_sale: 0 });
   const [loading, setLoading] = useState(true);
@@ -269,6 +271,26 @@ export default function PromotionsPage() {
     { key: 'expired', label: 'Expired (recent)', emoji: '🔴' },
     { key: 'no_sale', label: 'No Sale', emoji: '⚪' },
   ];
+
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageCoupons) {
+    return (
+      <div>
+        <PageHeader title="Promotions" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage promotions.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

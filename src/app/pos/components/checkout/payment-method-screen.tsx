@@ -5,11 +5,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
+import { usePosPermission } from '../../context/pos-permission-context';
 import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 
 export function PaymentMethodScreen() {
   const { ticket } = useTicket();
   const { setPaymentMethod, setStep, closeCheckout } = useCheckout();
+  const { granted: canProcessCard } = usePosPermission('pos.process_card');
+  const { granted: canProcessCash } = usePosPermission('pos.process_cash');
+  const { granted: canProcessSplit } = usePosPermission('pos.process_split');
   const isOnline = useOnlineStatus();
 
   function handleSelect(method: 'cash' | 'card' | 'check' | 'split') {
@@ -36,10 +40,14 @@ export function PaymentMethodScreen() {
       <div className="flex gap-6">
         <button
           onClick={() => handleSelect('cash')}
+          disabled={!canProcessCash}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all',
-            'hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 active:scale-[0.97]'
+            canProcessCash
+              ? 'hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 active:scale-[0.97]'
+              : 'cursor-not-allowed opacity-40'
           )}
+          title={!canProcessCash ? 'You do not have permission to process cash payments' : undefined}
         >
           <Banknote className="h-8 w-8 text-green-600 dark:text-green-400" />
           <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Cash</span>
@@ -47,13 +55,14 @@ export function PaymentMethodScreen() {
 
         <button
           onClick={() => handleSelect('card')}
-          disabled={!isOnline}
+          disabled={!isOnline || !canProcessCard}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all',
-            isOnline
+            isOnline && canProcessCard
               ? 'hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-[0.97]'
               : 'cursor-not-allowed opacity-40'
           )}
+          title={!canProcessCard ? 'You do not have permission to process card payments' : undefined}
         >
           <CreditCard className="h-8 w-8 text-blue-600 dark:text-blue-400" />
           <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Card</span>
@@ -61,13 +70,14 @@ export function PaymentMethodScreen() {
 
         <button
           onClick={() => handleSelect('check')}
-          disabled={!isOnline}
+          disabled={!isOnline || !canProcessCash}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all',
-            isOnline
+            isOnline && canProcessCash
               ? 'hover:border-amber-400 dark:hover:border-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 active:scale-[0.97]'
               : 'cursor-not-allowed opacity-40'
           )}
+          title={!canProcessCash ? 'You do not have permission to process check payments' : undefined}
         >
           <FileText className="h-8 w-8 text-amber-600 dark:text-amber-400" />
           <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Check</span>
@@ -75,13 +85,14 @@ export function PaymentMethodScreen() {
 
         <button
           onClick={() => handleSelect('split')}
-          disabled={!isOnline}
+          disabled={!isOnline || !canProcessSplit}
           className={cn(
             'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all',
-            isOnline
+            isOnline && canProcessSplit
               ? 'hover:border-purple-400 hover:bg-purple-50 active:scale-[0.97]'
               : 'cursor-not-allowed opacity-40'
           )}
+          title={!canProcessSplit ? 'You do not have permission to process split payments' : undefined}
         >
           <Split className="h-8 w-8 text-purple-600" />
           <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Split</span>

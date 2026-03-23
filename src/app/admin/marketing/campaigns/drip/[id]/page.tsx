@@ -9,6 +9,8 @@ import { DripBuilder } from '../_components/drip-builder';
 import { DripEnrollmentsTable } from '../_components/drip-enrollments-table';
 import { DripAnalytics } from '../_components/drip-analytics';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { PageHeader } from '@/components/ui/page-header';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -35,6 +37,7 @@ export default function EditDripSequencePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { granted: canManageCampaigns, loading: permLoading } = usePermission('marketing.campaigns');
 
   const [sequence, setSequence] = useState<DripSequenceWithSteps | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,10 +74,22 @@ export default function EditDripSequencePage() {
     load();
   }, [id, router]);
 
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageCampaigns) {
+    return (
+      <div>
+        <PageHeader title="Drip Sequence" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage campaigns.</p>
+        </div>
       </div>
     );
   }

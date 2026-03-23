@@ -14,11 +14,11 @@ export function getPeriodDates(period: string): { start: string; end: string } {
 }
 
 /**
- * Standard admin auth check. Returns { user, adminClient } or a NextResponse error.
+ * Standard admin auth check. Returns { user, employeeId, adminClient } or a NextResponse error.
  */
 export async function authenticateAdmin(): Promise<
   | { error: NextResponse }
-  | { user: { id: string }; adminClient: ReturnType<typeof createAdminClient> }
+  | { user: { id: string }; employeeId: string; adminClient: ReturnType<typeof createAdminClient> }
 > {
   const authClient = await createClient();
   const { data: { user } } = await authClient.auth.getUser();
@@ -28,7 +28,7 @@ export async function authenticateAdmin(): Promise<
 
   const { data: employee } = await authClient
     .from('employees')
-    .select('role')
+    .select('id, role')
     .eq('auth_user_id', user.id)
     .single();
 
@@ -36,5 +36,5 @@ export async function authenticateAdmin(): Promise<
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
-  return { user, adminClient: createAdminClient() };
+  return { user, employeeId: employee.id, adminClient: createAdminClient() };
 }

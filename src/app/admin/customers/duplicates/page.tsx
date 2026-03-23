@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { ChevronLeft, Merge, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface DuplicateCustomer {
   id: string;
@@ -99,6 +100,7 @@ function customerLabel(c: DuplicateCustomer): string {
 
 export default function DuplicateCustomersPage() {
   const supabase = createClient();
+  const { granted: canMergeCustomers, loading: permLoading } = usePermission('customers.merge');
 
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,10 +210,19 @@ export default function DuplicateCustomersPage() {
     }
   }
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canMergeCustomers) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-2 text-sm text-gray-500">You don&apos;t have permission to merge customers.</p>
       </div>
     );
   }

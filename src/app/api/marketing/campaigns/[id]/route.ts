@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { campaignUpdateSchema } from '@/lib/utils/validation';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(
@@ -17,12 +18,15 @@ export async function GET(
     const admin = createAdminClient();
     const { data: employee } = await admin
       .from('employees')
-      .select('role')
+      .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const { data, error } = await admin
       .from('campaigns')
@@ -78,12 +82,15 @@ export async function PATCH(
     const admin = createAdminClient();
     const { data: employee } = await admin
       .from('employees')
-      .select('role')
+      .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     // Check current status — only draft/scheduled can be edited
     const { data: existing } = await admin
@@ -170,12 +177,15 @@ export async function DELETE(
     const admin = createAdminClient();
     const { data: employee } = await admin
       .from('employees')
-      .select('role')
+      .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     // Only draft campaigns can be deleted
     const { data: existing } = await admin

@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface CouponOption {
   id: string;
@@ -40,6 +41,7 @@ export default function AutomationDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const supabase = createClient();
+  const { granted: canManageAutomations, loading: permLoading } = usePermission('marketing.lifecycle_rules');
 
   const [services, setServices] = useState<Service[]>([]);
   const [coupons, setCoupons] = useState<CouponOption[]>([]);
@@ -192,10 +194,22 @@ export default function AutomationDetailPage() {
     </div>
   );
 
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageAutomations) {
+    return (
+      <div>
+        <PageHeader title="Edit Automation Rule" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage automations.</p>
+        </div>
       </div>
     );
   }

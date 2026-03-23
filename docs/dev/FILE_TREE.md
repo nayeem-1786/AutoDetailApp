@@ -1333,6 +1333,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260316000001_feature_flags_anon_select_policy.sql
 20260317000001_add_services_sale_price.sql
 20260317000002_sale_history.sql
+20260322000001_add_missing_permission_definitions.sql
 ```
 
 ---

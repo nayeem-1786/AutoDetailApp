@@ -36,6 +36,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Maximum 100 photos per bulk update' }, { status: 400 });
     }
 
+    // If toggling featured status, require photos.approve_marketing permission
+    if (typeof is_featured === 'boolean') {
+      const marketingDenied = await requirePermission(employee.id, 'photos.approve_marketing');
+      if (marketingDenied) return marketingDenied;
+    }
+
     const hasFieldUpdate = typeof is_featured === 'boolean' || typeof is_internal === 'boolean';
     const hasTagUpdate = (add_tags && add_tags.length > 0) || (remove_tags && remove_tags.length > 0);
 

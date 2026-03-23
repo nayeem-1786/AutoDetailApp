@@ -92,6 +92,9 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
   const router = useRouter();
   const { dispatch: quoteDispatch, quoteValidityDays } = useQuote();
   const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
+  const { granted: canCreateQuote } = usePosPermission('quotes.create');
+  const { granted: canSendQuote } = usePosPermission('quotes.send');
+  const { granted: canConvertQuote } = usePosPermission('quotes.convert');
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -301,18 +304,24 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
           {/* Draft: Edit, Send, Convert, Create Job, Delete */}
           {quote.status === 'draft' && (
             <>
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Edit3 className="mr-1.5 h-3.5 w-3.5" />
-                Edit
-              </Button>
-              <Button size="sm" onClick={() => setSendDialogOpen(true)}>
-                <Send className="mr-1.5 h-3.5 w-3.5" />
-                Send
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
-                <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
-                Convert to Appointment
-              </Button>
+              {canCreateQuote && (
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              )}
+              {canSendQuote && (
+                <Button size="sm" onClick={() => setSendDialogOpen(true)}>
+                  <Send className="mr-1.5 h-3.5 w-3.5" />
+                  Send
+                </Button>
+              )}
+              {canConvertQuote && (
+                <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
+                  <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
+                  Convert to Appointment
+                </Button>
+              )}
               {canManageJobs && quote.customer && (
                 <Button
                   variant="outline"
@@ -342,18 +351,24 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
           {/* Sent/Viewed: Edit, Resend, Convert, Create Job */}
           {(quote.status === 'sent' || quote.status === 'viewed') && (
             <>
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Edit3 className="mr-1.5 h-3.5 w-3.5" />
-                Edit
-              </Button>
-              <Button size="sm" onClick={() => setSendDialogOpen(true)}>
-                <Send className="mr-1.5 h-3.5 w-3.5" />
-                Resend
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
-                <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
-                Convert to Appointment
-              </Button>
+              {canCreateQuote && (
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              )}
+              {canSendQuote && (
+                <Button size="sm" onClick={() => setSendDialogOpen(true)}>
+                  <Send className="mr-1.5 h-3.5 w-3.5" />
+                  Resend
+                </Button>
+              )}
+              {canConvertQuote && (
+                <Button variant="outline" size="sm" onClick={() => setConvertDialogOpen(true)}>
+                  <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
+                  Convert to Appointment
+                </Button>
+              )}
               {canManageJobs && quote.customer && (
                 <Button
                   variant="outline"
@@ -375,14 +390,18 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
           {/* Accepted: Convert, Edit, Create Job */}
           {quote.status === 'accepted' && (
             <>
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Edit3 className="mr-1.5 h-3.5 w-3.5" />
-                Edit
-              </Button>
-              <Button size="sm" onClick={() => setConvertDialogOpen(true)}>
-                <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
-                Convert to Appointment
-              </Button>
+              {canCreateQuote && (
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              )}
+              {canConvertQuote && (
+                <Button size="sm" onClick={() => setConvertDialogOpen(true)}>
+                  <ArrowRightCircle className="mr-1.5 h-3.5 w-3.5" />
+                  Convert to Appointment
+                </Button>
+              )}
               {canManageJobs && quote.customer && (
                 <Button
                   variant="outline"
@@ -402,7 +421,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
           )}
 
           {/* Expired: Re-quote */}
-          {quote.status === 'expired' && (
+          {quote.status === 'expired' && canCreateQuote && (
             <Button size="sm" onClick={handleReQuote}>
               <Copy className="mr-1.5 h-3.5 w-3.5" />
               Re-Quote

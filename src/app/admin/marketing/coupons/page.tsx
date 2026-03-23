@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 function discountSummary(coupon: Coupon & { coupon_rewards?: CouponReward[] }): string {
   const rewards = coupon.coupon_rewards || coupon.rewards || [];
@@ -30,6 +31,7 @@ function discountSummary(coupon: Coupon & { coupon_rewards?: CouponReward[] }): 
 
 export default function CouponsListPage() {
   const router = useRouter();
+  const { granted: canManageCoupons, loading: permLoading } = usePermission('marketing.coupons');
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -319,10 +321,22 @@ export default function CouponsListPage() {
     },
   ];
 
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageCoupons) {
+    return (
+      <div>
+        <PageHeader title="Coupons" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage coupons.</p>
+        </div>
       </div>
     );
   }

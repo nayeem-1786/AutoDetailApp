@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 const VALID_TRIGGERS = ['no_visit_days', 'after_service', 'new_customer', 'manual_enroll', 'tag_added'] as const;
 
@@ -11,6 +12,9 @@ export async function GET(request: NextRequest) {
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -71,6 +75,9 @@ export async function POST(request: NextRequest) {
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const body = await request.json();
     const {

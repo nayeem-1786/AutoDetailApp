@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Plus } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface RuleWithService {
   id: string;
@@ -32,6 +33,7 @@ interface RuleWithService {
 
 export default function AutomationsListPage() {
   const router = useRouter();
+  const { granted: canManageAutomations, loading: permLoading } = usePermission('marketing.lifecycle_rules');
 
   const [rules, setRules] = useState<RuleWithService[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,10 +170,22 @@ export default function AutomationsListPage() {
     },
   ];
 
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageAutomations) {
+    return (
+      <div>
+        <PageHeader title="Automations" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage automations.</p>
+        </div>
       </div>
     );
   }

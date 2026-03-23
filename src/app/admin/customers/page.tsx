@@ -275,6 +275,7 @@ function TagFilterDropdown({
 export default function CustomersPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canViewCustomers, loading: viewLoading } = usePermission('customers.view');
   const { granted: canCreateCustomer } = usePermission('customers.create');
   const { granted: canEditCustomer } = usePermission('customers.edit');
   const { granted: canMergeCustomers } = usePermission('customers.merge');
@@ -635,10 +636,19 @@ export default function CustomersPage() {
     },
   ];
 
-  if (loading) {
+  if (viewLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canViewCustomers) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-2 text-sm text-gray-500">You don&apos;t have permission to view customers.</p>
       </div>
     );
   }

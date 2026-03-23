@@ -6,9 +6,11 @@ import { cn } from '@/lib/utils/cn';
 import { LOYALTY, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { useTicket } from '../context/ticket-context';
+import { usePosPermission } from '../context/pos-permission-context';
 
 export function LoyaltyPanel() {
   const { ticket, dispatch } = useTicket();
+  const { granted: canApplyLoyalty } = usePosPermission('pos.apply_loyalty');
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,7 +42,7 @@ export function LoyaltyPanel() {
     }
   }, [showInput]);
 
-  if (!customer || flagLoading || !loyaltyEnabled) return null;
+  if (!customer || flagLoading || !loyaltyEnabled || !canApplyLoyalty) return null;
 
   function handleApplyClick() {
     if (isRedeeming) {

@@ -31,9 +31,11 @@ interface AppointmentStatsData {
 export default function AppointmentsPage() {
   const supabase = createClient();
   useAuth();
+  const { granted: canViewToday, loading: viewTodayLoading } = usePermission('appointments.view_today');
   const { granted: canViewFullCalendar } = usePermission('appointments.view_calendar');
   const { granted: canReschedule } = usePermission('appointments.reschedule');
   const { granted: canCancel } = usePermission('appointments.cancel');
+  const { granted: canAddNotes } = usePermission('appointments.add_notes');
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -200,6 +202,19 @@ export default function AppointmentsPage() {
     fetchEmployees();
   }, [fetchEmployees]);
 
+  // Permission gate: appointments.view_today is the minimum permission
+  if (!viewTodayLoading && !canViewToday) {
+    return (
+      <div>
+        <PageHeader title="Appointments" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to view appointments.</p>
+        </div>
+      </div>
+    );
+  }
+
   function handleMonthChange(date: Date) {
     setCurrentMonth(date);
   }
@@ -321,6 +336,7 @@ export default function AppointmentsPage() {
           onCancel={handleCancelClick}
           canReschedule={false}
           canCancel={false}
+          canAddNotes={canAddNotes}
         />
       </div>
     );
@@ -518,6 +534,7 @@ export default function AppointmentsPage() {
         onCancel={handleCancelClick}
         canReschedule={canReschedule}
         canCancel={canCancel}
+        canAddNotes={canAddNotes}
       />
 
       {/* Cancel dialog — only rendered if user has cancel permission */}

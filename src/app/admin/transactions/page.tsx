@@ -108,6 +108,10 @@ const DATE_PRESETS: DatePreset[] = ['today', 'yesterday', 'this_week', 'this_mon
 export default function AdminTransactionsPage() {
   const supabase = createClient();
   const { granted: canExport } = usePermission('reports.export');
+  const { granted: canViewRevenue } = usePermission('reports.revenue');
+  const { granted: canViewFinancialDetail } = usePermission('reports.financial_detail');
+  const { granted: canViewEmployeeTips } = usePermission('reports.employee_tips');
+  const { granted: canViewOwnTips } = usePermission('reports.own_tips');
 
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -312,22 +316,27 @@ export default function AdminTransactionsPage() {
         }
       />
 
-      {/* Revenue Stats */}
-      <RevenueStats
-        revenue={stats?.revenue ?? 0}
-        transactionCount={stats?.transactionCount ?? 0}
-        avgTicket={stats?.avgTicket ?? 0}
-        tips={stats?.tips ?? 0}
-        newCustomers={stats?.newCustomers ?? 0}
-        winBacks={stats?.winBacks ?? 0}
-        loading={statsLoading}
-      />
+      {/* Revenue Stats — gated by reports.revenue */}
+      {canViewRevenue && (
+        <RevenueStats
+          revenue={stats?.revenue ?? 0}
+          transactionCount={stats?.transactionCount ?? 0}
+          avgTicket={stats?.avgTicket ?? 0}
+          tips={stats?.tips ?? 0}
+          newCustomers={stats?.newCustomers ?? 0}
+          winBacks={stats?.winBacks ?? 0}
+          loading={statsLoading}
+          showTips={canViewEmployeeTips || canViewOwnTips}
+        />
+      )}
 
-      {/* Payment Breakdown */}
-      <PaymentBreakdown
-        methods={stats?.paymentMethods ?? []}
-        loading={statsLoading}
-      />
+      {/* Payment Breakdown — gated by reports.financial_detail */}
+      {canViewFinancialDetail && (
+        <PaymentBreakdown
+          methods={stats?.paymentMethods ?? []}
+          loading={statsLoading}
+        />
+      )}
 
       {/* Filters row */}
       <Card>

@@ -96,6 +96,11 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.catalog_display.manage': true,
     'cms.seo.manage': true,
     'cms.pages.manage': true,
+    'orders.view': true,
+    'orders.manage': true,
+    'pos.override_prerequisites': true,
+    'customers.merge': true,
+    'reports.view': true,
   },
 
   admin: {
@@ -189,6 +194,11 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.catalog_display.manage': true,
     'cms.seo.manage': true,
     'cms.pages.manage': true,
+    'orders.view': true,
+    'orders.manage': true,
+    'pos.override_prerequisites': false,
+    'customers.merge': false,
+    'reports.view': true,
   },
 
   cashier: {
@@ -282,6 +292,11 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.catalog_display.manage': false,
     'cms.seo.manage': false,
     'cms.pages.manage': false,
+    'orders.view': true,
+    'orders.manage': false,
+    'pos.override_prerequisites': false,
+    'customers.merge': false,
+    'reports.view': false,
   },
 
   detailer: {
@@ -375,5 +390,10 @@ export const ROLE_PERMISSION_DEFAULTS: Record<string, Record<string, boolean>> =
     'cms.catalog_display.manage': false,
     'cms.seo.manage': false,
     'cms.pages.manage': false,
+    'orders.view': false,
+    'orders.manage': false,
+    'pos.override_prerequisites': false,
+    'customers.merge': false,
+    'reports.view': false,
   },
 };

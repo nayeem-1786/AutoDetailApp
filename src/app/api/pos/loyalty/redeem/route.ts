@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import { LOYALTY, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 
@@ -9,6 +10,13 @@ export async function POST(request: NextRequest) {
     const posEmployee = authenticatePosRequest(request);
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Permission check: pos.apply_loyalty
+    const supabaseForPerm = createAdminClient();
+    const loyaltyPermGranted = await checkPosPermission(supabaseForPerm, posEmployee.role, posEmployee.employee_id, 'pos.apply_loyalty');
+    if (!loyaltyPermGranted) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     if (!await isFeatureEnabled(FEATURE_FLAGS.LOYALTY_REWARDS)) {

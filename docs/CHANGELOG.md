@@ -4,6 +4,57 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Roles & permissions — full enforcement audit (Sessions 0–8) — 2026-03-22
+
+Wired up 83 of 97 defined permissions across the entire app (7 skipped for unbuilt features, 3 skipped for missing UI, 4 already fully enforced).
+
+### Session 0: Foundation Fixes
+- Added 5 missing keys to `role-defaults.ts` (`orders.view`, `orders.manage`, `pos.override_prerequisites`, `customers.merge`, `reports.view`) across all 4 role blocks
+- Fixed mismatch: team-members + credentials API routes now check `cms.about.manage` instead of `cms.pages.manage`
+- New migration `20260322000001` adds `customers.merge` and `reports.view` to `permission_definitions` table
+
+### Session 1: POS Operations (10 permissions)
+- **Server:** 6 API routes gated — cash-drawer, coupons/validate, loyalty/redeem, stripe/payment-intent, transactions (payment method + discount checks), jobs/addons (flag issue)
+- **Client:** 8 components — payment method buttons disabled, catalog/register item adding blocked, ticket clearing gated, coupon/loyalty panels hidden
+
+### Session 2: Customer Management (8 permissions)
+- **Client:** customers page gated (`customers.view`), History/Loyalty tabs conditionally rendered, duplicates page gated (`customers.merge`)
+- `customers.export` skipped (no export feature exists)
+
+### Session 3: Appointments (9 permissions)
+- **Server:** notes update, schedule/blocked-dates routes, calendar stats, waive-fee in cancel route
+- **Client:** appointments page gated (`view_today`), scheduling page gated, notes disabled when denied
+- `appointments.create` skipped (no admin creation UI)
+
+### Session 4: Catalog & Inventory (14 permissions)
+- **Server:** PO create/update/delete, PO receive routes
+- **Client:** products + services pages/detail/new gated for view/edit/delete, addon + pricing sections gated, stock columns conditional, vendor page gated, PO pages gated
+
+### Session 5: Marketing & Messaging (5 permissions)
+- **Server:** 35+ API routes across campaigns, drip sequences, coupons, promotions, analytics, automations, messaging
+- **Client:** all marketing pages gated (campaigns, coupons, analytics, automations, messaging)
+
+### Session 6: Quotes & Photos (7 permissions)
+- **Server:** quote create/send/convert (both POS + admin routes), photo upload/view/delete (POS), photo approve (admin single + bulk)
+- **Client:** quote list/detail buttons gated, photo capture/view/delete gated, admin photos featured toggle gated
+
+### Session 7: Reports & Dashboard (8 permissions)
+- **Server:** transactions/stats, 10 QBO API routes, QBO export routes
+- **Client:** revenue stats, financial detail, tips card conditional, QBO page gated
+- `reports.cost_margin` skipped (no UI exists)
+
+### Session 8: Settings (3 permissions)
+- **Server:** audit-log + export routes (replaced hardcoded super_admin check with `requirePermission`)
+- **Client:** tax-config page gated, audit-log page gated
+- `settings.feature_toggles` already fully enforced
+
+### Audit Results
+- **48 PASS** (full server + client enforcement)
+- **35 PARTIAL** (one-sided — appropriate: client-only items use Supabase RLS not admin APIs; server-only items like CMS already return 403)
+- **0 FAIL**
+
+---
+
 ## refactor: Email template preview — slide-over panel with auto-refresh — 2026-03-21
 
 - **Slide-over preview**: Preview button now opens a 672px slide-over panel from the right instead of an inline card below the editor. Eliminates nested scrolling issues — the slide-over scrolls naturally while the editor stays in place.

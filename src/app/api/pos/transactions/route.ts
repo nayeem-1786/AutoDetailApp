@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import { transactionCreateSchema } from '@/lib/utils/validation';
 import { CC_FEE_RATE, LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
@@ -26,6 +27,39 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+
+    // Permission checks based on payment method
+    const paymentMethod = data.payment_method;
+    if (paymentMethod === 'card') {
+      const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_card');
+      if (!granted) {
+        return NextResponse.json({ error: 'Forbidden: cannot process card payments' }, { status: 403 });
+      }
+    } else if (paymentMethod === 'cash' || paymentMethod === 'check') {
+      const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_cash');
+      if (!granted) {
+        return NextResponse.json({ error: 'Forbidden: cannot process cash/check payments' }, { status: 403 });
+      }
+    } else if (paymentMethod === 'split') {
+      const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_split');
+      if (!granted) {
+        return NextResponse.json({ error: 'Forbidden: cannot process split payments' }, { status: 403 });
+      }
+    }
+
+    // Permission check: manual discount
+    if (data.discount_amount && data.discount_amount > 0) {
+      // Only check if there's a manual discount (not coupon/loyalty-only discounts)
+      // Coupon discount is tracked separately via coupon_id, so we only subtract loyalty
+      const loyaltyDiscount = data.loyalty_discount || 0;
+      const manualDiscountPortion = data.discount_amount - loyaltyDiscount;
+      if (manualDiscountPortion > 0) {
+        const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.manual_discounts');
+        if (!granted) {
+          return NextResponse.json({ error: 'Forbidden: cannot apply manual discounts' }, { status: 403 });
+        }
+      }
+    }
 
     // 1. Insert transaction
     const { data: transaction, error: txError } = await supabase

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 
 /**
  * PATCH /api/pos/jobs/[id]/photos/[photoId] — Update photo metadata
@@ -70,6 +71,10 @@ export async function DELETE(
     }
 
     const supabase = createAdminClient();
+    const canDelete = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'photos.delete');
+    if (!canDelete) {
+      return NextResponse.json({ error: 'Forbidden', message: 'Missing permission: photos.delete' }, { status: 403 });
+    }
 
     // Get photo to find storage path
     const { data: photo, error: fetchError } = await supabase

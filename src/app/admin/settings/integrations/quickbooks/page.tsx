@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -165,6 +166,8 @@ function syncRateColor(rate: number): string {
 
 export default function QuickBooksSettingsPage() {
   const searchParams = useSearchParams();
+  const { granted: canViewQbo, loading: permLoading } = usePermission('reports.quickbooks_status');
+  const { granted: canExport } = usePermission('reports.export');
 
   // Active tab
   const [activeTab, setActiveTab] = useState<'settings' | 'reports'>('settings');
@@ -539,8 +542,8 @@ export default function QuickBooksSettingsPage() {
     window.open(`/api/admin/integrations/qbo/reports/export?period=${reportPeriod}`);
   }
 
-  // ── Loading state ──
-  if (loading) {
+  // ── Permission check ──
+  if (permLoading || loading) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -549,6 +552,17 @@ export default function QuickBooksSettingsPage() {
         />
         <div className="flex items-center justify-center py-12">
           <Spinner size="lg" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!canViewQbo) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to view QuickBooks settings.</p>
         </div>
       </div>
     );
@@ -1004,10 +1018,12 @@ export default function QuickBooksSettingsPage() {
                       />
                       Auto-refresh
                     </label>
-                    <Button variant="outline" size="sm" onClick={handleExportSyncLog}>
-                      <Download className="mr-1 h-3 w-3" />
-                      Export CSV
-                    </Button>
+                    {canExport && (
+                      <Button variant="outline" size="sm" onClick={handleExportSyncLog}>
+                        <Download className="mr-1 h-3 w-3" />
+                        Export CSV
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={handleClearLog}>
                       Clear Log
                     </Button>
@@ -1202,10 +1218,12 @@ export default function QuickBooksSettingsPage() {
                 </button>
               ))}
             </div>
-            <Button variant="outline" size="sm" onClick={handleExportRevenue}>
-              <Download className="mr-1 h-3 w-3" />
-              Export Revenue CSV
-            </Button>
+            {canExport && (
+              <Button variant="outline" size="sm" onClick={handleExportRevenue}>
+                <Download className="mr-1 h-3 w-3" />
+                Export Revenue CSV
+              </Button>
+            )}
           </div>
 
           {reportLoading && !reportData ? (

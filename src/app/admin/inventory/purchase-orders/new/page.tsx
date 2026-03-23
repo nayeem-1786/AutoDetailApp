@@ -17,7 +17,8 @@ import { Select } from '@/components/ui/select';
 import { SearchInput } from '@/components/ui/search-input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, ShieldAlert } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface POLineItem {
   product_id: string;
@@ -31,6 +32,7 @@ export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const supabase = createClient();
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
+  const { granted: canManagePO, loading: loadingPerm } = usePermission('inventory.manage_po');
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -166,10 +168,20 @@ export default function NewPurchaseOrderPage() {
     }
   }
 
-  if (loading) {
+  if (loadingPerm || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManagePO) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-gray-300 mb-4" />
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You do not have permission to create purchase orders.</p>
       </div>
     );
   }

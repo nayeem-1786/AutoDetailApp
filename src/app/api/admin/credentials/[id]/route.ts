@@ -18,7 +18,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const denied = await requirePermission(employee.id, 'cms.pages.manage');
+  const denied = await requirePermission(employee.id, 'cms.about.manage');
   if (denied) return denied;
 
   const { id } = await params;
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const denied = await requirePermission(employee.id, 'cms.pages.manage');
+  const denied = await requirePermission(employee.id, 'cms.about.manage');
   if (denied) return denied;
 
   const { id } = await params;
@@ -81,7 +81,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const denied = await requirePermission(employee.id, 'cms.pages.manage');
+  const denied = await requirePermission(employee.id, 'cms.about.manage');
   if (denied) return denied;
 
   const { id } = await params;

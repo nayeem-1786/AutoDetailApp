@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function POST(
   _request: NextRequest,
@@ -21,6 +22,9 @@ export async function POST(
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     // Fetch original campaign
     const { data: original, error: fetchErr } = await admin

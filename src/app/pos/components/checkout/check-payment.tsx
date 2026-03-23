@@ -8,10 +8,12 @@ import { posFetch } from '../../lib/pos-fetch';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
+import { usePosPermission } from '../../context/pos-permission-context';
 
 export function CheckPayment() {
   const { ticket, dispatch } = useTicket();
   const checkout = useCheckout();
+  const { granted: canOpenDrawer } = usePosPermission('pos.open_close_register');
 
   const amountDue = ticket.total;
   const [checkNumber, setCheckNumber] = useState('');
@@ -76,11 +78,13 @@ export function CheckPayment() {
         throw new Error(json.error || 'Failed to process transaction');
       }
 
-      // Fire-and-forget: kick cash drawer open via print server
-      posFetch('/api/pos/receipts/cash-drawer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      }).catch(() => { /* drawer kick is best-effort */ });
+      // Fire-and-forget: kick cash drawer open via print server (skip if no permission)
+      if (canOpenDrawer) {
+        posFetch('/api/pos/receipts/cash-drawer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch(() => { /* drawer kick is best-effort */ });
+      }
 
       checkout.setComplete(
         json.data.id,

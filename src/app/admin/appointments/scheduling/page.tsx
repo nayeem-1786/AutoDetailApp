@@ -12,6 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { EmployeeSchedule } from '@/lib/supabase/types';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -498,6 +499,27 @@ function TodayStaffCard() {
 
 export default function SchedulingPage() {
   const [tab, setTab] = useState('schedules');
+  const { granted: canManageSchedule, loading: schedulePermLoading } = usePermission('appointments.manage_schedule');
+
+  if (schedulePermLoading) {
+    return (
+      <div className="flex h-60 items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageSchedule) {
+    return (
+      <div>
+        <PageHeader title="Staff Scheduling" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage staff schedules.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

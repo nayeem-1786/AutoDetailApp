@@ -96,6 +96,8 @@ export default function CustomerProfilePage() {
   const { employee: adminEmployee } = useAuth();
   const { granted: canDeleteCustomer } = usePermission('customers.delete');
   const { granted: canAdjustLoyalty } = usePermission('customers.adjust_loyalty');
+  const { granted: canViewHistory } = usePermission('customers.view_history');
+  const { granted: canViewLoyalty } = usePermission('customers.view_loyalty');
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -959,8 +961,8 @@ export default function CustomerProfilePage() {
         <TabsList>
           <TabsTrigger value="info">Info</TabsTrigger>
           <TabsTrigger value="vehicles">Vehicles ({vehicles.length})</TabsTrigger>
-          <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
-          <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>
+          {canViewLoyalty && <TabsTrigger value="loyalty">Loyalty</TabsTrigger>}
+          {canViewHistory && <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>}
           <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
           <TabsTrigger value="service-history">Service History</TabsTrigger>
           <TabsTrigger value="sequences">Sequences</TabsTrigger>
@@ -1582,7 +1584,7 @@ export default function CustomerProfilePage() {
         </TabsContent>
 
         {/* ===== LOYALTY TAB ===== */}
-        <TabsContent value="loyalty">
+        {canViewLoyalty && <TabsContent value="loyalty">
           <div className="space-y-6">
             {/* Balance Card */}
             <Card>
@@ -1690,10 +1692,10 @@ export default function CustomerProfilePage() {
               </Button>
             </DialogFooter>
           </Dialog>
-        </TabsContent>
+        </TabsContent>}
 
         {/* ===== HISTORY TAB ===== */}
-        <TabsContent value="history">
+        {canViewHistory && <TabsContent value="history">
           {/* Stat cards */}
           <div className="mb-4 grid gap-4 sm:grid-cols-4">
             <Card>
@@ -1771,7 +1773,7 @@ export default function CustomerProfilePage() {
             customerEmail={customer?.email ?? undefined}
             customerPhone={customer?.phone ?? undefined}
           />
-        </TabsContent>
+        </TabsContent>}
 
         {/* ===== QUOTES TAB ===== */}
         <TabsContent value="quotes">

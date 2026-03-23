@@ -16,7 +16,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Plus, Check, X as XIcon, Wrench, ImageOff } from 'lucide-react';
+import { Plus, Check, X as XIcon, Wrench, ImageOff, ShieldAlert } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ServiceWithCategory = Service & {
@@ -27,6 +28,8 @@ export default function ServicesPage() {
   const router = useRouter();
   const supabase = createClient();
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
+  const { granted: canViewServices, loading: loadingViewPerm } = usePermission('services.view');
+  const { granted: canEditServices } = usePermission('services.edit');
 
   const [services, setServices] = useState<ServiceWithCategory[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
@@ -229,18 +232,20 @@ export default function ServicesPage() {
           return (
             <div className="flex items-center gap-2">
               <Badge variant="secondary">Inactive</Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
-                disabled={reactivatingId === s.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleReactivate(s);
-                }}
-              >
-                {reactivatingId === s.id ? 'Activating...' : 'Activate'}
-              </Button>
+              {canEditServices && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                  disabled={reactivatingId === s.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleReactivate(s);
+                  }}
+                >
+                  {reactivatingId === s.id ? 'Activating...' : 'Activate'}
+                </Button>
+              )}
             </div>
           );
         }
@@ -250,10 +255,20 @@ export default function ServicesPage() {
     },
   ];
 
-  if (loading) {
+  if (loadingViewPerm || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canViewServices) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-gray-300 mb-4" />
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You do not have permission to view services.</p>
       </div>
     );
   }
@@ -265,10 +280,12 @@ export default function ServicesPage() {
         title="Services"
         description={`${services.length} services in catalog`}
         action={
-          <Button onClick={() => router.push('/admin/catalog/services/new')}>
-            <Plus className="h-4 w-4" />
-            Add Service
-          </Button>
+          canEditServices ? (
+            <Button onClick={() => router.push('/admin/catalog/services/new')}>
+              <Plus className="h-4 w-4" />
+              Add Service
+            </Button>
+          ) : undefined
         }
       />
 
@@ -354,10 +371,12 @@ export default function ServicesPage() {
         emptyTitle="No services found"
         emptyDescription="Get started by adding your first service."
         emptyAction={
-          <Button onClick={() => router.push('/admin/catalog/services/new')}>
-            <Plus className="h-4 w-4" />
-            Add Service
-          </Button>
+          canEditServices ? (
+            <Button onClick={() => router.push('/admin/catalog/services/new')}>
+              <Plus className="h-4 w-4" />
+              Add Service
+            </Button>
+          ) : undefined
         }
       />
     </div>

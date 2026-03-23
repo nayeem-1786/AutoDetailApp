@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { PeriodSelector } from './components/period-selector';
 import { OverviewKpis } from './components/overview-kpis';
 import { ChannelComparison } from './components/channel-comparison';
@@ -149,6 +150,7 @@ const EMPTY_DATA: AnalyticsData = {
 // -------------------------------------------------------------------------
 
 export default function MarketingAnalyticsPage() {
+  const { granted: canViewAnalytics, loading: permLoading } = usePermission('marketing.analytics');
   const [period, setPeriod] = useState('30d');
   const [data, setData] = useState<AnalyticsData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
@@ -183,6 +185,27 @@ export default function MarketingAnalyticsPage() {
 
   function handlePeriodChange(newPeriod: string) {
     setPeriod(newPeriod);
+  }
+
+  // Permission gate
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canViewAnalytics) {
+    return (
+      <div>
+        <PageHeader title="Marketing Analytics" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to view marketing analytics.</p>
+        </div>
+      </div>
+    );
   }
 
   // Error state

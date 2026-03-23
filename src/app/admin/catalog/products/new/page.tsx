@@ -19,12 +19,14 @@ import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import { ImageUpload } from '@/app/admin/catalog/components/image-upload';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 export default function NewProductPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canEditProducts, loading: loadingPerm } = usePermission('products.edit');
 
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -177,10 +179,20 @@ export default function NewProductPage() {
     }
   }
 
-  if (loadingOptions) {
+  if (loadingPerm || loadingOptions) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canEditProducts) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-gray-300 mb-4" />
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You do not have permission to create products.</p>
       </div>
     );
   }

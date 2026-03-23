@@ -32,6 +32,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Plus, Package, ImageOff } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
+import { ShieldAlert } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ProductWithRelations = Product & {
@@ -52,7 +53,10 @@ export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const { granted: canViewProducts, loading: loadingViewPerm } = usePermission('products.view');
+  const { granted: canEditProducts } = usePermission('products.edit');
   const { granted: canViewCost } = usePermission('inventory.view_costs');
+  const { granted: canViewStock } = usePermission('inventory.view_stock');
   const { granted: canAdjustStock } = usePermission('inventory.adjust_stock');
 
   const initialStock = (['all', 'in-stock', 'low-stock', 'out-of-stock'] as const).includes(
@@ -351,65 +355,101 @@ export default function ProductsPage() {
       ]
     : [];
 
-  const stockColumns: ColumnDef<ProductWithRelations, unknown>[] = [
-    {
-      accessorKey: 'quantity_on_hand',
-      header: 'Stock',
-      size: 64,
-      cell: ({ row }) =>
-        canAdjustStock ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              openAdjust(row.original);
-            }}
-            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-          >
-            {row.original.quantity_on_hand}
-          </button>
-        ) : (
-          <span>{row.original.quantity_on_hand}</span>
-        ),
-    },
-    {
-      id: 'reorder_threshold',
-      header: 'Reorder At',
-      size: 80,
-      cell: ({ row }) =>
-        row.original.reorder_threshold !== null
-          ? row.original.reorder_threshold
-          : '--',
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      size: 130,
-      cell: ({ row }) => {
-        const p = row.original;
-        if (!p.is_active) {
-          return (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">Inactive</Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
-                disabled={reactivatingId === p.id}
+  const stockColumns: ColumnDef<ProductWithRelations, unknown>[] = canViewStock
+    ? [
+        {
+          accessorKey: 'quantity_on_hand',
+          header: 'Stock',
+          size: 64,
+          cell: ({ row }) =>
+            canAdjustStock ? (
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setReactivateTarget(p);
+                  openAdjust(row.original);
                 }}
+                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
               >
-                {reactivatingId === p.id ? 'Activating...' : 'Activate'}
-              </Button>
-            </div>
-          );
-        }
-        return getStockIcon(p);
-      },
-      enableSorting: false,
-    },
-  ];
+                {row.original.quantity_on_hand}
+              </button>
+            ) : (
+              <span>{row.original.quantity_on_hand}</span>
+            ),
+        },
+        {
+          id: 'reorder_threshold',
+          header: 'Reorder At',
+          size: 80,
+          cell: ({ row }) =>
+            row.original.reorder_threshold !== null
+              ? row.original.reorder_threshold
+              : '--',
+        },
+        {
+          id: 'status',
+          header: 'Status',
+          size: 130,
+          cell: ({ row }) => {
+            const p = row.original;
+            if (!p.is_active) {
+              return (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">Inactive</Badge>
+                  {canEditProducts && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                      disabled={reactivatingId === p.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReactivateTarget(p);
+                      }}
+                    >
+                      {reactivatingId === p.id ? 'Activating...' : 'Activate'}
+                    </Button>
+                  )}
+                </div>
+              );
+            }
+            return getStockIcon(p);
+          },
+          enableSorting: false,
+        },
+      ]
+    : [
+        {
+          id: 'status',
+          header: 'Status',
+          size: 130,
+          cell: ({ row }) => {
+            const p = row.original;
+            if (!p.is_active) {
+              return (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">Inactive</Badge>
+                  {canEditProducts && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                      disabled={reactivatingId === p.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReactivateTarget(p);
+                      }}
+                    >
+                      {reactivatingId === p.id ? 'Activating...' : 'Activate'}
+                    </Button>
+                  )}
+                </div>
+              );
+            }
+            return <Badge variant="success">Active</Badge>;
+          },
+          enableSorting: false,
+        },
+      ];
 
   const columns: ColumnDef<ProductWithRelations, unknown>[] = [
     ...baseColumns,
@@ -417,10 +457,20 @@ export default function ProductsPage() {
     ...stockColumns,
   ];
 
-  if (loading) {
+  if (loadingViewPerm || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canViewProducts) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-gray-300 mb-4" />
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You do not have permission to view products.</p>
       </div>
     );
   }
@@ -431,10 +481,12 @@ export default function ProductsPage() {
         title="Products"
         description={`${products.length} products in catalog`}
         action={
-          <Button onClick={() => router.push('/admin/catalog/products/new')}>
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Button>
+          canEditProducts ? (
+            <Button onClick={() => router.push('/admin/catalog/products/new')}>
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Button>
+          ) : undefined
         }
       />
 
@@ -517,10 +569,12 @@ export default function ProductsPage() {
         emptyTitle="No products found"
         emptyDescription="Get started by adding your first product."
         emptyAction={
-          <Button onClick={() => router.push('/admin/catalog/products/new')}>
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Button>
+          canEditProducts ? (
+            <Button onClick={() => router.push('/admin/catalog/products/new')}>
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Button>
+          ) : undefined
         }
       />
 

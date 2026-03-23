@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { createClient } from '@/lib/supabase/client';
 import { taxConfigSchema, type TaxConfigInput } from '@/lib/utils/validation';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ interface TaxFormValues {
 }
 
 export default function TaxConfigPage() {
+  const { granted: canManageTax, loading: permLoading } = usePermission('settings.tax_payment');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -125,7 +127,7 @@ export default function TaxConfigPage() {
     setSaving(false);
   }
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -134,6 +136,18 @@ export default function TaxConfigPage() {
         />
         <div className="flex items-center justify-center py-12">
           <Spinner size="lg" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!canManageTax) {
+    return (
+      <div>
+        <PageHeader title="Tax Configuration" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage tax configuration.</p>
         </div>
       </div>
     );

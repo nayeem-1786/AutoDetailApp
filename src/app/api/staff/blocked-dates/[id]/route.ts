@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const employee = await getEmployeeFromSession();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const denied = await requirePermission(employee.id, 'appointments.manage_schedule');
+    if (denied) return denied;
+
     const { id } = await params;
     const supabase = createAdminClient();
 

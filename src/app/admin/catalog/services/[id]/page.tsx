@@ -95,7 +95,10 @@ export default function ServiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canEditService } = usePermission('services.edit');
   const { granted: canDeleteService } = usePermission('services.delete');
+  const { granted: canManageAddons } = usePermission('services.manage_addons');
+  const { granted: canSetPricing } = usePermission('services.set_pricing');
   const serviceId = params.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -1203,9 +1206,11 @@ export default function ServiceDetailPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Details'}
-                </Button>
+                {canEditService && (
+                  <Button type="submit" disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Details'}
+                  </Button>
+                )}
               </div>
             </div>
           </form>
@@ -1457,16 +1462,18 @@ export default function ServiceDetailPage() {
 
               {/* Action buttons */}
               <div className="flex items-center justify-between">
-                {(hasAnySalePrice(pricing) || service.sale_price != null) && (
+                {canSetPricing && (hasAnySalePrice(pricing) || service.sale_price != null) && (
                   <Button variant="outline" size="sm" onClick={() => setShowClearSaleDialog(true)} disabled={savingSale}>
                     <X className="h-4 w-4" />
                     Clear All Sale Prices
                   </Button>
                 )}
                 <div className="ml-auto flex items-center gap-3">
-                  <Button onClick={onSavePricing} disabled={savingPricing}>
-                    {savingPricing ? 'Saving...' : 'Save Pricing'}
-                  </Button>
+                  {canSetPricing && (
+                    <Button onClick={onSavePricing} disabled={savingPricing}>
+                      {savingPricing ? 'Saving...' : 'Save Pricing'}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1478,10 +1485,12 @@ export default function ServiceDetailPage() {
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle>Add-On Suggestions</CardTitle>
-              <Button size="sm" onClick={() => openAddonDialog()}>
-                <Plus className="h-4 w-4" />
-                Add Suggestion
-              </Button>
+              {canManageAddons && (
+                <Button size="sm" onClick={() => openAddonDialog()}>
+                  <Plus className="h-4 w-4" />
+                  Add Suggestion
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {addons.length === 0 ? (
@@ -1511,14 +1520,16 @@ export default function ServiceDetailPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openAddonDialog(addon)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setDeleteAddonId(addon.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
+                      {canManageAddons && (
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openAddonDialog(addon)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteAddonId(addon.id)}>
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1532,10 +1543,12 @@ export default function ServiceDetailPage() {
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle>Service Prerequisites</CardTitle>
-              <Button size="sm" onClick={() => openPrereqDialog()}>
-                <Plus className="h-4 w-4" />
-                Add Prerequisite
-              </Button>
+              {canEditService && (
+                <Button size="sm" onClick={() => openPrereqDialog()}>
+                  <Plus className="h-4 w-4" />
+                  Add Prerequisite
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {prerequisites.length === 0 ? (
@@ -1562,14 +1575,16 @@ export default function ServiceDetailPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openPrereqDialog(prereq)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setDeletePrereqId(prereq.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
+                      {canEditService && (
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openPrereqDialog(prereq)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeletePrereqId(prereq.id)}>
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

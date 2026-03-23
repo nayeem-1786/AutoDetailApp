@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { blockedDateSchema } from '@/lib/utils/validation';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,6 +50,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const employee = await getEmployeeFromSession();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const denied = await requirePermission(employee.id, 'appointments.manage_schedule');
+    if (denied) return denied;
+
     const body = await request.json();
 
     // Validate request body

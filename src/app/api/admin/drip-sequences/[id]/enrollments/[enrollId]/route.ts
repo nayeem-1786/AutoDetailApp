@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 type Params = { params: Promise<{ id: string; enrollId: string }> };
 
@@ -8,11 +9,13 @@ type Params = { params: Promise<{ id: string; enrollId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const employee = await getEmployeeFromSession();
+    if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const denied = await requirePermission(employee.id, 'marketing.campaigns');
+    if (denied) return denied;
 
     const { id, enrollId } = await params;
     const admin = createAdminClient();

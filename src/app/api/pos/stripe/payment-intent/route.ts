@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -12,6 +14,14 @@ export async function POST(request: NextRequest) {
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Permission check: pos.process_card
+    const supabase = createAdminClient();
+    const cardPermGranted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_card');
+    if (!cardPermGranted) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { amount, description } = body;
 

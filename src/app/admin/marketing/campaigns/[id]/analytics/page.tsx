@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { CampaignSummaryCards } from './campaign-summary-cards';
 import { DeliveryFunnel } from './delivery-funnel';
 import { RecipientTable } from './recipient-table';
@@ -25,6 +26,7 @@ export default function CampaignAnalyticsPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const { granted: canViewAnalytics, loading: permLoading } = usePermission('marketing.analytics');
 
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,10 +63,22 @@ export default function CampaignAnalyticsPage() {
   }, [fetchAnalytics]);
 
   // Full-page loading
-  if (loading && !data) {
+  if ((loading && !data) || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canViewAnalytics) {
+    return (
+      <div>
+        <PageHeader title="Campaign Analytics" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to view marketing analytics.</p>
+        </div>
       </div>
     );
   }

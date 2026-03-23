@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import { convertQuote } from '@/lib/quotes/convert-service';
 import { convertSchema } from '@/lib/utils/validation';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
@@ -15,6 +16,12 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createAdminClient();
+    const canConvert = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'quotes.convert');
+    if (!canConvert) {
+      return NextResponse.json({ error: 'Forbidden', message: 'Missing permission: quotes.convert' }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const parsed = convertSchema.safeParse(body);
@@ -26,7 +33,6 @@ export async function POST(
       );
     }
 
-    const supabase = createAdminClient();
     const result = await convertQuote(supabase, id, parsed.data);
 
     if (!result.success) {

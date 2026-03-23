@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +12,19 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id, role')
+      .eq('auth_user_id', user.id)
+      .single();
+    if (!employee) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Permission check: reports.quickbooks_status
+    const denied = await requirePermission(employee.id, 'reports.quickbooks_status');
+    if (denied) return denied;
 
     const body = await request.json().catch(() => ({}));
     const { transactionId } = body as { transactionId?: string };

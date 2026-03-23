@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin } from '@/lib/utils/analytics-helpers';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { getAttributedRevenue } from '@/lib/utils/attribution';
 import { getVariantStats } from '@/lib/campaigns/ab-testing';
 
@@ -10,7 +11,10 @@ export async function GET(
   try {
     const auth = await authenticateAdmin();
     if ('error' in auth) return auth.error;
-    const { adminClient } = auth;
+    const { employeeId, adminClient } = auth;
+
+    const denied = await requirePermission(employeeId, 'marketing.analytics');
+    if (denied) return denied;
 
     const { id } = await params;
     const { searchParams } = request.nextUrl;

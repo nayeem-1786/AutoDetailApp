@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 export async function GET(
   _request: NextRequest,
@@ -83,6 +84,9 @@ export async function PATCH(
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const denied = await requirePermission(employee.id, 'inventory.manage_po');
+    if (denied) return denied;
 
     // Fetch current PO
     const { data: existing } = await admin
@@ -182,12 +186,15 @@ export async function DELETE(
 
     const { data: employee } = await admin
       .from('employees')
-      .select('role')
+      .select('id, role')
       .eq('auth_user_id', user.id)
       .single();
     if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const deleteDenied = await requirePermission(employee.id, 'inventory.manage_po');
+    if (deleteDenied) return deleteDenied;
 
     // Only draft POs can be deleted
     const { data: po } = await admin

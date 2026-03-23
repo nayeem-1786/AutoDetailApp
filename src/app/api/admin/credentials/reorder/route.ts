@@ -14,7 +14,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const denied = await requirePermission(employee.id, 'cms.pages.manage');
+  const denied = await requirePermission(employee.id, 'cms.about.manage');
   if (denied) return denied;
 
   const body = await request.json();

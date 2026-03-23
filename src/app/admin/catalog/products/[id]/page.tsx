@@ -53,6 +53,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const productId = params.id as string;
   const supabase = createClient();
+  const { granted: canEditProduct } = usePermission('products.edit');
   const { granted: canViewCost } = usePermission('inventory.view_costs');
   const { granted: canDeleteProduct } = usePermission('products.delete');
 
@@ -724,9 +725,11 @@ export default function ProductDetailPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
+          {canEditProduct && (
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          )}
         </div>
       </form>
 

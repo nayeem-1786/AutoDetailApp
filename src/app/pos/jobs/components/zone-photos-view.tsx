@@ -5,6 +5,7 @@ import { ArrowLeft, Camera, Plus, Trash2, X } from 'lucide-react';
 import { getZoneLabel } from '@/lib/utils/job-zones';
 import { AnnotationOverlay } from './photo-annotation';
 import { posFetch } from '../../lib/pos-fetch';
+import { usePosPermission } from '../../context/pos-permission-context';
 import type { JobPhoto, JobPhotoPhase } from '@/lib/supabase/types';
 import type { Annotation } from '@/lib/utils/job-zones';
 
@@ -27,6 +28,9 @@ export function ZonePhotosView({
   onBack,
   onPhotosChanged,
 }: ZonePhotosViewProps) {
+  const { granted: canViewPhotos } = usePosPermission('photos.view');
+  const { granted: canUploadPhotos } = usePosPermission('photos.upload');
+  const { granted: canDeletePhotos } = usePosPermission('photos.delete');
   const [selectedPhoto, setSelectedPhoto] = useState<JobPhoto | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -47,6 +51,23 @@ export function ZonePhotosView({
     }
   }
 
+  // Permission check — hide photos section entirely if denied
+  if (!canViewPhotos) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <button onClick={onBack} className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          </button>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{getZoneLabel(zone)}</h2>
+        </div>
+        <div className="flex flex-1 items-center justify-center bg-gray-50 dark:bg-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">You do not have permission to view photos.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Full-size photo viewer
   if (selectedPhoto) {
     const annotations = (selectedPhoto.annotation_data ?? []) as Annotation[];
@@ -57,13 +78,17 @@ export function ZonePhotosView({
             <X className="h-5 w-5" />
           </button>
           <span className="text-sm text-gray-300 dark:text-gray-500">{getZoneLabel(zone)}</span>
-          <button
-            onClick={() => handleDelete(selectedPhoto.id)}
-            disabled={deleting === selectedPhoto.id}
-            className="text-red-400 dark:text-red-300 hover:text-red-300 dark:hover:text-red-400 disabled:opacity-50"
-          >
-            <Trash2 className="h-5 w-5" />
-          </button>
+          {canDeletePhotos ? (
+            <button
+              onClick={() => handleDelete(selectedPhoto.id)}
+              disabled={deleting === selectedPhoto.id}
+              className="text-red-400 dark:text-red-300 hover:text-red-300 dark:hover:text-red-400 disabled:opacity-50"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          ) : (
+            <div className="w-5" />
+          )}
         </div>
         <div className="relative flex-1 overflow-hidden">
           <img
@@ -100,13 +125,15 @@ export function ZonePhotosView({
             {photos.length} photo{photos.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={onAddPhoto}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
-        >
-          <Plus className="h-4 w-4" />
-          Add
-        </button>
+        {canUploadPhotos && (
+          <button
+            onClick={onAddPhoto}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </button>
+        )}
       </div>
 
       {/* Photo grid */}
@@ -115,12 +142,14 @@ export function ZonePhotosView({
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Camera className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-500" />
             <p className="text-sm text-gray-500 dark:text-gray-400">No photos yet</p>
-            <button
-              onClick={onAddPhoto}
-              className="mt-3 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
-            >
-              Take Photo
-            </button>
+            {canUploadPhotos && (
+              <button
+                onClick={onAddPhoto}
+                className="mt-3 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+              >
+                Take Photo
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">

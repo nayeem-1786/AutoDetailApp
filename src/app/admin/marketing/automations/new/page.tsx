@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface CouponOption {
   id: string;
@@ -37,6 +38,7 @@ interface EmailTemplateOption {
 export default function NewAutomationPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { granted: canManageAutomations, loading: permLoading } = usePermission('marketing.lifecycle_rules');
   const [services, setServices] = useState<Service[]>([]);
   const [coupons, setCoupons] = useState<CouponOption[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateOption[]>([]);
@@ -167,10 +169,22 @@ export default function NewAutomationPage() {
     </div>
   );
 
-  if (loadingOptions) {
+  if (loadingOptions || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageAutomations) {
+    return (
+      <div>
+        <PageHeader title="Create Automation Rule" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage automations.</p>
+        </div>
       </div>
     );
   }

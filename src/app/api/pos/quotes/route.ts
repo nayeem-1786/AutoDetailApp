@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { checkPosPermission } from '@/lib/pos/check-permission';
 import { createQuoteSchema } from '@/lib/utils/validation';
 import { listQuotes, createQuote } from '@/lib/quotes/quote-service';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
@@ -37,6 +38,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createAdminClient();
+    const canCreate = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'quotes.create');
+    if (!canCreate) {
+      return NextResponse.json({ error: 'Forbidden', message: 'Missing permission: quotes.create' }, { status: 403 });
+    }
+
     const body = await request.json();
     const parsed = createQuoteSchema.safeParse(body);
 
@@ -46,8 +53,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const supabase = createAdminClient();
     const result = await createQuote(supabase, parsed.data, posEmployee.employee_id);
     const createdQuote = result.quote as { id?: string; quote_number?: string } | null;
 

@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
+import { PageHeader } from '@/components/ui/page-header';
 import { CampaignWizard, type InitialCampaignData } from '../../_components/campaign-wizard';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 export default function EditCampaignPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { granted: canManageCampaigns, loading: permLoading } = usePermission('marketing.campaigns');
 
   const [campaign, setCampaign] = useState<InitialCampaignData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,10 +53,22 @@ export default function EditCampaignPage() {
     load();
   }, [id, router]);
 
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canManageCampaigns) {
+    return (
+      <div>
+        <PageHeader title="Edit Campaign" />
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <p className="text-lg font-medium text-gray-900">Access Denied</p>
+          <p className="mt-1 text-sm text-gray-500">You do not have permission to manage campaigns.</p>
+        </div>
       </div>
     );
   }
