@@ -61,7 +61,7 @@ Per-day schedule editor with:
 | Field | Description |
 |-------|-------------|
 | Deposit Amount | Dollar amount required as a deposit when customers book online (default: $50) |
-| Quote Validity (Days) | How many days a quote remains valid before expiring (default: 14) |
+| Quote Validity (Days) | How many days a quote remains valid before expiring (default: 10) |
 
 The deposit amount syncs to the booking payment step. The quote validity syncs across the POS date picker, voice agent, Twilio webhook, and email templates.
 
@@ -71,7 +71,8 @@ The deposit amount syncs to the booking payment step. The quote validity syncs a
 |-------|-------------|
 | Site Description | Meta description used for the homepage and OG tags |
 | Latitude / Longitude | GPS coordinates for JSON-LD structured data |
-| Service Area (miles) | Radius used in JSON-LD geo data |
+| Service Area Name | Name of the service area (e.g., "South Bay, Los Angeles") for structured data |
+| Service Area Radius | Distance radius (e.g., "5 mi") for JSON-LD geo data |
 | Price Range | Price range indicator (e.g., "$$") for structured data |
 
 ### Social Share Image (OG Image)
@@ -128,7 +129,7 @@ Toggles are grouped by category:
 |--------|-----|-----------------|
 | Recurring Services | `recurring_services` | Reserved for future recurring appointment feature |
 
-Each toggle shows a status badge (Enabled/Disabled) and updates immediately when flipped. Disabling a toggle does not delete data — it only hides the UI and disables the related functionality.
+Each toggle shows a status badge (On/Off) and updates immediately when flipped. Disabling a toggle does not delete data — it only hides the UI and disables the related functionality.
 
 ---
 
@@ -145,8 +146,10 @@ The staff list page shows all employees in a table:
 | Name | Full name (clickable link to detail) |
 | Email | Staff email address |
 | Role | Role badge (Super Admin, Admin, Cashier, Detailer, or custom) |
-| POS PIN | Status indicator — green "Enabled" if PIN is set, gray "Disabled" if not |
 | Status | Active or Inactive badge |
+| Bookable | Whether the staff member appears in the booking calendar |
+
+The list includes **Role filter** and **Status filter** dropdowns above the table for quick filtering.
 
 A **New Staff** button opens the creation form.
 
@@ -157,12 +160,14 @@ A **New Staff** button opens the creation form.
 Required fields:
 - **First Name** and **Last Name**
 - **Email** — Must be unique across all staff
-- **Phone** — Optional
+- **Password** — Minimum 8 characters (required at creation)
+- **Mobile** — Optional phone number
 - **Role** — Dropdown populated from the `roles` table (supports custom roles)
 - **POS PIN** — Optional 4-digit numeric code. Setting a PIN grants POS access.
+- **Hourly Rate** — Optional rate for payroll tracking
 - **Bookable for Appointments** — Toggle on if this staff member should appear in the booking calendar
 
-On save, a Supabase Auth user is created and linked to the employee record. The staff member can then log in at `/login` with their email and a password set by the admin.
+On save, a Supabase Auth user is created with the provided email and password, then linked to the employee record. The staff member can then log in at `/login`.
 
 ### Staff Detail Page
 
@@ -244,6 +249,7 @@ Permissions are organized into these categories:
 | `pos.jobs.manage` | Yes | Yes | No | Yes |
 | `pos.jobs.flag_issue` | Yes | Yes | No | Yes |
 | `pos.jobs.cancel` | Yes | Yes | No | No |
+| `pos.override_prerequisites` | Yes | No | No | No |
 
 **Customers (`customers.*`)**
 | Key | Super Admin | Admin | Cashier | Detailer |
@@ -255,7 +261,14 @@ Permissions are organized into these categories:
 | `customers.view_history` | Yes | Yes | Yes | No |
 | `customers.view_loyalty` | Yes | Yes | Yes | No |
 | `customers.adjust_loyalty` | Yes | Yes | No | No |
+| `customers.merge` | Yes | No | No | No |
 | `customers.export` | Yes | No | No | No |
+
+**Orders (`orders.*`)**
+| Key | Super Admin | Admin | Cashier | Detailer |
+|-----|:-----------:|:-----:|:-------:|:--------:|
+| `orders.view` | Yes | Yes | Yes | No |
+| `orders.manage` | Yes | Yes | No | No |
 
 **Appointments (`appointments.*`)**
 | Key | Super Admin | Admin | Cashier | Detailer |
@@ -322,6 +335,7 @@ Permissions are organized into these categories:
 **Reports (`reports.*`)**
 | Key | Super Admin | Admin | Cashier | Detailer |
 |-----|:-----------:|:-----:|:-------:|:--------:|
+| `reports.view` | Yes | Yes | No | No |
 | `reports.revenue` | Yes | Yes | No | No |
 | `reports.financial_detail` | Yes | No | No | No |
 | `reports.cost_margin` | Yes | No | No | No |
@@ -396,16 +410,17 @@ Configures the AI auto-responder and conversation lifecycle. Shows a warning ban
 
 | Setting | Description |
 |---------|-------------|
-| Enable AI Auto-Responder | Master toggle for automatic AI replies to inbound SMS |
-| Audience — Business Hours | Toggle pills to select who gets AI replies during business hours: "Unknown Numbers" and/or "Known Customers" |
+| Enable AI Assistant | Master toggle for automatic AI replies to inbound SMS |
+| Audience — Business Hours | Toggle pills to select who gets AI replies during business hours: "Unknown" and/or "Customers" |
+| Audience — After Hours | When the business is closed, AI handles all inbound messages automatically regardless of audience settings |
 | AI Prompt | Textarea containing the system prompt that guides the AI's tone and behavior. An "Apply Standard Template" button resets it to the default prompt. |
 
 ### Conversation Lifecycle
 
 | Setting | Description |
 |---------|-------------|
-| Auto-Close After | How many hours of inactivity before a conversation is automatically closed (dropdown: 1h to 72h) |
-| Auto-Archive After | How many days after closing before a conversation is archived (dropdown: 1 to 30 days) |
+| Auto-Close After | How long before an inactive conversation is automatically closed (options: 24h, 48h, 72h, 1 week, 2 weeks, Never) |
+| Auto-Archive After | How many days after closing before a conversation is archived (options: 7, 14, 30, 60, 90 days, Never) |
 
 ---
 
@@ -422,7 +437,7 @@ Manages who receives automated notification emails (currently used for stock ale
 | Email | Recipient email address |
 | Type | Badge showing notification type (e.g., "Low Stock") |
 | Active | Toggle to enable/disable without deleting |
-| Delete | Remove the recipient |
+| Actions | Remove the recipient |
 
 ### Adding a Recipient
 
@@ -451,7 +466,7 @@ Configures service zones for mobile detailing with distance-based surcharges.
 | Zone Name | Display name (e.g., "Local — 0-10 miles") |
 | Distance Range | Min and max distance in miles |
 | Surcharge | Dollar amount added to the service price for travel |
-| Available | Toggle to enable/disable the zone |
+| Status | Toggle switch with Available/Unavailable badge |
 
 ### Creating/Editing a Zone
 
@@ -513,8 +528,6 @@ The reader appears in the registered readers list.
 | Label | Reader name |
 | Device Type | Hardware model (e.g., "WisePOS E") |
 | Status | Online (green) or Offline (gray) badge |
-| Location | Assigned location name |
-| Delete | Remove the reader registration |
 
 ### Troubleshooting
 
@@ -531,7 +544,8 @@ Configures receipt printing for POS transactions.
 
 ### Printer Connection
 
-- **Printer IP Address** — The network IP of the receipt printer
+- **Print Server URL** — The URL of the print server (e.g., `http://192.168.1.174:8080`). Use **Test Connection** and **Test Print** buttons to verify connectivity.
+- **Printer IP Address (Legacy)** — Direct IP for Star TSP-100 printers (fallback)
 
 ### Header Branding
 
@@ -553,26 +567,29 @@ Leave fields blank to use the values from Business Profile.
 
 ### Custom Text Zones
 
-The receipt supports multiple custom text zones with dynamic shortcodes. Available shortcodes (16 total):
+The receipt supports multiple custom text zones with dynamic shortcodes. Available shortcodes (19 total):
 
 | Shortcode | Value |
 |-----------|-------|
 | `{business_name}` | Business name |
 | `{business_phone}` | Business phone |
 | `{business_email}` | Business email |
-| `{business_address}` | Business address |
 | `{business_website}` | Business website |
 | `{customer_name}` | Customer full name |
+| `{customer_first_name}` | Customer first name only |
+| `{customer_type}` | Customer type (Enthusiast/Professional) |
 | `{customer_phone}` | Customer phone |
 | `{customer_email}` | Customer email |
-| `{vehicle_info}` | Year, make, model |
+| `{customer_since}` | Date customer was first created |
+| `{staff_name}` | Staff who processed the transaction |
+| `{staff_first_name}` | Staff first name only |
 | `{receipt_number}` | POS receipt number |
-| `{date}` | Transaction date |
-| `{time}` | Transaction time |
-| `{total}` | Transaction total |
-| `{payment_method}` | Payment method used |
-| `{employee_name}` | Staff who processed the transaction |
-| `{tip_amount}` | Tip amount |
+| `{transaction_date}` | Transaction date |
+| `{total_amount}` | Transaction total |
+| `{vehicle}` | Year, make, model |
+| `{barcode_receipt}` | Barcode of the receipt number |
+| `{qr_google}` | QR code linking to Google review page |
+| `{qr_yelp}` | QR code linking to Yelp review page |
 
 ### Live Preview
 
@@ -651,7 +668,7 @@ Configures the quick-action tiles on the POS Register tab for fast access to com
 
 ### Creating/Editing a Tile
 
-1. Click **Add Tile** or edit an existing one
+1. Click **Add Favorite** or edit an existing one
 2. Select the **type** from the dropdown
 3. For Product/Service types, select the specific item from a picker
 4. Set a **label** (displayed on the tile)
@@ -680,7 +697,7 @@ Full Shippo integration configuration for the online store.
 ### Ship-From Address
 
 Full address form for the origin of shipments:
-- Name, street, city, state (dropdown), zip code, country
+- Company, name, street, city, state (dropdown), zip code, country, phone, email
 - **Validate Address** — Checks the address against Shippo's address validation
 
 ### Default Package Dimensions
@@ -695,9 +712,9 @@ Set default package measurements (length, width, height in inches, weight in pou
 ### Service Level Filter
 
 14 common service levels with checkbox toggles:
-- USPS: Priority, Priority Express, First Class, Parcel Select, Media Mail, Ground Advantage
-- UPS: Ground, 3 Day Select, 2nd Day Air, Next Day Air
-- FedEx: Ground, Express Saver, 2Day, Standard Overnight
+- USPS: Ground Advantage, Priority Mail, Priority Mail Express
+- UPS: Ground, 3 Day Select, 2nd Day Air, Next Day Air Saver, Next Day Air
+- FedEx: Ground, Home Delivery, Express Saver, 2Day, Standard Overnight, Priority Overnight
 
 ### Pricing & Fees
 
@@ -717,7 +734,7 @@ Set default package measurements (length, width, height in inches, weight in pou
 
 ### Local Pickup
 
-Toggle to enable local pickup as a shipping option at checkout.
+Toggle to enable local pickup as a shipping option at checkout. When enabled, additional fields appear for the pickup address and instructions.
 
 ---
 
@@ -778,19 +795,18 @@ The audit log tracks all significant user actions across the admin panel and POS
 
 ### What Gets Logged
 
-Every create, update, and delete action is logged with:
+Every create, update, and delete action is logged. The main table shows 6 columns:
 
-| Field | Description |
-|-------|-------------|
-| Timestamp | When the action occurred (PST), shown as relative time with full timestamp on hover |
-| User | Email of the user who performed the action |
-| Employee Name | Display name of the staff member |
+| Column | Description |
+|--------|-------------|
+| Time | When the action occurred (PST), shown as relative time with full timestamp on hover |
+| User | Employee name (falls back to email if no employee record) |
 | Action | Badge: Create (green), Update (blue), Delete (red) |
-| Entity Type | What was affected: settings, employee, customer, product, service, appointment, etc. |
-| Entity Label | Readable name of the affected record |
+| Type | What was affected: settings, employee, customer, product, service, appointment, etc. |
+| Entity | Readable name of the affected record |
 | Details | JSON object with specific field changes |
-| Source | Where the action originated: "admin" or "pos" |
-| IP Address | The user's IP address at the time of the action |
+
+Click any row to open a **detail dialog** that additionally shows: Source (admin or POS), IP address, and the full raw JSON payload.
 
 ### Viewing the Log
 
@@ -798,7 +814,7 @@ Every create, update, and delete action is logged with:
 - **Search** — Search by entity label, user email, or employee name
 - **Entity Type** — Filter by type (settings, employee, customer, etc.)
 - **Action** — Filter by create, update, or delete
-- **Date Presets** — Quick filters: Today, Last 7 Days, Last 30 Days, All Time
+- **Date Presets** — Quick filters: Today, 7 Days, 30 Days, All Time
 
 **Table:** Paginated table (50 entries per page) with clickable rows that open a detail dialog showing the full entry including IP address and JSON details.
 
