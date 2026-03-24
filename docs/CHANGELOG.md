@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: AI SEO batch generation rate-limit throttling — 2026-03-24
+
+The "AI Generate All" feature fired all page requests simultaneously, hitting Anthropic's rate limit. Rewrote to use client-side batched processing:
+
+- **Batching**: Pages processed in groups of 4, with 15-second delays between batches (stays under 5 req/min limit)
+- **Dry-run mode**: New `dryRun` parameter on `/api/admin/cms/seo/ai-generate` returns target paths without calling AI, so the frontend knows total page count upfront
+- **Rate-limit retry**: On 429 responses, waits 60 seconds then retries (max 2 retries per page)
+- **Cancellation**: Cancel button in the review modal stops processing mid-run, preserving already-completed results
+- **Progress UI**: Shows batch number, pages completed, and estimated time remaining
+- **429 propagation**: AI service and API route now return HTTP 429 on Anthropic rate limit errors (was 500)
+
+---
+
 ## feat: BreadcrumbList schema + image sitemap extensions — 2026-03-24
 
 - **BreadcrumbList JSON-LD** added to 4 pages that were missing it: `/services`, `/services/[cat]`, `/products`, `/products/[cat]`. Detail pages (`/services/[cat]/[svc]` and `/products/[cat]/[prod]`) already had it.

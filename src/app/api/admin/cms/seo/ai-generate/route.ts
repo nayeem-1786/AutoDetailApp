@@ -15,6 +15,7 @@ interface GenerateRequest {
   pagePath?: string;
   pagePaths?: string[];
   overwriteExisting?: boolean;
+  dryRun?: boolean;
 }
 
 interface PageResult {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   if (denied) return denied;
 
   const body = (await request.json()) as GenerateRequest;
-  const { mode, pagePath, pagePaths, overwriteExisting = false } = body;
+  const { mode, pagePath, pagePaths, overwriteExisting = false, dryRun = false } = body;
 
   if (!mode || !['single', 'global', 'batch'].includes(mode)) {
     return NextResponse.json({ error: 'Invalid mode. Must be single, global, or batch.' }, { status: 400 });
@@ -113,9 +114,9 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (err) {
-      return NextResponse.json({
-        error: err instanceof Error ? err.message : 'AI generation failed',
-      }, { status: 500 });
+      const errMsg = err instanceof Error ? err.message : 'AI generation failed';
+      const status = errMsg.startsWith('rate_limit') ? 429 : 500;
+      return NextResponse.json({ error: errMsg }, { status });
     }
   }
 
@@ -159,7 +160,14 @@ export async function POST(request: NextRequest) {
 
   if (targetPaths.length === 0) {
     return NextResponse.json({
-      data: { totalPages: 0, results: [], errors: [] },
+      data: { totalPages: 0, targetPaths: [], results: [], errors: [] },
+    });
+  }
+
+  // Dry-run mode: return just the list of target paths (no AI generation)
+  if (dryRun) {
+    return NextResponse.json({
+      data: { totalPages: targetPaths.length, targetPaths },
     });
   }
 

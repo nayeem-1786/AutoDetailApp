@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -833,11 +833,17 @@ function AiReviewModal({
   generating,
   onApply,
   onClose,
+  onCancel,
+  batchProgress,
+  totalPages,
 }: {
   results: AiPageResult[];
   generating: boolean;
   onApply: (selected: AiPageResult[]) => Promise<void>;
   onClose: () => void;
+  onCancel?: () => void;
+  batchProgress?: string;
+  totalPages?: number;
 }) {
   const [items, setItems] = useState<AiPageResult[]>(
     results.map((r) => ({ ...r, selected: r.status === 'success', edited: { ...r.generated } }))
@@ -913,13 +919,24 @@ function AiReviewModal({
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {generating
-                ? `Generating... ${successCount} of ${items.length} complete`
+                ? (batchProgress || `Generating... ${successCount} of ${totalPages || items.length} complete`)
                 : `${successCount} pages generated — ${selectedCount} selected`}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {generating && onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-md border border-red-300 dark:border-red-700 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Progress bar during generation */}
@@ -928,7 +945,9 @@ function AiReviewModal({
             <div
               className="h-1 bg-blue-500 transition-all duration-500"
               style={{
-                width: items.length > 0 ? `${(successCount / items.length) * 100}%` : '0%',
+                width: (totalPages || items.length) > 0
+                  ? `${(items.length / (totalPages || items.length)) * 100}%`
+                  : '0%',
               }}
             />
           </div>
@@ -1150,6 +1169,9 @@ export default function SeoDashboardPage() {
   const [aiGeneratingGlobal, setAiGeneratingGlobal] = useState(false);
   const [showAiConfirmDialog, setShowAiConfirmDialog] = useState(false);
   const [aiOverwriteExisting, setAiOverwriteExisting] = useState(false);
+  const [aiBatchProgress, setAiBatchProgress] = useState('');
+  const [aiTotalPages, setAiTotalPages] = useState(0);
+  const aiCancelledRef = useRef(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -1242,43 +1264,162 @@ export default function SeoDashboardPage() {
     }
   };
 
-  // AI Generate All — opens confirmation then generates
+  // AI Generate All — batched client-side to avoid rate limits
+  const BATCH_SIZE = 4;
+  const BATCH_DELAY_MS = 15_000; // 15s between batches
+  const RATE_LIMIT_RETRY_MS = 60_000; // 60s retry on rate limit
+  const MAX_RETRIES = 2;
+
+  const handleAiCancelGeneration = useCallback(() => {
+    aiCancelledRef.current = true;
+  }, []);
+
   const handleAiGenerateAll = async () => {
     setShowAiConfirmDialog(false);
     setAiGeneratingGlobal(true);
     setAiResults([]);
+    setAiBatchProgress('Discovering pages...');
+    setAiTotalPages(0);
     setShowAiReviewModal(true);
+    aiCancelledRef.current = false;
 
     try {
-      const res = await adminFetch('/api/admin/cms/seo/ai-generate', {
+      // Step 1: Get target paths via dry-run
+      const dryRes = await adminFetch('/api/admin/cms/seo/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'global',
           overwriteExisting: aiOverwriteExisting,
+          dryRun: true,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'AI generation failed');
+      if (!dryRes.ok) {
+        const err = await dryRes.json();
+        throw new Error(err.error || 'Failed to discover pages');
       }
-      const { data } = await res.json();
-      const mappedResults: AiPageResult[] = (data.results || []).map((r: AiPageResult) => ({
-        ...r,
-        selected: r.status === 'success',
-        edited: r.status === 'success' ? { ...r.generated } : undefined,
-      }));
-      setAiResults(mappedResults);
-      if (data.errors?.length > 0) {
-        toast.warning(`${data.errors.length} page${data.errors.length !== 1 ? 's' : ''} failed`);
-      } else {
-        toast.success(`AI generated SEO for ${mappedResults.filter((r: AiPageResult) => r.status === 'success').length} pages`);
+      const { data: dryData } = await dryRes.json();
+      const targetPaths: string[] = dryData.targetPaths || [];
+
+      if (targetPaths.length === 0) {
+        toast.info('No pages need SEO generation');
+        setShowAiReviewModal(false);
+        setAiGeneratingGlobal(false);
+        return;
+      }
+
+      setAiTotalPages(targetPaths.length);
+      const totalBatches = Math.ceil(targetPaths.length / BATCH_SIZE);
+      const allResults: AiPageResult[] = [];
+
+      // Step 2: Process in batches of BATCH_SIZE
+      for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+        if (aiCancelledRef.current) {
+          toast.info(`Cancelled after ${allResults.length} of ${targetPaths.length} pages`);
+          break;
+        }
+
+        const batchStart = batchIdx * BATCH_SIZE;
+        const batchPaths = targetPaths.slice(batchStart, batchStart + BATCH_SIZE);
+        const batchNum = batchIdx + 1;
+        const pagesCompleted = allResults.length;
+        const remainingBatches = totalBatches - batchIdx;
+        const etaSeconds = remainingBatches * (BATCH_DELAY_MS / 1000);
+        const etaMin = Math.ceil(etaSeconds / 60);
+        setAiBatchProgress(
+          `Batch ${batchNum}/${totalBatches} — ${pagesCompleted}/${targetPaths.length} pages — ~${etaMin}m remaining`
+        );
+
+        // Fire batch in parallel
+        const batchPromises = batchPaths.map(async (path) => {
+          let lastError = '';
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (aiCancelledRef.current) {
+              return {
+                pagePath: path,
+                generated: { seo_title: '', meta_description: '', meta_keywords: '', focus_keyword: '', og_title: '', og_description: '', suggestions: [] },
+                current: { seo_title: null, meta_description: null, meta_keywords: null, focus_keyword: null, og_title: null, og_description: null },
+                status: 'error' as const,
+                error: 'Cancelled',
+              };
+            }
+            try {
+              const res = await adminFetch('/api/admin/cms/seo/ai-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'single', pagePath: path }),
+              });
+              if (!res.ok) {
+                const errBody = await res.json();
+                const errMsg = errBody.error || `HTTP ${res.status}`;
+                // Rate limit — wait and retry
+                if (res.status === 429 || errMsg.includes('rate_limit')) {
+                  lastError = errMsg;
+                  if (attempt < MAX_RETRIES) {
+                    setAiBatchProgress(
+                      `Rate limited — waiting 60s before retry (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
+                    );
+                    await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
+                    continue;
+                  }
+                }
+                throw new Error(errMsg);
+              }
+              const { data } = await res.json();
+              return {
+                pagePath: path,
+                generated: data.generated,
+                current: data.current,
+                status: 'success' as const,
+              };
+            } catch (err) {
+              lastError = err instanceof Error ? err.message : 'Unknown error';
+              if (attempt < MAX_RETRIES && lastError.includes('rate_limit')) {
+                await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
+                continue;
+              }
+            }
+          }
+          return {
+            pagePath: path,
+            generated: { seo_title: '', meta_description: '', meta_keywords: '', focus_keyword: '', og_title: '', og_description: '', suggestions: [] },
+            current: { seo_title: null, meta_description: null, meta_keywords: null, focus_keyword: null, og_title: null, og_description: null },
+            status: 'error' as const,
+            error: lastError,
+          };
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        const mapped: AiPageResult[] = batchResults.map(r => ({
+          ...r,
+          selected: r.status === 'success',
+          edited: r.status === 'success' ? { ...r.generated } : undefined,
+        }));
+        allResults.push(...mapped);
+        setAiResults([...allResults]);
+
+        // Wait between batches (skip delay after last batch)
+        if (batchIdx < totalBatches - 1 && !aiCancelledRef.current) {
+          setAiBatchProgress(
+            `Waiting before next batch... ${allResults.length}/${targetPaths.length} pages done`
+          );
+          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        }
+      }
+
+      const successCount = allResults.filter(r => r.status === 'success').length;
+      const failCount = allResults.filter(r => r.status === 'error' && r.error !== 'Cancelled').length;
+      if (failCount > 0) {
+        toast.warning(`${successCount} pages generated, ${failCount} failed`);
+      } else if (successCount > 0) {
+        toast.success(`AI generated SEO for ${successCount} pages`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'AI generation failed');
       setShowAiReviewModal(false);
     } finally {
       setAiGeneratingGlobal(false);
+      setAiBatchProgress('');
     }
   };
 
@@ -1687,6 +1828,9 @@ export default function SeoDashboardPage() {
               setAiResults([]);
             }
           }}
+          onCancel={handleAiCancelGeneration}
+          batchProgress={aiBatchProgress}
+          totalPages={aiTotalPages}
         />
       )}
     </div>

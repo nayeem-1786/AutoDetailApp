@@ -122,6 +122,9 @@ export async function generateSeoForPage(input: PageContentForSeo): Promise<AiSe
   if (!response.ok) {
     const error = await response.text();
     console.error('AI SEO generation failed:', error);
+    if (response.status === 429) {
+      throw new Error('rate_limit: Too many requests — please wait before retrying');
+    }
     throw new Error(`AI SEO generation failed: ${response.status}`);
   }
 
