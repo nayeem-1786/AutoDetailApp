@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: move photo_gallery flag from Future to Operations category — 2026-03-24
+
+- Migration `20260324000001` moves `photo_gallery` from `Future` to `Operations` category, grouping it with `inventory_management`
+- `photo_gallery` is an active feature (gates public gallery page), not a future placeholder
+- DEAD flags (`recurring_services`, `online_store`) remain correctly in `Future`
+
+---
+
 ## fix: complete feature flag wiring for photo_documentation and inventory_management — 2026-03-24
 
 Two PARTIAL feature flags now fully gate their features:

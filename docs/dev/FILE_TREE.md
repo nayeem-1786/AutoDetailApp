@@ -1343,6 +1343,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260317000002_sale_history.sql
 20260322000001_add_missing_permission_definitions.sql
 20260323000001_create_print_jobs.sql
+20260324000001_move_photo_gallery_to_operations.sql
 ```
 
 ---
