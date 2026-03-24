@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: WordPress → New App 301 redirect map — 2026-03-24
+
+Complete SEO redirect map in `next.config.ts` for DNS cutover from WordPress/WooCommerce to Next.js app. 102 permanent (301) redirects covering:
+
+- **25 page redirects**: `/about-us` → `/p/about-us`, `/shop` → `/products`, `/my-account` → `/signin`, etc.
+- **5 service redirects**: `/ova_sev/*` WordPress custom post type → `/services/*` with catch-all
+- **34 product category redirects**: All 34 WordPress categories mapped to matching new app categories (12 exact, 9 close-match, 5 brands → `/products`, 8 service categories → `/services`, catch-all)
+- **31 individual product redirects**: 30 exact slug matches from 141 WordPress products → direct product pages, plus catch-all `/product/:path*` → `/products`
+- **1 team catch-all**: `/team/*` → `/` (all WordPress entries were dummy data)
+- **5 WP infrastructure blocks**: `/wp-admin`, `/wp-login.php`, `/xmlrpc.php`, `/wp-json`, `/wp-content` all 301 to `/`
+- **Trailing slash handling**: Next.js `skipTrailingSlashRedirect: false` ensures WordPress URLs with trailing slashes are normalized
+
+All destinations verified against live database (432 products, 13 product categories, 30 services, 6 service categories, 4 CMS pages). Existing host-based subdomain redirects preserved.
+
+---
+
 ## fix: move photo_gallery flag from Future to Operations category — 2026-03-24
 
 - Migration `20260324000001` moves `photo_gallery` from `Future` to `Operations` category, grouping it with `inventory_management`
