@@ -32,6 +32,8 @@ import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
 import { usePosAuth } from '../../context/pos-auth-context';
 import { usePosPermission } from '../../context/pos-permission-context';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
 import { ZonePicker } from './zone-picker';
 import { JobTimer } from './job-timer';
@@ -194,6 +196,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
   const { granted: canCancelJobs } = usePosPermission('pos.jobs.cancel');
   const { granted: canFlagIssue } = usePosPermission('pos.jobs.flag_issue');
+  const { enabled: photosEnabled } = useFeatureFlag(FEATURE_FLAGS.PHOTO_DOCUMENTATION);
   const [job, setJob] = useState<JobDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [startingIntake, setStartingIntake] = useState(false);
@@ -313,7 +316,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       if (res.ok) {
         const { data } = await res.json();
         setJob(data);
-        setZonePickerMode('intake');
+        if (photosEnabled) {
+          setZonePickerMode('intake');
+        }
       }
     } catch (err) {
       console.error('Failed to start intake:', err);
@@ -336,6 +341,25 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       console.error('Failed to start work:', err);
     } finally {
       setStartingWork(false);
+    }
+  }
+
+  async function handleCompleteJobDirect() {
+    try {
+      const res = await posFetch(`/api/pos/jobs/${jobId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skip_photo_check: true }),
+      });
+      if (res.ok) {
+        fetchJob();
+        toast.success('Job completed');
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to complete job');
+      }
+    } catch {
+      toast.error('Failed to complete job');
     }
   }
 
@@ -619,7 +643,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   }
 
   // Show zone picker (intake or completion flow)
-  if (zonePickerMode && job) {
+  if (zonePickerMode && photosEnabled && job) {
     const isCompletion = zonePickerMode === 'completion';
     return (
       <ZonePicker
@@ -1113,7 +1137,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             {startingIntake ? 'Starting...' : 'Start Intake'}
           </button>
         )}
-        {job.status === 'intake' && !job.intake_completed_at && (
+        {job.status === 'intake' && !job.intake_completed_at && photosEnabled && (
           <button
             onClick={() => setZonePickerMode('intake')}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
@@ -1135,13 +1159,15 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         {job.status === 'in_progress' && (
           <div className="space-y-2">
             <div className="flex gap-2">
-              <button
-                onClick={() => setZonePickerMode('progress')}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <ImageIcon className="h-4 w-4" />
-                Photos
-              </button>
+              {photosEnabled && (
+                <button
+                  onClick={() => setZonePickerMode('progress')}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  Photos
+                </button>
+              )}
               {canFlagIssue && (
                 <button
                   onClick={() => setShowFlagIssue(true)}
@@ -1153,7 +1179,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
               )}
             </div>
             <button
-              onClick={() => setZonePickerMode('completion')}
+              onClick={photosEnabled ? () => setZonePickerMode('completion') : handleCompleteJobDirect}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-600"
             >
               <CheckCircle2 className="h-4 w-4" />
@@ -1161,7 +1187,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             </button>
           </div>
         )}
-        {job.status === 'pending_approval' && (
+        {job.status === 'pending_approval' && photosEnabled && (
           <div className="flex gap-2">
             <button
               onClick={() => setZonePickerMode('progress')}

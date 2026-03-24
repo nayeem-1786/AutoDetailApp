@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
 
@@ -14,6 +16,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await isFeatureEnabled(FEATURE_FLAGS.PHOTO_DOCUMENTATION))) {
+      return NextResponse.json({ error: 'Photo documentation is disabled' }, { status: 403 });
+    }
     const { id } = await params;
     const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
@@ -63,6 +68,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await isFeatureEnabled(FEATURE_FLAGS.PHOTO_DOCUMENTATION))) {
+      return NextResponse.json({ error: 'Photo documentation is disabled' }, { status: 403 });
+    }
     const { id: jobId } = await params;
     const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {

@@ -505,6 +505,7 @@ src/app/admin/customers/page.tsx
 
 ### Inventory
 ```
+src/app/admin/inventory/layout.tsx
 src/app/admin/inventory/page.tsx
 src/app/admin/inventory/purchase-orders/[id]/page.tsx
 src/app/admin/inventory/purchase-orders/new/page.tsx

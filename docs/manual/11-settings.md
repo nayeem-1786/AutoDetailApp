@@ -89,19 +89,14 @@ Feature toggles enable or disable entire sections of the platform. Each toggle i
 
 Toggles are grouped by category:
 
-### Core POS
-| Toggle | Key | What It Controls |
-|--------|-----|-----------------|
-| Cash Drawer Management | `cash_drawer` | Cash drawer open/close tracking in POS |
-| Walk-In Flow | `walk_in_flow` | Walk-in job creation from POS Jobs tab |
-
 ### Marketing
 | Toggle | Key | What It Controls |
 |--------|-----|-----------------|
-| Marketing Campaigns | `marketing_campaigns` | Campaign creation and sending in Admin > Marketing |
-| Marketing Automations | `marketing_automations` | Lifecycle automation rules |
-| Coupons & Promotions | `coupons_promotions` | Coupon creation, validation, and POS application |
+| SMS Marketing | `sms_marketing` | SMS campaign sending and SMS-based lifecycle automations |
+| Email Marketing | `email_marketing` | Email campaign sending and email-based lifecycle automations |
 | Google Review Requests | `google_review_requests` | Automated review solicitation after completed jobs |
+
+> **Note:** Marketing campaigns and lifecycle automations are gated by the `sms_marketing` and `email_marketing` flags respectively. There are no separate campaign or automation toggles.
 
 ### Communication
 | Toggle | Key | What It Controls |
@@ -111,8 +106,8 @@ Toggles are grouped by category:
 ### Booking
 | Toggle | Key | What It Controls |
 |--------|-----|-----------------|
-| Online Booking | `online_booking` | Public booking wizard at `/book` |
-| Mobile Services | `mobile_services` | Mobile zone selection during booking |
+| Online Booking Payment | `online_booking_payment` | Whether booking requires payment (deposit collection) |
+| Mobile Service | `mobile_service` | Mobile zone selection during booking |
 
 ### Integrations
 | Toggle | Key | What It Controls |
@@ -123,11 +118,14 @@ Toggles are grouped by category:
 | Toggle | Key | What It Controls |
 |--------|-----|-----------------|
 | Photo Gallery | `photo_gallery` | Public gallery page and gallery API endpoint |
+| Photo Documentation | `photo_documentation` | POS photo capture workflow (intake, progress, completion) and admin photo management page |
+| Inventory Management | `inventory_management` | Admin inventory pages (purchase orders, vendors, stock history) and related APIs |
 
 ### Future
 | Toggle | Key | What It Controls |
 |--------|-----|-----------------|
 | Recurring Services | `recurring_services` | Reserved for future recurring appointment feature |
+| Online Store | `online_store` | Reserved for future online store gating |
 
 Each toggle shows a status badge (On/Off) and updates immediately when flipped. Disabling a toggle does not delete data — it only hides the UI and disables the related functionality.
 

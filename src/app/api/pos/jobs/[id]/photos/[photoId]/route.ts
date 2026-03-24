@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
 /**
  * PATCH /api/pos/jobs/[id]/photos/[photoId] — Update photo metadata
@@ -12,6 +14,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; photoId: string }> }
 ) {
   try {
+    if (!(await isFeatureEnabled(FEATURE_FLAGS.PHOTO_DOCUMENTATION))) {
+      return NextResponse.json({ error: 'Photo documentation is disabled' }, { status: 403 });
+    }
     const { id: jobId, photoId } = await params;
     const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {
@@ -79,6 +84,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; photoId: string }> }
 ) {
   try {
+    if (!(await isFeatureEnabled(FEATURE_FLAGS.PHOTO_DOCUMENTATION))) {
+      return NextResponse.json({ error: 'Photo documentation is disabled' }, { status: 403 });
+    }
     const { id: jobId, photoId } = await params;
     const posEmployee = await authenticatePosRequest(request);
     if (!posEmployee) {

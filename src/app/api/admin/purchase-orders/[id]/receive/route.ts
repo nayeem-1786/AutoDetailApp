@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
 interface ReceiveItem {
   item_id: string;
@@ -13,6 +15,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await isFeatureEnabled(FEATURE_FLAGS.INVENTORY_MANAGEMENT))) {
+      return NextResponse.json({ error: 'Inventory management is disabled' }, { status: 403 });
+    }
+
     const { id } = await params;
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

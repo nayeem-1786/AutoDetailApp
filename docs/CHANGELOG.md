@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: complete feature flag wiring for photo_documentation and inventory_management — 2026-03-24
+
+Two PARTIAL feature flags now fully gate their features:
+
+- **`photo_documentation`**: Added `isFeatureEnabled` checks to all POS photo API routes (GET/POST photos, PATCH/DELETE individual photos). POS job detail hides photo capture buttons (Continue Intake, Photos, View Photos) and skips ZonePicker when flag is off. Complete Job calls the API directly without photo requirements when disabled.
+- **`inventory_management`**: Created `src/app/admin/inventory/layout.tsx` as a client layout gate — shows disabled state with link to Feature Toggles when flag is off. Covers all 7 inventory sub-pages. Added `isFeatureEnabled` checks to purchase-orders (GET/POST, GET/PATCH by ID, POST receive) and stock-adjustments (GET/POST) API routes.
+- **Manual fix**: Corrected Section 11.3 in `docs/manual/11-settings.md` — removed 5 ghost flags (`cash_drawer`, `walk_in_flow`, `coupons_promotions`, `marketing_campaigns`, `marketing_automations`), renamed `online_booking` → `online_booking_payment`, `mobile_services` → `mobile_service`, added `photo_documentation` and `inventory_management` to Operations section.
+
+---
+
 ## fix: print job queue — thermal printing + cash drawer via Supabase queue — 2026-03-23
 
 The app runs on a remote VPS that cannot reach the store's LAN print server. HTTPS→HTTP mixed content also blocks browser-direct calls. Solution: print job queue with an OptiPlex polling agent.
