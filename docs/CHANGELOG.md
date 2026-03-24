@@ -4,14 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## feat: WordPress → New App 301 redirect map — 2026-03-24
+## feat: WordPress → New App 301 redirect map (+ fuzzy product matching) — 2026-03-24
 
-Complete SEO redirect map in `next.config.ts` for DNS cutover from WordPress/WooCommerce to Next.js app. 102 permanent (301) redirects covering:
+Complete SEO redirect map in `next.config.ts` for DNS cutover from WordPress/WooCommerce to Next.js app. **211 permanent (301) redirects** covering every known WordPress URL:
 
 - **25 page redirects**: `/about-us` → `/p/about-us`, `/shop` → `/products`, `/my-account` → `/signin`, etc.
 - **5 service redirects**: `/ova_sev/*` WordPress custom post type → `/services/*` with catch-all
 - **34 product category redirects**: All 34 WordPress categories mapped to matching new app categories (12 exact, 9 close-match, 5 brands → `/products`, 8 service categories → `/services`, catch-all)
-- **31 individual product redirects**: 30 exact slug matches from 141 WordPress products → direct product pages, plus catch-all `/product/:path*` → `/products`
+- **140 individual product redirects** (all 141 WordPress products covered):
+  - 30 exact slug matches → direct product pages
+  - 91 fuzzy/manual matches → closest matching product (normalized sizes, brands, abbreviations; 22 manual overrides for bad fuzzy results)
+  - 18 category fallbacks → parent category page (discontinued/unrecognizable products)
+  - 1 catch-all `/product/:path*` → `/products` (safety net for URLs not in the WordPress export)
 - **1 team catch-all**: `/team/*` → `/` (all WordPress entries were dummy data)
 - **5 WP infrastructure blocks**: `/wp-admin`, `/wp-login.php`, `/xmlrpc.php`, `/wp-json`, `/wp-content` all 301 to `/`
 - **Trailing slash handling**: Next.js `skipTrailingSlashRedirect: false` ensures WordPress URLs with trailing slashes are normalized
