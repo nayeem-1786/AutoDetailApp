@@ -6,6 +6,7 @@ import { getProductCategories } from '@/lib/data/products';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getCmsToggles } from '@/lib/data/cms';
 import { ProductCategoryCard } from '@/components/public/product-category-card';
+import { ProductSearch } from '@/components/public/product-search';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
@@ -71,6 +72,9 @@ export default async function ProductsPage() {
 
       <section className="bg-brand-dark py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <ProductSearch />
+          </div>
           {categories.length > 0 ? (
             <AnimatedSection stagger className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((category) => (

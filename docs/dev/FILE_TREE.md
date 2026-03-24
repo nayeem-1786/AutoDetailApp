@@ -407,6 +407,7 @@ src/app/api/public/cms/site-theme/route.ts
 src/app/api/public/cms/theme/route.ts
 src/app/api/public/cms/theme-preview/route.ts
 src/app/api/public/cms/tickers/route.ts
+src/app/api/public/products/search/route.ts
 ```
 
 ### Quotes
@@ -1041,6 +1042,7 @@ src/components/public/mobile-menu.tsx
 src/components/public/nav-dropdown.tsx
 src/components/public/product-card.tsx
 src/components/public/product-category-card.tsx
+src/components/public/product-search.tsx
 src/components/public/scroll-reveal.tsx
 src/components/public/service-card.tsx
 src/components/public/service-category-card.tsx

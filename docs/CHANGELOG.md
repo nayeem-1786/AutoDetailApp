@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: product search bar on public product pages — 2026-03-24
+
+- **New API:** `GET /api/public/products/search?q=&category=` — public endpoint, ILIKE search on name/description/category, returns top 10 matches with image, price, slugs. No auth required.
+- **New component:** `src/components/public/product-search.tsx` — debounced (300ms) search bar with dropdown results, keyboard navigation (arrow keys + Enter + Escape), sale price display, mobile-friendly touch targets.
+- Added search bar to `/products` (main catalog) and `/products/[categorySlug]` (category pages).
+- On category pages, search is scoped to that category by default with a "Search all products" toggle.
+- Minimum 2 characters to trigger search. Clear button to reset.
+
+---
+
 ## feat: WordPress → New App 301 redirect map (+ fuzzy product matching) — 2026-03-24
 
 Complete SEO redirect map in `next.config.ts` for DNS cutover from WordPress/WooCommerce to Next.js app. **211 permanent (301) redirects** covering every known WordPress URL:
