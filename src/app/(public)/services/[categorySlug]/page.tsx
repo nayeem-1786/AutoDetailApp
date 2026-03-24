@@ -7,8 +7,11 @@ import { getServiceCategories, getServicesByCategory } from '@/lib/data/services
 import { getBusinessInfo } from '@/lib/data/business';
 import { generateCategoryMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { generateBreadcrumbSchema } from '@/lib/seo/json-ld';
+import { SITE_URL } from '@/lib/utils/constants';
 import { getCmsToggles } from '@/lib/data/cms';
 import { ServiceCard } from '@/components/public/service-card';
+import { JsonLd } from '@/components/public/json-ld';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
 import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
@@ -63,8 +66,16 @@ export default async function ServiceCategoryPage({ params }: PageProps) {
   ]);
   const otherCategories = allCategories.filter((cat) => cat.slug !== categorySlug);
 
+  const breadcrumbItems = [
+    { name: 'Home', url: SITE_URL },
+    { name: 'Services', url: `${SITE_URL}/services` },
+    { name: category.name, url: `${SITE_URL}/services/${categorySlug}` },
+  ];
+
   return (
     <>
+      <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
+
       {/* Category Hero */}
       <section className="bg-brand-black py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

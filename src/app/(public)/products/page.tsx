@@ -4,7 +4,9 @@ import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getProductCategories } from '@/lib/data/products';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { getCmsToggles } from '@/lib/data/cms';
+import { JsonLd } from '@/components/public/json-ld';
 import { ProductCategoryCard } from '@/components/public/product-category-card';
 import { ProductSearch } from '@/components/public/product-search';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
@@ -50,8 +52,15 @@ export default async function ProductsPage() {
     getCmsToggles(),
   ]);
 
+  const breadcrumbItems = [
+    { name: 'Home', url: SITE_URL },
+    { name: 'Products', url: `${SITE_URL}/products` },
+  ];
+
   return (
     <>
+      <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
+
       {/* Page Hero */}
       <section className="bg-brand-black py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

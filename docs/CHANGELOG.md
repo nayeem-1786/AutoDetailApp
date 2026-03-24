@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: BreadcrumbList schema + image sitemap extensions — 2026-03-24
+
+- **BreadcrumbList JSON-LD** added to 4 pages that were missing it: `/services`, `/services/[cat]`, `/products`, `/products/[cat]`. Detail pages (`/services/[cat]/[svc]` and `/products/[cat]/[prod]`) already had it.
+- **Image sitemap extensions**: Added `xmlns:image` namespace to sitemap.xml. Product and service entries now include `<image:image>` with `<image:loc>` and `<image:title>` when an image URL exists. Extended `SitemapProduct` and `SitemapService` interfaces with `imageUrl` and name fields.
+
+---
+
 ## feat: product search bar on public product pages — 2026-03-24
 
 - **New API:** `GET /api/public/products/search?q=&category=` — public endpoint, ILIKE search on name/description/category, returns top 10 matches with image, price, slugs. No auth required.

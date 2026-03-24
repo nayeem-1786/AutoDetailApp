@@ -58,8 +58,10 @@ export interface ServiceWithCategory {
 
 export interface SitemapService {
   serviceSlug: string;
+  serviceName: string;
   categorySlug: string;
   updatedAt: string;
+  imageUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +207,7 @@ export async function getAllServicesForSitemap(): Promise<SitemapService[]> {
   const { data, error } = await supabase
     .from('services')
     .select(
-      'slug, updated_at, service_categories!inner(slug)'
+      'slug, name, image_url, updated_at, service_categories!inner(slug)'
     )
     .eq('is_active', true)
     .eq('show_on_website', true)
@@ -218,7 +220,9 @@ export async function getAllServicesForSitemap(): Promise<SitemapService[]> {
 
   return (data ?? []).map((row) => ({
     serviceSlug: row.slug as string,
+    serviceName: row.name as string,
     categorySlug: (row.service_categories as unknown as { slug: string }).slug,
     updatedAt: row.updated_at as string,
+    imageUrl: (row.image_url as string) ?? null,
   }));
 }

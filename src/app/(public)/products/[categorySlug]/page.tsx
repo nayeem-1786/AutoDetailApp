@@ -4,7 +4,10 @@ import { getProductCategories, getProductsByCategory } from '@/lib/data/products
 import { getBusinessInfo } from '@/lib/data/business';
 import { generateCategoryMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { generateBreadcrumbSchema } from '@/lib/seo/json-ld';
+import { SITE_URL } from '@/lib/utils/constants';
 import { ProductCard } from '@/components/public/product-card';
+import { JsonLd } from '@/components/public/json-ld';
 import { ProductSearch } from '@/components/public/product-search';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
@@ -52,8 +55,16 @@ export default async function ProductCategoryPage({ params }: PageProps) {
 
   const { category, products } = result;
 
+  const breadcrumbItems = [
+    { name: 'Home', url: SITE_URL },
+    { name: 'Products', url: `${SITE_URL}/products` },
+    { name: category.name, url: `${SITE_URL}/products/${categorySlug}` },
+  ];
+
   return (
     <>
+      <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
+
       {/* Category Hero */}
       <section className="bg-brand-black py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

@@ -34,8 +34,10 @@ export interface ProductWithCategoryResult {
 
 export interface SitemapProduct {
   productSlug: string;
+  productName: string;
   categorySlug: string;
   updatedAt: string;
+  imageUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +151,7 @@ export async function getAllProductsForSitemap(): Promise<SitemapProduct[]> {
 
   const { data, error } = await supabase
     .from('products')
-    .select('slug, updated_at, product_categories!inner(slug)')
+    .select('slug, name, image_url, updated_at, product_categories!inner(slug)')
     .eq('is_active', true)
     .eq('show_on_website', true)
     .eq('product_categories.is_active', true);
@@ -161,7 +163,9 @@ export async function getAllProductsForSitemap(): Promise<SitemapProduct[]> {
 
   return (data ?? []).map((row) => ({
     productSlug: row.slug as string,
+    productName: row.name as string,
     categorySlug: (row.product_categories as unknown as { slug: string }).slug,
     updatedAt: row.updated_at as string,
+    imageUrl: (row.image_url as string) ?? null,
   }));
 }

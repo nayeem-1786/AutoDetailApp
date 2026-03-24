@@ -10,29 +10,47 @@ import { getPublishedPages } from '@/lib/data/website-pages';
 // GET /sitemap.xml
 // ---------------------------------------------------------------------------
 
+interface SitemapImage {
+  loc: string;
+  title: string;
+}
+
 interface SitemapEntry {
   loc: string;
   lastmod?: string;
   changefreq: string;
   priority: number;
+  image?: SitemapImage;
 }
 
 function buildXml(entries: SitemapEntry[]): string {
   const urls = entries
     .map(
-      (entry) =>
-        `  <url>
+      (entry) => {
+        let xml = `  <url>
     <loc>${escapeXml(entry.loc)}</loc>${
           entry.lastmod ? `\n    <lastmod>${entry.lastmod}</lastmod>` : ''
         }
     <changefreq>${entry.changefreq}</changefreq>
-    <priority>${entry.priority.toFixed(1)}</priority>
-  </url>`
+    <priority>${entry.priority.toFixed(1)}</priority>`;
+
+        if (entry.image) {
+          xml += `
+    <image:image>
+      <image:loc>${escapeXml(entry.image.loc)}</image:loc>
+      <image:title>${escapeXml(entry.image.title)}</image:title>
+    </image:image>`;
+        }
+
+        xml += '\n  </url>';
+        return xml;
+      }
     )
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls}
 </urlset>`;
 }
@@ -116,6 +134,7 @@ export async function GET() {
       lastmod: toISODate(svc.updatedAt),
       changefreq: isCeramicCoatings ? 'weekly' : 'monthly',
       priority: isCeramicCoatings ? 1.0 : 0.7,
+      ...(svc.imageUrl ? { image: { loc: svc.imageUrl, title: svc.serviceName } } : {}),
     });
   }
 
@@ -138,6 +157,7 @@ export async function GET() {
       lastmod: toISODate(prod.updatedAt),
       changefreq: 'monthly',
       priority: 0.6,
+      ...(prod.imageUrl ? { image: { loc: prod.imageUrl, title: prod.productName } } : {}),
     });
   }
 

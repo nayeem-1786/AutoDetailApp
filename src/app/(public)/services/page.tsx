@@ -4,7 +4,9 @@ import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getServiceCategories } from '@/lib/data/services';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
+import { generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { getCmsToggles } from '@/lib/data/cms';
+import { JsonLd } from '@/components/public/json-ld';
 import { getHomepageSettings } from '@/lib/data/homepage-settings';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
@@ -51,8 +53,15 @@ export default async function ServicesPage() {
     getHomepageSettings(),
   ]);
 
+  const breadcrumbItems = [
+    { name: 'Home', url: SITE_URL },
+    { name: 'Services', url: `${SITE_URL}/services` },
+  ];
+
   return (
     <>
+      <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
+
       {/* Page Hero */}
       <section className="bg-brand-black py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
