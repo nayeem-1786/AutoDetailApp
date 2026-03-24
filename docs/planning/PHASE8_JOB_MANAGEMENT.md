@@ -462,6 +462,24 @@ Detailer taps "Start Intake" on a job card → `intake_started_at` set → statu
 | `interior_door_panels` | Door Panels | All 4 door interiors |
 | `interior_trunk_cargo` | Trunk/Cargo | Trunk liner, cargo area |
 
+### Vehicle-Type-Specific Silhouettes
+
+The zone picker renders vehicle-specific SVG silhouettes based on the job's `vehicle.size_class`:
+
+| Size Class | Exterior Silhouette | Interior Silhouette |
+|-----------|--------------------|--------------------|
+| `sedan` (default) | Compact body, defined trunk, lower roofline | 2-row cabin: front seats, rear bench |
+| `truck_suv_2row` | Wider body, roof rails, boxier shape | 2-row cabin: wider seats, larger console |
+| `suv_3row_van` | Tallest/widest body, extended rear, sliding door seams | 3-row cabin: 2nd + 3rd row seats (both map to `interior_seats_rear`) |
+
+**Files**: `src/app/pos/jobs/components/vehicle-silhouettes/`
+- `sedan-exterior.tsx`, `suv-exterior.tsx`, `van-exterior.tsx` — exterior top-down silhouettes
+- `sedan-interior.tsx`, `suv-interior.tsx`, `van-interior.tsx` — interior cabin layouts
+- `index.tsx` — `getExteriorSilhouette()` / `getInteriorSilhouette()` mapping functions
+- `types.ts` — shared `SilhouetteProps` interface and color helpers
+
+**Fallback**: If `size_class` is null or unknown, sedan silhouette is used.
+
 ### Zone Groups (for minimum enforcement)
 - **Exterior group**: All `exterior_*` zones → minimum configurable (default 4)
 - **Interior group**: All `interior_*` zones → minimum configurable (default 2)

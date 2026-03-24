@@ -630,6 +630,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         onComplete={handleZonePickerComplete}
         onBack={() => setZonePickerMode(null)}
         isCompletionFlow={isCompletion}
+        sizeClass={job.vehicle?.size_class}
       />
     );
   }
