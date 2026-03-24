@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: enrich SMS AI auto-responder with full customer context (Phase 1/5) — 2026-03-24
+
+The AI auto-responder previously only saw customer name, email, and last 10 transactions. Now it gets the full customer profile:
+
+- **Vehicles**: All vehicles on file (year, make, model, color, type, size class) — AI references them by name instead of re-asking
+- **Appointments**: Upcoming appointments with services and status — AI mentions them proactively
+- **Quotes**: Last 3 non-deleted quotes with status, total, validity — AI asks about pending quotes
+- **Loyalty**: Points balance and dollar value — AI mentions redemption when balance is significant
+- **Notes/Tags**: Staff-written notes and customer tags — AI uses for personalization
+- **Engagement**: Customer since date, visit count, lifetime spend, last visit — AI adapts tone and suggestions
+- **Message history**: Bumped from 20 to 30 messages for broader conversation context
+- **Customer queries parallelized**: All 5 data fetches (profile, transactions, vehicles, appointments, quotes) run via `Promise.all` for faster response
+- **Updated behavioral rules**: New instructions for vehicle awareness, quote follow-up, loyalty mentions, appointment proactivity
+
+Files modified: `messaging-ai.ts` (expanded `CustomerContext` + system prompt), `twilio/inbound/route.ts` (parallel queries), `messaging-ai-prompt.ts` (behavioral rules)
+
+---
+
 ## fix: AI SEO batch generation rate-limit throttling — 2026-03-24
 
 The "AI Generate All" feature fired all page requests simultaneously, hitting Anthropic's rate limit. Rewrote to use client-side batched processing:

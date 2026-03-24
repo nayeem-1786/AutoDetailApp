@@ -559,35 +559,101 @@ export async function POST(request: NextRequest) {
             .select('*')
             .eq('conversation_id', conversation.id)
             .order('created_at', { ascending: true })
-            .limit(20);
+            .limit(30);
 
           // Build customer context for known customers
           let customerCtx: CustomerContext | undefined;
           if (isCustomer && conversation.customer_id) {
-            const { data: custData } = await admin
-              .from('customers')
-              .select('first_name, last_name, email')
-              .eq('id', conversation.customer_id)
-              .single();
+            const custId = conversation.customer_id;
 
-            const { data: txns } = await admin
-              .from('transactions')
-              .select('transaction_date, total_amount, transaction_items(item_name)')
-              .eq('customer_id', conversation.customer_id)
-              .order('transaction_date', { ascending: false })
-              .limit(10);
+            const [
+              { data: custData },
+              { data: txns },
+              { data: vehicles },
+              { data: appointments },
+              { data: quotes },
+            ] = await Promise.all([
+              admin
+                .from('customers')
+                .select('first_name, last_name, email, customer_type, loyalty_points_balance, notes, tags, first_visit_date, last_visit_date, visit_count, lifetime_spend')
+                .eq('id', custId)
+                .single(),
+              admin
+                .from('transactions')
+                .select('transaction_date, total_amount, transaction_items(item_name)')
+                .eq('customer_id', custId)
+                .order('transaction_date', { ascending: false })
+                .limit(10),
+              admin
+                .from('vehicles')
+                .select('year, make, model, color, vehicle_type, size_class')
+                .eq('customer_id', custId)
+                .order('created_at', { ascending: false }),
+              admin
+                .from('appointments')
+                .select('scheduled_date, scheduled_time, status, appointment_services(services(name))')
+                .eq('customer_id', custId)
+                .gte('scheduled_date', new Date().toISOString().split('T')[0])
+                .neq('status', 'cancelled')
+                .order('scheduled_date', { ascending: true })
+                .limit(5),
+              admin
+                .from('quotes')
+                .select('quote_number, status, total_amount, valid_until, quote_items(quantity, total_price)')
+                .eq('customer_id', custId)
+                .is('deleted_at', null)
+                .order('created_at', { ascending: false })
+                .limit(3),
+            ]);
 
             if (custData) {
               customerCtx = {
                 name: `${custData.first_name} ${custData.last_name}`.trim(),
                 email: custData.email || undefined,
+                customer_type: custData.customer_type,
                 transaction_history: (txns || []).map((t) => ({
-                  date: new Date(t.transaction_date).toLocaleDateString(),
+                  date: new Date(t.transaction_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
                   services: ((t.transaction_items as Array<{ item_name: string }>) || []).map(
                     (i) => i.item_name
                   ),
                   total: t.total_amount,
                 })),
+                vehicles: (vehicles || []).map((v) => ({
+                  year: v.year,
+                  make: v.make,
+                  model: v.model,
+                  color: v.color,
+                  vehicle_type: v.vehicle_type,
+                  size_class: v.size_class,
+                })),
+                appointments: (appointments || []).map((a) => ({
+                  date: new Date(a.scheduled_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
+                  time: a.scheduled_time || '',
+                  status: a.status,
+                  services: ((a.appointment_services as unknown as Array<{ services: { name: string } }>) || []).map(
+                    (as) => as.services?.name || 'Service'
+                  ),
+                })),
+                quotes: (quotes || []).map((q) => ({
+                  quote_number: q.quote_number,
+                  status: q.status,
+                  total: q.total_amount,
+                  valid_until: q.valid_until,
+                  services: ((q.quote_items as Array<{ quantity: number; total_price: number }>) || []).map(
+                    (_item, idx) => `Item ${idx + 1}`
+                  ),
+                })),
+                loyalty_points: custData.loyalty_points_balance || 0,
+                notes: custData.notes || null,
+                tags: custData.tags || [],
+                first_visit: custData.first_visit_date
+                  ? new Date(custData.first_visit_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })
+                  : null,
+                last_visit: custData.last_visit_date
+                  ? new Date(custData.last_visit_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })
+                  : null,
+                visit_count: custData.visit_count || 0,
+                lifetime_spend: custData.lifetime_spend || 0,
               };
             }
           }

@@ -282,11 +282,40 @@ async function searchRelevantProducts(
 export interface CustomerContext {
   name: string;
   email?: string;
+  customer_type?: string | null;
   transaction_history: Array<{
     date: string;
     services: string[];
     total: number;
   }>;
+  vehicles: Array<{
+    year: number | null;
+    make: string | null;
+    model: string | null;
+    color: string | null;
+    vehicle_type: string | null;
+    size_class: string | null;
+  }>;
+  appointments: Array<{
+    date: string;
+    time: string;
+    status: string;
+    services: string[];
+  }>;
+  quotes: Array<{
+    quote_number: string;
+    status: string;
+    total: number;
+    valid_until: string | null;
+    services: string[];
+  }>;
+  loyalty_points: number;
+  notes: string | null;
+  tags: string[];
+  first_visit: string | null;
+  last_visit: string | null;
+  visit_count: number;
+  lifetime_spend: number;
 }
 
 /**
@@ -329,25 +358,72 @@ export async function getAIResponse(
       .map((t) => `- ${t.date}: ${t.services.join(', ')} — $${t.total}`)
       .join('\n');
 
+    const vehicleLines = customerContext.vehicles
+      .map((v) => {
+        const parts = [v.year, v.color, v.make, v.model].filter(Boolean);
+        const sizeInfo = v.size_class ? ` (${v.size_class})` : '';
+        return `- ${parts.join(' ') || 'Vehicle'}${sizeInfo}`;
+      })
+      .join('\n');
+
+    const appointmentLines = customerContext.appointments
+      .map((a) => `- ${a.date} at ${a.time}: ${a.services.join(', ')} [${a.status}]`)
+      .join('\n');
+
+    const quoteLines = customerContext.quotes
+      .map((q) => {
+        const validStr = q.valid_until
+          ? `, valid until ${new Date(q.valid_until).toLocaleDateString()}`
+          : '';
+        return `- ${q.quote_number} (${q.status}${validStr}): ${q.services.join(', ')} — $${q.total}`;
+      })
+      .join('\n');
+
+    const loyaltyValue = (customerContext.loyalty_points * 0.05).toFixed(2);
+
+    const engagementParts: string[] = [];
+    if (customerContext.first_visit) engagementParts.push(`Customer since ${customerContext.first_visit}`);
+    if (customerContext.visit_count > 0) engagementParts.push(`${customerContext.visit_count} visits`);
+    if (customerContext.lifetime_spend > 0) engagementParts.push(`$${customerContext.lifetime_spend.toFixed(0)} lifetime spend`);
+    if (customerContext.last_visit) engagementParts.push(`Last visit: ${customerContext.last_visit}`);
+
     systemPrompt += `
 
 CUSTOMER CONTEXT (this is a returning customer — greet them by name):
 Name: ${customerContext.name}
 ${customerContext.email ? `Email: ${customerContext.email}` : ''}
+${customerContext.customer_type ? `Type: ${customerContext.customer_type}` : ''}
+
+${vehicleLines ? `VEHICLES ON FILE:\n${vehicleLines}` : 'No vehicles on file.'}
+
+${appointmentLines ? `UPCOMING APPOINTMENTS:\n${appointmentLines}` : 'No upcoming appointments.'}
+
+${quoteLines ? `RECENT QUOTES:\n${quoteLines}` : ''}
 
 ${historyLines ? `TRANSACTION HISTORY:\n${historyLines}` : 'No previous transactions on file.'}
 
+${customerContext.loyalty_points > 0 ? `LOYALTY: ${customerContext.loyalty_points} points ($${loyaltyValue} value)` : ''}
+
+${customerContext.notes ? `STAFF NOTES: ${customerContext.notes}` : ''}
+${customerContext.tags.length > 0 ? `TAGS: ${customerContext.tags.join(', ')}` : ''}
+
+${engagementParts.length > 0 ? `ENGAGEMENT: ${engagementParts.join(' | ')}` : ''}
+
 INSTRUCTIONS FOR RETURNING CUSTOMERS:
 - Greet them by first name
+- Reference their vehicles by name (e.g., "your 2020 Honda Accord") — NEVER re-ask for vehicle info you already have
+- If they have an upcoming appointment, mention it proactively
+- If a recent quote is still valid, ask if they'd like to proceed with it
 - Reference their past services: "Last time you got a [service] — would you like to book that again?"
 - If they had a premium service, suggest the same tier
 - If it's been 2+ months since last visit, suggest a maintenance service
-- You already have their vehicle info from past transactions — don't ask for it again
-- Focus on booking, not collecting info you already have`;
+- If loyalty balance > 100 points ($5+ value), mention they can redeem points on their next visit
+- Focus on booking, not collecting info you already have
+- Only ask for vehicle info if they mention a DIFFERENT vehicle not in their profile`;
   }
 
-  // Build message history for context (last 20 messages max)
-  const recentHistory = conversationHistory.slice(-20);
+  // Build message history for context (last 30 messages max)
+  const recentHistory = conversationHistory.slice(-30);
   const messages = recentHistory.map((msg) => ({
     role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
     content: msg.body,
