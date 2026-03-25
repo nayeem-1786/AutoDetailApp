@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const {
       customer_name,
       customer_phone,
-      services: serviceInputs,
+      services: rawServices,
       vehicle_year,
       vehicle_make,
       vehicle_model,
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Validate required fields
+    const serviceInputs = typeof rawServices === "string" ? JSON.parse(rawServices) : rawServices;
     if (!customer_name || !customer_phone || !serviceInputs?.length) {
       return NextResponse.json(
         {
