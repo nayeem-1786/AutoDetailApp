@@ -40,7 +40,7 @@ const body = await request.json();
       send_sms?: boolean | string;
     };
 
-    const serviceInputs = typeof rawServices === 'string' ? JSON.parse(rawServices) : rawServices;
+    const serviceInputs: QuoteServiceInput[] = typeof rawServices === 'string' ? JSON.parse(rawServices) : rawServices;
 
     // Validate required fields
     if (!customer_name || !customer_phone || !serviceInputs?.length) {
