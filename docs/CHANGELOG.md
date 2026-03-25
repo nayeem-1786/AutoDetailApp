@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: voice-agent services endpoint returns empty pricing for 14 services — 2026-03-24
+
+`/api/voice-agent/services` only joined `service_pricing` (tier-based). Services with `flat`, `per_unit`, or `custom` pricing models store prices on the `services` table itself, not in `service_pricing`. Result: `pricing: []` for 14 services, causing the voice agent to hallucinate or say it doesn't know the price.
+
+- Added `flat_price`, `per_unit_price`, `per_unit_label`, `per_unit_max`, `custom_starting_price` to the select query
+- Added `switch` on `pricing_model` to build pricing array for all 6 models:
+  - `vehicle_size`/`scope`/`specialty` → service_pricing tiers (unchanged)
+  - `flat` → `[{ tier_name: "flat", price: flat_price }]`
+  - `per_unit` → `[{ tier_name: "per_unit", price: per_unit_price, note: "Per panel" }]`
+  - `custom` → `[{ tier_name: "custom", price: starting_price, note: "Custom quote required" }]`
+- **No other API consumers affected** — SMS AI prompt, POS services, website pages, and voice-agent quotes all handle all pricing models correctly already
+
+---
+
 ## feat: voice agent infrastructure + admin UI enhancements (Phase 4-5/5) — 2026-03-24
 
 **Phase 4 — Voice Agent Infrastructure:**
