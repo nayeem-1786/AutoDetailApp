@@ -1,45 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
 import { generateConversationSummary } from '@/lib/services/conversation-summary';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
 import { resolveServiceByName } from '@/lib/services/service-resolver';
+import crypto from 'crypto';
+
+const ELEVENLABS_WEBHOOK_SECRET = process.env.ELEVENLABS_WEBHOOK_SECRET;
+const SIGNATURE_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * POST /api/webhooks/elevenlabs/call-complete
  * After-call webhook — when an ElevenLabs voice call ends, it sends a summary.
  * Logs the call into the unified conversation thread so SMS AI has context.
  *
- * Auth: Bearer token matching business_settings.voice_agent_api_key
+ * Auth: HMAC signature via ElevenLabs-Signature header (primary),
+ *       falls back to Bearer token if ELEVENLABS_WEBHOOK_SECRET not set.
  */
 export async function POST(request: NextRequest) {
   try {
-    // Validate API key (same as voice-agent endpoints)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Read raw body for HMAC verification (must be done before .json())
+    const rawBody = await request.text();
+
+    // Auth: HMAC signature verification (primary) or Bearer token (fallback)
+    if (ELEVENLABS_WEBHOOK_SECRET) {
+      const signatureHeader = request.headers.get('elevenlabs-signature') || '';
+      if (!verifyElevenLabsSignature(signatureHeader, rawBody, ELEVENLABS_WEBHOOK_SECRET)) {
+        console.error('[ElevenLabs Webhook] HMAC signature verification failed');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+      }
+    } else {
+      // Fallback: Bearer token auth (backward compatibility)
+      const auth = await validateApiKey(request);
+      if (!auth.valid) {
+        return NextResponse.json({ error: auth.error }, { status: 401 });
+      }
     }
 
-    const token = authHeader.slice(7).trim();
     const admin = createAdminClient();
-
-    const { data: setting } = await admin
-      .from('business_settings')
-      .select('value')
-      .eq('key', 'voice_agent_api_key')
-      .single();
-
-    const expectedKey = setting?.value
-      ? String(setting.value).replace(/^"|"$/g, '')
-      : '';
-
-    if (!expectedKey || token !== expectedKey) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
-    }
-
-    const body = await request.json();
+    const body = JSON.parse(rawBody);
     const {
       phone,
       transcript,
@@ -425,6 +427,57 @@ async function processPostCall(
     console.log(`[PostCall] Auto-quote ${quoteRecord.quote_number} sent to ${phone}`);
   } catch (err) {
     console.error('[PostCall] Quote creation failed:', err);
+  }
+}
+
+/**
+ * Verify ElevenLabs webhook HMAC signature.
+ * Header format: t=<timestamp>,v0=<hex_signature>
+ * Signature = HMAC-SHA256("<timestamp>.<rawBody>", secret)
+ */
+function verifyElevenLabsSignature(
+  signatureHeader: string,
+  rawBody: string,
+  secret: string
+): boolean {
+  if (!signatureHeader) return false;
+
+  // Parse "t=<timestamp>,v0=<signature>" pairs
+  const parts: Record<string, string> = {};
+  for (const part of signatureHeader.split(',')) {
+    const [key, ...rest] = part.split('=');
+    if (key && rest.length > 0) {
+      parts[key.trim()] = rest.join('=').trim();
+    }
+  }
+
+  const timestamp = parts['t'];
+  const signature = parts['v0'];
+
+  if (!timestamp || !signature) return false;
+
+  // Replay attack protection: reject timestamps older than 5 minutes
+  const timestampMs = parseInt(timestamp, 10) * 1000;
+  if (isNaN(timestampMs) || Math.abs(Date.now() - timestampMs) > SIGNATURE_TOLERANCE_MS) {
+    console.error('[ElevenLabs Webhook] Timestamp outside tolerance window');
+    return false;
+  }
+
+  // Compute expected signature
+  const signedPayload = `${timestamp}.${rawBody}`;
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(signedPayload)
+    .digest('hex');
+
+  // Timing-safe comparison
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(signature, 'hex'),
+      Buffer.from(expected, 'hex')
+    );
+  } catch {
+    return false;
   }
 }
 

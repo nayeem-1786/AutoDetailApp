@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: ElevenLabs call-complete webhook — HMAC signature verification — 2026-03-25
+
+ElevenLabs post-call webhooks use HMAC-SHA256 signature in `ElevenLabs-Signature` header, not Bearer token. The endpoint was rejecting all webhook calls with 401.
+
+- Replaced Bearer token auth with HMAC signature verification: parses `t=<timestamp>,v0=<signature>`, computes `HMAC-SHA256("<timestamp>.<rawBody>", secret)`, timing-safe comparison
+- Replay attack protection: rejects timestamps older than 5 minutes
+- Falls back to `validateApiKey` (Bearer token) if `ELEVENLABS_WEBHOOK_SECRET` env var is not set (backward compatibility)
+- New env var: `ELEVENLABS_WEBHOOK_SECRET` — set to the webhook signing secret from ElevenLabs dashboard
+
+---
+
 ## fix: voice-agent initiation — past appointments shown, 24h time format — 2026-03-25
 
 - Appointment query used UTC date (`new Date().toISOString()`) — showed past appointments in PST. Fixed with `toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })` for correct PST YYYY-MM-DD.
