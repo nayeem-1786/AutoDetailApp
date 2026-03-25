@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
-import { normalizePhone } from '@/lib/utils/format';
+import { normalizePhone, formatTime } from '@/lib/utils/format';
 
 /**
  * POST /api/voice-agent/initiation
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parallel fetches for customer details
-    const today = new Date().toISOString().split('T')[0];
+    const todayPST = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); // YYYY-MM-DD
     const [vehicleRes, apptRes, quoteRes] = await Promise.all([
       supabase
         .from('vehicles')
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         .from('appointments')
         .select('scheduled_date, scheduled_start_time, appointment_services(services(name))')
         .eq('customer_id', customer.id)
-        .gte('scheduled_date', today)
+        .gte('scheduled_date', todayPST)
         .neq('status', 'cancelled')
         .order('scheduled_date', { ascending: true })
         .limit(1)
@@ -117,12 +117,13 @@ export async function POST(request: NextRequest) {
 
     const appt = apptRes.data;
     if (appt) {
-      const apptDate = new Date(appt.scheduled_date).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
+      const apptDate = new Date(appt.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
       });
+      const apptTime = appt.scheduled_start_time ? formatTime(appt.scheduled_start_time) : 'TBD';
       const services = ((appt.appointment_services as unknown as Array<{ services: { name: string } }>) || [])
         .map((as) => as.services?.name).filter(Boolean);
-      summaryParts.push(`Upcoming: ${services.join(', ') || 'appointment'} on ${apptDate} at ${appt.scheduled_start_time || 'TBD'}.`);
+      summaryParts.push(`Upcoming: ${services.join(', ') || 'appointment'} on ${apptDate} at ${apptTime}.`);
     }
 
     const quote = quoteRes.data;

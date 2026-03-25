@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: voice-agent initiation — past appointments shown, 24h time format — 2026-03-25
+
+- Appointment query used UTC date (`new Date().toISOString()`) — showed past appointments in PST. Fixed with `toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })` for correct PST YYYY-MM-DD.
+- Appointment time showed raw "12:00:00" — now uses `formatTime()` for "12:00 PM".
+- Appointment date showed "Mar 24" — now shows "Saturday, March 28" (weekday + full month, noon anchor to avoid day shift).
+
+---
+
 ## fix: voice agent SMS formatting — date/time, message logging, system messages — 2026-03-25
 
 **Bug 1 — Date off by one day + 24-hour time:**
