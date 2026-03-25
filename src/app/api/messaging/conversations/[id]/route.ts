@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { generateConversationSummary } from '@/lib/services/conversation-summary';
 
 const STATUS_ACTION_LABELS: Record<string, string> = {
   closed: 'closed',
@@ -67,6 +68,13 @@ export async function PATCH(
         body: `Conversation ${action} by ${staffName}`,
         sender_type: 'system',
         status: 'delivered',
+      });
+    }
+
+    // Generate conversation summary on close/archive (fire-and-forget)
+    if (updates.status === 'closed' || updates.status === 'archived') {
+      generateConversationSummary(id).catch((err) => {
+        console.error(`[ConvSummary] Failed to generate on ${updates.status}:`, err);
       });
     }
   }

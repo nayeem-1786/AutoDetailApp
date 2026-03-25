@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: conversation summaries for cross-session AI memory (Phase 2/5) — 2026-03-24
+
+AI-generated conversation summaries persist key facts across sessions so the auto-responder maintains context even when conversations span days/weeks or exceed the 30-message window.
+
+- **New:** `src/lib/services/conversation-summary.ts` — Generates structured summaries via Claude Haiku (customer, vehicle, interest, quotes, outcome, next steps)
+- **New:** `src/app/api/cron/conversation-summaries/route.ts` — Cron job every 6 hours, summarizes active conversations with 5+ new messages since last summary, 1-hour cooldown
+- **New columns:** `conversations.summary` (TEXT) and `conversations.summary_updated_at` (TIMESTAMPTZ)
+- **Summary injection:** `getAIResponse()` now accepts optional `conversationSummary` param, injected as `PREVIOUS CONVERSATION SUMMARY:` in system prompt
+- **Auto-trigger:** Summary generated on conversation close/archive via admin messaging (fire-and-forget)
+- **Cron registered:** `conversation-summaries` added to scheduler (every 6 hours)
+
+---
+
 ## feat: enrich SMS AI auto-responder with full customer context (Phase 1/5) — 2026-03-24
 
 The AI auto-responder previously only saw customer name, email, and last 10 transactions. Now it gets the full customer profile:

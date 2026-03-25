@@ -194,6 +194,7 @@ All core build phases complete. App is in active daily use with ongoing refineme
 | QBO auto-sync | Every 30 min | `/api/cron/qbo-sync` |
 | Order cleanup | Every 6 hours | `/api/cron/cleanup-orders` |
 | Booking reminders | Daily 8 AM PST | `/api/cron/booking-reminders` |
+| Conversation summaries | Every 6 hours | `/api/cron/conversation-summaries` |
 | Audit log cleanup | Daily 3:30 AM PST | `/api/cron/cleanup-audit-log` |
 
 ## Production Env Vars (Required)

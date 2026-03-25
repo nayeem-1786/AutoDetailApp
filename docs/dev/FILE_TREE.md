@@ -268,6 +268,7 @@ src/app/api/checkout/validate-address/route.ts
 src/app/api/cron/cleanup-audit-log/route.ts
 src/app/api/cron/cleanup-idempotency/route.ts
 src/app/api/cron/cleanup-orders/route.ts
+src/app/api/cron/conversation-summaries/route.ts
 src/app/api/cron/google-reviews/route.ts
 src/app/api/cron/lifecycle-engine/route.ts
 src/app/api/cron/qbo-sync/route.ts
@@ -881,6 +882,7 @@ src/lib/services/coupon-summary.ts
 src/lib/services/job-addons.ts
 src/lib/services/messaging-ai-prompt.ts
 src/lib/services/messaging-ai.ts
+src/lib/services/conversation-summary.ts
 src/lib/services/page-content-extractor.ts
 src/lib/services/shippo.ts
 ```
@@ -1346,6 +1348,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260322000001_add_missing_permission_definitions.sql
 20260323000001_create_print_jobs.sql
 20260324000001_move_photo_gallery_to_operations.sql
+20260324000002_conversation_summaries.sql
 ```
 
 ---

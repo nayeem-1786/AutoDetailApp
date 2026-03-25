@@ -320,15 +320,17 @@ export interface CustomerContext {
 
 /**
  * Get an AI response using the Anthropic Messages API.
- * Passes conversation history for context (up to 20 messages).
+ * Passes conversation history for context (up to 30 messages).
  * When customerContext is provided, appends customer info to the system prompt.
  * When customerId is provided, pending addon authorizations are injected into the prompt.
+ * When conversationSummary is provided, injects it for cross-session memory.
  */
 export async function getAIResponse(
   conversationHistory: Message[],
   newMessage: string,
   customerContext?: CustomerContext,
-  customerId?: string | null
+  customerId?: string | null,
+  conversationSummary?: string | null
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -350,6 +352,16 @@ export async function getAIResponse(
     }
   } catch (err) {
     console.error('Product search failed:', err);
+  }
+
+  // Inject conversation summary for cross-session memory
+  if (conversationSummary) {
+    systemPrompt += `
+
+PREVIOUS CONVERSATION SUMMARY:
+The following summary covers earlier parts of this conversation that may not appear in the recent message history. Use this context to maintain continuity — reference past discussions naturally without re-asking questions that were already answered.
+
+${conversationSummary}`;
   }
 
   // Append customer context for returning customers

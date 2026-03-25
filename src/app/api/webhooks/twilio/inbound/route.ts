@@ -658,7 +658,7 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          autoReply = await getAIResponse(history || [], body, customerCtx, conversation.customer_id);
+          autoReply = await getAIResponse(history || [], body, customerCtx, conversation.customer_id, conversation.summary);
         } catch (err) {
           console.error('AI auto-reply failed:', err);
         }

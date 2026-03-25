@@ -590,6 +590,8 @@ idx_refund_items_refund — btree (refund_id)
 | phone_number | TEXT | NOT NULL | |
 | customer_id | UUID | FK → customers(id) | |
 | status | TEXT | CHECK ('open','closed','archived') | |
+| summary | TEXT | | AI-generated conversation summary for cross-session memory |
+| summary_updated_at | TIMESTAMPTZ | | When the summary was last generated |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
