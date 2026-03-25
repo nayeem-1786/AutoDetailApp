@@ -43,7 +43,6 @@ const body = await request.json();
     const serviceInputs = typeof rawServices === 'string' ? JSON.parse(rawServices) : rawServices;
 
     // Validate required fields
-    const serviceInputs = typeof rawServices === "string" ? JSON.parse(rawServices) : rawServices;
     if (!customer_name || !customer_phone || !serviceInputs?.length) {
       return NextResponse.json(
         {
