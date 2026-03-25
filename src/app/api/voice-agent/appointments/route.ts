@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
-import { normalizePhone } from '@/lib/utils/format';
+import { normalizePhone, formatTime } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { APPOINTMENT } from '@/lib/utils/constants';
@@ -333,19 +333,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send SMS confirmation (non-blocking)
+    // Format date and time for SMS and system message (PST, 12-hour)
+    const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
+    });
+    const formattedTime = formatTime(time);
+
+    // Send SMS confirmation and log it
     if (hasSmsConsent) {
-      const apptDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-        weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
-      });
-      sendSms(
-        e164Phone,
-        `Your appointment at Smart Details Auto Spa is confirmed! ${service.name} on ${apptDate} at ${time}. We look forward to seeing you! Reply STOP to opt out.`
-      ).catch((err) => console.error('Appointment SMS confirmation failed:', err));
+      const smsBody = `Your appointment at Smart Details Auto Spa is confirmed! ${service.name} on ${formattedDate} at ${formattedTime}. We look forward to seeing you! Reply STOP to opt out.`;
+      sendSms(e164Phone, smsBody)
+        .then(() => logSmsMessage(supabase, e164Phone, smsBody))
+        .catch((err) => console.error('Appointment SMS confirmation failed:', err));
     }
 
     // Log system message to conversation thread (non-blocking)
-    logVoiceAction(supabase, e164Phone, `Appointment booked via phone: ${service.name} on ${date} at ${time}`).catch(() => {});
+    logVoiceAction(supabase, e164Phone, `Appointment booked via phone: ${service.name} on ${formattedDate} at ${formattedTime}`).catch(() => {});
 
     // Fire webhook (non-blocking)
     fireWebhook(
@@ -457,4 +460,27 @@ async function logVoiceAction(
       last_channel: 'voice',
     })
     .eq('id', conv.id);
+}
+
+async function logSmsMessage(
+  supabase: ReturnType<typeof createAdminClient>,
+  phone: string,
+  body: string
+) {
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('phone_number', phone)
+    .maybeSingle();
+
+  if (!conv) return;
+
+  await supabase.from('messages').insert({
+    conversation_id: conv.id,
+    direction: 'outbound',
+    body,
+    sender_type: 'system',
+    status: 'delivered',
+    channel: 'sms',
+  });
 }

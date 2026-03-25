@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: voice agent SMS formatting — date/time, message logging, system messages — 2026-03-25
+
+**Bug 1 — Date off by one day + 24-hour time:**
+- Appointment SMS showed "Friday, March 27 at 13:00" instead of "Saturday, March 28 at 1:00 PM"
+- Root cause: `new Date(date + 'T00:00:00')` parsed as UTC midnight, which is previous day in PST
+- Fix: Use `T12:00:00` (noon) to avoid day-boundary shift + `formatTime()` from `@/lib/utils/format` for 12-hour AM/PM
+
+**Bug 2 — Outbound SMS not visible in Messages panel:**
+- SMS confirmations and auto-quotes were sent but only system-log messages ("Appointment confirmation SMS sent") appeared in admin messaging
+- Fix: After every `sendSms()` call, insert an additional message record with the actual SMS body, `channel: 'sms'`. Three sites fixed: appointment confirmation, post-call appointment confirmation, post-call auto-quote.
+
+**Bug 3 — System message raw date/time:**
+- System log showed "Engine Bay Detail on 2026-03-28 at 13:00"
+- Fix: Uses same formatted date/time as SMS: "Engine Bay Detail on Saturday, March 28 at 1:00 PM"
+
+---
+
 ## feat: voice agent — conversation initiation, auto-quote after calls, SMS confirmations — 2026-03-25
 
 Three voice agent enhancements:

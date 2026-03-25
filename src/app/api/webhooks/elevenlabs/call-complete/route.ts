@@ -244,15 +244,17 @@ async function processPostCall(
 
       if (cust?.sms_consent) {
         const name = cust.first_name ? `, ${cust.first_name}` : '';
-        await sendSms(phone, `Thanks for calling Smart Details Auto Spa${name}! Your appointment is confirmed. We look forward to seeing you! Reply STOP to opt out.`);
+        const smsBody = `Thanks for calling Smart Details Auto Spa${name}! Your appointment is confirmed. We look forward to seeing you! Reply STOP to opt out.`;
+        await sendSms(phone, smsBody);
 
+        // Log the actual SMS content
         await admin.from('messages').insert({
           conversation_id: conversationId,
           direction: 'outbound',
-          body: 'Appointment confirmation SMS sent after phone call',
+          body: smsBody,
           sender_type: 'system',
           status: 'delivered',
-          channel: 'voice',
+          channel: 'sms',
         });
       }
     }
@@ -387,15 +389,26 @@ async function processPostCall(
       .single();
 
     if (custCheck?.sms_consent) {
-      await sendSms(phone, `Thanks for calling Smart Details Auto Spa! Here's a quote for what we discussed: ${linkUrl}\n\nReply STOP to opt out.`);
+      const quoteSmsBody = `Thanks for calling Smart Details Auto Spa! Here's a quote for what we discussed: ${linkUrl}\n\nReply STOP to opt out.`;
+      await sendSms(phone, quoteSmsBody);
+
+      // Log the actual SMS content
+      await admin.from('messages').insert({
+        conversation_id: conversationId,
+        direction: 'outbound',
+        body: quoteSmsBody,
+        sender_type: 'system',
+        status: 'delivered',
+        channel: 'sms',
+      });
     }
 
-    // Log to conversation
+    // Log system note to conversation
     const serviceNames = quoteItems.map((i) => i.item_name).join(', ');
     await admin.from('messages').insert({
       conversation_id: conversationId,
       direction: 'outbound',
-      body: `Auto-quote ${quoteRecord.quote_number} sent via SMS after phone call: ${serviceNames}`,
+      body: `Auto-quote ${quoteRecord.quote_number} generated after phone call: ${serviceNames}`,
       sender_type: 'system',
       status: 'delivered',
       channel: 'voice',
