@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils/cn';
 import { formatPhone } from '@/lib/utils/format';
 import type { Conversation } from '@/lib/supabase/types';
-import { Phone, Bot } from 'lucide-react';
+import { Phone, Bot, MessageSquare } from 'lucide-react';
 
 interface ConversationRowProps {
   conversation: Conversation;
@@ -60,6 +60,11 @@ export function ConversationRow({ conversation, isSelected, onClick }: Conversat
             {displayName}
           </span>
           <div className="flex shrink-0 items-center gap-1.5">
+            {conversation.last_channel === 'voice' ? (
+              <Phone className="h-3 w-3 text-amber-500" />
+            ) : (
+              <MessageSquare className="h-3 w-3 text-gray-300" />
+            )}
             {conversation.is_ai_enabled && (
               <Bot className="h-3.5 w-3.5 text-purple-500" />
             )}

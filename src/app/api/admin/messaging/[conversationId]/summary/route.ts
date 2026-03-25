@@ -32,10 +32,10 @@ export async function GET(
   const denied = await requirePermission(employee.id, 'marketing.two_way_sms');
   if (denied) return denied;
 
-  // Fetch conversation with customer
+  // Fetch conversation with customer + summary
   const { data: conversation } = await admin
     .from('conversations')
-    .select('id, customer_id, phone_number')
+    .select('id, customer_id, phone_number, summary, last_channel')
     .eq('id', conversationId)
     .single();
 
@@ -46,14 +46,53 @@ export async function GET(
   let customerData = null;
   let vehicleData = null;
   let latestQuoteData = null;
+  let loyaltyData = null;
+  let appointmentData = null;
+  let engagementData = null;
 
   if (conversation.customer_id) {
-    // Fetch customer
-    const { data: customer } = await admin
-      .from('customers')
-      .select('first_name, last_name, phone, customer_type')
-      .eq('id', conversation.customer_id)
-      .single();
+    const custId = conversation.customer_id;
+    const today = new Date().toISOString().split('T')[0];
+
+    // Parallel fetches
+    const [
+      { data: customer },
+      { data: vehicle },
+      { data: quote },
+      { data: appointments },
+    ] = await Promise.all([
+      admin
+        .from('customers')
+        .select('first_name, last_name, phone, customer_type, loyalty_points_balance, first_visit_date, last_visit_date, visit_count, lifetime_spend')
+        .eq('id', custId)
+        .single(),
+      admin
+        .from('vehicles')
+        .select('year, make, model, color')
+        .eq('customer_id', custId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single(),
+      admin
+        .from('quotes')
+        .select(`
+          quote_number, status, total_amount, created_at, sent_at, viewed_at, accepted_at,
+          items:quote_items(service:services(name))
+        `)
+        .eq('customer_id', custId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single(),
+      admin
+        .from('appointments')
+        .select('scheduled_date, scheduled_start_time, status, appointment_services(services(name))')
+        .eq('customer_id', custId)
+        .gte('scheduled_date', today)
+        .neq('status', 'cancelled')
+        .order('scheduled_date', { ascending: true })
+        .limit(3),
+    ]);
 
     if (customer) {
       const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
@@ -62,16 +101,19 @@ export async function GET(
         phone: customer.phone || conversation.phone_number,
         type: customer.customer_type || 'unknown',
       };
-    }
 
-    // Fetch most recent vehicle
-    const { data: vehicle } = await admin
-      .from('vehicles')
-      .select('year, make, model, color')
-      .eq('customer_id', conversation.customer_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+      loyaltyData = {
+        points: customer.loyalty_points_balance || 0,
+        value: ((customer.loyalty_points_balance || 0) * 0.05).toFixed(2),
+      };
+
+      engagementData = {
+        first_visit: customer.first_visit_date || null,
+        last_visit: customer.last_visit_date || null,
+        visit_count: customer.visit_count || 0,
+        lifetime_spend: customer.lifetime_spend || 0,
+      };
+    }
 
     if (vehicle) {
       vehicleData = {
@@ -81,19 +123,6 @@ export async function GET(
         color: vehicle.color || '',
       };
     }
-
-    // Fetch latest quote with items
-    const { data: quote } = await admin
-      .from('quotes')
-      .select(`
-        quote_number, status, total_amount, created_at, sent_at, viewed_at, accepted_at,
-        items:quote_items(service:services(name))
-      `)
-      .eq('customer_id', conversation.customer_id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
 
     if (quote) {
       const items = quote.items as unknown as Array<{ service: { name: string } | null }>;
@@ -112,6 +141,16 @@ export async function GET(
         accepted_at: quote.accepted_at,
       };
     }
+
+    if (appointments && appointments.length > 0) {
+      appointmentData = appointments.map((a) => ({
+        date: a.scheduled_date,
+        time: a.scheduled_start_time,
+        status: a.status,
+        services: ((a.appointment_services as unknown as Array<{ services: { name: string } }>) || [])
+          .map((as) => as.services?.name || 'Service'),
+      }));
+    }
   }
 
   // If no customer linked, return phone-only data
@@ -127,5 +166,10 @@ export async function GET(
     customer: customerData,
     vehicle: vehicleData,
     latestQuote: latestQuoteData,
+    loyalty: loyaltyData,
+    appointments: appointmentData,
+    engagement: engagementData,
+    aiSummary: conversation.summary || null,
+    lastChannel: conversation.last_channel || 'sms',
   });
 }

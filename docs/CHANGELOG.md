@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: voice agent infrastructure + admin UI enhancements (Phase 4-5/5) — 2026-03-24
+
+**Phase 4 — Voice Agent Infrastructure:**
+- **New:** `docs/dev/VOICE_AGENT.md` — Complete ElevenLabs setup guide: architecture, API endpoints, agent system prompt, tool configuration, Twilio voice routing, cross-channel context flow
+- **New:** `POST /api/webhooks/twilio/voice` — TwiML voice fallback route for when ElevenLabs is unavailable (plays greeting, records voicemail)
+- Voice agent reference doc added to CLAUDE.md
+
+**Phase 5 — Admin Messaging UI:**
+- **Message bubbles:** Voice messages render with amber phone icon badge, call duration, and distinct amber styling. SMS messages show gray message icon.
+- **Conversation list:** Channel indicator (phone/SMS icon) next to each conversation showing last contact method
+- **Enhanced summary panel:** Now shows loyalty points + value, upcoming appointments with service names, engagement metrics (visit count, lifetime spend), and AI conversation summary with purple brain icon
+- **Summary API expanded:** `/api/admin/messaging/[id]/summary` now returns loyalty, appointments, engagement, aiSummary, lastChannel (parallelized queries)
+
+---
+
 ## feat: cross-channel bridge — unified SMS + voice conversation threads (Phase 3/5) — 2026-03-24
 
 Voice calls and SMS now share a single conversation thread per phone number. A customer who texts about ceramic coating and calls three days later is recognized with full context.

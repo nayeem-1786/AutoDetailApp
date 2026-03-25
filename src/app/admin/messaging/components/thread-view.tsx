@@ -14,6 +14,11 @@ import {
   X as XIcon,
   Archive,
   RotateCcw,
+  Phone,
+  Star,
+  Calendar,
+  TrendingUp,
+  Brain,
 } from 'lucide-react';
 import { formatPhone, formatCurrency } from '@/lib/utils/format';
 import { adminFetch } from '@/lib/utils/admin-fetch';
@@ -35,6 +40,21 @@ interface ConversationSummary {
     viewed_at: string | null;
     accepted_at: string | null;
   } | null;
+  loyalty: { points: number; value: string } | null;
+  appointments: Array<{
+    date: string;
+    time: string;
+    status: string;
+    services: string[];
+  }> | null;
+  engagement: {
+    first_visit: string | null;
+    last_visit: string | null;
+    visit_count: number;
+    lifetime_spend: number;
+  } | null;
+  aiSummary: string | null;
+  lastChannel: string;
 }
 
 interface ThreadViewProps {
@@ -310,7 +330,7 @@ export function ThreadView({
 }
 
 function SummaryCard({ summary, phoneDisplay }: { summary: ConversationSummary; phoneDisplay: string }) {
-  const { customer, vehicle, latestQuote } = summary;
+  const { customer, vehicle, latestQuote, loyalty, appointments, engagement, aiSummary, lastChannel } = summary;
   const hasCustomerName = customer?.name && customer.name.trim().length > 0;
 
   // Build vehicle string
@@ -338,9 +358,15 @@ function SummaryCard({ summary, phoneDisplay }: { summary: ConversationSummary; 
   const serviceNames = latestQuote?.services?.join(', ') || '';
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-1.5">
+      {/* Customer + vehicle + channel */}
       <div className="flex items-center gap-1.5">
-        <span>{hasCustomerName ? customer!.name : phoneDisplay}</span>
+        {lastChannel === 'voice' ? (
+          <Phone className="h-3 w-3 text-amber-500" />
+        ) : (
+          <MessageSquare className="h-3 w-3 text-gray-400" />
+        )}
+        <span className="font-medium">{hasCustomerName ? customer!.name : phoneDisplay}</span>
         {hasCustomerName && vehicleStr && (
           <>
             <span className="text-gray-400">&middot;</span>
@@ -348,9 +374,54 @@ function SummaryCard({ summary, phoneDisplay }: { summary: ConversationSummary; 
           </>
         )}
       </div>
+
+      {/* Quote */}
       {latestQuote && (
         <div className="text-gray-500">
           Quote #{latestQuote.quote_number}: {serviceNames} &mdash; {formatCurrency(latestQuote.total_amount)} ({quoteStatusText})
+        </div>
+      )}
+
+      {/* Upcoming appointments */}
+      {appointments && appointments.length > 0 && (
+        <div className="flex items-start gap-1.5 text-gray-500">
+          <Calendar className="mt-0.5 h-3 w-3 shrink-0 text-blue-500" />
+          <span>
+            {appointments.map((a, i) => (
+              <span key={i}>
+                {i > 0 && ', '}
+                {a.services.join(', ')} on {new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
+
+      {/* Loyalty + engagement row */}
+      {((loyalty?.points ?? 0) > 0 || (engagement && engagement.visit_count > 0)) && (
+        <div className="flex items-center gap-3 text-gray-500">
+          {loyalty && loyalty.points > 0 && (
+            <span className="flex items-center gap-1">
+              <Star className="h-3 w-3 text-amber-500" />
+              {loyalty.points} pts (${loyalty.value})
+            </span>
+          )}
+          {engagement && engagement.visit_count > 0 && (
+            <span className="flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-green-500" />
+              {engagement.visit_count} visits &middot; ${engagement.lifetime_spend.toFixed(0)} lifetime
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* AI conversation summary */}
+      {aiSummary && (
+        <div className="mt-1 border-t border-gray-100 pt-1.5">
+          <div className="flex items-start gap-1.5 text-gray-500">
+            <Brain className="mt-0.5 h-3 w-3 shrink-0 text-purple-500" />
+            <p className="text-xs whitespace-pre-line">{aiSummary}</p>
+          </div>
         </div>
       )}
     </div>

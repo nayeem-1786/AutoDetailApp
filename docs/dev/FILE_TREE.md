@@ -437,6 +437,7 @@ src/app/api/webhooks/elevenlabs/call-complete/route.ts
 src/app/api/webhooks/stripe/route.ts
 src/app/api/webhooks/twilio/inbound/route.ts
 src/app/api/webhooks/twilio/status/route.ts
+src/app/api/webhooks/twilio/voice/route.ts
 ```
 
 ### Vehicle Categories (Public)
