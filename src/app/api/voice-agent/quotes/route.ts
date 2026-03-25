@@ -201,8 +201,9 @@ const body = await request.json();
 
     // Determine initial status and timestamps
     const now = new Date().toISOString();
-    const status = send_sms ? 'sent' : 'draft';
-    const sentAt = send_sms ? now : null;
+    const shouldSendSms = send_sms === true || send_sms === 'true';
+    const status = shouldSendSms ? 'sent' : 'draft';
+    const sentAt = shouldSendSms ? now : null;
 
     // Read quote validity from admin settings
     const { data: validitySetting } = await supabase
@@ -273,11 +274,11 @@ const body = await request.json();
     logVoiceAction(supabase, e164Phone, `Quote ${quote.quote_number} created via phone: ${serviceNames} — $${Number(quote.total_amount).toFixed(2)}`).catch(() => {});
 
     // Fire webhook (non-blocking)
-    const webhookEvent = send_sms ? 'quote_sent' : 'quote_created';
+    const webhookEvent = shouldSendSms ? 'quote_sent' : 'quote_created';
     fireWebhook(
       webhookEvent,
       {
-        event: send_sms ? 'quote.sent' : 'quote.created',
+        event: shouldSendSms ? 'quote.sent' : 'quote.created',
         timestamp: now,
         source: 'voice_agent',
         quote: {

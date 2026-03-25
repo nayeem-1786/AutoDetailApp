@@ -24,9 +24,17 @@ POST /api/webhooks/elevenlabs/call-complete → log call to conversation thread
 
 All endpoints require `Authorization: Bearer <api_key>` where the key matches `business_settings.voice_agent_api_key`.
 
+### POST /api/voice-agent/initiation
+
+**Conversation initiation webhook.** ElevenLabs calls this during the ring period before the call connects. Returns `conversation_initiation_client_data` with dynamic variables and a personalized first message.
+
+For returning customers, includes a `customer_summary` string with vehicle, visits, loyalty, tags, appointments, and quotes. For unknown callers, returns generic greeting.
+
+Must respond within **5 seconds** (ElevenLabs timeout during ring period).
+
 ### GET /api/voice-agent/context?phone=+1XXXXXXXXXX
 
-**Use at call start.** Returns everything the agent needs in one request:
+**Use during call.** Returns everything the agent needs in one request:
 - Customer profile (name, email, type, loyalty points, notes, tags, engagement metrics)
 - Vehicles on file
 - Upcoming appointments with services

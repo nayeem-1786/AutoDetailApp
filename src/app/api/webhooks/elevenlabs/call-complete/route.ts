@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
+import { sendSms } from '@/lib/utils/sms';
 import { generateConversationSummary } from '@/lib/services/conversation-summary';
+import { createQuote } from '@/lib/quotes/quote-service';
+import { createShortLink } from '@/lib/utils/short-link';
+import { resolveServiceByName } from '@/lib/services/service-resolver';
 
 /**
  * POST /api/webhooks/elevenlabs/call-complete
@@ -139,6 +143,13 @@ export async function POST(request: NextRequest) {
       console.error('[ElevenLabs Webhook] Summary generation failed:', err);
     });
 
+    // Fire-and-forget: post-call processing (auto-quote, confirmation SMS)
+    if (transcript) {
+      processPostCall(admin, normalizedPhone, transcript, conversation.id, customer?.id || null).catch((err) => {
+        console.error('[ElevenLabs Webhook] Post-call processing failed:', err);
+      });
+    }
+
     console.log(
       `[ElevenLabs Webhook] Call logged for ${normalizedPhone}` +
       (call_id ? ` (call_id: ${call_id})` : '') +
@@ -152,6 +163,255 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[ElevenLabs Webhook] Error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Post-call processing — auto-quote and confirmation SMS
+// ---------------------------------------------------------------------------
+
+interface CallExtraction {
+  services_discussed: string[];
+  vehicle: { year?: number; make?: string; model?: string; color?: string } | null;
+  appointment_booked: boolean;
+  customer_interest: 'interested' | 'maybe' | 'not_interested';
+}
+
+async function extractCallInfo(transcript: string): Promise<CallExtraction | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        system: 'Extract information from this auto detailing business phone call transcript. Return JSON only, no markdown.',
+        messages: [{
+          role: 'user',
+          content: `Extract from this call transcript:
+- services_discussed: array of service names mentioned (use common auto detailing service names like "Ceramic Coating", "Interior Detail", "Express Wash", etc.)
+- vehicle: { year, make, model, color } if mentioned, or null
+- appointment_booked: true/false (did they confirm a booking during the call?)
+- customer_interest: "interested" | "maybe" | "not_interested"
+
+Return JSON only:
+
+${transcript}`,
+        }],
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text?.trim();
+    if (!text) return null;
+
+    const jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    return JSON.parse(jsonStr) as CallExtraction;
+  } catch (err) {
+    console.error('[PostCall] Extraction failed:', err);
+    return null;
+  }
+}
+
+async function processPostCall(
+  admin: ReturnType<typeof createAdminClient>,
+  phone: string,
+  transcript: string,
+  conversationId: string,
+  customerId: string | null
+) {
+  const extraction = await extractCallInfo(transcript);
+  if (!extraction) return;
+
+  // If appointment was booked, send confirmation SMS
+  if (extraction.appointment_booked) {
+    // Check SMS consent before sending
+    if (customerId) {
+      const { data: cust } = await admin
+        .from('customers')
+        .select('sms_consent, first_name')
+        .eq('id', customerId)
+        .single();
+
+      if (cust?.sms_consent) {
+        const name = cust.first_name ? `, ${cust.first_name}` : '';
+        await sendSms(phone, `Thanks for calling Smart Details Auto Spa${name}! Your appointment is confirmed. We look forward to seeing you! Reply STOP to opt out.`);
+
+        await admin.from('messages').insert({
+          conversation_id: conversationId,
+          direction: 'outbound',
+          body: 'Appointment confirmation SMS sent after phone call',
+          sender_type: 'system',
+          status: 'delivered',
+          channel: 'voice',
+        });
+      }
+    }
+    return;
+  }
+
+  // If services discussed and customer is interested, auto-generate quote
+  if (
+    extraction.services_discussed.length === 0 ||
+    extraction.customer_interest === 'not_interested'
+  ) {
+    return;
+  }
+
+  // Resolve service names to IDs
+  const quoteItems: Array<{
+    service_id: string;
+    item_name: string;
+    quantity: number;
+    unit_price: number;
+    tier_name: string | null;
+  }> = [];
+
+  for (const serviceName of extraction.services_discussed) {
+    const service = await resolveServiceByName(admin, serviceName);
+    if (!service) {
+      console.warn(`[PostCall] Service not found: "${serviceName}"`);
+      continue;
+    }
+    // Use flat price or first tier price as default
+    let price = service.flat_price ?? 0;
+    let tierName: string | null = null;
+    if (service.service_pricing?.length > 0) {
+      price = service.service_pricing[0].price;
+      tierName = service.service_pricing[0].tier_name;
+    }
+    quoteItems.push({
+      service_id: service.id,
+      item_name: service.name,
+      quantity: 1,
+      unit_price: price,
+      tier_name: tierName,
+    });
+  }
+
+  if (quoteItems.length === 0) return;
+
+  // Find or create customer
+  let custId = customerId;
+  if (!custId) {
+    const { data: existing } = await admin
+      .from('customers')
+      .select('id')
+      .eq('phone', phone)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      custId = existing.id;
+    } else {
+      // Can't create a customer without a name from just a phone call
+      // Skip auto-quote for unknown callers who didn't provide name
+      console.log('[PostCall] Skipping auto-quote — unknown caller, no name available');
+      return;
+    }
+  }
+
+  // Create vehicle if extracted
+  let vehicleId: string | undefined;
+  if (extraction.vehicle && (extraction.vehicle.make || extraction.vehicle.model)) {
+    const { data: newVehicle } = await admin
+      .from('vehicles')
+      .insert({
+        customer_id: custId,
+        vehicle_type: 'standard',
+        year: extraction.vehicle.year || null,
+        make: extraction.vehicle.make || null,
+        model: extraction.vehicle.model || null,
+        color: extraction.vehicle.color || null,
+      })
+      .select('id')
+      .single();
+    vehicleId = newVehicle?.id;
+  }
+
+  // Read quote validity
+  const { data: validitySetting } = await admin
+    .from('business_settings')
+    .select('value')
+    .eq('key', 'quote_validity_days')
+    .maybeSingle();
+
+  let quoteValidityDays = 10;
+  if (validitySetting?.value) {
+    try {
+      const parsed = JSON.parse(validitySetting.value);
+      if (typeof parsed === 'number' && parsed > 0) quoteValidityDays = parsed;
+    } catch { /* use fallback */ }
+  }
+
+  const validUntil = new Date(Date.now() + quoteValidityDays * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    const { quote } = await createQuote(admin, {
+      customer_id: custId,
+      vehicle_id: vehicleId,
+      items: quoteItems,
+      notes: 'Auto-generated after phone call',
+      valid_until: validUntil,
+    });
+
+    const quoteRecord = quote as { id: string; quote_number: string; access_token: string };
+
+    // Mark as sent
+    await admin
+      .from('quotes')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', quoteRecord.id);
+
+    // Generate short link
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const quoteUrl = `${appUrl}/quote/${quoteRecord.access_token}`;
+    let linkUrl = quoteUrl;
+    try { linkUrl = await createShortLink(quoteUrl); } catch { /* use full URL */ }
+
+    // Check SMS consent before sending
+    const { data: custCheck } = await admin
+      .from('customers')
+      .select('sms_consent')
+      .eq('id', custId)
+      .single();
+
+    if (custCheck?.sms_consent) {
+      await sendSms(phone, `Thanks for calling Smart Details Auto Spa! Here's a quote for what we discussed: ${linkUrl}\n\nReply STOP to opt out.`);
+    }
+
+    // Log to conversation
+    const serviceNames = quoteItems.map((i) => i.item_name).join(', ');
+    await admin.from('messages').insert({
+      conversation_id: conversationId,
+      direction: 'outbound',
+      body: `Auto-quote ${quoteRecord.quote_number} sent via SMS after phone call: ${serviceNames}`,
+      sender_type: 'system',
+      status: 'delivered',
+      channel: 'voice',
+    });
+
+    // Log quote communication
+    await admin.from('quote_communications').insert({
+      quote_id: quoteRecord.id,
+      channel: 'sms',
+      sent_to: phone,
+      status: 'sent',
+    });
+
+    console.log(`[PostCall] Auto-quote ${quoteRecord.quote_number} sent to ${phone}`);
+  } catch (err) {
+    console.error('[PostCall] Quote creation failed:', err);
   }
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone } from '@/lib/utils/format';
+import { sendSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
@@ -225,14 +226,17 @@ export async function POST(request: NextRequest) {
 
     const { data: existingCustomer } = await supabase
       .from('customers')
-      .select('id')
+      .select('id, sms_consent')
       .eq('phone', e164Phone)
       .is('deleted_at', null)
       .limit(1)
       .single();
 
+    let hasSmsConsent = false;
+
     if (existingCustomer) {
       customerId = existingCustomer.id;
+      hasSmsConsent = existingCustomer.sms_consent ?? false;
     } else {
       const { data: newCustomer, error: custErr } = await supabase
         .from('customers')
@@ -240,9 +244,11 @@ export async function POST(request: NextRequest) {
           first_name: firstName,
           last_name: lastName,
           phone: e164Phone,
+          sms_consent: true, // Implied consent — customer initiated phone call
         })
         .select('id')
         .single();
+      hasSmsConsent = true;
 
       if (custErr || !newCustomer) {
         console.error('Customer creation failed:', custErr?.message);
@@ -325,6 +331,17 @@ export async function POST(request: NextRequest) {
         'Appointment services insertion failed:',
         junctionErr.message
       );
+    }
+
+    // Send SMS confirmation (non-blocking)
+    if (hasSmsConsent) {
+      const apptDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
+      });
+      sendSms(
+        e164Phone,
+        `Your appointment at Smart Details Auto Spa is confirmed! ${service.name} on ${apptDate} at ${time}. We look forward to seeing you! Reply STOP to opt out.`
+      ).catch((err) => console.error('Appointment SMS confirmation failed:', err));
     }
 
     // Log system message to conversation thread (non-blocking)

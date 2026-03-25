@@ -460,6 +460,7 @@ src/app/api/voice-agent/appointments/route.ts
 src/app/api/voice-agent/availability/route.ts
 src/app/api/voice-agent/context/route.ts
 src/app/api/voice-agent/customers/route.ts
+src/app/api/voice-agent/initiation/route.ts
 src/app/api/voice-agent/quotes/route.ts
 src/app/api/voice-agent/services/route.ts
 src/app/api/waitlist/[id]/route.ts
@@ -887,6 +888,7 @@ src/lib/services/messaging-ai-prompt.ts
 src/lib/services/messaging-ai.ts
 src/lib/services/conversation-summary.ts
 src/lib/services/page-content-extractor.ts
+src/lib/services/service-resolver.ts
 src/lib/services/shippo.ts
 ```
 

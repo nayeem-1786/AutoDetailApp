@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: voice agent — conversation initiation, auto-quote after calls, SMS confirmations — 2026-03-25
+
+Three voice agent enhancements:
+
+**Fix 1 — Conversation Initiation Webhook:**
+- **New:** `POST /api/voice-agent/initiation` — ElevenLabs calls this during ring period. Returns `conversation_initiation_client_data` with customer profile summary and personalized first_message. Known customers get "Hey Nayeem, welcome back!" with vehicle/appointment/loyalty context. Unknown callers get generic greeting. Lean parallel queries for < 5s response.
+
+**Fix 2 — Auto-Quote After Call Ends:**
+- Enhanced `POST /api/webhooks/elevenlabs/call-complete` with post-call processing
+- Claude Haiku extracts services discussed, vehicle info, booking status, and interest level from transcript
+- If services discussed + no booking + interested → auto-creates quote via `createQuote()`, sends SMS with quote link
+- If appointment booked → sends SMS confirmation
+- **New:** `src/lib/services/service-resolver.ts` — extracted `resolveServiceByName()` and `resolvePrice()` into shared module (was duplicated in Twilio inbound webhook)
+
+**Fix 3 — SMS Confirmation After Appointment Booking:**
+- `POST /api/voice-agent/appointments` now sends SMS confirmation after successful booking
+- Checks `sms_consent` before sending. New customers created from phone calls get `sms_consent: true` (implied consent from initiating contact)
+- Format: "Your appointment at Smart Details Auto Spa is confirmed! [Service] on [Date] at [Time]."
+
+**Bonus — `send_sms` string truthiness fix:**
+- `/api/voice-agent/quotes` now normalizes `send_sms` to boolean (`true` or `"true"` → true, anything else → false). Previously string `"false"` was truthy.
+
+---
+
 ## fix: voice-agent services endpoint returns empty pricing for 14 services — 2026-03-24
 
 `/api/voice-agent/services` only joined `service_pricing` (tier-based). Services with `flat`, `per_unit`, or `custom` pricing models store prices on the `services` table itself, not in `service_pricing`. Result: `pricing: []` for 14 services, causing the voice agent to hallucinate or say it doesn't know the price.
