@@ -590,6 +590,7 @@ idx_refund_items_refund — btree (refund_id)
 | phone_number | TEXT | NOT NULL | |
 | customer_id | UUID | FK → customers(id) | |
 | status | TEXT | CHECK ('open','closed','archived') | |
+| last_channel | TEXT | NOT NULL, DEFAULT 'sms', CHECK ('sms','voice') | Last channel used in conversation |
 | summary | TEXT | | AI-generated conversation summary for cross-session memory |
 | summary_updated_at | TIMESTAMPTZ | | When the summary was last generated |
 | created_at | TIMESTAMPTZ | | |
@@ -601,6 +602,8 @@ idx_refund_items_refund — btree (refund_id)
 | id | UUID | PK | |
 | body | TEXT | NOT NULL | |
 | status | TEXT | CHECK ('sent','delivered','failed','received') | |
+| channel | TEXT | NOT NULL, DEFAULT 'sms', CHECK ('sms','voice') | SMS or voice call |
+| voice_duration_seconds | INTEGER | | Duration of voice call in seconds |
 | created_at | TIMESTAMPTZ | | |
 
 ### marketing_consent_log

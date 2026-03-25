@@ -399,6 +399,7 @@ export async function POST(request: NextRequest) {
             sender_type: 'customer',
             twilio_sid: messageSid,
             status: 'received',
+            channel: 'sms',
           });
 
           // Log system message
@@ -409,6 +410,7 @@ export async function POST(request: NextRequest) {
             body: `Customer sent "${body}" — ${action} SMS`,
             sender_type: 'system',
             status: 'received',
+            channel: 'sms',
           });
 
           // Update AI status on conversation
@@ -489,6 +491,7 @@ export async function POST(request: NextRequest) {
           body: 'Conversation reopened — customer re-engaged',
           sender_type: 'system',
           status: 'delivered',
+          channel: 'sms',
         });
       }
     }
@@ -504,6 +507,7 @@ export async function POST(request: NextRequest) {
       sender_type: 'customer',
       twilio_sid: messageSid,
       status: 'received',
+      channel: 'sms',
     });
 
     // -------------------------------------------------------------------
@@ -912,6 +916,7 @@ export async function POST(request: NextRequest) {
           sender_type: 'ai',
           twilio_sid: smsResult.success ? smsResult.sid : null,
           status: smsResult.success ? 'sent' : 'failed',
+          channel: 'sms',
         });
       }
 

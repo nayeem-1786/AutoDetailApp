@@ -33,6 +33,7 @@ export type EmployeeStatus = 'active' | 'inactive' | 'terminated';
 export type CustomerType = 'enthusiast' | 'professional';
 export type ConversationStatus = 'open' | 'closed' | 'archived';
 export type MessageDirection = 'inbound' | 'outbound';
+export type MessageChannel = 'sms' | 'voice';
 export type MessageSenderType = 'customer' | 'staff' | 'ai' | 'system';
 export type MessageStatus = 'sent' | 'delivered' | 'failed' | 'received';
 
@@ -855,8 +856,11 @@ export interface Conversation {
   status: ConversationStatus;
   last_message_at: string | null;
   last_message_preview: string | null;
+  last_channel: MessageChannel;
   unread_count: number;
   assigned_to: string | null;
+  summary: string | null;
+  summary_updated_at: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations
@@ -874,6 +878,8 @@ export interface Message {
   sent_by: string | null;
   twilio_sid: string | null;
   status: MessageStatus;
+  channel: MessageChannel;
+  voice_duration_seconds: number | null;
   created_at: string;
   // Joined
   sender?: Employee;

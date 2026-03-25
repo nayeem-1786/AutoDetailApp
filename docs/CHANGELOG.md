@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: cross-channel bridge — unified SMS + voice conversation threads (Phase 3/5) — 2026-03-24
+
+Voice calls and SMS now share a single conversation thread per phone number. A customer who texts about ceramic coating and calls three days later is recognized with full context.
+
+- **New columns:** `messages.channel` ('sms'|'voice'), `messages.voice_duration_seconds`, `conversations.last_channel` ('sms'|'voice')
+- **New:** `POST /api/webhooks/elevenlabs/call-complete` — after-call webhook ingests call summary/transcript into conversation thread with `channel: 'voice'`, triggers conversation summary regeneration
+- **New:** `GET /api/voice-agent/context?phone=X` — unified context endpoint returns customer profile + vehicles + appointments + quotes + loyalty + conversation history (both channels) + summary in one call
+- **Voice agent actions logged:** Appointment creation and quote creation via `/api/voice-agent/*` now log system messages to the conversation thread (e.g., "Appointment booked via phone: Ceramic Coating on Mar 28")
+- **All SMS message inserts** now include `channel: 'sms'` (6 insert sites updated across inbound webhook, staff messages, and conversation status changes)
+- **Types updated:** `Message` and `Conversation` interfaces extended with channel fields; new `MessageChannel` type
+- **Admin messaging:** Optimistic message includes new channel fields
+
+---
+
 ## feat: conversation summaries for cross-session AI memory (Phase 2/5) — 2026-03-24
 
 AI-generated conversation summaries persist key facts across sessions so the auto-responder maintains context even when conversations span days/weeks or exceed the 30-message window.

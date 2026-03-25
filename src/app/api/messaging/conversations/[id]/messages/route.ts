@@ -129,6 +129,7 @@ export async function POST(
       sent_by: employee.id,
       twilio_sid: twilioSid,
       status: messageStatus,
+      channel: 'sms',
     })
     .select('*, sender:employees!sent_by(id, first_name, last_name)')
     .single();

@@ -433,6 +433,7 @@ src/app/api/staff/schedules/route.ts
 ### Webhooks
 ```
 src/app/api/webhooks/mailgun/route.ts
+src/app/api/webhooks/elevenlabs/call-complete/route.ts
 src/app/api/webhooks/stripe/route.ts
 src/app/api/webhooks/twilio/inbound/route.ts
 src/app/api/webhooks/twilio/status/route.ts
@@ -456,6 +457,7 @@ src/app/api/t/[code]/route.ts
 src/app/api/unsubscribe/[customerId]/route.ts
 src/app/api/voice-agent/appointments/route.ts
 src/app/api/voice-agent/availability/route.ts
+src/app/api/voice-agent/context/route.ts
 src/app/api/voice-agent/customers/route.ts
 src/app/api/voice-agent/quotes/route.ts
 src/app/api/voice-agent/services/route.ts
@@ -1349,6 +1351,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260323000001_create_print_jobs.sql
 20260324000001_move_photo_gallery_to_operations.sql
 20260324000002_conversation_summaries.sql
+20260324000003_cross_channel_bridge.sql
 ```
 
 ---

@@ -327,6 +327,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Log system message to conversation thread (non-blocking)
+    logVoiceAction(supabase, e164Phone, `Appointment booked via phone: ${service.name} on ${date} at ${time}`).catch(() => {});
+
     // Fire webhook (non-blocking)
     fireWebhook(
       'booking_created',
@@ -405,4 +408,36 @@ function splitName(fullName: string): {
     firstName: trimmed.slice(0, lastSpaceIdx),
     lastName: trimmed.slice(lastSpaceIdx + 1),
   };
+}
+
+async function logVoiceAction(
+  supabase: ReturnType<typeof createAdminClient>,
+  phone: string,
+  body: string
+) {
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('phone_number', phone)
+    .maybeSingle();
+
+  if (!conv) return;
+
+  await supabase.from('messages').insert({
+    conversation_id: conv.id,
+    direction: 'outbound',
+    body,
+    sender_type: 'system',
+    status: 'delivered',
+    channel: 'voice',
+  });
+
+  await supabase
+    .from('conversations')
+    .update({
+      last_message_at: new Date().toISOString(),
+      last_message_preview: body.substring(0, 200),
+      last_channel: 'voice',
+    })
+    .eq('id', conv.id);
 }

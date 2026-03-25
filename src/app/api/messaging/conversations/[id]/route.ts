@@ -68,6 +68,7 @@ export async function PATCH(
         body: `Conversation ${action} by ${staffName}`,
         sender_type: 'system',
         status: 'delivered',
+        channel: 'sms',
       });
     }
 

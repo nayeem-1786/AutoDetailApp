@@ -266,6 +266,10 @@ export async function POST(request: NextRequest) {
       console.error('Quote items insertion failed:', itemsErr.message);
     }
 
+    // Log system message to conversation thread (non-blocking)
+    const serviceNames = quoteItems.map((i) => i.item_name).join(', ');
+    logVoiceAction(supabase, e164Phone, `Quote ${quote.quote_number} created via phone: ${serviceNames} — $${Number(quote.total_amount).toFixed(2)}`).catch(() => {});
+
     // Fire webhook (non-blocking)
     const webhookEvent = send_sms ? 'quote_sent' : 'quote_created';
     fireWebhook(
@@ -349,4 +353,36 @@ function splitName(fullName: string): {
     firstName: trimmed.slice(0, lastSpaceIdx),
     lastName: trimmed.slice(lastSpaceIdx + 1),
   };
+}
+
+async function logVoiceAction(
+  supabase: ReturnType<typeof createAdminClient>,
+  phone: string,
+  body: string
+) {
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('phone_number', phone)
+    .maybeSingle();
+
+  if (!conv) return;
+
+  await supabase.from('messages').insert({
+    conversation_id: conv.id,
+    direction: 'outbound',
+    body,
+    sender_type: 'system',
+    status: 'delivered',
+    channel: 'voice',
+  });
+
+  await supabase
+    .from('conversations')
+    .update({
+      last_message_at: new Date().toISOString(),
+      last_message_preview: body.substring(0, 200),
+      last_channel: 'voice',
+    })
+    .eq('id', conv.id);
 }
