@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
-    const body = await request.json();
+const body = await request.json();
     const {
       customer_name,
       customer_phone,
@@ -31,14 +31,16 @@ export async function POST(request: NextRequest) {
     } = body as {
       customer_name: string;
       customer_phone: string;
-      services: QuoteServiceInput[];
+      services: QuoteServiceInput[] | string;
       vehicle_year?: number;
       vehicle_make?: string;
       vehicle_model?: string;
       vehicle_color?: string;
       notes?: string;
-      send_sms?: boolean;
+      send_sms?: boolean | string;
     };
+
+    const serviceInputs = typeof rawServices === 'string' ? JSON.parse(rawServices) : rawServices;
 
     // Validate required fields
     const serviceInputs = typeof rawServices === "string" ? JSON.parse(rawServices) : rawServices;
