@@ -25,6 +25,13 @@ function formatDuration(seconds: number): string {
  */
 function NotificationBar({ message }: { message: Message }) {
   const isVoice = message.channel === 'voice';
+
+  // Strip the "Phone call (X:XX)\n" prefix from body when we render duration separately
+  let displayBody = message.body;
+  if (isVoice && message.voice_duration_seconds != null) {
+    displayBody = displayBody.replace(/^Phone call\s*\(\d+:\d+\)\s*\n?/, '');
+  }
+
   return (
     <div className="flex justify-center py-1.5">
       <div className="max-w-[85%] rounded-md bg-gray-50 px-3 py-1.5">
@@ -34,10 +41,10 @@ function NotificationBar({ message }: { message: Message }) {
             {isVoice && message.voice_duration_seconds != null && (
               <span className="font-medium text-gray-600">
                 Phone call ({formatDuration(message.voice_duration_seconds)})
-                {message.body.includes('Summary:') ? ' — ' : '\n'}
+                {displayBody ? ' — ' : ''}
               </span>
             )}
-            {message.body}
+            {displayBody}
           </p>
           <span className="shrink-0 text-[10px] text-gray-400">{formatMessageTime(message.created_at)}</span>
         </div>

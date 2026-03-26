@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       sent_by: employee.id,
       twilio_sid: twilioSid,
       status: messageStatus,
+      channel: 'sms',
     })
     .select()
     .single();
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest) {
     .update({
       last_message_at: new Date().toISOString(),
       last_message_preview: messageBody.substring(0, 200),
+      last_channel: 'sms',
       unread_count: 0,
     })
     .eq('id', conversation_id);

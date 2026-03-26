@@ -142,6 +142,7 @@ export async function POST(
   const updates: Record<string, unknown> = {
     last_message_at: new Date().toISOString(),
     last_message_preview: messageBody.slice(0, 100),
+    last_channel: 'sms',
   };
 
   // Reopen if closed

@@ -78,7 +78,8 @@ export async function generateConversationSummary(
     });
 
     if (!response.ok) {
-      console.error('[ConvSummary] Anthropic API error:', response.status);
+      const errBody = await response.text().catch(() => 'unable to read body');
+      console.error('[ConvSummary] Anthropic API error:', response.status, errBody);
       return null;
     }
 

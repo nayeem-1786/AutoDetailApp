@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Messaging audit — 7 issues across SMS/voice flows — 2026-03-26
+
+End-to-end messaging audit after voice agent integration. Fixed:
+
+1. `last_channel` not updated to `'sms'` on inbound SMS — conversation row kept showing phone icon after customer texted
+2. `last_channel` not updated to `'sms'` on staff reply (both `/api/messaging/send` and `/api/messaging/conversations/[id]/messages`)
+3. `channel: 'sms'` not explicitly set on staff message insert in `/api/messaging/send` (relied on DB default)
+4. "Conversation reopened" system message used `channel: 'sms'` — rendered as Auto SMS bubble instead of notification bar. Changed to `channel: 'voice'`
+5. AI auto-reply context included system messages (auto-quote notes, reopen notices). Added `.neq('sender_type', 'system')` filter matching conversation-summary.ts pattern
+6. Conversation summary error logging didn't include response body — added `response.text()` on 400 errors for diagnostics
+7. Voice notification bar doubled "Phone call (X:XX)" prefix — `buildCallMessage()` prepends it AND the UI rendered it again. Now strips prefix from body when duration is rendered separately
+
+---
+
 ## fix: Admin Messaging — distinguish chat bubbles from system notifications — 2026-03-26
 
 System-sent SMS (auto-quote links, appointment confirmations) rendered as tiny centered gray text instead of proper chat bubbles. Voice call logs rendered as amber bubbles instead of notification bars.

@@ -407,6 +407,7 @@ export async function POST(request: NextRequest) {
       const updates: Record<string, unknown> = {
         last_message_at: new Date().toISOString(),
         last_message_preview: body.substring(0, 200),
+        last_channel: 'sms',
         unread_count: (conversation.unread_count || 0) + 1,
         status: 'open',
       };
@@ -420,6 +421,7 @@ export async function POST(request: NextRequest) {
         .eq('id', conversation.id);
 
       // Insert system message when a closed/archived conversation is reopened
+      // Use channel 'voice' so it renders as a notification bar, not a chat bubble
       if (wasClosedOrArchived) {
         await admin.from('messages').insert({
           conversation_id: conversation.id,
@@ -427,7 +429,7 @@ export async function POST(request: NextRequest) {
           body: 'Conversation reopened — customer re-engaged',
           sender_type: 'system',
           status: 'delivered',
-          channel: 'sms',
+          channel: 'voice',
         });
       }
     }
@@ -498,6 +500,7 @@ export async function POST(request: NextRequest) {
             .from('messages')
             .select('*')
             .eq('conversation_id', conversation.id)
+            .neq('sender_type', 'system')
             .order('created_at', { ascending: true })
             .limit(30);
 
