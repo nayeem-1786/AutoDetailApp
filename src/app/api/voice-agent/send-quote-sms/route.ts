@@ -129,8 +129,6 @@ export async function POST(request: NextRequest) {
           last_name: lastName || '',
           phone: normalizedPhone,
           sms_consent: true,
-          sms_consent_date: new Date().toISOString(),
-          sms_consent_source: 'voice_call',
         })
         .select('id, sms_consent')
         .single();

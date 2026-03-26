@@ -313,8 +313,6 @@ async function autoGenerateQuote(
           last_name: lastName,
           phone,
           sms_consent: true,
-          sms_consent_date: new Date().toISOString(),
-          sms_consent_source: 'voice_call',
         })
         .select('id')
         .single();
