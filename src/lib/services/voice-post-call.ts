@@ -18,6 +18,7 @@ export interface ProcessVoiceCallParams {
   servicesDiscussed?: string[];
   appointmentBooked?: boolean;
   customerInterest?: string;
+  customerName?: string;
   durationSeconds?: number;
   elevenlabsConversationId?: string;
   source: 'tool' | 'poll' | 'webhook';
@@ -140,13 +141,22 @@ export async function processVoiceCallEnd(
   const appointmentBooked = params.appointmentBooked === true;
   const customerInterest = params.customerInterest || 'interested';
 
+  console.log(
+    `[VoicePostCall] Processing voice call end for ${normalizedPhone},` +
+    ` services: [${servicesDiscussed.join(', ')}],` +
+    ` interest: ${customerInterest},` +
+    ` booked: ${appointmentBooked}`
+  );
+
   if (appointmentBooked) {
     // Send confirmation SMS
+    console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: appointment already booked`);
     if (customer?.sms_consent) {
       const biz = await getBusinessInfo();
       const name = customer.first_name ? `, ${customer.first_name}` : '';
       const smsBody = `Thanks for calling ${biz.name}${name}! Your appointment is confirmed. We look forward to seeing you! Reply STOP to opt out.`;
-      await sendSms(normalizedPhone, smsBody);
+      const smsResult = await sendSms(normalizedPhone, smsBody);
+      console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
 
       await admin.from('messages').insert({
         conversation_id: conversation.id,
@@ -156,30 +166,49 @@ export async function processVoiceCallEnd(
         status: 'delivered',
         channel: 'sms',
       });
-    }
-  } else if (
-    servicesDiscussed.length > 0 &&
-    customerInterest !== 'not_interested' &&
-    !params.skipAutoQuote
-  ) {
-    // Check for recent quotes sent in the last 10 minutes (dedup with send_quote_sms)
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const { data: recentQuotes } = await admin
-      .from('quotes')
-      .select('id')
-      .eq('customer_id', customer?.id || '')
-      .gte('created_at', tenMinutesAgo)
-      .limit(1);
-
-    if (recentQuotes && recentQuotes.length > 0) {
-      console.log('[VoicePostCall] Skipping auto-quote — recent quote exists');
     } else {
+      console.log(`[VoicePostCall] SMS send result: skipped — no SMS consent (customer: ${customer?.id || 'not found'})`);
+    }
+  } else if (servicesDiscussed.length === 0) {
+    console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: no services discussed`);
+  } else if (customerInterest === 'not_interested') {
+    console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: customer not interested`);
+  } else if (params.skipAutoQuote) {
+    console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: skipAutoQuote flag set`);
+  } else {
+    // Check for recent quotes sent in the last 10 minutes (dedup with send_quote_sms)
+    if (customer?.id) {
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: recentQuotes } = await admin
+        .from('quotes')
+        .select('id')
+        .eq('customer_id', customer.id)
+        .gte('created_at', tenMinutesAgo)
+        .limit(1);
+
+      if (recentQuotes && recentQuotes.length > 0) {
+        console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: recent quote exists (last 10min)`);
+      } else {
+        console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, customer interested, no recent quote`);
+        await autoGenerateQuote(
+          admin,
+          normalizedPhone,
+          servicesDiscussed,
+          customer.id,
+          conversation.id,
+          params.customerName
+        );
+      }
+    } else {
+      // No existing customer — create one and send auto-quote
+      console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, customer interested, new caller (will create customer)`);
       await autoGenerateQuote(
         admin,
         normalizedPhone,
         servicesDiscussed,
-        customer?.id || null,
-        conversation.id
+        null,
+        conversation.id,
+        params.customerName
       );
     }
   }
@@ -219,7 +248,8 @@ async function autoGenerateQuote(
   phone: string,
   servicesDiscussed: string[],
   customerId: string | null,
-  conversationId: string
+  conversationId: string,
+  customerName?: string
 ) {
   // Resolve service names to IDs
   const quoteItems: Array<{
@@ -251,9 +281,12 @@ async function autoGenerateQuote(
     });
   }
 
-  if (quoteItems.length === 0) return;
+  if (quoteItems.length === 0) {
+    console.log('[VoicePostCall] Auto-quote aborted — no services resolved to valid IDs');
+    return;
+  }
 
-  // Need a customer to create a quote
+  // Find or create customer
   let custId = customerId;
   if (!custId) {
     const { data: existing } = await admin
@@ -267,8 +300,31 @@ async function autoGenerateQuote(
     if (existing) {
       custId = existing.id;
     } else {
-      console.log('[VoicePostCall] Skipping auto-quote — unknown caller, no name available');
-      return;
+      // Create fallback customer — a quote with a generic name is better than no quote
+      const fallbackName = customerName?.trim() || 'Phone Caller';
+      const nameParts = fallbackName.split(/\s+/);
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || null;
+
+      const { data: newCust, error: custErr } = await admin
+        .from('customers')
+        .insert({
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+          sms_consent: true,
+          sms_consent_date: new Date().toISOString(),
+          sms_consent_source: 'voice_call',
+        })
+        .select('id')
+        .single();
+
+      if (custErr || !newCust) {
+        console.error('[VoicePostCall] Failed to create fallback customer:', custErr);
+        return;
+      }
+      custId = newCust.id;
+      console.log(`[VoicePostCall] Created fallback customer "${firstName} ${lastName || ''}" for ${phone}`);
     }
   }
 
@@ -321,7 +377,8 @@ async function autoGenerateQuote(
     if (custCheck?.sms_consent) {
       const biz = await getBusinessInfo();
       const quoteSmsBody = `Thanks for calling ${biz.name}! Here's a quote for what we discussed: ${linkUrl}\n\nReply STOP to opt out.`;
-      await sendSms(phone, quoteSmsBody);
+      const smsResult = await sendSms(phone, quoteSmsBody);
+      console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
 
       await admin.from('messages').insert({
         conversation_id: conversationId,
@@ -331,6 +388,8 @@ async function autoGenerateQuote(
         status: 'delivered',
         channel: 'sms',
       });
+    } else {
+      console.log(`[VoicePostCall] SMS send result: skipped — no SMS consent (customer: ${custId})`);
     }
 
     // Log system note

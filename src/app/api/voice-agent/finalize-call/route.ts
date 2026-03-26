@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       phone,
+      customer_name,
       transcript_summary,
       services_discussed,
       appointment_booked,
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest) {
       elevenlabs_conversation_id,
     } = body as {
       phone: string;
+      customer_name?: string;
       transcript_summary?: string;
       services_discussed?: string; // comma-separated
       appointment_booked?: boolean | string;
@@ -50,6 +52,7 @@ export async function POST(request: NextRequest) {
 
     const result = await processVoiceCallEnd({
       phone,
+      customerName: customer_name,
       transcriptSummary: transcript_summary,
       servicesDiscussed: servicesArr,
       appointmentBooked,

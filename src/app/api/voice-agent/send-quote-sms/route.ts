@@ -110,10 +110,16 @@ export async function POST(request: NextRequest) {
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
-    } else if (customer_name) {
-      // Parse name
-      const nameParts = customer_name.trim().split(/\s+/);
-      const firstName = nameParts[0] || 'Customer';
+    } else {
+      // Determine name — use provided name if real, otherwise fallback
+      const GENERIC_NAMES = ['new customer', 'customer', 'unknown', 'caller', 'phone caller'];
+      const nameIsGeneric = !customer_name
+        || customer_name.trim().length === 0
+        || GENERIC_NAMES.includes(customer_name.trim().toLowerCase());
+
+      const finalName = nameIsGeneric ? 'Phone Caller' : customer_name!.trim();
+      const nameParts = finalName.split(/\s+/);
+      const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(' ') || null;
 
       const { data: newCustomer } = await admin
@@ -131,13 +137,15 @@ export async function POST(request: NextRequest) {
 
       if (newCustomer) {
         customerId = newCustomer.id;
+        console.log(`[SendQuoteSMS] Created customer "${firstName} ${lastName || ''}" for ${normalizedPhone}`);
       }
     }
 
     if (!customerId) {
+      console.error(`[SendQuoteSMS] Failed to find or create customer for ${normalizedPhone}`);
       return NextResponse.json(
-        { error: 'Could not find or create customer — name required for new callers' },
-        { status: 400 }
+        { error: 'Failed to create customer record' },
+        { status: 500 }
       );
     }
 
