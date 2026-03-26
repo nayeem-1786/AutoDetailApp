@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (insertError) {
-        console.error(`[SendQuoteSMS] Customer insert error:`, insertError);
+        console.error(`[SendQuoteSMS] Insert error detail:`, JSON.stringify(insertError));
       }
 
       if (newCustomer) {
