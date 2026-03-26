@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Admin Messaging — distinguish chat bubbles from system notifications — 2026-03-26
+
+System-sent SMS (auto-quote links, appointment confirmations) rendered as tiny centered gray text instead of proper chat bubbles. Voice call logs rendered as amber bubbles instead of notification bars.
+
+- System SMS (`sender_type: 'system'` + `channel: 'sms'`) now renders as right-aligned chat bubbles with "Auto" bot badge
+- Voice channel messages and non-SMS system events render as centered notification bars (gray background, inline timestamp)
+- Removed amber bubble treatment for voice messages — they're log entries, not conversations
+
+---
+
 ## feat: post-call data ingestion — agent tools + polling fallback — 2026-03-25
 
 ElevenLabs post-call webhook never fires reliably. Implemented three-layer ingestion:
