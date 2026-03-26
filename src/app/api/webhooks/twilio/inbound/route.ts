@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
     // 1. Validate Twilio signature (ALWAYS — security)
     // -------------------------------------------------------------------
     const twilioSignature = request.headers.get('x-twilio-signature') || '';
-    const requestUrl = request.url;
+    const requestUrl = process.env.TWILIO_WEBHOOK_URL || request.url;
     const skipSignatureValidation = process.env.NODE_ENV === 'development';
 
     if (!skipSignatureValidation && !validateTwilioSignature(requestUrl, params, twilioSignature)) {
