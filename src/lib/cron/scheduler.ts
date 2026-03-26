@@ -116,6 +116,7 @@ export function setupCronJobs() {
     { name: 'cleanup-audit-log', expr: '30 11 * * *', fn: () => runJob('cleanup-audit-log', '/api/cron/cleanup-audit-log') },
     { name: 'booking-reminders', expr: '0 16 * * *', fn: () => runJob('booking-reminders', '/api/cron/booking-reminders') },
     { name: 'conversation-summaries', expr: '0 */6 * * *', fn: () => runJob('conversation-summaries', '/api/cron/conversation-summaries') },
+    { name: 'voice-calls-poll', expr: '*/5 * * * *', fn: () => runJob('voice-calls-poll', '/api/cron/voice-calls-poll') },
   ];
 
   // Stagger task starts 2s apart to avoid aligned schedule bursts
@@ -138,4 +139,5 @@ export function setupCronJobs() {
   console.log('  - cleanup-audit-log: daily at 3:30 AM PST');
   console.log('  - booking-reminders: daily at 8:00 AM PST');
   console.log('  - conversation-summaries: every 6 hours');
+  console.log('  - voice-calls-poll: every 5 minutes');
 }

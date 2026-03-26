@@ -195,11 +195,12 @@ All core build phases complete. App is in active daily use with ongoing refineme
 | Order cleanup | Every 6 hours | `/api/cron/cleanup-orders` |
 | Booking reminders | Daily 8 AM PST | `/api/cron/booking-reminders` |
 | Conversation summaries | Every 6 hours | `/api/cron/conversation-summaries` |
+| Voice calls poll | Every 5 min | `/api/cron/voice-calls-poll` |
 | Audit log cleanup | Daily 3:30 AM PST | `/api/cron/cleanup-audit-log` |
 
 ## Production Env Vars (Required)
 
-`NEXT_PUBLIC_APP_URL`, `TWILIO_WEBHOOK_URL`, `MAILGUN_WEBHOOK_SIGNING_KEY`, `ANTHROPIC_API_KEY`, `CRON_API_KEY`, `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `ELEVENLABS_WEBHOOK_SECRET`
+`NEXT_PUBLIC_APP_URL`, `TWILIO_WEBHOOK_URL`, `MAILGUN_WEBHOOK_SIGNING_KEY`, `ANTHROPIC_API_KEY`, `CRON_API_KEY`, `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `ELEVENLABS_WEBHOOK_SECRET`, `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`
 
 ## Reference Docs
 

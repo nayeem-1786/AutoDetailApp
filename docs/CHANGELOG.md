@@ -4,6 +4,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: post-call data ingestion — agent tools + polling fallback — 2026-03-25
+
+ElevenLabs post-call webhook never fires reliably. Implemented three-layer ingestion:
+
+1. **`send_quote_sms` tool** (`POST /api/voice-agent/send-quote-sms`) — mid-call tool for texting quote links when customer requests pricing. Creates quote, generates short link, sends SMS, logs to conversation.
+2. **`finalize_call` tool** (`POST /api/voice-agent/finalize-call`) — end-of-call tool the agent MUST call before hanging up. Logs call summary, triggers auto-quote/confirmation SMS.
+3. **Polling cron** (`GET /api/cron/voice-calls-poll`) — every 5 minutes, polls ElevenLabs API for unprocessed calls as safety net.
+
+All three paths + existing webhook use shared `processVoiceCallEnd()` in `src/lib/services/voice-post-call.ts`. Dedup via `voice_call_log` table (unique on `elevenlabs_conversation_id`, source tracking).
+
+Key design decisions:
+- All service parameters use comma-separated strings (not arrays) — ElevenLabs has proven unreliable with JSON array formatting
+- Boolean normalization for `appointment_booked` (may arrive as `"true"` string)
+- 10-minute window dedup between `send_quote_sms` and `finalize_call` auto-quote to prevent duplicate quotes
+- Refactored `call-complete` webhook to use shared processing logic
+
+New files: migration (`voice_call_log`), `voice-post-call.ts`, `send-quote-sms/route.ts`, `finalize-call/route.ts`, `voice-calls-poll/route.ts`
+Edited: `call-complete/route.ts` (shared logic), `scheduler.ts` (new cron), `VOICE_AGENT.md`, `FILE_TREE.md`
+
+New env vars needed: `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`
+
+---
+
 ## fix: ElevenLabs call-complete webhook — HMAC signature verification — 2026-03-25
 
 ElevenLabs post-call webhooks use HMAC-SHA256 signature in `ElevenLabs-Signature` header, not Bearer token. The endpoint was rejecting all webhook calls with 401.

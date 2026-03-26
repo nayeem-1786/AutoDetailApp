@@ -276,6 +276,7 @@ src/app/api/cron/booking-reminders/route.ts
 src/app/api/cron/quote-reminders/route.ts
 src/app/api/cron/stock-alerts/route.ts
 src/app/api/cron/theme-activation/route.ts
+src/app/api/cron/voice-calls-poll/route.ts
 ```
 
 ### Customer Portal API
@@ -460,8 +461,10 @@ src/app/api/voice-agent/appointments/route.ts
 src/app/api/voice-agent/availability/route.ts
 src/app/api/voice-agent/context/route.ts
 src/app/api/voice-agent/customers/route.ts
+src/app/api/voice-agent/finalize-call/route.ts
 src/app/api/voice-agent/initiation/route.ts
 src/app/api/voice-agent/quotes/route.ts
+src/app/api/voice-agent/send-quote-sms/route.ts
 src/app/api/voice-agent/services/route.ts
 src/app/api/waitlist/[id]/route.ts
 src/app/api/waitlist/route.ts
@@ -889,6 +892,7 @@ src/lib/services/messaging-ai.ts
 src/lib/services/conversation-summary.ts
 src/lib/services/page-content-extractor.ts
 src/lib/services/service-resolver.ts
+src/lib/services/voice-post-call.ts
 src/lib/services/shippo.ts
 ```
 
@@ -1355,6 +1359,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260324000001_move_photo_gallery_to_operations.sql
 20260324000002_conversation_summaries.sql
 20260324000003_cross_channel_bridge.sql
+20260325000001_voice_call_log.sql
 ```
 
 ---
