@@ -120,13 +120,13 @@ export async function POST(request: NextRequest) {
       const finalName = nameIsGeneric ? 'Phone Caller' : customer_name!.trim();
       const nameParts = finalName.split(/\s+/);
       const firstName = nameParts[0];
-      const lastName = nameParts.slice(1).join(' ') || null;
+      const lastName = nameParts.slice(1).join(' ') || '';
 
-      const { data: newCustomer } = await admin
+      const { data: newCustomer, error: insertError } = await admin
         .from('customers')
         .insert({
           first_name: firstName,
-          last_name: lastName,
+          last_name: lastName || '',
           phone: normalizedPhone,
           sms_consent: true,
           sms_consent_date: new Date().toISOString(),
@@ -134,6 +134,10 @@ export async function POST(request: NextRequest) {
         })
         .select('id, sms_consent')
         .single();
+
+      if (insertError) {
+        console.error(`[SendQuoteSMS] Customer insert error:`, insertError);
+      }
 
       if (newCustomer) {
         customerId = newCustomer.id;

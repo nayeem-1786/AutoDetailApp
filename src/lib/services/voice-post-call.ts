@@ -304,7 +304,7 @@ async function autoGenerateQuote(
       const fallbackName = customerName?.trim() || 'Phone Caller';
       const nameParts = fallbackName.split(/\s+/);
       const firstName = nameParts[0];
-      const lastName = nameParts.slice(1).join(' ') || null;
+      const lastName = nameParts.slice(1).join(' ') || '';
 
       const { data: newCust, error: custErr } = await admin
         .from('customers')
