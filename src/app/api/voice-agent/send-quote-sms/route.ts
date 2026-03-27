@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     let customerId: string | null = null;
     const { data: existingCustomer } = await admin
       .from('customers')
-      .select('id, sms_consent')
+      .select('id, first_name, sms_consent')
       .eq('phone', normalizedPhone)
       .is('deleted_at', null)
       .limit(1)
@@ -110,6 +110,23 @@ export async function POST(request: NextRequest) {
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
+
+      // Update generic name with real name if available
+      const GENERIC_FIRST_NAMES = ['phone', 'new', 'customer', 'valued'];
+      if (
+        existingCustomer.first_name &&
+        GENERIC_FIRST_NAMES.includes(existingCustomer.first_name.toLowerCase()) &&
+        customer_name &&
+        customer_name.trim().length > 0 &&
+        !['new customer', 'customer', 'unknown', 'caller', 'phone caller'].includes(customer_name.trim().toLowerCase())
+      ) {
+        const nameParts = customer_name.trim().split(/\s+/);
+        await admin
+          .from('customers')
+          .update({ first_name: nameParts[0], last_name: nameParts.slice(1).join(' ') || '' })
+          .eq('id', existingCustomer.id);
+        console.log(`[SendQuoteSMS] Updated generic name to "${customer_name.trim()}" for ${normalizedPhone}`);
+      }
     } else {
       // Determine name — use provided name if real, otherwise fallback
       const GENERIC_NAMES = ['new customer', 'customer', 'unknown', 'caller', 'phone caller'];
@@ -151,22 +168,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create vehicle if provided
+    // Find or create vehicle — dedup by make + model (case-insensitive)
     let vehicleId: string | undefined;
     if (vehicle_make || vehicle_model) {
-      const { data: newVehicle } = await admin
+      let vehicleQuery = admin
         .from('vehicles')
-        .insert({
-          customer_id: customerId,
-          vehicle_type: 'standard',
-          year: vehicle_year || null,
-          make: vehicle_make || null,
-          model: vehicle_model || null,
-          color: vehicle_color || null,
-        })
         .select('id')
-        .single();
-      vehicleId = newVehicle?.id;
+        .eq('customer_id', customerId);
+
+      if (vehicle_make) vehicleQuery = vehicleQuery.ilike('make', vehicle_make);
+      if (vehicle_model) vehicleQuery = vehicleQuery.ilike('model', vehicle_model);
+
+      const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
+
+      if (existingVehicle) {
+        vehicleId = existingVehicle.id;
+      } else {
+        const { data: newVehicle } = await admin
+          .from('vehicles')
+          .insert({
+            customer_id: customerId,
+            vehicle_type: 'standard',
+            year: vehicle_year || null,
+            make: vehicle_make || null,
+            model: vehicle_model || null,
+            color: vehicle_color || null,
+          })
+          .select('id')
+          .single();
+        vehicleId = newVehicle?.id;
+      }
     }
 
     // Read quote validity

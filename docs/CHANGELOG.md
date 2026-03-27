@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Voice agent — vehicle dedup + generic customer name upgrade — 2026-03-26
+
+- `send-quote-sms`: check for existing vehicle by make+model (case-insensitive) before creating — prevents duplicate vehicle records on repeat calls
+- `send-quote-sms` + `voice-post-call`: when finding an existing customer with a generic name ("Phone", "New", etc.) and a real name is available, update the customer record with the real name
+
+---
+
 ## feat: Voice agent — enriched initiation context — 2026-03-26
 
 Expanded voice agent initiation webhook from compressed one-liner to full structured customer context. Now matches the SMS AI's context depth.

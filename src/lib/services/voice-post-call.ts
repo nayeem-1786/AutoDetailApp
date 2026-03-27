@@ -291,7 +291,7 @@ async function autoGenerateQuote(
   if (!custId) {
     const { data: existing } = await admin
       .from('customers')
-      .select('id')
+      .select('id, first_name')
       .eq('phone', phone)
       .is('deleted_at', null)
       .limit(1)
@@ -299,6 +299,22 @@ async function autoGenerateQuote(
 
     if (existing) {
       custId = existing.id;
+
+      // Update generic name with real name if available
+      const GENERIC_FIRST_NAMES = ['phone', 'new', 'customer', 'valued'];
+      if (
+        existing.first_name &&
+        GENERIC_FIRST_NAMES.includes(existing.first_name.toLowerCase()) &&
+        customerName &&
+        customerName.trim().length > 0
+      ) {
+        const nameParts = customerName.trim().split(/\s+/);
+        await admin
+          .from('customers')
+          .update({ first_name: nameParts[0], last_name: nameParts.slice(1).join(' ') || '' })
+          .eq('id', existing.id);
+        console.log(`[VoicePostCall] Updated generic name to "${customerName.trim()}" for ${phone}`);
+      }
     } else {
       // Create fallback customer — a quote with a generic name is better than no quote
       const fallbackName = customerName?.trim() || 'Phone Caller';
