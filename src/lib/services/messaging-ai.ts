@@ -434,8 +434,8 @@ INSTRUCTIONS FOR RETURNING CUSTOMERS:
 - Only ask for vehicle info if they mention a DIFFERENT vehicle not in their profile`;
   }
 
-  // Build message history for context (last 30 messages max)
-  const recentHistory = conversationHistory.slice(-30);
+  // Build message history for context (last 100 messages max)
+  const recentHistory = conversationHistory.slice(-100);
   const messages = recentHistory.map((msg) => ({
     role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
     content: msg.body,

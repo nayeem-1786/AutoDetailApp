@@ -41,7 +41,7 @@ const STOP_WORDS = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
 const START_WORDS = ['START', 'YES', 'UNSTOP'];
 
 /** Max AI auto-replies per conversation per hour */
-const MAX_AI_REPLIES_PER_HOUR = 10;
+const MAX_AI_REPLIES_PER_HOUR = 25;
 
 // -------------------------------------------------------------------
 // Auto-quote helpers
@@ -502,7 +502,7 @@ export async function POST(request: NextRequest) {
             .eq('conversation_id', conversation.id)
             .neq('sender_type', 'system')
             .order('created_at', { ascending: true })
-            .limit(30);
+            .limit(100);
 
           // Build customer context for known customers
           let customerCtx: CustomerContext | undefined;

@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Messaging — AI context, rate limit, nav badge polling, always-on polling — 2026-03-26
+
+- AI message context increased from 30 to 100 messages (both DB fetch and API slice)
+- AI rate limit increased from 10 to 25 replies per conversation per hour
+- Nav unread badge now polls every 15s (visibility-aware) — no longer stale when Realtime is down
+- Messaging page polling runs continuously regardless of Realtime state — fixes interval reset from Realtime flip-flop
+
+---
+
 ## fix: Messaging — polling fallback, message limit bug, smart auto-scroll — 2026-03-26
 
 Supabase Realtime fails with `CHANNEL_ERROR` / `UnableToConnectToProject` — platform issue outside our control. Added polling fallback so messaging works regardless.

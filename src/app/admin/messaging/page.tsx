@@ -454,11 +454,10 @@ export default function MessagingPage() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Polling fallback: when Realtime is disconnected, poll for updates
+  // Polling: always-on baseline. Realtime provides bonus instant delivery
+  // when it works, but polling runs continuously regardless.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (realtimeConnected) return;
-
     const msgInterval = setInterval(pollMessages, POLL_MESSAGES_MS);
     const convInterval = setInterval(pollConversations, POLL_CONVERSATIONS_MS);
 
@@ -466,7 +465,7 @@ export default function MessagingPage() {
       clearInterval(msgInterval);
       clearInterval(convInterval);
     };
-  }, [realtimeConnected, pollMessages, pollConversations]);
+  }, [pollMessages, pollConversations]);
 
   const handleStatusFilterChange = useCallback((status: ConversationStatus) => {
     setStatusFilter(status);

@@ -455,7 +455,12 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     // Initial fetch on mount
     fetchUnread();
 
-    // Realtime subscription — updates unread count when conversations change
+    // Poll every 15 seconds — Realtime is unreliable, polling is the baseline
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchUnread();
+    }, 15_000);
+
+    // Realtime subscription — bonus instant delivery when it works
     const supabase = createClient();
     const channel = supabase
       .channel('sidebar-unread')
@@ -468,6 +473,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
     return () => {
       abortController.abort();
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [employee, twoWaySmsEnabled]);
