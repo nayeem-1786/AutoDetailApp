@@ -26,6 +26,10 @@ export async function POST(request: NextRequest) {
       customer_interest,
       call_duration_seconds,
       elevenlabs_conversation_id,
+      vehicle_year,
+      vehicle_make,
+      vehicle_model,
+      vehicle_color,
     } = body as {
       phone: string;
       customer_name?: string;
@@ -35,6 +39,10 @@ export async function POST(request: NextRequest) {
       customer_interest?: string;
       call_duration_seconds?: number;
       elevenlabs_conversation_id?: string;
+      vehicle_year?: number | string;
+      vehicle_make?: string;
+      vehicle_model?: string;
+      vehicle_color?: string;
     };
 
     if (!phone) {
@@ -50,6 +58,11 @@ export async function POST(request: NextRequest) {
       ? services_discussed.split(',').map((s: string) => s.trim()).filter(Boolean)
       : [];
 
+    // Normalize vehicle_year — ElevenLabs may send as string
+    const parsedVehicleYear = vehicle_year
+      ? typeof vehicle_year === 'number' ? vehicle_year : parseInt(String(vehicle_year), 10) || undefined
+      : undefined;
+
     const result = await processVoiceCallEnd({
       phone,
       customerName: customer_name,
@@ -59,6 +72,10 @@ export async function POST(request: NextRequest) {
       customerInterest: customer_interest,
       durationSeconds: call_duration_seconds,
       elevenlabsConversationId: elevenlabs_conversation_id,
+      vehicleYear: parsedVehicleYear,
+      vehicleMake: vehicle_make,
+      vehicleModel: vehicle_model,
+      vehicleColor: vehicle_color,
       source: 'tool',
     });
 

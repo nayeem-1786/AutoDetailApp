@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: finalize_call — vehicle storage + reliable customer name upgrade — 2026-03-26
+
+- `finalize_call` now accepts optional vehicle params (year, make, model, color) — vehicles are saved even when no quote SMS was requested
+- Vehicle find-or-create uses make+model case-insensitive dedup (same pattern as send_quote_sms)
+- Generic customer name upgrade moved into main `processVoiceCallEnd` flow — was only in `autoGenerateQuote` which only runs when auto-quoting triggers. Now runs on every call regardless
+- ElevenLabs `finalize_call` tool needs 4 new optional string params: vehicle_year, vehicle_make, vehicle_model, vehicle_color
+
+---
+
 ## fix: Voice agent — vehicle dedup + generic customer name upgrade — 2026-03-26
 
 - `send-quote-sms`: check for existing vehicle by make+model (case-insensitive) before creating — prevents duplicate vehicle records on repeat calls

@@ -19,6 +19,10 @@ export interface ProcessVoiceCallParams {
   appointmentBooked?: boolean;
   customerInterest?: string;
   customerName?: string;
+  vehicleYear?: number;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
   durationSeconds?: number;
   elevenlabsConversationId?: string;
   source: 'tool' | 'poll' | 'webhook';
@@ -65,6 +69,50 @@ export async function processVoiceCallEnd(
     .is('deleted_at', null)
     .limit(1)
     .maybeSingle();
+
+  // Upgrade generic customer name if a real name is available
+  if (customer && params.customerName && params.customerName.trim().length > 0) {
+    const GENERIC_FIRST_NAMES = ['phone', 'new', 'customer', 'valued'];
+    if (
+      customer.first_name &&
+      GENERIC_FIRST_NAMES.includes(customer.first_name.toLowerCase())
+    ) {
+      const nameParts = params.customerName.trim().split(/\s+/);
+      const newFirst = nameParts[0];
+      const newLast = nameParts.slice(1).join(' ') || '';
+      await admin
+        .from('customers')
+        .update({ first_name: newFirst, last_name: newLast })
+        .eq('id', customer.id);
+      customer.first_name = newFirst;
+      console.log(`[VoicePostCall] Upgrading customer name from "${customer.first_name}" to "${params.customerName.trim()}" for ${normalizedPhone}`);
+    }
+  }
+
+  // Find or create vehicle if vehicle info provided
+  if (customer && (params.vehicleMake || params.vehicleModel)) {
+    let vehicleQuery = admin
+      .from('vehicles')
+      .select('id')
+      .eq('customer_id', customer.id);
+
+    if (params.vehicleMake) vehicleQuery = vehicleQuery.ilike('make', params.vehicleMake);
+    if (params.vehicleModel) vehicleQuery = vehicleQuery.ilike('model', params.vehicleModel);
+
+    const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
+
+    if (!existingVehicle) {
+      await admin.from('vehicles').insert({
+        customer_id: customer.id,
+        vehicle_type: 'standard',
+        year: params.vehicleYear || null,
+        make: params.vehicleMake || null,
+        model: params.vehicleModel || null,
+        color: params.vehicleColor || null,
+      });
+      console.log(`[VoicePostCall] Created vehicle ${params.vehicleYear || ''} ${params.vehicleMake || ''} ${params.vehicleModel || ''} for ${normalizedPhone}`);
+    }
+  }
 
   // Build the message body
   const messageBody = buildCallMessage(

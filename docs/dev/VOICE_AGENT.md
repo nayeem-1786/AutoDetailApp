@@ -244,12 +244,17 @@ Set the API key header on all tools: `Authorization: Bearer <key>`
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `phone` | string | Yes | Customer phone number |
+| `customer_name` | string | No | Customer's full name (upgrades generic names) |
 | `transcript_summary` | string | Yes | Brief summary of the conversation |
 | `services_discussed` | string | No | Comma-separated service names |
 | `appointment_booked` | boolean | Yes | Whether an appointment was confirmed |
 | `customer_interest` | string | Yes | `interested`, `maybe`, or `not_interested` |
 | `call_duration_seconds` | number | No | Duration of the call in seconds |
 | `elevenlabs_conversation_id` | string | No | ElevenLabs conversation ID for dedup |
+| `vehicle_year` | number | No | Vehicle year |
+| `vehicle_make` | string | No | Vehicle make |
+| `vehicle_model` | string | No | Vehicle model |
+| `vehicle_color` | string | No | Vehicle color |
 
 ### 4. Configure After-Call Webhook (Passive)
 
