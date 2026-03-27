@@ -23,6 +23,7 @@ export interface ProcessVoiceCallParams {
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleColor?: string;
+  customerType?: string;
   durationSeconds?: number;
   elevenlabsConversationId?: string;
   source: 'tool' | 'poll' | 'webhook';
@@ -64,7 +65,7 @@ export async function processVoiceCallEnd(
   // Find customer by phone
   const { data: customer } = await admin
     .from('customers')
-    .select('id, first_name, sms_consent')
+    .select('id, first_name, sms_consent, customer_type')
     .eq('phone', normalizedPhone)
     .is('deleted_at', null)
     .limit(1)
@@ -87,6 +88,21 @@ export async function processVoiceCallEnd(
       customer.first_name = newFirst;
       console.log(`[VoicePostCall] Upgrading customer name from "${customer.first_name}" to "${params.customerName.trim()}" for ${normalizedPhone}`);
     }
+  }
+
+  // Classify customer type if provided and not already set
+  const validTypes = ['enthusiast', 'professional'];
+  if (
+    customer &&
+    params.customerType &&
+    validTypes.includes(params.customerType) &&
+    !customer.customer_type
+  ) {
+    await admin
+      .from('customers')
+      .update({ customer_type: params.customerType })
+      .eq('id', customer.id);
+    console.log(`[VoicePostCall] Set customer_type to "${params.customerType}" for ${normalizedPhone}`);
   }
 
   // Track resolved customer ID — may be set later by autoGenerateQuote for new callers

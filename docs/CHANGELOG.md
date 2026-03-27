@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Voice agent — auto-classify customer type — 2026-03-27
+
+- `finalize_call` accepts optional `customer_type` param (`enthusiast` or `professional`)
+- Sets `customer_type` on the customer record only if currently NULL (unclassified) — never downgrades
+- DB CHECK constraint: only `'enthusiast'` and `'professional'` are valid values
+
+---
+
 ## fix: finalize_call — vehicle creation for new callers on all paths — 2026-03-27
 
 Vehicle creation was gated on `customer` being non-null, but for new callers `customer` is null at that point — vehicles were silently skipped.

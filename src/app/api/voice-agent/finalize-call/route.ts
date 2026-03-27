@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       vehicle_make,
       vehicle_model,
       vehicle_color,
+      customer_type,
     } = body as {
       phone: string;
       customer_name?: string;
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
       vehicle_make?: string;
       vehicle_model?: string;
       vehicle_color?: string;
+      customer_type?: string;
     };
 
     if (!phone) {
@@ -76,6 +78,7 @@ export async function POST(request: NextRequest) {
       vehicleMake: vehicle_make,
       vehicleModel: vehicle_model,
       vehicleColor: vehicle_color,
+      customerType: customer_type,
       source: 'tool',
     });
 

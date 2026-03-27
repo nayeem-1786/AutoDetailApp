@@ -255,6 +255,7 @@ Set the API key header on all tools: `Authorization: Bearer <key>`
 | `vehicle_make` | string | No | Vehicle make |
 | `vehicle_model` | string | No | Vehicle model |
 | `vehicle_color` | string | No | Vehicle color |
+| `customer_type` | string | No | `enthusiast` or `professional` — only sets if currently unclassified |
 
 ### 4. Configure After-Call Webhook (Passive)
 
