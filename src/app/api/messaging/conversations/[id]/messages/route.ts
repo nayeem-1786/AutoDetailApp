@@ -34,14 +34,17 @@ export async function GET(
   const admin = createAdminClient();
 
   const { searchParams } = new URL(request.url);
-  const limit = parseInt(searchParams.get('limit') || '50');
+  const limit = parseInt(searchParams.get('limit') || '200');
   const before = searchParams.get('before'); // cursor for pagination
 
+  // Fetch newest messages first (descending), then reverse for chronological display.
+  // Without this, .order(ascending).limit(N) returns the OLDEST N messages,
+  // cutting off the most recent ones in long conversations.
   let query = admin
     .from('messages')
     .select('*, sender:employees!sent_by(id, first_name, last_name)')
     .eq('conversation_id', id)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(limit);
 
   if (before) {
@@ -54,7 +57,10 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ data: messages });
+  // Reverse to chronological order for display
+  const chronological = (messages || []).reverse();
+
+  return NextResponse.json({ data: chronological });
 }
 
 export async function POST(

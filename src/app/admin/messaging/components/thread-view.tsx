@@ -103,9 +103,25 @@ export function ThreadView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation?.id]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages — only if user is near the bottom (within 200px)
+  const prevMessageCount = useRef(messages.length);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = containerRef.current;
+    if (!container) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      prevMessageCount.current = messages.length;
+      return;
+    }
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottom = distanceFromBottom < 200;
+    const isNewConversation = prevMessageCount.current === 0 && messages.length > 0;
+
+    if (isNearBottom || isNewConversation) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    prevMessageCount.current = messages.length;
   }, [messages.length]);
 
   // Close menu on outside click

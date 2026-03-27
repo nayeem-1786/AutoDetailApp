@@ -32,6 +32,10 @@ function sortConversationsByRecent(convs: Conversation[]): Conversation[] {
   });
 }
 
+/** Polling intervals (ms) */
+const POLL_MESSAGES_MS = 5_000;
+const POLL_CONVERSATIONS_MS = 10_000;
+
 export default function MessagingPage() {
   const { employee } = useAuth();
   const { enabled: twoWaySmsEnabled, loading: flagLoading } = useFeatureFlag(FEATURE_FLAGS.TWO_WAY_SMS);
@@ -47,14 +51,25 @@ export default function MessagingPage() {
   const [statusFilter, setStatusFilter] = useState<ConversationStatus>('open');
   const [statusCounts, setStatusCounts] = useState<StatusCounts>({ open: 0, closed: 0, archived: 0 });
   const [mobileView, setMobileView] = useState<'list' | 'thread'>('list');
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   const searchDebounceRef = useRef<NodeJS.Timeout>(null);
   const activeConversationIdRef = useRef<string | null>(null);
+  const searchRef = useRef(search);
+  const statusFilterRef = useRef(statusFilter);
   const supabase = createClient();
 
-  // Keep ref in sync so Realtime handlers always have the latest value
+  // Keep refs in sync so polling/Realtime handlers always have the latest values
   useEffect(() => {
     activeConversationIdRef.current = activeConversation?.id || null;
   }, [activeConversation?.id]);
+
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
+
+  useEffect(() => {
+    statusFilterRef.current = statusFilter;
+  }, [statusFilter]);
 
   // Fetch status counts for pills
   const fetchStatusCounts = useCallback(async () => {
@@ -128,6 +143,62 @@ export default function MessagingPage() {
       setLoadingMessages(false);
     }
   }, []);
+
+  // Silent poll: refetch messages without loading spinner, merge with existing state
+  const pollMessages = useCallback(async () => {
+    const conversationId = activeConversationIdRef.current;
+    if (!conversationId) return;
+    if (document.visibilityState !== 'visible') return;
+
+    try {
+      const res = await adminFetch(`/api/messaging/conversations/${conversationId}/messages`);
+      if (res.ok) {
+        const { data } = await res.json();
+        const freshMessages = deduplicateMessages(data || []);
+        setMessages((prev) => {
+          // Merge: keep optimistic messages, add any new from server
+          const merged = deduplicateMessages([...prev, ...freshMessages]);
+          // Only update if there's actually a change (avoid unnecessary re-renders)
+          if (merged.length === prev.length && merged.every((m, i) => m.id === prev[i]?.id)) {
+            return prev;
+          }
+          return merged;
+        });
+      }
+    } catch {
+      // Silent fail — polling is best-effort
+    }
+  }, []);
+
+  // Silent poll: refetch conversations without loading spinner
+  const pollConversations = useCallback(async () => {
+    if (document.visibilityState !== 'visible') return;
+
+    try {
+      const params = new URLSearchParams({ status: statusFilterRef.current || 'open' });
+      const currentSearch = searchRef.current;
+      if (currentSearch && currentSearch.length >= 2) {
+        params.set('search', currentSearch);
+      }
+      const res = await adminFetch(`/api/messaging/conversations?${params}`);
+      if (res.ok) {
+        const { data } = await res.json();
+        setConversations(data || []);
+        // Update active conversation if it's in the new data
+        const activeId = activeConversationIdRef.current;
+        if (activeId) {
+          const updated = (data || []).find((c: Conversation) => c.id === activeId);
+          if (updated) {
+            setActiveConversation((prev) => prev ? { ...prev, ...updated } : prev);
+          }
+        }
+      }
+    } catch {
+      // Silent fail
+    }
+    // Also refresh counts
+    fetchStatusCounts();
+  }, [fetchStatusCounts]);
 
   // Mark conversation as read
   const markAsRead = useCallback(async (conversationId: string) => {
@@ -283,8 +354,10 @@ export default function MessagingPage() {
     [activeConversation, statusFilter, fetchStatusCounts]
   );
 
+  // ---------------------------------------------------------------------------
   // Realtime: new messages for active conversation
   // Uses activeConversation?.id (primitive) to avoid tearing down the channel on object ref changes
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const conversationId = activeConversation?.id;
     if (!conversationId) return;
@@ -309,8 +382,11 @@ export default function MessagingPage() {
         }
       )
       .subscribe((status: string, err?: Error) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('[Messaging] Messages channel error:', err);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeConnected(true);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Messaging] Messages channel error:', status, err);
+          setRealtimeConnected(false);
         }
       });
 
@@ -320,8 +396,10 @@ export default function MessagingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation?.id]);
 
+  // ---------------------------------------------------------------------------
   // Realtime: conversation updates (new conversations, unread changes)
   // Stable subscription — never tears down except on unmount. Uses ref for active conversation ID.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const channel = supabase
       .channel('conversations-updates')
@@ -363,8 +441,9 @@ export default function MessagingPage() {
         }
       )
       .subscribe((status: string, err?: Error) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('[Messaging] Conversations channel error:', err);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Messaging] Conversations channel error:', status, err);
+          setRealtimeConnected(false);
         }
       });
 
@@ -373,6 +452,21 @@ export default function MessagingPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Polling fallback: when Realtime is disconnected, poll for updates
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (realtimeConnected) return;
+
+    const msgInterval = setInterval(pollMessages, POLL_MESSAGES_MS);
+    const convInterval = setInterval(pollConversations, POLL_CONVERSATIONS_MS);
+
+    return () => {
+      clearInterval(msgInterval);
+      clearInterval(convInterval);
+    };
+  }, [realtimeConnected, pollMessages, pollConversations]);
 
   const handleStatusFilterChange = useCallback((status: ConversationStatus) => {
     setStatusFilter(status);
@@ -434,6 +528,13 @@ export default function MessagingPage() {
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col">
       <PageHeader title="Messaging" />
+
+      {/* Polling indicator */}
+      {!realtimeConnected && activeConversation && (
+        <div className="px-4 pb-1">
+          <p className="text-xs text-gray-400">Live updates unavailable — refreshing automatically</p>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         {/* Left Panel - Conversation List */}

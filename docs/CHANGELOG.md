@@ -4,6 +4,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Messaging — polling fallback, message limit bug, smart auto-scroll — 2026-03-26
+
+Supabase Realtime fails with `CHANNEL_ERROR` / `UnableToConnectToProject` — platform issue outside our control. Added polling fallback so messaging works regardless.
+
+**Polling fallback:**
+- Tracks `realtimeConnected` state from Realtime subscribe callbacks
+- When Realtime is disconnected: polls messages every 5s, conversations every 10s
+- Silent polling — no loading spinners, merges new data into existing state
+- Respects `document.visibilityState` — no wasted API calls when tab is hidden
+- Subtle "Live updates unavailable — refreshing automatically" indicator
+- Stops polling automatically when Realtime reconnects
+
+**Message limit bug:**
+- Messages API used `.order(ascending).limit(50)` — fetched oldest 50 messages, silently dropped the newest
+- Fixed: order descending, limit 200, reverse for display — always shows the most recent messages
+
+**Smart auto-scroll:**
+- Previously always force-scrolled to bottom on any new message
+- Now checks scroll position — only auto-scrolls if user is within 200px of the bottom
+- Always scrolls on initial conversation load
+
+---
+
 ## fix: Messaging audit — 7 issues across SMS/voice flows — 2026-03-26
 
 End-to-end messaging audit after voice agent integration. Fixed:
