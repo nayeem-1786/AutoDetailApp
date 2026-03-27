@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       vehicleMake: vehicle_make,
       vehicleModel: vehicle_model,
       vehicleColor: vehicle_color,
-      customerType: customer_type,
+      customerType: customer_type ? customer_type.trim().toLowerCase() : undefined,
       source: 'tool',
     });
 
