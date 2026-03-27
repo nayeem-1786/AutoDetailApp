@@ -96,7 +96,7 @@ export async function processVoiceCallEnd(
     customer &&
     params.customerType &&
     validTypes.includes(params.customerType) &&
-    !customer.customer_type
+    (!customer.customer_type || customer.customer_type === 'unknown')
   ) {
     await admin
       .from('customers')
