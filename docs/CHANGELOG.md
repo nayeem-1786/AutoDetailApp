@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Voice agent — enriched initiation context — 2026-03-26
+
+Expanded voice agent initiation webhook from compressed one-liner to full structured customer context. Now matches the SMS AI's context depth.
+
+- ALL vehicles (was limited to 1)
+- Visit history with last transaction service name and amount
+- Up to 5 upcoming appointments (was 1)
+- Last 3 quotes with item names, totals, and status (was 1, no items)
+- Loyalty points, tags, staff notes
+- Conversation summary (cross-channel memory from SMS + voice history)
+- Multi-line natural language format with section headers (not JSON)
+- All queries run in parallel — stays within 5-second ElevenLabs timeout
+
+---
+
 ## fix: Messaging — AI context, rate limit, nav badge polling, always-on polling — 2026-03-26
 
 - AI message context increased from 30 to 100 messages (both DB fetch and API slice)

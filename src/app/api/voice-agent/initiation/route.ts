@@ -11,6 +11,10 @@ import { normalizePhone, formatTime } from '@/lib/utils/format';
  *
  * Returns dynamic_variables and a personalized first_message
  * so the voice agent greets returning customers by name.
+ *
+ * The customer_summary is a multi-line natural language string
+ * with structured sections (vehicles, history, quotes, etc.)
+ * that the ElevenLabs LLM reads as conversation context.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Lean parallel queries — must be fast (< 5s total)
+    // Round 1: customer + conversation (parallel, must be fast)
     const [customerRes, conversationRes] = await Promise.all([
       supabase
         .from('customers')
@@ -55,16 +59,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(newCallerResponse(e164Phone), { status: 200 });
     }
 
-    // Parallel fetches for customer details
-    const todayPST = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); // YYYY-MM-DD
-    const [vehicleRes, apptRes, quoteRes] = await Promise.all([
+    // Round 2: all detail queries in parallel
+    const todayPST = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    const [vehiclesRes, apptsRes, quotesRes, lastTxnRes] = await Promise.all([
       supabase
         .from('vehicles')
         .select('year, make, model, color, size_class')
         .eq('customer_id', customer.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .order('created_at', { ascending: false }),
       supabase
         .from('appointments')
         .select('scheduled_date, scheduled_start_time, appointment_services(services(name))')
@@ -72,71 +74,118 @@ export async function POST(request: NextRequest) {
         .gte('scheduled_date', todayPST)
         .neq('status', 'cancelled')
         .order('scheduled_date', { ascending: true })
-        .limit(1)
-        .maybeSingle(),
+        .limit(5),
       supabase
         .from('quotes')
-        .select('quote_number, status, total_amount')
+        .select('quote_number, status, total_amount, created_at, quote_items(item_name)')
         .eq('customer_id', customer.id)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
+        .limit(3),
+      supabase
+        .from('transactions')
+        .select('transaction_date, total_amount, transaction_items(item_name)')
+        .eq('customer_id', customer.id)
+        .order('transaction_date', { ascending: false })
         .limit(1)
         .maybeSingle(),
     ]);
 
-    // Build customer summary string
-    const summaryParts: string[] = ['Returning customer.'];
     const firstName = customer.first_name || '';
     const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
 
-    const vehicle = vehicleRes.data;
-    if (vehicle) {
-      const vParts = [vehicle.year, vehicle.color, vehicle.make, vehicle.model].filter(Boolean);
-      const sizeLabel = vehicle.size_class ? ` (${vehicle.size_class})` : '';
-      if (vParts.length > 0) summaryParts.push(`Vehicle: ${vParts.join(' ')}${sizeLabel}.`);
+    // Build enriched customer summary
+    const sections: string[] = [];
+    sections.push(`Returning customer: ${fullName}`);
+
+    // Vehicles
+    const vehicles = vehiclesRes.data || [];
+    if (vehicles.length > 0) {
+      const vehicleLines = vehicles.map((v) => {
+        const parts = [v.year, v.color, v.make, v.model].filter(Boolean).join(' ');
+        const size = v.size_class ? ` (${v.size_class})` : '';
+        return `  ${parts}${size}`;
+      });
+      sections.push(`VEHICLES:\n${vehicleLines.join('\n')}`);
     }
 
-    if (customer.visit_count > 0) {
-      summaryParts.push(`${customer.visit_count} visits, $${(customer.lifetime_spend || 0).toFixed(0)} lifetime spend.`);
+    // History
+    if (customer.visit_count > 0 || customer.lifetime_spend > 0) {
+      let historyLine = `HISTORY: ${customer.visit_count || 0} visits, $${(customer.lifetime_spend || 0).toFixed(0)} lifetime spend.`;
+      const lastTxn = lastTxnRes.data;
+      if (lastTxn) {
+        const txnDate = new Date(lastTxn.transaction_date).toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
+        });
+        const txnServices = ((lastTxn.transaction_items as Array<{ item_name: string }>) || [])
+          .map((i) => i.item_name).filter(Boolean);
+        const serviceStr = txnServices.length > 0 ? txnServices.join(', ') : 'service';
+        historyLine += ` Last visit ${txnDate} (${serviceStr}, $${Number(lastTxn.total_amount).toFixed(0)}).`;
+      } else if (customer.last_visit_date) {
+        const lastVisit = new Date(customer.last_visit_date).toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
+        });
+        historyLine += ` Last visit ${lastVisit}.`;
+      }
+      sections.push(historyLine);
     }
 
+    // Upcoming appointments
+    const appts = apptsRes.data || [];
+    if (appts.length > 0) {
+      const apptLines = appts.map((a) => {
+        const apptDate = new Date(a.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', {
+          weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
+        });
+        const apptTime = a.scheduled_start_time ? formatTime(a.scheduled_start_time) : 'TBD';
+        const services = ((a.appointment_services as unknown as Array<{ services: { name: string } }>) || [])
+          .map((as) => as.services?.name).filter(Boolean);
+        return `  ${services.join(', ') || 'Appointment'} on ${apptDate} at ${apptTime}`;
+      });
+      sections.push(`UPCOMING APPOINTMENTS:\n${apptLines.join('\n')}`);
+    }
+
+    // Recent quotes
+    const quotes = quotesRes.data || [];
+    if (quotes.length > 0) {
+      const quoteLines = quotes.map((q) => {
+        const items = ((q.quote_items as Array<{ item_name: string }>) || [])
+          .map((i) => i.item_name).filter(Boolean);
+        const serviceStr = items.length > 0 ? items.join(' + ') : 'Services';
+        const statusDate = new Date(q.created_at).toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
+        });
+        const statusLabel = q.status.charAt(0).toUpperCase() + q.status.slice(1);
+        return `  ${q.quote_number}: ${serviceStr} — $${Number(q.total_amount).toFixed(0)} (${statusLabel} ${statusDate})`;
+      });
+      sections.push(`RECENT QUOTES:\n${quoteLines.join('\n')}`);
+    }
+
+    // Loyalty
     if (customer.loyalty_points_balance > 0) {
-      summaryParts.push(`Loyalty: ${customer.loyalty_points_balance} points.`);
+      sections.push(`LOYALTY: ${customer.loyalty_points_balance} points`);
     }
 
+    // Tags
     if (customer.tags && customer.tags.length > 0) {
-      summaryParts.push(`Tags: ${customer.tags.join(', ')}.`);
+      sections.push(`TAGS: ${customer.tags.join(', ')}`);
     }
 
-    if (customer.last_visit_date) {
-      const lastVisit = new Date(customer.last_visit_date).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
-      });
-      summaryParts.push(`Last visit: ${lastVisit}.`);
+    // Staff notes
+    if (customer.notes) {
+      sections.push(`STAFF NOTES: ${customer.notes}`);
     }
 
-    const appt = apptRes.data;
-    if (appt) {
-      const apptDate = new Date(appt.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', {
-        weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
-      });
-      const apptTime = appt.scheduled_start_time ? formatTime(appt.scheduled_start_time) : 'TBD';
-      const services = ((appt.appointment_services as unknown as Array<{ services: { name: string } }>) || [])
-        .map((as) => as.services?.name).filter(Boolean);
-      summaryParts.push(`Upcoming: ${services.join(', ') || 'appointment'} on ${apptDate} at ${apptTime}.`);
-    }
-
-    const quote = quoteRes.data;
-    if (quote) {
-      summaryParts.push(`Recent quote: ${quote.quote_number} (${quote.status}, $${Number(quote.total_amount).toFixed(0)}).`);
-    }
-
+    // Conversation summary (cross-channel memory)
     if (conversationRes.data?.summary) {
-      summaryParts.push(`Context: ${conversationRes.data.summary}`);
+      sections.push(`PREVIOUS CONVERSATIONS: ${conversationRes.data.summary}`);
     }
+
+    const customerSummary = sections.join('\n');
 
     // Build personalized first message
-    const firstMessage = appt
+    const hasAppt = appts.length > 0;
+    const firstMessage = hasAppt
       ? `Hey ${firstName}, welcome back to Smart Details! I see you have an upcoming appointment. How can I help you today?`
       : `Hey ${firstName}, welcome back to Smart Details! How can I help you today?`;
 
@@ -146,7 +195,7 @@ export async function POST(request: NextRequest) {
         customer_name: fullName,
         customer_phone: e164Phone,
         is_returning: 'true',
-        customer_summary: summaryParts.join(' '),
+        customer_summary: customerSummary,
       },
       conversation_config_override: {
         agent: {
