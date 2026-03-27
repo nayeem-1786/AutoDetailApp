@@ -221,7 +221,7 @@ function newCallerResponse(phone: string) {
     },
     conversation_config_override: {
       agent: {
-        first_message: 'Thank you for calling Smart Details Auto Spa! This is your virtual assistant. How can I help you today?',
+        first_message: 'Thank you for calling Smart Details Auto Spa! This is Tom. Can I get your name before we get started?',
       },
     },
   };
