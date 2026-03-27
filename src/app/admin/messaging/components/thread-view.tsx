@@ -103,26 +103,48 @@ export function ThreadView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation?.id]);
 
-  // Auto-scroll to bottom on new messages — only if user is near the bottom (within 200px)
-  const prevMessageCount = useRef(messages.length);
+  // Scroll to bottom on conversation change (initial load)
+  const prevConversationId = useRef<string | null>(null);
   useEffect(() => {
+    if (conversation?.id && conversation.id !== prevConversationId.current) {
+      prevConversationId.current = conversation.id;
+      // Use requestAnimationFrame to ensure DOM has rendered the messages
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView();
+      });
+    }
+  }, [conversation?.id, messages.length]);
+
+  // Auto-scroll on new messages — only if near bottom or staff sent the message
+  const prevMessageCount = useRef(0);
+  useEffect(() => {
+    if (messages.length <= prevMessageCount.current) {
+      prevMessageCount.current = messages.length;
+      return;
+    }
+
+    const newMessages = messages.slice(prevMessageCount.current);
+    prevMessageCount.current = messages.length;
+
+    // Always scroll if the newest message is outbound (staff/AI/system reply)
+    const latestIsOutbound = newMessages.some((m) => m.direction === 'outbound');
+
     const container = containerRef.current;
     if (!container) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      prevMessageCount.current = messages.length;
       return;
     }
 
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     const isNearBottom = distanceFromBottom < 200;
-    const isNewConversation = prevMessageCount.current === 0 && messages.length > 0;
 
-    if (isNearBottom || isNewConversation) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottom || latestIsOutbound) {
+      // Small delay so the DOM updates with the new message before scrolling
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      });
     }
-
-    prevMessageCount.current = messages.length;
-  }, [messages.length]);
+  }, [messages]);
 
   // Close menu on outside click
   useEffect(() => {
