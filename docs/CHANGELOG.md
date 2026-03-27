@@ -4,6 +4,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Infer customer_type and extract vehicle info from transcript — 2026-03-27
+
+For abandoned calls where `finalize_call` never fires, the polling cron now extracts useful data from the transcript:
+
+**Customer type inference:**
+- Keyword-based: professional keywords (dealership, fleet, wholesale, body shop, etc.) → `professional`, otherwise → `enthusiast`
+- Tool params take priority when available, transcript is fallback
+- Only sets when `customer_type` is NULL — never overwrites
+- Applied on all customer creation paths (existing customer update, new customer insert in both auto-quote and non-quote paths)
+
+**Vehicle extraction from transcript:**
+- Parses make (35 brands), model (200+ models), year (1990-2030), color from transcript sentences
+- Searches sentences in reverse — last vehicle mention is most likely the actual vehicle
+- Tool params always take priority; extraction only runs when make/model not provided
+- Extracted vehicle flows into vehicle find-or-create AND auto-quote (vehicle_id now passed to createQuote)
+
+**Structural changes:**
+- Vehicle find-or-create moved BEFORE autoGenerateQuote so vehicle_id is available for quotes
+- autoGenerateQuote accepts vehicleId + transcriptSummary params
+- New customer inserts include inferred customer_type
+- Polling cron transcript increased from 1000 to 3000 chars
+
+---
+
 ## feat: Voice agent — auto-classify customer type — 2026-03-27
 
 - `finalize_call` accepts optional `customer_type` param (`enthusiast` or `professional`)

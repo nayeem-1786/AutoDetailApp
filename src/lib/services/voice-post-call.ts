@@ -90,19 +90,41 @@ export async function processVoiceCallEnd(
     }
   }
 
-  // Classify customer type if provided and not already set
+  // Classify customer type — tool params take priority, transcript inference as fallback
   const validTypes = ['enthusiast', 'professional'];
-  if (
-    customer &&
-    params.customerType &&
-    validTypes.includes(params.customerType) &&
-    (!customer.customer_type || customer.customer_type === 'unknown')
-  ) {
-    await admin
-      .from('customers')
-      .update({ customer_type: params.customerType })
-      .eq('id', customer.id);
-    console.log(`[VoicePostCall] Set customer_type to "${params.customerType}" for ${normalizedPhone}`);
+  if (customer && !customer.customer_type) {
+    let resolvedType: string | null = null;
+
+    if (params.customerType && validTypes.includes(params.customerType)) {
+      resolvedType = params.customerType;
+    } else {
+      resolvedType = inferCustomerType(params.transcriptSummary || '');
+    }
+
+    if (resolvedType) {
+      await admin
+        .from('customers')
+        .update({ customer_type: resolvedType })
+        .eq('id', customer.id);
+      console.log(`[VoicePostCall] Set customer_type to "${resolvedType}" for ${normalizedPhone} (source: ${params.customerType ? 'tool' : 'transcript'})`);
+    }
+  }
+
+  // Resolve vehicle info — tool params take priority, transcript extraction as fallback
+  let resolvedVehicleMake = params.vehicleMake;
+  let resolvedVehicleModel = params.vehicleModel;
+  let resolvedVehicleYear = params.vehicleYear;
+  let resolvedVehicleColor = params.vehicleColor;
+
+  if (!resolvedVehicleMake && !resolvedVehicleModel && params.transcriptSummary) {
+    const extracted = extractVehicleFromTranscript(params.transcriptSummary);
+    if (extracted) {
+      resolvedVehicleMake = extracted.vehicleMake;
+      resolvedVehicleModel = extracted.vehicleModel;
+      resolvedVehicleYear = extracted.vehicleYear ? parseInt(extracted.vehicleYear, 10) || undefined : undefined;
+      resolvedVehicleColor = extracted.vehicleColor;
+      console.log(`[VoicePostCall] Extracted vehicle from transcript: ${extracted.vehicleYear || ''} ${extracted.vehicleColor || ''} ${extracted.vehicleMake || ''} ${extracted.vehicleModel || ''}`);
+    }
   }
 
   // Track resolved customer ID — may be set later by autoGenerateQuote for new callers
@@ -190,6 +212,89 @@ export async function processVoiceCallEnd(
     ` booked: ${appointmentBooked}`
   );
 
+  // For new callers on non-auto-quote paths (appointment booked, not interested, no services),
+  // create a customer record so vehicle info isn't lost
+  if (!resolvedCustomerId && (resolvedVehicleMake || resolvedVehicleModel || params.customerName)) {
+    const { data: phoneCustomer } = await admin
+      .from('customers')
+      .select('id, first_name')
+      .eq('phone', normalizedPhone)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (phoneCustomer) {
+      resolvedCustomerId = phoneCustomer.id;
+      // Upgrade generic name if real name available
+      const GENERIC_FIRST_NAMES = ['phone', 'new', 'customer', 'valued'];
+      if (
+        phoneCustomer.first_name &&
+        GENERIC_FIRST_NAMES.includes(phoneCustomer.first_name.toLowerCase()) &&
+        params.customerName &&
+        params.customerName.trim().length > 0
+      ) {
+        const nameParts = params.customerName.trim().split(/\s+/);
+        await admin
+          .from('customers')
+          .update({ first_name: nameParts[0], last_name: nameParts.slice(1).join(' ') || '' })
+          .eq('id', phoneCustomer.id);
+        console.log(`[VoicePostCall] Upgrading customer name from "${phoneCustomer.first_name}" to "${params.customerName.trim()}" for ${normalizedPhone}`);
+      }
+    } else {
+      const fallbackName = params.customerName?.trim() || 'Phone Caller';
+      const nameParts = fallbackName.split(/\s+/);
+      const inferredType = inferCustomerType(params.transcriptSummary || '');
+      const { data: newCust } = await admin
+        .from('customers')
+        .insert({
+          first_name: nameParts[0],
+          last_name: nameParts.slice(1).join(' ') || '',
+          phone: normalizedPhone,
+          sms_consent: true,
+          customer_type: inferredType,
+        })
+        .select('id')
+        .single();
+      if (newCust) {
+        resolvedCustomerId = newCust.id;
+        console.log(`[VoicePostCall] Created customer "${fallbackName}" (${inferredType}) for ${normalizedPhone} (non-quote path)`);
+      }
+    }
+  }
+
+  // Find or create vehicle — runs BEFORE autoGenerateQuote so vehicle_id is available for quotes
+  let resolvedVehicleId: string | undefined;
+  if (resolvedCustomerId && (resolvedVehicleMake || resolvedVehicleModel)) {
+    let vehicleQuery = admin
+      .from('vehicles')
+      .select('id')
+      .eq('customer_id', resolvedCustomerId);
+
+    if (resolvedVehicleMake) vehicleQuery = vehicleQuery.ilike('make', resolvedVehicleMake);
+    if (resolvedVehicleModel) vehicleQuery = vehicleQuery.ilike('model', resolvedVehicleModel);
+
+    const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
+
+    if (existingVehicle) {
+      resolvedVehicleId = existingVehicle.id;
+    } else {
+      const { data: newVehicle } = await admin
+        .from('vehicles')
+        .insert({
+          customer_id: resolvedCustomerId,
+          vehicle_type: 'standard',
+          year: resolvedVehicleYear || null,
+          make: resolvedVehicleMake || null,
+          model: resolvedVehicleModel || null,
+          color: resolvedVehicleColor || null,
+        })
+        .select('id')
+        .single();
+      resolvedVehicleId = newVehicle?.id;
+      console.log(`[VoicePostCall] Created vehicle ${resolvedVehicleYear || ''} ${resolvedVehicleColor || ''} ${resolvedVehicleMake || ''} ${resolvedVehicleModel || ''} for ${normalizedPhone}`);
+    }
+  }
+
   if (appointmentBooked) {
     // Send confirmation SMS
     console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: appointment already booked`);
@@ -219,12 +324,12 @@ export async function processVoiceCallEnd(
     console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: skipAutoQuote flag set`);
   } else {
     // Check for recent quotes sent in the last 10 minutes (dedup with send_quote_sms)
-    if (customer?.id) {
+    if (resolvedCustomerId) {
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data: recentQuotes } = await admin
         .from('quotes')
         .select('id')
-        .eq('customer_id', customer.id)
+        .eq('customer_id', resolvedCustomerId)
         .gte('created_at', tenMinutesAgo)
         .limit(1);
 
@@ -236,9 +341,11 @@ export async function processVoiceCallEnd(
           admin,
           normalizedPhone,
           servicesDiscussed,
-          customer.id,
+          resolvedCustomerId,
           conversation.id,
-          params.customerName
+          params.customerName,
+          resolvedVehicleId,
+          params.transcriptSummary
         );
         if (createdId) resolvedCustomerId = createdId;
       }
@@ -251,82 +358,11 @@ export async function processVoiceCallEnd(
         servicesDiscussed,
         null,
         conversation.id,
-        params.customerName
+        params.customerName,
+        resolvedVehicleId,
+        params.transcriptSummary
       );
       if (createdId) resolvedCustomerId = createdId;
-    }
-  }
-
-  // For new callers on non-auto-quote paths (appointment booked, not interested, no services),
-  // create a customer record so vehicle info isn't lost
-  if (!resolvedCustomerId && (params.vehicleMake || params.vehicleModel || params.customerName)) {
-    const { data: phoneCustomer } = await admin
-      .from('customers')
-      .select('id, first_name')
-      .eq('phone', normalizedPhone)
-      .is('deleted_at', null)
-      .limit(1)
-      .maybeSingle();
-
-    if (phoneCustomer) {
-      resolvedCustomerId = phoneCustomer.id;
-      // Upgrade generic name if real name available
-      const GENERIC_FIRST_NAMES = ['phone', 'new', 'customer', 'valued'];
-      if (
-        phoneCustomer.first_name &&
-        GENERIC_FIRST_NAMES.includes(phoneCustomer.first_name.toLowerCase()) &&
-        params.customerName &&
-        params.customerName.trim().length > 0
-      ) {
-        const nameParts = params.customerName.trim().split(/\s+/);
-        await admin
-          .from('customers')
-          .update({ first_name: nameParts[0], last_name: nameParts.slice(1).join(' ') || '' })
-          .eq('id', phoneCustomer.id);
-        console.log(`[VoicePostCall] Upgrading customer name from "${phoneCustomer.first_name}" to "${params.customerName.trim()}" for ${normalizedPhone}`);
-      }
-    } else {
-      const fallbackName = params.customerName?.trim() || 'Phone Caller';
-      const nameParts = fallbackName.split(/\s+/);
-      const { data: newCust } = await admin
-        .from('customers')
-        .insert({
-          first_name: nameParts[0],
-          last_name: nameParts.slice(1).join(' ') || '',
-          phone: normalizedPhone,
-          sms_consent: true,
-        })
-        .select('id')
-        .single();
-      if (newCust) {
-        resolvedCustomerId = newCust.id;
-        console.log(`[VoicePostCall] Created customer "${fallbackName}" for ${normalizedPhone} (non-quote path)`);
-      }
-    }
-  }
-
-  // Find or create vehicle — runs after ALL customer creation paths have resolved
-  if (resolvedCustomerId && (params.vehicleMake || params.vehicleModel)) {
-    let vehicleQuery = admin
-      .from('vehicles')
-      .select('id')
-      .eq('customer_id', resolvedCustomerId);
-
-    if (params.vehicleMake) vehicleQuery = vehicleQuery.ilike('make', params.vehicleMake);
-    if (params.vehicleModel) vehicleQuery = vehicleQuery.ilike('model', params.vehicleModel);
-
-    const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
-
-    if (!existingVehicle) {
-      await admin.from('vehicles').insert({
-        customer_id: resolvedCustomerId,
-        vehicle_type: 'standard',
-        year: params.vehicleYear || null,
-        make: params.vehicleMake || null,
-        model: params.vehicleModel || null,
-        color: params.vehicleColor || null,
-      });
-      console.log(`[VoicePostCall] Created vehicle ${params.vehicleYear || ''} ${params.vehicleMake || ''} ${params.vehicleModel || ''} for ${normalizedPhone}`);
     }
   }
 
@@ -360,14 +396,16 @@ export async function processVoiceCallEnd(
 // Auto-generate and send quote
 // ---------------------------------------------------------------------------
 
-/** Returns the resolved customer ID (found or created) so the caller can use it for vehicle creation */
+/** Returns the resolved customer ID (found or created) so the caller can use it */
 async function autoGenerateQuote(
   admin: ReturnType<typeof createAdminClient>,
   phone: string,
   servicesDiscussed: string[],
   customerId: string | null,
   conversationId: string,
-  customerName?: string
+  customerName?: string,
+  vehicleId?: string,
+  transcriptSummary?: string
 ): Promise<string | null> {
   // Resolve service names to IDs
   const quoteItems: Array<{
@@ -439,6 +477,7 @@ async function autoGenerateQuote(
       const nameParts = fallbackName.split(/\s+/);
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(' ') || '';
+      const inferredType = inferCustomerType(transcriptSummary || '');
 
       const { data: newCust, error: custErr } = await admin
         .from('customers')
@@ -447,6 +486,7 @@ async function autoGenerateQuote(
           last_name: lastName,
           phone,
           sms_consent: true,
+          customer_type: inferredType,
         })
         .select('id')
         .single();
@@ -456,7 +496,7 @@ async function autoGenerateQuote(
         return null;
       }
       custId = newCust.id;
-      console.log(`[VoicePostCall] Created fallback customer "${firstName} ${lastName || ''}" for ${phone}`);
+      console.log(`[VoicePostCall] Created fallback customer "${firstName} ${lastName || ''}" (${inferredType}) for ${phone}`);
     }
   }
 
@@ -480,6 +520,7 @@ async function autoGenerateQuote(
   try {
     const { quote } = await createQuote(admin, {
       customer_id: custId,
+      vehicle_id: vehicleId,
       items: quoteItems,
       notes: 'Auto-generated after phone call',
       valid_until: validUntil,
@@ -549,6 +590,133 @@ async function autoGenerateQuote(
   }
 
   return custId;
+}
+
+// ---------------------------------------------------------------------------
+// Transcript inference helpers
+// ---------------------------------------------------------------------------
+
+/** Infer customer type from transcript keywords. Defaults to 'enthusiast'. */
+function inferCustomerType(transcript: string): 'enthusiast' | 'professional' {
+  if (!transcript) return 'enthusiast';
+  const lower = transcript.toLowerCase();
+  const professionalKeywords = [
+    'dealership', 'dealer', 'fleet', 'wholesale',
+    'shop', 'we detail', 'our shop', 'my shop',
+    'body shop', 'auto body', 'commercial',
+    'multiple cars', 'multiple vehicles', 'bulk',
+    'reseller', 'lot', 'car lot', 'used car',
+    'detailing business', 'my business', 'our business',
+  ];
+  return professionalKeywords.some((kw) => lower.includes(kw)) ? 'professional' : 'enthusiast';
+}
+
+/** Extract vehicle info from transcript text. Best-effort, returns null if nothing found. */
+function extractVehicleFromTranscript(transcript: string): {
+  vehicleYear?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
+} | null {
+  if (!transcript) return null;
+
+  const MAKES: Record<string, string> = {
+    honda: 'Honda', toyota: 'Toyota', bmw: 'BMW', mercedes: 'Mercedes',
+    ford: 'Ford', chevrolet: 'Chevrolet', chevy: 'Chevrolet', tesla: 'Tesla',
+    nissan: 'Nissan', hyundai: 'Hyundai', kia: 'Kia', lexus: 'Lexus',
+    audi: 'Audi', volkswagen: 'Volkswagen', vw: 'Volkswagen', subaru: 'Subaru',
+    mazda: 'Mazda', jeep: 'Jeep', dodge: 'Dodge', ram: 'Ram', gmc: 'GMC',
+    cadillac: 'Cadillac', lincoln: 'Lincoln', acura: 'Acura', infiniti: 'Infiniti',
+    porsche: 'Porsche', volvo: 'Volvo', buick: 'Buick', chrysler: 'Chrysler',
+    mitsubishi: 'Mitsubishi', mini: 'Mini', 'land rover': 'Land Rover',
+  };
+
+  const MODELS: Record<string, string[]> = {
+    Honda: ['Accord', 'Civic', 'CR-V', 'Pilot', 'HR-V', 'Odyssey', 'Ridgeline', 'Fit', 'Passport', 'Element', 'S2000', 'Insight'],
+    Toyota: ['Camry', 'Corolla', 'RAV4', 'Highlander', 'Tacoma', 'Tundra', '4Runner', 'Prius', 'Supra', 'Sienna', 'Avalon', 'Venza', 'GR86', 'Land Cruiser'],
+    BMW: ['X1', 'X3', 'X5', 'X7', 'M3', 'M4', 'M5', 'M540i', 'M550i', '328i', '330i', '340i', '528i', '530i', '540i', '740i', '750i'],
+    Mercedes: ['C-Class', 'E-Class', 'S-Class', 'GLC', 'GLE', 'GLS', 'A-Class', 'CLA', 'AMG', 'C300', 'E350', 'S500'],
+    Ford: ['F-150', 'Mustang', 'Explorer', 'Escape', 'Bronco', 'Edge', 'Ranger', 'Expedition', 'Maverick', 'Focus', 'Fusion', 'F-250', 'F-350'],
+    Chevrolet: ['Silverado', 'Camaro', 'Corvette', 'Equinox', 'Tahoe', 'Suburban', 'Traverse', 'Malibu', 'Blazer', 'Colorado', 'Impala', 'Trax'],
+    Tesla: ['Model 3', 'Model Y', 'Model S', 'Model X', 'Cybertruck'],
+    Nissan: ['Altima', 'Maxima', 'Sentra', 'Rogue', 'Pathfinder', 'Frontier', 'Titan', '370Z', 'GT-R', 'Murano', 'Kicks', 'Armada'],
+    Hyundai: ['Elantra', 'Sonata', 'Tucson', 'Santa Fe', 'Palisade', 'Kona', 'Ioniq', 'Venue', 'Genesis'],
+    Kia: ['Forte', 'Optima', 'K5', 'Sorento', 'Sportage', 'Telluride', 'Soul', 'Stinger', 'Seltos', 'Carnival'],
+    Lexus: ['IS', 'ES', 'GS', 'LS', 'RX', 'NX', 'UX', 'GX', 'LX', 'RC', 'LC'],
+    Audi: ['A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'Q3', 'Q5', 'Q7', 'Q8', 'RS', 'S4', 'S5', 'TT', 'R8', 'e-tron'],
+    Volkswagen: ['Jetta', 'Passat', 'Golf', 'GTI', 'Tiguan', 'Atlas', 'Arteon', 'ID.4', 'Taos'],
+    Subaru: ['Outback', 'Forester', 'Crosstrek', 'Impreza', 'WRX', 'Legacy', 'Ascent', 'BRZ'],
+    Mazda: ['Mazda3', 'Mazda6', 'CX-5', 'CX-9', 'CX-30', 'CX-50', 'MX-5', 'Miata'],
+    Jeep: ['Wrangler', 'Grand Cherokee', 'Cherokee', 'Compass', 'Renegade', 'Gladiator'],
+    Dodge: ['Charger', 'Challenger', 'Durango', 'Hornet'],
+    Ram: ['1500', '2500', '3500'],
+    GMC: ['Sierra', 'Yukon', 'Terrain', 'Acadia', 'Canyon', 'Denali'],
+    Cadillac: ['Escalade', 'CT4', 'CT5', 'XT4', 'XT5', 'XT6', 'Lyriq'],
+    Lincoln: ['Navigator', 'Aviator', 'Corsair', 'Nautilus'],
+    Acura: ['TLX', 'MDX', 'RDX', 'Integra', 'NSX', 'ILX'],
+    Infiniti: ['Q50', 'Q60', 'QX50', 'QX55', 'QX60', 'QX80'],
+    Porsche: ['911', 'Cayenne', 'Macan', 'Panamera', 'Taycan', 'Boxster', 'Cayman'],
+    Volvo: ['XC40', 'XC60', 'XC90', 'S60', 'S90', 'V60', 'V90'],
+  };
+
+  const COLORS = [
+    'black', 'white', 'silver', 'gray', 'grey', 'red', 'blue', 'green',
+    'gold', 'brown', 'orange', 'yellow', 'purple', 'beige', 'tan',
+  ];
+
+  // Split transcript into sentences for context-bounded searching
+  const sentences = transcript.split(/[.\n]+/).map((s) => s.trim()).filter(Boolean);
+
+  // Search sentences in reverse — last mention is most likely the actual vehicle
+  let foundMake: string | undefined;
+  let foundModel: string | undefined;
+  let foundYear: string | undefined;
+  let foundColor: string | undefined;
+
+  for (let i = sentences.length - 1; i >= 0; i--) {
+    const sentence = sentences[i].toLowerCase();
+
+    // Find make in this sentence
+    for (const [key, canonical] of Object.entries(MAKES)) {
+      if (sentence.includes(key)) {
+        foundMake = canonical;
+
+        // Look for model in same sentence
+        const models = MODELS[canonical] || [];
+        for (const model of models) {
+          if (sentence.includes(model.toLowerCase())) {
+            foundModel = model;
+            break;
+          }
+        }
+
+        // Look for year (4-digit 1990-2030) in same sentence
+        const yearMatch = sentence.match(/\b(199\d|20[0-3]\d)\b/);
+        if (yearMatch) foundYear = yearMatch[1];
+
+        // Look for color in same sentence
+        for (const color of COLORS) {
+          if (sentence.includes(color)) {
+            foundColor = color === 'grey' ? 'Gray' : color.charAt(0).toUpperCase() + color.slice(1);
+            break;
+          }
+        }
+
+        break; // Found a make in this sentence, stop searching makes
+      }
+    }
+
+    if (foundMake) break; // Found in this sentence, stop searching sentences
+  }
+
+  if (!foundMake) return null;
+
+  return {
+    vehicleMake: foundMake,
+    vehicleModel: foundModel,
+    vehicleYear: foundYear,
+    vehicleColor: foundColor,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
         transcriptSummary = detail.transcript
           .map((t) => `${t.role}: ${t.message}`)
           .join('\n')
-          .substring(0, 1000);
+          .substring(0, 3000);
       }
 
       // Extract services from data collection results if available
