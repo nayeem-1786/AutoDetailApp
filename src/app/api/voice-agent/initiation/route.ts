@@ -196,6 +196,7 @@ export async function POST(request: NextRequest) {
         customer_phone: e164Phone,
         is_returning: 'true',
         customer_summary: customerSummary,
+        time_of_day: getTimeOfDay(),
       },
       conversation_config_override: {
         agent: {
@@ -210,6 +211,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
+function getTimeOfDay(): string {
+  const hour = parseInt(
+    new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Los_Angeles' }),
+    10
+  );
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
+
 function newCallerResponse(phone: string) {
   return {
     type: 'conversation_initiation_client_data',
@@ -218,6 +229,7 @@ function newCallerResponse(phone: string) {
       customer_phone: phone,
       is_returning: 'false',
       customer_summary: 'New caller. No account on file.',
+      time_of_day: getTimeOfDay(),
     },
     conversation_config_override: {
       agent: {
