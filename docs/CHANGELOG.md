@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: finalize_call — vehicle creation for new callers on all paths — 2026-03-27
+
+Vehicle creation was gated on `customer` being non-null, but for new callers `customer` is null at that point — vehicles were silently skipped.
+
+- Moved vehicle find-or-create to run AFTER all customer creation paths resolve (auto-quote, appointment booked, not interested, no services)
+- `autoGenerateQuote` now returns the resolved customer ID so the caller can use it
+- For non-auto-quote paths (appointment booked, not interested), creates customer record if vehicle/name info provided — previously these new callers were lost entirely
+- Customer name upgrade + vehicle dedup run on every path, not just auto-quote
+
+---
+
 ## fix: finalize_call — vehicle storage + reliable customer name upgrade — 2026-03-26
 
 - `finalize_call` now accepts optional vehicle params (year, make, model, color) — vehicles are saved even when no quote SMS was requested

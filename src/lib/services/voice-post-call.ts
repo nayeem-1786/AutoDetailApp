@@ -89,30 +89,8 @@ export async function processVoiceCallEnd(
     }
   }
 
-  // Find or create vehicle if vehicle info provided
-  if (customer && (params.vehicleMake || params.vehicleModel)) {
-    let vehicleQuery = admin
-      .from('vehicles')
-      .select('id')
-      .eq('customer_id', customer.id);
-
-    if (params.vehicleMake) vehicleQuery = vehicleQuery.ilike('make', params.vehicleMake);
-    if (params.vehicleModel) vehicleQuery = vehicleQuery.ilike('model', params.vehicleModel);
-
-    const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
-
-    if (!existingVehicle) {
-      await admin.from('vehicles').insert({
-        customer_id: customer.id,
-        vehicle_type: 'standard',
-        year: params.vehicleYear || null,
-        make: params.vehicleMake || null,
-        model: params.vehicleModel || null,
-        color: params.vehicleColor || null,
-      });
-      console.log(`[VoicePostCall] Created vehicle ${params.vehicleYear || ''} ${params.vehicleMake || ''} ${params.vehicleModel || ''} for ${normalizedPhone}`);
-    }
-  }
+  // Track resolved customer ID — may be set later by autoGenerateQuote for new callers
+  let resolvedCustomerId: string | null = customer?.id || null;
 
   // Build the message body
   const messageBody = buildCallMessage(
@@ -238,7 +216,7 @@ export async function processVoiceCallEnd(
         console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: recent quote exists (last 10min)`);
       } else {
         console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, customer interested, no recent quote`);
-        await autoGenerateQuote(
+        const createdId = await autoGenerateQuote(
           admin,
           normalizedPhone,
           servicesDiscussed,
@@ -246,11 +224,12 @@ export async function processVoiceCallEnd(
           conversation.id,
           params.customerName
         );
+        if (createdId) resolvedCustomerId = createdId;
       }
     } else {
       // No existing customer — create one and send auto-quote
       console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, customer interested, new caller (will create customer)`);
-      await autoGenerateQuote(
+      const createdId = await autoGenerateQuote(
         admin,
         normalizedPhone,
         servicesDiscussed,
@@ -258,6 +237,80 @@ export async function processVoiceCallEnd(
         conversation.id,
         params.customerName
       );
+      if (createdId) resolvedCustomerId = createdId;
+    }
+  }
+
+  // For new callers on non-auto-quote paths (appointment booked, not interested, no services),
+  // create a customer record so vehicle info isn't lost
+  if (!resolvedCustomerId && (params.vehicleMake || params.vehicleModel || params.customerName)) {
+    const { data: phoneCustomer } = await admin
+      .from('customers')
+      .select('id, first_name')
+      .eq('phone', normalizedPhone)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (phoneCustomer) {
+      resolvedCustomerId = phoneCustomer.id;
+      // Upgrade generic name if real name available
+      const GENERIC_FIRST_NAMES = ['phone', 'new', 'customer', 'valued'];
+      if (
+        phoneCustomer.first_name &&
+        GENERIC_FIRST_NAMES.includes(phoneCustomer.first_name.toLowerCase()) &&
+        params.customerName &&
+        params.customerName.trim().length > 0
+      ) {
+        const nameParts = params.customerName.trim().split(/\s+/);
+        await admin
+          .from('customers')
+          .update({ first_name: nameParts[0], last_name: nameParts.slice(1).join(' ') || '' })
+          .eq('id', phoneCustomer.id);
+        console.log(`[VoicePostCall] Upgrading customer name from "${phoneCustomer.first_name}" to "${params.customerName.trim()}" for ${normalizedPhone}`);
+      }
+    } else {
+      const fallbackName = params.customerName?.trim() || 'Phone Caller';
+      const nameParts = fallbackName.split(/\s+/);
+      const { data: newCust } = await admin
+        .from('customers')
+        .insert({
+          first_name: nameParts[0],
+          last_name: nameParts.slice(1).join(' ') || '',
+          phone: normalizedPhone,
+          sms_consent: true,
+        })
+        .select('id')
+        .single();
+      if (newCust) {
+        resolvedCustomerId = newCust.id;
+        console.log(`[VoicePostCall] Created customer "${fallbackName}" for ${normalizedPhone} (non-quote path)`);
+      }
+    }
+  }
+
+  // Find or create vehicle — runs after ALL customer creation paths have resolved
+  if (resolvedCustomerId && (params.vehicleMake || params.vehicleModel)) {
+    let vehicleQuery = admin
+      .from('vehicles')
+      .select('id')
+      .eq('customer_id', resolvedCustomerId);
+
+    if (params.vehicleMake) vehicleQuery = vehicleQuery.ilike('make', params.vehicleMake);
+    if (params.vehicleModel) vehicleQuery = vehicleQuery.ilike('model', params.vehicleModel);
+
+    const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
+
+    if (!existingVehicle) {
+      await admin.from('vehicles').insert({
+        customer_id: resolvedCustomerId,
+        vehicle_type: 'standard',
+        year: params.vehicleYear || null,
+        make: params.vehicleMake || null,
+        model: params.vehicleModel || null,
+        color: params.vehicleColor || null,
+      });
+      console.log(`[VoicePostCall] Created vehicle ${params.vehicleYear || ''} ${params.vehicleMake || ''} ${params.vehicleModel || ''} for ${normalizedPhone}`);
     }
   }
 
@@ -291,6 +344,7 @@ export async function processVoiceCallEnd(
 // Auto-generate and send quote
 // ---------------------------------------------------------------------------
 
+/** Returns the resolved customer ID (found or created) so the caller can use it for vehicle creation */
 async function autoGenerateQuote(
   admin: ReturnType<typeof createAdminClient>,
   phone: string,
@@ -298,7 +352,7 @@ async function autoGenerateQuote(
   customerId: string | null,
   conversationId: string,
   customerName?: string
-) {
+): Promise<string | null> {
   // Resolve service names to IDs
   const quoteItems: Array<{
     service_id: string;
@@ -331,7 +385,7 @@ async function autoGenerateQuote(
 
   if (quoteItems.length === 0) {
     console.log('[VoicePostCall] Auto-quote aborted — no services resolved to valid IDs');
-    return;
+    return customerId;
   }
 
   // Find or create customer
@@ -383,7 +437,7 @@ async function autoGenerateQuote(
 
       if (custErr || !newCust) {
         console.error('[VoicePostCall] Failed to create fallback customer:', custErr);
-        return;
+        return null;
       }
       custId = newCust.id;
       console.log(`[VoicePostCall] Created fallback customer "${firstName} ${lastName || ''}" for ${phone}`);
@@ -477,6 +531,8 @@ async function autoGenerateQuote(
   } catch (err) {
     console.error('[VoicePostCall] Quote creation failed:', err);
   }
+
+  return custId;
 }
 
 // ---------------------------------------------------------------------------
