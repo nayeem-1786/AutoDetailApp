@@ -102,10 +102,11 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
 // ---------------------------------------------------------------------------
 
 export const UNSAFE_SMS_TEMPLATES = [
-  'addon_authorization',     // Contains HMAC crypto token URL — format cannot be changed
-  'addon_authorization_resend', // Same — re-sends expired addon auth
-  'quote_sms_voice',         // Contains short link + optional MMS PDF
-  'quote_sms_postcall',      // Contains short link
-  'quote_sms_midcall',       // Contains short link + service list
-  'receipt_sms',             // 160-char limit with truncation logic + short link
+  'addon_authorization',        // src/app/api/pos/jobs/[id]/addons/route.ts — HMAC crypto token URL
+  'addon_authorization_resend', // src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts — fresh token + MMS photo
+  'addon_authorization_expired', // src/app/api/webhooks/twilio/inbound/route.ts:819,831 — static "authorization expired" (2 identical sends, zero variables)
+  'quote_sms_admin',            // src/lib/quotes/send-service.ts — short link + optional MMS PDF attachment
+  'quote_sms_postcall',         // src/lib/services/voice-post-call.ts — short link
+  'quote_sms_midcall',          // src/app/api/voice-agent/send-quote-sms/route.ts — short link + service list
+  'receipt_sms',                // src/app/api/pos/receipts/sms/route.ts — 160-char limit with truncation logic + short link
 ] as const;

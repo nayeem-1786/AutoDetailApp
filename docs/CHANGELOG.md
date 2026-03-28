@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: complete UNSAFE_SMS_TEMPLATES inventory — 2026-03-27
+
+Post-audit fix for `src/lib/sms/sms-template-variables.ts`:
+- Added `addon_authorization_expired` (2 identical static sends in `webhooks/twilio/inbound/route.ts:819,831` — zero variables, not worth templating)
+- Added `quote_sms_admin` (admin/POS quote send in `send-service.ts` — short link + MMS PDF attachment)
+- Renamed `quote_sms_voice` → split into `quote_sms_postcall` + `quote_sms_midcall` (already correct, just removed stale `quote_sms_voice` entry)
+- Added source file paths as comments for each slug
+- Total: 7 unsafe slugs (was 6, now correctly accounts for all hardcoded SMS)
+
+---
+
 ## feat: refactor all 15 SMS call sites to use template renderer (Session 13K) — 2026-03-27
 
 All 15 admin-editable SMS templates now flow through `renderSmsTemplate()`:
