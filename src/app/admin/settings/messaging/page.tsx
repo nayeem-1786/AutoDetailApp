@@ -23,6 +23,8 @@ interface MessagingSettings {
   messaging_ai_instructions: string;
   messaging_auto_close_hours: string;
   messaging_auto_archive_days: string;
+  sms_business_phone_override: string;
+  sms_test_phone_number: string;
 }
 
 const SETTINGS_KEYS = [
@@ -31,6 +33,8 @@ const SETTINGS_KEYS = [
   'messaging_ai_instructions',
   'messaging_auto_close_hours',
   'messaging_auto_archive_days',
+  'sms_business_phone_override',
+  'sms_test_phone_number',
 ] as const;
 
 const DEFAULTS: MessagingSettings = {
@@ -39,6 +43,8 @@ const DEFAULTS: MessagingSettings = {
   messaging_ai_instructions: '',
   messaging_auto_close_hours: '48',
   messaging_auto_archive_days: '30',
+  sms_business_phone_override: '',
+  sms_test_phone_number: '',
 };
 
 const AUTO_CLOSE_OPTIONS = [
@@ -179,6 +185,63 @@ export default function MessagingSettingsPage() {
           </p>
         </div>
       )}
+
+      {/* SMS Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>SMS Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <FormField
+            label="Business Phone Override"
+            description="If set, replaces {business_phone} in all SMS templates. Leave empty to use the default business phone."
+            htmlFor="sms_phone_override"
+          >
+            <input
+              id="sms_phone_override"
+              type="tel"
+              placeholder="Default business phone"
+              value={settings.sms_business_phone_override}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, sms_business_phone_override: e.target.value }))
+              }
+              className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
+            />
+          </FormField>
+          <FormField
+            label="SMS Test Phone Number"
+            description="Template test messages will be sent to this number using real customer data."
+            htmlFor="sms_test_phone"
+          >
+            <input
+              id="sms_test_phone"
+              type="tel"
+              placeholder="+1XXXXXXXXXX"
+              value={settings.sms_test_phone_number}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, sms_test_phone_number: e.target.value }))
+              }
+              className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
+            />
+          </FormField>
+        </CardContent>
+      </Card>
+
+      {/* SMS Templates navigation card */}
+      <a href="/admin/settings/messaging/sms-templates" className="block">
+        <Card className="transition-colors hover:bg-gray-50">
+          <CardContent className="flex items-center justify-between py-5">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">SMS Templates</p>
+              <p className="mt-0.5 text-sm text-gray-500">Customize the wording of automated text messages.</p>
+            </div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">15 templates</span>
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </CardContent>
+        </Card>
+      </a>
 
       {/* AI Assistant */}
       <Card>

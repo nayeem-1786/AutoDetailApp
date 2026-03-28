@@ -42,6 +42,14 @@ let cachedTemplates: Map<string, CachedTemplate> | null = null;
 let cacheExpiry = 0;
 const CACHE_TTL_MS = 60_000; // 60 seconds
 
+/** Bust the template cache so the next render reads fresh data from DB. */
+export function invalidateSmsTemplateCache(): void {
+  cachedTemplates = null;
+  cacheExpiry = 0;
+  cachedPhoneOverride = null;
+  phoneOverrideExpiry = 0;
+}
+
 async function loadTemplates(): Promise<Map<string, CachedTemplate>> {
   const now = Date.now();
 

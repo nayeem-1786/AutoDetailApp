@@ -869,6 +869,11 @@ src/lib/email/drip-engine.ts
 ```
 src/lib/sms/render-sms-template.ts
 src/lib/sms/sms-template-variables.ts
+src/app/api/admin/sms-templates/route.ts
+src/app/api/admin/sms-templates/[slug]/route.ts
+src/app/api/admin/sms-templates/[slug]/reset/route.ts
+src/app/api/admin/sms-templates/[slug]/test/route.ts
+src/app/admin/settings/messaging/sms-templates/page.tsx
 ```
 
 ### Quotes

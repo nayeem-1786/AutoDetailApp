@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: admin UI for SMS templates (Session 13J) — 2026-03-27
+
+Full admin interface for managing SMS templates:
+
+- **Cache invalidation:** Added `invalidateSmsTemplateCache()` export to `render-sms-template.ts` — API routes bust cache on save so changes propagate immediately.
+- **API routes:** CRUD for sms_templates — GET list, GET/PUT by slug, POST reset to default, POST test send. PUT validates required variables, E.164 phone format, and `can_silence` confirmation. All routes invalidate renderer cache after writes.
+- **Test endpoint:** `/api/admin/sms-templates/[slug]/test` — fetches real recent customer data (name, vehicle, appointment, quote) to populate variables, renders template, sends to configured test phone number.
+- **Settings > Messaging page:** Added Business Phone Override input (replaces `{business_phone}` globally), SMS Test Phone Number input, and SMS Templates navigation card linking to the template editor.
+- **SMS Templates list page:** `/admin/settings/messaging/sms-templates` — 15 templates grouped by 5 categories (Booking, Quote, Reminder, Transactional, System). Each row has on/off Switch toggle (immediate async save), template preview text, recipient badge (Customer/Staff/Detailer), and click-to-edit.
+- **Toggle behavior:** `can_silence=true` templates toggle instantly. `can_silence=false` (critical) templates show ConfirmDialog warning before disable.
+- **Slide-over editor:** Template body textarea with monospace font, VariableInserter (reused from email templates) with cursor-position insertion, required variables marked with asterisk, live SMS preview with sample values, character count + segment indicator (160/153 formula), phone number chip manager for staff templates.
+- **Actions:** Send Test (sends to test phone with real data), Reset to Default (with confirmation), Save (validates required variables client-side + server-side). Unsaved changes guard on close.
+
+---
+
 ## feat: SMS template system — database, seed data, renderer (Session 13I) — 2026-03-27
 
 Foundation for admin-editable SMS templates:
