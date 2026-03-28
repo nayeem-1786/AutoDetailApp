@@ -301,12 +301,19 @@ export async function processVoiceCallEnd(
     if (customer?.sms_consent) {
       // Note: the voice-agent/appointments endpoint already sends a detailed
       // confirmation SMS with date/time/service during the call. This post-call
-      // message is a brief follow-up — skip if the mid-call SMS already sent.
-      // For now, keep as a simple thank-you (no date/time since we don't have it here).
+      // message is a brief follow-up.
       const biz = await getBusinessInfo();
       const name = customer.first_name ? `, ${customer.first_name}` : '';
-      const smsBody = `Thanks for calling ${biz.name}${name}! Your appointment is confirmed. Questions? Call ${biz.phone}`;
-      const smsResult = await sendSms(normalizedPhone, smsBody);
+      const smsFallback = `Thanks for calling ${biz.name}${name}! Your appointment is confirmed. Questions? Call ${biz.phone}`;
+      const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+      const templateResult = await renderSmsTemplate('appointment_confirmed_postcall', {
+        first_name: customer.first_name || undefined,
+      }, smsFallback);
+      const smsBody = templateResult.isActive ? templateResult.body : null;
+      if (!smsBody) {
+        console.log('[VoicePostCall] Post-call SMS template disabled — skipping SMS');
+      }
+      const smsResult = smsBody ? await sendSms(normalizedPhone, smsBody) : { success: false, error: 'template disabled' };
       console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
 
       await admin.from('messages').insert({

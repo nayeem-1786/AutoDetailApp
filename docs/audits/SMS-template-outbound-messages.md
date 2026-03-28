@@ -142,3 +142,31 @@
 - **STOP footers removed from transactional SMS:** Templates #4 (voice-agent appointment), #6 (voice post-call auto-quote), #7 (mid-call send-quote-sms) no longer include "Reply STOP to opt out." These use `sendSms()` (transactional) — only `sendMarketingSms()` should have STOP footers.
 - **Quote-to-appointment conversion auto-notifies:** `QuoteBookDialog` now auto-sends confirmation via `/notify` endpoint after conversion. No longer requires manual staff "Notify" click.
 - **New SMS sends added:** Staff notification on quote acceptance (G1), booking confirmation to customer (G2), staff notification on new booking (G3), SMS booking reminder (G6), viewed-quote follow-up (G4).
+
+### Session 13I–13K: Admin-Editable SMS Template System (2026-03-27)
+
+**All 15 admin-editable templates now use `renderSmsTemplate()` from `src/lib/sms/render-sms-template.ts`:**
+
+| Slug | File | Category |
+|------|------|----------|
+| `appointment_confirmed` | `sms.ts` (via `buildAppointmentConfirmationSms`) | booking |
+| `appointment_confirmed_postcall` | `voice-post-call.ts` | booking |
+| `booking_confirmed` | `book/route.ts` | booking |
+| `appointment_cancelled` | `pos/jobs/[id]/cancel/route.ts` | booking |
+| `quote_accepted_single` | `quotes/[id]/accept/route.ts` | quote |
+| `quote_accepted_multi` | `quotes/[id]/accept/route.ts` | quote |
+| `quote_accepted_staff_notify` | `quotes/[id]/accept/route.ts` | system |
+| `booking_reminder` | `cron/booking-reminders/route.ts` | reminder |
+| `quote_reminder` | `cron/quote-reminders/route.ts` | reminder |
+| `quote_viewed_followup` | `cron/quote-reminders/route.ts` | reminder |
+| `job_complete` | `pos/jobs/[id]/complete/route.ts` | transactional |
+| `addon_approved` | `job-addons.ts` | transactional |
+| `addon_declined` | `job-addons.ts` | transactional |
+| `booking_staff_notify` | `book/route.ts` | system |
+| `detailer_job_assigned` | `appointments/[id]/notify/route.ts` | system |
+
+**6 templates remain hardcoded (unsafe):** addon authorization (HMAC tokens), addon resend, quote SMS voice/postcall/midcall (short links + MMS), receipt SMS (160-char truncation).
+
+**2 staff freeform:** messaging/send + conversations/messages (user-composed, not templates).
+
+**1 AI-generated:** Twilio inbound webhook AI auto-reply (prompt is editable, output is not).

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { sendSms } from '@/lib/utils/sms';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 export async function GET(request: NextRequest) {
   const apiKey = request.headers.get('x-api-key');
@@ -71,7 +72,14 @@ export async function GET(request: NextRequest) {
     // SMS reminder (transactional — no marketing consent needed, but respect opt-out)
     if (customer.phone && customer.sms_consent !== false) {
       try {
-        await sendSms(customer.phone, `Reminder: Your ${serviceName} appointment at ${business.name} is tomorrow at ${displayTime}. Need to reschedule? Call us at ${business.phone}`);
+        const smsFallback = `Reminder: Your ${serviceName} appointment at ${business.name} is tomorrow at ${displayTime}. Need to reschedule? Call us at ${business.phone}`;
+        const smsResult = await renderSmsTemplate('booking_reminder', {
+          service_name: serviceName,
+          appointment_time: displayTime,
+        }, smsFallback);
+        if (smsResult.isActive) {
+          await sendSms(customer.phone, smsResult.body);
+        }
       } catch (smsErr) {
         console.error(`[BookingReminder] SMS failed for appointment ${appt.id}:`, smsErr);
       }

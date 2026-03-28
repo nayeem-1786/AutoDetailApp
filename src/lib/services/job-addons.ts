@@ -7,6 +7,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendSms } from '@/lib/utils/sms';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -140,7 +141,11 @@ export async function approveAddon(addonId: string): Promise<AddonActionResult> 
   const serviceName = getAddonName(addon);
 
   if (customerPhone) {
-    await sendSms(customerPhone, `Great! Your add-on (${serviceName}) has been approved. We'll get started right away!`);
+    const fallback = `Great! Your add-on (${serviceName}) has been approved. We'll get started right away!`;
+    const result = await renderSmsTemplate('addon_approved', { service_name: serviceName }, fallback);
+    if (result.isActive) {
+      await sendSms(customerPhone, result.body);
+    }
   }
 
   console.log(`[AddonApprove] Addon ${addonId} approved for job ${addon.job_id}`);
@@ -202,7 +207,11 @@ export async function declineAddon(addonId: string): Promise<AddonActionResult> 
   const serviceName = getAddonName(addon);
 
   if (customerPhone) {
-    await sendSms(customerPhone, `No problem! We've noted ${serviceName} as a recommendation for your next visit.`);
+    const fallback = `No problem! We've noted ${serviceName} as a recommendation for your next visit.`;
+    const result = await renderSmsTemplate('addon_declined', { service_name: serviceName }, fallback);
+    if (result.isActive) {
+      await sendSms(customerPhone, result.body);
+    }
   }
 
   console.log(`[AddonDecline] Addon ${addonId} declined for job ${addon.job_id}`);

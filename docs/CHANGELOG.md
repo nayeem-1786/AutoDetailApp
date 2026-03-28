@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: refactor all 15 SMS call sites to use template renderer (Session 13K) — 2026-03-27
+
+All 15 admin-editable SMS templates now flow through `renderSmsTemplate()`:
+
+- **15 call sites refactored** across 10 files: job-addons.ts (2), quotes/accept (3), booking-reminders (1), quote-reminders (2), sms.ts/buildAppointmentConfirmationSms (1 — now async, returns `Promise<string | null>`), book/route.ts (2), jobs/complete (1), jobs/cancel (1), voice-post-call.ts (1), appointments/notify (1)
+- **`buildAppointmentConfirmationSms()`** changed from sync `string` return to async `Promise<string | null>`. Returns `null` when template is disabled. All 3 callers updated to check `if (smsBody)` before sending.
+- **isActive check on every call site**: when admin disables a template, SMS is skipped entirely
+- **Staff templates** (booking_staff_notify, quote_accepted_staff_notify) now send to `result.recipientPhones` with business phone fallback
+- **Marketing SMS preserved**: quote_reminder and quote_viewed_followup still use `sendMarketingSms()` for the send — only the message body comes from the renderer
+- **business_name/business_phone NOT passed manually** — auto-injected by renderer
+- **Hardcoded strings retained as fallback** parameters for disaster recovery (DB down)
+
+---
+
 ## feat: admin UI for SMS templates (Session 13J) — 2026-03-27
 
 Full admin interface for managing SMS templates:

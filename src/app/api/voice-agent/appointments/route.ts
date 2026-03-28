@@ -343,16 +343,18 @@ export async function POST(request: NextRequest) {
     // Send SMS confirmation and log it
     const biz = await getBusinessInfo();
     if (hasSmsConsent) {
-      const smsBody = buildAppointmentConfirmationSms({
+      const smsBody = await buildAppointmentConfirmationSms({
         businessName: biz.name,
         businessPhone: biz.phone,
         date: formattedDate,
         time: formattedTime,
         serviceName: service.name,
       });
-      sendSms(e164Phone, smsBody)
-        .then(() => logSmsMessage(supabase, e164Phone, smsBody))
-        .catch((err) => console.error('Appointment SMS confirmation failed:', err));
+      if (smsBody) {
+        sendSms(e164Phone, smsBody)
+          .then(() => logSmsMessage(supabase, e164Phone, smsBody))
+          .catch((err) => console.error('Appointment SMS confirmation failed:', err));
+      }
     }
 
     // Log system message to conversation thread (non-blocking)

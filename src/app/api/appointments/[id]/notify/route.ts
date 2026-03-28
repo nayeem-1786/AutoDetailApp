@@ -260,7 +260,7 @@ Thank you for choosing ${business.name}!`;
       if (!customer.phone) {
         errors.push('Customer has no phone number');
       } else {
-        const smsBody = buildAppointmentConfirmationSms({
+        const smsBody = await buildAppointmentConfirmationSms({
           businessName: business.name,
           businessPhone: business.phone,
           date: dateStr,
@@ -268,11 +268,13 @@ Thank you for choosing ${business.name}!`;
           total: formatCurrency(appointment.total_amount),
         });
 
-        const smsResult = await sendSms(customer.phone, smsBody);
-        if (smsResult.success) {
-          sentVia.push('sms');
-        } else {
-          errors.push(smsResult.error);
+        if (smsBody) {
+          const smsResult = await sendSms(customer.phone, smsBody);
+          if (smsResult.success) {
+            sentVia.push('sms');
+          } else {
+            errors.push(smsResult.error);
+          }
         }
       }
     }
@@ -280,13 +282,23 @@ Thank you for choosing ${business.name}!`;
     // --- Notify assigned detailer via SMS (non-blocking) ---
     if (appointment.employee_id && employee?.phone) {
       try {
-        const detailerBody =
+        const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+        const detailerFallback =
           `New job assigned: ${serviceNames}` +
           (vehicle ? ` – ${vehicleStr}` : '') +
           `\n${dateStr} at ${displayTime}` +
           (appointment.mobile_address ? `\n${appointment.mobile_address}` : '') +
           `\nTotal: ${formatCurrency(appointment.total_amount)}`;
-        const smsResult = await sendSms(employee.phone, detailerBody);
+        const detailerResult = await renderSmsTemplate('detailer_job_assigned', {
+          services: serviceNames,
+          vehicle_description: vehicle ? vehicleStr : undefined,
+          appointment_date: dateStr,
+          appointment_time: displayTime,
+          address: appointment.mobile_address || undefined,
+          service_total: formatCurrency(appointment.total_amount),
+        }, detailerFallback);
+        if (!detailerResult.isActive) throw new Error('skip');
+        const smsResult = await sendSms(employee.phone, detailerResult.body);
         if (smsResult.success) {
           console.log(`Detailer SMS sent to ${employee.first_name} ${employee.last_name}`);
         } else {

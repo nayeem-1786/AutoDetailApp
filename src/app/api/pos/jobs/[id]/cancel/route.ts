@@ -6,6 +6,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 const CANCELLABLE_EARLY = ['scheduled', 'intake'];
 const CANCELLABLE_LATE = ['in_progress', 'pending_approval'];
@@ -206,12 +207,21 @@ export async function POST(
 
             // Send SMS
             if (shouldSms && customer.phone) {
-              const smsBody =
+              const smsFallback =
                 `Hi ${customer.first_name}, your ${serviceNames} appointment on ${dateStr} at ${displayTime} has been cancelled. ` +
                 `Please contact us to reschedule. - ${business.name} ${business.phone}`;
 
-              const smsResult = await sendSms(customer.phone, smsBody);
-              if (smsResult.success) sentVia.push('sms');
+              const smsTemplateResult = await renderSmsTemplate('appointment_cancelled', {
+                first_name: customer.first_name,
+                services: serviceNames,
+                appointment_date: dateStr,
+                appointment_time: displayTime,
+              }, smsFallback);
+
+              if (smsTemplateResult.isActive) {
+                const smsResult = await sendSms(customer.phone, smsTemplateResult.body);
+                if (smsResult.success) sentVia.push('sms');
+              }
             }
 
             // Send Email

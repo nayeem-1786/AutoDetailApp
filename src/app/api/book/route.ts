@@ -15,6 +15,7 @@ import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 export async function POST(request: NextRequest) {
   try {
@@ -473,21 +474,26 @@ export async function POST(request: NextRequest) {
 
       // G2 — Customer confirmation SMS
       if (e164Phone) {
-        const customerSms = [
+        const customerSmsFallback = [
           `${biz.name} — Booking Confirmed!`,
-          '',
-          `${dateStr}`,
-          `${timeStr}`,
-          serviceNames,
-          vehicleStr ? `Vehicle: ${vehicleStr}` : '',
-          `Total: ${total}`,
-          '',
-          `Questions? Call ${biz.phone}`,
+          '', `${dateStr}`, `${timeStr}`, serviceNames,
+          vehicleStr ? `Vehicle: ${vehicleStr}` : '', `Total: ${total}`,
+          '', `Questions? Call ${biz.phone}`,
         ].filter(Boolean).join('\n');
 
-        sendSms(e164Phone, customerSms).catch((err) =>
-          console.error('[Booking] Customer SMS failed (non-blocking):', err)
-        );
+        renderSmsTemplate('booking_confirmed', {
+          appointment_date: dateStr,
+          appointment_time: timeStr,
+          services: serviceNames,
+          vehicle_description: vehicleStr || undefined,
+          service_total: total,
+        }, customerSmsFallback).then((result) => {
+          if (result.isActive) {
+            sendSms(e164Phone, result.body).catch((err) =>
+              console.error('[Booking] Customer SMS failed (non-blocking):', err)
+            );
+          }
+        }).catch((err) => console.error('[Booking] Template render failed:', err));
       }
 
       // G2 — Customer confirmation email
@@ -521,11 +527,25 @@ export async function POST(request: NextRequest) {
       }
 
       // G3 — Staff notification SMS
-      if (biz.phone) {
+      {
         const depositInfo = data.payment_intent_id ? 'Deposit paid.' : 'Pay on site.';
-        sendSms(biz.phone, `New online booking! ${customerName} — ${serviceNames} on ${dateStr} at ${timeStr}. ${depositInfo}`).catch((err) =>
-          console.error('[Booking] Staff SMS failed (non-blocking):', err)
-        );
+        const staffFallback = `New online booking! ${customerName} — ${serviceNames} on ${dateStr} at ${timeStr}. ${depositInfo}`;
+        renderSmsTemplate('booking_staff_notify', {
+          customer_name: customerName,
+          services: serviceNames,
+          appointment_date: dateStr,
+          appointment_time: timeStr,
+          deposit_info: depositInfo,
+        }, staffFallback).then((result) => {
+          if (result.isActive) {
+            const phones = result.recipientPhones?.length ? result.recipientPhones : (biz.phone ? [biz.phone] : []);
+            for (const phone of phones) {
+              sendSms(phone, result.body).catch((err) =>
+                console.error('[Booking] Staff SMS failed (non-blocking):', err)
+              );
+            }
+          }
+        }).catch((err) => console.error('[Booking] Staff template render failed:', err));
       }
 
       // G3 — Staff notification email

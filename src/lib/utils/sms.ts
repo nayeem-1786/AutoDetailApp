@@ -235,8 +235,11 @@ async function checkFrequencyCap(
 // Shared SMS template builders
 // ---------------------------------------------------------------------------
 
-/** Build a canonical appointment confirmation SMS used by all entry paths. */
-export function buildAppointmentConfirmationSms(params: {
+/**
+ * Build a canonical appointment confirmation SMS used by all entry paths.
+ * Returns null if the template is disabled (admin toggled off).
+ */
+export async function buildAppointmentConfirmationSms(params: {
   businessName: string;
   businessPhone: string;
   date: string;
@@ -244,18 +247,28 @@ export function buildAppointmentConfirmationSms(params: {
   serviceName?: string;
   customerFirstName?: string;
   total?: string;
-}): string {
+}): Promise<string | null> {
+  const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
   const { businessName, businessPhone, date, time, serviceName, customerFirstName, total } = params;
   const greeting = customerFirstName ? `Hi ${customerFirstName}, your` : 'Your';
   const serviceLine = serviceName ? `${serviceName}\n` : '';
   const totalLine = total ? `Total: ${total}\n` : '';
 
-  return (
+  const fallback =
     `${businessName} — Appointment Confirmed\n\n` +
     `${greeting} appointment is scheduled:\n` +
     serviceLine +
     `${date} at ${time}\n` +
     totalLine +
-    `\nQuestions? Call ${businessPhone}`
-  );
+    `\nQuestions? Call ${businessPhone}`;
+
+  const result = await renderSmsTemplate('appointment_confirmed', {
+    first_name: customerFirstName,
+    service_name: serviceName,
+    appointment_date: date,
+    appointment_time: time,
+    service_total: total,
+  }, fallback);
+
+  return result.isActive ? result.body : null;
 }

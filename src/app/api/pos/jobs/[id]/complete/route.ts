@@ -8,6 +8,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, type BusinessHours } from '@/lib/data/business-hours';
 import { createShortLink } from '@/lib/utils/short-link';
 import { formatCurrency } from '@/lib/utils/format';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import crypto from 'crypto';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
@@ -236,9 +237,18 @@ async function sendCompletionNotifications(
 
   // SMS notification — no MMS image
   if (customer.phone) {
-    const smsBody = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup! \u{1F389}\nView your before & after photos: ${galleryLink}\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
+    const smsFallback = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup! \u{1F389}\nView your before & after photos: ${galleryLink}\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
 
-    await sendSms(customer.phone, smsBody);
+    const smsResult = await renderSmsTemplate('job_complete', {
+      first_name: customer.first_name,
+      vehicle_description: vehicleDisplay,
+      gallery_link: galleryLink,
+      hours_line: hoursLine,
+    }, smsFallback);
+
+    if (smsResult.isActive) {
+      await sendSms(customer.phone, smsResult.body);
+    }
   }
 
   // Email notification

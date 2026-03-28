@@ -5,6 +5,7 @@ import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 export async function POST(
   request: NextRequest,
@@ -76,22 +77,26 @@ export async function POST(
     const customer = quote.customer as { id: string; first_name: string; last_name: string; phone: string | null; email: string | null } | null;
     if (customer?.phone) {
       const items = (quote.items as Array<{ item_name: string }>) ?? [];
-      let smsBody: string;
-      if (items.length === 1) {
-        smsBody = `Thanks ${customer.first_name}! Your quote for ${items[0].item_name} has been accepted. Our team will reach out shortly to schedule your appointment.`;
-      } else {
-        smsBody = `Thanks ${customer.first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.`;
+      const slug = items.length === 1 ? 'quote_accepted_single' : 'quote_accepted_multi';
+      const fallback = items.length === 1
+        ? `Thanks ${customer.first_name}! Your quote for ${items[0].item_name} has been accepted. Our team will reach out shortly to schedule your appointment.`
+        : `Thanks ${customer.first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.`;
+
+      const result = await renderSmsTemplate(slug, {
+        first_name: customer.first_name,
+        item_name: items[0]?.item_name,
+      }, fallback);
+
+      if (result.isActive) {
+        const smsResult = await sendSms(customer.phone, result.body);
+        await supabase.from('quote_communications').insert({
+          quote_id: id,
+          channel: 'sms',
+          sent_to: customer.phone,
+          status: smsResult.success ? 'sent' : 'failed',
+          error_message: smsResult.success ? null : 'SMS delivery failed',
+        });
       }
-
-      const smsResult = await sendSms(customer.phone, smsBody);
-
-      await supabase.from('quote_communications').insert({
-        quote_id: id,
-        channel: 'sms',
-        sent_to: customer.phone,
-        status: smsResult.success ? 'sent' : 'failed',
-        error_message: smsResult.success ? null : 'SMS delivery failed',
-      });
     }
 
     // Notify staff — fire-and-forget, must not block customer response
@@ -104,11 +109,22 @@ export async function POST(
         ? `${customer.first_name} ${customer.last_name}`.trim()
         : 'Customer';
 
-      // Staff SMS
-      if (biz.phone) {
-        sendSms(biz.phone, `Quote accepted! ${customerName} — Q-${quote.quote_number} for ${formatCurrency(Number(quote.total_amount))}. Services: ${serviceList}. Schedule in POS.`).catch((err) =>
-          console.error('[QuoteAccept] Staff SMS failed:', err)
-        );
+      // Staff SMS via template
+      const staffFallback = `Quote accepted! ${customerName} — Q-${quote.quote_number} for ${formatCurrency(Number(quote.total_amount))}. Services: ${serviceList}. Schedule in POS.`;
+      const staffResult = await renderSmsTemplate('quote_accepted_staff_notify', {
+        customer_name: customerName,
+        quote_number: quote.quote_number,
+        service_total: formatCurrency(Number(quote.total_amount)),
+        services: serviceList,
+      }, staffFallback);
+
+      if (staffResult.isActive) {
+        const phones = staffResult.recipientPhones?.length ? staffResult.recipientPhones : (biz.phone ? [biz.phone] : []);
+        for (const phone of phones) {
+          sendSms(phone, staffResult.body).catch((err) =>
+            console.error('[QuoteAccept] Staff SMS failed:', err)
+          );
+        }
       }
 
       // Staff email

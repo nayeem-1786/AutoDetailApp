@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { createShortLink } from '@/lib/utils/short-link';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 /**
  * Quote follow-up reminder cron endpoint.
@@ -72,7 +73,14 @@ export async function GET(request: NextRequest) {
       const shortUrl = await createShortLink(`${appUrl}/quote/${quote.access_token}`);
 
       const firstName = customer.first_name || 'there';
-      const message = `Hey ${firstName}! Just checking if you had a chance to look at your quote: ${shortUrl}`;
+      const fallbackMsg = `Hey ${firstName}! Just checking if you had a chance to look at your quote: ${shortUrl}`;
+      const rendered = await renderSmsTemplate('quote_reminder', {
+        first_name: firstName,
+        short_url: shortUrl,
+      }, fallbackMsg);
+
+      if (!rendered.isActive) continue;
+      const message = rendered.body;
 
       const result = await sendMarketingSms(customer.phone, message, quote.customer_id);
 
@@ -143,7 +151,14 @@ export async function GET(request: NextRequest) {
         const shortUrl = await createShortLink(`${appUrl}/quote/${quote.access_token}`);
 
         const firstName = customer.first_name || 'there';
-        const message = `Hi ${firstName}! You checked out your estimate — ready to book? Any questions, just reply here or call us. ${shortUrl}`;
+        const fallbackMsg = `Hi ${firstName}! You checked out your estimate — ready to book? Any questions, just reply here or call us. ${shortUrl}`;
+        const rendered = await renderSmsTemplate('quote_viewed_followup', {
+          first_name: firstName,
+          short_url: shortUrl,
+        }, fallbackMsg);
+
+        if (!rendered.isActive) continue;
+        const message = rendered.body;
 
         const result = await sendMarketingSms(customer.phone, message, quote.customer_id);
 

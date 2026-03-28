@@ -246,7 +246,7 @@ Thank you for choosing ${business.name}!`;
       if (!customer.phone) {
         errors.push('Customer has no phone number');
       } else {
-        const smsBody = buildAppointmentConfirmationSms({
+        const smsBody = await buildAppointmentConfirmationSms({
           businessName: business.name,
           businessPhone: business.phone,
           date: dateStr,
@@ -254,11 +254,13 @@ Thank you for choosing ${business.name}!`;
           total: formatCurrency(appointment.total_amount),
         });
 
-        const smsResult = await sendSms(customer.phone, smsBody);
-        if (smsResult.success) {
-          sentVia.push('sms');
-        } else {
-          errors.push(smsResult.error);
+        if (smsBody) {
+          const smsResult = await sendSms(customer.phone, smsBody);
+          if (smsResult.success) {
+            sentVia.push('sms');
+          } else {
+            errors.push(smsResult.error);
+          }
         }
       }
     }
