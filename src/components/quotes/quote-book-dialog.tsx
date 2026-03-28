@@ -10,8 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { NotifyCustomerDialog } from './notify-customer-dialog';
-
 interface QuoteBookDialogProps {
   open: boolean;
   onClose: () => void;
@@ -48,10 +46,6 @@ export function QuoteBookDialog({
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [booking, setBooking] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
-
-  // Post-conversion notification
-  const [showNotifyDialog, setShowNotifyDialog] = useState(false);
-  const [bookedAppointmentId, setBookedAppointmentId] = useState('');
 
   // Set default date to tomorrow on open
   useEffect(() => {
@@ -125,15 +119,23 @@ export function QuoteBookDialog({
 
       const data = await res.json();
       const apptId = data.appointment?.id ?? '';
-      toast.success('Appointment booked successfully');
 
-      // Show notification dialog if customer has contact info
-      if (customerEmail || customerPhone) {
-        setBookedAppointmentId(apptId);
-        setShowNotifyDialog(true);
+      // Auto-send confirmation to customer (fire-and-forget)
+      if (apptId && (customerEmail || customerPhone)) {
+        fetchFn(`${notifyApiBasePath}/${apptId}/notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ method: 'both' }),
+        }).then(() => {
+          toast.success('Appointment booked — confirmation sent to customer');
+        }).catch(() => {
+          toast.success('Appointment booked (confirmation send failed — notify manually)');
+        });
       } else {
-        onBooked(apptId);
+        toast.success('Appointment booked successfully');
       }
+
+      onBooked(apptId);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to book appointment');
     } finally {
@@ -150,7 +152,7 @@ export function QuoteBookDialog({
 
   return (
     <>
-      <Dialog open={open && !showNotifyDialog} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <DialogHeader>
           <DialogTitle>Book Appointment</DialogTitle>
         </DialogHeader>
@@ -242,18 +244,6 @@ export function QuoteBookDialog({
         </DialogContent>
       </Dialog>
 
-      <NotifyCustomerDialog
-        open={showNotifyDialog}
-        onClose={() => {
-          setShowNotifyDialog(false);
-          onBooked(bookedAppointmentId);
-        }}
-        appointmentId={bookedAppointmentId}
-        customerEmail={customerEmail ?? null}
-        customerPhone={customerPhone ?? null}
-        fetchFn={fetchFn}
-        apiBasePath={notifyApiBasePath}
-      />
     </>
   );
 }

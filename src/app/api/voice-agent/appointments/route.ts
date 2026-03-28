@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone, formatTime } from '@/lib/utils/format';
-import { sendSms } from '@/lib/utils/sms';
+import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { APPOINTMENT } from '@/lib/utils/constants';
@@ -343,7 +343,13 @@ export async function POST(request: NextRequest) {
     // Send SMS confirmation and log it
     const biz = await getBusinessInfo();
     if (hasSmsConsent) {
-      const smsBody = `Your appointment at ${biz.name} is confirmed! ${service.name} on ${formattedDate} at ${formattedTime}. We look forward to seeing you!`;
+      const smsBody = buildAppointmentConfirmationSms({
+        businessName: biz.name,
+        businessPhone: biz.phone,
+        date: formattedDate,
+        time: formattedTime,
+        serviceName: service.name,
+      });
       sendSms(e164Phone, smsBody)
         .then(() => logSmsMessage(supabase, e164Phone, smsBody))
         .catch((err) => console.error('Appointment SMS confirmation failed:', err));

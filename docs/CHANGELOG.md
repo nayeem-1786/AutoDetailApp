@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: unified appointment SMS template + remove transactional STOP footers + auto-notify on conversion (G10, G7, G8) — 2026-03-27
+
+- **G10 — Unified appointment confirmation SMS:** New `buildAppointmentConfirmationSms()` in `src/lib/utils/sms.ts` replaces 4 hardcoded templates. All callers (POS notify, admin notify, voice-agent, voice-post-call) now use the shared function. Supports optional `customerFirstName`, `serviceName`, `total` fields.
+- **G7 — Remove STOP footers from transactional SMS:** Removed "Reply STOP to opt out" from 3 voice-agent transactional messages (`voice-post-call.ts` appointment + quote, `send-quote-sms/route.ts`). STOP footer is only appropriate on `sendMarketingSms()` which auto-appends it.
+- **G8 — Auto-notify on quote-to-appointment conversion:** `QuoteBookDialog` now auto-sends confirmation (SMS + email via `/notify` endpoint) immediately after conversion instead of showing a `NotifyCustomerDialog` popup. Fire-and-forget — conversion succeeds even if notification fails. Staff still sees "Notify" button for re-sends.
+
+---
+
 ## feat: email variable registry + SMS booking reminders + viewed-quote follow-up (B2, G6, G4) — 2026-03-27
 
 - **B2 — Email template variable registry:** Added `cancellation_reason` to APPOINTMENT_VARS (transactional templates) and `amount_paid` to LOYALTY_VARS (marketing templates) in `src/lib/email/variables.ts` and corresponding `EMAIL_VARIABLE_GROUPS`. Both were passed by code but invisible in the admin template editor. Spot-checked top 3 callers — no other orphan variables found.

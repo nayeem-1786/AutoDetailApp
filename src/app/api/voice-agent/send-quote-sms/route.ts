@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
     // Send SMS
     const biz = await getBusinessInfo();
     const serviceList = quoteItems.map((i) => i.item_name).join(', ');
-    const smsBody = `Here's your quote from ${biz.name} for ${serviceList}: ${linkUrl}\n\nReply STOP to opt out.`;
+    const smsBody = `Here's your quote from ${biz.name} for ${serviceList}: ${linkUrl}`;
     await sendSms(normalizedPhone, smsBody);
 
     // Log SMS to conversation thread

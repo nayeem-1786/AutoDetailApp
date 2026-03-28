@@ -4,7 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
-import { sendSms } from '@/lib/utils/sms';
+import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 
@@ -246,12 +246,13 @@ Thank you for choosing ${business.name}!`;
       if (!customer.phone) {
         errors.push('Customer has no phone number');
       } else {
-        const smsBody =
-          `${business.name} — Appointment Confirmed\n\n` +
-          `${dateStr}\n` +
-          `${displayTime}\n` +
-          `Total: ${formatCurrency(appointment.total_amount)}\n\n` +
-          `Questions? Call ${business.phone}`;
+        const smsBody = buildAppointmentConfirmationSms({
+          businessName: business.name,
+          businessPhone: business.phone,
+          date: dateStr,
+          time: displayTime,
+          total: formatCurrency(appointment.total_amount),
+        });
 
         const smsResult = await sendSms(customer.phone, smsBody);
         if (smsResult.success) {

@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
-import { sendSms } from '@/lib/utils/sms';
+import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { generateConversationSummary } from '@/lib/services/conversation-summary';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
@@ -299,9 +299,13 @@ export async function processVoiceCallEnd(
     // Send confirmation SMS
     console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: appointment already booked`);
     if (customer?.sms_consent) {
+      // Note: the voice-agent/appointments endpoint already sends a detailed
+      // confirmation SMS with date/time/service during the call. This post-call
+      // message is a brief follow-up — skip if the mid-call SMS already sent.
+      // For now, keep as a simple thank-you (no date/time since we don't have it here).
       const biz = await getBusinessInfo();
       const name = customer.first_name ? `, ${customer.first_name}` : '';
-      const smsBody = `Thanks for calling ${biz.name}${name}! Your appointment is confirmed. We look forward to seeing you! Reply STOP to opt out.`;
+      const smsBody = `Thanks for calling ${biz.name}${name}! Your appointment is confirmed. Questions? Call ${biz.phone}`;
       const smsResult = await sendSms(normalizedPhone, smsBody);
       console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
 
@@ -549,7 +553,7 @@ async function autoGenerateQuote(
 
     if (custCheck?.sms_consent) {
       const biz = await getBusinessInfo();
-      const quoteSmsBody = `Thanks for calling ${biz.name}! Here's a quote for what we discussed: ${linkUrl}\n\nReply STOP to opt out.`;
+      const quoteSmsBody = `Thanks for calling ${biz.name}! Here's a quote for what we discussed: ${linkUrl}`;
       const smsResult = await sendSms(phone, quoteSmsBody);
       console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
 

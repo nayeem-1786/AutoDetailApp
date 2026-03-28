@@ -230,3 +230,32 @@ async function checkFrequencyCap(
 
   return { allowed: sentToday < cap, sentToday, cap };
 }
+
+// ---------------------------------------------------------------------------
+// Shared SMS template builders
+// ---------------------------------------------------------------------------
+
+/** Build a canonical appointment confirmation SMS used by all entry paths. */
+export function buildAppointmentConfirmationSms(params: {
+  businessName: string;
+  businessPhone: string;
+  date: string;
+  time: string;
+  serviceName?: string;
+  customerFirstName?: string;
+  total?: string;
+}): string {
+  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total } = params;
+  const greeting = customerFirstName ? `Hi ${customerFirstName}, your` : 'Your';
+  const serviceLine = serviceName ? `${serviceName}\n` : '';
+  const totalLine = total ? `Total: ${total}\n` : '';
+
+  return (
+    `${businessName} — Appointment Confirmed\n\n` +
+    `${greeting} appointment is scheduled:\n` +
+    serviceLine +
+    `${date} at ${time}\n` +
+    totalLine +
+    `\nQuestions? Call ${businessPhone}`
+  );
+}

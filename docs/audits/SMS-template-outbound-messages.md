@@ -133,3 +133,12 @@
 - `sms_daily_cap_per_customer` — Daily marketing SMS limit per customer (default: 5)
 - `google_review_url` — Used in lifecycle templates as `{google_review_link}`
 - `yelp_review_url` — Used in lifecycle templates as `{yelp_review_link}`
+
+---
+
+### Post-Audit Changes (Session 13F–13H, 2026-03-27)
+
+- **Appointment confirmation SMS unified:** Templates #1, #2, #3, #4 now use shared `buildAppointmentConfirmationSms()` from `src/lib/utils/sms.ts`. Single canonical template with optional `serviceName`, `customerFirstName`, `total` fields.
+- **STOP footers removed from transactional SMS:** Templates #4 (voice-agent appointment), #6 (voice post-call auto-quote), #7 (mid-call send-quote-sms) no longer include "Reply STOP to opt out." These use `sendSms()` (transactional) — only `sendMarketingSms()` should have STOP footers.
+- **Quote-to-appointment conversion auto-notifies:** `QuoteBookDialog` now auto-sends confirmation via `/notify` endpoint after conversion. No longer requires manual staff "Notify" click.
+- **New SMS sends added:** Staff notification on quote acceptance (G1), booking confirmation to customer (G2), staff notification on new booking (G3), SMS booking reminder (G6), viewed-quote follow-up (G4).
