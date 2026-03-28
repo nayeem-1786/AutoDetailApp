@@ -10,6 +10,11 @@ import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
 import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
+import { sendSms } from '@/lib/utils/sms';
+import { sendEmail } from '@/lib/utils/email';
+import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
+import { getBusinessInfo } from '@/lib/data/business';
+import { formatCurrency } from '@/lib/utils/format';
 
 export async function POST(request: NextRequest) {
   try {
@@ -442,6 +447,128 @@ export async function POST(request: NextRequest) {
       }, supabase).catch((err) =>
         console.error('Confirmed webhook fire failed:', err)
       );
+    }
+
+    // 10. Send booking confirmation + staff notification (fire-and-forget)
+    try {
+      const biz = await getBusinessInfo();
+      const dateStr = new Date(data.date + 'T12:00:00').toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        timeZone: 'America/Los_Angeles',
+      });
+      const [tH, tM] = data.time.split(':').map(Number);
+      const period = tH >= 12 ? 'PM' : 'AM';
+      const displayHour = tH % 12 || 12;
+      const timeStr = `${displayHour}:${String(tM).padStart(2, '0')} ${period}`;
+
+      const allServices = [
+        serviceRow.name as string,
+        ...data.addons.map((a) => a.name),
+      ];
+      const serviceNames = allServices.join(', ');
+      const vehicleParts = [data.vehicle?.year, data.vehicle?.make, data.vehicle?.model].filter(Boolean);
+      const vehicleStr = vehicleParts.length > 0 ? vehicleParts.join(' ') : '';
+      const customerName = `${data.customer.first_name} ${data.customer.last_name}`.trim();
+      const total = formatCurrency(Number(appointment.total_amount));
+
+      // G2 — Customer confirmation SMS
+      if (e164Phone) {
+        const customerSms = [
+          `${biz.name} — Booking Confirmed!`,
+          '',
+          `${dateStr}`,
+          `${timeStr}`,
+          serviceNames,
+          vehicleStr ? `Vehicle: ${vehicleStr}` : '',
+          `Total: ${total}`,
+          '',
+          `Questions? Call ${biz.phone}`,
+        ].filter(Boolean).join('\n');
+
+        sendSms(e164Phone, customerSms).catch((err) =>
+          console.error('[Booking] Customer SMS failed (non-blocking):', err)
+        );
+      }
+
+      // G2 — Customer confirmation email
+      if (data.customer.email) {
+        const serviceRowsHtml = allServices
+          .map((name, i) => {
+            const price = i === 0 ? data.price : data.addons[i - 1]?.price ?? 0;
+            return `<tr><td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;">${name}</td><td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatCurrency(price)}</td></tr>`;
+          })
+          .join('');
+        const servicesTableHtml = `<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th style="padding:8px 16px;text-align:left;font-size:12px;text-transform:uppercase;">Service</th><th style="padding:8px 16px;text-align:right;font-size:12px;text-transform:uppercase;">Price</th></tr></thead><tbody>${serviceRowsHtml}</tbody></table>`;
+
+        sendTemplatedEmail(data.customer.email, 'appointment_confirmed', {
+          first_name: data.customer.first_name,
+          last_name: data.customer.last_name,
+          customer_name: customerName,
+          appointment_date: dateStr,
+          appointment_time: timeStr,
+          appointment_total: total,
+          vehicle_info: vehicleStr || 'N/A',
+          services_list: serviceNames,
+          items_table: servicesTableHtml,
+          business_name: biz.name,
+          business_phone: biz.phone,
+          business_email: biz.email || '',
+          business_address: biz.address,
+          business_website: biz.website || '',
+        }).catch((err) =>
+          console.error('[Booking] Customer email failed (non-blocking):', err)
+        );
+      }
+
+      // G3 — Staff notification SMS
+      if (biz.phone) {
+        const depositInfo = data.payment_intent_id ? 'Deposit paid.' : 'Pay on site.';
+        sendSms(biz.phone, `New online booking! ${customerName} — ${serviceNames} on ${dateStr} at ${timeStr}. ${depositInfo}`).catch((err) =>
+          console.error('[Booking] Staff SMS failed (non-blocking):', err)
+        );
+      }
+
+      // G3 — Staff notification email
+      if (biz.email) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+        const subject = `New Booking — ${customerName} — ${dateStr}`;
+        const textBody = [
+          `New online booking received!`,
+          '',
+          `Customer: ${customerName}`,
+          `Phone: ${e164Phone}`,
+          data.customer.email ? `Email: ${data.customer.email}` : '',
+          vehicleStr ? `Vehicle: ${vehicleStr}` : '',
+          `Services: ${serviceNames}`,
+          `Date: ${dateStr} at ${timeStr}`,
+          `Total: ${total}`,
+          data.payment_intent_id ? `Payment: Deposit paid` : `Payment: Pay on site`,
+          data.notes ? `Notes: ${data.notes}` : '',
+          '',
+          `View appointments: ${appUrl}/admin/appointments`,
+        ].filter(Boolean).join('\n');
+
+        const htmlBody = `<div style="font-family:sans-serif;max-width:500px;">
+<h2 style="color:#1e3a5f;">New Online Booking</h2>
+<p><strong>Customer:</strong> ${customerName}</p>
+<p><strong>Phone:</strong> ${e164Phone}</p>
+${data.customer.email ? `<p><strong>Email:</strong> ${data.customer.email}</p>` : ''}
+${vehicleStr ? `<p><strong>Vehicle:</strong> ${vehicleStr}</p>` : ''}
+<p><strong>Services:</strong> ${serviceNames}</p>
+<p><strong>Date:</strong> ${dateStr} at ${timeStr}</p>
+<p><strong>Total:</strong> ${total}</p>
+<p><strong>Payment:</strong> ${data.payment_intent_id ? 'Deposit paid' : 'Pay on site'}</p>
+${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
+<br/>
+<a href="${appUrl}/admin/appointments" style="display:inline-block;padding:12px 24px;background-color:#1e3a5f;color:#fff;text-decoration:none;border-radius:6px;">View Appointments</a>
+</div>`;
+
+        sendEmail(biz.email, subject, textBody, htmlBody).catch((err) =>
+          console.error('[Booking] Staff email failed (non-blocking):', err)
+        );
+      }
+    } catch (notifyErr) {
+      console.error('[Booking] Notification failed (non-blocking):', notifyErr);
     }
 
     logAudit({

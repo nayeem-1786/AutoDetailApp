@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: critical pre-launch customer journey fixes (B1, B3, G1, G2+G3) — 2026-03-27
+
+Five fixes from the full customer journey audit (`docs/planning/SESSION-13E-full-customer-journey.md`):
+
+- **B1 — Voice agent hardcoded biz name:** Replaced `"Smart Details Auto Spa"` with `getBusinessInfo().name` in `voice-agent/appointments/route.ts:344`. Also removed unnecessary "Reply STOP to opt out" from this transactional SMS (G7).
+- **B3 — SMS AI appointment awareness:** Added APPOINTMENTS section to default system prompt in `messaging-ai-prompt.ts`. AI now acknowledges appointments, references dates/times/services, and directs customers to call for cancellation/rescheduling instead of saying "I can't find any appointments."
+- **G1 — Staff notification on quote acceptance:** When a customer accepts a quote, staff now receives SMS + email with customer name, quote number, total, service list, and admin link. Fire-and-forget — customer acceptance response is never blocked.
+- **G2 — Booking confirmation to customer:** Online bookings now send confirmation SMS (date, time, services, total) and templated email (`appointment_confirmed` template) immediately after appointment creation. Previously customers got nothing after paying a deposit.
+- **G3 — Staff notification on new booking:** Staff receives SMS + email when a new online booking arrives, including customer details, services, date/time, deposit status, and admin link.
+
+---
+
 ## feat: Infer customer_type and extract vehicle info from transcript — 2026-03-27
 
 For abandoned calls where `finalize_call` never fires, the polling cron now extracts useful data from the transcript:

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { sendSms } from '@/lib/utils/sms';
+import { sendEmail } from '@/lib/utils/email';
+import { getBusinessInfo } from '@/lib/data/business';
+import { formatCurrency } from '@/lib/utils/format';
 
 export async function POST(
   request: NextRequest,
@@ -89,6 +92,63 @@ export async function POST(
         status: smsResult.success ? 'sent' : 'failed',
         error_message: smsResult.success ? null : 'SMS delivery failed',
       });
+    }
+
+    // Notify staff — fire-and-forget, must not block customer response
+    try {
+      const biz = await getBusinessInfo();
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+      const items = (quote.items as Array<{ item_name: string }>) ?? [];
+      const serviceList = items.map((i) => i.item_name).join(', ') || 'Services';
+      const customerName = customer
+        ? `${customer.first_name} ${customer.last_name}`.trim()
+        : 'Customer';
+
+      // Staff SMS
+      if (biz.phone) {
+        sendSms(biz.phone, `Quote accepted! ${customerName} — Q-${quote.quote_number} for ${formatCurrency(Number(quote.total_amount))}. Services: ${serviceList}. Schedule in POS.`).catch((err) =>
+          console.error('[QuoteAccept] Staff SMS failed:', err)
+        );
+      }
+
+      // Staff email
+      if (biz.email) {
+        const adminUrl = `${appUrl}/admin/quotes/${id}`;
+        const subject = `Quote #${quote.quote_number} Accepted — ${customerName}`;
+        const textBody = [
+          `Quote #${quote.quote_number} has been accepted!`,
+          '',
+          `Customer: ${customerName}`,
+          customer?.phone ? `Phone: ${customer.phone}` : '',
+          customer?.email ? `Email: ${customer.email}` : '',
+          `Services: ${serviceList}`,
+          `Total: ${formatCurrency(Number(quote.total_amount))}`,
+          '',
+          `View in admin: ${adminUrl}`,
+          '',
+          'Next step: Convert this quote to an appointment in POS.',
+        ].filter(Boolean).join('\n');
+
+        const htmlBody = `<div style="font-family: sans-serif; max-width: 500px;">
+<h2 style="color: #1e3a5f;">Quote Accepted!</h2>
+<p><strong>Quote #${quote.quote_number}</strong></p>
+<p><strong>Customer:</strong> ${customerName}</p>
+${customer?.phone ? `<p><strong>Phone:</strong> ${customer.phone}</p>` : ''}
+${customer?.email ? `<p><strong>Email:</strong> ${customer.email}</p>` : ''}
+<p><strong>Services:</strong> ${serviceList}</p>
+<p><strong>Total:</strong> ${formatCurrency(Number(quote.total_amount))}</p>
+<br/>
+<a href="${adminUrl}" style="display: inline-block; padding: 12px 24px; background-color: #1e3a5f; color: #fff; text-decoration: none; border-radius: 6px;">View Quote in Admin</a>
+<br/><br/>
+<p style="color: #6b7280; font-size: 14px;">Next step: Convert this quote to an appointment in POS.</p>
+</div>`;
+
+        sendEmail(biz.email, subject, textBody, htmlBody).catch((err) =>
+          console.error('[QuoteAccept] Staff email failed:', err)
+        );
+      }
+    } catch (staffNotifyErr) {
+      console.error('[QuoteAccept] Staff notification failed (non-blocking):', staffNotifyErr);
     }
 
     return NextResponse.json({ success: true, quote: updated });

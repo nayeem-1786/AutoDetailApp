@@ -4,6 +4,7 @@ import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone, formatTime } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
+import { getBusinessInfo } from '@/lib/data/business';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 
@@ -340,8 +341,9 @@ export async function POST(request: NextRequest) {
     const formattedTime = formatTime(time);
 
     // Send SMS confirmation and log it
+    const biz = await getBusinessInfo();
     if (hasSmsConsent) {
-      const smsBody = `Your appointment at Smart Details Auto Spa is confirmed! ${service.name} on ${formattedDate} at ${formattedTime}. We look forward to seeing you! Reply STOP to opt out.`;
+      const smsBody = `Your appointment at ${biz.name} is confirmed! ${service.name} on ${formattedDate} at ${formattedTime}. We look forward to seeing you!`;
       sendSms(e164Phone, smsBody)
         .then(() => logSmsMessage(supabase, e164Phone, smsBody))
         .catch((err) => console.error('Appointment SMS confirmation failed:', err));
