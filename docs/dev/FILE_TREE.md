@@ -865,6 +865,12 @@ src/lib/email/variables.ts
 src/lib/email/drip-engine.ts
 ```
 
+### SMS Template System
+```
+src/lib/sms/render-sms-template.ts
+src/lib/sms/sms-template-variables.ts
+```
+
 ### Quotes
 ```
 src/lib/quotes/convert-service.ts

@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: SMS template system — database, seed data, renderer (Session 13I) — 2026-03-27
+
+Foundation for admin-editable SMS templates:
+
+- **Migration:** `sms_templates` table with 15 seeded templates across 5 categories (booking, quote, transactional, reminder, system). Each template has editable body, immutable default, variable definitions (JSONB), on/off toggle (`is_active`), `can_silence` flag, recipient routing (`customer`/`staff`/`detailer`), and optional `recipient_phones` array for staff templates.
+- **Renderer:** `src/lib/sms/render-sms-template.ts` — fetches templates from DB with 60s TTL cache (module-level, same pattern as IP whitelist). Auto-injects `{business_name}`, `{business_phone}`, `{business_address}`. Supports business phone override via `business_settings.sms_business_phone_override`. Falls back to hardcoded string on DB error/missing template. Returns `isActive`, `recipientType`, `recipientPhones` for caller routing.
+- **Variable definitions:** `src/lib/sms/sms-template-variables.ts` — per-slug variable lists with descriptions and samples for admin UI. Lists 6 unsafe templates (addon auth, quote SMS, receipt) that stay hardcoded.
+- **No admin UI yet** (Session 13J). **No call site refactoring yet** (Session 13K).
+
+---
+
 ## feat: unified appointment SMS template + remove transactional STOP footers + auto-notify on conversion (G10, G7, G8) — 2026-03-27
 
 - **G10 — Unified appointment confirmation SMS:** New `buildAppointmentConfirmationSms()` in `src/lib/utils/sms.ts` replaces 4 hardcoded templates. All callers (POS notify, admin notify, voice-agent, voice-post-call) now use the shared function. Supports optional `customerFirstName`, `serviceName`, `total` fields.

@@ -615,6 +615,23 @@ idx_refund_items_refund — btree (refund_id)
 | source | consent_source (enum) | NOT NULL | |
 | created_at | TIMESTAMPTZ | | |
 
+### sms_templates
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| slug | TEXT | UNIQUE, NOT NULL | Template identifier used in code (e.g. 'appointment_confirmed') |
+| name | TEXT | NOT NULL | Display name in admin UI |
+| category | TEXT | CHECK ('booking','quote','transactional','reminder','system') | Grouping for admin UI |
+| body_template | TEXT | NOT NULL | Editable template text with `{variable}` placeholders |
+| default_body | TEXT | NOT NULL | Immutable seed value for "Reset to Default" |
+| variables | JSONB | NOT NULL | Array of `[{key, description, required}]` |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | When false, SMS is not sent for this event |
+| can_silence | BOOLEAN | NOT NULL, DEFAULT true | When false, admin sees extra confirmation before toggling off |
+| recipient_type | TEXT | CHECK ('customer','staff','detailer'), DEFAULT 'customer' | Who receives the SMS |
+| recipient_phones | TEXT[] | DEFAULT NULL | Explicit phone numbers for staff templates; falls back to business phone if empty |
+| updated_at | TIMESTAMPTZ | NOT NULL | Auto-updated via trigger |
+| updated_by | UUID | FK → auth.users(id) | Admin who last edited |
+
 ### sms_consent_log
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
