@@ -372,7 +372,7 @@ export default function SmsTemplatesPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900">{t.name}</p>
                     <p className="mt-0.5 truncate text-xs text-gray-500">
-                      {t.body_template.slice(0, 60)}{t.body_template.length > 60 ? '...' : ''}
+                      {t.body_template}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
