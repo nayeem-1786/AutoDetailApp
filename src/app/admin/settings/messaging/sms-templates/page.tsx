@@ -12,6 +12,7 @@ import { VariableInserter } from '@/app/admin/marketing/email-templates/_compone
 import { SMS_TEMPLATE_VARIABLES } from '@/lib/sms/sms-template-variables';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { renderTemplate } from '@/lib/utils/template';
 import type { VariableDefinition } from '@/lib/email/variables';
@@ -60,20 +61,30 @@ function countSegments(text: string): { chars: number; segments: number } {
   return { chars, segments: Math.ceil(chars / 153) };
 }
 
-function buildSampleVars(variables: Array<{ key: string; description: string; required: boolean }>, slug: string): Record<string, string> {
+interface BusinessInfo {
+  name: string;
+  phone: string;
+  address: string;
+}
+
+function buildSampleVars(
+  variables: Array<{ key: string; description: string; required: boolean }>,
+  slug: string,
+  bizInfo: BusinessInfo | null
+): Record<string, string> {
   const defs = SMS_TEMPLATE_VARIABLES[slug] ?? [];
   const result: Record<string, string> = {};
   for (const v of variables) {
     const def = defs.find((d) => d.key === v.key);
     const sample = def?.sample;
-    if (sample && !sample.startsWith('[')) {
+    if (v.key === 'business_name' && bizInfo?.name) {
+      result[v.key] = bizInfo.name;
+    } else if (v.key === 'business_phone' && bizInfo?.phone) {
+      result[v.key] = bizInfo.phone;
+    } else if (v.key === 'business_address' && bizInfo?.address) {
+      result[v.key] = bizInfo.address;
+    } else if (sample && !sample.startsWith('[')) {
       result[v.key] = sample;
-    } else if (v.key === 'business_name') {
-      result[v.key] = 'Smart Details Auto Spa';
-    } else if (v.key === 'business_phone') {
-      result[v.key] = '(310) 756-4789';
-    } else if (v.key === 'business_address') {
-      result[v.key] = '2500 PCH, Lomita, CA';
     } else {
       result[v.key] = `[${v.description}]`;
     }
@@ -97,6 +108,7 @@ export default function SmsTemplatesPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [confirmSilenceSlug, setConfirmSilenceSlug] = useState<string | null>(null);
+  const [bizInfo, setBizInfo] = useState<BusinessInfo | null>(null);
 
   // Loaded values for dirty detection
   const [loadedBody, setLoadedBody] = useState('');
@@ -110,7 +122,7 @@ export default function SmsTemplatesPage() {
   const isDirty = editBody !== loadedBody || JSON.stringify(editPhones) !== JSON.stringify(loadedPhones);
   useUnsavedChanges(isDirty);
 
-  // Fetch templates
+  // Fetch templates + business info for preview
   useEffect(() => {
     async function load() {
       try {
@@ -122,6 +134,27 @@ export default function SmsTemplatesPage() {
         toast.error('Failed to load SMS templates');
       } finally {
         setLoading(false);
+      }
+
+      // Load business info for live preview (phone override + actual biz name)
+      try {
+        const supabase = createClient();
+        const { data: settings } = await supabase
+          .from('business_settings')
+          .select('key, value')
+          .in('key', ['business_name', 'business_phone', 'business_address', 'sms_business_phone_override']);
+
+        const biz: BusinessInfo = { name: '', phone: '', address: '' };
+        for (const row of settings ?? []) {
+          const val = typeof row.value === 'string' ? row.value : String(row.value ?? '');
+          if (row.key === 'business_name') biz.name = val;
+          else if (row.key === 'business_phone') biz.phone = val;
+          else if (row.key === 'business_address') biz.address = val;
+          else if (row.key === 'sms_business_phone_override' && val.trim()) biz.phone = val.trim();
+        }
+        if (biz.name || biz.phone) setBizInfo(biz);
+      } catch {
+        // Preview will use sample values as fallback
       }
     }
     load();
@@ -308,7 +341,7 @@ export default function SmsTemplatesPage() {
   }
 
   // Preview rendering
-  const sampleVars = editTemplate ? buildSampleVars(editTemplate.variables, editTemplate.slug) : {};
+  const sampleVars = editTemplate ? buildSampleVars(editTemplate.variables, editTemplate.slug, bizInfo) : {};
   const previewText = editTemplate ? renderTemplate(editBody, sampleVars) : '';
   const { chars, segments } = countSegments(previewText);
 
