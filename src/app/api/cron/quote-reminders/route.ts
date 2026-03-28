@@ -97,5 +97,73 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ sent, errors });
+  // ── Phase 2: Viewed-but-not-accepted follow-up (48h after view) ──────────
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  const { data: viewedQuotes, error: viewedError } = await admin
+    .from('quotes')
+    .select(`
+      id,
+      access_token,
+      customer_id,
+      customer:customers!inner(first_name, phone, sms_consent)
+    `)
+    .eq('status', 'viewed')
+    .lt('viewed_at', fortyEightHoursAgo)
+    .is('deleted_at', null);
+
+  if (viewedError) {
+    console.error('Viewed-quote follow-up query error:', viewedError);
+    return NextResponse.json({ sent, errors, viewed_sent: 0, viewed_errors: 0 });
+  }
+
+  let viewedSent = 0;
+  let viewedErrors = 0;
+
+  if (viewedQuotes && viewedQuotes.length > 0) {
+    // Dedup: check for existing viewed-followup communications
+    const viewedIds = viewedQuotes.map((q) => q.id);
+    const { data: existingFollowups } = await admin
+      .from('quote_communications')
+      .select('quote_id')
+      .in('quote_id', viewedIds)
+      .eq('channel', 'sms')
+      .ilike('message', '%viewed-followup%');
+
+    const alreadyFollowedUp = new Set(existingFollowups?.map((r) => r.quote_id) || []);
+
+    for (const quote of viewedQuotes) {
+      if (alreadyFollowedUp.has(quote.id)) continue;
+
+      const customer = quote.customer as unknown as { first_name: string; phone: string | null; sms_consent: boolean };
+      if (!customer?.phone || !customer.sms_consent || !quote.access_token) continue;
+
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const shortUrl = await createShortLink(`${appUrl}/quote/${quote.access_token}`);
+
+        const firstName = customer.first_name || 'there';
+        const message = `Hi ${firstName}! You checked out your estimate — ready to book? Any questions, just reply here or call us. ${shortUrl}`;
+
+        const result = await sendMarketingSms(customer.phone, message, quote.customer_id);
+
+        await admin.from('quote_communications').insert({
+          quote_id: quote.id,
+          channel: 'sms',
+          sent_to: customer.phone,
+          status: result.success ? 'sent' : 'failed',
+          error_message: result.success ? null : result.error,
+          message: `[viewed-followup] ${message}`,
+        });
+
+        if (result.success) viewedSent++;
+        else viewedErrors++;
+      } catch (err) {
+        console.error(`Failed to send viewed-followup for quote ${quote.id}:`, err);
+        viewedErrors++;
+      }
+    }
+  }
+
+  return NextResponse.json({ sent, errors, viewed_sent: viewedSent, viewed_errors: viewedErrors });
 }

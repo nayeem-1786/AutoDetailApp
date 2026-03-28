@@ -40,6 +40,7 @@ const LOYALTY_VARS: VariableDefinition[] = [
   { key: 'visit_count', description: 'Total number of visits', sample: '12' },
   { key: 'days_since_last_visit', description: 'Days since last service', sample: '45' },
   { key: 'lifetime_spend', description: 'Total amount spent', sample: '$2,340' },
+  { key: 'amount_paid', description: 'Amount paid on last visit', sample: '$149.00' },
 ];
 
 const COUPON_VARS: VariableDefinition[] = [
@@ -57,6 +58,7 @@ const APPOINTMENT_VARS: VariableDefinition[] = [
   { key: 'appointment_date', description: 'Appointment date', sample: 'March 15, 2026' },
   { key: 'appointment_time', description: 'Appointment time', sample: '10:00 AM' },
   { key: 'appointment_total', description: 'Appointment total amount', sample: '$299.00' },
+  { key: 'cancellation_reason', description: 'Reason for cancellation', sample: 'Customer requested reschedule' },
 ];
 
 const ORDER_VARS: VariableDefinition[] = [
@@ -161,6 +163,7 @@ export const EMAIL_VARIABLE_GROUPS = {
     appointment_time: 'Appointment time',
     appointment_total: 'Appointment total amount',
     timer_display: 'Job duration (e.g. 2h 15m)',
+    cancellation_reason: 'Reason for cancellation',
   },
   'Notification': {
     products_table: 'Stock alert products table (pre-rendered HTML)',

@@ -25,6 +25,7 @@ export const VARIABLE_GROUPS = {
     visit_count: 'Total number of visits',
     days_since_last_visit: 'Days since last service',
     lifetime_spend: 'Total amount spent',
+    amount_paid: 'Amount paid on last visit',
   },
   'Coupons': {
     coupon_code: 'Unique coupon code (when coupon attached)',

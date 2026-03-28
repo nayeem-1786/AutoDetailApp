@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: email variable registry + SMS booking reminders + viewed-quote follow-up (B2, G6, G4) — 2026-03-27
+
+- **B2 — Email template variable registry:** Added `cancellation_reason` to APPOINTMENT_VARS (transactional templates) and `amount_paid` to LOYALTY_VARS (marketing templates) in `src/lib/email/variables.ts` and corresponding `EMAIL_VARIABLE_GROUPS`. Both were passed by code but invisible in the admin template editor. Spot-checked top 3 callers — no other orphan variables found.
+- **G6 — SMS booking reminders:** Day-before appointment reminder cron now sends SMS in addition to email. Added `phone` and `sms_consent` to the customer query. Respects opt-out (`sms_consent !== false`). Fire-and-forget — email still sends even if SMS fails.
+- **G4 — Viewed-but-not-accepted quote follow-up:** New Phase 2 in quote-reminders cron. Quotes opened 48+ hours ago but not accepted get a one-time nudge SMS via `sendMarketingSms()` (consent-checked, frequency-capped). Deduped via `[viewed-followup]` tag in `quote_communications` — distinct from existing `[reminder]` tag. Existing unviewed-quote reminder logic untouched.
+
+---
+
 ## feat: critical pre-launch customer journey fixes (B1, B3, G1, G2+G3) — 2026-03-27
 
 Five fixes from the full customer journey audit (`docs/planning/SESSION-13E-full-customer-journey.md`):

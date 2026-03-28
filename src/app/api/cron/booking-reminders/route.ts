@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
+import { sendSms } from '@/lib/utils/sms';
 
 export async function GET(request: NextRequest) {
   const apiKey = request.headers.get('x-api-key');
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     .from('appointments')
     .select(`
       id, scheduled_date, scheduled_start_time, total_amount,
-      customer:customers!inner(id, first_name, last_name, email),
+      customer:customers!inner(id, first_name, last_name, email, phone, sms_consent),
       services:appointment_services(service_id, service:services(name))
     `)
     .eq('scheduled_date', tomorrowPST)
@@ -33,8 +34,7 @@ export async function GET(request: NextRequest) {
   let failed = 0;
 
   for (const appt of appointments || []) {
-    const customer = appt.customer as unknown as { id: string; first_name: string; last_name: string; email: string | null };
-    if (!customer?.email) continue;
+    const customer = appt.customer as unknown as { id: string; first_name: string; last_name: string; email: string | null; phone: string | null; sms_consent: boolean };
 
     const services = (appt.services || []) as unknown as { service_id: string; service: { name: string } | null }[];
     const primaryService = services[0];
@@ -49,25 +49,39 @@ export async function GET(request: NextRequest) {
     const displayHour = h % 12 || 12;
     const displayTime = `${displayHour}:${m.toString().padStart(2, '0')} ${period}`;
 
-    const result = await sendTemplatedEmail(customer.email, 'booking_reminder', {
-      first_name: customer.first_name,
-      customer_name: `${customer.first_name} ${customer.last_name || ''}`.trim(),
-      service_name: primaryService?.service?.name || 'Your service',
-      appointment_date: dateStr,
-      appointment_time: displayTime,
-      business_name: business.name,
-      business_phone: business.phone,
-      booking_url: `${process.env.NEXT_PUBLIC_APP_URL}/book`,
-    });
+    const serviceName = primaryService?.service?.name || 'Your service';
+
+    // Email reminder
+    if (customer.email) {
+      const result = await sendTemplatedEmail(customer.email, 'booking_reminder', {
+        first_name: customer.first_name,
+        customer_name: `${customer.first_name} ${customer.last_name || ''}`.trim(),
+        service_name: serviceName,
+        appointment_date: dateStr,
+        appointment_time: displayTime,
+        business_name: business.name,
+        business_phone: business.phone,
+        booking_url: `${process.env.NEXT_PUBLIC_APP_URL}/book`,
+      });
+
+      if (result.success || result.usedTemplate) sent++;
+      else failed++;
+    }
+
+    // SMS reminder (transactional — no marketing consent needed, but respect opt-out)
+    if (customer.phone && customer.sms_consent !== false) {
+      try {
+        await sendSms(customer.phone, `Reminder: Your ${serviceName} appointment at ${business.name} is tomorrow at ${displayTime}. Need to reschedule? Call us at ${business.phone}`);
+      } catch (smsErr) {
+        console.error(`[BookingReminder] SMS failed for appointment ${appt.id}:`, smsErr);
+      }
+    }
 
     // Mark as reminded regardless (prevent retries on failure)
     await supabase
       .from('appointments')
       .update({ reminder_sent_at: new Date().toISOString() })
       .eq('id', appt.id);
-
-    if (result.success || result.usedTemplate) sent++;
-    else failed++;
   }
 
   return NextResponse.json({ success: true, sent, failed, total: (appointments || []).length });
