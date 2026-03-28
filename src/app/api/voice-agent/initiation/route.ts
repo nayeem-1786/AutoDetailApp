@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone, formatTime } from '@/lib/utils/format';
+import { getBusinessInfo } from '@/lib/data/business';
 
 /**
  * POST /api/voice-agent/initiation
@@ -23,16 +24,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
+    const biz = await getBusinessInfo();
     const body = await request.json();
     const callerPhone = body.caller_id as string | undefined;
 
     if (!callerPhone) {
-      return NextResponse.json(newCallerResponse(''), { status: 200 });
+      return NextResponse.json(newCallerResponse('', biz.name), { status: 200 });
     }
 
     const e164Phone = normalizePhone(callerPhone);
     if (!e164Phone) {
-      return NextResponse.json(newCallerResponse(callerPhone), { status: 200 });
+      return NextResponse.json(newCallerResponse(callerPhone, biz.name), { status: 200 });
     }
 
     const supabase = createAdminClient();
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
     const customer = customerRes.data;
 
     if (!customer) {
-      return NextResponse.json(newCallerResponse(e164Phone), { status: 200 });
+      return NextResponse.json(newCallerResponse(e164Phone, biz.name), { status: 200 });
     }
 
     // Round 2: all detail queries in parallel
@@ -221,7 +223,8 @@ function getTimeOfDay(): string {
   return 'evening';
 }
 
-function newCallerResponse(phone: string) {
+function newCallerResponse(phone: string, businessName?: string) {
+  const name = businessName || 'our business';
   return {
     type: 'conversation_initiation_client_data',
     dynamic_variables: {
@@ -233,7 +236,7 @@ function newCallerResponse(phone: string) {
     },
     conversation_config_override: {
       agent: {
-        first_message: 'Thank you for calling Smart Details Auto Spa! This is Tom. Can I get your name before we get started?',
+        first_message: `Thank you for calling ${name}! This is Tom. Can I get your name before we get started?`,
       },
     },
   };

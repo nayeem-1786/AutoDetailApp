@@ -530,8 +530,8 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
       last_name: customer.last_name,
       coupon_code: sampleCode,
       business_name: businessInfo?.name || '',
-      business_phone: businessInfo?.phone ? formatPhoneForPreview(businessInfo.phone) : '(310) 756-4789',
-      business_address: businessInfo?.address || '123 Main St, Lomita, CA',
+      business_phone: businessInfo?.phone ? formatPhoneForPreview(businessInfo.phone) : '[Business Phone]',
+      business_address: businessInfo?.address || '[Business Address]',
       booking_url: `${SITE_URL}/book`,
       book_url: previewBookUrl,
       offer_url: sampleCode
