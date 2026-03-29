@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: auto-quote name + vehicle classification + conversation linking + schedule save (Session 13P) — 2026-03-29
+
+### Bug 1 — Auto-Quote SMS Customer Name
+- Auto-quote SMS now includes customer's first name: "Thanks for calling Smart Details, Nayeem!"
+- Graceful fallback: no comma or dangling space when name is unavailable
+
+### Bug 2 — Vehicle Classification During Voice Intake
+- New `resolveVehicleClassification()` in `vehicle-categories.ts` — 3-layer approach:
+  - Layer 1: Query `vehicle_makes` table for category (automobile/motorcycle/rv/boat/aircraft)
+  - Layer 2: Static `MODEL_SIZE_HINTS` map for automobile `size_class` (sedan/truck_suv_2row/suv_3row_van)
+  - Layer 3: Default `specialty_tier` for non-automobiles (e.g., motorcycle → standard_cruiser)
+- Applied to vehicle creation AND existing vehicle backfill in voice-post-call.ts
+- Existing vehicles with NULL classification get backfilled without overwriting manual corrections
+
+### Bug 3 — Conversation Customer Linking
+- After all customer creation paths resolve, backfill `conversation.customer_id` if it was null
+- Uses `.is('customer_id', null)` SQL guard to prevent race conditions
+- Messaging UI now shows customer name instead of phone number for voice-originated conversations
+
+### Bug 4 — Detailer Schedule Save
+- Replaced direct Supabase browser client calls with `adminFetch()` to existing API endpoint
+- `PUT /api/staff/schedules/{employeeId}` uses `createAdminClient()` (service role, bypasses RLS)
+- Follows established admin page pattern — was the only page using direct client writes
+
+---
+
 ## feat: SMS variable fallbacks + detailer_first_name + appointment confirmed data fix + variable audit (Session 13N) — 2026-03-29
 
 ### Part 1 — Variable Fallback System

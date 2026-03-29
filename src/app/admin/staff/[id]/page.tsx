@@ -452,34 +452,29 @@ export default function StaffDetailPage() {
   async function handleSaveSchedule() {
     setSavingSchedule(true);
     try {
-      // Delete existing schedules for this employee
-      const { error: deleteError } = await supabase
-        .from('employee_schedules')
-        .delete()
-        .eq('employee_id', id);
-
-      if (deleteError) throw deleteError;
-
-      // Insert all schedule entries
       const rows = schedule.map((d) => ({
-        employee_id: id,
         day_of_week: d.day_of_week,
         start_time: d.start_time,
         end_time: d.end_time,
         is_available: d.is_available,
       }));
 
-      const { error: insertError } = await supabase
-        .from('employee_schedules')
-        .insert(rows);
+      const res = await adminFetch(`/api/staff/schedules/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedules: rows }),
+      });
 
-      if (insertError) throw insertError;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save schedule');
+      }
 
       toast.success('Schedule saved successfully');
       setScheduleDirty(false);
     } catch (err) {
       console.error('Save schedule error:', err);
-      toast.error('Failed to save schedule');
+      toast.error(err instanceof Error ? err.message : 'Failed to save schedule');
     } finally {
       setSavingSchedule(false);
     }

@@ -265,9 +265,11 @@ export async function processVoiceCallEnd(
   // Find or create vehicle — runs BEFORE autoGenerateQuote so vehicle_id is available for quotes
   let resolvedVehicleId: string | undefined;
   if (resolvedCustomerId && (resolvedVehicleMake || resolvedVehicleModel)) {
+    const { resolveVehicleClassification } = await import('@/lib/utils/vehicle-categories');
+
     let vehicleQuery = admin
       .from('vehicles')
-      .select('id')
+      .select('id, vehicle_category, size_class, specialty_tier')
       .eq('customer_id', resolvedCustomerId);
 
     if (resolvedVehicleMake) vehicleQuery = vehicleQuery.ilike('make', resolvedVehicleMake);
@@ -277,12 +279,27 @@ export async function processVoiceCallEnd(
 
     if (existingVehicle) {
       resolvedVehicleId = existingVehicle.id;
+
+      // Backfill classification if missing (don't overwrite existing non-null values)
+      if (!existingVehicle.vehicle_category || !existingVehicle.size_class) {
+        const classification = await resolveVehicleClassification(admin, resolvedVehicleMake || '', resolvedVehicleModel);
+        const updates: Record<string, unknown> = {};
+        if (!existingVehicle.vehicle_category) updates.vehicle_category = classification.vehicle_category;
+        if (!existingVehicle.size_class && classification.size_class) updates.size_class = classification.size_class;
+        if (!existingVehicle.specialty_tier && classification.specialty_tier) updates.specialty_tier = classification.specialty_tier;
+        if (!existingVehicle.vehicle_category) updates.vehicle_type = classification.vehicle_type;
+        if (Object.keys(updates).length > 0) {
+          await admin.from('vehicles').update(updates).eq('id', existingVehicle.id);
+          console.log(`[VoicePostCall] Backfilled vehicle classification for ${existingVehicle.id}:`, updates);
+        }
+      }
     } else {
+      const classification = await resolveVehicleClassification(admin, resolvedVehicleMake || '', resolvedVehicleModel);
       const { data: newVehicle } = await admin
         .from('vehicles')
         .insert({
           customer_id: resolvedCustomerId,
-          vehicle_type: 'standard',
+          ...classification,
           year: resolvedVehicleYear || null,
           make: resolvedVehicleMake || null,
           model: resolvedVehicleModel || null,
@@ -291,7 +308,7 @@ export async function processVoiceCallEnd(
         .select('id')
         .single();
       resolvedVehicleId = newVehicle?.id;
-      console.log(`[VoicePostCall] Created vehicle ${resolvedVehicleYear || ''} ${resolvedVehicleColor || ''} ${resolvedVehicleMake || ''} ${resolvedVehicleModel || ''} for ${normalizedPhone}`);
+      console.log(`[VoicePostCall] Created vehicle ${resolvedVehicleYear || ''} ${resolvedVehicleColor || ''} ${resolvedVehicleMake || ''} ${resolvedVehicleModel || ''} (${classification.vehicle_category}/${classification.size_class || classification.specialty_tier}) for ${normalizedPhone}`);
     }
   }
 
@@ -375,6 +392,16 @@ export async function processVoiceCallEnd(
       );
       if (createdId) resolvedCustomerId = createdId;
     }
+  }
+
+  // Backfill conversation customer_id if it was created before the customer existed
+  if (resolvedCustomerId && conversation && !conversation.customer_id) {
+    await admin
+      .from('conversations')
+      .update({ customer_id: resolvedCustomerId })
+      .eq('id', conversation.id)
+      .is('customer_id', null);
+    conversation.customer_id = resolvedCustomerId;
   }
 
   // Insert into voice_call_log for dedup
@@ -560,7 +587,9 @@ async function autoGenerateQuote(
 
     if (custCheck?.sms_consent) {
       const biz = await getBusinessInfo();
-      const quoteSmsBody = `Thanks for calling ${biz.name}! Here's a quote for what we discussed: ${linkUrl}`;
+      const firstName = customerName?.trim().split(/\s+/)[0];
+      const nameGreeting = firstName ? `, ${firstName}` : '';
+      const quoteSmsBody = `Thanks for calling ${biz.name}${nameGreeting}! Here's a quote for what we discussed: ${linkUrl}`;
       const smsResult = await sendSms(phone, quoteSmsBody);
       console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
 
