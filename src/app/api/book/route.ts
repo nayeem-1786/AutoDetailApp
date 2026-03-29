@@ -482,6 +482,7 @@ export async function POST(request: NextRequest) {
         ].filter(Boolean).join('\n');
 
         renderSmsTemplate('booking_confirmed', {
+          first_name: data.customer.first_name || undefined,
           appointment_date: dateStr,
           appointment_time: timeStr,
           services: serviceNames,

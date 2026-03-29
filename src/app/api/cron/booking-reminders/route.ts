@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
       try {
         const smsFallback = `Reminder: Your ${serviceName} appointment at ${business.name} is tomorrow at ${displayTime}. Need to reschedule? Call us at ${business.phone}`;
         const smsResult = await renderSmsTemplate('booking_reminder', {
+          first_name: customer.first_name || undefined,
           service_name: serviceName,
           appointment_time: displayTime,
         }, smsFallback);

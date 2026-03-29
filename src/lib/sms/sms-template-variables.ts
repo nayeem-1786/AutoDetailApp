@@ -14,6 +14,7 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'service_name', description: 'Service name', sample: 'Ceramic Coating' },
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'service_total', description: 'Service total amount', sample: '$299.00' },
+    { key: 'detailer_first_name', description: "Assigned detailer's first name", sample: 'Mike' },
   ],
   appointment_confirmed_postcall: [
     { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
@@ -21,6 +22,7 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
   ],
   booking_confirmed: [
+    { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
     { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
     { key: 'appointment_date', description: 'Appointment date', sample: 'Monday, March 28, 2026' },
@@ -28,6 +30,7 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'services', description: 'Comma-separated service names', sample: 'Ceramic Coating, Interior Detail' },
     { key: 'vehicle_description', description: 'Vehicle year/make/model', sample: '2024 Tesla Model 3' },
     { key: 'service_total', description: 'Total amount', sample: '$499.00' },
+    { key: 'detailer_first_name', description: "Assigned detailer's first name", sample: 'Mike' },
   ],
   appointment_cancelled: [
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
@@ -51,6 +54,7 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'services', description: 'Service names', sample: 'Ceramic Coating, Interior Detail' },
   ],
   booking_reminder: [
+    { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'service_name', description: 'Primary service name', sample: 'Ceramic Coating' },
     { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
     { key: 'appointment_time', description: 'Appointment time', sample: '10:30 AM' },
@@ -72,11 +76,14 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'business_address', description: 'Business address', sample: '[From Settings]' },
     { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
     { key: 'hours_line', description: "Today's business hours", sample: 'Open today until 6:00 PM' },
+    { key: 'detailer_first_name', description: "Assigned detailer's first name", sample: 'Mike' },
   ],
   addon_approved: [
+    { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'service_name', description: 'Add-on service/product name', sample: 'Paint Correction' },
   ],
   addon_declined: [
+    { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'service_name', description: 'Add-on service/product name', sample: 'Paint Correction' },
   ],
   booking_staff_notify: [
@@ -93,6 +100,7 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'appointment_time', description: 'Appointment time', sample: '10:30 AM' },
     { key: 'address', description: 'Mobile service address', sample: '123 Main St, Torrance, CA' },
     { key: 'service_total', description: 'Total amount', sample: '$299.00' },
+    { key: 'detailer_first_name', description: "Assigned detailer's first name", sample: 'Mike' },
   ],
 };
 

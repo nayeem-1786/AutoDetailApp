@@ -1371,6 +1371,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260324000002_conversation_summaries.sql
 20260324000003_cross_channel_bridge.sql
 20260325000001_voice_call_log.sql
+20260327000001_sms_template_system.sql
+20260329000001_sms_template_variable_audit.sql
 ```
 
 ---

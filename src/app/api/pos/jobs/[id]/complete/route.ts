@@ -37,7 +37,8 @@ export async function POST(
       .select(`
         *,
         customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone, email),
-        vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color)
+        vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
+        assigned_employee:employees!jobs_assigned_staff_id_fkey(id, first_name)
       `)
       .eq('id', id)
       .single();
@@ -239,11 +240,13 @@ async function sendCompletionNotifications(
   if (customer.phone) {
     const smsFallback = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup! \u{1F389}\nView your before & after photos: ${galleryLink}\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
 
+    const assignedEmp = (job.assigned_employee as { id: string; first_name: string } | null);
     const smsResult = await renderSmsTemplate('job_complete', {
       first_name: customer.first_name,
       vehicle_description: vehicleDisplay,
       gallery_link: galleryLink,
       hours_line: hoursLine,
+      detailer_first_name: assignedEmp?.first_name || undefined,
     }, smsFallback);
 
     if (smsResult.isActive) {

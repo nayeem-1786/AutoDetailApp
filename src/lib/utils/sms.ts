@@ -247,9 +247,10 @@ export async function buildAppointmentConfirmationSms(params: {
   serviceName?: string;
   customerFirstName?: string;
   total?: string;
+  detailerFirstName?: string;
 }): Promise<string | null> {
   const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
-  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total } = params;
+  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total, detailerFirstName } = params;
   const greeting = customerFirstName ? `Hi ${customerFirstName}, your` : 'Your';
   const serviceLine = serviceName ? `${serviceName}\n` : '';
   const totalLine = total ? `Total: ${total}\n` : '';
@@ -268,6 +269,7 @@ export async function buildAppointmentConfirmationSms(params: {
     appointment_date: date,
     appointment_time: time,
     service_total: total,
+    detailer_first_name: detailerFirstName,
   }, fallback);
 
   return result.isActive ? result.body : null;

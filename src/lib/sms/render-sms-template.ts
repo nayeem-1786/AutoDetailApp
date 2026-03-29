@@ -32,6 +32,7 @@ interface CachedTemplate {
   canSilence: boolean;
   recipientType: 'customer' | 'staff' | 'detailer';
   recipientPhones: string[] | null;
+  variables: SmsTemplateVariable[];
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +67,7 @@ async function loadTemplates(): Promise<Map<string, CachedTemplate>> {
 
     const { data, error } = await supabase
       .from('sms_templates')
-      .select('slug, body_template, is_active, can_silence, recipient_type, recipient_phones');
+      .select('slug, body_template, is_active, can_silence, recipient_type, recipient_phones, variables');
 
     if (error) {
       console.error('[SmsTemplate] Cache load failed:', error.message);
@@ -82,6 +83,7 @@ async function loadTemplates(): Promise<Map<string, CachedTemplate>> {
         canSilence: row.can_silence,
         recipientType: row.recipient_type as CachedTemplate['recipientType'],
         recipientPhones: row.recipient_phones,
+        variables: Array.isArray(row.variables) ? row.variables as SmsTemplateVariable[] : [],
       });
     }
 
@@ -128,6 +130,32 @@ async function getBusinessPhoneOverride(): Promise<string | null> {
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Variable fallback map — safety net for unreplaced placeholders
+// Business variables are NOT included here — auto-injection via getBusinessInfo()
+// handles those (CLAUDE.md Rule 8: never hardcode business info).
+// ---------------------------------------------------------------------------
+
+const DEFAULT_VARIABLE_FALLBACKS: Record<string, string> = {
+  first_name: 'there',
+  customer_name: 'Valued Customer',
+  appointment_date: 'your scheduled date',
+  appointment_time: 'your scheduled time',
+  service_name: 'your service',
+  services: 'your scheduled services',
+  service_total: '',
+  vehicle_description: 'your vehicle',
+  vehicle_type: 'your vehicle',
+  gallery_link: '',
+  short_url: '',
+  hours_line: '',
+  address: '',
+  deposit_info: '',
+  item_name: 'your selected service',
+  quote_number: 'your quote',
+  detailer_first_name: 'your detailer',
+};
 
 // ---------------------------------------------------------------------------
 // Renderer
@@ -191,13 +219,40 @@ export async function renderSmsTemplate(
   // Render template
   let rendered = renderTemplate(template.bodyTemplate, enriched);
 
-  // Post-render cleanup: strip lines that are only an unreplaced {variable}
+  // Post-render fallback pass: replace any remaining {variable} placeholders
+  // with human-friendly defaults so customers never see raw {variable_name}.
+  // Runs AFTER auto-injection, so business_name/phone/address are already resolved
+  // unless getBusinessInfo() failed — in which case they'll hit the unknown handler.
+  rendered = rendered.replace(/\{([a-z_]+)\}/g, (_match, key: string) => {
+    const defaultVal = DEFAULT_VARIABLE_FALLBACKS[key];
+    if (defaultVal === undefined) {
+      // Unknown variable — strip it and warn
+      console.warn(`[SMS] Unknown variable with no fallback: {${key}} in template "${slug}"`);
+      return '';
+    }
+    if (defaultVal === '') {
+      // Empty fallback — mark for full-line removal below
+      return `\x00REMOVE_LINE\x00`;
+    }
+    return defaultVal;
+  });
+
+  // Remove entire lines that contained empty-fallback variables
+  // (avoids orphaned labels like "Total: " with nothing after it)
   rendered = rendered
     .split('\n')
-    .filter((line) => !/^\s*\{\w+\}\s*$/.test(line))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n') // collapse triple+ newlines
-    .trim();
+    .filter((line) => !line.includes('\x00REMOVE_LINE\x00'))
+    .join('\n');
+
+  // Log warnings for required variables that were missing (uses cached data)
+  for (const v of template.variables) {
+    if (v.required && !enriched[v.key]) {
+      console.warn(`[SMS] Required variable {${v.key}} missing in template "${slug}" — possible code bug`);
+    }
+  }
+
+  // Collapse multiple consecutive newlines and trim
+  rendered = rendered.replace(/\n{3,}/g, '\n\n').trim();
 
   // If rendering produced nothing, fall back
   if (!rendered) {

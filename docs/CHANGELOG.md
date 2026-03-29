@@ -4,6 +4,36 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: SMS variable fallbacks + detailer_first_name + appointment confirmed data fix + variable audit (Session 13N) — 2026-03-29
+
+### Part 1 — Variable Fallback System
+- Replaced simple line-only cleanup regex with full fallback pass in `render-sms-template.ts`
+- `DEFAULT_VARIABLE_FALLBACKS` map provides human-friendly defaults (e.g., `{first_name}` → "there", `{vehicle_description}` → "your vehicle")
+- Empty fallbacks (`service_total`, `gallery_link`, `short_url`, etc.) remove the entire line to avoid orphaned labels
+- Unknown variables stripped with console warning for debugging
+- Required variables that are missing log a warning for code bug detection
+- Template cache now includes `variables` JSONB for required-variable checking without extra DB query
+- Business variables NOT in fallback map — auto-injection via `getBusinessInfo()` handles those (Rule 8 compliance)
+
+### Part 2 — detailer_first_name Variable
+- Added `detailer_first_name` to 4 templates: `appointment_confirmed`, `booking_confirmed`, `job_complete`, `detailer_job_assigned`
+- Updated `sms-template-variables.ts` with variable definitions and sample values
+- Passed at call sites: admin notify (already had employee join), POS notify (added employee join), job complete (added employee join)
+- `buildAppointmentConfirmationSms()` updated with `detailerFirstName` optional param
+
+### Part 3 — Appointment Confirmed SMS Data Fix
+- Both admin and POS notify endpoints now pass `customerFirstName`, `serviceName`, and `detailerFirstName` to `buildAppointmentConfirmationSms()`
+- POS notify endpoint now joins `employee:employees(id, first_name, last_name, phone)` for detailer data
+- POS notify endpoint now sends detailer notification SMS (matching admin endpoint behavior)
+- `quote-book-dialog.tsx`: added `console.error` to fire-and-forget catch block for VPS log visibility
+
+### Part 4 — Variable Completeness Audit
+- Added `first_name` to: `booking_confirmed`, `booking_reminder`, `addon_approved`, `addon_declined`
+- Passed `first_name` at call sites: booking-reminders cron, booking route, job-addons approve/decline
+- Migration: `20260329000001_sms_template_variable_audit.sql` — safely appends new variables to JSONB arrays with duplicate protection
+
+---
+
 ## docs: complete UNSAFE_SMS_TEMPLATES inventory — 2026-03-27
 
 Post-audit fix for `src/lib/sms/sms-template-variables.ts`:

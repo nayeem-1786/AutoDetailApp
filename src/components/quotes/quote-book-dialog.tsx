@@ -128,7 +128,8 @@ export function QuoteBookDialog({
           body: JSON.stringify({ method: 'both' }),
         }).then(() => {
           toast.success('Appointment booked — confirmation sent to customer');
-        }).catch(() => {
+        }).catch((err) => {
+          console.error('[QUOTE-BOOK] Auto-notify failed:', err);
           toast.success('Appointment booked (confirmation send failed — notify manually)');
         });
       } else {

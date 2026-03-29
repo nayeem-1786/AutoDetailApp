@@ -265,7 +265,10 @@ Thank you for choosing ${business.name}!`;
           businessPhone: business.phone,
           date: dateStr,
           time: displayTime,
+          serviceName: serviceNames || undefined,
+          customerFirstName: customer.first_name || undefined,
           total: formatCurrency(appointment.total_amount),
+          detailerFirstName: employee?.first_name || undefined,
         });
 
         if (smsBody) {

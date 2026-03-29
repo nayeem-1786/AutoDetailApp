@@ -32,6 +32,7 @@ export async function POST(
         *,
         customer:customers(id, first_name, last_name, phone, email),
         vehicle:vehicles(id, year, make, model),
+        employee:employees(id, first_name, last_name, phone),
         services:appointment_services(
           price_at_booking,
           tier_name,
@@ -62,6 +63,10 @@ export async function POST(
     } | null;
     const vehicleStr = vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'N/A';
 
+    const employee = appointment.employee as {
+      id: string; first_name: string; last_name: string; phone: string | null;
+    } | null;
+
     const services = (appointment.services as {
       price_at_booking: number;
       tier_name: string | null;
@@ -69,6 +74,7 @@ export async function POST(
     }[]) ?? [];
 
     const customerName = `${customer.first_name} ${customer.last_name}`;
+    const serviceNames = services.map(s => s.service?.name || 'Service').join(', ');
     const dateStr = new Date(appointment.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
@@ -251,7 +257,10 @@ Thank you for choosing ${business.name}!`;
           businessPhone: business.phone,
           date: dateStr,
           time: displayTime,
+          serviceName: serviceNames || undefined,
+          customerFirstName: customer.first_name || undefined,
           total: formatCurrency(appointment.total_amount),
+          detailerFirstName: employee?.first_name || undefined,
         });
 
         if (smsBody) {
@@ -262,6 +271,36 @@ Thank you for choosing ${business.name}!`;
             errors.push(smsResult.error);
           }
         }
+      }
+    }
+
+    // --- Notify assigned detailer via SMS (non-blocking) ---
+    if (appointment.employee_id && employee?.phone) {
+      try {
+        const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+        const detailerFallback =
+          `New job assigned: ${serviceNames}` +
+          (vehicle ? ` – ${vehicleStr}` : '') +
+          `\n${dateStr} at ${displayTime}` +
+          (appointment.mobile_address ? `\n${appointment.mobile_address}` : '') +
+          `\nTotal: ${formatCurrency(appointment.total_amount)}`;
+        const detailerResult = await renderSmsTemplate('detailer_job_assigned', {
+          services: serviceNames,
+          vehicle_description: vehicle ? vehicleStr : undefined,
+          appointment_date: dateStr,
+          appointment_time: displayTime,
+          address: appointment.mobile_address || undefined,
+          service_total: formatCurrency(appointment.total_amount),
+        }, detailerFallback);
+        if (!detailerResult.isActive) throw new Error('skip');
+        const smsResult = await sendSms(employee.phone, detailerResult.body);
+        if (smsResult.success) {
+          console.log(`Detailer SMS sent to ${employee.first_name} ${employee.last_name}`);
+        } else {
+          console.error(`Detailer SMS failed for ${employee.first_name}:`, smsResult.error);
+        }
+      } catch (detailerErr) {
+        console.error('Detailer SMS error (non-blocking):', detailerErr);
       }
     }
 
