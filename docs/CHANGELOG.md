@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: addon approved/declined SMS not firing (Session 13X) — 2026-03-30
+
+- Public authorize endpoints (`/api/authorize/[token]/approve` and `/decline`) were directly updating the DB without calling the service layer
+- Rewired both endpoints to delegate to `approveAddon()` / `declineAddon()` from `job-addons.ts`, which handle status validation, expiry check, DB update, AND SMS notification
+- Removes duplicated validation logic — single source of truth in service layer
+- Customer now receives addon_approved / addon_declined SMS confirmation when responding via authorization link
+
+---
+
 ## fix: replace partial unique index with full constraint on jobs.appointment_id (Session 13W) — 2026-03-29
 
 - Supabase JS `.upsert({ onConflict })` cannot match partial unique indexes (PostgreSQL requires `ON CONFLICT ... WHERE` which the client doesn't support)
