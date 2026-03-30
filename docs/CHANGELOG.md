@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: voice agent availability uses PST day-of-week instead of UTC (Session 13T) — 2026-03-29
+
+- `voice-agent/availability/route.ts`: replaced `getUTCDay()` with `Intl.DateTimeFormat` using `America/Los_Angeles` timezone for day-of-week extraction
+- Prevents voice agent from offering wrong-day availability during DST transitions or late-night calls
+- Full audit of all 14 cron/scheduling endpoints confirmed this was the only UTC vs PST bug
+
+---
+
 ## perf: async finalize_call processing (Session 13S) — 2026-03-29
 
 - `POST /api/voice-agent/finalize-call` now returns immediate 200 response

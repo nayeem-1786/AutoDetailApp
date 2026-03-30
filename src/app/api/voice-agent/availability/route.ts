@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse the date to get day-of-week
+    // Parse the date to get day-of-week in PST (not UTC)
     const dateObj = new Date(dateStr + 'T12:00:00');
     if (isNaN(dateObj.getTime())) {
       return NextResponse.json(
@@ -40,7 +40,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dayName = DAY_NAMES[dateObj.getUTCDay()];
+    const pstDayIndex = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      weekday: 'short',
+    }).format(dateObj);
+    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dayName = DAY_NAMES[dayMap[pstDayIndex] ?? dateObj.getDay()];
     const supabase = createAdminClient();
 
     // 1. Determine duration: from service if provided, otherwise default 60
