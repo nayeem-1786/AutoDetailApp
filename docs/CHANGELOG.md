@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: voice agent appointment time parsing — handle 12-hour AM/PM format (Session 14B) — 2026-03-30
+
+- New `normalizeTimeTo24h()` in `format.ts` — converts "09:00 AM" → "09:00", "2:00 PM" → "14:00", handles noon/midnight edge cases, passes through 24-hour input unchanged
+- Applied in `voice-agent/appointments/route.ts` — normalizes time once after validation, used in all 4 places: `addMinutesToTime()`, overlap query, DB insert, and `formatTime()` for SMS
+- Fixes: `"NaN:NaN"` error when ElevenLabs agent sends 12-hour time format
+
+---
+
 ## perf: voice agent timing instrumentation across all 9 endpoints (Session 14A) — 2026-03-30
 
 - New `createPerfTimer()` utility in `src/lib/utils/voice-perf.ts`

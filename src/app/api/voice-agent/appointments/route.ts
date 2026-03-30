@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
-import { normalizePhone, formatTime } from '@/lib/utils/format';
+import { normalizePhone, formatTime, normalizeTimeTo24h } from '@/lib/utils/format';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
@@ -181,6 +181,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize time — ElevenLabs may send "09:00 AM" (12-hour) or "09:00" (24-hour)
+    const normalizedTime = normalizeTimeTo24h(time);
+
     // Normalize phone
     const e164Phone = normalizePhone(customer_phone);
     if (!e164Phone) {
@@ -211,7 +214,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate end time
     const endTime = addMinutesToTime(
-      time,
+      normalizedTime,
       service.base_duration_minutes + APPOINTMENT.BUFFER_MINUTES
     );
 
@@ -223,7 +226,7 @@ export async function POST(request: NextRequest) {
       .eq('scheduled_date', date)
       .neq('status', 'cancelled')
       .lt('scheduled_start_time', endTime)
-      .gt('scheduled_end_time', time)
+      .gt('scheduled_end_time', normalizedTime)
       .limit(1);
     perf.mark('query:appointments_overlap', t);
 
@@ -317,7 +320,7 @@ export async function POST(request: NextRequest) {
         status: 'pending',
         channel: 'phone',
         scheduled_date: date,
-        scheduled_start_time: time,
+        scheduled_start_time: normalizedTime,
         scheduled_end_time: endTime,
         is_mobile: false,
         subtotal: 0,
@@ -363,7 +366,7 @@ export async function POST(request: NextRequest) {
     const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
     });
-    const formattedTime = formatTime(time);
+    const formattedTime = formatTime(normalizedTime);
 
     // Send SMS confirmation and log it
     t = perf.now();

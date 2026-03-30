@@ -117,6 +117,34 @@ export function formatTime(time: string): string {
   return `${hour12}:${minutes} ${ampm}`;
 }
 
+/**
+ * Normalize a time string to 24-hour HH:MM format.
+ * Handles: "09:00 AM", "2:00 PM", "12:00 AM", "12:00 PM", "13:00", "9:30"
+ */
+export function normalizeTimeTo24h(time: string): string {
+  const trimmed = time.trim().toUpperCase();
+  const hasAmPm = /[AP]M$/.test(trimmed);
+
+  if (hasAmPm) {
+    const isPm = trimmed.endsWith('PM');
+    const timePart = trimmed.replace(/\s*[AP]M$/, '');
+    const [hStr, mStr] = timePart.split(':');
+    let h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10) || 0;
+
+    if (isPm && h !== 12) h += 12;   // 1 PM → 13, 11 PM → 23
+    if (!isPm && h === 12) h = 0;    // 12 AM → 0 (midnight)
+
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  // Already 24-hour — just pad
+  const [hStr, mStr] = trimmed.split(':');
+  const h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export function formatPoints(points: number): string {
   return new Intl.NumberFormat('en-US').format(points);
 }
