@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-detailer';
+import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
@@ -21,46 +22,80 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter') || 'mine';
 
-    // Today in PST
-    const now = new Date();
-    const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-    const todayStart = new Date(pstDate.getFullYear(), pstDate.getMonth(), pstDate.getDate());
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
+    // Today in PST (YYYY-MM-DD) — same reliable pattern as populate endpoint
+    const todayPst = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
 
-    // Convert back to UTC ISO strings for Supabase query
-    const startUtc = new Date(todayStart.getTime() + (now.getTime() - pstDate.getTime())).toISOString();
-    const endUtc = new Date(todayEnd.getTime() + (now.getTime() - pstDate.getTime())).toISOString();
+    const jobSelect = `
+      *,
+      customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone),
+      vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
+      assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
+      addons:job_addons(id, status)
+    `;
+    const excludeStatuses = ['cancelled', 'closed'];
 
-    let query = supabase
+    // Step 1: Get today's appointment IDs
+    // (Supabase .or() on related tables doesn't work — query appointments first)
+    const { data: todayApts } = await supabase
+      .from('appointments')
+      .select('id')
+      .eq('scheduled_date', todayPst);
+    const todayAptIds = (todayApts ?? []).map((a) => a.id);
+
+    // Step 2a: Jobs linked to today's appointments
+    let aptJobsQuery = todayAptIds.length > 0
+      ? supabase
+          .from('jobs')
+          .select(jobSelect)
+          .in('appointment_id', todayAptIds)
+          .not('status', 'in', `(${excludeStatuses.join(',')})`)
+      : null;
+
+    // Step 2b: Walk-in jobs (no appointment) created today in PST
+    const startUtc = dateToPstStartOfDay(todayPst);
+    const endUtc = dateToPstEndOfDay(todayPst);
+    let walkInQuery = supabase
       .from('jobs')
-      .select(`
-        *,
-        customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone),
-        vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
-        assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
-        addons:job_addons(id, status)
-      `)
-      .gte('created_at', startUtc)
-      .lt('created_at', endUtc)
-      .neq('status', 'cancelled')
-      .neq('status', 'closed');
+      .select(jobSelect)
+      .is('appointment_id', null)
+      .not('status', 'in', `(${excludeStatuses.join(',')})`)
+      .gte('created_at', startUtc!)
+      .lte('created_at', endUtc!);
 
+    // Apply staff filter to both queries
     if (filter === 'mine') {
-      query = query.eq('assigned_staff_id', posEmployee.employee_id);
+      if (aptJobsQuery) aptJobsQuery = aptJobsQuery.eq('assigned_staff_id', posEmployee.employee_id);
+      walkInQuery = walkInQuery.eq('assigned_staff_id', posEmployee.employee_id);
     } else if (filter === 'unassigned') {
-      query = query.is('assigned_staff_id', null);
+      if (aptJobsQuery) aptJobsQuery = aptJobsQuery.is('assigned_staff_id', null);
+      walkInQuery = walkInQuery.is('assigned_staff_id', null);
     }
-    // filter === 'all' has no additional constraint
 
-    const { data: jobs, error } = await query.order('created_at', { ascending: false });
+    // Execute both queries in parallel
+    const [aptResult, walkInResult] = await Promise.all([
+      aptJobsQuery ?? Promise.resolve({ data: [], error: null }),
+      walkInQuery,
+    ]);
 
-    if (error) {
-      console.error('Jobs list error:', error);
+    if (aptResult.error) {
+      console.error('Jobs list (appointment) error:', aptResult.error);
+      return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
+    }
+    if (walkInResult.error) {
+      console.error('Jobs list (walk-in) error:', walkInResult.error);
       return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
     }
 
-    return NextResponse.json({ data: jobs ?? [] });
+    // Merge and sort by created_at descending
+    const allJobs = [...(aptResult.data ?? []), ...(walkInResult.data ?? [])]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return NextResponse.json({ data: allJobs });
   } catch (err) {
     console.error('Jobs list route error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

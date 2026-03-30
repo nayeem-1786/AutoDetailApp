@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: POS jobs filter by appointment scheduled_date instead of created_at (Session 13U) — 2026-03-29
+
+- `GET /api/pos/jobs` no longer uses brittle `created_at` range with manual UTC offset arithmetic
+- Appointment-linked jobs: filters by `appointments.scheduled_date = todayPst` (two-step query pattern per Supabase .or() limitation)
+- Walk-in jobs: filters by `created_at` within PST day bounds using `dateToPstStartOfDay/dateToPstEndOfDay`
+- Both queries run in parallel and merge results
+- Uses same `Intl.DateTimeFormat` PST pattern as the populate endpoint for consistency
+- Fixes: confirmed appointments for today no longer disappear from POS Jobs during PST evening hours (when UTC has rolled to next day)
+
+---
+
 ## fix: voice agent availability uses PST day-of-week instead of UTC (Session 13T) — 2026-03-29
 
 - `voice-agent/availability/route.ts`: replaced `getUTCDay()` with `Intl.DateTimeFormat` using `America/Los_Angeles` timezone for day-of-week extraction
