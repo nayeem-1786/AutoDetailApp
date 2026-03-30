@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf, Plug, Bell, Truck } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf, Plug, Bell, Truck, Trash2 } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -158,6 +158,13 @@ const settingsGroups: SettingsGroup[] = [
         description: 'View system activity history and user actions.',
         href: '/admin/settings/audit-log',
         icon: ClipboardList,
+        roles: ['super_admin'],
+      },
+      {
+        title: 'Data Management',
+        description: 'Permanently purge customer records and all associated data.',
+        href: '/admin/settings/data-management',
+        icon: Trash2,
         roles: ['super_admin'],
       },
     ],

@@ -33,6 +33,8 @@ src/app/api/admin/customers/check-duplicate/route.ts
 src/app/api/admin/customers/route.ts
 src/app/api/admin/customers/search/route.ts
 src/app/api/admin/customers/stats/route.ts
+src/app/api/admin/customers/purge/route.ts
+src/app/api/admin/customers/[id]/purge-preview/route.ts
 src/app/api/admin/footer/bottom-links/route.ts
 src/app/api/admin/footer/columns/[columnId]/links/route.ts
 src/app/api/admin/footer/columns/reorder/route.ts
@@ -605,6 +607,7 @@ src/app/admin/quotes/page.tsx
 ```
 src/app/admin/settings/page.tsx
 src/app/admin/settings/audit-log/page.tsx
+src/app/admin/settings/data-management/page.tsx
 src/app/admin/settings/business-profile/page.tsx
 src/app/admin/settings/card-reader/page.tsx
 src/app/admin/settings/coupon-enforcement/page.tsx

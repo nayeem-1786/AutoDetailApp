@@ -4,6 +4,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: customer data purge tool (Session 13R) — 2026-03-29
+
+### Admin UI — Data Management page
+- New page at Admin > Settings > Data Management
+- Customer search with debounced typeahead (name, phone, email)
+- Purge queue with record counts per customer (appointments, quotes, jobs, messages, etc.)
+- Typed confirmation: must enter "PURGE" to execute
+- Warning banner explaining the destructive nature of the operation
+
+### API — Customer purge with FK cascade handling
+- `POST /api/admin/customers/purge` — hard-deletes customers and all associated data
+- 6-step deletion order handles all FK constraints:
+  1. refund_items → refunds (unblocks RESTRICT on transactions)
+  2. appointment_services → appointments, quote_items/comms → quotes (unblocks RESTRICT on customer)
+  3. transactions, messages, conversations (SET NULL tables)
+  4. orders, link_clicks, tracked_links, delivery logs, lifecycle_executions (no-constraint orphans)
+  5. voice_call_log (phone-based, no customer FK)
+  6. Customer record (CASCADE auto-deletes: vehicles, jobs, job_photos, job_addons, loyalty_ledger, payment_methods, consent logs, campaign_recipients, drip_enrollments)
+- Pre-captures appointment/transaction/conversation IDs before deletion for transitive lookups
+- Transactions captured by BOTH customer_id AND appointment_id (catches NULL customer_id)
+- Best-effort: continues on individual table errors, reports successes and failures
+- Audit trail: logs purge initiator, customer names, and results to console
+
+### API — Purge preview
+- `GET /api/admin/customers/[id]/purge-preview` — returns record counts for a customer
+- Parallel count queries for appointments, quotes, jobs, vehicles, transactions, orders, messages, calls
+
+### Extended search endpoint
+- Added email and created_at to search results
+- Added email search (ILIKE)
+- Added `include_deleted=true` param to include soft-deleted customers
+
+---
+
 ## fix: auto-quote name + vehicle classification + conversation linking + schedule save (Session 13P) — 2026-03-29
 
 ### Bug 1 — Auto-Quote SMS Customer Name

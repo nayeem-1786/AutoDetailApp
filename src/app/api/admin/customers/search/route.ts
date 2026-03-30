@@ -34,17 +34,22 @@ export async function GET(request: NextRequest) {
     const digits = term.replace(/\D/g, '');
     const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
 
+    const includeSoftDeleted = searchParams.get('include_deleted') === 'true';
+
     let dbQuery = admin
       .from('customers')
-      .select('id, first_name, last_name, phone')
-      .is('deleted_at', null)
+      .select('id, first_name, last_name, phone, email, created_at')
       .order('last_name')
       .limit(10);
+
+    if (!includeSoftDeleted) {
+      dbQuery = dbQuery.is('deleted_at', null);
+    }
 
     if (isPhoneSearch) {
       dbQuery = dbQuery.like('phone', `%${digits}%`);
     } else {
-      dbQuery = dbQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+      dbQuery = dbQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`);
     }
 
     const { data: customers } = await dbQuery;
