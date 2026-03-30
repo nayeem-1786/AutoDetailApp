@@ -65,7 +65,16 @@ export async function POST(request: NextRequest) {
       ? typeof vehicle_year === 'number' ? vehicle_year : parseInt(String(vehicle_year), 10) || undefined
       : undefined;
 
-    const result = await processVoiceCallEnd({
+    // Return immediate 200 so ElevenLabs agent doesn't wait ~3s for processing.
+    // PM2 keeps the Node process alive, so fire-and-forget runs to completion.
+    // The polling cron is the safety net if background processing is interrupted.
+    // Note: the previous 400 error path for dedup (already-processed) is removed —
+    // ElevenLabs always gets 200. The dedup check inside processVoiceCallEnd
+    // still prevents duplicate DB writes; it just logs and exits silently.
+    console.log('[FINALIZE] Returning immediate response, processing async');
+    const startTime = Date.now();
+
+    const params = {
       phone,
       customerName: customer_name,
       transcriptSummary: transcript_summary,
@@ -79,17 +88,23 @@ export async function POST(request: NextRequest) {
       vehicleModel: vehicle_model,
       vehicleColor: vehicle_color,
       customerType: customer_type ? customer_type.trim().toLowerCase() : undefined,
-      source: 'tool',
-    });
+      source: 'tool' as const,
+    };
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.reason }, { status: 400 });
-    }
+    processVoiceCallEnd(params)
+      .then((result) => {
+        console.log(
+          `[FINALIZE] Background processing completed in ${Date.now() - startTime}ms` +
+          ` (success=${result.success}, skipped=${result.skipped || false})`
+        );
+      })
+      .catch((err) => {
+        console.error(`[FINALIZE] Background processing failed after ${Date.now() - startTime}ms:`, err);
+      });
 
     return NextResponse.json({
       success: true,
-      conversation_id: result.conversationId,
-      skipped: result.skipped || false,
+      message: 'Call logged, processing in background',
     });
   } catch (err) {
     console.error('[FinalizeCall] Error:', err);

@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## perf: async finalize_call processing (Session 13S) — 2026-03-29
+
+- `POST /api/voice-agent/finalize-call` now returns immediate 200 response
+- `processVoiceCallEnd()` runs as fire-and-forget after response (PM2 keeps process alive)
+- Eliminates ~3s silence at end of voice calls while ElevenLabs waited for processing
+- Previous 400 error path for dedup removed — dedup still runs inside `processVoiceCallEnd`, just logs silently
+- Timing logs added: `[FINALIZE] Background processing completed in Xms`
+- Polling cron remains as safety net if background processing is interrupted
+
+---
+
 ## feat: customer data purge tool (Session 13R) — 2026-03-29
 
 ### Admin UI — Data Management page
