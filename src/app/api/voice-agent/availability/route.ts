@@ -53,13 +53,13 @@ export async function GET(request: NextRequest) {
     // 1. Determine duration: from service if provided, otherwise default 60
     let duration = 60;
     if (serviceId) {
-      let t = perf.now();
+      const t1 = perf.now();
       const { data: service } = await supabase
         .from('services')
         .select('base_duration_minutes')
         .eq('id', serviceId)
         .single();
-      perf.mark('query:services', t);
+      perf.mark('query:services', t1);
 
       if (service) {
         duration = service.base_duration_minutes;

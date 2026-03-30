@@ -11,7 +11,6 @@ export async function POST() {
   try {
     const business = await getBusinessInfo();
     const businessName = business.name || 'Smart Details Auto Spa';
-    const phone = business.phone || '';
 
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>

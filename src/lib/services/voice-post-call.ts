@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
-import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
+import { sendSms } from '@/lib/utils/sms';
 import { generateConversationSummary } from '@/lib/services/conversation-summary';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';

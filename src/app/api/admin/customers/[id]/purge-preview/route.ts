@@ -39,7 +39,7 @@ export async function GET(
       vehicles,
       transactions,
       orders,
-      conversations,
+      _conversations,
       voiceCalls,
     ] = await Promise.all([
       supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('customer_id', id),

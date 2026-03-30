@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    let t = perf.now();
+    const t = perf.now();
     const { data: services, error } = await supabase
       .from('services')
       .select(`
