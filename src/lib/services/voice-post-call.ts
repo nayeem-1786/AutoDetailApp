@@ -71,6 +71,25 @@ export async function processVoiceCallEnd(
     .limit(1)
     .maybeSingle();
 
+  // Auto-enable SMS consent for inbound callers — calling the business = transactional consent
+  if (customer && !customer.sms_consent) {
+    try {
+      const { updateSmsConsent } = await import('@/lib/utils/sms-consent');
+      await updateSmsConsent({
+        customerId: customer.id,
+        phone: normalizedPhone,
+        action: 'opt_in',
+        keyword: 'inbound_call',
+        source: 'inbound_call',
+        notes: 'Customer initiated phone call — auto-enabled transactional SMS consent',
+      });
+      customer.sms_consent = true;
+      console.log(`[VoicePostCall] Auto-enabled SMS consent for customer ${customer.id} (inbound call)`);
+    } catch (consentErr) {
+      console.error('[VoicePostCall] Failed to auto-enable SMS consent:', consentErr);
+    }
+  }
+
   // Upgrade generic customer name if a real name is available
   if (customer && params.customerName && params.customerName.trim().length > 0) {
     const GENERIC_FIRST_NAMES = ['phone', 'new', 'customer', 'valued'];

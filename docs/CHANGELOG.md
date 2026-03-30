@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: auto-enable SMS consent for inbound callers (Session 13Y) — 2026-03-30
+
+- Existing customers who call in with `sms_consent = false` now get consent auto-enabled
+- Uses `updateSmsConsent()` with source `'inbound_call'` for proper audit trail in `sms_consent_log`
+- Mutates `customer.sms_consent = true` in memory so downstream SMS checks pass immediately
+- Added `'inbound_call'` to ConsentChangeParams source union type
+- New customer creation paths already set `sms_consent: true` (no change needed)
+- Does NOT affect: online booking consent checkbox, STOP/unsubscribe handling, admin/POS manual management
+
+---
+
 ## feat: unified system SMS logging — Session A foundation (Session 13Y) — 2026-03-30
 
 ### Data Foundation

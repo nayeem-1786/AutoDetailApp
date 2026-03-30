@@ -5,7 +5,7 @@ interface ConsentChangeParams {
   phone: string;
   action: 'opt_out' | 'opt_in';
   keyword: string;
-  source: 'inbound_sms' | 'admin_manual' | 'unsubscribe_page' | 'booking_form' | 'customer_portal' | 'system';
+  source: 'inbound_sms' | 'inbound_call' | 'admin_manual' | 'unsubscribe_page' | 'booking_form' | 'customer_portal' | 'system';
   notes?: string;
 }
 
