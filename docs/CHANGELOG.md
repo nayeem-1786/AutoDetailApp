@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: replace partial unique index with full constraint on jobs.appointment_id (Session 13W) — 2026-03-29
+
+- Supabase JS `.upsert({ onConflict })` cannot match partial unique indexes (PostgreSQL requires `ON CONFLICT ... WHERE` which the client doesn't support)
+- Dropped `idx_jobs_unique_appointment_id` (partial index with `WHERE appointment_id IS NOT NULL`)
+- Added `jobs_appointment_id_unique` full UNIQUE constraint (PostgreSQL allows multiple NULLs by default, so walk-in jobs are unaffected)
+- Migration includes duplicate cleanup (keeps oldest job per appointment)
+- Fixes 500 error (42P10) on `POST /api/pos/jobs/populate`
+
+---
+
 ## fix: POS jobs filter by appointment scheduled_date instead of created_at (Session 13U) — 2026-03-29
 
 - `GET /api/pos/jobs` no longer uses brittle `created_at` range with manual UTC offset arithmetic

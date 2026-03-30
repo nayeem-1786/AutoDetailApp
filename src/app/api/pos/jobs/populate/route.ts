@@ -127,7 +127,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Use upsert with ignoreDuplicates to safely handle concurrent calls.
-    // The partial unique index on appointment_id prevents duplicates at the DB level.
+    // The UNIQUE constraint on appointment_id prevents duplicates at the DB level.
+    // (Partial indexes don't work with Supabase .upsert() — full constraint required.)
     const { data: createdJobs, error: insertError } = await supabase
       .from('jobs')
       .upsert(jobInserts, { onConflict: 'appointment_id', ignoreDuplicates: true })
