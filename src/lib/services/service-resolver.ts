@@ -49,7 +49,13 @@ export function resolvePrice(
     case 'vehicle_size':
     case 'scope': {
       if (tiers.length === 0) return { price: service.flat_price ?? 0, tierName: null };
-      const tier = tiers[0];
+
+      // Prefer the vehicle-size-aware tier when a vehicle is known —
+      // for scope services like Hot Shampoo, this selects "Complete Interior"
+      // instead of "Floor Mats Only" (the first tier by display_order).
+      const sizeAwareTier = tiers.find((t) => t.is_vehicle_size_aware && t.vehicle_size_sedan_price != null);
+      const tier = sizeAwareTier || tiers[0];
+
       if (tier.is_vehicle_size_aware && tier.vehicle_size_sedan_price != null) {
         switch (sizeClass) {
           case 'truck_suv_2row':

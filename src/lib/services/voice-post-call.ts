@@ -4,7 +4,7 @@ import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { generateConversationSummary } from '@/lib/services/conversation-summary';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
-import { resolveServiceByName } from '@/lib/services/service-resolver';
+import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
 import { getBusinessInfo } from '@/lib/data/business';
 
 // ---------------------------------------------------------------------------
@@ -460,7 +460,18 @@ async function autoGenerateQuote(
   vehicleId?: string,
   transcriptSummary?: string
 ): Promise<string | null> {
-  // Resolve service names to IDs
+  // Get vehicle size_class for tier-aware pricing
+  let sizeClass = 'sedan'; // safe default for unknown vehicles
+  if (vehicleId) {
+    const { data: vehicle } = await admin
+      .from('vehicles')
+      .select('size_class')
+      .eq('id', vehicleId)
+      .single();
+    if (vehicle?.size_class) sizeClass = vehicle.size_class;
+  }
+
+  // Resolve service names to IDs with correct tier pricing
   const quoteItems: Array<{
     service_id: string;
     item_name: string;
@@ -475,12 +486,7 @@ async function autoGenerateQuote(
       console.warn(`[VoicePostCall] Service not found: "${serviceName}"`);
       continue;
     }
-    let price = service.flat_price ?? 0;
-    let tierName: string | null = null;
-    if (service.service_pricing?.length > 0) {
-      price = service.service_pricing[0].price;
-      tierName = service.service_pricing[0].tier_name;
-    }
+    const { price, tierName } = resolvePrice(service, sizeClass);
     quoteItems.push({
       service_id: service.id,
       item_name: service.name,

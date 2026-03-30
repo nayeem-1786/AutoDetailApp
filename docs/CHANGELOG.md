@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: auto-quote selects vehicle-size-aware tier for multi-tier services (Session 13Z) — 2026-03-30
+
+- `resolvePrice()` in service-resolver.ts now prefers the vehicle-size-aware tier for scope services (e.g., Hot Shampoo "Complete Interior" at $300 instead of "Floor Mats Only" at $75)
+- `autoGenerateQuote()` in voice-post-call.ts now queries vehicle size_class and calls `resolvePrice(service, sizeClass)` instead of hardcoding `service_pricing[0]`
+- Sedan/truck_suv_2row/suv_3row_van prices are correctly selected based on the customer's vehicle
+- Single-tier and flat-price services unaffected
+
+---
+
 ## feat: auto-enable SMS consent for inbound callers (Session 13Y) — 2026-03-30
 
 - Existing customers who call in with `sms_consent = false` now get consent auto-enabled
