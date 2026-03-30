@@ -235,6 +235,9 @@ export async function POST(
       const smsResult = await sendSms(customer.phone, smsBody, {
         customerId: customer.id,
         source: 'transactional',
+        logToConversation: true,
+        notificationType: 'addon_authorization_request',
+        contextId: addon.id,
       });
       if (smsResult.success) {
         notifiedVia.push('sms');

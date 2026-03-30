@@ -496,13 +496,18 @@ export async function POST(request: NextRequest) {
 
       if ((recentAiCount ?? 0) < MAX_AI_REPLIES_PER_HOUR) {
         try {
-          const { data: history } = await admin
+          const { data: allHistory } = await admin
             .from('messages')
             .select('*')
             .eq('conversation_id', conversation.id)
-            .neq('sender_type', 'system')
             .order('created_at', { ascending: true })
             .limit(100);
+
+          // Keep system SMS in AI context (notifications the customer may reply to)
+          // but exclude voice-channel system messages (call summaries, consent changes)
+          const history = (allHistory || []).filter(
+            (msg) => !(msg.sender_type === 'system' && msg.channel === 'voice')
+          );
 
           // Build customer context for known customers
           let customerCtx: CustomerContext | undefined;
@@ -601,7 +606,15 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          autoReply = await getAIResponse(history || [], body, customerCtx, conversation.customer_id, conversation.summary);
+          autoReply = await getAIResponse(
+            history || [],
+            body,
+            customerCtx,
+            conversation.customer_id,
+            conversation.summary,
+            conversation.last_notification_type,
+            conversation.last_notification_at,
+          );
         } catch (err) {
           console.error('AI auto-reply failed:', err);
         }

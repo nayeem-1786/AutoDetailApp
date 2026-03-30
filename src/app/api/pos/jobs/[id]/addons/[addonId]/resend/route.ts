@@ -128,6 +128,9 @@ export async function POST(
         customerId: customer.id,
         source: 'transactional',
         mediaUrl: photoUrl || undefined,
+        logToConversation: true,
+        notificationType: 'addon_authorization_resend',
+        contextId: addonId,
       });
       if (smsResult.success) notifiedVia.push('sms');
     }

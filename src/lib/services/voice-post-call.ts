@@ -330,17 +330,13 @@ export async function processVoiceCallEnd(
       if (!smsBody) {
         console.log('[VoicePostCall] Post-call SMS template disabled — skipping SMS');
       }
-      const smsResult = smsBody ? await sendSms(normalizedPhone, smsBody) : { success: false, error: 'template disabled' };
+      const smsResult = smsBody ? await sendSms(normalizedPhone, smsBody, {
+        logToConversation: true,
+        conversationId: conversation.id,
+        customerId: customer.id,
+        notificationType: 'voice_followup',
+      }) : { success: false, error: 'template disabled' };
       console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
-
-      await admin.from('messages').insert({
-        conversation_id: conversation.id,
-        direction: 'outbound',
-        body: smsBody,
-        sender_type: 'system',
-        status: 'delivered',
-        channel: 'sms',
-      });
     } else {
       console.log(`[VoicePostCall] SMS send result: skipped — no SMS consent (customer: ${customer?.id || 'not found'})`);
     }
@@ -590,17 +586,14 @@ async function autoGenerateQuote(
       const firstName = customerName?.trim().split(/\s+/)[0];
       const nameGreeting = firstName ? `, ${firstName}` : '';
       const quoteSmsBody = `Thanks for calling ${biz.name}${nameGreeting}! Here's a quote for what we discussed: ${linkUrl}`;
-      const smsResult = await sendSms(phone, quoteSmsBody);
-      console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
-
-      await admin.from('messages').insert({
-        conversation_id: conversationId,
-        direction: 'outbound',
-        body: quoteSmsBody,
-        sender_type: 'system',
-        status: 'delivered',
-        channel: 'sms',
+      const smsResult = await sendSms(phone, quoteSmsBody, {
+        logToConversation: true,
+        conversationId,
+        customerId: custId || undefined,
+        notificationType: 'voice_quote_sent',
+        contextId: quoteRecord.id,
       });
+      console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
     } else {
       console.log(`[VoicePostCall] SMS send result: skipped — no SMS consent (customer: ${custId})`);
     }

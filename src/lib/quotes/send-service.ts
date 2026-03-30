@@ -218,7 +218,13 @@ export async function sendQuote(
           ? `${appUrl}/api/quotes/${quoteId}/pdf?token=${quote.access_token}`
           : undefined;
 
-        const smsResult = await sendSms(customer.phone, smsBody, { mediaUrl });
+        const smsResult = await sendSms(customer.phone, smsBody, {
+          mediaUrl,
+          logToConversation: true,
+          customerId: customer.id,
+          notificationType: 'quote_sent',
+          contextId: quoteId,
+        });
 
         if (smsResult.success) {
           sentVia.push('sms');

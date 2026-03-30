@@ -330,7 +330,9 @@ export async function getAIResponse(
   newMessage: string,
   customerContext?: CustomerContext,
   customerId?: string | null,
-  conversationSummary?: string | null
+  conversationSummary?: string | null,
+  lastNotificationType?: string | null,
+  lastNotificationAt?: string | null,
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -362,6 +364,24 @@ PREVIOUS CONVERSATION SUMMARY:
 The following summary covers earlier parts of this conversation that may not appear in the recent message history. Use this context to maintain continuity — reference past discussions naturally without re-asking questions that were already answered.
 
 ${conversationSummary}`;
+  }
+
+  // System notification awareness — helps AI understand reply context
+  systemPrompt += `
+
+SYSTEM NOTIFICATION AWARENESS:
+- Messages prefixed with [SYSTEM NOTIFICATION: ...] are automated messages sent to this customer by the business.
+- When a customer replies shortly after a system notification, their reply is almost certainly about that notification. Respond in the context of that notification — don't pivot to a new service inquiry. Keep your reply brief and relevant to what the notification was about.
+- NEVER ask "what can I help you with?" right after a system notification — the context is already clear from the notification label and content.`;
+
+  if (lastNotificationType && lastNotificationAt) {
+    const elapsed = Date.now() - new Date(lastNotificationAt).getTime();
+    const minutesAgo = Math.round(elapsed / 60000);
+    const timeLabel = minutesAgo < 60
+      ? `${minutesAgo} minute${minutesAgo !== 1 ? 's' : ''} ago`
+      : `${Math.round(minutesAgo / 60)} hour${Math.round(minutesAgo / 60) !== 1 ? 's' : ''} ago`;
+    const readableType = lastNotificationType.replace(/_/g, ' ');
+    systemPrompt += `\nLAST SYSTEM NOTIFICATION: "${readableType}" sent ${timeLabel}. The customer's reply is very likely related to this.`;
   }
 
   // Append customer context for returning customers
@@ -436,10 +456,23 @@ INSTRUCTIONS FOR RETURNING CUSTOMERS:
 
   // Build message history for context (last 100 messages max)
   const recentHistory = conversationHistory.slice(-100);
-  const messages = recentHistory.map((msg) => ({
-    role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
-    content: msg.body,
-  }));
+  const messages = recentHistory.map((msg) => {
+    // Prefix system messages so the AI can distinguish notifications from its own replies
+    if (msg.sender_type === 'system') {
+      const notifType = msg.metadata?.notificationType;
+      const label = notifType
+        ? notifType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+        : 'System Notification';
+      return {
+        role: 'assistant' as const,
+        content: `[SYSTEM NOTIFICATION: ${label}] ${msg.body}`,
+      };
+    }
+    return {
+      role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+      content: msg.body,
+    };
+  });
 
   // Add the new inbound message
   messages.push({ role: 'user', content: newMessage });

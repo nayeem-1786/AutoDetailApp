@@ -20,29 +20,43 @@ function formatDuration(seconds: number): string {
 }
 
 /**
- * Notification bar: voice channel messages and non-SMS system events.
- * Centered, no bubble, small gray text.
+ * Notification bar: voice channel messages and system events (both voice and SMS).
+ * Centered, no bubble, small gray text. System SMS shows notification type label.
  */
 function NotificationBar({ message }: { message: Message }) {
   const isVoice = message.channel === 'voice';
+  const isSystemSms = message.sender_type === 'system' && message.channel === 'sms';
+
+  // Notification type label from metadata (e.g., "job_complete" → "Job Complete")
+  const notifLabel = isSystemSms && message.metadata?.notificationType
+    ? message.metadata.notificationType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+    : null;
 
   // Strip the "Phone call (X:XX)\n" prefix from body when we render duration separately
   let displayBody = message.body;
   if (isVoice && message.voice_duration_seconds != null) {
     displayBody = displayBody.replace(/^Phone call\s*\(\d+:\d+\)\s*\n?/, '');
   }
+  // Truncate long system SMS bodies
+  if (isSystemSms && displayBody.length > 120) {
+    displayBody = displayBody.substring(0, 120) + '...';
+  }
 
   return (
     <div className="flex justify-center py-1.5">
-      <div className="max-w-[85%] rounded-md bg-gray-50 px-3 py-1.5">
+      <div className="max-w-[85%] rounded-md bg-gray-50 px-3 py-1.5 dark:bg-gray-800">
         <div className="flex items-center justify-center gap-1.5">
           {isVoice && <Phone className="h-3 w-3 shrink-0 text-gray-400" />}
-          <p className="text-center text-xs text-gray-500 whitespace-pre-wrap break-words">
+          {isSystemSms && <MessageSquare className="h-3 w-3 shrink-0 text-blue-400" />}
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-words">
             {isVoice && message.voice_duration_seconds != null && (
-              <span className="font-medium text-gray-600">
+              <span className="font-medium text-gray-600 dark:text-gray-300">
                 Phone call ({formatDuration(message.voice_duration_seconds)})
                 {displayBody ? ' — ' : ''}
               </span>
+            )}
+            {notifLabel && (
+              <span className="font-medium text-blue-600 dark:text-blue-400">{notifLabel} — </span>
             )}
             {displayBody}
           </p>
@@ -54,10 +68,10 @@ function NotificationBar({ message }: { message: Message }) {
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-  // Notification bars: voice channel OR system messages that aren't SMS
+  // Notification bars: voice channel OR any system message (including system SMS)
   const isNotification =
     message.channel === 'voice' ||
-    (message.sender_type === 'system' && message.channel !== 'sms');
+    message.sender_type === 'system';
 
   if (isNotification) {
     return <NotificationBar message={message} />;

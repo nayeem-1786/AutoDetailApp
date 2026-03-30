@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { createShortLink } from '@/lib/utils/short-link';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { findOrCreateConversation } from '@/lib/utils/conversation-helpers';
 
 /**
  * Quote follow-up reminder cron endpoint.
@@ -94,6 +95,32 @@ export async function GET(request: NextRequest) {
         message: `[reminder] ${message}`,
       });
 
+      // Log to conversation thread for AI reply context
+      if (result.success) {
+        try {
+          const convId = await findOrCreateConversation(admin, customer.phone, quote.customer_id);
+          if (convId) {
+            await admin.from('messages').insert({
+              conversation_id: convId,
+              direction: 'outbound',
+              body: message,
+              sender_type: 'system',
+              status: 'sent',
+              channel: 'sms',
+              metadata: { notificationType: 'quote_reminder', contextId: quote.id },
+            });
+            await admin.from('conversations').update({
+              last_message_at: new Date().toISOString(),
+              last_message_preview: message.substring(0, 200),
+              last_notification_type: 'quote_reminder',
+              last_notification_at: new Date().toISOString(),
+            }).eq('id', convId);
+          }
+        } catch (logErr) {
+          console.error(`[QuoteReminder] Conversation log failed for quote ${quote.id}:`, logErr);
+        }
+      }
+
       if (result.success) {
         sent++;
       } else {
@@ -170,6 +197,32 @@ export async function GET(request: NextRequest) {
           error_message: result.success ? null : result.error,
           message: `[viewed-followup] ${message}`,
         });
+
+        // Log to conversation thread for AI reply context
+        if (result.success) {
+          try {
+            const convId = await findOrCreateConversation(admin, customer.phone, quote.customer_id);
+            if (convId) {
+              await admin.from('messages').insert({
+                conversation_id: convId,
+                direction: 'outbound',
+                body: message,
+                sender_type: 'system',
+                status: 'sent',
+                channel: 'sms',
+                metadata: { notificationType: 'quote_viewed_followup', contextId: quote.id },
+              });
+              await admin.from('conversations').update({
+                last_message_at: new Date().toISOString(),
+                last_message_preview: message.substring(0, 200),
+                last_notification_type: 'quote_viewed_followup',
+                last_notification_at: new Date().toISOString(),
+              }).eq('id', convId);
+            }
+          } catch (logErr) {
+            console.error(`[QuoteReminder] Conversation log failed for viewed-followup ${quote.id}:`, logErr);
+          }
+        }
 
         if (result.success) viewedSent++;
         else viewedErrors++;

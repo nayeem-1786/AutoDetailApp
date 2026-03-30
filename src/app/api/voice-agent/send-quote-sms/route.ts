@@ -244,43 +244,12 @@ export async function POST(request: NextRequest) {
     const biz = await getBusinessInfo();
     const serviceList = quoteItems.map((i) => i.item_name).join(', ');
     const smsBody = `Here's your quote from ${biz.name} for ${serviceList}: ${linkUrl}`;
-    await sendSms(normalizedPhone, smsBody);
-
-    // Log SMS to conversation thread
-    let { data: conversation } = await admin
-      .from('conversations')
-      .select('id')
-      .eq('phone_number', normalizedPhone)
-      .single();
-
-    if (!conversation) {
-      const { data: newConv } = await admin
-        .from('conversations')
-        .insert({
-          phone_number: normalizedPhone,
-          customer_id: customerId,
-          is_ai_enabled: true,
-          status: 'open',
-          last_message_at: new Date().toISOString(),
-          last_message_preview: smsBody.substring(0, 200),
-          last_channel: 'sms',
-          unread_count: 0,
-        })
-        .select('id')
-        .single();
-      conversation = newConv;
-    }
-
-    if (conversation) {
-      await admin.from('messages').insert({
-        conversation_id: conversation.id,
-        direction: 'outbound',
-        body: smsBody,
-        sender_type: 'system',
-        status: 'delivered',
-        channel: 'sms',
-      });
-    }
+    await sendSms(normalizedPhone, smsBody, {
+      logToConversation: true,
+      customerId: customerId || undefined,
+      notificationType: 'voice_quote_sent',
+      contextId: quoteRecord.id,
+    });
 
     // Log quote communication
     await admin.from('quote_communications').insert({

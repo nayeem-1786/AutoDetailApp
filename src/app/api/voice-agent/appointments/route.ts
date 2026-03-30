@@ -351,9 +351,12 @@ export async function POST(request: NextRequest) {
         serviceName: service.name,
       });
       if (smsBody) {
-        sendSms(e164Phone, smsBody)
-          .then(() => logSmsMessage(supabase, e164Phone, smsBody))
-          .catch((err) => console.error('Appointment SMS confirmation failed:', err));
+        sendSms(e164Phone, smsBody, {
+          logToConversation: true,
+          customerId: customerId || undefined,
+          notificationType: 'appointment_confirmed',
+          contextId: appointment.id,
+        }).catch((err) => console.error('Appointment SMS confirmation failed:', err));
       }
     }
 
@@ -472,25 +475,4 @@ async function logVoiceAction(
     .eq('id', conv.id);
 }
 
-async function logSmsMessage(
-  supabase: ReturnType<typeof createAdminClient>,
-  phone: string,
-  body: string
-) {
-  const { data: conv } = await supabase
-    .from('conversations')
-    .select('id')
-    .eq('phone_number', phone)
-    .maybeSingle();
-
-  if (!conv) return;
-
-  await supabase.from('messages').insert({
-    conversation_id: conv.id,
-    direction: 'outbound',
-    body,
-    sender_type: 'system',
-    status: 'delivered',
-    channel: 'sms',
-  });
-}
+// logSmsMessage removed — sendSms() auto-logs when logToConversation: true

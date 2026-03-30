@@ -21,7 +21,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - `addon_approved` + `addon_declined` (job-addons.ts)
 - `booking_reminder` (cron)
 
-### Session B (next): Hardcoded SMS sites, manual-to-auto migrations, sendMarketingSms sites, AI awareness, UI notification bars
+---
+
+## feat: unified system SMS logging — Session B: AI awareness + UI + remaining sites (Session 13Y-B) — 2026-03-30
+
+### 4 Hardcoded SMS Sites
+- `quote_sent` (send-service.ts — short link + MMS PDF)
+- `addon_authorization_request` (addons/route.ts — crypto auth URL)
+- `addon_authorization_resend` (addons/resend — fresh crypto URL + MMS photo)
+- `receipt_sent` (receipts/sms — truncated receipt + short link)
+
+### 4 Manual-to-Auto Migrations
+- voice-post-call.ts: post-call SMS + auto-quote SMS — removed 2 manual messages.insert blocks
+- voice-agent/send-quote-sms: removed manual conversation creation + messages.insert (25 lines)
+- voice-agent/appointments: removed logSmsMessage() function (22 lines)
+- All now use sendSms() auto-logging — single source of truth
+
+### 2 sendMarketingSms Sites (quote reminders cron)
+- `quote_reminder` and `quote_viewed_followup` — separate messages.insert after sendMarketingSms
+- Uses findOrCreateConversation() to ensure conversation exists
+
+### AI Awareness (Layer 2)
+- Removed `.neq('sender_type', 'system')` filter from inbound webhook — system SMS now visible to AI
+- Voice-channel system messages still filtered (consent changes, reopened notifications)
+- System messages prefixed with `[SYSTEM NOTIFICATION: Job Complete]` labels in AI context
+- Added notification awareness section to system prompt
+- Last notification type + elapsed time injected: `LAST SYSTEM NOTIFICATION: "job complete" sent 3 minutes ago`
+- getAIResponse() extended with lastNotificationType + lastNotificationAt params
+
+### UI Updates (Layer 3)
+- System SMS now renders as centered notification bars (was right-aligned blue bubbles)
+- Shows notification type label from metadata (e.g., "Job Complete — Hi John, your Tesla...")
+- Long system SMS bodies truncated to 120 chars with "..."
+- Dark mode support on notification bars
+- Distinct icon: MessageSquare (blue) for system SMS vs Phone for voice
 
 ---
 

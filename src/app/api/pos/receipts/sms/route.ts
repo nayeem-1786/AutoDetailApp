@@ -75,7 +75,11 @@ export async function POST(request: NextRequest) {
 
     const smsBody = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;
 
-    const result = await sendSms(phone, smsBody);
+    const result = await sendSms(phone, smsBody, {
+      logToConversation: true,
+      notificationType: 'receipt_sent',
+      contextId: transaction_id,
+    });
 
     if (!result.success) {
       return NextResponse.json(
