@@ -5,7 +5,7 @@ import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
-import { resolveServiceByName } from '@/lib/services/service-resolver';
+import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 
@@ -63,14 +63,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid services provided' }, { status: 400 });
     }
 
-    // Resolve services to quote items
+    // Resolve services to quote items (sale-aware via resolvePrice)
     const quoteItems: Array<{
       service_id: string;
       item_name: string;
       quantity: number;
       unit_price: number;
       tier_name: string | null;
+      standard_price: number | null;
+      pricing_type: 'standard' | 'sale' | 'combo' | null;
     }> = [];
+
+    // We don't know the vehicle yet, so default to sedan.
+    // Vehicle is created below — but service resolution needs a size class hint.
+    // Mid-call tool doesn't have vehicle_type/size_class params, so sedan is the safe default.
+    const sizeClass = 'sedan';
 
     let t = perf.now();
     for (const serviceName of serviceNames) {
@@ -79,18 +86,15 @@ export async function POST(request: NextRequest) {
         console.warn(`[SendQuoteSMS] Service not found: "${serviceName}"`);
         continue;
       }
-      let price = service.flat_price ?? 0;
-      let tierName: string | null = null;
-      if (service.service_pricing?.length > 0) {
-        price = service.service_pricing[0].price;
-        tierName = service.service_pricing[0].tier_name;
-      }
+      const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
       quoteItems.push({
         service_id: service.id,
         item_name: service.name,
         quantity: 1,
-        unit_price: price,
+        unit_price: isOnSale ? salePrice! : price,
         tier_name: tierName,
+        standard_price: isOnSale ? price : null,
+        pricing_type: isOnSale ? 'sale' : 'standard',
       });
     }
     perf.mark('resolve:services_batch', t);

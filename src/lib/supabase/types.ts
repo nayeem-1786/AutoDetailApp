@@ -653,6 +653,8 @@ export interface QuoteItem {
   unit_price: number;
   total_price: number;
   tier_name: string | null;
+  standard_price: number | null;
+  pricing_type: string | null;
   notes: string | null;
   created_at: string;
 }

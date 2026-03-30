@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: sale-aware pricing for voice agent auto-quotes (Session 14C) — 2026-03-30
+
+- Extended `resolvePrice()` in `service-resolver.ts` to return `{ price, salePrice, tierName, isOnSale }` — checks `getSaleStatus()` from shared sale-pricing utility
+- `resolveServiceByName()` now selects `sale_price`, `sale_starts_at`, `sale_ends_at` from services and `sale_price` from service_pricing tiers
+- Voice post-call auto-quote (`voice-post-call.ts`) uses sale price when active, stores `standard_price` and `pricing_type` on quote items
+- SMS auto-quote (Twilio inbound webhook) updated with same sale-aware pricing
+- Mid-call quote (`send-quote-sms/route.ts`) fixed to use `resolvePrice()` instead of manually grabbing `service_pricing[0].price` — now sale-aware and vehicle-size-aware
+- Voice agent services endpoint (`/api/voice-agent/services`) returns `sale_price` per tier when sale is active, so the agent can mention sale prices during calls
+- New migration `20260330000002`: adds `standard_price` (DECIMAL) and `pricing_type` (TEXT) columns to `quote_items` — mirrors `transaction_items` pattern
+- Updated `quoteItemSchema` validation, `QuoteItem` TypeScript interface, and `createQuote`/`updateQuote` to persist new fields
+- POS pricing path completely untouched — zero regression risk
+
+---
+
 ## fix: voice agent appointment time parsing — handle 12-hour AM/PM format (Session 14B) — 2026-03-30
 
 - New `normalizeTimeTo24h()` in `format.ts` — converts "09:00 AM" → "09:00", "2:00 PM" → "14:00", handles noon/midnight edge cases, passes through 24-hour input unchanged

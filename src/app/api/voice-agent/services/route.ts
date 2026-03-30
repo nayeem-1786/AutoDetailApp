@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
+import { getSaleStatus } from '@/lib/utils/sale-pricing';
 
 export async function GET(request: NextRequest) {
   const perf = createPerfTimer('GET /voice-agent/services');
@@ -22,6 +23,9 @@ export async function GET(request: NextRequest) {
         description,
         pricing_model,
         flat_price,
+        sale_price,
+        sale_starts_at,
+        sale_ends_at,
         per_unit_price,
         per_unit_label,
         per_unit_max,
@@ -29,7 +33,7 @@ export async function GET(request: NextRequest) {
         base_duration_minutes,
         mobile_eligible,
         service_categories ( name ),
-        service_pricing ( tier_name, price )
+        service_pricing ( tier_name, price, sale_price )
       `)
       .eq('is_active', true)
       .order('display_order', { ascending: true });
@@ -45,24 +49,41 @@ export async function GET(request: NextRequest) {
     }
 
     const formatted = (services ?? []).map((s) => {
-      const tiers = (s.service_pricing as { tier_name: string; price: number }[]) ?? [];
+      const tiers = (s.service_pricing as { tier_name: string; price: number; sale_price: number | null }[]) ?? [];
+      const saleWindow = { sale_starts_at: s.sale_starts_at as string | null, sale_ends_at: s.sale_ends_at as string | null };
+      const { isOnSale } = getSaleStatus(saleWindow);
 
       // Build pricing array based on pricing_model
-      let pricing: Array<{ tier_name: string; price: number | null; note?: string }>;
+      let pricing: Array<{ tier_name: string; price: number | null; sale_price?: number | null; note?: string }>;
 
       switch (s.pricing_model) {
         case 'vehicle_size':
         case 'scope':
         case 'specialty':
           // Tiered pricing — use service_pricing rows
-          pricing = tiers.map((p) => ({ tier_name: p.tier_name, price: Number(p.price) }));
+          pricing = tiers.map((p) => ({
+            tier_name: p.tier_name,
+            price: Number(p.price),
+            ...(isOnSale && p.sale_price != null && p.sale_price < p.price
+              ? { sale_price: Number(p.sale_price) }
+              : {}),
+          }));
           break;
 
-        case 'flat':
-          pricing = s.flat_price != null
-            ? [{ tier_name: 'flat', price: Number(s.flat_price) }]
+        case 'flat': {
+          const flatSalePrice = s.sale_price as number | null;
+          const flatPrice = s.flat_price as number | null;
+          pricing = flatPrice != null
+            ? [{
+                tier_name: 'flat',
+                price: Number(flatPrice),
+                ...(isOnSale && flatSalePrice != null && flatSalePrice < flatPrice
+                  ? { sale_price: Number(flatSalePrice) }
+                  : {}),
+              }]
             : [{ tier_name: 'flat', price: null, note: 'Contact for pricing' }];
           break;
+        }
 
         case 'per_unit':
           pricing = s.per_unit_price != null
@@ -85,7 +106,13 @@ export async function GET(request: NextRequest) {
           break;
 
         default:
-          pricing = tiers.map((p) => ({ tier_name: p.tier_name, price: Number(p.price) }));
+          pricing = tiers.map((p) => ({
+            tier_name: p.tier_name,
+            price: Number(p.price),
+            ...(isOnSale && p.sale_price != null && p.sale_price < p.price
+              ? { sale_price: Number(p.sale_price) }
+              : {}),
+          }));
       }
 
       return {

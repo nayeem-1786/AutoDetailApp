@@ -177,6 +177,8 @@ export async function createQuote(
     unit_price: item.unit_price,
     total_price: Math.round(item.quantity * item.unit_price * 100) / 100,
     tier_name: item.tier_name || null,
+    standard_price: item.standard_price ?? null,
+    pricing_type: item.pricing_type ?? null,
     notes: item.notes || null,
   }));
 
@@ -294,6 +296,8 @@ export async function updateQuote(
       unit_price: item.unit_price,
       total_price: Math.round(item.quantity * item.unit_price * 100) / 100,
       tier_name: item.tier_name || null,
+      standard_price: item.standard_price ?? null,
+      pricing_type: item.pricing_type ?? null,
       notes: item.notes || null,
     }));
 

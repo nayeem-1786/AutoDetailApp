@@ -1380,6 +1380,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260329000001_sms_template_variable_audit.sql
 20260329000002_jobs_appointment_id_unique_constraint.sql
 20260330000001_system_sms_logging.sql
+20260330000002_quote_items_sale_columns.sql
 ```
 
 ---

@@ -471,13 +471,15 @@ async function autoGenerateQuote(
     if (vehicle?.size_class) sizeClass = vehicle.size_class;
   }
 
-  // Resolve service names to IDs with correct tier pricing
+  // Resolve service names to IDs with correct tier pricing (sale-aware)
   const quoteItems: Array<{
     service_id: string;
     item_name: string;
     quantity: number;
     unit_price: number;
     tier_name: string | null;
+    standard_price: number | null;
+    pricing_type: 'standard' | 'sale' | 'combo' | null;
   }> = [];
 
   for (const serviceName of servicesDiscussed) {
@@ -486,13 +488,15 @@ async function autoGenerateQuote(
       console.warn(`[VoicePostCall] Service not found: "${serviceName}"`);
       continue;
     }
-    const { price, tierName } = resolvePrice(service, sizeClass);
+    const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
     quoteItems.push({
       service_id: service.id,
       item_name: service.name,
       quantity: 1,
-      unit_price: price,
+      unit_price: isOnSale ? salePrice! : price,
       tier_name: tierName,
+      standard_price: isOnSale ? price : null,
+      pricing_type: isOnSale ? 'sale' : 'standard',
     });
   }
 

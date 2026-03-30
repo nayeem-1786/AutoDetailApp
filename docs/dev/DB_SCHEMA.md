@@ -729,6 +729,8 @@ idx_refund_items_refund — btree (refund_id)
 | quote_id | UUID | NOT NULL, FK → quotes(id) ON DELETE CASCADE | |
 | quantity | INTEGER | NOT NULL, DEFAULT 1 | |
 | total_price | DECIMAL(10,2) | NOT NULL | |
+| standard_price | DECIMAL(10,2) | DEFAULT NULL | Original pre-sale price. NULL when no sale active. Added via `20260330000002` |
+| pricing_type | TEXT | DEFAULT NULL | standard, sale, combo. NULL for legacy items. Added via `20260330000002` |
 | created_at | TIMESTAMPTZ | | |
 
 ### quote_communications

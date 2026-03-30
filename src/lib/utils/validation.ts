@@ -517,6 +517,8 @@ export const quoteItemSchema = z.object({
   service_id: z.string().uuid().optional().nullable(),
   product_id: z.string().uuid().optional().nullable(),
   tier_name: optionalString,
+  standard_price: z.coerce.number().optional().nullable(),
+  pricing_type: z.enum(['standard', 'sale', 'combo']).optional().nullable(),
   notes: optionalString,
 });
 
