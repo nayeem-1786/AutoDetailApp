@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { processVoiceCallEnd } from '@/lib/services/voice-post-call';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 /**
  * POST /api/voice-agent/finalize-call
@@ -10,6 +11,7 @@ import { processVoiceCallEnd } from '@/lib/services/voice-post-call';
  * Auth: Bearer token (voice_agent_api_key)
  */
 export async function POST(request: NextRequest) {
+  const perf = createPerfTimer('POST /voice-agent/finalize-call');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -102,10 +104,12 @@ export async function POST(request: NextRequest) {
         console.error(`[FINALIZE] Background processing failed after ${Date.now() - startTime}ms:`, err);
       });
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       message: 'Call logged, processing in background',
-    });
+    };
+    perf.done(responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('[FinalizeCall] Error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

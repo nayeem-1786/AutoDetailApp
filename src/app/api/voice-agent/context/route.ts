@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone } from '@/lib/utils/format';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 /**
  * GET /api/voice-agent/context?phone=+1XXXXXXXXXX
@@ -11,6 +12,7 @@ import { normalizePhone } from '@/lib/utils/format';
  * conversation history (SMS + voice), and conversation summary.
  */
 export async function GET(request: NextRequest) {
+  const perf = createPerfTimer('GET /voice-agent/context');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -33,6 +35,7 @@ export async function GET(request: NextRequest) {
     const today = new Date().toISOString().split('T')[0];
 
     // Find customer
+    let t = perf.now();
     const { data: customer } = await supabase
       .from('customers')
       .select('id, first_name, last_name, phone, email, customer_type, loyalty_points_balance, notes, tags, first_visit_date, last_visit_date, visit_count, lifetime_spend')
@@ -40,21 +43,26 @@ export async function GET(request: NextRequest) {
       .is('deleted_at', null)
       .limit(1)
       .maybeSingle();
+    perf.mark('query:customers', t);
 
     // Find conversation
+    t = perf.now();
     const { data: conversation } = await supabase
       .from('conversations')
       .select('id, status, is_ai_enabled, summary, last_message_at, last_channel')
       .eq('phone_number', e164Phone)
       .maybeSingle();
+    perf.mark('query:conversations', t);
 
     // If no customer and no conversation, return minimal response
     if (!customer && !conversation) {
-      return NextResponse.json({
+      const responseData = {
         customer: null,
         conversation: null,
         is_new_caller: true,
-      });
+      };
+      perf.done(responseData);
+      return NextResponse.json(responseData);
     }
 
     // Parallel data fetches for known customers
@@ -64,6 +72,7 @@ export async function GET(request: NextRequest) {
     let messages: unknown[] = [];
 
     if (customer) {
+      t = perf.now();
       const [vehicleRes, apptRes, quoteRes] = await Promise.all([
         supabase
           .from('vehicles')
@@ -86,22 +95,25 @@ export async function GET(request: NextRequest) {
           .order('created_at', { ascending: false })
           .limit(3),
       ]);
+      perf.mark('query:vehicles+appointments+quotes', t);
       vehicles = vehicleRes.data || [];
       appointments = apptRes.data || [];
       quotes = quoteRes.data || [];
     }
 
     if (conversation) {
+      t = perf.now();
       const { data: msgData } = await supabase
         .from('messages')
         .select('direction, body, sender_type, channel, created_at')
         .eq('conversation_id', conversation.id)
         .order('created_at', { ascending: false })
         .limit(20);
+      perf.mark('query:messages', t);
       messages = (msgData || []).reverse();
     }
 
-    return NextResponse.json({
+    const responseData = {
       customer: customer ? {
         id: customer.id,
         first_name: customer.first_name,
@@ -130,7 +142,9 @@ export async function GET(request: NextRequest) {
         messages,
       } : null,
       is_new_caller: !customer,
-    });
+    };
+    perf.done(responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('Voice agent context error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

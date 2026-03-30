@@ -4,6 +4,7 @@ import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone } from '@/lib/utils/format';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { generateQuoteNumber } from '@/lib/utils/quote-number';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 interface QuoteServiceInput {
   service_id: string;
@@ -11,6 +12,7 @@ interface QuoteServiceInput {
 }
 
 export async function POST(request: NextRequest) {
+  const perf = createPerfTimer('POST /voice-agent/quotes');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -69,6 +71,7 @@ const body = await request.json();
 
     let customerId: string;
 
+    let t = perf.now();
     const { data: existingCustomer } = await supabase
       .from('customers')
       .select('id')
@@ -76,10 +79,12 @@ const body = await request.json();
       .is('deleted_at', null)
       .limit(1)
       .single();
+    perf.mark('query:customers_find', t);
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
     } else {
+      t = perf.now();
       const { data: newCustomer, error: custErr } = await supabase
         .from('customers')
         .insert({
@@ -89,6 +94,7 @@ const body = await request.json();
         })
         .select('id')
         .single();
+      perf.mark('query:customers_create', t);
 
       if (custErr || !newCustomer) {
         console.error('Customer creation failed:', custErr?.message);
@@ -103,6 +109,7 @@ const body = await request.json();
     // Optionally create vehicle
     let vehicleId: string | null = null;
     if (vehicle_make || vehicle_model || vehicle_year || vehicle_color) {
+      t = perf.now();
       const { data: newVehicle, error: vehErr } = await supabase
         .from('vehicles')
         .insert({
@@ -115,6 +122,7 @@ const body = await request.json();
         })
         .select('id')
         .single();
+      perf.mark('query:vehicles_create', t);
 
       if (vehErr) {
         console.error('Vehicle creation failed:', vehErr.message);
@@ -125,11 +133,13 @@ const body = await request.json();
 
     // Look up each service + pricing tier to get prices
     const serviceIds = serviceInputs.map((s) => s.service_id);
+    t = perf.now();
     const { data: servicesData, error: svcErr } = await supabase
       .from('services')
       .select('id, name, flat_price, pricing_model, service_pricing ( tier_name, price )')
       .in('id', serviceIds)
       .eq('is_active', true);
+    perf.mark('query:services', t);
 
     if (svcErr) {
       console.error('Services query error:', svcErr.message);
@@ -168,7 +178,7 @@ const body = await request.json();
       if (input.tier_name) {
         // Look up tier price
         const tiers = (svc.service_pricing as { tier_name: string; price: number }[]) ?? [];
-        const tier = tiers.find((t) => t.tier_name === input.tier_name);
+        const tier = tiers.find((tp) => tp.tier_name === input.tier_name);
         if (tier) {
           price = Number(tier.price);
           tierName = tier.tier_name;
@@ -197,7 +207,9 @@ const body = await request.json();
     const subtotal = quoteItems.reduce((sum, item) => sum + item.total_price, 0);
 
     // Generate quote number
+    t = perf.now();
     const quoteNumber = await generateQuoteNumber(supabase);
+    perf.mark('query:generateQuoteNumber', t);
 
     // Determine initial status and timestamps
     const now = new Date().toISOString();
@@ -206,11 +218,13 @@ const body = await request.json();
     const sentAt = shouldSendSms ? now : null;
 
     // Read quote validity from admin settings
+    t = perf.now();
     const { data: validitySetting } = await supabase
       .from('business_settings')
       .select('value')
       .eq('key', 'quote_validity_days')
       .maybeSingle();
+    perf.mark('query:business_settings', t);
 
     let quoteValidityDays = 10; // fallback
     if (validitySetting?.value) {
@@ -225,6 +239,7 @@ const body = await request.json();
     ).toISOString();
 
     // Create quote
+    t = perf.now();
     const { data: quote, error: quoteErr } = await supabase
       .from('quotes')
       .insert({
@@ -241,6 +256,7 @@ const body = await request.json();
       })
       .select('id, quote_number, status, subtotal, total_amount, valid_until, sent_at, created_at')
       .single();
+    perf.mark('query:quotes_create', t);
 
     if (quoteErr || !quote) {
       console.error('Quote creation failed:', quoteErr?.message);
@@ -261,9 +277,11 @@ const body = await request.json();
       tier_name: item.tier_name,
     }));
 
+    t = perf.now();
     const { error: itemsErr } = await supabase
       .from('quote_items')
       .insert(itemRows);
+    perf.mark('query:quote_items', t);
 
     if (itemsErr) {
       console.error('Quote items insertion failed:', itemsErr.message);
@@ -306,28 +324,27 @@ const body = await request.json();
       supabase
     ).catch((err) => console.error('Webhook fire failed:', err));
 
-    return NextResponse.json(
-      {
-        success: true,
-        quote: {
-          id: quote.id,
-          quote_number: quote.quote_number,
-          status: quote.status,
-          subtotal: Number(quote.subtotal),
-          total_amount: Number(quote.total_amount),
-          valid_until: quote.valid_until,
-          sent_at: quote.sent_at,
-          created_at: quote.created_at,
-          items: quoteItems.map((item) => ({
-            service_id: item.service_id,
-            name: item.item_name,
-            price: item.total_price,
-            tier_name: item.tier_name,
-          })),
-        },
+    const responseData = {
+      success: true,
+      quote: {
+        id: quote.id,
+        quote_number: quote.quote_number,
+        status: quote.status,
+        subtotal: Number(quote.subtotal),
+        total_amount: Number(quote.total_amount),
+        valid_until: quote.valid_until,
+        sent_at: quote.sent_at,
+        created_at: quote.created_at,
+        items: quoteItems.map((item) => ({
+          service_id: item.service_id,
+          name: item.item_name,
+          price: item.total_price,
+          tier_name: item.tier_name,
+        })),
       },
-      { status: 201 }
-    );
+    };
+    perf.done(responseData);
+    return NextResponse.json(responseData, { status: 201 });
   } catch (err) {
     console.error('Voice agent quotes error:', err);
     return NextResponse.json(

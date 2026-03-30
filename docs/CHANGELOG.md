@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## perf: voice agent timing instrumentation across all 9 endpoints (Session 14A) — 2026-03-30
+
+- New `createPerfTimer()` utility in `src/lib/utils/voice-perf.ts`
+- All 9 voice-agent endpoints instrumented with `[VOICE-PERF]` logging
+- Per-query timing (query:customers, query:services, etc.), total endpoint time, and payload size in bytes
+- Endpoints: initiation, services, customers, context, availability, appointments (GET+POST), send-quote-sms, finalize-call, quotes
+- Run `pm2 logs smart-details | grep VOICE-PERF` to see timing data during live calls
+- Temporary instrumentation — remove after optimization is complete
+
+---
+
 ## fix: auto-quote selects vehicle-size-aware tier for multi-tier services (Session 13Z) — 2026-03-30
 
 - `resolvePrice()` in service-resolver.ts now prefers the vehicle-size-aware tier for scope services (e.g., Hot Shampoo "Complete Interior" at $300 instead of "Floor Mats Only" at $75)

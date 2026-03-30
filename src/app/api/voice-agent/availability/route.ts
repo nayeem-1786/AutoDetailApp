@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { APPOINTMENT } from '@/lib/utils/constants';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 const DAY_NAMES = [
   'sunday',
@@ -14,6 +15,7 @@ const DAY_NAMES = [
 ] as const;
 
 export async function GET(request: NextRequest) {
+  const perf = createPerfTimer('GET /voice-agent/availability');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -51,11 +53,13 @@ export async function GET(request: NextRequest) {
     // 1. Determine duration: from service if provided, otherwise default 60
     let duration = 60;
     if (serviceId) {
+      let t = perf.now();
       const { data: service } = await supabase
         .from('services')
         .select('base_duration_minutes')
         .eq('id', serviceId)
         .single();
+      perf.mark('query:services', t);
 
       if (service) {
         duration = service.base_duration_minutes;
@@ -63,10 +67,12 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Get business_hours and booking_config from business_settings
+    let t = perf.now();
     const { data: settings } = await supabase
       .from('business_settings')
       .select('key, value')
       .in('key', ['business_hours', 'booking_config']);
+    perf.mark('query:business_settings', t);
 
     const settingsMap: Record<string, unknown> = {};
     for (const row of settings ?? []) {
@@ -85,18 +91,22 @@ export async function GET(request: NextRequest) {
     const dayHours = hours?.[dayName];
     if (!dayHours) {
       // Closed on this day
-      return NextResponse.json({ date: dateStr, slots: [] });
+      const responseData = { date: dateStr, slots: [] };
+      perf.done(responseData);
+      return NextResponse.json(responseData);
     }
 
     const slotInterval = config.slot_interval_minutes ?? 30;
     const totalNeeded = duration + APPOINTMENT.BUFFER_MINUTES;
 
     // 4. Get existing non-cancelled appointments for the date
+    t = perf.now();
     const { data: existing } = await supabase
       .from('appointments')
       .select('scheduled_start_time, scheduled_end_time')
       .eq('scheduled_date', dateStr)
       .neq('status', 'cancelled');
+    perf.mark('query:appointments', t);
 
     const appointments = (existing ?? []).map((a) => ({
       start: timeToMinutes(a.scheduled_start_time),
@@ -104,23 +114,27 @@ export async function GET(request: NextRequest) {
     }));
 
     // 5. Generate slots at slot_interval_minutes, filtering conflicts
+    t = perf.now();
     const openMin = timeToMinutes(dayHours.open);
     const closeMin = timeToMinutes(dayHours.close);
     const slots: string[] = [];
 
-    for (let t = openMin; t + totalNeeded <= closeMin; t += slotInterval) {
-      const slotEnd = t + totalNeeded;
+    for (let s = openMin; s + totalNeeded <= closeMin; s += slotInterval) {
+      const slotEnd = s + totalNeeded;
 
       const hasConflict = appointments.some(
-        (appt) => t < appt.end && slotEnd > appt.start
+        (appt) => s < appt.end && slotEnd > appt.start
       );
 
       if (!hasConflict) {
-        slots.push(minutesToTime(t));
+        slots.push(minutesToTime(s));
       }
     }
+    perf.mark('process:slot_generation', t);
 
-    return NextResponse.json({ date: dateStr, slots });
+    const responseData = { date: dateStr, slots };
+    perf.done(responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('Voice agent availability error:', err);
     return NextResponse.json(

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone } from '@/lib/utils/format';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 export async function GET(request: NextRequest) {
+  const perf = createPerfTimer('GET /voice-agent/customers');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -31,6 +33,7 @@ export async function GET(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Find customer by phone
+    let t = perf.now();
     const { data: customer, error: custErr } = await supabase
       .from('customers')
       .select(
@@ -40,6 +43,7 @@ export async function GET(request: NextRequest) {
       .is('deleted_at', null)
       .limit(1)
       .single();
+    perf.mark('query:customers', t);
 
     if (custErr || !customer) {
       return NextResponse.json(
@@ -49,23 +53,26 @@ export async function GET(request: NextRequest) {
     }
 
     // Get vehicles
+    t = perf.now();
     const { data: vehicles } = await supabase
       .from('vehicles')
       .select('id, vehicle_type, size_class, year, make, model, color')
       .eq('customer_id', customer.id)
       .order('created_at', { ascending: false });
+    perf.mark('query:vehicles', t);
 
     // Get upcoming appointments count
+    t = perf.now();
     const today = new Date().toISOString().split('T')[0];
-
     const { count: upcomingAppointments } = await supabase
       .from('appointments')
       .select('id', { count: 'exact', head: true })
       .eq('customer_id', customer.id)
       .gte('scheduled_date', today)
       .neq('status', 'cancelled');
+    perf.mark('query:appointments_count', t);
 
-    return NextResponse.json({
+    const responseData = {
       customer: {
         id: customer.id,
         first_name: customer.first_name,
@@ -84,7 +91,9 @@ export async function GET(request: NextRequest) {
         })),
         upcoming_appointments: upcomingAppointments ?? 0,
       },
-    });
+    };
+    perf.done(responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('Voice agent customers error:', err);
     return NextResponse.json(

@@ -7,11 +7,13 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 // ---------------------------------------------------------------------------
 // GET — Look up upcoming appointments by customer phone
 // ---------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
+  const perf = createPerfTimer('GET /voice-agent/appointments');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -39,6 +41,7 @@ export async function GET(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Find customer by phone
+    let t = perf.now();
     const { data: customer } = await supabase
       .from('customers')
       .select('id')
@@ -46,14 +49,18 @@ export async function GET(request: NextRequest) {
       .is('deleted_at', null)
       .limit(1)
       .single();
+    perf.mark('query:customers', t);
 
     if (!customer) {
-      return NextResponse.json({ appointments: [] });
+      const responseData = { appointments: [] };
+      perf.done(responseData);
+      return NextResponse.json(responseData);
     }
 
     // Get upcoming appointments (today or later, not cancelled)
     const today = new Date().toISOString().split('T')[0];
 
+    t = perf.now();
     const { data: appointments, error } = await supabase
       .from('appointments')
       .select(`
@@ -79,6 +86,7 @@ export async function GET(request: NextRequest) {
       .neq('status', 'cancelled')
       .order('scheduled_date', { ascending: true })
       .order('scheduled_start_time', { ascending: true });
+    perf.mark('query:appointments', t);
 
     if (error) {
       console.error('Voice agent appointments query error:', error.message);
@@ -114,7 +122,9 @@ export async function GET(request: NextRequest) {
       })),
     }));
 
-    return NextResponse.json({ appointments: formatted });
+    const responseData = { appointments: formatted };
+    perf.done(responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('Voice agent GET appointments error:', err);
     return NextResponse.json(
@@ -128,6 +138,7 @@ export async function GET(request: NextRequest) {
 // POST — Create a new appointment
 // ---------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
+  const perf = createPerfTimer('POST /voice-agent/appointments');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -182,12 +193,14 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Get service to determine duration
+    let t = perf.now();
     const { data: service } = await supabase
       .from('services')
       .select('id, name, base_duration_minutes')
       .eq('id', service_id)
       .eq('is_active', true)
       .single();
+    perf.mark('query:services', t);
 
     if (!service) {
       return NextResponse.json(
@@ -203,6 +216,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Check for overlapping appointments
+    t = perf.now();
     const { data: overlapping } = await supabase
       .from('appointments')
       .select('id')
@@ -211,6 +225,7 @@ export async function POST(request: NextRequest) {
       .lt('scheduled_start_time', endTime)
       .gt('scheduled_end_time', time)
       .limit(1);
+    perf.mark('query:appointments_overlap', t);
 
     if (overlapping && overlapping.length > 0) {
       return NextResponse.json(
@@ -225,6 +240,7 @@ export async function POST(request: NextRequest) {
     let customerId: string;
     let isNewCustomer = false;
 
+    t = perf.now();
     const { data: existingCustomer } = await supabase
       .from('customers')
       .select('id, sms_consent')
@@ -232,6 +248,7 @@ export async function POST(request: NextRequest) {
       .is('deleted_at', null)
       .limit(1)
       .single();
+    perf.mark('query:customers_find', t);
 
     let hasSmsConsent = false;
 
@@ -239,6 +256,7 @@ export async function POST(request: NextRequest) {
       customerId = existingCustomer.id;
       hasSmsConsent = existingCustomer.sms_consent ?? false;
     } else {
+      t = perf.now();
       const { data: newCustomer, error: custErr } = await supabase
         .from('customers')
         .insert({
@@ -249,6 +267,7 @@ export async function POST(request: NextRequest) {
         })
         .select('id')
         .single();
+      perf.mark('query:customers_create', t);
       hasSmsConsent = true;
 
       if (custErr || !newCustomer) {
@@ -266,6 +285,7 @@ export async function POST(request: NextRequest) {
     // Create vehicle if vehicle info provided
     let vehicleId: string | null = null;
     if (vehicle_make || vehicle_model || vehicle_year || vehicle_color) {
+      t = perf.now();
       const { data: newVehicle, error: vehErr } = await supabase
         .from('vehicles')
         .insert({
@@ -278,6 +298,7 @@ export async function POST(request: NextRequest) {
         })
         .select('id')
         .single();
+      perf.mark('query:vehicles_create', t);
 
       if (vehErr) {
         console.error('Vehicle creation failed:', vehErr.message);
@@ -287,6 +308,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create appointment
+    t = perf.now();
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .insert({
@@ -308,6 +330,7 @@ export async function POST(request: NextRequest) {
         'id, scheduled_date, scheduled_start_time, scheduled_end_time, status, channel'
       )
       .single();
+    perf.mark('query:appointments_create', t);
 
     if (apptErr || !appointment) {
       console.error('Appointment creation failed:', apptErr?.message);
@@ -318,6 +341,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create appointment_services row
+    t = perf.now();
     const { error: junctionErr } = await supabase
       .from('appointment_services')
       .insert({
@@ -326,6 +350,7 @@ export async function POST(request: NextRequest) {
         price_at_booking: 0,
         tier_name: null,
       });
+    perf.mark('query:appointment_services', t);
 
     if (junctionErr) {
       console.error(
@@ -341,7 +366,10 @@ export async function POST(request: NextRequest) {
     const formattedTime = formatTime(time);
 
     // Send SMS confirmation and log it
+    t = perf.now();
     const biz = await getBusinessInfo();
+    perf.mark('fetch:getBusinessInfo', t);
+
     if (hasSmsConsent) {
       const smsBody = await buildAppointmentConfirmationSms({
         businessName: biz.name,
@@ -394,25 +422,24 @@ export async function POST(request: NextRequest) {
       supabase
     ).catch((err) => console.error('Webhook fire failed:', err));
 
-    return NextResponse.json(
-      {
-        success: true,
-        appointment: {
-          id: appointment.id,
-          date: appointment.scheduled_date,
-          start_time: appointment.scheduled_start_time,
-          end_time: appointment.scheduled_end_time,
-          status: appointment.status,
-          channel: appointment.channel,
-          customer_id: customerId,
-          service: {
-            id: service.id,
-            name: service.name,
-          },
+    const responseData = {
+      success: true,
+      appointment: {
+        id: appointment.id,
+        date: appointment.scheduled_date,
+        start_time: appointment.scheduled_start_time,
+        end_time: appointment.scheduled_end_time,
+        status: appointment.status,
+        channel: appointment.channel,
+        customer_id: customerId,
+        service: {
+          id: service.id,
+          name: service.name,
         },
       },
-      { status: 201 }
-    );
+    };
+    perf.done(responseData);
+    return NextResponse.json(responseData, { status: 201 });
   } catch (err) {
     console.error('Voice agent POST appointments error:', err);
     return NextResponse.json(

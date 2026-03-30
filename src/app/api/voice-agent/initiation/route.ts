@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone, formatTime } from '@/lib/utils/format';
 import { getBusinessInfo } from '@/lib/data/business';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 /**
  * POST /api/voice-agent/initiation
@@ -18,13 +19,16 @@ import { getBusinessInfo } from '@/lib/data/business';
  * that the ElevenLabs LLM reads as conversation context.
  */
 export async function POST(request: NextRequest) {
+  const perf = createPerfTimer('POST /voice-agent/initiation');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
+    let t = perf.now();
     const biz = await getBusinessInfo();
+    perf.mark('getBusinessInfo', t);
     const body = await request.json();
     const callerPhone = body.caller_id as string | undefined;
 
@@ -40,6 +44,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Round 1: customer + conversation (parallel, must be fast)
+    t = perf.now();
     const [customerRes, conversationRes] = await Promise.all([
       supabase
         .from('customers')
@@ -55,6 +60,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
     ]);
 
+    perf.mark('query:customer+conversation', t);
     const customer = customerRes.data;
 
     if (!customer) {
@@ -62,6 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Round 2: all detail queries in parallel
+    t = perf.now();
     const todayPST = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
     const [vehiclesRes, apptsRes, quotesRes, lastTxnRes] = await Promise.all([
       supabase
@@ -93,6 +100,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
     ]);
 
+    perf.mark('query:details(vehicles+appts+quotes+txn)', t);
     const firstName = customer.first_name || '';
     const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
 
@@ -191,7 +199,7 @@ export async function POST(request: NextRequest) {
       ? `Hey ${firstName}, welcome back to Smart Details! I see you have an upcoming appointment. How can I help you today?`
       : `Hey ${firstName}, welcome back to Smart Details! How can I help you today?`;
 
-    return NextResponse.json({
+    const responseData = {
       type: 'conversation_initiation_client_data',
       dynamic_variables: {
         customer_name: fullName,
@@ -205,7 +213,9 @@ export async function POST(request: NextRequest) {
           first_message: firstMessage,
         },
       },
-    });
+    };
+    perf.done(responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('[Voice Initiation] Error:', err);
     // Return new-caller fallback on any error — don't block the call

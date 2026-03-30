@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
+import { createPerfTimer } from '@/lib/utils/voice-perf';
 
 export async function GET(request: NextRequest) {
+  const perf = createPerfTimer('GET /voice-agent/services');
   try {
     const auth = await validateApiKey(request);
     if (!auth.valid) {
@@ -11,6 +13,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
+    let t = perf.now();
     const { data: services, error } = await supabase
       .from('services')
       .select(`
@@ -30,6 +33,8 @@ export async function GET(request: NextRequest) {
       `)
       .eq('is_active', true)
       .order('display_order', { ascending: true });
+
+    perf.mark('query:services', t);
 
     if (error) {
       console.error('Voice agent services query error:', error.message);
@@ -95,7 +100,9 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ services: formatted });
+    const responseData = { services: formatted };
+    perf.done(responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('Voice agent services error:', err);
     return NextResponse.json(

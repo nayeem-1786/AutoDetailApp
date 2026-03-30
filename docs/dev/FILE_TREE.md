@@ -964,6 +964,7 @@ src/lib/utils/sale-pricing.ts
 src/lib/utils/shipping-types.ts
 src/lib/utils/short-link.ts
 src/lib/utils/conversation-helpers.ts
+src/lib/utils/voice-perf.ts
 src/lib/utils/sms-consent.ts
 src/lib/utils/sms.ts
 src/lib/utils/template.ts
