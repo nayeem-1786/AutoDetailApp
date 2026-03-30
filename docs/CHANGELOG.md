@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: public quote page strikethrough sale pricing + audit (Session 14E) — 2026-03-30
+
+- Public quote page (`/quote/[token]`) shows strikethrough original price + green sale price + per-item savings when `pricing_type === 'sale'`
+- Total savings line appears in footer when quote contains sale-priced items
+- Standard-priced items render unchanged — no visual noise
+- Audit of auto-quote decision tree documented: `not_interested` check blocks quotes for leads who discussed services (business rule conflict — recommend removing in future session)
+- Mobile-responsive: stacked price display (strikethrough above, sale price below) works on small screens
+
+---
+
 ## feat: sale-aware pricing for voice agent auto-quotes (Session 14C) — 2026-03-30
 
 - Extended `resolvePrice()` in `service-resolver.ts` to return `{ price, salePrice, tierName, isOnSale }` — checks `getSaleStatus()` from shared sale-pricing utility

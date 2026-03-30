@@ -224,26 +224,50 @@ export default async function PublicQuotePage({ params }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {(quote.items || []).map((item) => (
-                <tr key={item.id} className="border-b border-site-border">
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-site-text">{item.item_name}</div>
-                    {item.tier_name && (
-                      <div className="text-xs text-site-text-muted">{item.tier_name}</div>
-                    )}
-                    {item.notes && (
-                      <div className="mt-1 text-xs text-site-text-dim">{item.notes}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>
-                  <td className="px-4 py-4 text-right text-site-text-muted">
-                    {formatCurrency(item.unit_price)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-medium text-site-text">
-                    {formatCurrency(item.total_price)}
-                  </td>
-                </tr>
-              ))}
+              {(quote.items || []).map((item) => {
+                const isSaleItem =
+                  item.pricing_type === 'sale' &&
+                  item.standard_price != null &&
+                  item.standard_price > item.unit_price;
+                const savings = isSaleItem ? item.standard_price! - item.unit_price : 0;
+
+                return (
+                  <tr key={item.id} className="border-b border-site-border">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-site-text">{item.item_name}</div>
+                      {item.tier_name && (
+                        <div className="text-xs text-site-text-muted">{item.tier_name}</div>
+                      )}
+                      {item.notes && (
+                        <div className="mt-1 text-xs text-site-text-dim">{item.notes}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>
+                    <td className="px-4 py-4 text-right">
+                      {isSaleItem ? (
+                        <div>
+                          <span className="text-site-text-muted line-through text-xs">
+                            {formatCurrency(item.standard_price!)}
+                          </span>
+                          <div className="font-semibold text-green-500">
+                            {formatCurrency(item.unit_price)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-site-text-muted">{formatCurrency(item.unit_price)}</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="font-medium text-site-text">{formatCurrency(item.total_price)}</div>
+                      {isSaleItem && (
+                        <div className="text-xs text-green-500">
+                          Save {formatCurrency(savings)}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -263,6 +287,22 @@ export default async function PublicQuotePage({ params }: PageProps) {
                 </span>
               </div>
             )}
+            {(() => {
+              const totalSavings = (quote.items || []).reduce((sum, item) => {
+                if (item.pricing_type === 'sale' && item.standard_price != null && item.standard_price > item.unit_price) {
+                  return sum + (item.standard_price - item.unit_price) * item.quantity;
+                }
+                return sum;
+              }, 0);
+              return totalSavings > 0 ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-green-500">Sale Savings</span>
+                  <span className="font-medium text-green-500">
+                    -{formatCurrency(totalSavings)}
+                  </span>
+                </div>
+              ) : null;
+            })()}
             <div className="flex justify-between border-t border-site-border pt-2">
               <span className="text-base font-semibold text-site-text">Total</span>
               <span className="text-lg font-bold text-site-text">
