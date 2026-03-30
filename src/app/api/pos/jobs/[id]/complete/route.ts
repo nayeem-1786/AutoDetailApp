@@ -250,7 +250,12 @@ async function sendCompletionNotifications(
     }, smsFallback);
 
     if (smsResult.isActive) {
-      await sendSms(customer.phone, smsResult.body);
+      await sendSms(customer.phone, smsResult.body, {
+        logToConversation: true,
+        customerId: customer.id,
+        notificationType: 'job_complete',
+        contextId: job.id,
+      });
     }
   }
 

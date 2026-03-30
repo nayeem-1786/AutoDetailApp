@@ -79,7 +79,12 @@ export async function GET(request: NextRequest) {
           appointment_time: displayTime,
         }, smsFallback);
         if (smsResult.isActive) {
-          await sendSms(customer.phone, smsResult.body);
+          await sendSms(customer.phone, smsResult.body, {
+            logToConversation: true,
+            customerId: customer.id,
+            notificationType: 'booking_reminder',
+            contextId: appt.id,
+          });
         }
       } catch (smsErr) {
         console.error(`[BookingReminder] SMS failed for appointment ${appt.id}:`, smsErr);

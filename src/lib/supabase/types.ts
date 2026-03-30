@@ -868,6 +868,11 @@ export interface Conversation {
   assigned_employee?: Employee;
 }
 
+export interface MessageMetadata {
+  notificationType?: string;
+  contextId?: string;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -880,6 +885,7 @@ export interface Message {
   status: MessageStatus;
   channel: MessageChannel;
   voice_duration_seconds: number | null;
+  metadata: MessageMetadata | null;
   created_at: string;
   // Joined
   sender?: Employee;

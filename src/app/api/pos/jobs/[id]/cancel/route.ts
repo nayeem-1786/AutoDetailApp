@@ -219,7 +219,12 @@ export async function POST(
               }, smsFallback);
 
               if (smsTemplateResult.isActive) {
-                const smsResult = await sendSms(customer.phone, smsTemplateResult.body);
+                const smsResult = await sendSms(customer.phone, smsTemplateResult.body, {
+                  logToConversation: true,
+                  customerId: customer.id,
+                  notificationType: 'job_cancelled',
+                  contextId: id,
+                });
                 if (smsResult.success) sentVia.push('sms');
               }
             }

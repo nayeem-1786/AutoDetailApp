@@ -272,7 +272,12 @@ Thank you for choosing ${business.name}!`;
         });
 
         if (smsBody) {
-          const smsResult = await sendSms(customer.phone, smsBody);
+          const smsResult = await sendSms(customer.phone, smsBody, {
+            logToConversation: true,
+            customerId: customer.id,
+            notificationType: 'appointment_confirmed',
+            contextId: id,
+          });
           if (smsResult.success) {
             sentVia.push('sms');
           } else {

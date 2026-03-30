@@ -963,6 +963,7 @@ src/lib/utils/sale-history.ts
 src/lib/utils/sale-pricing.ts
 src/lib/utils/shipping-types.ts
 src/lib/utils/short-link.ts
+src/lib/utils/conversation-helpers.ts
 src/lib/utils/sms-consent.ts
 src/lib/utils/sms.ts
 src/lib/utils/template.ts
@@ -1377,6 +1378,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260327000001_sms_template_system.sql
 20260329000001_sms_template_variable_audit.sql
 20260329000002_jobs_appointment_id_unique_constraint.sql
+20260330000001_system_sms_logging.sql
 ```
 
 ---

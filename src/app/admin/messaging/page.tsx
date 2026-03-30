@@ -249,6 +249,7 @@ export default function MessagingPage() {
         status: 'sent',
         channel: 'sms',
         voice_duration_seconds: null,
+        metadata: null,
         created_at: new Date().toISOString(),
         sender: employee
           ? { id: employee.id, first_name: employee.first_name, last_name: employee.last_name } as Message['sender']

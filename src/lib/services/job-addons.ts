@@ -145,7 +145,12 @@ export async function approveAddon(addonId: string): Promise<AddonActionResult> 
     const fallback = `Great! Your add-on (${serviceName}) has been approved. We'll get started right away!`;
     const result = await renderSmsTemplate('addon_approved', { service_name: serviceName, first_name: customerFirstName }, fallback);
     if (result.isActive) {
-      await sendSms(customerPhone, result.body);
+      await sendSms(customerPhone, result.body, {
+        logToConversation: true,
+        customerId: job?.customer?.id,
+        notificationType: 'addon_approved',
+        contextId: addonId,
+      });
     }
   }
 
@@ -212,7 +217,12 @@ export async function declineAddon(addonId: string): Promise<AddonActionResult> 
     const fallback = `No problem! We've noted ${serviceName} as a recommendation for your next visit.`;
     const result = await renderSmsTemplate('addon_declined', { service_name: serviceName, first_name: customerFirstName }, fallback);
     if (result.isActive) {
-      await sendSms(customerPhone, result.body);
+      await sendSms(customerPhone, result.body, {
+        logToConversation: true,
+        customerId: job?.customer?.id,
+        notificationType: 'addon_declined',
+        contextId: addonId,
+      });
     }
   }
 

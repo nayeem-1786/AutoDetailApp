@@ -490,7 +490,12 @@ export async function POST(request: NextRequest) {
           service_total: total,
         }, customerSmsFallback).then((result) => {
           if (result.isActive) {
-            sendSms(e164Phone, result.body).catch((err) =>
+            sendSms(e164Phone, result.body, {
+              logToConversation: true,
+              customerId,
+              notificationType: 'booking_confirmed',
+              contextId: appointment.id,
+            }).catch((err) =>
               console.error('[Booking] Customer SMS failed (non-blocking):', err)
             );
           }

@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: unified system SMS logging — Session A foundation (Session 13Y) — 2026-03-30
+
+### Data Foundation
+- Migration: `metadata JSONB` on messages, `last_notification_type` + `last_notification_at` on conversations
+- New `findOrCreateConversation()` helper in `src/lib/utils/conversation-helpers.ts`
+- Extended `SendSmsOptions` with `logToConversation`, `conversationId`, `notificationType`, `contextId`
+- `sendSms()` auto-logs to messaging conversation thread when `logToConversation: true` — finds-or-creates conversation, inserts system message with metadata, updates conversation tracking
+
+### 9 Template-Based Call Sites Updated
+- `job_complete` (pos/jobs/complete)
+- `job_cancelled` (pos/jobs/cancel)
+- `booking_confirmed` (book/route)
+- `appointment_confirmed` (admin notify + POS notify)
+- `quote_accepted` (quotes/accept)
+- `addon_approved` + `addon_declined` (job-addons.ts)
+- `booking_reminder` (cron)
+
+### Session B (next): Hardcoded SMS sites, manual-to-auto migrations, sendMarketingSms sites, AI awareness, UI notification bars
+
+---
+
 ## fix: addon approved/declined SMS not firing (Session 13X) — 2026-03-30
 
 - Public authorize endpoints (`/api/authorize/[token]/approve` and `/decline`) were directly updating the DB without calling the service layer

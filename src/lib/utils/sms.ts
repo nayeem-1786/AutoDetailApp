@@ -26,6 +26,14 @@ export interface SendSmsOptions {
   lifecycleExecutionId?: string;
   /** Source label for delivery tracking (defaults to 'transactional') */
   source?: 'campaign' | 'lifecycle' | 'transactional' | 'manual';
+  /** If true, auto-log this SMS to the messaging conversation thread */
+  logToConversation?: boolean;
+  /** Existing conversation ID (avoids phone lookup if known) */
+  conversationId?: string;
+  /** Notification type label for AI context (e.g., 'job_complete', 'booking_confirmed') */
+  notificationType?: string;
+  /** Related entity UUID (job, quote, appointment, addon) for traceability */
+  contextId?: string;
 }
 
 /**
@@ -97,6 +105,51 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
     } catch (logErr) {
       // Don't fail the SMS send if delivery logging fails
       console.error('[SMS] Failed to insert delivery log:', logErr);
+    }
+
+    // Auto-log to conversation thread if requested
+    if (options?.logToConversation) {
+      try {
+        const { createAdminClient: createAdmin } = await import('@/lib/supabase/admin');
+        const { findOrCreateConversation } = await import('@/lib/utils/conversation-helpers');
+        const admin = createAdmin();
+
+        const convId = options.conversationId
+          || await findOrCreateConversation(admin, to, options.customerId);
+
+        if (convId) {
+          const metadata: Record<string, string> = {};
+          if (options.notificationType) metadata.notificationType = options.notificationType;
+          if (options.contextId) metadata.contextId = options.contextId;
+
+          await admin.from('messages').insert({
+            conversation_id: convId,
+            direction: 'outbound',
+            body,
+            media_url: options.mediaUrl || null,
+            sender_type: 'system',
+            twilio_sid: data.sid,
+            status: 'sent',
+            channel: 'sms',
+            metadata: Object.keys(metadata).length > 0 ? metadata : null,
+          });
+
+          // Update conversation tracking
+          const convUpdate: Record<string, unknown> = {
+            last_message_at: new Date().toISOString(),
+            last_message_preview: body.substring(0, 200),
+            last_channel: 'sms',
+          };
+          if (options.notificationType) {
+            convUpdate.last_notification_type = options.notificationType;
+            convUpdate.last_notification_at = new Date().toISOString();
+          }
+          await admin.from('conversations').update(convUpdate).eq('id', convId);
+        }
+      } catch (convErr) {
+        // Never fail the SMS send due to conversation logging errors
+        console.error('[SMS] Failed to log to conversation:', convErr);
+      }
     }
 
     return { success: true, sid: data.sid };

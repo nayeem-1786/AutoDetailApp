@@ -593,6 +593,8 @@ idx_refund_items_refund — btree (refund_id)
 | last_channel | TEXT | NOT NULL, DEFAULT 'sms', CHECK ('sms','voice') | Last channel used in conversation |
 | summary | TEXT | | AI-generated conversation summary for cross-session memory |
 | summary_updated_at | TIMESTAMPTZ | | When the summary was last generated |
+| last_notification_type | TEXT | | Most recent system notification type (e.g., 'job_complete') |
+| last_notification_at | TIMESTAMPTZ | | When the last system notification was sent |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
@@ -604,6 +606,7 @@ idx_refund_items_refund — btree (refund_id)
 | status | TEXT | CHECK ('sent','delivered','failed','received') | |
 | channel | TEXT | NOT NULL, DEFAULT 'sms', CHECK ('sms','voice') | SMS or voice call |
 | voice_duration_seconds | INTEGER | | Duration of voice call in seconds |
+| metadata | JSONB | DEFAULT NULL | Notification context: `{ notificationType, contextId }` |
 | created_at | TIMESTAMPTZ | | |
 
 ### marketing_consent_log

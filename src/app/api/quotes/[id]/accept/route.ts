@@ -88,7 +88,12 @@ export async function POST(
       }, fallback);
 
       if (result.isActive) {
-        const smsResult = await sendSms(customer.phone, result.body);
+        const smsResult = await sendSms(customer.phone, result.body, {
+          logToConversation: true,
+          customerId: customer.id,
+          notificationType: 'quote_accepted',
+          contextId: id,
+        });
         await supabase.from('quote_communications').insert({
           quote_id: id,
           channel: 'sms',
