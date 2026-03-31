@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: booking flow refactor 16A — new vehicle step + 4-step wizard restructure (Session 16A) — 2026-03-31
+
+- **New Step 1 — Vehicle** (`src/components/booking/step-vehicle.tsx`):
+  - Authenticated customers with vehicles: selectable card grid (radio-style, 1 col mobile / 2 col desktop)
+  - Each card shows `[Year] [Color] [Make] [Model]` with category badge and size class/specialty tier indicators
+  - Pre-selects first vehicle; "+ Add a New Vehicle" button reveals manual entry form
+  - Guest/no-vehicles: manual entry form directly
+  - Category selector (5 vehicle categories as icon buttons)
+  - Make: uses existing `VehicleMakeCombobox` (filters by category, "Other" free-text)
+  - Model, Year (optional), Color (optional) inputs
+  - Auto-resolves classification via `resolveVehicleClassification()` when make/model entered (debounced 400ms)
+  - Automobiles without make/model: shows 3-column size class picker (Sedan / Truck/SUV / SUV/Van)
+  - Specialty categories without make/model: shows specialty tier picker
+  - Sticky Continue button on mobile
+- **Step indicator** updated: 3 steps → 4 steps (Vehicle → Service → Schedule → Confirm)
+- **Booking wizard** restructured:
+  - New `vehicleData: VehicleSelection | null` in wizard state
+  - Step 1 (Vehicle) → Step 2 (Service) → Step 3 (Schedule) → Step 4 (Confirm)
+  - URL state preserves vehicle data (`vehicle_id`, `vehicle_category`, `size_class`, `make`, `model`)
+  - Rebook flow: pre-builds vehicle from rebook data, starts at Step 3 (schedule)
+  - Edit-from-confirm navigation updated for all 4 steps
+- **`buildVehicle()` in Step 4** now uses `vehicleData` from Step 1 — returns actual make/model/year/color instead of all-null fields
+
+---
+
 ## fix: model-aware vehicle classification for dual-category makes (Session 15E) — 2026-03-31
 
 - Fixed `resolveVehicleClassification()` — was using `.order('category', asc).limit(1)` which always picked alphabetically-first category for dual-category makes

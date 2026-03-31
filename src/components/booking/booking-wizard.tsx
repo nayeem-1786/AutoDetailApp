@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { LOYALTY } from '@/lib/utils/constants';
 import { StepIndicator } from './step-indicator';
+import { StepVehicle, type VehicleSelection } from './step-vehicle';
 import { StepServiceSelect, type ConfigureResult } from './step-service-select';
 import { StepSchedule } from './step-schedule';
 import { StepConfirmBook } from './step-confirm-book';
@@ -71,6 +72,7 @@ interface AppliedCoupon {
 }
 
 interface BookingState {
+  vehicleData: VehicleSelection | null;
   selectedCategory: string;
   service: BookableService | null;
   config: ConfigureResult | null;
@@ -105,10 +107,11 @@ interface ConfirmationData {
   customerEmail: string | null;
 }
 
-// Step mapping (3-step wizard):
-// Step 1: Service Select + Configure
-// Step 2: Schedule
-// Step 3: Confirm & Book (customer info + order summary + coupon/loyalty + payment)
+// Step mapping (4-step wizard):
+// Step 1: Vehicle Select
+// Step 2: Service Select + Configure
+// Step 3: Schedule
+// Step 4: Confirm & Book (customer info + order summary + coupon/loyalty + payment)
 
 export function BookingWizard({
   categories,
@@ -141,7 +144,7 @@ export function BookingWizard({
   // but can become true when user authenticates inline
   const [isPortalDynamic, setIsPortalDynamic] = useState(!!customerData);
 
-  // Auth customer data — set by inline auth in step 3, or from portal customer data
+  // Auth customer data — set by inline auth in step 4, or from portal customer data
   const [authCustomerData, setAuthCustomerData] = useState<AuthCustomerData | null>(
     customerData
       ? {
@@ -181,6 +184,26 @@ export function BookingWizard({
   // Whether payment is required for online bookings
   const requirePayment = bookingConfig.require_payment;
 
+  // --- Build initial vehicle data from rebook ---
+  function buildRebookVehicle(): VehicleSelection | null {
+    if (!rebookData?.vehicle) return null;
+    const v = rebookData.vehicle;
+    // RebookData.vehicle has vehicle_type but not vehicle_category/id/specialty_tier
+    // Derive category from vehicle_type
+    const vt = v.vehicle_type;
+    const cat = vt === 'standard' ? 'automobile' : (vt as string);
+    return {
+      vehicle_category: cat,
+      vehicle_type: vt,
+      size_class: v.size_class ?? null,
+      specialty_tier: null,
+      make: v.make ?? null,
+      model: v.model ?? null,
+      year: v.year ?? null,
+      color: v.color ?? null,
+    };
+  }
+
   // --- URL state restoration ---
   function getInitialState(): { step: number; state: BookingState } {
     const urlStep = parseInt(searchParams.get('step') ?? '', 10);
@@ -190,11 +213,55 @@ export function BookingWizard({
     const urlAddons = searchParams.get('addons');
     const urlCategory = searchParams.get('category') ?? 'automobile';
 
+    // URL vehicle data restoration
+    const urlVehicleId = searchParams.get('vehicle_id');
+    const urlVehicleCategory = searchParams.get('vehicle_category') ?? urlCategory;
+    const urlSizeClass = searchParams.get('size_class');
+    const urlMake = searchParams.get('make');
+    const urlModel = searchParams.get('model');
+
     const service = rebookService ?? preSelectedService;
+    const rebookVehicle = buildRebookVehicle();
+
+    // Restore vehicle data from URL params
+    let restoredVehicleData: VehicleSelection | null = rebookVehicle;
+    if (!restoredVehicleData && urlVehicleCategory && urlStep >= 2) {
+      if (urlVehicleId && customerData?.vehicles) {
+        // Find saved vehicle by ID
+        const savedV = customerData.vehicles.find((v) => v.id === urlVehicleId);
+        if (savedV) {
+          restoredVehicleData = {
+            id: savedV.id,
+            vehicle_category: savedV.vehicle_category ?? 'automobile',
+            vehicle_type: savedV.vehicle_type,
+            size_class: savedV.size_class,
+            specialty_tier: savedV.specialty_tier ?? null,
+            make: savedV.make,
+            model: savedV.model,
+            year: savedV.year,
+            color: savedV.color,
+          };
+        }
+      }
+      if (!restoredVehicleData) {
+        // Restore from URL params
+        restoredVehicleData = {
+          vehicle_category: urlVehicleCategory,
+          vehicle_type: urlVehicleCategory === 'automobile' ? 'standard' : urlVehicleCategory,
+          size_class: urlSizeClass ?? urlVehicle ?? null,
+          specialty_tier: null,
+          make: urlMake ? decodeURIComponent(urlMake) : null,
+          model: urlModel ? decodeURIComponent(urlModel) : null,
+          year: null,
+          color: null,
+        };
+      }
+    }
 
     // Base state
     const baseState: BookingState = {
-      selectedCategory: urlCategory,
+      vehicleData: restoredVehicleData,
+      selectedCategory: restoredVehicleData?.vehicle_category ?? urlCategory,
       service: service,
       config: rebookData && rebookService
         ? {
@@ -225,51 +292,61 @@ export function BookingWizard({
       hasTransactionHistory: false,
     };
 
-    // Default step: rebook → step 2 (schedule), otherwise step 1
-    const defaultStep = rebookService ? 2 : 1;
+    // Default step: rebook → step 3 (schedule), otherwise step 1
+    const defaultStep = rebookService ? 3 : 1;
 
     // If no URL step param or rebook mode, use defaults
-    if (!urlStep || isNaN(urlStep) || urlStep < 1 || urlStep > 3 || rebookData) {
+    if (!urlStep || isNaN(urlStep) || urlStep < 1 || urlStep > 4 || rebookData) {
       return { step: defaultStep, state: baseState };
     }
 
-    // Step 1: No extra state needed
+    // Step 1: Vehicle — no extra state needed
     if (urlStep === 1) {
       return { step: 1, state: baseState };
     }
 
-    // Step 2+: Need a service + config
-    if (!service) {
+    // Step 2+: Need vehicle data
+    if (!restoredVehicleData) {
       return { step: 1, state: baseState };
     }
 
-    // Step 2+: Try to reconstruct config from URL params
-    if (urlStep >= 2 && service) {
+    // Step 2: Service — need vehicle data
+    if (urlStep === 2) {
+      return { step: 2, state: baseState };
+    }
+
+    // Step 3+: Need a service + config
+    if (!service) {
+      return { step: 2, state: baseState };
+    }
+
+    // Step 3+: Try to reconstruct config from URL params
+    if (urlStep >= 3 && service) {
       const reconstructedConfig = reconstructConfig(service, urlVehicle, urlAddons);
       if (reconstructedConfig) {
         const restoredState = {
           ...baseState,
           config: reconstructedConfig,
-          date: urlStep >= 2 ? urlDate : null,
-          time: urlStep >= 2 ? urlTime : null,
+          date: urlStep >= 3 ? urlDate : null,
+          time: urlStep >= 3 ? urlTime : null,
         };
 
-        // Step 2: schedule — need config
-        if (urlStep === 2) {
-          return { step: 2, state: restoredState };
-        }
-
-        // Step 3: need config + date + time
-        if (urlDate && urlTime) {
+        // Step 3: schedule — need config
+        if (urlStep === 3) {
           return { step: 3, state: restoredState };
         }
 
-        // Have config but no date/time — go to step 2
-        return { step: 2, state: restoredState };
+        // Step 4: need config + date + time
+        if (urlDate && urlTime) {
+          return { step: 4, state: restoredState };
+        }
+
+        // Have config but no date/time — go to step 3
+        return { step: 3, state: restoredState };
       }
 
-      // Couldn't reconstruct config — go to step 1
-      return { step: 1, state: baseState };
+      // Couldn't reconstruct config — go to step 2
+      return { step: 2, state: baseState };
     }
 
     return { step: defaultStep, state: baseState };
@@ -386,12 +463,29 @@ export function BookingWizard({
     // Always set step
     params.set('step', String(newStep));
 
+    // Vehicle data
+    if (newState.vehicleData) {
+      if (newState.vehicleData.id) {
+        params.set('vehicle_id', newState.vehicleData.id);
+      }
+      params.set('vehicle_category', newState.vehicleData.vehicle_category);
+      if (newState.vehicleData.size_class) {
+        params.set('size_class', newState.vehicleData.size_class);
+      }
+      if (newState.vehicleData.make) {
+        params.set('make', encodeURIComponent(newState.vehicleData.make));
+      }
+      if (newState.vehicleData.model) {
+        params.set('model', encodeURIComponent(newState.vehicleData.model));
+      }
+    }
+
     // Service slug
     if (newState.service) {
       params.set('service', newState.service.slug);
     }
 
-    // Vehicle size
+    // Vehicle size (for config reconstruction)
     if (newState.config?.size_class) {
       params.set('vehicle', newState.config.size_class);
     }
@@ -410,7 +504,7 @@ export function BookingWizard({
       params.set('coupon', couponCode);
     }
 
-    // Vehicle category (only if not default)
+    // Vehicle category (also in vehicleData, but keep for backwards compat)
     if (newState.selectedCategory && newState.selectedCategory !== 'automobile') {
       params.set('category', newState.selectedCategory);
     }
@@ -481,7 +575,7 @@ export function BookingWizard({
       time: null,
     };
     setState(newState);
-    updateUrl(1, newState);
+    updateUrl(2, newState);
   }
 
   // Filter services by selected vehicle category
@@ -496,40 +590,60 @@ export function BookingWizard({
     }))
     .filter((cat) => cat.services.length > 0);
 
-  // Step 1: Select service + configure (merged)
+  // Step 1: Vehicle → advance to Step 2
+  function handleVehicleSelect(vehicle: VehicleSelection) {
+    const newState: BookingState = {
+      ...state,
+      vehicleData: vehicle,
+      selectedCategory: vehicle.vehicle_category,
+      // Reset service/config if category changed
+      service: state.vehicleData?.vehicle_category !== vehicle.vehicle_category ? null : state.service,
+      config: state.vehicleData?.vehicle_category !== vehicle.vehicle_category ? null : state.config,
+    };
+    setState(newState);
+
+    if (editEntryStep !== null) {
+      setEditEntryStep(null);
+      goToStep(4, newState);
+    } else {
+      goToStep(2, newState);
+    }
+  }
+
+  // Step 2: Select service + configure (merged)
   function handleServiceSelect(service: BookableService, config: ConfigureResult) {
     const newState: BookingState = {
       ...state,
       service,
       config,
-      // When editing from step 3, preserve date/time; otherwise reset
+      // When editing from step 4, preserve date/time; otherwise reset
       date: editEntryStep !== null ? state.date : null,
       time: editEntryStep !== null ? state.time : null,
     };
     setState(newState);
 
     if (editEntryStep !== null) {
-      // Editing from step 3 — go back to step 3
+      // Editing from step 4 — go back to step 4
       setEditEntryStep(null);
-      goToStep(3, newState);
+      goToStep(4, newState);
     } else {
-      goToStep(2, newState);
+      goToStep(3, newState);
     }
   }
 
-  // Step 2: Schedule → advance to Step 3
-  // Fetch customer check / coupons / loyalty data before entering step 3
+  // Step 3: Schedule → advance to Step 4
+  // Fetch customer check / coupons / loyalty data before entering step 4
   async function handleScheduleContinue(date: string, time: string) {
     const newState = { ...state, date, time };
     setState(newState);
 
     if (editEntryStep !== null) {
       setEditEntryStep(null);
-      goToStep(3, newState);
+      goToStep(4, newState);
       return;
     }
 
-    // Fetch customer data for step 3
+    // Fetch customer data for step 4
     if (isPortal) {
       try {
         const couponParams = new URLSearchParams();
@@ -565,19 +679,18 @@ export function BookingWizard({
           hasTransactionHistory: hasHistory,
         };
         setState(updatedState);
-        goToStep(3, updatedState);
+        goToStep(4, updatedState);
       } catch (err) {
         console.error('Failed to fetch customer data:', err);
-        goToStep(3, newState);
+        goToStep(4, newState);
       }
     } else {
       // For guest bookings, customer check happens via phone lookup inside step-confirm-book
-      // We also do check-customer when they fill in phone/email on the confirm page
-      goToStep(3, newState);
+      goToStep(4, newState);
     }
   }
 
-  // Step 3: Confirm & Book — receives customer + vehicle + optional paymentIntentId
+  // Step 4: Confirm & Book — receives customer + vehicle + optional paymentIntentId
   async function handleConfirmBook(
     customer: BookingCustomerInput,
     vehicle: BookingVehicleInput,
@@ -852,7 +965,7 @@ export function BookingWizard({
     return null;
   }
 
-  // Build order summary for step 2
+  // Build order summary for step 3
   const orderSummary = state.service && state.config ? {
     serviceName: state.service.name,
     tierName: state.config.tier_label ?? state.config.tier_name ?? null,
@@ -865,13 +978,34 @@ export function BookingWizard({
   } : undefined;
 
   return (
-    <div className={cn('mx-auto', step === 1 ? 'max-w-6xl' : 'max-w-5xl')}>
+    <div className={cn('mx-auto', step === 2 ? 'max-w-6xl' : 'max-w-5xl')}>
       <StepIndicator
         currentStep={step}
         onStepClick={handleStepClick}
       />
 
       {step === 1 && (
+        <>
+          <StepVehicle
+            customerData={authCustomerData}
+            onContinue={handleVehicleSelect}
+            initialVehicle={state.vehicleData}
+          />
+          {editEntryStep === 1 && (
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                onClick={() => { setEditEntryStep(null); goToStep(4); }}
+                className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
+              >
+                Back to Booking
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+
+      {step === 2 && (
         <>
           <StepServiceSelect
             categories={filteredCategories}
@@ -883,11 +1017,11 @@ export function BookingWizard({
             mobileZones={mobileZones}
             initialConfig={state.config ?? undefined}
           />
-          {editEntryStep === 1 && (
+          {editEntryStep === 2 && (
             <div className="mt-4">
               <Button
                 variant="outline"
-                onClick={() => { setEditEntryStep(null); goToStep(3); }}
+                onClick={() => { setEditEntryStep(null); goToStep(4); }}
                 className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
               >
                 Back to Booking
@@ -897,7 +1031,7 @@ export function BookingWizard({
         </>
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <StepSchedule
           businessHours={businessHours}
           bookingConfig={bookingConfig}
@@ -905,12 +1039,12 @@ export function BookingWizard({
           initialDate={state.date}
           initialTime={state.time}
           onContinue={handleScheduleContinue}
-          onBack={() => editEntryStep === 2 ? (setEditEntryStep(null), goToStep(3)) : goToStep(1)}
+          onBack={() => editEntryStep === 3 ? (setEditEntryStep(null), goToStep(4)) : goToStep(2)}
           orderSummary={orderSummary}
         />
       )}
 
-      {step === 3 &&
+      {step === 4 &&
         state.service &&
         state.config &&
         state.date &&
@@ -944,12 +1078,13 @@ export function BookingWizard({
             paymentOption={state.paymentOption}
             onPaymentOptionChange={handlePaymentOptionChange}
             onConfirm={handleConfirmBook}
-            onBack={() => goToStep(2)}
+            onBack={() => goToStep(3)}
             autoApplyCouponOnMount={!!couponCode && !urlCouponAttempted}
             onCouponAutoApplyAttempted={() => setUrlCouponAttempted(true)}
             vehicleCategory={state.selectedCategory}
             selectedSizeClass={state.config.size_class ?? null}
             depositAmount={bookingConfig.default_deposit_amount}
+            vehicleData={state.vehicleData}
           />
         )}
     </div>

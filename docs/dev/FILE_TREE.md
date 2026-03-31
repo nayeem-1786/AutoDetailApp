@@ -1119,7 +1119,8 @@ src/components/booking/step-confirm-book.tsx        (merged confirm & book page 
 src/components/booking/step-indicator.tsx
 src/components/booking/step-payment.tsx
 src/components/booking/step-schedule.tsx
-src/components/booking/step-service-select.tsx      (merged service select + configure — Step 1)
+src/components/booking/step-service-select.tsx      (merged service select + configure — Step 2)
+src/components/booking/step-vehicle.tsx              (vehicle selection — Step 1)
 ```
 
 ### Quote Components

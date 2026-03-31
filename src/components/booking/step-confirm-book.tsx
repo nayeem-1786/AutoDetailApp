@@ -6,6 +6,7 @@ import { formatCurrency, formatDate, formatTime, formatPhone } from '@/lib/utils
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { isSpecialtyCategory, type VehicleCategory } from '@/lib/utils/vehicle-categories';
+import type { VehicleSelection } from './step-vehicle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
@@ -93,6 +94,8 @@ export interface StepConfirmBookProps {
   selectedSizeClass: VehicleSizeClass | null;
   // Configurable deposit amount
   depositAmount?: number;
+  // Vehicle data from Step 1
+  vehicleData?: VehicleSelection | null;
 }
 
 // --- Component ---
@@ -132,6 +135,7 @@ export function StepConfirmBook({
   vehicleCategory,
   selectedSizeClass,
   depositAmount: depositAmountProp = 50,
+  vehicleData,
 }: StepConfirmBookProps) {
   // --- State ---
   const [businessName, setBusinessName] = useState('our business');
@@ -303,6 +307,20 @@ export function StepConfirmBook({
 
   // --- Vehicle construction ---
   function buildVehicle(): BookingVehicleInput {
+    // Use vehicleData from Step 1 if available
+    if (vehicleData) {
+      return {
+        vehicle_category: vehicleData.vehicle_category as 'automobile' | 'motorcycle' | 'rv' | 'boat' | 'aircraft',
+        vehicle_type: vehicleData.vehicle_type as 'standard' | 'motorcycle' | 'rv' | 'boat' | 'aircraft',
+        size_class: (vehicleData.size_class as BookingVehicleInput['size_class']) ?? null,
+        specialty_tier: vehicleData.specialty_tier ?? null,
+        year: vehicleData.year ?? null,
+        make: vehicleData.make ?? null,
+        model: vehicleData.model ?? null,
+        color: vehicleData.color ?? null,
+      } as BookingVehicleInput;
+    }
+    // Fallback: category-only (legacy path)
     const cat = vehicleCategory as VehicleCategory;
     const specialty = isSpecialtyCategory(cat);
     return {

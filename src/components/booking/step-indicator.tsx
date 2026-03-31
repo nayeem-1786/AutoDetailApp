@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils/cn';
 import { Check } from 'lucide-react';
 
 const STEPS = [
+  { label: 'Vehicle' },
   { label: 'Service' },
   { label: 'Schedule' },
   { label: 'Confirm' },
