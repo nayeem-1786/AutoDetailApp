@@ -361,8 +361,6 @@ export async function processVoiceCallEnd(
     }
   } else if (servicesDiscussed.length === 0) {
     console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: no services discussed`);
-  } else if (customerInterest === 'not_interested') {
-    console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: customer not interested`);
   } else if (params.skipAutoQuote) {
     console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: skipAutoQuote flag set`);
   } else {
@@ -379,7 +377,7 @@ export async function processVoiceCallEnd(
       if (recentQuotes && recentQuotes.length > 0) {
         console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: recent quote exists (last 10min)`);
       } else {
-        console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, customer interested, no recent quote`);
+        console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, no recent quote`);
         const createdId = await autoGenerateQuote(
           admin,
           normalizedPhone,
@@ -394,7 +392,7 @@ export async function processVoiceCallEnd(
       }
     } else {
       // No existing customer — create one and send auto-quote
-      console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, customer interested, new caller (will create customer)`);
+      console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, new caller (will create customer)`);
       const createdId = await autoGenerateQuote(
         admin,
         normalizedPhone,

@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: remove not_interested gate — send quotes to all callers who discussed services (Session 14E follow-up) — 2026-03-30
+
+- Removed `customerInterest === 'not_interested'` condition from auto-quote decision tree in `voice-post-call.ts`
+- Quotes are now generated for ALL callers who discussed services, regardless of stated interest level
+- Only remaining skip conditions: appointment booked, no services discussed, skipAutoQuote flag, recent quote dedup
+- Business rationale: lead capture — even "not interested" callers should get a quote for future reference
+
+---
+
 ## feat: public quote page strikethrough sale pricing + audit (Session 14E) — 2026-03-30
 
 - Public quote page (`/quote/[token]`) shows strikethrough original price + green sale price + per-item savings when `pricing_type === 'sale'`
