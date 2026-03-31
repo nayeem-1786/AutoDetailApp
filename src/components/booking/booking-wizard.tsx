@@ -1019,7 +1019,7 @@ export function BookingWizard({
             selectedCategoryKey={state.selectedCategory}
             mobileZones={mobileZones}
             initialConfig={state.config ?? undefined}
-            vehicleSizeClass={state.vehicleData?.size_class as import('@/lib/supabase/types').VehicleSizeClass | null ?? null}
+            vehicleSizeClass={(state.vehicleData?.size_class as VehicleSizeClass) ?? null}
             vehicleSpecialtyTier={state.vehicleData?.specialty_tier ?? null}
           />
           {editEntryStep === 2 && (

@@ -148,10 +148,21 @@ export function StepServiceSelect({
     initialConfig?.addons ?? []
   );
   const [showAllAddons, setShowAllAddons] = useState(false);
-  // Sync sizeClass when vehicle changes in Step 1 (back navigation: same category, different size)
+  // Sync sizeClass AND selectedTier when vehicle changes in Step 1 (back navigation: same category, different size)
   useEffect(() => {
-    if (vehicleSizeClass && vehicleSizeClass !== sizeClass) {
-      setSizeClass(vehicleSizeClass);
+    if (vehicleSizeClass) {
+      if (vehicleSizeClass !== sizeClass) {
+        setSizeClass(vehicleSizeClass);
+      }
+      // Also auto-select the matching tier for vehicle_size pricing
+      if (selectedService?.pricing_model === 'vehicle_size') {
+        const matchedTier = (selectedService.service_pricing ?? []).find(
+          (t) => t.tier_name === vehicleSizeClass
+        );
+        if (matchedTier && selectedTier !== vehicleSizeClass) {
+          setSelectedTier(matchedTier.tier_name);
+        }
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleSizeClass]);
@@ -209,8 +220,32 @@ export function StepServiceSelect({
     // Select new service — reset configure state
     setPendingServiceId(service.id);
     const newTiers = service.service_pricing;
-    setSelectedTier(newTiers.length === 1 ? newTiers[0].tier_name : null);
-    setSizeClass(null);
+
+    // Auto-select tier when vehicle size/specialty is known from Step 1
+    let autoTier: string | null = null;
+    let autoSize: VehicleSizeClass | null = null;
+
+    if (service.pricing_model === 'vehicle_size' && vehicleSizeClass) {
+      // Match the tier that corresponds to this vehicle size
+      const matchedTier = newTiers.find((t) => t.tier_name === vehicleSizeClass);
+      if (matchedTier) {
+        autoTier = matchedTier.tier_name;
+        autoSize = vehicleSizeClass;
+      }
+    } else if (service.pricing_model === 'specialty' && vehicleSpecialtyTier) {
+      const matchedTier = newTiers.find((t) => t.tier_name === vehicleSpecialtyTier);
+      if (matchedTier) {
+        autoTier = matchedTier.tier_name;
+      }
+    }
+
+    // Fallback: single tier auto-select
+    if (!autoTier && newTiers.length === 1) {
+      autoTier = newTiers[0].tier_name;
+    }
+
+    setSelectedTier(autoTier);
+    setSizeClass(autoSize ?? vehicleSizeClass ?? null);
     setPerUnitQty(1);
     setShowMobileFields(false);
     setMobileZoneId(null);
