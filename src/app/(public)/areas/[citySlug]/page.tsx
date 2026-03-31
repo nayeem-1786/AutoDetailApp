@@ -56,8 +56,7 @@ function parseServiceHighlights(raw: unknown): ServiceHighlight[] {
 // ---------------------------------------------------------------------------
 
 export async function generateStaticParams() {
-  const cities = await getActiveCities();
-  return cities.map((city) => ({ citySlug: city.slug }));
+  return []; // ISR: generate on first request, not at build time
 }
 
 // ---------------------------------------------------------------------------

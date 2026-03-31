@@ -8,10 +8,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export async function generateStaticParams() {
-  const cities = await getActiveCities();
-  return cities.map((city) => ({
-    citySlug: city.slug,
-  }));
+  return []; // ISR: generate on first request, not at build time
 }
 
 export default async function CityOGImage({

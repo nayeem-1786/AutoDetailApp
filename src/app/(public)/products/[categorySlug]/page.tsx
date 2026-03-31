@@ -39,10 +39,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  const categories = await getProductCategories();
-  return categories.map((cat) => ({
-    categorySlug: cat.slug,
-  }));
+  return []; // ISR: generate on first request, not at build time
 }
 
 export default async function ProductCategoryPage({ params }: PageProps) {

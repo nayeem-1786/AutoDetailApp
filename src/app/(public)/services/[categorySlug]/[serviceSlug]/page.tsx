@@ -48,11 +48,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  const services = await getAllServicesForSitemap();
-  return services.map((svc) => ({
-    categorySlug: svc.categorySlug,
-    serviceSlug: svc.serviceSlug,
-  }));
+  return []; // ISR: generate on first request, not at build time
 }
 
 export default async function ServiceDetailPage({ params }: PageProps) {

@@ -18,10 +18,7 @@ type PageProps = {
 };
 
 export async function generateStaticParams() {
-  const pages = await getPublishedPages();
-  return pages.map((page) => ({
-    slug: page.slug.split('/'),
-  }));
+  return []; // ISR: generate on first request, not at build time
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

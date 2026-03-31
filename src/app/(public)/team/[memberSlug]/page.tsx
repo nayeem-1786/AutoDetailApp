@@ -34,8 +34,7 @@ function stripHtml(html: string): string {
 // ---------------------------------------------------------------------------
 
 export async function generateStaticParams() {
-  const members = await getActiveTeamMembers();
-  return members.map((m) => ({ memberSlug: m.slug }));
+  return []; // ISR: generate on first request, not at build time
 }
 
 // ---------------------------------------------------------------------------
