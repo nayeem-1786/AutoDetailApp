@@ -4,13 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## feat: voice poll extracts services + customer data from ElevenLabs (Session 14J) — 2026-03-31
+## feat: complete polling cron data extraction — all 12 items (Session 14K) — 2026-03-31
 
-- Polling cron now passes `customerName`, `vehicleMake`, `vehicleModel`, `vehicleYear`, `vehicleColor` to `processVoiceCallEnd()` — extracted from `dynamic_variables.customer_name` and `customer_summary` VEHICLES section
-- **Option D service extraction:** When `data_collection_results.services_discussed` is empty (Option C), falls back to matching service names from `analysis.transcript_summary` against active services in the DB
-- Service matching is case-insensitive, sorted by name length descending to prevent substring false positives
-- Abandoned calls (caller hung up before `finalize_call`) now produce auto-quotes when services were discussed
-- Previously: polling cron passed only `phone`, `transcriptSummary`, `durationSeconds` — now passes 9 fields
+- Polling cron now passes ALL available data to `processVoiceCallEnd()`: `customerName`, `vehicleMake`, `vehicleModel`, `vehicleYear`, `vehicleColor`, `customerInterest`, `customerType`, `appointmentBooked`, `servicesDiscussed` (was only 3 fields: phone, summary, duration)
+- **Vehicle extraction:** Parse `customer_summary` VEHICLES section first, fallback to `extractVehicleFromTranscript()` on transcript_summary for new callers without vehicles on file
+- **Service extraction (Option D):** New shared `extractServicesFromTranscript()` in `src/lib/utils/service-extraction.ts` — scans transcript_summary first, then agent-only transcript messages as fallback. Agent messages use exact catalog names from get_services tool.
+- **Customer interest inference:** Keywords from transcript_summary ("interested in booking" → interested, "declined" → not_interested, default → interested)
+- **Customer type inference:** Professional keywords from transcript ("dealership", "fleet", "wholesale" → professional, default → enthusiast)
+- **Appointment booked detection:** Checks `system__conversation_history` JSON for `create_appointment` tool calls
+- **Old burned entries cleanup:** Deletes `voice_call_log` entries with `phone IS NULL` from poll source older than 1 hour — unblocks reprocessing of calls logged before the customer_phone key fix
+- Exported `extractVehicleFromTranscript()` from `voice-post-call.ts` for reuse by polling cron
 
 ---
 

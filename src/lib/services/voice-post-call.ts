@@ -658,7 +658,7 @@ function inferCustomerType(transcript: string): 'enthusiast' | 'professional' {
 }
 
 /** Extract vehicle info from transcript text. Best-effort, returns null if nothing found. */
-function extractVehicleFromTranscript(transcript: string): {
+export function extractVehicleFromTranscript(transcript: string): {
   vehicleYear?: string;
   vehicleMake?: string;
   vehicleModel?: string;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { processVoiceCallEnd } from '@/lib/services/voice-post-call';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { extractServicesFromTranscript } from '@/lib/utils/service-extraction';
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
@@ -50,6 +50,14 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+
+  // Clean up old entries logged without a phone (pre-fix for customer_phone key).
+  // These block reprocessing of real calls. Only delete poll entries older than 1 hour.
+  await admin.from('voice_call_log')
+    .delete()
+    .is('phone', null)
+    .eq('source', 'poll')
+    .lt('processed_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
 
   // Read last poll timestamp
   const { data: pollSetting } = await admin
@@ -129,7 +137,9 @@ export async function GET(request: NextRequest) {
       const dynVars = detail.conversation_initiation_client_data?.dynamic_variables || {};
       const dataCollection = detail.analysis?.data_collection_results || {};
 
-      // Extract phone from dynamic variables or metadata
+      // -----------------------------------------------------------------
+      // 1. Phone extraction
+      // -----------------------------------------------------------------
       const phone =
         dynVars['customer_phone'] ||
         detail.metadata?.['phone'] ||
@@ -137,7 +147,6 @@ export async function GET(request: NextRequest) {
 
       if (!phone) {
         console.warn(`[VoicePoll] No phone found for conversation ${conv.conversation_id}`);
-        // Still log it to prevent re-processing
         await admin.from('voice_call_log').insert({
           elevenlabs_conversation_id: conv.conversation_id,
           phone: null,
@@ -147,7 +156,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Build transcript summary from analysis or concatenated messages
+      // -----------------------------------------------------------------
+      // 2. Transcript summary
+      // -----------------------------------------------------------------
       let transcriptSummary = detail.analysis?.transcript_summary || '';
       if (!transcriptSummary && detail.transcript) {
         transcriptSummary = detail.transcript
@@ -156,21 +167,32 @@ export async function GET(request: NextRequest) {
           .substring(0, 3000);
       }
 
-      // -------------------------------------------------------------------
-      // Extract customer name from dynamic_variables (set at call initiation)
-      // -------------------------------------------------------------------
+      // -----------------------------------------------------------------
+      // 3. Build agent-only transcript for service extraction fallback
+      // Agent messages use exact catalog names from get_services tool.
+      // User messages have STT errors ("on-deck cord" → Honda Accord).
+      // -----------------------------------------------------------------
+      const agentTranscript = (detail.transcript || [])
+        .filter((t) => t.role === 'agent' && t.message)
+        .map((t) => t.message)
+        .join(' ');
+
+      // -----------------------------------------------------------------
+      // 4. Customer name
+      // -----------------------------------------------------------------
       const customerName = dynVars['customer_name'] || undefined;
 
-      // -------------------------------------------------------------------
-      // Extract vehicle info from dynamic_variables.customer_summary
-      // The summary includes lines like "VEHICLES:\n  2016 Silver Honda Accord (sedan)"
-      // -------------------------------------------------------------------
+      // -----------------------------------------------------------------
+      // 5. Vehicle info — parse from customer_summary, fallback to
+      //    extractVehicleFromTranscript inside processVoiceCallEnd
+      // -----------------------------------------------------------------
       let vehicleMake: string | undefined;
       let vehicleModel: string | undefined;
       let vehicleYear: number | undefined;
       let vehicleColor: string | undefined;
 
       const customerSummary = dynVars['customer_summary'] || '';
+      // Format: "VEHICLES:\n  2016 Silver Honda Accord (sedan)"
       const vehicleMatch = customerSummary.match(
         /VEHICLES:\n\s+(\d{4})?\s*(\w+)?\s+(\w[\w-]+)\s+([\w\s-]+?)(?:\s*\(|$)/m
       );
@@ -181,33 +203,113 @@ export async function GET(request: NextRequest) {
         vehicleModel = vehicleMatch[4]?.trim() || undefined;
       }
 
-      // -------------------------------------------------------------------
-      // Extract services discussed — Option C (data_collection) + Option D (transcript matching)
-      // -------------------------------------------------------------------
-
-      // Try Option C first: ElevenLabs data_collection_results
-      const servicesStr = dataCollection['services_discussed']?.value || '';
-      let servicesArr = servicesStr
-        ? servicesStr.split(',').map((s: string) => s.trim()).filter(Boolean)
-        : [];
-
-      // Option D fallback: match service names from transcript_summary against DB
-      if (servicesArr.length === 0 && transcriptSummary) {
-        servicesArr = await extractServicesFromSummary(admin, transcriptSummary);
-        if (servicesArr.length > 0) {
-          console.log(`[VoicePoll] Extracted services from transcript_summary: [${servicesArr.join(', ')}]`);
+      // Fallback: extract vehicle from transcript summary if customer_summary
+      // didn't have it (new callers have no VEHICLES section)
+      if (!vehicleMake && !vehicleModel && transcriptSummary) {
+        const { extractVehicleFromTranscript } = await import('@/lib/services/voice-post-call');
+        const extracted = extractVehicleFromTranscript(transcriptSummary);
+        if (extracted) {
+          vehicleMake = extracted.vehicleMake;
+          vehicleModel = extracted.vehicleModel;
+          vehicleYear = extracted.vehicleYear ? parseInt(extracted.vehicleYear, 10) || undefined : undefined;
+          vehicleColor = extracted.vehicleColor;
         }
       }
 
+      // -----------------------------------------------------------------
+      // 6. Customer interest — infer from transcript summary keywords
+      // -----------------------------------------------------------------
+      let customerInterest: string | undefined;
+      if (dataCollection['customer_interest']?.value) {
+        customerInterest = dataCollection['customer_interest'].value;
+      } else if (transcriptSummary) {
+        const lower = transcriptSummary.toLowerCase();
+        const interestedKeywords = ['interested in booking', 'confirmed their interest', 'wants to schedule', 'would like to book', 'agreed to', 'ready to book'];
+        const notInterestedKeywords = ['declined', 'not interested', 'just asking', 'just inquiring', 'changed their mind', 'decided against'];
+        if (interestedKeywords.some((kw) => lower.includes(kw))) {
+          customerInterest = 'interested';
+        } else if (notInterestedKeywords.some((kw) => lower.includes(kw))) {
+          customerInterest = 'not_interested';
+        } else {
+          customerInterest = 'interested'; // default: better to send a quote than miss a lead
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // 7. Customer type — infer from transcript
+      // -----------------------------------------------------------------
+      let customerType: string | undefined;
+      if (dataCollection['customer_type']?.value) {
+        customerType = dataCollection['customer_type'].value;
+      } else if (transcriptSummary) {
+        const lower = transcriptSummary.toLowerCase();
+        const professionalKeywords = ['dealership', 'dealer', 'fleet', 'wholesale', 'my shop', 'our shop', 'body shop', 'commercial', 'multiple vehicles'];
+        customerType = professionalKeywords.some((kw) => lower.includes(kw)) ? 'professional' : 'enthusiast';
+      }
+
+      // -----------------------------------------------------------------
+      // 8. Appointment booked — check conversation_history for tool calls
+      // -----------------------------------------------------------------
+      let appointmentBooked = false;
+      if (dataCollection['appointment_booked']?.value === 'true') {
+        appointmentBooked = true;
+      } else {
+        // Check conversation_history for create_appointment tool call
+        const convHistory = dynVars['system__conversation_history'] || '';
+        if (convHistory.includes('"tool_name"') && convHistory.includes('appointment')) {
+          try {
+            const parsed = JSON.parse(convHistory);
+            const entries = parsed?.entries || [];
+            appointmentBooked = entries.some(
+              (e: { tool_requests?: Array<{ tool_name: string }> }) =>
+                e.tool_requests?.some((tr) =>
+                  tr.tool_name === 'create_appointment' || tr.tool_name === 'book_appointment'
+                )
+            );
+          } catch {
+            // JSON parse failed — leave as false
+          }
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // 9. Services discussed — Option C (data_collection) + Option D (transcript matching)
+      // -----------------------------------------------------------------
+      let servicesDiscussed: string[] = [];
+
+      // Option C: ElevenLabs data_collection_results
+      const dcServices = dataCollection['services_discussed']?.value;
+      if (dcServices && typeof dcServices === 'string' && dcServices.trim()) {
+        servicesDiscussed = dcServices.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+
+      // Option D fallback: extract from transcript_summary + agent transcript
+      if (servicesDiscussed.length === 0 && (transcriptSummary || agentTranscript)) {
+        servicesDiscussed = await extractServicesFromTranscript(
+          admin,
+          transcriptSummary,
+          agentTranscript || undefined
+        );
+        if (servicesDiscussed.length > 0) {
+          console.log(`[VoicePoll] Extracted services from transcript: [${servicesDiscussed.join(', ')}]`);
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // 10. Call processVoiceCallEnd with all extracted data
+      // -----------------------------------------------------------------
       const result = await processVoiceCallEnd({
         phone,
         transcriptSummary: transcriptSummary || undefined,
-        servicesDiscussed: servicesArr,
+        servicesDiscussed,
         customerName,
         vehicleMake,
         vehicleModel,
         vehicleYear,
         vehicleColor,
+        customerInterest,
+        customerType,
+        appointmentBooked,
         durationSeconds: detail.call_duration_secs,
         elevenlabsConversationId: conv.conversation_id,
         source: 'poll',
@@ -252,44 +354,5 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     console.error('[VoicePoll] Error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Option D: Extract service names from transcript summary by matching
-// against active services in the database (case-insensitive).
-// The transcript_summary is generated by ElevenLabs and uses exact service
-// names from the agent's responses (which come from our get_services tool).
-// ---------------------------------------------------------------------------
-
-async function extractServicesFromSummary(
-  supabase: SupabaseClient,
-  summary: string
-): Promise<string[]> {
-  try {
-    const { data: services } = await supabase
-      .from('services')
-      .select('name')
-      .eq('is_active', true);
-
-    if (!services || services.length === 0) return [];
-
-    const summaryLower = summary.toLowerCase();
-    const matched: string[] = [];
-
-    // Sort by name length descending so "Signature Complete Detail" matches
-    // before "Complete" would as a substring of something else
-    const sorted = [...services].sort((a, b) => b.name.length - a.name.length);
-
-    for (const svc of sorted) {
-      if (summaryLower.includes(svc.name.toLowerCase())) {
-        matched.push(svc.name);
-      }
-    }
-
-    return matched;
-  } catch (err) {
-    console.error('[VoicePoll] Failed to extract services from summary:', err);
-    return [];
   }
 }
