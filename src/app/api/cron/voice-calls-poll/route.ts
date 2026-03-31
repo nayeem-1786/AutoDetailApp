@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
 
       // Extract phone from dynamic variables or metadata
       const phone =
-        detail.conversation_initiation_client_data?.dynamic_variables?.['phone'] ||
+        detail.conversation_initiation_client_data?.dynamic_variables?.['customer_phone'] ||
         detail.metadata?.['phone'] ||
         detail.analysis?.data_collection_results?.['phone']?.value;
 
