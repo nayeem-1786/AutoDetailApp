@@ -182,40 +182,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find or create vehicle — dedup by make + model (case-insensitive)
+    // Find or create vehicle — shared dedup by make + model + category
     let vehicleId: string | undefined;
-    if (vehicle_make || vehicle_model) {
-      let vehicleQuery = admin
-        .from('vehicles')
-        .select('id')
-        .eq('customer_id', customerId);
-
-      if (vehicle_make) vehicleQuery = vehicleQuery.ilike('make', vehicle_make);
-      if (vehicle_model) vehicleQuery = vehicleQuery.ilike('model', vehicle_model);
-
+    if (vehicle_make) {
+      const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
       t = perf.now();
-      const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
-      perf.mark('query:vehicles_find', t);
-
-      if (existingVehicle) {
-        vehicleId = existingVehicle.id;
-      } else {
-        t = perf.now();
-        const { data: newVehicle } = await admin
-          .from('vehicles')
-          .insert({
-            customer_id: customerId,
-            vehicle_type: 'standard',
-            year: vehicle_year || null,
-            make: vehicle_make || null,
-            model: vehicle_model || null,
-            color: vehicle_color || null,
-          })
-          .select('id')
-          .single();
-        perf.mark('query:vehicles_create', t);
-        vehicleId = newVehicle?.id;
-      }
+      const vehicleResult = await findOrCreateVehicle(admin, {
+        customerId: customerId!,
+        make: vehicle_make,
+        model: vehicle_model,
+        year: vehicle_year,
+        color: vehicle_color,
+      });
+      perf.mark('query:vehicles_findOrCreate', t);
+      if (vehicleResult) vehicleId = vehicleResult.id;
     }
 
     // Read quote validity

@@ -94,6 +94,11 @@ customers_square_customer_id_key — UNIQUE btree (square_customer_id)
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
+**Indexes:**
+```
+idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(model), vehicle_category) WHERE make IS NOT NULL AND model IS NOT NULL
+```
+
 ---
 
 ## Catalog

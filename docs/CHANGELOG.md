@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: vehicle dedup — shared findOrCreateVehicle + early voice_call_log + DB constraint (Session 14G) — 2026-03-30
+
+- New shared `findOrCreateVehicle()` in `src/lib/utils/vehicle-helpers.ts` — single dedup function for all non-user vehicle creation paths
+- Dedup key: `customer_id + LOWER(make) + LOWER(model) + vehicle_category` — prevents merging motorcycle + automobile from same manufacturer
+- Resolves vehicle classification (via `resolveVehicleClassification()`) BEFORE the dedup SELECT so the correct category is used in the query
+- Backfills NULL `size_class`, `specialty_tier`, `year`, `color` on existing records without overwriting non-null values
+- Handles unique constraint violations gracefully (re-query on 23505 error)
+- **Race condition fix:** Moved `voice_call_log` INSERT from END of `processVoiceCallEnd()` to immediately after dedup check — closes the 370-line race window where concurrent calls could both pass the dedup check
+- Added `'processing'` → `'completed'` status flow with 5-minute staleness check for abandoned entries
+- Replaced inline vehicle creation in 6 files: `voice-post-call.ts`, `send-quote-sms/route.ts`, `twilio/inbound/route.ts`, `appointments/route.ts`, `quotes/route.ts`, `book/route.ts`
+- Fixed `twilio/inbound` vehicle dedup: removed year from dedup key, replaced `.single()` with shared function's `.maybeSingle()`
+- Fixed `book/route.ts` vehicle dedup: was case-sensitive `eq()`, now case-insensitive `ilike()` via shared function
+- Fixed `appointments/route.ts` and `quotes/route.ts`: had zero vehicle dedup — now use shared function
+- New migration `20260330000003`: unique index on `vehicles (customer_id, LOWER(make), LOWER(model), vehicle_category) WHERE make IS NOT NULL AND model IS NOT NULL`
+- Customer portal + POS "add vehicle" paths intentionally left unchanged (user-initiated actions)
+
+---
+
 ## fix: remove not_interested gate — send quotes to all callers who discussed services (Session 14E follow-up) — 2026-03-30
 
 - Removed `customerInterest === 'not_interested'` condition from auto-quote decision tree in `voice-post-call.ts`

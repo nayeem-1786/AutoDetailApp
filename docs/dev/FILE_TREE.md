@@ -971,6 +971,7 @@ src/lib/utils/template.ts
 src/lib/utils/ticker-sections.ts
 src/lib/utils/validation.ts
 src/lib/utils/vehicle-categories.ts
+src/lib/utils/vehicle-helpers.ts
 src/lib/utils/webhook.ts
 ```
 
@@ -1381,6 +1382,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260329000002_jobs_appointment_id_unique_constraint.sql
 20260330000001_system_sms_logging.sql
 20260330000002_quote_items_sale_columns.sql
+20260330000003_vehicles_unique_constraint.sql
 ```
 
 ---

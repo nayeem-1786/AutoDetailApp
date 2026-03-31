@@ -106,29 +106,20 @@ const body = await request.json();
       customerId = newCustomer.id;
     }
 
-    // Optionally create vehicle
+    // Find or create vehicle — shared dedup by make + model + category
     let vehicleId: string | null = null;
-    if (vehicle_make || vehicle_model || vehicle_year || vehicle_color) {
+    if (vehicle_make) {
+      const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
       t = perf.now();
-      const { data: newVehicle, error: vehErr } = await supabase
-        .from('vehicles')
-        .insert({
-          customer_id: customerId,
-          vehicle_type: 'standard',
-          year: vehicle_year || null,
-          make: vehicle_make || null,
-          model: vehicle_model || null,
-          color: vehicle_color || null,
-        })
-        .select('id')
-        .single();
-      perf.mark('query:vehicles_create', t);
-
-      if (vehErr) {
-        console.error('Vehicle creation failed:', vehErr.message);
-      } else {
-        vehicleId = newVehicle?.id ?? null;
-      }
+      const vehicleResult = await findOrCreateVehicle(supabase, {
+        customerId,
+        make: vehicle_make,
+        model: vehicle_model,
+        year: vehicle_year,
+        color: vehicle_color,
+      });
+      perf.mark('query:vehicles_findOrCreate', t);
+      if (vehicleResult) vehicleId = vehicleResult.id;
     }
 
     // Look up each service + pricing tier to get prices

@@ -48,17 +48,48 @@ export async function processVoiceCallEnd(
     return { success: false, reason: 'Invalid phone number' };
   }
 
-  // Dedup check: skip if this conversation was already processed
+  // Dedup check: skip if this conversation was already processed or is in progress
   if (params.elevenlabsConversationId) {
     const { data: existing } = await admin
       .from('voice_call_log')
-      .select('id')
+      .select('id, status, processed_at')
       .eq('elevenlabs_conversation_id', params.elevenlabsConversationId)
       .maybeSingle();
 
     if (existing) {
-      console.log(`[VoicePostCall] Already processed: ${params.elevenlabsConversationId}`);
-      return { success: true, skipped: true, reason: 'Already processed' };
+      // Allow reprocessing of stale 'processing' entries (abandoned after 5 min)
+      const isStale = existing.status === 'processing' &&
+        existing.processed_at &&
+        Date.now() - new Date(existing.processed_at).getTime() > 5 * 60 * 1000;
+
+      if (!isStale) {
+        console.log(`[VoicePostCall] Already processed: ${params.elevenlabsConversationId} (status: ${existing.status})`);
+        return { success: true, skipped: true, reason: 'Already processed' };
+      }
+      console.log(`[VoicePostCall] Stale 'processing' entry found (>5min) — reprocessing: ${params.elevenlabsConversationId}`);
+    }
+
+    // Immediately claim this conversation to close the race window.
+    // If another process claimed it between our check and insert, the unique
+    // constraint will catch it and we bail.
+    const { error: claimErr } = existing
+      ? await admin.from('voice_call_log')
+          .update({ status: 'processing', source: params.source, processed_at: new Date().toISOString() })
+          .eq('id', existing.id)
+      : await admin.from('voice_call_log')
+          .insert({
+            elevenlabs_conversation_id: params.elevenlabsConversationId,
+            phone: normalizedPhone,
+            source: params.source,
+            status: 'processing',
+          });
+
+    if (claimErr) {
+      if (claimErr.code?.includes('23505')) {
+        console.log(`[VoicePostCall] Lost race to claim ${params.elevenlabsConversationId} — skipping`);
+        return { success: true, skipped: true, reason: 'Lost race' };
+      }
+      console.error('[VoicePostCall] Failed to claim voice_call_log:', claimErr);
     }
   }
 
@@ -283,52 +314,16 @@ export async function processVoiceCallEnd(
 
   // Find or create vehicle — runs BEFORE autoGenerateQuote so vehicle_id is available for quotes
   let resolvedVehicleId: string | undefined;
-  if (resolvedCustomerId && (resolvedVehicleMake || resolvedVehicleModel)) {
-    const { resolveVehicleClassification } = await import('@/lib/utils/vehicle-categories');
-
-    let vehicleQuery = admin
-      .from('vehicles')
-      .select('id, vehicle_category, size_class, specialty_tier')
-      .eq('customer_id', resolvedCustomerId);
-
-    if (resolvedVehicleMake) vehicleQuery = vehicleQuery.ilike('make', resolvedVehicleMake);
-    if (resolvedVehicleModel) vehicleQuery = vehicleQuery.ilike('model', resolvedVehicleModel);
-
-    const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
-
-    if (existingVehicle) {
-      resolvedVehicleId = existingVehicle.id;
-
-      // Backfill classification if missing (don't overwrite existing non-null values)
-      if (!existingVehicle.vehicle_category || !existingVehicle.size_class) {
-        const classification = await resolveVehicleClassification(admin, resolvedVehicleMake || '', resolvedVehicleModel);
-        const updates: Record<string, unknown> = {};
-        if (!existingVehicle.vehicle_category) updates.vehicle_category = classification.vehicle_category;
-        if (!existingVehicle.size_class && classification.size_class) updates.size_class = classification.size_class;
-        if (!existingVehicle.specialty_tier && classification.specialty_tier) updates.specialty_tier = classification.specialty_tier;
-        if (!existingVehicle.vehicle_category) updates.vehicle_type = classification.vehicle_type;
-        if (Object.keys(updates).length > 0) {
-          await admin.from('vehicles').update(updates).eq('id', existingVehicle.id);
-          console.log(`[VoicePostCall] Backfilled vehicle classification for ${existingVehicle.id}:`, updates);
-        }
-      }
-    } else {
-      const classification = await resolveVehicleClassification(admin, resolvedVehicleMake || '', resolvedVehicleModel);
-      const { data: newVehicle } = await admin
-        .from('vehicles')
-        .insert({
-          customer_id: resolvedCustomerId,
-          ...classification,
-          year: resolvedVehicleYear || null,
-          make: resolvedVehicleMake || null,
-          model: resolvedVehicleModel || null,
-          color: resolvedVehicleColor || null,
-        })
-        .select('id')
-        .single();
-      resolvedVehicleId = newVehicle?.id;
-      console.log(`[VoicePostCall] Created vehicle ${resolvedVehicleYear || ''} ${resolvedVehicleColor || ''} ${resolvedVehicleMake || ''} ${resolvedVehicleModel || ''} (${classification.vehicle_category}/${classification.size_class || classification.specialty_tier}) for ${normalizedPhone}`);
-    }
+  if (resolvedCustomerId && resolvedVehicleMake) {
+    const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
+    const vehicleResult = await findOrCreateVehicle(admin, {
+      customerId: resolvedCustomerId,
+      make: resolvedVehicleMake,
+      model: resolvedVehicleModel,
+      year: resolvedVehicleYear,
+      color: resolvedVehicleColor,
+    });
+    if (vehicleResult) resolvedVehicleId = vehicleResult.id;
   }
 
   if (appointmentBooked) {
@@ -417,20 +412,11 @@ export async function processVoiceCallEnd(
     conversation.customer_id = resolvedCustomerId;
   }
 
-  // Insert into voice_call_log for dedup
+  // Mark voice_call_log as completed (was claimed as 'processing' at the top)
   if (params.elevenlabsConversationId) {
-    await admin.from('voice_call_log').insert({
-      elevenlabs_conversation_id: params.elevenlabsConversationId,
-      phone: normalizedPhone,
-      source: params.source,
-    }).then(({ error }) => {
-      if (error) {
-        // Unique constraint violation = already processed (race condition), safe to ignore
-        if (!error.code?.includes('23505')) {
-          console.error('[VoicePostCall] Failed to insert voice_call_log:', error);
-        }
-      }
-    });
+    await admin.from('voice_call_log')
+      .update({ status: 'completed' })
+      .eq('elevenlabs_conversation_id', params.elevenlabsConversationId);
   }
 
   console.log(

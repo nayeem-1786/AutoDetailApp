@@ -203,67 +203,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Find existing or create vehicle linked to customer
+    // 5. Find existing or create vehicle linked to customer — shared dedup
     let vehicleId: string | null = null;
-    if (data.vehicle) {
-      // Check for existing vehicle with same make, model, year, color for this customer
-      const vehicleQuery = supabase
-        .from('vehicles')
-        .select('id')
-        .eq('customer_id', customerId)
-        .eq('vehicle_type', data.vehicle.vehicle_type || 'standard');
-
-      // Add optional field filters (treat null/empty as equivalent)
-      if (data.vehicle.make) {
-        vehicleQuery.eq('make', data.vehicle.make);
-      } else {
-        vehicleQuery.is('make', null);
-      }
-      if (data.vehicle.model) {
-        vehicleQuery.eq('model', data.vehicle.model);
-      } else {
-        vehicleQuery.is('model', null);
-      }
-      if (data.vehicle.year) {
-        vehicleQuery.eq('year', data.vehicle.year);
-      } else {
-        vehicleQuery.is('year', null);
-      }
-      if (data.vehicle.color) {
-        vehicleQuery.eq('color', data.vehicle.color);
-      } else {
-        vehicleQuery.is('color', null);
-      }
-
-      const { data: existingVehicle } = await vehicleQuery.limit(1).maybeSingle();
-
-      if (existingVehicle) {
-        // Use existing vehicle
-        vehicleId = existingVehicle.id;
-      } else {
-        // Create new vehicle
-        const { data: newVehicle, error: vehErr } = await supabase
-          .from('vehicles')
-          .insert({
-            customer_id: customerId,
-            vehicle_category: data.vehicle.vehicle_category || 'automobile',
-            vehicle_type: data.vehicle.vehicle_type || 'standard',
-            size_class: data.vehicle.size_class || null,
-            specialty_tier: data.vehicle.specialty_tier || null,
-            year: data.vehicle.year || null,
-            make: data.vehicle.make || null,
-            model: data.vehicle.model || null,
-            color: data.vehicle.color || null,
-          })
-          .select('id')
-          .single();
-
-        if (vehErr) {
-          console.error('Vehicle creation failed:', vehErr.message);
-        } else {
-          vehicleId = newVehicle?.id ?? null;
-        }
-      }
+    if (data.vehicle && data.vehicle.make) {
+      const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
+      const vehicleResult = await findOrCreateVehicle(supabase, {
+        customerId,
+        make: data.vehicle.make,
+        model: data.vehicle.model,
+        year: data.vehicle.year,
+        color: data.vehicle.color,
+        vehicle_category: data.vehicle.vehicle_category,
+        vehicle_type: data.vehicle.vehicle_type,
+        size_class: data.vehicle.size_class,
+        specialty_tier: data.vehicle.specialty_tier,
+      });
+      if (vehicleResult) vehicleId = vehicleResult.id;
     }
 
     // 6. Calculate totals

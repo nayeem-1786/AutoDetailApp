@@ -676,43 +676,18 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Find or create vehicle (match by customer + make + model + year)
-          let vehicleQuery = admin
-            .from('vehicles')
-            .select('id')
-            .eq('customer_id', quoteCustomerId)
-            .ilike('make', quoteData.vehicle_make)
-            .ilike('model', quoteData.vehicle_model);
-
-          if (quoteData.vehicle_year) {
-            vehicleQuery = vehicleQuery.eq('year', parseInt(quoteData.vehicle_year, 10));
-          }
-
-          const { data: existingVehicle } = await vehicleQuery.limit(1).single();
-
+          // Find or create vehicle — shared dedup by make + model + category
           let vehicleId: string | null = null;
-          if (existingVehicle) {
-            vehicleId = existingVehicle.id;
-          } else {
-            const { data: newVehicle, error: vehErr } = await admin
-              .from('vehicles')
-              .insert({
-                customer_id: quoteCustomerId,
-                vehicle_type: 'standard',
-                size_class: sizeClass,
-                year: quoteData.vehicle_year ? parseInt(quoteData.vehicle_year, 10) : null,
-                make: quoteData.vehicle_make,
-                model: quoteData.vehicle_model,
-                color: quoteData.vehicle_color || null,
-              })
-              .select('id')
-              .single();
-
-            if (vehErr || !newVehicle) {
-              console.error('[Auto-Quote] Vehicle creation failed:', vehErr?.message);
-            } else {
-              vehicleId = newVehicle.id;
-            }
+          if (quoteCustomerId) {
+            const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
+            const vehicleResult = await findOrCreateVehicle(admin, {
+              customerId: quoteCustomerId,
+              make: quoteData.vehicle_make,
+              model: quoteData.vehicle_model,
+              year: quoteData.vehicle_year,
+              color: quoteData.vehicle_color,
+            });
+            if (vehicleResult) vehicleId = vehicleResult.id;
           }
 
           // Resolve services and prices (sale-aware)
