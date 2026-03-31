@@ -127,15 +127,18 @@ export async function POST(request: NextRequest) {
         });
       }
     } else {
-      // Try matching by email
-      const { data: existingByEmail } = await supabase
-        .from('customers')
-        .select('id, phone')
-        .eq('email', data.customer.email)
-        .is('phone', null)
-        .is('deleted_at', null)
-        .limit(1)
-        .single();
+      // Try matching by email (only if email is non-empty — null/empty would match wrong records)
+      const hasEmail = data.customer.email && data.customer.email.trim();
+      const { data: existingByEmail } = hasEmail
+        ? await supabase
+            .from('customers')
+            .select('id, phone')
+            .eq('email', data.customer.email)
+            .is('phone', null)
+            .is('deleted_at', null)
+            .limit(1)
+            .single()
+        : { data: null };
 
       if (existingByEmail) {
         customerId = existingByEmail.id;

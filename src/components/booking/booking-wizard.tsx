@@ -824,7 +824,7 @@ export function BookingWizard({
       paymentOption: confirmPaymentOption,
       amountCharged,
       grandTotal,
-      customerEmail: customer.email,
+      customerEmail: customer.email || null,
     });
 
     // Clear URL params so refresh doesn't restore the booking form

@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: booking email optional + profile email editable for phone-only accounts (Session 15A) — 2026-03-31
+
+- `bookingCustomerSchema.email` changed from `z.string().email()` (required) to `emailSchema` (optional, allows empty)
+- Phone-only customers can now complete bookings without an email address
+- Added optional email input in booking confirm step — only shows for customers without an email on file
+- Fixed hardcoded `email_consent: true` → now `!!email` (only true when email is provided)
+- Profile page email field: conditionally editable for phone-only customers (was always locked)
+- Added `email` to `customerProfileSchema` and profile PATCH API — phone-only customers can add an email
+- Profile API handles unique constraint violation (23505) with user-friendly "email already in use" error
+- Fixed `book/route.ts` email-based customer lookup: guarded against null/empty email matching wrong records
+- Customer confirmation email only sends when email is provided (existing guard, no change needed)
+
+---
+
 ## feat: complete polling cron data extraction — all 12 items (Session 14K) — 2026-03-31
 
 - Polling cron now passes ALL available data to `processVoiceCallEnd()`: `customerName`, `vehicleMake`, `vehicleModel`, `vehicleYear`, `vehicleColor`, `customerInterest`, `customerType`, `appointmentBooked`, `servicesDiscussed` (was only 3 fields: phone, summary, duration)

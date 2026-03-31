@@ -144,6 +144,8 @@ export function StepConfirmBook({
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponExpanded, setCouponExpanded] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [optionalEmail, setOptionalEmail] = useState('');
+  const [optionalEmailError, setOptionalEmailError] = useState<string | null>(null);
 
   // Track whether user is authenticated (portal or inline auth completed)
   const isAuthenticated = isPortal || !!customerData;
@@ -316,17 +318,37 @@ export function StepConfirmBook({
   }
 
   // --- Submit ---
-  async function handleBookingSubmit() {
-    if (!agreedToAll || !customerData) return;
+  /** Resolve the email to use: profile email, or optional email entered at checkout */
+  function resolveEmail(): string {
+    const profileEmail = customerData?.customer.email;
+    if (profileEmail) return profileEmail;
+    return optionalEmail.trim();
+  }
 
-    const customer: BookingCustomerInput = {
+  function buildCustomer(): BookingCustomerInput | null {
+    if (!customerData) return null;
+    // Validate optional email format if entered
+    const email = resolveEmail();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setOptionalEmailError('Please enter a valid email address');
+      return null;
+    }
+    setOptionalEmailError(null);
+    return {
       first_name: customerData.customer.first_name,
       last_name: customerData.customer.last_name,
       phone: formatPhone(customerData.customer.phone),
-      email: customerData.customer.email,
+      email: email || '',
       sms_consent: true,
-      email_consent: true,
+      email_consent: !!email,
     };
+  }
+
+  async function handleBookingSubmit() {
+    if (!agreedToAll || !customerData) return;
+
+    const customer = buildCustomer();
+    if (!customer) return;
 
     // If Stripe payment needed, show inline payment form
     if (needsStripePayment && !showPaymentForm) {
@@ -348,15 +370,8 @@ export function StepConfirmBook({
   }
 
   function handlePaymentSuccess(paymentIntentId: string) {
-    if (!customerData) return;
-    const customer: BookingCustomerInput = {
-      first_name: customerData.customer.first_name,
-      last_name: customerData.customer.last_name,
-      phone: formatPhone(customerData.customer.phone),
-      email: customerData.customer.email,
-      sms_consent: true,
-      email_consent: true,
-    };
+    const customer = buildCustomer();
+    if (!customer) return;
     const vehicle = buildVehicle();
     onConfirm(customer, vehicle, paymentIntentId);
   }
@@ -481,6 +496,30 @@ export function StepConfirmBook({
               />
             </div>
           </div>
+
+          {/* Optional email input for phone-only customers */}
+          {isAuthenticated && customerData && !customerData.customer.email && (
+            <div className="rounded-lg border border-site-border bg-brand-dark p-4">
+              <label htmlFor="optional-email" className="block text-sm font-medium text-site-text">
+                Email <span className="font-normal text-site-text-muted">(optional)</span>
+              </label>
+              <Input
+                id="optional-email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={optionalEmail}
+                onChange={(e) => { setOptionalEmail(e.target.value); setOptionalEmailError(null); }}
+                className="mt-1.5 text-base sm:text-sm"
+              />
+              {optionalEmailError && (
+                <p className="mt-1 text-xs text-red-400">{optionalEmailError}</p>
+              )}
+              <p className="mt-1.5 text-xs text-site-text-dim">
+                We&apos;ll send your booking confirmation and receipt to this email
+              </p>
+            </div>
+          )}
 
           {/* Rest of the page only visible after auth */}
           {isAuthenticated && (

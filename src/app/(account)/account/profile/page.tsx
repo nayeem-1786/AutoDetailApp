@@ -43,6 +43,7 @@ export default function AccountProfilePage() {
           first_name: customer.first_name,
           last_name: customer.last_name,
           phone: customer.phone ? formatPhone(customer.phone) : '',
+          email: customer.email ?? '',
           sms_consent: customer.sms_consent,
           email_consent: customer.email_consent,
           notify_promotions: customer.notify_promotions ?? true,
@@ -50,6 +51,8 @@ export default function AccountProfilePage() {
         }
       : undefined,
   });
+
+  const hasExistingEmail = !!(customer?.email);
 
   const smsConsent = watch('sms_consent');
   const emailConsent = watch('email_consent');
@@ -173,14 +176,32 @@ export default function AccountProfilePage() {
               </FormField>
             </div>
 
-            <FormField label="Email" htmlFor="email">
-              <div className="relative">
-                <Input id="email" value={customer.email ?? ''} disabled className="bg-brand-dark pr-10" />
-                <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-site-text-muted" />
-              </div>
-              <p className="mt-1 text-xs text-site-text-dim">
-                Your email is used to sign in and cannot be changed here. Contact us if you need to update it.
-              </p>
+            <FormField label="Email" htmlFor="email" error={errors.email?.message}>
+              {hasExistingEmail ? (
+                <>
+                  <div className="relative">
+                    <Input id="email" value={customer.email ?? ''} disabled className="bg-brand-dark pr-10" />
+                    <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-site-text-muted" />
+                  </div>
+                  <p className="mt-1 text-xs text-site-text-dim">
+                    Your email is used to sign in and cannot be changed here. Contact us if you need to update it.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Enter your email address"
+                    className="text-base sm:text-sm"
+                    {...register('email')}
+                  />
+                  <p className="mt-1 text-xs text-site-text-dim">
+                    Add an email for booking confirmations and receipts
+                  </p>
+                </>
+              )}
             </FormField>
 
             <FormField

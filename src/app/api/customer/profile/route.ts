@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest) {
     // Find the customer record for this auth user
     const { data: customer } = await admin
       .from('customers')
-      .select('id, phone, sms_consent')
+      .select('id, phone, email, sms_consent')
       .eq('auth_user_id', user.id)
       .single();
 
@@ -108,21 +108,37 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Build update payload — only include email if provided and customer doesn't already have one
+    const updatePayload: Record<string, unknown> = {
+      first_name: data.first_name,
+      last_name: data.last_name,
+      phone: e164Phone,
+      sms_consent: data.sms_consent,
+      email_consent: data.email_consent,
+      notify_promotions: data.notify_promotions,
+      notify_loyalty: data.notify_loyalty,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Allow setting email only for customers who don't have one yet
+    // (email-auth customers have their email locked in the UI)
+    if (data.email && data.email.trim() && !customer.email) {
+      updatePayload.email = data.email.trim();
+    }
+
     const { error: updateErr } = await admin
       .from('customers')
-      .update({
-        first_name: data.first_name,
-        last_name: data.last_name,
-        phone: e164Phone,
-        sms_consent: data.sms_consent,
-        email_consent: data.email_consent,
-        notify_promotions: data.notify_promotions,
-        notify_loyalty: data.notify_loyalty,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', customer.id);
 
     if (updateErr) {
+      // Handle unique constraint violation on email
+      if (updateErr.code?.includes('23505') && updateErr.message?.includes('email')) {
+        return NextResponse.json(
+          { error: 'This email is already associated with another account' },
+          { status: 409 }
+        );
+      }
       console.error('Profile update failed:', updateErr.message);
       return NextResponse.json(
         { error: 'Failed to update profile' },
