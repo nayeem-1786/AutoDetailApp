@@ -39,6 +39,8 @@ export interface OrderSummaryData {
   addons: { name: string; price: number }[];
   mobileSurcharge: number;
   total: number;
+  durationMinutes?: number;
+  vehicleDescription?: string | null;
 }
 
 interface StepScheduleProps {
@@ -254,6 +256,21 @@ export function StepSchedule({
           </div>
         </div>
 
+        {/* Estimated completion time */}
+        {selectedTime && durationMinutes > 0 && (() => {
+          const [h, m] = selectedTime.split(':').map(Number);
+          const endTotal = h * 60 + m + durationMinutes;
+          const endH = Math.floor(endTotal / 60) % 24;
+          const endM = endTotal % 60;
+          const period = endH >= 12 ? 'PM' : 'AM';
+          const display = `${endH % 12 || 12}:${String(endM).padStart(2, '0')} ${period}`;
+          return (
+            <p className="mt-4 text-sm text-accent-brand font-medium">
+              Estimated completion: {display}
+            </p>
+          );
+        })()}
+
         {/* Info note */}
         <div className="mt-6 flex gap-3 rounded-lg border-l-4 border-blue-400 bg-blue-50 p-3 dark:bg-blue-900/20">
           <Info className="h-4 w-4 flex-shrink-0 text-blue-400 mt-0.5" />
@@ -289,6 +306,11 @@ export function StepSchedule({
               Your Selection
             </h3>
             <div className="mt-3 space-y-2 text-sm">
+              {orderSummary.vehicleDescription && (
+                <div className="flex items-center gap-1.5 text-site-text-muted">
+                  <span>{orderSummary.vehicleDescription}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-site-text">
                   {orderSummary.serviceName}
@@ -314,6 +336,13 @@ export function StepSchedule({
                   <span className="font-medium text-site-text">
                     {formatCurrency(orderSummary.mobileSurcharge)}
                   </span>
+                </div>
+              )}
+              {orderSummary.durationMinutes && orderSummary.durationMinutes > 0 && (
+                <div className="text-site-text-muted">
+                  Duration: ~{orderSummary.durationMinutes >= 60
+                    ? `${Math.floor(orderSummary.durationMinutes / 60)}h${orderSummary.durationMinutes % 60 > 0 ? ` ${orderSummary.durationMinutes % 60}m` : ''}`
+                    : `${orderSummary.durationMinutes}m`}
                 </div>
               )}
               <div className="flex justify-between border-t border-site-border pt-2 font-semibold text-site-text">

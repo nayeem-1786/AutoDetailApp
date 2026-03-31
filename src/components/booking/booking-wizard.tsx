@@ -975,6 +975,10 @@ export function BookingWizard({
     total: (state.config.price) +
       (state.config.addons ?? []).reduce((s, a) => s + a.price, 0) +
       (state.config.mobile_surcharge ?? 0),
+    durationMinutes: totalDuration,
+    vehicleDescription: state.vehicleData
+      ? [state.vehicleData.year, state.vehicleData.color, state.vehicleData.make, state.vehicleData.model].filter(Boolean).join(' ') || null
+      : null,
   } : undefined;
 
   return (
@@ -1013,9 +1017,10 @@ export function BookingWizard({
             onSelect={handleServiceSelect}
             vehicleCategories={vehicleCategories}
             selectedCategoryKey={state.selectedCategory}
-            onCategoryChange={handleCategoryChange}
             mobileZones={mobileZones}
             initialConfig={state.config ?? undefined}
+            vehicleSizeClass={state.vehicleData?.size_class as import('@/lib/supabase/types').VehicleSizeClass | null ?? null}
+            vehicleSpecialtyTier={state.vehicleData?.specialty_tier ?? null}
           />
           {editEntryStep === 2 && (
             <div className="mt-4">

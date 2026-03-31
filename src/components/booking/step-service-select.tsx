@@ -69,9 +69,12 @@ interface StepServiceSelectProps {
   onSelect: (service: BookableService, config: ConfigureResult) => void;
   vehicleCategories?: VehicleCategoryRecord[];
   selectedCategoryKey?: string;
-  onCategoryChange?: (key: string) => void;
   mobileZones: MobileZone[];
   initialConfig?: Partial<ConfigureResult>;
+  /** Vehicle size class from Step 1 — when set, hides the size picker and uses this for pricing */
+  vehicleSizeClass?: VehicleSizeClass | null;
+  /** Vehicle specialty tier from Step 1 — when set, hides the tier picker and uses this for pricing */
+  vehicleSpecialtyTier?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,9 +87,10 @@ export function StepServiceSelect({
   onSelect,
   vehicleCategories = [],
   selectedCategoryKey = 'automobile',
-  onCategoryChange,
   mobileZones,
   initialConfig,
+  vehicleSizeClass,
+  vehicleSpecialtyTier,
 }: StepServiceSelectProps) {
   // Helper to find a service by ID across all categories
   function findService(id: string | null): BookableService | null {
@@ -132,7 +136,7 @@ export function StepServiceSelect({
     return null;
   });
   const [sizeClass, setSizeClass] = useState<VehicleSizeClass | null>(
-    initialConfig?.size_class ?? null
+    vehicleSizeClass ?? initialConfig?.size_class ?? null
   );
   const [perUnitQty, setPerUnitQty] = useState(initialConfig?.per_unit_quantity ?? 1);
   const [showMobileFields, setShowMobileFields] = useState(initialConfig?.is_mobile ?? false);
@@ -144,7 +148,24 @@ export function StepServiceSelect({
     initialConfig?.addons ?? []
   );
   const [showAllAddons, setShowAllAddons] = useState(false);
-  const [showVehicleSheet, setShowVehicleSheet] = useState(false);
+  // Sync sizeClass when vehicle changes in Step 1 (back navigation: same category, different size)
+  useEffect(() => {
+    if (vehicleSizeClass && vehicleSizeClass !== sizeClass) {
+      setSizeClass(vehicleSizeClass);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleSizeClass]);
+
+  // Auto-select specialty tier when known from Step 1
+  useEffect(() => {
+    if (vehicleSpecialtyTier && selectedService?.pricing_model === 'specialty') {
+      const matchingTier = tiers.find((t) => t.tier_name === vehicleSpecialtyTier);
+      if (matchingTier && selectedTier !== vehicleSpecialtyTier) {
+        setSelectedTier(vehicleSpecialtyTier);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleSpecialtyTier, selectedService?.id]);
 
   // --- Derived values ---
   const tiers = selectedService?.service_pricing ?? [];
@@ -250,6 +271,8 @@ export function StepServiceSelect({
           perUnitQty={perUnitQty}
           onSetQty={setPerUnitQty}
           saleStatus={saleStatus}
+          vehicleSizeClass={vehicleSizeClass}
+          vehicleSpecialtyTier={vehicleSpecialtyTier}
         />
 
         {/* Add-ons */}
@@ -498,46 +521,13 @@ export function StepServiceSelect({
   // --- Render ---
   return (
     <div>
-      {/* Vehicle Category Link + Sheet */}
-      {vehicleCategories.length > 1 && onCategoryChange && (
-        <div className="mb-6">
-          {selectedCategoryKey !== 'automobile' ? (
-            <p className="text-sm text-site-text-muted">
-              Vehicle type:{' '}
-              <span className="font-medium text-site-text">
-                {vehicleCategories.find((vc) => vc.key === selectedCategoryKey)?.display_name ?? selectedCategoryKey}
-              </span>
-              {' '}
-              <button
-                type="button"
-                onClick={() => setShowVehicleSheet(true)}
-                className="text-accent-brand hover:text-accent-brand-hover font-medium"
-              >
-                Change
-              </button>
-            </p>
-          ) : (
-            <p className="text-sm text-site-text-muted">
-              Detailing a motorcycle, RV, boat, or aircraft?{' '}
-              <button
-                type="button"
-                onClick={() => setShowVehicleSheet(true)}
-                className="text-accent-brand hover:text-accent-brand-hover font-medium"
-              >
-                Change vehicle type
-              </button>
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Two-column layout */}
       <div className="lg:grid lg:grid-cols-[1fr_400px] lg:gap-8">
         {/* Left column: Service list */}
         <div>
-          <h2 className="text-xl font-semibold text-site-text">Choose Your Detail</h2>
+          <h2 className="text-xl font-semibold text-site-text">Select Your Service</h2>
           <p className="mt-1 text-sm text-site-text-secondary">
-            Select a service and customize your options.
+            Choose a service and customize your options.
           </p>
 
           {categories.length === 0 ? (
@@ -570,6 +560,8 @@ export function StepServiceSelect({
                           categoryName={cat.category.name}
                           isSelected={service.id === pendingServiceId}
                           onClick={() => handleCardClick(service)}
+                          vehicleSizeClass={vehicleSizeClass}
+                          vehicleSpecialtyTier={vehicleSpecialtyTier}
                         />
                         {/* Mobile accordion: configure panel inline below selected card */}
                         {pendingServiceId === service.id && (
@@ -635,108 +627,7 @@ export function StepServiceSelect({
         </div>
       )}
 
-      {/* Vehicle category bottom sheet */}
-      {showVehicleSheet && (
-        <VehicleCategorySheet
-          vehicleCategories={vehicleCategories}
-          selectedKey={selectedCategoryKey}
-          onSelect={(key) => {
-            onCategoryChange?.(key);
-            setShowVehicleSheet(false);
-          }}
-          onClose={() => setShowVehicleSheet(false)}
-        />
-      )}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// VehicleCategorySheet — bottom sheet on mobile, centered dialog on desktop
-// ---------------------------------------------------------------------------
-
-function VehicleCategorySheet({
-  vehicleCategories,
-  selectedKey,
-  onSelect,
-  onClose,
-}: {
-  vehicleCategories: VehicleCategoryRecord[];
-  selectedKey: string;
-  onSelect: (key: string) => void;
-  onClose: () => void;
-}) {
-  // Handle Escape key
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  // Prevent body scroll when open
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/50"
-        onClick={onClose}
-        aria-hidden
-      />
-      {/* Sheet — bottom on mobile, centered on desktop */}
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-brand-surface p-6 shadow-lg lg:inset-auto lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-2xl lg:max-w-md lg:w-full">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-site-text">Vehicle Type</h3>
-          <button type="button" onClick={onClose} className="text-site-text-muted hover:text-site-text">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {vehicleCategories.map((vc) => {
-            const isActive = selectedKey === vc.key;
-            const FallbackIcon = CATEGORY_FALLBACK_ICONS[vc.key] ?? Car;
-
-            return (
-              <button
-                key={vc.id}
-                type="button"
-                onClick={() => onSelect(vc.key)}
-                className={cn(
-                  'flex flex-col items-center gap-2 rounded-lg border p-4 transition-all',
-                  isActive
-                    ? 'border-accent-brand bg-accent-brand/10 ring-1 ring-accent-brand'
-                    : 'border-site-border hover:border-accent-ui/50'
-                )}
-              >
-                {vc.image_url ? (
-                  <img
-                    src={vc.image_url}
-                    alt={vc.image_alt || vc.display_name}
-                    className="h-12 w-12 rounded-lg object-cover"
-                  />
-                ) : (
-                  <FallbackIcon className={cn('h-8 w-8', isActive ? 'text-accent-brand' : 'text-site-text-muted')} />
-                )}
-                <span className={cn('text-sm font-medium', isActive ? 'text-accent-brand' : 'text-site-text')}>
-                  {vc.display_name}
-                </span>
-                {isActive && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-brand text-site-text-on-primary">
-                    <Check className="h-3 w-3" strokeWidth={3} />
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -749,13 +640,17 @@ function ServiceCard({
   categoryName,
   isSelected,
   onClick,
+  vehicleSizeClass,
+  vehicleSpecialtyTier,
 }: {
   service: BookableService;
   categoryName: string;
   isSelected: boolean;
   onClick: () => void;
+  vehicleSizeClass?: VehicleSizeClass | null;
+  vehicleSpecialtyTier?: string | null;
 }) {
-  const { priceLabel, originalPrice, isOnSale } = getServicePriceDisplay(service);
+  const { priceLabel, originalPrice, isOnSale } = getServicePriceDisplay(service, vehicleSizeClass, vehicleSpecialtyTier);
 
   return (
     <button
@@ -886,6 +781,8 @@ function PricingSelector({
   perUnitQty,
   onSetQty,
   saleStatus,
+  vehicleSizeClass,
+  vehicleSpecialtyTier,
 }: {
   service: BookableService;
   tiers: ServicePricing[];
@@ -896,7 +793,14 @@ function PricingSelector({
   perUnitQty: number;
   onSetQty: (q: number) => void;
   saleStatus: SaleStatusInfo;
+  vehicleSizeClass?: VehicleSizeClass | null;
+  vehicleSpecialtyTier?: string | null;
 }) {
+  // When vehicle size is known from Step 1, hide the size picker entirely
+  const hideSizePicker = !!vehicleSizeClass;
+  // When specialty tier is known from Step 1, hide the tier picker
+  const hideSpecialtyPicker = !!vehicleSpecialtyTier;
+
   switch (service.pricing_model) {
     case 'flat': {
       const flatSaleStatus = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
@@ -919,7 +823,30 @@ function PricingSelector({
       );
     }
 
-    case 'vehicle_size':
+    case 'vehicle_size': {
+      // When vehicle size is known from Step 1, show the price directly (no picker)
+      if (hideSizePicker) {
+        const matchedTier = tiers.find((t) => t.tier_name === vehicleSizeClass);
+        if (matchedTier) {
+          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
+          const label = matchedTier.tier_label ?? VEHICLE_SIZE_LABELS[matchedTier.tier_name] ?? matchedTier.tier_name;
+          return (
+            <div className="rounded-lg border border-site-border p-4">
+              <p className="text-sm text-site-text-secondary">{label}</p>
+              {saleInfo?.isDiscounted ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-site-text-muted line-through">{formatCurrency(saleInfo.originalPrice)}</p>
+                  <p className="text-2xl font-bold text-accent-brand">{formatCurrency(saleInfo.currentPrice)}</p>
+                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-red-600 dark:bg-red-900/30 dark:text-red-400">Sale</span>
+                </div>
+              ) : (
+                <p className="text-2xl font-bold text-site-text">{formatCurrency(saleInfo?.currentPrice ?? matchedTier.price)}</p>
+              )}
+            </div>
+          );
+        }
+      }
+
       return (
         <div>
           <h3 className="text-sm font-semibold text-accent-brand">
@@ -975,6 +902,7 @@ function PricingSelector({
           </div>
         </div>
       );
+    }
 
     case 'scope':
       return (
@@ -999,8 +927,8 @@ function PricingSelector({
             </div>
           </div>
 
-          {/* Nested vehicle size for vehicle-size-aware scope tiers */}
-          {selectedTier && (() => {
+          {/* Nested vehicle size for vehicle-size-aware scope tiers — hidden when size known from Step 1 */}
+          {selectedTier && !hideSizePicker && (() => {
             const current = tiers.find((t) => t.tier_name === selectedTier);
             if (!current?.is_vehicle_size_aware) return null;
             return (
@@ -1048,7 +976,29 @@ function PricingSelector({
         </div>
       );
 
-    case 'specialty':
+    case 'specialty': {
+      // When specialty tier is known from Step 1, show matching tier price directly
+      if (hideSpecialtyPicker) {
+        const matchedTier = tiers.find((t) => t.tier_name === vehicleSpecialtyTier);
+        if (matchedTier) {
+          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
+          return (
+            <div className="rounded-lg border border-site-border p-4">
+              <p className="text-sm text-site-text-secondary">{matchedTier.tier_label ?? matchedTier.tier_name}</p>
+              {saleInfo?.isDiscounted ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-site-text-muted line-through">{formatCurrency(saleInfo.originalPrice)}</p>
+                  <p className="text-2xl font-bold text-accent-brand">{formatCurrency(saleInfo.currentPrice)}</p>
+                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-red-600 dark:bg-red-900/30 dark:text-red-400">Sale</span>
+                </div>
+              ) : (
+                <p className="text-2xl font-bold text-site-text">{formatCurrency(saleInfo?.currentPrice ?? matchedTier.price)}</p>
+              )}
+            </div>
+          );
+        }
+      }
+
       return (
         <div>
           <h3 className="text-sm font-semibold text-site-text-secondary">
@@ -1070,6 +1020,7 @@ function PricingSelector({
           </div>
         </div>
       );
+    }
 
     case 'per_unit': {
       const puSaleStatus = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
@@ -1279,7 +1230,11 @@ function getAddonMinPrice(
 // Price display helpers (for service cards)
 // ---------------------------------------------------------------------------
 
-function getServicePriceDisplay(service: BookableService): {
+function getServicePriceDisplay(
+  service: BookableService,
+  vehicleSizeClass?: VehicleSizeClass | null,
+  vehicleSpecialtyTier?: string | null
+): {
   priceLabel: string | null;
   originalPrice: string | null;
   isOnSale: boolean;
@@ -1298,9 +1253,43 @@ function getServicePriceDisplay(service: BookableService): {
       return { priceLabel: formatCurrency(service.flat_price), originalPrice: null, isOnSale: false };
     }
 
-    case 'vehicle_size':
-    case 'scope':
-    case 'specialty': {
+    case 'vehicle_size': {
+      const tiers = service.service_pricing;
+      if (tiers.length === 0) return { priceLabel: null, originalPrice: null, isOnSale: false };
+
+      // When vehicle size is known, show exact price for that tier
+      if (vehicleSizeClass) {
+        const matchedTier = tiers.find((t) => t.tier_name === vehicleSizeClass);
+        if (matchedTier) {
+          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
+          if (saleInfo?.isDiscounted) {
+            return { priceLabel: formatCurrency(saleInfo.currentPrice), originalPrice: formatCurrency(saleInfo.originalPrice), isOnSale: true };
+          }
+          return { priceLabel: formatCurrency(saleInfo?.currentPrice ?? matchedTier.price), originalPrice: null, isOnSale: false };
+        }
+      }
+
+      // Fallback: "From $X" (no vehicle size known)
+      let minCurrent = Infinity;
+      let minOriginal = Infinity;
+      let hasDiscount = false;
+      for (const tier of tiers) {
+        const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+        if (saleInfo) {
+          if (saleInfo.currentPrice < minCurrent) minCurrent = saleInfo.currentPrice;
+          if (saleInfo.originalPrice < minOriginal) minOriginal = saleInfo.originalPrice;
+          if (saleInfo.isDiscounted) hasDiscount = true;
+        }
+      }
+      if (minCurrent === Infinity) return { priceLabel: null, originalPrice: null, isOnSale: false };
+      return {
+        priceLabel: `From ${formatCurrency(minCurrent)}`,
+        originalPrice: hasDiscount && minOriginal !== minCurrent ? `From ${formatCurrency(minOriginal)}` : null,
+        isOnSale: hasDiscount,
+      };
+    }
+
+    case 'scope': {
       const tiers = service.service_pricing;
       if (tiers.length === 0) return { priceLabel: null, originalPrice: null, isOnSale: false };
 
@@ -1309,7 +1298,15 @@ function getServicePriceDisplay(service: BookableService): {
       let hasDiscount = false;
 
       for (const tier of tiers) {
-        if (tier.is_vehicle_size_aware) {
+        // For vehicle-size-aware scope tiers, use the specific size price
+        if (tier.is_vehicle_size_aware && vehicleSizeClass) {
+          const sizePrice = getVehicleSizePrice(tier, vehicleSizeClass);
+          if (sizePrice != null && sizePrice < minCurrent) {
+            minCurrent = sizePrice;
+            minOriginal = sizePrice;
+          }
+        } else if (tier.is_vehicle_size_aware) {
+          // No size known — use sedan as minimum
           const sedanPrice = tier.vehicle_size_sedan_price;
           if (sedanPrice != null) {
             if (sedanPrice < minCurrent) minCurrent = sedanPrice;
@@ -1326,7 +1323,43 @@ function getServicePriceDisplay(service: BookableService): {
       }
 
       if (minCurrent === Infinity) return { priceLabel: null, originalPrice: null, isOnSale: false };
+      const prefix = vehicleSizeClass ? '' : 'From ';
+      return {
+        priceLabel: `${prefix}${formatCurrency(minCurrent)}`,
+        originalPrice: hasDiscount && minOriginal !== minCurrent ? `${prefix}${formatCurrency(minOriginal)}` : null,
+        isOnSale: hasDiscount,
+      };
+    }
 
+    case 'specialty': {
+      const tiers = service.service_pricing;
+      if (tiers.length === 0) return { priceLabel: null, originalPrice: null, isOnSale: false };
+
+      // When specialty tier is known, show exact price
+      if (vehicleSpecialtyTier) {
+        const matchedTier = tiers.find((t) => t.tier_name === vehicleSpecialtyTier);
+        if (matchedTier) {
+          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
+          if (saleInfo?.isDiscounted) {
+            return { priceLabel: formatCurrency(saleInfo.currentPrice), originalPrice: formatCurrency(saleInfo.originalPrice), isOnSale: true };
+          }
+          return { priceLabel: formatCurrency(saleInfo?.currentPrice ?? matchedTier.price), originalPrice: null, isOnSale: false };
+        }
+      }
+
+      // Fallback: "From $X"
+      let minCurrent = Infinity;
+      let minOriginal = Infinity;
+      let hasDiscount = false;
+      for (const tier of tiers) {
+        const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+        if (saleInfo) {
+          if (saleInfo.currentPrice < minCurrent) minCurrent = saleInfo.currentPrice;
+          if (saleInfo.originalPrice < minOriginal) minOriginal = saleInfo.originalPrice;
+          if (saleInfo.isDiscounted) hasDiscount = true;
+        }
+      }
+      if (minCurrent === Infinity) return { priceLabel: null, originalPrice: null, isOnSale: false };
       return {
         priceLabel: `From ${formatCurrency(minCurrent)}`,
         originalPrice: hasDiscount && minOriginal !== minCurrent ? `From ${formatCurrency(minOriginal)}` : null,

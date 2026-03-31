@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: booking flow refactor 16B — service step vehicle integration + schedule enhancement (Session 16B) — 2026-03-31
+
+- **Service card prices now vehicle-specific:** When vehicle size/specialty tier known from Step 1, cards show exact price (e.g., "$210") instead of "From $X". Sale pricing preserved with strikethrough + "Sale" badge.
+- **Size picker hidden when size known:** Vehicle_size pricing model hides the 3-column Sedan/Truck/SUV grid when size_class comes from Step 1. Shows price directly. Picker still appears for guests with category-only (no make/model).
+- **Specialty tier picker hidden when tier known:** Same pattern for motorcycle/RV/boat/aircraft tiers.
+- **Scope tier nested size picker hidden:** Vehicle-size-aware scope tiers (e.g., Hot Shampoo) also hide the nested size picker when size is known.
+- **Vehicle category selector removed from Step 2:** "Change vehicle type" link and VehicleCategorySheet bottom sheet removed — category changes require going back to Step 1.
+- **Heading updated:** "Choose Your Detail" → "Select Your Service"
+- **Schedule: duration display** in order summary sidebar: "Duration: ~3h 30m"
+- **Schedule: estimated completion time** below time slots: "Estimated completion: 1:30 PM"
+- **Schedule: vehicle description** in order summary: "2016 Silver Honda Accord"
+- **Back navigation price sync:** useEffect syncs sizeClass and specialty tier when vehicle changes in Step 1 after service was already configured
+- Removed `onCategoryChange` prop and `VehicleCategorySheet` component from step-service-select.tsx
+
+---
+
 ## feat: booking flow refactor 16A — new vehicle step + 4-step wizard restructure (Session 16A) — 2026-03-31
 
 - **New Step 1 — Vehicle** (`src/components/booking/step-vehicle.tsx`):
