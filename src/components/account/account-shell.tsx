@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
+import { EmailOnboardingBanner } from '@/components/account/email-onboarding-banner';
 import { AlertTriangle, Phone } from 'lucide-react';
 
 const ACCOUNT_TABS = [
@@ -130,6 +131,9 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+
+      {/* Email onboarding prompt for phone-only customers — hidden on profile page */}
+      {pathname !== '/account/profile' && <EmailOnboardingBanner />}
 
       {children}
     </div>

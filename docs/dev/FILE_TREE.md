@@ -288,6 +288,7 @@ src/app/api/customer/appointments/[id]/route.ts
 src/app/api/customer/check-exists/route.ts
 src/app/api/customer/coupons/route.ts
 src/app/api/customer/link-account/route.ts
+src/app/api/customer/dismiss-email-prompt/route.ts
 src/app/api/customer/link-by-phone/route.ts
 src/app/api/customer/loyalty/route.ts
 src/app/api/customer/profile/route.ts
@@ -1099,6 +1100,7 @@ src/components/public/cart/quantity-selector.tsx
 ### Account Components
 ```
 src/components/account/account-shell.tsx
+src/components/account/email-onboarding-banner.tsx
 src/components/account/appointment-card.tsx
 src/components/account/appointment-edit-dialog.tsx
 src/components/account/coupon-card.tsx
@@ -1384,6 +1386,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260330000001_system_sms_logging.sql
 20260330000002_quote_items_sale_columns.sql
 20260330000003_vehicles_unique_constraint.sql
+20260331000001_email_prompt_dismissed.sql
 ```
 
 ---

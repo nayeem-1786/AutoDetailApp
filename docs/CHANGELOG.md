@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: email onboarding banner for phone-only customers on dashboard (Session 15B) — 2026-03-31
+
+- New `EmailOnboardingBanner` component in `src/components/account/email-onboarding-banner.tsx`
+- Shows on all customer dashboard pages (except profile) when: email is null AND `email_prompt_dismissed_at` is null
+- "Add Email" navigates to `/account/profile` where the email field is now editable (Session 15A)
+- "Maybe Later" or X dismisses permanently via `POST /api/customer/dismiss-email-prompt`
+- Optimistic UI: banner hides immediately, then `refreshCustomer()` reloads data in background
+- Disappears naturally once customer adds an email (no more null email → condition fails)
+- New migration `20260331000001`: adds `email_prompt_dismissed_at TIMESTAMPTZ` to customers table
+- Added `email_prompt_dismissed_at: string | null` to `Customer` TypeScript interface
+
+---
+
 ## feat: booking email optional + profile email editable for phone-only accounts (Session 15A) — 2026-03-31
 
 - `bookingCustomerSchema.email` changed from `z.string().email()` (required) to `emailSchema` (optional, allows empty)

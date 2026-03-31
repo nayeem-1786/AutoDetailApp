@@ -53,6 +53,7 @@
 | visit_count | INTEGER | NOT NULL, DEFAULT 0 | Incremented on each completed transaction |
 | lifetime_spend | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Running total of transaction amounts |
 | loyalty_points_balance | INTEGER | NOT NULL, DEFAULT 0 | Current loyalty points (denormalized from loyalty_ledger) |
+| email_prompt_dismissed_at | TIMESTAMPTZ | DEFAULT NULL | When phone-only customer dismissed "add email" banner. Added via `20260331000001` |
 | qbo_id | TEXT | | QuickBooks Online ID |
 | qbo_synced_at | TIMESTAMPTZ | | |
 | deleted_at | TIMESTAMPTZ | DEFAULT NULL | Soft delete. NULL = active. Set = archived |
