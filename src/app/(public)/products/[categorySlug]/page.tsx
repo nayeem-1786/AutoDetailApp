@@ -15,6 +15,7 @@ import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 export const revalidate = 300;
+export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ categorySlug: string }>;

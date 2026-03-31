@@ -19,6 +19,7 @@ import { AdZone } from '@/components/public/cms/ad-zone';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 export const revalidate = 300;
+export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ categorySlug: string }>;

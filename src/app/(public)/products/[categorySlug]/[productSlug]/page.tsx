@@ -20,6 +20,7 @@ import { getCmsToggles } from '@/lib/data/cms';
 import { ProductAddToCart } from '@/components/public/cart/product-add-to-cart';
 
 export const revalidate = 300;
+export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ categorySlug: string; productSlug: string }>;

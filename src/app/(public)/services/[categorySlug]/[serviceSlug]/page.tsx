@@ -24,6 +24,7 @@ import { AdZone } from '@/components/public/cms/ad-zone';
 import { getCmsToggles } from '@/lib/data/cms';
 
 export const revalidate = 300;
+export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ categorySlug: string; serviceSlug: string }>;

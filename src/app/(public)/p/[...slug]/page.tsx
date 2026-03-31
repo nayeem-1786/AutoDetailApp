@@ -7,6 +7,7 @@ import { ContentBlocks } from '@/components/public/content-block-renderer';
 import { SITE_URL } from '@/lib/utils/constants';
 
 export const revalidate = 300;
+export const dynamicParams = true;
 
 // ---------------------------------------------------------------------------
 // /p/[...slug] — Custom page catch-all route

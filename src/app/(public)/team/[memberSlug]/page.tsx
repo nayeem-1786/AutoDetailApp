@@ -8,6 +8,7 @@ import { getActiveTeamMembers, getTeamMemberBySlug } from '@/lib/data/team-membe
 import { SITE_URL } from '@/lib/utils/constants';
 
 export const revalidate = 300;
+export const dynamicParams = true;
 
 // ---------------------------------------------------------------------------
 // /team/[memberSlug] — Team member detail page
