@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 function noStoreJson(data: unknown, init?: ResponseInit) {
-  return noStoreJson(data, {
+  return Response.json(data, {
     ...init,
     headers: { ...init?.headers, 'Cache-Control': 'no-store' },
   });
