@@ -11,7 +11,10 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - Now queries ALL matching rows from `vehicle_makes` and disambiguates by model keywords
 - New `MOTORCYCLE_MODEL_KEYWORDS` (65 entries): Harley-Davidson, Honda, BMW, Yamaha, Suzuki, Kawasaki, Ducati, Indian, Triumph models
 - New `BOAT_MODEL_KEYWORDS` (14 entries): Yamaha WaveRunner, jet ski, watercraft models
-- New `disambiguateCategory()` function: checks model against keyword hints for motorcycle → boat → automobile (existing MODEL_SIZE_HINTS) → defaults to automobile
+- New `RV_MODEL_KEYWORDS` (38 entries): Class A/B/C models, travel trailers, Airstream, generic RV terms
+- New `AIRCRAFT_MODEL_KEYWORDS` (28 entries): Cessna, Piper, Beechcraft, Cirrus, HondaJet, Gulfstream, generic terms
+- New `disambiguateCategory()` function: checks model against keyword hints for motorcycle → boat → rv → aircraft → automobile (existing MODEL_SIZE_HINTS) → defaults to automobile
+- Note: RV/aircraft keywords only activate when the make exists in that category in `vehicle_makes` — Ford "Transit Motorhome" won't resolve as RV because Ford is automobile-only in the DB. Add Ford/Mercedes to RV category in `vehicle_makes` if needed.
 - Unambiguous makes (Harley-Davidson, Toyota, Winnebago, Cessna, etc.) behavior unchanged — single-row query, no disambiguation needed
 - Null model with dual-category make defaults to automobile with warning log (most common case)
 

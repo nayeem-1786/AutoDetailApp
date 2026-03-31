@@ -185,6 +185,42 @@ const BOAT_MODEL_KEYWORDS = [
   'boat', 'watercraft', 'pwc',
 ];
 
+const RV_MODEL_KEYWORDS = [
+  // Class A
+  'allegro', 'allegro bus', 'phaeton', 'ventana', 'discovery', 'palazzo', 'dutch star',
+  'mountain aire', 'king aire', 'essex', 'zephyr', 'anthem',
+  // Class B
+  'revel', 'solis', 'boldt', 'paseo', 'interstate', 'era', 'beyond',
+  'travato', 'tofino', 'ekko',
+  // Class C
+  'minnie winnie', 'spirit', 'forester', 'leprechaun', 'four winds', 'chateau',
+  'sunseeker', 'prism', 'vita', 'navion',
+  // Travel trailers
+  'airstream', 'bambi', 'basecamp', 'caravel', 'flying cloud', 'globetrotter',
+  // Sprinter/Transit based
+  'sprinter rv', 'transit rv',
+  // Generic RV terms
+  'motorhome', 'motor home', 'camper', 'rv', 'class a', 'class b', 'class c',
+  'fifth wheel', 'toy hauler', 'travel trailer',
+];
+
+const AIRCRAFT_MODEL_KEYWORDS = [
+  // Cessna
+  'skyhawk', 'skylane', 'citation', 'caravan', 'stationair', 'turbo stationair',
+  // Piper
+  'cherokee', 'archer', 'warrior', 'seneca', 'navajo', 'malibu', 'meridian', 'seminole',
+  // Beechcraft
+  'bonanza', 'baron', 'king air', 'kingair',
+  // Cirrus
+  'sr20', 'sr22', 'vision jet', 'sf50',
+  // Honda
+  'hondajet', 'ha-420',
+  // Gulfstream
+  'g280', 'g500', 'g600', 'g650', 'g700', 'g800',
+  // Generic aircraft terms
+  'aircraft', 'airplane', 'plane', 'jet', 'turboprop', 'helicopter', 'chopper', 'heli',
+];
+
 /**
  * Disambiguate vehicle category when a make exists in multiple categories.
  * Checks model against keyword hints for each possible category.
@@ -208,10 +244,24 @@ function disambiguateCategory(
     }
   }
 
-  // Check boat models (for Yamaha)
+  // Check boat models
   if (categories.includes('boat')) {
     if (BOAT_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
       return 'boat';
+    }
+  }
+
+  // Check RV models
+  if (categories.includes('rv')) {
+    if (RV_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
+      return 'rv';
+    }
+  }
+
+  // Check aircraft models
+  if (categories.includes('aircraft')) {
+    if (AIRCRAFT_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
+      return 'aircraft';
     }
   }
 
