@@ -20,7 +20,6 @@ import { getCmsToggles } from '@/lib/data/cms';
 import { ProductAddToCart } from '@/components/public/cart/product-add-to-cart';
 
 export const revalidate = 300;
-export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ categorySlug: string; productSlug: string }>;
@@ -45,7 +44,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  return []; // ISR: generate on first request, not at build time
+  const products = await getAllProductsForSitemap();
+  return products.map((prod) => ({
+    categorySlug: prod.categorySlug,
+    productSlug: prod.productSlug,
+  }));
 }
 
 export default async function ProductDetailPage({ params }: PageProps) {

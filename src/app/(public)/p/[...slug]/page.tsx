@@ -7,7 +7,6 @@ import { ContentBlocks } from '@/components/public/content-block-renderer';
 import { SITE_URL } from '@/lib/utils/constants';
 
 export const revalidate = 300;
-export const dynamicParams = true;
 
 // ---------------------------------------------------------------------------
 // /p/[...slug] — Custom page catch-all route
@@ -19,7 +18,10 @@ type PageProps = {
 };
 
 export async function generateStaticParams() {
-  return []; // ISR: generate on first request, not at build time
+  const pages = await getPublishedPages();
+  return pages.map((page) => ({
+    slug: page.slug.split('/'),
+  }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

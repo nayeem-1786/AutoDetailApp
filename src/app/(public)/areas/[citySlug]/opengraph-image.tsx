@@ -6,10 +6,12 @@ import { getReviewData } from '@/lib/data/reviews';
 export const alt = 'Mobile Auto Detailing Service Area';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  return []; // ISR: generate on first request, not at build time
+  const cities = await getActiveCities();
+  return cities.map((city) => ({
+    citySlug: city.slug,
+  }));
 }
 
 export default async function CityOGImage({

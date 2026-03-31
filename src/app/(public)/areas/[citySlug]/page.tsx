@@ -16,7 +16,6 @@ import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { ServiceCategoryCard } from '@/components/public/service-category-card';
 
 export const revalidate = 300;
-export const dynamicParams = true;
 import { ContentBlocks } from '@/components/public/content-block-renderer';
 import { CtaSection } from '@/components/public/cta-section';
 import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
@@ -57,7 +56,8 @@ function parseServiceHighlights(raw: unknown): ServiceHighlight[] {
 // ---------------------------------------------------------------------------
 
 export async function generateStaticParams() {
-  return []; // ISR: generate on first request, not at build time
+  const cities = await getActiveCities();
+  return cities.map((city) => ({ citySlug: city.slug }));
 }
 
 // ---------------------------------------------------------------------------

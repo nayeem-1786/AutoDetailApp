@@ -15,7 +15,6 @@ import { SectionTickerSlot } from '@/components/public/cms/section-ticker-slot';
 import AnimatedSection, { AnimatedItem } from '@/components/public/animated-section';
 
 export const revalidate = 300;
-export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ categorySlug: string }>;
@@ -40,7 +39,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  return []; // ISR: generate on first request, not at build time
+  const categories = await getProductCategories();
+  return categories.map((cat) => ({
+    categorySlug: cat.slug,
+  }));
 }
 
 export default async function ProductCategoryPage({ params }: PageProps) {

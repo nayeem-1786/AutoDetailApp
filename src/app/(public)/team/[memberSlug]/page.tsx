@@ -8,7 +8,6 @@ import { getActiveTeamMembers, getTeamMemberBySlug } from '@/lib/data/team-membe
 import { SITE_URL } from '@/lib/utils/constants';
 
 export const revalidate = 300;
-export const dynamicParams = true;
 
 // ---------------------------------------------------------------------------
 // /team/[memberSlug] — Team member detail page
@@ -35,7 +34,8 @@ function stripHtml(html: string): string {
 // ---------------------------------------------------------------------------
 
 export async function generateStaticParams() {
-  return []; // ISR: generate on first request, not at build time
+  const members = await getActiveTeamMembers();
+  return members.map((m) => ({ memberSlug: m.slug }));
 }
 
 // ---------------------------------------------------------------------------

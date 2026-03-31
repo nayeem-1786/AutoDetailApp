@@ -24,7 +24,6 @@ import { AdZone } from '@/components/public/cms/ad-zone';
 import { getCmsToggles } from '@/lib/data/cms';
 
 export const revalidate = 300;
-export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ categorySlug: string; serviceSlug: string }>;
@@ -49,7 +48,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  return []; // ISR: generate on first request, not at build time
+  const services = await getAllServicesForSitemap();
+  return services.map((svc) => ({
+    categorySlug: svc.categorySlug,
+    serviceSlug: svc.serviceSlug,
+  }));
 }
 
 export default async function ServiceDetailPage({ params }: PageProps) {
