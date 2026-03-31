@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: model-aware vehicle classification for dual-category makes (Session 15E) — 2026-03-31
+
+- Fixed `resolveVehicleClassification()` — was using `.order('category', asc).limit(1)` which always picked alphabetically-first category for dual-category makes
+- Honda CBR600 was classified as automobile (a < m), BMW R1250GS as automobile, Yamaha YZF-R1 as boat (b < m)
+- Now queries ALL matching rows from `vehicle_makes` and disambiguates by model keywords
+- New `MOTORCYCLE_MODEL_KEYWORDS` (65 entries): Harley-Davidson, Honda, BMW, Yamaha, Suzuki, Kawasaki, Ducati, Indian, Triumph models
+- New `BOAT_MODEL_KEYWORDS` (14 entries): Yamaha WaveRunner, jet ski, watercraft models
+- New `disambiguateCategory()` function: checks model against keyword hints for motorcycle → boat → automobile (existing MODEL_SIZE_HINTS) → defaults to automobile
+- Unambiguous makes (Harley-Davidson, Toyota, Winnebago, Cessna, etc.) behavior unchanged — single-row query, no disambiguation needed
+- Null model with dual-category make defaults to automobile with warning log (most common case)
+
+---
+
 ## feat: email onboarding banner for phone-only customers on dashboard (Session 15B) — 2026-03-31
 
 - New `EmailOnboardingBanner` component in `src/components/account/email-onboarding-banner.tsx`

@@ -140,6 +140,93 @@ const MODEL_SIZE_HINTS: Record<string, string[]> = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Non-automobile model keyword hints — used to disambiguate dual-category
+// makes like Honda (automobile + motorcycle), BMW, Yamaha, etc.
+// Case-insensitive substring match against the model string.
+// ---------------------------------------------------------------------------
+
+const MOTORCYCLE_MODEL_KEYWORDS = [
+  // Harley-Davidson
+  'sportster', 'softail', 'road king', 'road glide', 'street glide', 'fat boy', 'fat bob',
+  'iron', 'nightster', 'breakout', 'heritage', 'electra glide', 'ultra limited', 'low rider',
+  'night rod',
+  // Honda motorcycle
+  'cbr', 'crf', 'cb500', 'cb650', 'cb300', 'africa twin', 'gold wing', 'goldwing',
+  'rebel', 'grom', 'monkey', 'trail',
+  // BMW motorcycle
+  'r1250', 'r1200', 'f850', 'f750', 'f900', 'g310', 'c400', 's1000', 'r nine', 'rninet',
+  'k1600', 'ce 04',
+  // Yamaha motorcycle
+  'yzf', 'mt-', 'mt0', 'mt1', 'tenere', 'r1', 'r6', 'r7', 'r3', 'fz', 'xsr',
+  'bolt', 'v-star', 'vstar', 'drag star',
+  // Suzuki motorcycle
+  'gsx', 'gsxr', 'gsx-r', 'v-strom', 'vstrom', 'hayabusa', 'katana', 'boulevard',
+  'burgman', 'dr-z', 'drz',
+  // Kawasaki motorcycle
+  'ninja', 'zx-', 'zx6', 'zx10', 'zx14', 'z900', 'z650', 'z400', 'versys',
+  'klr', 'klx', 'vulcan', 'concours', 'eliminator',
+  // Ducati
+  'panigale', 'monster', 'scrambler', 'multistrada', 'diavel', 'streetfighter',
+  'hypermotard', 'desert x',
+  // Indian
+  'scout', 'chieftain', 'pursuit', 'springfield', 'roadmaster',
+  // Triumph
+  'street triple', 'speed triple', 'tiger', 'bonneville', 'thruxton', 'rocket',
+  'trident',
+  // Generic motorcycle terms
+  'motorcycle', 'bike', 'motorbike',
+];
+
+const BOAT_MODEL_KEYWORDS = [
+  'waverunner', 'wave runner', 'jet ski', 'jetski', 'fx', 'vx',
+  'ar195', 'ar210', 'ar250', 'sx195', 'sx210', 'sx250',
+  '190 fsh', '195s', '210 fsh', '212',
+  'boat', 'watercraft', 'pwc',
+];
+
+/**
+ * Disambiguate vehicle category when a make exists in multiple categories.
+ * Checks model against keyword hints for each possible category.
+ * Falls back to automobile if model is unknown (most common case).
+ */
+function disambiguateCategory(
+  categories: string[],
+  model: string | null | undefined
+): VehicleCategory {
+  if (!model) {
+    console.warn('[VehicleClassify] Dual-category make with no model — defaulting to automobile');
+    return 'automobile';
+  }
+
+  const modelLower = model.toLowerCase();
+
+  // Check motorcycle models
+  if (categories.includes('motorcycle')) {
+    if (MOTORCYCLE_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
+      return 'motorcycle';
+    }
+  }
+
+  // Check boat models (for Yamaha)
+  if (categories.includes('boat')) {
+    if (BOAT_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
+      return 'boat';
+    }
+  }
+
+  // Check automobile models (existing MODEL_SIZE_HINTS)
+  if (categories.includes('automobile')) {
+    const allAutoModels = Object.values(MODEL_SIZE_HINTS).flat();
+    if (allAutoModels.some((hint) => modelLower.includes(hint.toLowerCase()))) {
+      return 'automobile';
+    }
+  }
+
+  // No model match — default to automobile
+  return 'automobile';
+}
+
 // Default specialty tier per category — smallest/most common, correctable by staff
 const DEFAULT_SPECIALTY_TIERS: Record<Exclude<VehicleCategory, 'automobile'>, string> = {
   motorcycle: 'standard_cruiser',
@@ -183,17 +270,24 @@ export async function resolveVehicleClassification(
   if (make) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
+      const { data: makeRows } = await (supabase as any)
         .from('vehicle_makes')
         .select('category')
         .ilike('name', make.trim())
-        .eq('is_active', true)
-        .order('category', { ascending: true }) // 'automobile' sorts first
-        .limit(1)
-        .maybeSingle();
+        .eq('is_active', true);
 
-      if (data?.category && VEHICLE_CATEGORIES.includes(data.category as VehicleCategory)) {
-        category = data.category as VehicleCategory;
+      const validRows = (makeRows || []).filter(
+        (r: { category: string }) => VEHICLE_CATEGORIES.includes(r.category as VehicleCategory)
+      );
+
+      if (validRows.length === 1) {
+        // Unambiguous: single category for this make
+        category = validRows[0].category as VehicleCategory;
+      } else if (validRows.length > 1) {
+        // Dual-category make (e.g., Honda = automobile + motorcycle)
+        // Disambiguate using model keywords
+        const categories = validRows.map((r: { category: string }) => r.category);
+        category = disambiguateCategory(categories, model);
       }
     } catch {
       // DB unavailable — default to automobile
