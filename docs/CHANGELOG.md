@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: voice poll extracts services + customer data from ElevenLabs (Session 14J) — 2026-03-31
+
+- Polling cron now passes `customerName`, `vehicleMake`, `vehicleModel`, `vehicleYear`, `vehicleColor` to `processVoiceCallEnd()` — extracted from `dynamic_variables.customer_name` and `customer_summary` VEHICLES section
+- **Option D service extraction:** When `data_collection_results.services_discussed` is empty (Option C), falls back to matching service names from `analysis.transcript_summary` against active services in the DB
+- Service matching is case-insensitive, sorted by name length descending to prevent substring false positives
+- Abandoned calls (caller hung up before `finalize_call`) now produce auto-quotes when services were discussed
+- Previously: polling cron passed only `phone`, `transcriptSummary`, `durationSeconds` — now passes 9 fields
+
+---
+
 ## fix: customer purge FK order — delete jobs before quotes (Session 14G) — 2026-03-30
 
 - Fixed 2 FK constraint errors in Admin > Settings > Data Management purge
