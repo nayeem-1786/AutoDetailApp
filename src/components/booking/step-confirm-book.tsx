@@ -501,7 +501,7 @@ export function StepConfirmBook({
           {isAuthenticated && customerData && !customerData.customer.email && (
             <div className="rounded-lg border border-site-border bg-brand-dark p-4">
               <label htmlFor="optional-email" className="block text-sm font-medium text-site-text">
-                Email <span className="font-normal text-site-text-muted">(optional)</span>
+                Email
               </label>
               <Input
                 id="optional-email"

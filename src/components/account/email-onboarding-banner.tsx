@@ -7,33 +7,22 @@ import { Mail, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /**
- * One-time dismissable banner encouraging phone-only customers to add their email.
- * Shows when: customer.email is null/empty AND email_prompt_dismissed_at is null.
- * Dismisses permanently on "Maybe Later" click.
+ * Session-dismissable banner encouraging phone-only customers to add their email.
+ * Shows every visit when customer.email is null/empty.
+ * "Maybe Later" hides for the current session only — reappears on next login/page load.
  * Disappears naturally once the customer adds an email.
  */
 export function EmailOnboardingBanner() {
-  const { customer, refreshCustomer } = useCustomerAuth();
+  const { customer } = useCustomerAuth();
   const router = useRouter();
   const [dismissed, setDismissed] = useState(false);
 
-  // Don't render if: no customer, has email, already dismissed, or locally dismissed
   if (!customer) return null;
   if (customer.email) return null;
-  if (customer.email_prompt_dismissed_at) return null;
   if (dismissed) return null;
 
-  async function handleDismiss() {
-    // Optimistic: hide immediately
+  function handleDismiss() {
     setDismissed(true);
-
-    try {
-      await fetch('/api/customer/dismiss-email-prompt', { method: 'POST' });
-      // Refresh in background so stale data doesn't bring it back on navigation
-      refreshCustomer();
-    } catch {
-      // Dismissal is best-effort — banner stays hidden via local state
-    }
   }
 
   function handleAddEmail() {
