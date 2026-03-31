@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: customer purge FK order — delete jobs before quotes (Session 14G) — 2026-03-30
+
+- Fixed 2 FK constraint errors in Admin > Settings > Data Management purge
+- Error 1: `jobs.quote_id` (default RESTRICT) blocked quote deletion — jobs must be deleted first
+- Error 2: `quotes.customer_id` (RESTRICT) blocked customer deletion — cascading consequence of Error 1
+- Added explicit job deletion (with cascade to `job_photos`, `job_addons`) before quote deletion in purge route
+- Pre-capture `jobIds` alongside other transitive lookups
+
+---
+
 ## fix: vehicle dedup — shared findOrCreateVehicle + early voice_call_log + DB constraint (Session 14G) — 2026-03-30
 
 - New shared `findOrCreateVehicle()` in `src/lib/utils/vehicle-helpers.ts` — single dedup function for all non-user vehicle creation paths

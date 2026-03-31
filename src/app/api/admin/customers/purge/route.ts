@@ -86,6 +86,12 @@ export async function POST(request: NextRequest) {
       .in('customer_id', customerIds);
     const appointmentIds = appointmentRows?.map((r) => r.id) || [];
 
+    const { data: jobRows } = await supabase
+      .from('jobs')
+      .select('id')
+      .in('customer_id', customerIds);
+    const jobIds = jobRows?.map((r) => r.id) || [];
+
     const { data: quoteRows } = await supabase
       .from('quotes')
       .select('id')
@@ -138,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     console.log(
       `[Purge] Starting purge for ${customerIds.length} customer(s) by ${employee.first_name} ${employee.last_name}` +
-      ` | appointments: ${appointmentIds.length}, quotes: ${quoteIds.length}` +
+      ` | appointments: ${appointmentIds.length}, jobs: ${jobIds.length}, quotes: ${quoteIds.length}` +
       `, transactions: ${transactionIds.length}, orders: ${orderIds.length}` +
       `, conversations: ${conversationIds.length}`
     );
@@ -176,6 +182,14 @@ export async function POST(request: NextRequest) {
       );
       await safeDelete('appointments', () =>
         supabase.from('appointments').delete({ count: 'exact' }).in('id', appointmentIds)
+      );
+    }
+
+    // Jobs reference quotes via quote_id (default RESTRICT) — must delete before quotes.
+    // job_photos and job_addons cascade from jobs automatically.
+    if (jobIds.length > 0) {
+      await safeDelete('jobs', () =>
+        supabase.from('jobs').delete({ count: 'exact' }).in('id', jobIds)
       );
     }
 
@@ -255,10 +269,10 @@ export async function POST(request: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // Step 6 — Customer records (CASCADE handles: vehicles, jobs, job_photos,
-    // job_addons, loyalty_ledger, customer_payment_methods,
-    // marketing_consent_log, sms_consent_log, campaign_recipients,
-    // drip_enrollments, drip_send_log)
+    // Step 6 — Customer records (CASCADE handles: vehicles, loyalty_ledger,
+    // customer_payment_methods, marketing_consent_log, sms_consent_log,
+    // campaign_recipients, drip_enrollments, drip_send_log)
+    // Note: jobs deleted explicitly in Step 2 (before quotes) due to jobs.quote_id RESTRICT FK
     // -----------------------------------------------------------------------
 
     await safeDelete('customers', () =>
