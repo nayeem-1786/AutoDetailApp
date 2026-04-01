@@ -61,7 +61,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, AlertTriangle, Car, Award, Clock, Receipt, Loader2, Check, CalendarDays, DollarSign, ShoppingCart, FileText, TrendingUp, ShieldCheck, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { CustomerTypeBadge } from '@/app/pos/components/customer-type-badge';
 import { adminFetch } from '@/lib/utils/admin-fetch';
@@ -1181,7 +1181,22 @@ export default function CustomerProfilePage() {
                     )}
                   </FormField>
 
-                  <FormField label="Email" error={errors.email?.message} htmlFor="email">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="email" className="text-sm font-medium text-ui-text">Email</label>
+                      {customer && watchEmail && customer.email_verified_at && watchEmail.toLowerCase() === (customer.email || '').toLowerCase() && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+                          <ShieldCheck className="h-3 w-3" />
+                          Verified
+                        </span>
+                      )}
+                      {customer && watchEmail && (!customer.email_verified_at || watchEmail.toLowerCase() !== (customer.email || '').toLowerCase()) && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-400">
+                          <ShieldAlert className="h-3 w-3" />
+                          Unverified
+                        </span>
+                      )}
+                    </div>
                     <Input
                       id="email"
                       type="email"
@@ -1197,7 +1212,10 @@ export default function CustomerProfilePage() {
                         Email already belongs to {emailDup.name}
                       </p>
                     )}
-                  </FormField>
+                    {errors.email?.message && (
+                      <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
+                    )}
+                  </div>
 
                   {/* Row 2: Address Line 1 | Address Line 2 | City | State + Zip */}
                   <FormField label="Address Line 1" error={errors.address_line_1?.message} htmlFor="address_line_1">

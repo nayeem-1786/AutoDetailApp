@@ -197,6 +197,7 @@ All core build phases complete. App is in active daily use with ongoing refineme
 | Conversation summaries | Every 6 hours | `/api/cron/conversation-summaries` |
 | Voice calls poll | Every 5 min | `/api/cron/voice-calls-poll` |
 | Audit log cleanup | Daily 3:30 AM PST | `/api/cron/cleanup-audit-log` |
+| Verification code cleanup | Daily 4 AM PST | `/api/cron/cleanup-verification-codes` |
 
 ## Production Env Vars (Required)
 

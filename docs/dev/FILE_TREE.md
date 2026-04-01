@@ -270,6 +270,7 @@ src/app/api/checkout/validate-address/route.ts
 src/app/api/cron/cleanup-audit-log/route.ts
 src/app/api/cron/cleanup-idempotency/route.ts
 src/app/api/cron/cleanup-orders/route.ts
+src/app/api/cron/cleanup-verification-codes/route.ts
 src/app/api/cron/conversation-summaries/route.ts
 src/app/api/cron/google-reviews/route.ts
 src/app/api/cron/lifecycle-engine/route.ts
@@ -289,6 +290,9 @@ src/app/api/customer/check-exists/route.ts
 src/app/api/customer/coupons/route.ts
 src/app/api/customer/link-account/route.ts
 src/app/api/customer/dismiss-email-prompt/route.ts
+src/app/api/customer/email/route.ts
+src/app/api/customer/email/send-code/route.ts
+src/app/api/customer/email/verify-code/route.ts
 src/app/api/customer/link-by-phone/route.ts
 src/app/api/customer/loyalty/route.ts
 src/app/api/customer/profile/route.ts
@@ -1388,6 +1392,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260330000002_quote_items_sale_columns.sql
 20260330000003_vehicles_unique_constraint.sql
 20260331000001_email_prompt_dismissed.sql
+20260331000002_email_verification_system.sql
 ```
 
 ---

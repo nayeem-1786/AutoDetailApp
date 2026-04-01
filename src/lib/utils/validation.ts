@@ -396,16 +396,24 @@ export const customerSignupSchema = z.object({
 });
 
 // Customer profile update schema (portal profile edit)
+// NOTE: email is NOT in this schema — email changes go through /api/customer/email/send-code + verify-code
 export const customerProfileSchema = z.object({
   first_name: requiredString,
   last_name: requiredString,
   phone: z.string().regex(bookingPhoneRegex, 'Enter valid mobile number'),
-  email: emailSchema,
   sms_consent: z.boolean(),
   email_consent: z.boolean(),
   notify_promotions: z.boolean(),
   notify_loyalty: z.boolean(),
 });
+
+// Email verification code schema (customer portal email verification)
+export const emailVerifyCodeSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+
+export type EmailVerifyCodeInput = z.infer<typeof emailVerifyCodeSchema>;
 
 // Appointment update schema (admin edit)
 // Time regex accepts HH:MM or HH:MM:SS (database may return with seconds)

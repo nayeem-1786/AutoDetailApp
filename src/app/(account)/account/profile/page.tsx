@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
@@ -15,12 +15,31 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
-import { Info, Lock } from 'lucide-react';
+import { Info, ShieldCheck, Mail } from 'lucide-react';
+
+type EmailState = 'none' | 'verified' | 'editing' | 'otp';
 
 export default function AccountProfilePage() {
   const router = useRouter();
-  const { customer } = useCustomerAuth();
+  const { customer, user, refreshCustomer } = useCustomerAuth();
   const [saving, setSaving] = useState(false);
+
+  // Auth provider detection
+  const providers = user?.app_metadata?.providers as string[] | undefined;
+  const isEmailAuthUser =
+    user?.app_metadata?.provider === 'email' ||
+    (Array.isArray(providers) && providers.includes('email'));
+
+  // Email verification state
+  const [emailState, setEmailState] = useState<EmailState>('none');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [removingEmail, setRemovingEmail] = useState(false);
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
   // Confirmation dialog states
   const [confirmSmsOff, setConfirmSmsOff] = useState(false);
@@ -28,6 +47,7 @@ export default function AccountProfilePage() {
   const [confirmPromotionsOff, setConfirmPromotionsOff] = useState(false);
   const [confirmLoyaltyOff, setConfirmLoyaltyOff] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [confirmRemoveEmail, setConfirmRemoveEmail] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   const {
@@ -43,7 +63,6 @@ export default function AccountProfilePage() {
           first_name: customer.first_name,
           last_name: customer.last_name,
           phone: customer.phone ? formatPhone(customer.phone) : '',
-          email: customer.email ?? '',
           sms_consent: customer.sms_consent,
           email_consent: customer.email_consent,
           notify_promotions: customer.notify_promotions ?? true,
@@ -52,12 +71,168 @@ export default function AccountProfilePage() {
       : undefined,
   });
 
-  const hasExistingEmail = !!(customer?.email);
-
   const smsConsent = watch('sms_consent');
   const emailConsent = watch('email_consent');
   const notifyPromotions = watch('notify_promotions');
   const notifyLoyalty = watch('notify_loyalty');
+
+  // Initialize email state from customer data
+  useEffect(() => {
+    if (!customer) return;
+    if (customer.email && customer.email_verified_at) {
+      setEmailState('verified');
+    } else if (customer.email && !customer.email_verified_at) {
+      // Unverified email — show as editable
+      setEmailState('none');
+      setEmailInput(customer.email);
+    } else {
+      setEmailState('none');
+    }
+  }, [customer]);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  // OTP auto-focus with triple-rAF + 300ms fallback (matches inline-auth.tsx pattern)
+  useEffect(() => {
+    if (emailState === 'otp') {
+      const tryFocus = () => otpInputRef.current?.focus();
+      requestAnimationFrame(() => {
+        tryFocus();
+        requestAnimationFrame(() => {
+          tryFocus();
+        });
+      });
+      const timer = setTimeout(tryFocus, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [emailState]);
+
+  const sendVerificationCode = useCallback(async (emailToVerify: string) => {
+    setEmailLoading(true);
+    setEmailError('');
+
+    try {
+      const res = await fetch('/api/customer/email/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToVerify }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setEmailError(data.error || 'Failed to send verification code');
+        setEmailLoading(false);
+        return false;
+      }
+
+      setPendingEmail(emailToVerify);
+      setOtpCode('');
+      setResendCooldown(60);
+      setEmailState('otp');
+      setEmailLoading(false);
+      return true;
+    } catch {
+      setEmailError('Something went wrong. Please try again.');
+      setEmailLoading(false);
+      return false;
+    }
+  }, []);
+
+  const handleAddEmail = async () => {
+    const trimmed = emailInput.trim();
+    if (!trimmed || !trimmed.includes('@')) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    await sendVerificationCode(trimmed);
+  };
+
+  const handleVerifyCode = async () => {
+    if (otpCode.length !== 6) {
+      setEmailError('Enter the 6-digit code');
+      return;
+    }
+
+    setEmailLoading(true);
+    setEmailError('');
+
+    try {
+      const res = await fetch('/api/customer/email/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail, code: otpCode }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setEmailError(data.error || 'Verification failed');
+        setEmailLoading(false);
+        return;
+      }
+
+      toast.success('Email verified');
+      await refreshCustomer();
+      setEmailState('verified');
+      setOtpCode('');
+      setEmailError('');
+    } catch {
+      setEmailError('Something went wrong. Please try again.');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    await sendVerificationCode(pendingEmail);
+  };
+
+  const handleRemoveEmail = async () => {
+    setRemovingEmail(true);
+    try {
+      const res = await fetch('/api/customer/email', { method: 'DELETE' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to remove email');
+        return;
+      }
+
+      toast.success('Email removed');
+      await refreshCustomer();
+      setEmailState('none');
+      setEmailInput('');
+    } catch {
+      toast.error('Failed to remove email');
+    } finally {
+      setRemovingEmail(false);
+      setConfirmRemoveEmail(false);
+    }
+  };
+
+  const handleChangeEmail = () => {
+    setEmailInput('');
+    setEmailError('');
+    setOtpCode('');
+    setEmailState('editing');
+  };
+
+  const handleCancelOtp = () => {
+    setOtpCode('');
+    setEmailError('');
+    if (customer?.email && customer?.email_verified_at) {
+      setEmailState('verified');
+    } else {
+      setEmailState('none');
+    }
+  };
 
   if (!customer) return null;
 
@@ -149,6 +324,141 @@ export default function AccountProfilePage() {
     }
   };
 
+  // Render email section based on state
+  const renderEmailSection = () => {
+    // State C: OTP verification
+    if (emailState === 'otp') {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-site-text">
+            Enter the 6-digit code sent to <strong className="text-accent-brand">{pendingEmail}</strong>
+          </p>
+          <Input
+            ref={otpInputRef}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="000000"
+            value={otpCode}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+              setOtpCode(val);
+              setEmailError('');
+            }}
+            className="text-center text-lg tracking-[0.3em] text-base sm:text-sm max-w-[200px]"
+          />
+          {emailError && (
+            <p className="text-sm text-red-400">{emailError}</p>
+          )}
+          <div className="flex items-center gap-4">
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleVerifyCode}
+              disabled={emailLoading || otpCode.length !== 6}
+            >
+              {emailLoading ? 'Verifying...' : 'Verify'}
+            </Button>
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={resendCooldown > 0}
+              className="text-sm text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
+            >
+              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelOtp}
+              className="text-sm text-site-text-muted hover:text-site-text"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // State B: Verified email on file
+    if (emailState === 'verified' && customer.email) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-site-text">{customer.email}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-400">
+              <ShieldCheck className="h-3 w-3" />
+              Verified
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleChangeEmail}
+              className="text-sm text-accent-brand hover:text-accent-brand-hover"
+            >
+              Change Email
+            </button>
+            {!isEmailAuthUser && (
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveEmail(true)}
+                disabled={removingEmail}
+                className="text-sm text-site-text-muted hover:text-red-400"
+              >
+                Remove Email
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // State A: No email / editing
+    return (
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Input
+            type="email"
+            autoComplete="email"
+            placeholder="Enter your email address"
+            className="text-base sm:text-sm flex-1"
+            value={emailInput}
+            onChange={(e) => {
+              setEmailInput(e.target.value);
+              setEmailError('');
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleAddEmail}
+            disabled={emailLoading || !emailInput.trim()}
+          >
+            {emailLoading ? 'Sending...' : emailState === 'editing' ? 'Verify' : 'Add Email'}
+          </Button>
+        </div>
+        {emailError && (
+          <p className="text-sm text-red-400">{emailError}</p>
+        )}
+        {emailState === 'editing' && (
+          <button
+            type="button"
+            onClick={handleCancelOtp}
+            className="text-sm text-site-text-muted hover:text-site-text"
+          >
+            Cancel
+          </button>
+        )}
+        <p className="text-xs text-site-text-dim">
+          {emailState === 'editing'
+            ? 'Enter your new email address. We\'ll send a verification code.'
+            : 'Add an email for booking confirmations and receipts'}
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-site-text">Profile</h1>
@@ -176,33 +486,14 @@ export default function AccountProfilePage() {
               </FormField>
             </div>
 
-            <FormField label="Email" htmlFor="email" error={errors.email?.message}>
-              {hasExistingEmail ? (
-                <>
-                  <div className="relative">
-                    <Input id="email" value={customer.email ?? ''} disabled className="bg-brand-dark pr-10" />
-                    <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-site-text-muted" />
-                  </div>
-                  <p className="mt-1 text-xs text-site-text-dim">
-                    Your email is used to sign in and cannot be changed here. Contact us if you need to update it.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="Enter your email address"
-                    className="text-base sm:text-sm"
-                    {...register('email')}
-                  />
-                  <p className="mt-1 text-xs text-site-text-dim">
-                    Add an email for booking confirmations and receipts
-                  </p>
-                </>
-              )}
-            </FormField>
+            {/* Email section — separate from main form, uses verification flow */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-site-text flex items-center gap-1.5">
+                <Mail className="h-4 w-4 text-site-text-muted" />
+                Email
+              </label>
+              {renderEmailSection()}
+            </div>
 
             <FormField
               label="Mobile"
@@ -449,6 +740,17 @@ export default function AccountProfilePage() {
         variant="destructive"
         loading={signingOut}
         onConfirm={handleSignOutAllDevices}
+      />
+
+      <ConfirmDialog
+        open={confirmRemoveEmail}
+        onOpenChange={setConfirmRemoveEmail}
+        title="Remove Email?"
+        description="You'll stop receiving email receipts, booking confirmations, and other email communications. You can add a new email anytime."
+        confirmLabel="Remove"
+        variant="destructive"
+        loading={removingEmail}
+        onConfirm={handleRemoveEmail}
       />
     </div>
   );

@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: email verification system + email consent auto-toggle (Session 17A) — 2026-03-31
+
+- **Email verification via 6-digit code:** Customers must verify email before it's saved. Code sent via Mailgun, 15-minute expiry, max 5 attempts, 60-second resend cooldown.
+- **Email always editable:** Removed permanent email lock. Both phone-auth and email-auth customers can change their email with re-verification. Phone-auth users can also remove their email entirely.
+- **Auth provider detection fix:** Replaced `!!(customer?.email)` heuristic with actual Supabase `app_metadata.provider` check to distinguish phone-auth from email-auth users.
+- **email_consent auto-default:** Verification auto-sets `email_consent = true` as a sensible default. Customers can still manually toggle it off (remains a manual override, not locked).
+- **Admin verification badge:** Admin customer edit shows green "Verified" or yellow "Unverified" badge next to email field. Admin-entered emails are trusted (auto-verified).
+- **Email onboarding banner update:** Now shows "Verify your email" for unverified emails, "Add your email" for no email, hidden when verified.
+- **New DB table:** `email_verification_codes` with customer_id, email, code, expires_at, attempts, verified_at. RLS enabled (service-role only).
+- **New column:** `customers.email_verified_at` — backfilled for all existing emails.
+- **New API routes:** `POST /api/customer/email/send-code`, `POST /api/customer/email/verify-code`, `DELETE /api/customer/email`
+- **New cron:** `cleanup-verification-codes` — daily 4 AM PST, deletes records older than 24h.
+- **Profile API cleanup:** Removed old email-setting logic from profile PATCH. Added `email_verified_at` to profile GET select.
+- **Admin API:** Sets `email_verified_at = now()` when admin changes email, clears it when email removed. Added to audit diff tracking.
+- **Consent logging:** DELETE email route logs `email_consent` opt-out to `marketing_consent_log` for compliance.
+
+---
+
 ## feat: booking flow refactor 16C — confirm step + API + SMS + polish (Session 16C) — 2026-03-31
 
 - **buildVehicle() now includes vehicle ID:** Saved vehicles pass `id` to booking API, skipping findOrCreateVehicle

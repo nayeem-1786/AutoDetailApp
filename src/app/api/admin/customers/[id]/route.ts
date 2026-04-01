@@ -101,11 +101,30 @@ export async function PATCH(
         ? null
         : existing.customer_type;
 
+    // Determine email_verified_at based on email change
+    const existingEmail = (existing.email || '').toLowerCase().trim();
+    const emailChanged = normalizedEmail !== existingEmail;
+    let resolvedEmailVerifiedAt = existing.email_verified_at;
+    let resolvedEmailConsentForPayload = email_consent ?? existing.email_consent;
+
+    if (emailChanged) {
+      if (normalizedEmail) {
+        // Admin set/changed email — trusted, mark as verified
+        resolvedEmailVerifiedAt = new Date().toISOString();
+        resolvedEmailConsentForPayload = true;
+      } else {
+        // Admin cleared email
+        resolvedEmailVerifiedAt = null;
+        resolvedEmailConsentForPayload = false;
+      }
+    }
+
     const updatePayload = {
       first_name: first_name ?? existing.first_name,
       last_name: last_name ?? existing.last_name,
       phone: normalizedPhone,
       email: normalizedEmail || null,
+      email_verified_at: resolvedEmailVerifiedAt,
       birthday: birthday !== undefined ? (birthday || null) : existing.birthday,
       address_line_1: address_line_1 !== undefined ? (address_line_1 || null) : existing.address_line_1,
       address_line_2: address_line_2 !== undefined ? (address_line_2 || null) : existing.address_line_2,
@@ -115,7 +134,7 @@ export async function PATCH(
       notes: notes !== undefined ? (notes || null) : existing.notes,
       tags: tags !== undefined ? (tags || []) : existing.tags,
       sms_consent: sms_consent ?? existing.sms_consent,
-      email_consent: email_consent ?? existing.email_consent,
+      email_consent: resolvedEmailConsentForPayload,
       customer_type: resolvedType,
     };
 
@@ -131,7 +150,7 @@ export async function PATCH(
 
     // Log consent changes
     const resolvedSmsConsent = sms_consent ?? existing.sms_consent;
-    const resolvedEmailConsent = email_consent ?? existing.email_consent;
+    const resolvedEmailConsent = resolvedEmailConsentForPayload;
 
     if (resolvedSmsConsent !== existing.sms_consent) {
       await supabase.from('marketing_consent_log').insert({
@@ -166,7 +185,7 @@ export async function PATCH(
     const changes = buildChangeDetails(
       existing as Record<string, unknown>,
       updatePayload as Record<string, unknown>,
-      ['first_name', 'last_name', 'phone', 'email', 'customer_type', 'sms_consent', 'email_consent']
+      ['first_name', 'last_name', 'phone', 'email', 'email_verified_at', 'customer_type', 'sms_consent', 'email_consent']
     );
 
     logAudit({

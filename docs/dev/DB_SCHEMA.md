@@ -53,6 +53,7 @@
 | visit_count | INTEGER | NOT NULL, DEFAULT 0 | Incremented on each completed transaction |
 | lifetime_spend | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Running total of transaction amounts |
 | loyalty_points_balance | INTEGER | NOT NULL, DEFAULT 0 | Current loyalty points (denormalized from loyalty_ledger) |
+| email_verified_at | TIMESTAMPTZ | DEFAULT NULL | When email was last verified. Set on verification or admin edit. Backfilled for existing emails via `20260331000002` |
 | email_prompt_dismissed_at | TIMESTAMPTZ | DEFAULT NULL | When phone-only customer dismissed "add email" banner. Added via `20260331000001` |
 | qbo_id | TEXT | | QuickBooks Online ID |
 | qbo_synced_at | TIMESTAMPTZ | | |
@@ -968,6 +969,22 @@ idx_refund_items_refund — btree (refund_id)
 | entity_type | TEXT | NOT NULL | |
 | entity_id | UUID | | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+### email_verification_codes
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE CASCADE | |
+| email | TEXT | NOT NULL | Lowercase, trimmed |
+| code | TEXT | NOT NULL | 6-digit numeric string |
+| expires_at | TIMESTAMPTZ | NOT NULL | 15 minutes from creation |
+| attempts | INTEGER | NOT NULL, DEFAULT 0 | Failed attempt counter, max 5 |
+| verified_at | TIMESTAMPTZ | DEFAULT NULL | Set when code verified successfully |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:** `idx_email_verification_codes_customer_email` on (customer_id, email), `idx_email_verification_codes_expires_at` on (expires_at)
+
+**RLS:** Enabled, service-role only. Added via `20260331000002`.
 
 ### idempotency_keys
 | Column | Type | Constraints | Notes |
