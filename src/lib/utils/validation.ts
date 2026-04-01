@@ -289,6 +289,7 @@ export const bookingCustomerSchema = z.object({
 });
 
 export const bookingVehicleSchema = z.object({
+  id: z.string().uuid().optional().nullable(),
   vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft'], {
     error: 'Please select a vehicle category',
   }).default('automobile'),

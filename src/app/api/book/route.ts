@@ -208,7 +208,11 @@ export async function POST(request: NextRequest) {
 
     // 5. Find existing or create vehicle linked to customer — shared dedup
     let vehicleId: string | null = null;
-    if (data.vehicle && data.vehicle.make) {
+    if (data.vehicle?.id) {
+      // Existing vehicle selected from Step 1 — use directly
+      vehicleId = data.vehicle.id;
+    } else if (data.vehicle && data.vehicle.make) {
+      // New vehicle entered — find or create
       const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
       const vehicleResult = await findOrCreateVehicle(supabase, {
         customerId,
@@ -425,8 +429,21 @@ export async function POST(request: NextRequest) {
         ...data.addons.map((a) => a.name),
       ];
       const serviceNames = allServices.join(', ');
-      const vehicleParts = [data.vehicle?.year, data.vehicle?.make, data.vehicle?.model].filter(Boolean);
-      const vehicleStr = vehicleParts.length > 0 ? vehicleParts.join(' ') : '';
+      // Build vehicle description for SMS/email — use form data first, query DB if only ID
+      let vehicleStr = '';
+      const vehicleFormParts = [data.vehicle?.year, data.vehicle?.make, data.vehicle?.model].filter(Boolean);
+      if (vehicleFormParts.length > 0) {
+        vehicleStr = vehicleFormParts.join(' ');
+      } else if (vehicleId) {
+        const { data: vehRecord } = await supabase
+          .from('vehicles')
+          .select('year, make, model, color')
+          .eq('id', vehicleId)
+          .single();
+        if (vehRecord) {
+          vehicleStr = [vehRecord.year, vehRecord.color, vehRecord.make, vehRecord.model].filter(Boolean).join(' ');
+        }
+      }
       const customerName = `${data.customer.first_name} ${data.customer.last_name}`.trim();
       const total = formatCurrency(Number(appointment.total_amount));
 

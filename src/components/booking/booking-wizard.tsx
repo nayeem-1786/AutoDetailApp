@@ -560,6 +560,9 @@ export function BookingWizard({
         grandTotal={confirmation.grandTotal}
         customerEmail={confirmation.customerEmail}
         isPortal={isPortal}
+        vehicleDescription={state.vehicleData
+          ? [state.vehicleData.year, state.vehicleData.color, state.vehicleData.make, state.vehicleData.model].filter(Boolean).join(' ') || null
+          : null}
       />
     );
   }
@@ -1084,6 +1087,7 @@ export function BookingWizard({
             onPaymentOptionChange={handlePaymentOptionChange}
             onConfirm={handleConfirmBook}
             onBack={() => goToStep(3)}
+            onEditStep={(targetStep) => { setEditEntryStep(targetStep); goToStep(targetStep); }}
             autoApplyCouponOnMount={!!couponCode && !urlCouponAttempted}
             onCouponAutoApplyAttempted={() => setUrlCouponAttempted(true)}
             vehicleCategory={state.selectedCategory}

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CheckCircle, CalendarDays, Clock, MapPin } from 'lucide-react';
+import { CheckCircle, CalendarDays, Clock, MapPin, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils/format';
 import Link from 'next/link';
@@ -25,6 +25,7 @@ interface BookingConfirmationProps {
   grandTotal?: number;
   customerEmail?: string | null;
   isPortal?: boolean;
+  vehicleDescription?: string | null;
 }
 
 function getPaymentFootnote(
@@ -66,6 +67,7 @@ export function BookingConfirmation({
   grandTotal,
   customerEmail,
   isPortal,
+  vehicleDescription,
 }: BookingConfirmationProps) {
   const footnote = getPaymentFootnote(paymentOption, amountCharged, grandTotal, appointment.total);
 
@@ -122,6 +124,16 @@ export function BookingConfirmation({
         <h3 className="text-lg font-semibold text-site-text">{serviceName}</h3>
 
         <dl className="mt-4 space-y-3">
+          {vehicleDescription && (
+            <div className="flex items-center gap-3">
+              <Car className="h-5 w-5 text-site-text-muted" />
+              <div>
+                <dt className="sr-only">Vehicle</dt>
+                <dd className="text-sm text-site-text">{vehicleDescription}</dd>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <CalendarDays className="h-5 w-5 text-site-text-muted" />
             <div>

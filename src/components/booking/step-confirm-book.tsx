@@ -24,6 +24,8 @@ import {
   CalendarDays,
   Clock,
   Truck,
+  Car,
+  Pencil,
 } from 'lucide-react';
 
 // --- Types ---
@@ -86,6 +88,7 @@ export interface StepConfirmBookProps {
   // Actions
   onConfirm: (customer: BookingCustomerInput, vehicle: BookingVehicleInput, paymentIntentId?: string) => void | Promise<void>;
   onBack: () => void;
+  onEditStep?: (step: number) => void;
   // Auto-apply URL coupon
   autoApplyCouponOnMount?: boolean;
   onCouponAutoApplyAttempted?: () => void;
@@ -130,6 +133,7 @@ export function StepConfirmBook({
   onPaymentOptionChange,
   onConfirm,
   onBack,
+  onEditStep,
   autoApplyCouponOnMount,
   onCouponAutoApplyAttempted,
   vehicleCategory,
@@ -310,6 +314,7 @@ export function StepConfirmBook({
     // Use vehicleData from Step 1 if available
     if (vehicleData) {
       return {
+        id: vehicleData.id ?? null,
         vehicle_category: vehicleData.vehicle_category as 'automobile' | 'motorcycle' | 'rv' | 'boat' | 'aircraft',
         vehicle_type: vehicleData.vehicle_type as 'standard' | 'motorcycle' | 'rv' | 'boat' | 'aircraft',
         size_class: (vehicleData.size_class as BookingVehicleInput['size_class']) ?? null,
@@ -415,13 +420,37 @@ export function StepConfirmBook({
   };
 
   // --- Order Summary renderer ---
+  const vehicleDescription = vehicleData
+    ? [vehicleData.year, vehicleData.color, vehicleData.make, vehicleData.model].filter(Boolean).join(' ')
+    : null;
+
   const renderOrderSummary = () => (
     <div className="space-y-2 text-sm">
-      {/* Appointment info */}
+      {/* Vehicle + Appointment info */}
       <div className="space-y-1.5 pb-3 border-b border-site-border">
-        <div className="flex items-center gap-2 text-site-text">
-          <CalendarDays className="h-4 w-4 text-site-text-muted" />
-          {formatDate(date + 'T12:00:00')}
+        {vehicleDescription && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-site-text">
+              <Car className="h-4 w-4 text-site-text-muted" />
+              {vehicleDescription}
+            </div>
+            {onEditStep && (
+              <button type="button" onClick={() => onEditStep(1)} className="text-site-text-muted hover:text-accent-brand transition-colors" aria-label="Edit vehicle">
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-site-text">
+            <CalendarDays className="h-4 w-4 text-site-text-muted" />
+            {formatDate(date + 'T12:00:00')}
+          </div>
+          {onEditStep && (
+            <button type="button" onClick={() => onEditStep(3)} className="text-site-text-muted hover:text-accent-brand transition-colors" aria-label="Edit date">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2 text-site-text">
           <Clock className="h-4 w-4 text-site-text-muted" />
@@ -442,7 +471,14 @@ export function StepConfirmBook({
 
       {/* Price lines */}
       <div className="flex justify-between">
-        <span className="text-site-text-secondary">{serviceName}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-site-text-secondary">{serviceName}</span>
+          {onEditStep && (
+            <button type="button" onClick={() => onEditStep(2)} className="text-site-text-muted hover:text-accent-brand transition-colors" aria-label="Edit service">
+              <Pencil className="h-3 w-3" />
+            </button>
+          )}
+        </div>
         <span className="font-medium text-site-text">{formatCurrency(price)}</span>
       </div>
       {addons.map((addon) => (

@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: booking flow refactor 16C — confirm step + API + SMS + polish (Session 16C) — 2026-03-31
+
+- **buildVehicle() now includes vehicle ID:** Saved vehicles pass `id` to booking API, skipping findOrCreateVehicle
+- **SMS fix:** Confirmation SMS shows "2016 Silver Honda Accord" instead of "your vehicle" — queries DB when vehicle came from ID selection
+- **Vehicle in order review:** Confirm step shows vehicle description with Car icon in the order summary
+- **Edit links from Step 4:** Pencil icons on Vehicle (→ Step 1), Service (→ Step 2), and Date/Time (→ Step 3) sections. Uses editEntryStep pattern to return to Step 4 after changes.
+- **Booking API:** Accepts `vehicle.id` in bookingVehicleSchema. When provided, uses ID directly instead of findOrCreateVehicle.
+- **Confirmation page:** Shows vehicle description with Car icon above date/time
+- **Schema:** Added `id: z.string().uuid().optional().nullable()` to bookingVehicleSchema (backward-compatible)
+
+---
+
 ## feat: booking flow refactor 16B — service step vehicle integration + schedule enhancement (Session 16B) — 2026-03-31
 
 - **Service card prices now vehicle-specific:** When vehicle size/specialty tier known from Step 1, cards show exact price (e.g., "$210") instead of "From $X". Sale pricing preserved with strikethrough + "Sale" badge.
