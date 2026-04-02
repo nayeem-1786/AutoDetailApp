@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: universal send-info-sms voice agent endpoint (Session 17D) — 2026-04-02
+
+- **New endpoint:** `POST /api/voice-agent/send-info-sms` — universal mid-call tool to text callers links and info
+- **6 info types:** `store_info` (address + hours + Google Maps link), `product_link`, `category_link`, `service_page`, `booking_link`, `quote_link`
+- **Flexible identifier lookup:** Accepts slug or plain name — tries exact slug match first, falls back to case-insensitive name ILIKE
+- **All URLs shortened** via `createShortLink()` to avoid SMS truncation
+- **Business info from DB:** Uses `getBusinessInfo()` and `getBusinessHours()`/`formatBusinessHoursText()` — no hardcoded business data
+- **Google Maps link:** Prefers Place ID if `google_place_id` exists in business_settings, falls back to address search URL
+- **Quote lookup:** Finds most recent actionable quote (status=sent/viewed, not deleted) for the caller's phone number
+- **Service URLs:** Joins service_categories for the two-segment URL pattern `/services/{categorySlug}/{serviceSlug}`
+- **Conversation logging:** All SMS auto-logged via `sendSms({ logToConversation: true })`
+- **Performance logging:** `createPerfTimer()` with `[VOICE-PERF]` prefix
+- **Auth:** Bearer token via `validateApiKey()`, same as all voice agent endpoints
+
+---
+
 ## feat: voice agent products lookup endpoint (Session 17C) — 2026-04-02
 
 - New `GET /api/voice-agent/products` endpoint for voice agent product lookup
